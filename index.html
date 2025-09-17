@@ -28,298 +28,343 @@
         }
     </script>
 </head>
-<body class="font-sans antialiased">
+<body class="font-sans antialiased bg-gray-50">
+    
     <!-- Navigation -->
-    <nav class="bg-fire-700 text-white shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-6">
+    <nav class="bg-fire-700 text-white shadow-lg">
+        <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 mr-3 bg-white rounded-full flex items-center justify-center">
-                        <span class="text-fire-700 text-xl font-bold">🚒</span>
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-fire-500 rounded-full flex items-center justify-center">
+                        <span class="font-bold text-lg">FW</span>
                     </div>
-                    <h1 class="text-xl font-bold">FWV Raura Kaiseraugst</h1>
+                    <div>
+                        <h1 class="text-xl font-bold">Feuerwehrverein</h1>
+                        <p class="text-xs text-fire-200">Raura Kaiseraugst</p>
+                    </div>
                 </div>
+                
                 <div class="hidden md:flex space-x-6">
-                    <a href="#home" class="hover:text-fire-200 transition-colors">Home</a>
-                    <a href="#verein" class="hover:text-fire-200 transition-colors">Verein</a>
-                    <a href="#vorstand" class="hover:text-fire-200 transition-colors">Vorstand</a>
-                    <a href="#veranstaltungen" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
-                    <a href="#kontakt" class="hover:text-fire-200 transition-colors">Kontakt</a>
+                    <a href="#start" class="hover:text-fire-200 transition duration-200">Start</a>
+                    <a href="#verein" class="hover:text-fire-200 transition duration-200">Verein</a>
+                    <a href="#vorstand" class="hover:text-fire-200 transition duration-200">Vorstand</a>
+                    <a href="#kalender" class="hover:text-fire-200 transition duration-200">Kalender</a>
+                    <a href="#veranstaltungen" class="hover:text-fire-200 transition duration-200">Veranstaltungen</a>
+                    <a href="#galerie" class="hover:text-fire-200 transition duration-200">Galerie</a>
+                    <a href="#kontakt" class="hover:text-fire-200 transition duration-200">Kontakt</a>
                 </div>
-                <button class="md:hidden text-white">
+                
+                <button id="mobile-menu" class="md:hidden">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                     </svg>
                 </button>
             </div>
+            
+            <!-- Mobile Menu -->
+            <div id="mobile-nav" class="hidden md:hidden pb-4">
+                <a href="#start" class="block py-2 hover:text-fire-200">Start</a>
+                <a href="#verein" class="block py-2 hover:text-fire-200">Verein</a>
+                <a href="#vorstand" class="block py-2 hover:text-fire-200">Vorstand</a>
+                <a href="#kalender" class="block py-2 hover:text-fire-200">Kalender</a>
+                <a href="#veranstaltungen" class="block py-2 hover:text-fire-200">Veranstaltungen</a>
+                <a href="#galerie" class="block py-2 hover:text-fire-200">Galerie</a>
+                <a href="#kontakt" class="block py-2 hover:text-fire-200">Kontakt</a>
+            </div>
         </div>
     </nav>
 
     <!-- Hero Section -->
-    <section id="home" class="bg-gradient-to-r from-fire-600 to-fire-800 text-white py-20">
-        <div class="container mx-auto px-6 text-center">
-            <h1 class="text-4xl md:text-6xl font-bold mb-6">Feuerwehrverein Raura Kaiseraugst</h1>
-            <p class="text-xl md:text-2xl mb-8 text-fire-100">Tradition, Gemeinschaft und Engagement seit Jahren</p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="#verein" class="bg-white text-fire-700 px-8 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors">
-                    Mehr erfahren
-                </a>
-                <a href="#kontakt" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-fire-700 transition-colors">
-                    Kontakt aufnehmen
-                </a>
+    <section id="start" class="bg-gradient-to-br from-fire-600 via-fire-700 to-fire-800 text-white">
+        <div class="container mx-auto px-4 py-20">
+            <div class="text-center">
+                <div class="inline-block bg-white/10 backdrop-blur-sm rounded-full p-6 mb-8">
+                    <svg class="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M22 11c0 6.075-4.925 11-11 11S0 17.075 0 11h2c0 4.963 4.037 9 9 9s9-4.037 9-9h2zm-11 1c-3.309 0-6-2.691-6-6s2.691-6 6-6 6 2.691 6 6-2.691 6-6 6zm0-10c-2.206 0-4 1.794-4 4s1.794 4 4 4 4-1.794 4-4-1.794-4-4-4z"/>
+                    </svg>
+                </div>
+                <h1 class="text-5xl md:text-7xl font-bold mb-6">
+                    Feuerwehrverein <br>
+                    <span class="text-fire-200">Raura Kaiseraugst</span>
+                </h1>
+                <p class="text-xl md:text-2xl mb-8 text-fire-100">
+                    Tradition • Kameradschaft • Gemeinschaft
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="#verein" 
+                       class="bg-white text-fire-700 px-8 py-4 rounded-full font-semibold hover:bg-fire-50 transition duration-300 shadow-lg">
+                        Mehr über uns
+                    </a>
+                    <a href="#veranstaltungen" 
+                       class="border-2 border-white text-white px-8 py-4 rounded-full font-semibold hover:bg-white hover:text-fire-700 transition duration-300">
+                        Unsere Events
+                    </a>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Über uns Section -->
-    <section id="verein" class="py-16 bg-white">
-        <div class="container mx-auto px-6">
-            <div class="grid md:grid-cols-2 gap-12 items-center">
-                <div>
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">Über unseren Verein</h2>
-                    <p class="text-gray-600 text-lg mb-6">
-                        Der Feuerwehrverein Raura Kaiseraugst ist eine traditionsreiche Gemeinschaft, die sich der 
-                        Kameradschaft und dem gesellschaftlichen Leben in unserer Region widmet.
-                    </p>
-                    <p class="text-gray-600 text-lg mb-6">
-                        Wir organisieren regelmäßig Veranstaltungen wie unsere beliebte Chilbi, Grillplausch und 
-                        Vereinsausflüge, die das Gemeinschaftsgefühl stärken und allen Mitgliedern unvergessliche 
-                        Momente bescheren.
-                    </p>
-                    <div class="flex flex-wrap gap-4">
-                        <span class="bg-fire-100 text-fire-700 px-4 py-2 rounded-full text-sm font-medium">Tradition</span>
-                        <span class="bg-fire-100 text-fire-700 px-4 py-2 rounded-full text-sm font-medium">Gemeinschaft</span>
-                        <span class="bg-fire-100 text-fire-700 px-4 py-2 rounded-full text-sm font-medium">Engagement</span>
+    <!-- Über den Verein -->
+    <section id="verein" class="py-20 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="max-w-4xl mx-auto text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-800 mb-6">Über unseren Verein</h2>
+                <p class="text-xl text-gray-600 leading-relaxed">
+                    Der Feuerwehrverein Raura Kaiseraugst pflegt seit Jahren die Tradition der Kameradschaft 
+                    und des gesellschaftlichen Zusammenhalts in unserer Gemeinde.
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="text-center p-8 rounded-2xl bg-gradient-to-br from-fire-50 to-fire-100">
+                    <div class="w-16 h-16 bg-fire-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span class="text-2xl text-white">🎪</span>
                     </div>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Chilbi</h3>
+                    <p class="text-gray-600">
+                        Unser jährlicher Höhepunkt im Roten Schopf mit Festwirtschaft, 
+                        Musik und geselligem Beisammensein.
+                    </p>
                 </div>
-                <div class="bg-fire-50 p-8 rounded-lg">
-                    <h3 class="text-2xl font-semibold text-gray-800 mb-6">Unsere Aktivitäten</h3>
-                    <ul class="space-y-4">
-                        <li class="flex items-center">
-                            <span class="text-fire-600 text-xl mr-3">🎪</span>
-                            <span>Jährliche Chilbi im Roten Schopf</span>
-                        </li>
-                        <li class="flex items-center">
-                            <span class="text-fire-600 text-xl mr-3">🍖</span>
-                            <span>Geselliger Grillplausch</span>
-                        </li>
-                        <li class="flex items-center">
-                            <span class="text-fire-600 text-xl mr-3">🚌</span>
-                            <span>Spannende Vereinsausflüge</span>
-                        </li>
-                        <li class="flex items-center">
-                            <span class="text-fire-600 text-xl mr-3">🤝</span>
-                            <span>Regelmäßige Vereinsversammlungen</span>
-                        </li>
-                    </ul>
+                
+                <div class="text-center p-8 rounded-2xl bg-gradient-to-br from-green-50 to-green-100">
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span class="text-2xl text-white">🍖</span>
+                    </div>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Grillplausch</h3>
+                    <p class="text-gray-600">
+                        Gemütliche Grillabende in lockerer Atmosphäre für Mitglieder 
+                        und deren Familien.
+                    </p>
+                </div>
+                
+                <div class="text-center p-8 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100">
+                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <span class="text-2xl text-white">🚌</span>
+                    </div>
+                    <h3 class="text-2xl font-semibold text-gray-800 mb-4">Vereinsausflug</h3>
+                    <p class="text-gray-600">
+                        Spannende Ausflüge zu interessanten Zielen stärken 
+                        unsere Gemeinschaft.
+                    </p>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Vorstand Section -->
-    <section id="vorstand" class="py-16 bg-gray-50">
-        <div class="container mx-auto px-6">
-            <h2 class="text-3xl font-bold text-gray-800 text-center mb-12">Unser Vorstand</h2>
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-                <!-- Präsident -->
-                <div class="text-center bg-white rounded-lg shadow-md p-6 md:col-span-2 lg:col-span-1">
+    <section id="vorstand" class="py-20 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-800 mb-6">Unser Vorstand</h2>
+                <p class="text-xl text-gray-600">Die Menschen hinter unserem Verein</p>
+            </div>
+            
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="text-center bg-white rounded-lg shadow-md p-6">
                     <div class="w-28 h-28 mx-auto mb-4 rounded-full overflow-hidden shadow-lg">
                         <img src="images/präsident.png" alt="René Käslin" class="w-full h-full object-cover">
                     </div>
                     <h3 class="text-xl font-semibold text-gray-800 mb-2">René Käslin</h3>
-                    <p class="text-fire-600 font-medium text-lg mb-3">Präsident</p>
-                    <p class="text-gray-600 text-sm">Ansprechpartner für allgemeine Vereinsangelegenheiten und Veranstaltungsorganisation</p>
+                    <p class="text-fire-600 font-medium">Präsident</p>
                 </div>
-                <!-- Aktuar -->
                 <div class="text-center bg-white rounded-lg shadow-md p-6">
                     <div class="w-28 h-28 mx-auto mb-4 rounded-full overflow-hidden shadow-lg">
                         <img src="images/aktuar.png" alt="Stefan Müller" class="w-full h-full object-cover">
                     </div>
                     <h3 class="text-xl font-semibold text-gray-800 mb-2">Stefan Müller</h3>
-                    <p class="text-fire-600 font-medium text-lg mb-3">Aktuar</p>
-                    <p class="text-gray-600 text-sm">Zuständig für Protokolle, Korrespondenz und administrative Aufgaben</p>
+                    <p class="text-fire-600 font-medium">Aktuar</p>
                 </div>
-                <!-- Kassier -->
                 <div class="text-center bg-white rounded-lg shadow-md p-6">
                     <div class="w-28 h-28 mx-auto mb-4 rounded-full overflow-hidden shadow-lg">
                         <img src="images/kassier.png" alt="Giuseppe Costanza" class="w-full h-full object-cover">
                     </div>
                     <h3 class="text-xl font-semibold text-gray-800 mb-2">Giuseppe Costanza</h3>
-                    <p class="text-fire-600 font-medium text-lg mb-3">Kassier</p>
-                    <p class="text-gray-600 text-sm">Verantwortlich für die Vereinsfinanzen und Buchhaltung</p>
+                    <p class="text-fire-600 font-medium">Kassier</p>
                 </div>
-                <!-- Materialwart -->
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8 mt-8 max-w-2xl mx-auto">
                 <div class="text-center bg-white rounded-lg shadow-md p-6">
                     <div class="w-28 h-28 mx-auto mb-4 rounded-full overflow-hidden shadow-lg">
                         <img src="images/materialwart.png" alt="Edi Grossenbacher" class="w-full h-full object-cover">
                     </div>
                     <h3 class="text-xl font-semibold text-gray-800 mb-2">Edi Grossenbacher</h3>
-                    <p class="text-fire-600 font-medium text-lg mb-3">Materialwart</p>
-                    <p class="text-gray-600 text-sm">Betreuung und Wartung der Vereinsausrüstung und Materialien</p>
+                    <p class="text-fire-600 font-medium">Materialwart</p>
                 </div>
-                <!-- Beisitzer -->
                 <div class="text-center bg-white rounded-lg shadow-md p-6">
                     <div class="w-28 h-28 mx-auto mb-4 rounded-full overflow-hidden shadow-lg">
                         <img src="images/beisitzer.png" alt="Urs Michel" class="w-full h-full object-cover">
                     </div>
                     <h3 class="text-xl font-semibold text-gray-800 mb-2">Urs Michel</h3>
-                    <p class="text-fire-600 font-medium text-lg mb-3">Beisitzer</p>
-                    <p class="text-gray-600 text-sm">Unterstützung des Vorstandes bei Entscheidungen und Projekten</p>
+                    <p class="text-fire-600 font-medium">Beisitzer</p>
                 </div>
             </div>
-            <div class="text-center mt-12">
-                <p class="text-gray-600 mb-4">Haben Sie Fragen oder Anliegen?</p>
-                <a href="#kontakt" class="inline-flex items-center px-6 py-3 bg-fire-600 text-white font-medium rounded-lg hover:bg-fire-700 transition-colors">
-                    <span class="mr-2">📧</span>
-                    Kontakt aufnehmen
+        </div>
+    </section>
+
+    <!-- Veranstaltungen Vorschau -->
+    <section id="veranstaltungen" class="py-20 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-800 mb-6">Kommende Veranstaltungen</h2>
+                <p class="text-xl text-gray-600">Seien Sie dabei bei unseren Events!</p>
+            </div>
+            
+            <div id="events-container" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+                <!-- Events werden hier dynamisch geladen -->
+                <div class="col-span-full text-center text-gray-500 py-8">
+                    <div class="animate-pulse">Veranstaltungen werden geladen...</div>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <a href="veranstaltungen.html" 
+                   class="bg-fire-600 text-white px-8 py-4 rounded-full font-semibold hover:bg-fire-700 transition duration-300 shadow-lg">
+                    Alle Veranstaltungen ansehen
                 </a>
             </div>
         </div>
     </section>
 
-    <!-- Veranstaltungen Section -->
-    <section id="veranstaltungen" class="py-16 bg-white">
-        <div class="container mx-auto px-6">
-            <h2 class="text-3xl font-bold text-gray-800 text-center mb-12">Kommende Veranstaltungen</h2>
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <div class="bg-gradient-to-br from-fire-50 to-fire-100 rounded-lg p-6 border-l-4 border-fire-600">
-                    <div class="text-fire-600 text-3xl mb-4">🎪</div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Chilbi 2024</h3>
-                    <p class="text-gray-600 mb-4">Unsere traditionelle Chilbi im Roten Schopf Kaiseraugst mit Festwirtschaft, Musik und Gemeinschaft.</p>
-                    <div class="text-sm text-fire-600 font-medium">
-                        📅 Oktober 2024<br>
-                        📍 Roter Schopf Kaiseraugst
-                    </div>
-                </div>
-                <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border-l-4 border-green-600">
-                    <div class="text-green-600 text-3xl mb-4">🍖</div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Grillplausch</h3>
-                    <p class="text-gray-600 mb-4">Geselliger Grillabend für Mitglieder und Freunde des Vereins in entspannter Atmosphäre.</p>
-                    <div class="text-sm text-green-600 font-medium">
-                        📅 Sommer 2024<br>
-                        📍 Bei Edi Grossenbacher
-                    </div>
-                </div>
-                <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border-l-4 border-blue-600">
-                    <div class="text-blue-600 text-3xl mb-4">🚌</div>
-                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Vereinsausflug</h3>
-                    <p class="text-gray-600 mb-4">Unser jährlicher Vereinsausflug mit spannenden Zielen und gemeinsamen Erlebnissen.</p>
-                    <div class="text-sm text-blue-600 font-medium">
-                        📅 Herbst 2024<br>
-                        📍 Ziel wird bekannt gegeben
-                    </div>
-                </div>
+    <!-- Galerie Teaser -->
+    <section id="galerie" class="py-20 bg-gray-100">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-gray-800 mb-6">Impressionen</h2>
+                <p class="text-xl text-gray-600">Einblicke in unser Vereinsleben</p>
             </div>
-            <div class="text-center mt-12">
-                <p class="text-gray-600 mb-4">Interesse an unseren Veranstaltungen?</p>
-                <a href="#kontakt" class="inline-flex items-center px-6 py-3 bg-fire-600 text-white font-medium rounded-lg hover:bg-fire-700 transition-colors">
-                    Mehr erfahren
-                </a>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="aspect-square bg-gradient-to-br from-fire-300 to-fire-500 rounded-xl flex items-center justify-center text-white text-4xl">
+                    🎪
+                </div>
+                <div class="aspect-square bg-gradient-to-br from-green-300 to-green-500 rounded-xl flex items-center justify-center text-white text-4xl">
+                    🍖
+                </div>
+                <div class="aspect-square bg-gradient-to-br from-blue-300 to-blue-500 rounded-xl flex items-center justify-center text-white text-4xl">
+                    🚌
+                </div>
+                <div class="aspect-square bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-xl flex items-center justify-center text-white text-4xl">
+                    🤝
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Galerie Section -->
-    <section class="py-16 bg-gray-50">
-        <div class="container mx-auto px-6">
-            <h2 class="text-3xl font-bold text-gray-800 text-center mb-12">Impressionen</h2>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <div class="aspect-square bg-fire-100 rounded-lg flex items-center justify-center text-4xl">🎪</div>
-                <div class="aspect-square bg-green-100 rounded-lg flex items-center justify-center text-4xl">🍖</div>
-                <div class="aspect-square bg-blue-100 rounded-lg flex items-center justify-center text-4xl">🚌</div>
-                <div class="aspect-square bg-yellow-100 rounded-lg flex items-center justify-center text-4xl">🤝</div>
-                <div class="aspect-square bg-purple-100 rounded-lg flex items-center justify-center text-4xl">🏆</div>
-                <div class="aspect-square bg-pink-100 rounded-lg flex items-center justify-center text-4xl">🎉</div>
-                <div class="aspect-square bg-indigo-100 rounded-lg flex items-center justify-center text-4xl">🥳</div>
-                <div class="aspect-square bg-red-100 rounded-lg flex items-center justify-center text-4xl">❤️</div>
+    <!-- Kontakt -->
+    <section id="kontakt" class="py-20 bg-fire-700 text-white">
+        <div class="container mx-auto px-4">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold mb-6">Kontakt & Anmeldung</h2>
+                <p class="text-xl text-fire-200">Haben Sie Interesse an unserem Verein?</p>
             </div>
-        </div>
-    </section>
-
-    <!-- Kontakt Section -->
-    <section id="kontakt" class="py-16 bg-fire-700 text-white">
-        <div class="container mx-auto px-6">
-            <div class="grid md:grid-cols-2 gap-12">
+            
+            <div class="grid md:grid-cols-2 gap-12 max-w-4xl mx-auto">
                 <div>
-                    <h2 class="text-3xl font-bold mb-6">Kontakt</h2>
-                    <div class="space-y-6">
-                        <div class="flex items-start">
-                            <span class="text-2xl mr-4">📍</span>
+                    <h3 class="text-2xl font-bold mb-6">Kontaktieren Sie uns</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-fire-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <span class="text-sm">👤</span>
+                            </div>
                             <div>
-                                <h3 class="font-semibold mb-2">Adresse</h3>
-                                <p class="text-fire-200">
-                                    Feuerwehrverein Raura Kaiseraugst<br>
-                                    Kaiseraugst, Schweiz
-                                </p>
+                                <h4 class="font-semibold">Präsident</h4>
+                                <p class="text-fire-200">René Käslin</p>
                             </div>
                         </div>
-                        <div class="flex items-start">
-                            <span class="text-2xl mr-4">📧</span>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-fire-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <span class="text-sm">📧</span>
+                            </div>
                             <div>
-                                <h3 class="font-semibold mb-2">E-Mail</h3>
+                                <h4 class="font-semibold">E-Mail</h4>
                                 <p class="text-fire-200">info@fwv-raura.ch</p>
                             </div>
                         </div>
-                        <div class="flex items-start">
-                            <span class="text-2xl mr-4">🌐</span>
+                        
+                        <div class="flex items-start space-x-4">
+                            <div class="w-8 h-8 bg-fire-500 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                                <span class="text-sm">📍</span>
+                            </div>
                             <div>
-                                <h3 class="font-semibold mb-2">Online</h3>
-                                <p class="text-fire-200">Nextcloud Portal für Mitglieder verfügbar</p>
+                                <h4 class="font-semibold">Adresse</h4>
+                                <p class="text-fire-200">Kaiseraugst, Schweiz</p>
                             </div>
                         </div>
                     </div>
                 </div>
+                
                 <div>
-                    <h3 class="text-2xl font-bold mb-6">Nachricht senden</h3>
-                    <form class="space-y-4">
-                        <input type="text" placeholder="Ihr Name" class="w-full px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-fire-300">
-                        <input type="email" placeholder="Ihre E-Mail" class="w-full px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-fire-300">
-                        <textarea placeholder="Ihre Nachricht" rows="5" class="w-full px-4 py-3 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-fire-300"></textarea>
-                        <button type="submit" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors">
-                            Nachricht senden
-                        </button>
-                    </form>
+                    <h3 class="text-2xl font-bold mb-6">Mitglied werden</h3>
+                    <p class="text-fire-100 mb-6">
+                        Werden Sie Teil unserer Gemeinschaft! Kontaktieren Sie uns 
+                        für weitere Informationen zur Mitgliedschaft.
+                    </p>
+                    <a href="mailto:info@fwv-raura.ch" 
+                       class="bg-white text-fire-700 px-8 py-4 rounded-full font-semibold hover:bg-fire-50 transition duration-300 inline-block">
+                        Interesse bekunden
+                    </a>
                 </div>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-gray-800 text-white py-8">
-        <div class="container mx-auto px-6">
+    <footer class="bg-gray-800 text-white py-12">
+        <div class="container mx-auto px-4">
             <div class="grid md:grid-cols-3 gap-8">
                 <div>
-                    <h3 class="text-lg font-semibold mb-4">Feuerwehrverein Raura Kaiseraugst</h3>
-                    <p class="text-gray-400">Tradition, Gemeinschaft und Engagement in Kaiseraugst und Umgebung.</p>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 bg-fire-500 rounded-full flex items-center justify-center">
+                            <span class="font-bold">FW</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">Feuerwehrverein</h3>
+                            <p class="text-sm text-gray-400">Raura Kaiseraugst</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-400">
+                        Tradition, Kameradschaft und Gemeinschaft seit Jahren.
+                    </p>
                 </div>
+                
                 <div>
-                    <h3 class="text-lg font-semibold mb-4">Quick Links</h3>
+                    <h4 class="font-semibold mb-4">Navigation</h4>
                     <ul class="space-y-2 text-gray-400">
-                        <li><a href="#home" class="hover:text-white transition-colors">Home</a></li>
-                        <li><a href="#verein" class="hover:text-white transition-colors">Verein</a></li>
-                        <li><a href="#vorstand" class="hover:text-white transition-colors">Vorstand</a></li>
-                        <li><a href="#kontakt" class="hover:text-white transition-colors">Kontakt</a></li>
+                        <li><a href="#start" class="hover:text-white transition">Start</a></li>
+                        <li><a href="#verein" class="hover:text-white transition">Verein</a></li>
+                        <li><a href="#vorstand" class="hover:text-white transition">Vorstand</a></li>
+                        <li><a href="#veranstaltungen" class="hover:text-white transition">Veranstaltungen</a></li>
                     </ul>
                 </div>
+                
                 <div>
-                    <h3 class="text-lg font-semibold mb-4">Folgen Sie uns</h3>
-                    <div class="flex space-x-4">
-                        <a href="#" class="text-gray-400 hover:text-white transition-colors text-2xl">📘</a>
-                        <a href="#" class="text-gray-400 hover:text-white transition-colors text-2xl">📷</a>
-                        <a href="#" class="text-gray-400 hover:text-white transition-colors text-2xl">🐦</a>
-                    </div>
+                    <h4 class="font-semibold mb-4">Kontakt</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li>📧 info@fwv-raura.ch</li>
+                        <li>📍 Kaiseraugst, Schweiz</li>
+                        <li>👤 René Käslin (Präsident)</li>
+                    </ul>
                 </div>
             </div>
+            
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
-                <p>&copy; 2024 Feuerwehrverein Raura Kaiseraugst. Alle Rechte vorbehalten.</p>
+                <p>&copy; 2023 Feuerwehrverein Raura Kaiseraugst. Alle Rechte vorbehalten.</p>
             </div>
         </div>
     </footer>
 
-    <!-- JavaScript für mobile Navigation -->
+    <!-- JavaScript -->
     <script>
-        // Smooth scrolling für Navigation
+        // Mobile Menu Toggle
+        document.getElementById('mobile-menu').addEventListener('click', function() {
+            const mobileNav = document.getElementById('mobile-nav');
+            mobileNav.classList.toggle('hidden');
+        });
+
+        // Smooth scroll for navigation links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
@@ -332,6 +377,133 @@
                 }
             });
         });
+
+        // Load Events from GitHub
+        async function loadEvents() {
+            const container = document.getElementById('events-container');
+            const colors = [
+                ['fire-500', 'fire-600', 'fire-100'],
+                ['green-500', 'green-600', 'green-100'],
+                ['blue-500', 'blue-600', 'blue-100'],
+                ['purple-500', 'purple-600', 'purple-100'],
+                ['yellow-500', 'yellow-600', 'yellow-100']
+            ];
+
+            try {
+                // GitHub API URL für den events Ordner
+                const repoUrl = 'https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/contents/events';
+                
+                const response = await fetch(repoUrl);
+                if (!response.ok) {
+                    throw new Error('Events konnten nicht geladen werden');
+                }
+
+                const files = await response.json();
+                const mdFiles = files.filter(file => file.name.endsWith('.md'));
+                
+                // Lade die neuesten 3 Events
+                const eventPromises = mdFiles
+                    .slice(0, 3)
+                    .map(async (file, index) => {
+                        try {
+                            const fileResponse = await fetch(file.download_url);
+                            const content = await fileResponse.text();
+                            
+                            // Parse Frontmatter
+                            const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+                            if (!frontmatterMatch) return null;
+                            
+                            const frontmatter = {};
+                            frontmatterMatch[1].split('\n').forEach(line => {
+                                const [key, ...values] = line.split(':');
+                                if (key && values.length) {
+                                    frontmatter[key.trim()] = values.join(':').trim().replace(/['"]/g, '');
+                                }
+                            });
+
+                            const color = colors[index % colors.length];
+                            
+                            return {
+                                title: frontmatter.title || 'Unbekanntes Event',
+                                description: frontmatter.description || 'Keine Beschreibung verfügbar',
+                                date: frontmatter.date || 'Datum folgt',
+                                location: frontmatter.location || 'Ort wird bekannt gegeben',
+                                emoji: frontmatter.emoji || '📅',
+                                color: color
+                            };
+                        } catch (err) {
+                            console.error('Fehler beim Laden eines Events:', err);
+                            return null;
+                        }
+                    });
+
+                const events = (await Promise.all(eventPromises)).filter(Boolean);
+                
+                if (events.length === 0) {
+                    // Fallback Events falls keine geladen werden können
+                    const fallbackEvents = [
+                        {
+                            title: 'Chilbi 2024',
+                            description: 'Traditionelle Chilbi im Roten Schopf mit Festwirtschaft.',
+                            date: 'Oktober 2024',
+                            location: 'Roter Schopf Kaiseraugst',
+                            emoji: '🎪',
+                            color: colors[0]
+                        },
+                        {
+                            title: 'Grillplausch',
+                            description: 'Gemütlicher Grillabend für Mitglieder und Freunde.',
+                            date: 'Sommer 2024',
+                            location: 'Bei Edi Grossenbacher',
+                            emoji: '🍖',
+                            color: colors[1]
+                        },
+                        {
+                            title: 'Vereinsausflug',
+                            description: 'Spannender Ausflug zu interessanten Zielen.',
+                            date: 'Herbst 2024',
+                            location: 'Wird bekannt gegeben',
+                            emoji: '🚌',
+                            color: colors[2]
+                        }
+                    ];
+                    
+                    container.innerHTML = fallbackEvents.map(event => 
+                        createEventCard(event)
+                    ).join('');
+                } else {
+                    container.innerHTML = events.map(event => 
+                        createEventCard(event)
+                    ).join('');
+                }
+            } catch (error) {
+                console.error('Fehler beim Laden der Events:', error);
+                // Fallback anzeigen
+                container.innerHTML = `
+                    <div class="col-span-full text-center text-gray-500 py-8">
+                        <p>Events konnten nicht geladen werden.</p>
+                        <p class="text-sm mt-2">Überprüfen Sie die Repository-Konfiguration.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function createEventCard(event) {
+            return `
+                <div class="bg-gradient-to-br from-${event.color[0]} to-${event.color[1]} text-white rounded-2xl p-8">
+                    <div class="text-4xl mb-4">${event.emoji}</div>
+                    <h3 class="text-2xl font-bold mb-4">${event.title}</h3>
+                    <p class="mb-6">${event.description}</p>
+                    <div class="text-${event.color[2]}">
+                        <p>📅 ${event.date}</p>
+                        <p>📍 ${event.location}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Events laden wenn die Seite fertig ist
+        document.addEventListener('DOMContentLoaded', loadEvents);
     </script>
 </body>
 </html>
