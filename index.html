@@ -34,8 +34,13 @@
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-fire-500 rounded-full flex items-center justify-center">
-                        <span class="font-bold text-lg">FW</span>
+                    <!-- Logo-Bild (anpassen je nach deinem Dateinamen) -->
+                    <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-fire-300 shadow-lg bg-white">
+                        <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="w-full h-full object-contain p-1">
+                        <!-- Fallback falls Bild nicht lädt -->
+                        <div class="w-full h-full bg-fire-500 flex items-center justify-center text-white font-bold text-lg" style="display: none;">
+                            FW
+                        </div>
                     </div>
                     <div>
                         <h1 class="text-xl font-bold">Feuerwehrverein Raura</h1>
@@ -74,7 +79,14 @@
     <section id="home" class="bg-gradient-to-br from-fire-600 to-fire-800 text-white py-20">
         <div class="container mx-auto px-4 text-center">
             <div class="max-w-4xl mx-auto">
-                <h2 class="text-5xl md:text-6xl font-bold mb-6 animate-pulse">
+                <!-- Großes Logo im Hero -->
+                <div class="mb-8 flex justify-center">
+                    <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-white border-opacity-30 shadow-2xl bg-white">
+                        <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="w-full h-full object-contain p-2">
+                    </div>
+                </div>
+                
+                <h2 class="text-5xl md:text-6xl font-bold mb-6">
                     Feuerwehrverein Raura
                 </h2>
                 <p class="text-2xl md:text-3xl mb-8 text-fire-100">Kaiseraugst</p>
@@ -288,8 +300,8 @@
     <footer class="bg-gray-800 text-white py-8">
         <div class="container mx-auto px-4 text-center">
             <div class="flex items-center justify-center mb-4">
-                <div class="w-10 h-10 bg-fire-500 rounded-full flex items-center justify-center mr-3">
-                    <span class="font-bold">FW</span>
+                <div class="w-10 h-10 rounded-full overflow-hidden border-2 border-fire-300 mr-3 bg-white">
+                    <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="w-full h-full object-contain p-1">
                 </div>
                 <div>
                     <h3 class="text-lg font-bold">Feuerwehrverein Raura Kaiseraugst</h3>
@@ -303,6 +315,17 @@
     </footer>
 
     <script>
+        // Logo-Fallback wenn Bild nicht lädt
+        document.addEventListener('DOMContentLoaded', function() {
+            const logos = document.querySelectorAll('img[alt*="Logo"]');
+            logos.forEach(logo => {
+                logo.onerror = function() {
+                    this.style.display = 'none';
+                    this.nextElementSibling.style.display = 'flex';
+                };
+            });
+        });
+
         // Mobile menu toggle
         const mobileMenuBtn = document.getElementById('mobile-menu-btn');
         const mobileMenu = document.getElementById('mobile-menu');
