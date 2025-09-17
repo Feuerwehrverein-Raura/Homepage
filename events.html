@@ -34,8 +34,8 @@
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-fire-500 rounded-full flex items-center justify-center">
-                        <span class="font-bold text-lg">FW</span>
+                    <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-fire-300 shadow-lg bg-white">
+                        <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="w-full h-full object-contain p-1">
                     </div>
                     <div>
                         <h1 class="text-xl font-bold">Feuerwehrverein Raura</h1>
@@ -120,7 +120,7 @@
 
     <!-- Event Detail Modal -->
     <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div class="relative">
                 <!-- Modal Header -->
                 <div id="modal-header" class="bg-gradient-to-r from-fire-500 to-fire-600 text-white p-6 rounded-t-lg">
@@ -135,7 +135,60 @@
                         <!-- Event details will be loaded here -->
                     </div>
                     
-                    <!-- Modal Actions -->
+                    <!-- Registration Section -->
+                    <div id="registration-section" class="hidden mt-8 border-t pt-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">📧 Anmeldung</h3>
+                        
+                        <!-- Shift Selection -->
+                        <div id="shift-selection" class="hidden mb-6">
+                            <h4 class="font-semibold text-gray-700 mb-3">Verfügbare Schichten:</h4>
+                            <div id="shifts-container" class="space-y-2">
+                                <!-- Shifts will be populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Personal Information -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                                <input type="text" id="reg-name" placeholder="Ihr Name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail *</label>
+                                <input type="email" id="reg-email" placeholder="ihre@email.ch" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
+                                <input type="tel" id="reg-phone" placeholder="079 123 45 67" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div id="participants-section" class="hidden">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Anzahl Personen</label>
+                                <select id="reg-participants" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                                    <option value="1">1 Person</option>
+                                    <option value="2">2 Personen</option>
+                                    <option value="3">3 Personen</option>
+                                    <option value="4">4 Personen</option>
+                                    <option value="5">5+ Personen</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Additional Notes -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Bemerkungen</label>
+                            <textarea id="reg-notes" rows="3" placeholder="Besondere Wünsche, Allergien, etc." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500"></textarea>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                            <button id="send-registration-email" class="flex-1 bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center space-x-2">
+                                <span>📧</span>
+                                <span>Anmeldung per E-Mail senden</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Regular Modal Actions -->
                     <div class="mt-6 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
                         <button id="download-event-ics" class="flex-1 bg-fire-500 text-white px-4 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
                             <span>⬇️</span>
@@ -172,6 +225,7 @@
                 this.searchQuery = '';
                 this.viewMode = 'list';
                 this.selectedEvent = null;
+                this.selectedShifts = [];
                 
                 this.init();
             }
@@ -210,7 +264,82 @@
                         registrationRequired: true,
                         registrationDeadline: new Date(2024, 9, 4),
                         cost: 'Kostenlos',
-                        tags: ['Chilbi', 'Familie', 'Essen', 'Tradition']
+                        tags: ['Chilbi', 'Familie', 'Essen', 'Tradition'],
+                        // Schichten für Helfer
+                        shifts: [
+                            {
+                                id: 'aufbau-1',
+                                name: 'Aufbau 1',
+                                date: '05.10.2024',
+                                time: '17:00 Uhr',
+                                needed: 5,
+                                description: 'Grundaufbau und Vorbereitung'
+                            },
+                            {
+                                id: 'aufbau-2',
+                                name: 'Aufbau 2',
+                                date: '12.10.2024',
+                                time: 'Abends (Zeit folgt)',
+                                needed: 5,
+                                description: 'Dekoration und finale Vorbereitungen'
+                            },
+                            {
+                                id: 'samstag-1',
+                                name: 'Samstag Schicht 1',
+                                date: '14.10.2024',
+                                time: '14:00-18:00',
+                                needed: 3,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'samstag-2',
+                                name: 'Samstag Schicht 2',
+                                date: '14.10.2024',
+                                time: '18:00-22:00',
+                                needed: 5,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'samstag-3',
+                                name: 'Samstag Schicht 3',
+                                date: '14.10.2024',
+                                time: '22:00-Open End',
+                                needed: 5,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'sonntag-1',
+                                name: 'Sonntag Schicht 1',
+                                date: '15.10.2024',
+                                time: '12:00-17:00',
+                                needed: 3,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'sonntag-2',
+                                name: 'Sonntag Schicht 2',
+                                date: '15.10.2024',
+                                time: '17:00-22:00',
+                                needed: 5,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'abbau-1',
+                                name: 'Abbau 1',
+                                date: '16.10.2024',
+                                time: 'Abends (Zeit folgt)',
+                                needed: 5,
+                                description: 'Erste Aufräumarbeiten'
+                            },
+                            {
+                                id: 'abbau-2',
+                                name: 'Abbau 2',
+                                date: '18.10.2024',
+                                time: 'Abends (Zeit folgt)',
+                                needed: 15,
+                                description: 'Kompletter Abbau und Räumung'
+                            }
+                        ]
                     },
                     {
                         id: 'grillplausch-sommer-2024',
@@ -227,7 +356,9 @@
                         registrationRequired: true,
                         registrationDeadline: new Date(2024, 5, 12),
                         cost: 'Kostenlos',
-                        tags: ['Grillen', 'Geselligkeit', 'Sommer', 'Familie']
+                        tags: ['Grillen', 'Geselligkeit', 'Sommer', 'Familie'],
+                        // Keine Schichten, normale Anmeldung
+                        participantRegistration: true
                     },
                     {
                         id: 'vereinsausflug-2024',
@@ -244,7 +375,8 @@
                         registrationRequired: true,
                         registrationDeadline: new Date(2024, 10, 1),
                         cost: 'CHF 35.- pro Person',
-                        tags: ['Ausflug', 'Wein', 'Kultur', 'Geselligkeit']
+                        tags: ['Ausflug', 'Wein', 'Kultur', 'Geselligkeit'],
+                        participantRegistration: true
                     },
                     {
                         id: 'vorstandssitzung-q4-2024',
@@ -307,6 +439,9 @@
                 document.getElementById('close-modal-btn').addEventListener('click', () => this.closeModal());
                 document.getElementById('download-event-ics').addEventListener('click', () => this.downloadEventICS());
                 document.getElementById('share-event').addEventListener('click', () => this.shareEvent());
+                
+                // Registration
+                document.getElementById('send-registration-email').addEventListener('click', () => this.sendRegistrationEmail());
                 
                 document.getElementById('event-modal').addEventListener('click', (e) => {
                     if (e.target.id === 'event-modal') this.closeModal();
@@ -405,6 +540,7 @@
             createEventListItem(event) {
                 const isPast = event.endDate < new Date();
                 const statusBadge = this.getStatusBadge(event);
+                const registrationBadge = this.getRegistrationBadge(event);
                 
                 return `
                     <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
@@ -415,9 +551,14 @@
                                     <div class="flex items-start justify-between mb-3">
                                         <div>
                                             <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
+                                        <div>
+                                            <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
                                             <p class="text-fire-600 font-medium">${event.subtitle}</p>
                                         </div>
-                                        ${statusBadge}
+                                        <div class="flex space-x-2">
+                                            ${statusBadge}
+                                            ${registrationBadge}
+                                        </div>
                                     </div>
                                     
                                     <div class="prose prose-sm max-w-none mb-4 text-gray-600">
@@ -475,6 +616,7 @@
             createEventGridItem(event) {
                 const isPast = event.endDate < new Date();
                 const statusBadge = this.getStatusBadge(event);
+                const registrationBadge = this.getRegistrationBadge(event);
                 
                 return `
                     <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
@@ -482,7 +624,10 @@
                         <div class="p-6">
                             <div class="flex justify-between items-start mb-3">
                                 <h3 class="text-lg font-bold text-gray-800 leading-tight">${event.title}</h3>
-                                ${statusBadge}
+                                <div class="flex flex-col space-y-1">
+                                    ${statusBadge}
+                                    ${registrationBadge}
+                                </div>
                             </div>
                             
                             <p class="text-fire-600 text-sm font-medium mb-3">${event.subtitle}</p>
@@ -529,11 +674,28 @@
                 }
             }
 
+            getRegistrationBadge(event) {
+                if (!event.registrationRequired) return '';
+                
+                const now = new Date();
+                if (event.registrationDeadline && event.registrationDeadline < now) return '';
+                if (event.endDate < now) return '';
+                
+                if (event.shifts && event.shifts.length > 0) {
+                    return '<span class="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">👷 Helfer gesucht</span>';
+                } else if (event.participantRegistration) {
+                    return '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">📧 Anmeldung möglich</span>';
+                }
+                
+                return '';
+            }
+
             showEventModal(eventId) {
                 const event = this.events.find(e => e.id === eventId);
                 if (!event) return;
 
                 this.selectedEvent = event;
+                this.selectedShifts = [];
                 
                 document.getElementById('modal-title').textContent = event.title;
                 document.getElementById('modal-meta').innerHTML = `
@@ -607,12 +769,199 @@
                     ` : ''}
                 `;
 
+                // Show registration section if applicable
+                this.setupRegistrationSection(event);
+                
                 document.getElementById('event-modal').classList.remove('hidden');
+            }
+
+            setupRegistrationSection(event) {
+                const registrationSection = document.getElementById('registration-section');
+                const shiftSelection = document.getElementById('shift-selection');
+                const shiftsContainer = document.getElementById('shifts-container');
+                const participantsSection = document.getElementById('participants-section');
+
+                // Check if registration is possible
+                const now = new Date();
+                const canRegister = event.registrationRequired && 
+                    (!event.registrationDeadline || event.registrationDeadline > now) &&
+                    event.endDate > now;
+
+                if (!canRegister) {
+                    registrationSection.classList.add('hidden');
+                    return;
+                }
+
+                registrationSection.classList.remove('hidden');
+
+                // Setup shifts if available
+                if (event.shifts && event.shifts.length > 0) {
+                    shiftSelection.classList.remove('hidden');
+                    participantsSection.classList.add('hidden');
+                    
+                    shiftsContainer.innerHTML = event.shifts.map(shift => `
+                        <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="font-medium text-gray-800">${shift.name}</p>
+                                        <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
+                                        <p class="text-xs text-gray-500">${shift.description}</p>
+                                    </div>
+                                    <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
+                                        ${shift.needed} benötigt
+                                    </span>
+                                </div>
+                            </div>
+                        </label>
+                    `).join('');
+                } else if (event.participantRegistration) {
+                    shiftSelection.classList.add('hidden');
+                    participantsSection.classList.remove('hidden');
+                } else {
+                    shiftSelection.classList.add('hidden');
+                    participantsSection.classList.add('hidden');
+                }
+
+                // Make eventsManager globally accessible for checkbox events
+                window.eventsManager = this;
+            }
+
+            toggleShift(shiftId) {
+                const index = this.selectedShifts.indexOf(shiftId);
+                if (index > -1) {
+                    this.selectedShifts.splice(index, 1);
+                } else {
+                    this.selectedShifts.push(shiftId);
+                }
+            }
+
+            sendRegistrationEmail() {
+                const event = this.selectedEvent;
+                if (!event) return;
+
+                // Get form data
+                const name = document.getElementById('reg-name').value.trim();
+                const email = document.getElementById('reg-email').value.trim();
+                const phone = document.getElementById('reg-phone').value.trim();
+                const notes = document.getElementById('reg-notes').value.trim();
+
+                // Validation
+                if (!name || !email) {
+                    alert('Bitte füllen Sie mindestens Name und E-Mail aus.');
+                    return;
+                }
+
+                // Build email content
+                let subject, body;
+
+                if (event.shifts && event.shifts.length > 0 && this.selectedShifts.length > 0) {
+                    // Helper registration with shifts
+                    subject = `Helfer-Anmeldung: ${event.title}`;
+                    
+                    const selectedShiftDetails = event.shifts
+                        .filter(shift => this.selectedShifts.includes(shift.id))
+                        .map(shift => `• ${shift.name} (${shift.date}, ${shift.time}) - ${shift.description}`)
+                        .join('\n');
+
+                    body = `Hallo ${event.organizer},
+
+hiermit melde ich mich als Helfer für folgende Schichten an:
+
+VERANSTALTUNG: ${event.title}
+DATUM: ${this.formatDate(event.startDate)}
+ORT: ${event.location}
+
+GEWÄHLTE SCHICHTEN:
+${selectedShiftDetails}
+
+MEINE KONTAKTDATEN:
+Name: ${name}
+E-Mail: ${email}
+${phone ? `Telefon: ${phone}` : ''}
+
+${notes ? `BEMERKUNGEN:\n${notes}` : ''}
+
+Vielen Dank für die Organisation!
+
+Mit freundlichen Grüssen
+${name}`;
+
+                } else if (event.participantRegistration) {
+                    // Participant registration
+                    const participants = document.getElementById('reg-participants').value || '1';
+                    subject = `Anmeldung: ${event.title}`;
+                    
+                    body = `Hallo ${event.organizer},
+
+hiermit melde ich mich für die Veranstaltung an:
+
+VERANSTALTUNG: ${event.title}
+DATUM: ${this.formatDate(event.startDate)}
+ZEIT: ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}
+ORT: ${event.location}
+${event.cost !== 'Kostenlos' ? `KOSTEN: ${event.cost}` : ''}
+
+ANMELDUNG:
+Name: ${name}
+E-Mail: ${email}
+${phone ? `Telefon: ${phone}` : ''}
+${event.participantRegistration && participants !== '1' ? `Anzahl Personen: ${participants}` : ''}
+
+${notes ? `BEMERKUNGEN:\n${notes}` : ''}
+
+Vielen Dank für die Organisation!
+
+Mit freundlichen Grüssen
+${name}`;
+
+                } else {
+                    // General registration
+                    subject = `Anmeldung: ${event.title}`;
+                    body = `Hallo ${event.organizer},
+
+hiermit melde ich mich für die Veranstaltung an:
+
+VERANSTALTUNG: ${event.title}
+DATUM: ${this.formatDate(event.startDate)}
+
+KONTAKTDATEN:
+Name: ${name}
+E-Mail: ${email}
+${phone ? `Telefon: ${phone}` : ''}
+
+${notes ? `BEMERKUNGEN:\n${notes}` : ''}
+
+Mit freundlichen Grüssen
+${name}`;
+                }
+
+                // Create mailto link
+                const mailtoLink = `mailto:${event.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                
+                // Open email client
+                window.location.href = mailtoLink;
+
+                // Show success message
+                setTimeout(() => {
+                    alert('E-Mail-Client wurde geöffnet. Bitte senden Sie die E-Mail ab.');
+                }, 500);
             }
 
             closeModal() {
                 document.getElementById('event-modal').classList.add('hidden');
                 this.selectedEvent = null;
+                this.selectedShifts = [];
+                
+                // Reset form
+                document.getElementById('reg-name').value = '';
+                document.getElementById('reg-email').value = '';
+                document.getElementById('reg-phone').value = '';
+                document.getElementById('reg-notes').value = '';
+                
+                // Uncheck all shift checkboxes
+                document.querySelectorAll('.shift-checkbox').forEach(cb => cb.checked = false);
             }
 
             downloadEventICS() {
