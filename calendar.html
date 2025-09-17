@@ -1,1 +1,556 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalender - Feuerwehrverein Raura Kaiseraugst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-sans antialiased bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-fire-700 text-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-fire-500 rounded-full flex items-center justify-center">
+                        <span class="font-bold text-lg">FW</span>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">Feuerwehrverein Raura</h1>
+                        <p class="text-fire-200 text-sm">Kaiseraugst</p>
+                    </div>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="index.html" class="hover:text-fire-200 transition-colors">Home</a>
+                    <a href="calendar.html" class="text-fire-200 font-semibold">Kalender</a>
+                    <a href="events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                </div>
+            </div>
+        </div>
+    </nav>
 
+    <!-- Header -->
+    <section class="bg-gradient-to-r from-fire-600 to-fire-700 text-white py-12">
+        <div class="container mx-auto px-4 text-center">
+            <h2 class="text-4xl font-bold mb-4">Vereinskalender</h2>
+            <p class="text-fire-100 text-lg mb-6">Alle wichtigen Termine auf einen Blick</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button id="subscribe-btn" class="bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors flex items-center justify-center space-x-2">
+                    <span>📅</span>
+                    <span>Kalender abonnieren</span>
+                </button>
+                <button id="download-ics-btn" class="border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white hover:text-fire-700 transition-colors flex items-center justify-center space-x-2">
+                    <span>⬇️</span>
+                    <span>ICS herunterladen</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Calendar Controls -->
+    <section class="bg-white shadow-sm py-4">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                <div class="flex items-center space-x-4">
+                    <button id="prev-month" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="text-xl">←</span>
+                    </button>
+                    <h3 id="current-month" class="text-xl font-bold text-gray-800"></h3>
+                    <button id="next-month" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="text-xl">→</span>
+                    </button>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="today-btn" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
+                        Heute
+                    </button>
+                    <select id="view-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <option value="month">Monatsansicht</option>
+                        <option value="list">Listenansicht</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Calendar View -->
+    <section id="calendar-view" class="py-8">
+        <div class="container mx-auto px-4">
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                <!-- Calendar Header -->
+                <div class="grid grid-cols-7 bg-gray-100">
+                    <div class="p-4 text-center font-semibold text-gray-700">Mo</div>
+                    <div class="p-4 text-center font-semibold text-gray-700">Di</div>
+                    <div class="p-4 text-center font-semibold text-gray-700">Mi</div>
+                    <div class="p-4 text-center font-semibold text-gray-700">Do</div>
+                    <div class="p-4 text-center font-semibold text-gray-700">Fr</div>
+                    <div class="p-4 text-center font-semibold text-gray-700">Sa</div>
+                    <div class="p-4 text-center font-semibold text-gray-700">So</div>
+                </div>
+                <!-- Calendar Body -->
+                <div id="calendar-grid" class="grid grid-cols-7 gap-0">
+                    <!-- Calendar days will be generated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- List View -->
+    <section id="list-view" class="py-8 hidden">
+        <div class="container mx-auto px-4">
+            <div id="events-list" class="space-y-4">
+                <!-- Event list will be generated by JavaScript -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Event Modal -->
+    <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 id="modal-title" class="text-xl font-bold text-gray-800"></h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                </div>
+                <div id="modal-content" class="space-y-4">
+                    <!-- Modal content will be populated by JavaScript -->
+                </div>
+                <div class="mt-6 flex space-x-3">
+                    <button id="download-event-ics" class="flex-1 bg-fire-500 text-white px-4 py-2 rounded-lg hover:bg-fire-600 transition-colors">
+                        ICS herunterladen
+                    </button>
+                    <button id="close-modal-btn" class="flex-1 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        Schließen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-40">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-fire-500 mx-auto mb-4"></div>
+            <p class="text-gray-600">Lade Veranstaltungen...</p>
+        </div>
+    </div>
+
+    <script>
+        class EventCalendar {
+            constructor() {
+                this.events = [];
+                this.currentDate = new Date();
+                this.selectedDate = new Date();
+                this.viewMode = 'month';
+                this.init();
+            }
+
+            async init() {
+                await this.loadEvents();
+                this.setupEventListeners();
+                this.render();
+                document.getElementById('loading').classList.add('hidden');
+            }
+
+            async loadEvents() {
+                try {
+                    // In a real GitHub Pages setup, you would fetch from your events folder
+                    // For now, we'll use sample data
+                    this.events = this.getSampleEvents();
+                } catch (error) {
+                    console.error('Fehler beim Laden der Veranstaltungen:', error);
+                    this.events = [];
+                }
+            }
+
+            getSampleEvents() {
+                const now = new Date();
+                return [
+                    {
+                        id: 'chilbi-2024',
+                        title: 'Chilbi 2024',
+                        description: 'Traditionelle Chilbi mit Festbetrieb im Roten Schopf',
+                        startDate: new Date(2024, 9, 14, 14, 0), // 14. Oktober 2024, 14:00
+                        endDate: new Date(2024, 9, 15, 22, 0),   // 15. Oktober 2024, 22:00
+                        location: 'Roter Schopf, Kaiseraugst',
+                        category: 'Hauptveranstaltung',
+                        organizer: 'René Käslin'
+                    },
+                    {
+                        id: 'grillplausch-sommer',
+                        title: 'Grillplausch',
+                        description: 'Geselliger Grillplausch für alle Mitglieder und Familien',
+                        startDate: new Date(2024, 6, 20, 16, 0), // 20. Juli 2024, 16:00
+                        endDate: new Date(2024, 6, 20, 22, 0),   // 20. Juli 2024, 22:00
+                        location: 'Kurzenbettli 23, Augst',
+                        category: 'Gesellschaftsanlass',
+                        organizer: 'Edi Grossenbacher'
+                    },
+                    {
+                        id: 'vereinsausflug-2024',
+                        title: 'Vereinsausflug',
+                        description: 'Weinverkostung und Ausflug für alle Mitglieder',
+                        startDate: new Date(2024, 10, 15, 9, 0), // 15. November 2024, 9:00
+                        endDate: new Date(2024, 10, 15, 18, 0),  // 15. November 2024, 18:00
+                        location: 'Wird noch bekannt gegeben',
+                        category: 'Ausflug',
+                        organizer: 'Vereinsvorstand'
+                    },
+                    {
+                        id: 'vorstandssitzung-q4',
+                        title: 'Vorstandssitzung Q4',
+                        description: 'Quartalsweise Vorstandssitzung',
+                        startDate: new Date(2024, 11, 5, 19, 0), // 5. Dezember 2024, 19:00
+                        endDate: new Date(2024, 11, 5, 21, 0),   // 5. Dezember 2024, 21:00
+                        location: 'Vereinslokal',
+                        category: 'Vereinsintern',
+                        organizer: 'René Käslin'
+                    }
+                ];
+            }
+
+            setupEventListeners() {
+                // Navigation
+                document.getElementById('prev-month').addEventListener('click', () => this.previousMonth());
+                document.getElementById('next-month').addEventListener('click', () => this.nextMonth());
+                document.getElementById('today-btn').addEventListener('click', () => this.goToToday());
+                
+                // View mode
+                document.getElementById('view-select').addEventListener('change', (e) => {
+                    this.viewMode = e.target.value;
+                    this.toggleView();
+                });
+
+                // Buttons
+                document.getElementById('subscribe-btn').addEventListener('click', () => this.subscribeCalendar());
+                document.getElementById('download-ics-btn').addEventListener('click', () => this.downloadAllICS());
+                document.getElementById('download-event-ics').addEventListener('click', () => this.downloadEventICS());
+
+                // Modal
+                document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
+                document.getElementById('close-modal-btn').addEventListener('click', () => this.closeModal());
+                document.getElementById('event-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'event-modal') this.closeModal();
+                });
+            }
+
+            render() {
+                this.updateMonthDisplay();
+                if (this.viewMode === 'month') {
+                    this.renderCalendarGrid();
+                } else {
+                    this.renderEventsList();
+                }
+            }
+
+            updateMonthDisplay() {
+                const monthNames = [
+                    'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+                    'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
+                ];
+                document.getElementById('current-month').textContent = 
+                    `${monthNames[this.currentDate.getMonth()]} ${this.currentDate.getFullYear()}`;
+            }
+
+            renderCalendarGrid() {
+                const grid = document.getElementById('calendar-grid');
+                grid.innerHTML = '';
+
+                const year = this.currentDate.getFullYear();
+                const month = this.currentDate.getMonth();
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const startDate = new Date(firstDay);
+                startDate.setDate(startDate.getDate() - (firstDay.getDay() + 6) % 7);
+
+                for (let i = 0; i < 42; i++) {
+                    const cellDate = new Date(startDate);
+                    cellDate.setDate(startDate.getDate() + i);
+                    
+                    const cell = this.createCalendarCell(cellDate, month);
+                    grid.appendChild(cell);
+                }
+            }
+
+            createCalendarCell(date, currentMonth) {
+                const cell = document.createElement('div');
+                const isCurrentMonth = date.getMonth() === currentMonth;
+                const isToday = this.isToday(date);
+                const dayEvents = this.getEventsForDate(date);
+
+                cell.className = `min-h-24 p-2 border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${
+                    !isCurrentMonth ? 'bg-gray-100 text-gray-400' : ''
+                } ${isToday ? 'bg-fire-50 border-fire-300' : ''}`;
+
+                cell.innerHTML = `
+                    <div class="font-semibold text-sm mb-1 ${isToday ? 'text-fire-700' : ''}">${date.getDate()}</div>
+                    <div class="space-y-1">
+                        ${dayEvents.map(event => `
+                            <div class="text-xs p-1 bg-fire-100 text-fire-800 rounded truncate cursor-pointer hover:bg-fire-200 transition-colors" 
+                                 data-event-id="${event.id}">
+                                ${event.title}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                // Add event listeners for events
+                cell.querySelectorAll('[data-event-id]').forEach(eventEl => {
+                    eventEl.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const eventId = e.target.getAttribute('data-event-id');
+                        this.showEventModal(eventId);
+                    });
+                });
+
+                return cell;
+            }
+
+            renderEventsList() {
+                const container = document.getElementById('events-list');
+                const sortedEvents = [...this.events].sort((a, b) => a.startDate - b.startDate);
+
+                container.innerHTML = sortedEvents.map(event => `
+                    <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" data-event-id="${event.id}">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                            <div class="flex-1">
+                                <h3 class="text-xl font-bold text-gray-800 mb-2">${event.title}</h3>
+                                <p class="text-gray-600 mb-3">${event.description}</p>
+                                <div class="flex flex-wrap gap-4 text-sm text-gray-500">
+                                    <span>📅 ${this.formatDate(event.startDate)}</span>
+                                    <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
+                                    <span>📍 ${event.location}</span>
+                                </div>
+                            </div>
+                            <div class="mt-4 md:mt-0">
+                                <span class="px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
+                                    ${event.category}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Add event listeners
+                container.querySelectorAll('[data-event-id]').forEach(eventEl => {
+                    eventEl.addEventListener('click', () => {
+                        const eventId = eventEl.getAttribute('data-event-id');
+                        this.showEventModal(eventId);
+                    });
+                });
+            }
+
+            getEventsForDate(date) {
+                return this.events.filter(event => {
+                    const eventStart = new Date(event.startDate);
+                    const eventEnd = new Date(event.endDate);
+                    return date >= eventStart.toDateString() && date <= eventEnd.toDateString() ||
+                           this.isSameDay(date, eventStart) || 
+                           (date >= eventStart && date <= eventEnd);
+                });
+            }
+
+            showEventModal(eventId) {
+                const event = this.events.find(e => e.id === eventId);
+                if (!event) return;
+
+                this.selectedEvent = event;
+                document.getElementById('modal-title').textContent = event.title;
+                document.getElementById('modal-content').innerHTML = `
+                    <div class="space-y-3">
+                        <p class="text-gray-600">${event.description}</p>
+                        <div class="grid grid-cols-1 gap-3 text-sm">
+                            <div class="flex items-center">
+                                <span class="font-semibold text-gray-700 w-20">Datum:</span>
+                                <span>${this.formatDate(event.startDate)}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-semibold text-gray-700 w-20">Zeit:</span>
+                                <span>${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-semibold text-gray-700 w-20">Ort:</span>
+                                <span>${event.location}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-semibold text-gray-700 w-20">Kategorie:</span>
+                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category}</span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-semibold text-gray-700 w-20">Kontakt:</span>
+                                <span>${event.organizer}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('event-modal').classList.remove('hidden');
+            }
+
+            closeModal() {
+                document.getElementById('event-modal').classList.add('hidden');
+                this.selectedEvent = null;
+            }
+
+            toggleView() {
+                const calendarView = document.getElementById('calendar-view');
+                const listView = document.getElementById('list-view');
+
+                if (this.viewMode === 'month') {
+                    calendarView.classList.remove('hidden');
+                    listView.classList.add('hidden');
+                    this.renderCalendarGrid();
+                } else {
+                    calendarView.classList.add('hidden');
+                    listView.classList.remove('hidden');
+                    this.renderEventsList();
+                }
+            }
+
+            previousMonth() {
+                this.currentDate.setMonth(this.currentDate.getMonth() - 1);
+                this.render();
+            }
+
+            nextMonth() {
+                this.currentDate.setMonth(this.currentDate.getMonth() + 1);
+                this.render();
+            }
+
+            goToToday() {
+                this.currentDate = new Date();
+                this.render();
+            }
+
+            subscribeCalendar() {
+                const icsData = this.generateICS(this.events);
+                const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+                const url = window.URL.createObjectURL(blob);
+                
+                // Create webcal link for subscription
+                const webcalUrl = 'webcal://' + window.location.host + window.location.pathname.replace(/\/[^\/]*$/, '') + '/calendar.ics';
+                
+                alert(`Kalender-Abonnement:\n\nFügen Sie diese URL zu Ihrem Kalender hinzu:\n${webcalUrl}\n\nOder laden Sie die ICS-Datei herunter und importieren Sie sie manuell.`);
+            }
+
+            downloadAllICS() {
+                const icsData = this.generateICS(this.events);
+                this.downloadICS(icsData, 'feuerwehrverein-raura-kalender.ics');
+            }
+
+            downloadEventICS() {
+                if (!this.selectedEvent) return;
+                const icsData = this.generateICS([this.selectedEvent]);
+                this.downloadICS(icsData, `${this.selectedEvent.id}.ics`);
+            }
+
+            downloadICS(icsData, filename) {
+                const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+
+            generateICS(events) {
+                const now = new Date();
+                let ics = [
+                    'BEGIN:VCALENDAR',
+                    'VERSION:2.0',
+                    'PRODID:-//Feuerwehrverein Raura Kaiseraugst//Vereinskalender//DE',
+                    'CALSCALE:GREGORIAN',
+                    'METHOD:PUBLISH',
+                    'X-WR-CALNAME:Feuerwehrverein Raura Kaiseraugst',
+                    'X-WR-CALDESC:Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst',
+                    'X-WR-TIMEZONE:Europe/Zurich'
+                ];
+
+                events.forEach(event => {
+                    const uid = `${event.id}@feuerwehrverein-raura.ch`;
+                    const dtstart = this.formatDateForICS(event.startDate);
+                    const dtend = this.formatDateForICS(event.endDate);
+                    const dtstamp = this.formatDateForICS(now);
+
+                    ics.push(
+                        'BEGIN:VEVENT',
+                        `UID:${uid}`,
+                        `DTSTAMP:${dtstamp}`,
+                        `DTSTART:${dtstart}`,
+                        `DTEND:${dtend}`,
+                        `SUMMARY:${event.title}`,
+                        `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`,
+                        `LOCATION:${event.location}`,
+                        `ORGANIZER;CN=${event.organizer}:mailto:kontakt@feuerwehrverein-raura.ch`,
+                        `CATEGORIES:${event.category}`,
+                        'STATUS:CONFIRMED',
+                        'END:VEVENT'
+                    );
+                });
+
+                ics.push('END:VCALENDAR');
+                return ics.join('\r\n');
+            }
+
+            formatDateForICS(date) {
+                return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            }
+
+            formatDate(date) {
+                return new Intl.DateTimeFormat('de-DE', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }).format(date);
+            }
+
+            formatTime(date) {
+                return new Intl.DateTimeFormat('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            }
+
+            isToday(date) {
+                const today = new Date();
+                return this.isSameDay(date, today);
+            }
+
+            isSameDay(date1, date2) {
+                return date1.getDate() === date2.getDate() &&
+                       date1.getMonth() === date2.getMonth() &&
+                       date1.getFullYear() === date2.getFullYear();
+            }
+        }
+
+        // Initialize calendar when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new EventCalendar();
+        });
+    </script>
+</body>
+</html>
