@@ -1,207 +1,291 @@
-# Feuerwehrverein Raura Kaiseraugst Website
+# 🔥 Feuerwehrverein Raura Kaiseraugst - Homepage
 
 Eine moderne, responsive Website für den Feuerwehrverein Raura Kaiseraugst mit integriertem Kalender- und Veranstaltungssystem.
 
+## 🌐 Live Website
+**https://feuerwehrverein-raura.github.io/Homepage/**
+
+## 📅 Kalender-Abonnement
+```
+webcal://feuerwehrverein-raura.github.io/Homepage/calendar.ics
+```
+
+---
+
 ## 🚀 Features
 
-- **Responsive Design** - funktioniert auf allen Geräten
-- **Vereinskalender** mit Monats- und Listenansicht
-- **Veranstaltungsseite** mit Filter- und Suchfunktionen
-- **ICS-Kalender-Downloads** für einzelne Events oder alle Termine
-- **Abonnierbarer Kalender-Feed** (webcal://)
-- **Markdown-basierte Eventverwaltung** über GitHub
-- **Automatische ICS-Generierung** via GitHub Actions
+### 📱 **Moderne Website**
+- **Responsive Design** für alle Geräte (Desktop, Tablet, Mobile)
+- **Professionelles Design** mit Vereinslogo und Fire-Theme
+- **Schnelle Ladezeiten** durch optimierte Struktur
+- **SEO-optimiert** für bessere Auffindbarkeit
+
+### 📅 **Intelligenter Kalender**
+- **Interaktive Kalenderansicht** mit Monats- und Listenansicht
+- **Event-Details** mit vollständigen Informationen
+- **ICS-Downloads** für einzelne Events oder kompletten Kalender
+- **Abonnierbarer Feed** für Apple Kalender, Google Calendar, Outlook
+
+### 📧 **Smart Event-Anmeldungen**
+- **E-Mail-Anmeldungen** mit vorausgefüllten Formularen
+- **Schichtauswahl** für Helfer-Events (z.B. Chilbi)
+- **Teilnehmer-Anmeldungen** für gesellige Events
+- **Automatische E-Mail-Generierung** mit allen relevanten Details
+
+### 🎪 **Event-Management**
+- **Markdown-basierte Events** - einfach zu erstellen und bearbeiten
+- **Kategorien und Tags** für bessere Organisation
+- **Status-Tracking** (geplant, läuft, vergangen)
+- **Anmeldeschluss-Management** mit automatischen Benachrichtigungen
+
+### 🤖 **Automation**
+- **GitHub Actions** für automatische ICS-Generierung
+- **Versionskontrolle** für alle Änderungen
+- **Automatische Deployment** auf GitHub Pages
+
+---
 
 ## 📁 Projektstruktur
 
 ```
-feuerwehrverein-raura/
-├── index.html                    # Hauptseite
-├── calendar.html                 # Kalenderseite
-├── events.html                   # Veranstaltungsseite
-├── calendar.ics                  # Automatisch generierter ICS-Feed
-├── events/                       # Event-Markdown-Dateien
-│   ├── chilbi-2024.md
-│   └── grillplausch-sommer-2024.md
-├── images/                       # Bilder für Events
-├── scripts/
-│   └── generate-ics.js           # ICS-Generator-Script
-├── .github/workflows/
-│   └── generate-calendar.yml     # GitHub Action für ICS
-└── README.md
+Homepage/
+├── 🏠 index.html                    # Hauptseite
+├── 📅 calendar.html                 # Interaktive Kalenderseite
+├── 🎫 events.html                   # Veranstaltungsübersicht mit Anmeldung
+├── 📄 calendar.ics                  # Automatisch generierter ICS-Feed
+├── 📂 events/                       # Event-Markdown-Dateien
+│   ├── 📝 README.md                 # Event-Dokumentation
+│   ├── 🎪 chilbi-2024.md           # Beispiel: Chilbi mit Helfer-Schichten
+│   └── 🍖 grillplausch-2024.md     # Beispiel: Teilnehmer-Event
+├── 🖼️ images/                       # Bilder und Assets
+│   └── 🔥 logo.png                  # Vereinslogo
+├── ⚙️ scripts/
+│   └── 📊 generate-ics.js           # ICS-Generator-Script
+├── 🔄 .github/workflows/
+│   └── ⚡ generate-calendar.yml     # GitHub Actions Workflow
+└── 📋 README.md                     # Diese Dokumentation
 ```
 
-## 🎯 Event-Verwaltung
+---
 
-### Neue Veranstaltung hinzufügen
+## 🛠️ Lokale Entwicklung
 
-1. Erstelle eine neue Markdown-Datei im `events/` Ordner
-2. Verwende folgende Struktur:
+### **Voraussetzungen**
+- Git installiert
+- Python 3 oder Node.js für lokalen Server
+- Texteditor (VS Code empfohlen)
 
+### **Repository klonen**
+```bash
+git clone https://github.com/Feuerwehrverein-Raura/Homepage.git
+cd Homepage
+```
+
+### **Lokalen Server starten**
+```bash
+# Option 1: Python
+python -m http.server 8000
+
+# Option 2: Node.js
+npx http-server
+
+# Option 3: Live Server (VS Code Extension)
+# Rechtsklick auf index.html → "Open with Live Server"
+```
+
+### **Website öffnen**
+```
+http://localhost:8000
+```
+
+---
+
+## ➕ Neue Veranstaltung erstellen
+
+### **1. Markdown-Datei erstellen**
+Erstelle eine neue `.md` Datei im `events/` Ordner:
+
+```bash
+# Beispiel-Dateiname
+events/silvester-party-2024.md
+```
+
+### **2. Frontmatter-Template verwenden**
 ```markdown
 ---
-id: eindeutige-id
-title: Event Titel
-subtitle: Kurzbeschreibung
-startDate: 2024-10-14T14:00:00
-endDate: 2024-10-14T22:00:00
-location: Ort der Veranstaltung
-category: Hauptveranstaltung
-organizer: Name des Organisators
-email: kontakt@email.ch
+id: silvester-party-2024
+title: Silvester-Party 2024
+subtitle: Gemeinsam ins neue Jahr
+startDate: 2024-12-31T20:00:00
+endDate: 2025-01-01T02:00:00
+location: Vereinslokal
+category: Gesellschaftsanlass
+organizer: Max Mustermann
+email: max@feuerwehrverein-raura.ch
 registrationRequired: true
-registrationDeadline: 2024-10-04T23:59:59
-cost: Kostenlos
-status: confirmed
-tags: [Tag1, Tag2, Tag3]
-image: images/event-bild.jpg
+registrationDeadline: 2024-12-20T23:59:59
+cost: CHF 25.- pro Person
+tags: [Party, Silvester, Geselligkeit]
+participantRegistration: true
 ---
 
-# Event Titel
+# Silvester-Party 2024
 
-Hier kommt die ausführliche Beschreibung...
-
-## Programm
-
-- Punkt 1
-- Punkt 2
-
-## Anmeldung
-
-Weitere Details...
+Beschreibung der Veranstaltung...
 ```
 
-3. Committe und pushe die Datei - die Website wird automatisch aktualisiert
-
-## 📅 Kalender-Integration
-
-### Kalender abonnieren
-
-**Webcal-URL für Kalender-Apps:**
-```
-webcal://username.github.io/feuerwehrverein-raura/calendar.ics
+### **3. Datei committen**
+```bash
+git add events/silvester-party-2024.md
+git commit -m "Neue Veranstaltung: Silvester-Party 2024"
+git push
 ```
 
-**Direkte ICS-URL:**
+**→ Die Website wird automatisch aktualisiert!**
+
+---
+
+## 📧 Anmeldungen konfigurieren
+
+### **Teilnehmer-Anmeldungen** (Grillplausch, Ausflüge)
+```yaml
+registrationRequired: true
+participantRegistration: true
 ```
-https://username.github.io/feuerwehrverein-raura/calendar.ics
+
+### **Helfer-Anmeldungen** (Chilbi, Arbeitseinsätze)
+```yaml
+registrationRequired: true
+shifts:
+  - id: aufbau
+    name: Aufbau
+    date: 2024-12-30
+    time: 14:00-18:00
+    needed: 5
+    description: Dekoration und Vorbereitung
 ```
 
-### Unterstützte Kalender-Apps
-- Apple Kalender (macOS/iOS)
-- Google Calendar
-- Outlook
-- Thunderbird
-- Alle anderen iCal-kompatiblen Apps
+**→ Mehr Details in [`events/README.md`](./events/README.md)**
 
-## 🔧 Setup & Deployment
+---
 
-### GitHub Pages einrichten
+## 🔧 Anpassungen
 
-1. **Repository erstellen:**
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/username/feuerwehrverein-raura.git
-   git push -u origin main
-   ```
+### **Vereinsdaten aktualisieren**
+In allen HTML-Dateien anpassen:
+- ✏️ **Kontakt-E-Mail:** `kontakt@fwv-raura.ch`
+- 📍 **Adresse:** Vollständige Postadresse hinzufügen
+- 📞 **Telefon:** Vereins-Telefonnummer ergänzen
 
-2. **GitHub Pages aktivieren:**
-   - Gehe zu Repository → Settings → Pages
-   - Source: "Deploy from a branch"
-   - Branch: "main" → "/ (root)"
-   - Save
+### **Logo austauschen**
+- 📁 Neues Logo in `images/logo.png` ablegen
+- 🖼️ Empfohlene Größe: 400x400px, transparenter Hintergrund
 
-3. **Website ist verfügbar unter:**
-   ```
-   https://username.github.io/feuerwehrverein-raura/
-   ```
-
-### Lokale Entwicklung
-
-1. **Repository klonen:**
-   ```bash
-   git clone https://github.com/username/feuerwehrverein-raura.git
-   cd feuerwehrverein-raura
-   ```
-
-2. **Lokalen Server starten:**
-   ```bash
-   # Python 3
-   python -m http.server 8000
-   
-   # Python 2
-   python -m SimpleHTTPServer 8000
-   
-   # Node.js (mit http-server)
-   npx http-server
-   ```
-
-3. **Website öffnen:** http://localhost:8000
-
-## 🛠️ Anpassungen
-
-### Farben ändern
-Die Website verwendet ein Feuerwehr-Farbschema. Anpassungen in allen HTML-Dateien:
-
+### **Farben anpassen**
+In den HTML-Dateien die `fire`-Farbpalette ändern:
 ```javascript
 fire: {
     500: '#ef4444',  // Hauptfarbe
     600: '#dc2626',  // Dunklere Variante
-    700: '#b91c1c',  // Noch dunkler
-    // ...
+    700: '#b91c1c',  // Navigation
 }
 ```
 
-### Kontaktdaten aktualisieren
-In allen HTML-Dateien die Platzhalter ersetzen:
-- `kontakt@fwv-raura.ch` → echte E-Mail
-- Adressen und Telefonnummern hinzufügen
+---
 
-### Logos und Bilder
-- Vereinslogo in der Navigation anpassen
-- Event-Bilder im `images/` Ordner ablegen
-- Galerie-Platzhalter durch echte Fotos ersetzen
+## 🤝 Mitarbeit
 
-## 🔄 Automatisierung
+### **Berechtigungen**
+- 👥 **Vorstands-Mitglieder:** Admin-Rechte
+- 📝 **Content-Manager:** Event-Erstellung und -Bearbeitung
+- 👀 **Mitglieder:** Issue-Erstellung für Feedback
 
-### GitHub Actions
-Die Website generiert automatisch einen ICS-Kalender:
+### **Beiträge**
+1. 🍴 Fork das Repository
+2. 🌿 Erstelle einen Feature-Branch
+3. ✅ Mache deine Änderungen
+4. 🔄 Erstelle einen Pull Request
 
-- **Trigger:** Bei Änderungen im `events/` Ordner
-- **Schedule:** Täglich um 6:00 Uhr
-- **Output:** `calendar.ics` wird aktualisiert
-
-### Event-Status
-Events werden automatisch als "vergangen" markiert basierend auf dem Enddatum.
-
-## 📱 Browser-Kompatibilität
-
-- ✅ Chrome/Edge (moderne Versionen)
-- ✅ Firefox (moderne Versionen)
-- ✅ Safari (macOS/iOS)
-- ✅ Mobile Browser (responsive)
-
-## 🤝 Beiträge
-
-1. Fork das Repository
-2. Erstelle einen Feature-Branch (`git checkout -b feature/neue-funktion`)
-3. Committe deine Änderungen (`git commit -am 'Neue Funktion hinzugefügt'`)
-4. Push den Branch (`git push origin feature/neue-funktion`)
-5. Erstelle einen Pull Request
-
-## 📄 Lizenz
-
-Dieses Projekt steht unter der MIT-Lizenz. Siehe `LICENSE` Datei für Details.
-
-## 🆘 Support
-
-Bei Fragen oder Problemen:
-- Issue im GitHub Repository erstellen
-- E-Mail an: kontakt@feuerwehrverein-raura.ch
+### **Issues melden**
+- 🐛 **Bugs:** Beschreibe das Problem detailliert
+- 💡 **Feature-Requests:** Erkläre den gewünschten Nutzen
+- ❓ **Fragen:** Nutze die Discussions
 
 ---
 
+## 📊 GitHub Actions
+
+### **Automatische Prozesse**
+- 🔄 **ICS-Generierung:** Täglich um 6:00 Uhr
+- 📅 **Kalender-Update:** Bei Event-Änderungen
+- 🚀 **Website-Deployment:** Bei Push auf `main`
+
+### **Monitoring**
+- ✅ **Actions-Tab:** Überwachung der Workflows
+- 📊 **Pages-Status:** Deployment-Status prüfen
+- 🔍 **Logs:** Detaillierte Fehleranalyse
+
+---
+
+## 📱 Browser-Kompatibilität
+
+| Browser | Desktop | Mobile | Status |
+|---------|---------|--------|--------|
+| Chrome  | ✅ 90+  | ✅ 90+ | Voll unterstützt |
+| Firefox | ✅ 88+  | ✅ 88+ | Voll unterstützt |
+| Safari  | ✅ 14+  | ✅ 14+ | Voll unterstützt |
+| Edge    | ✅ 90+  | ✅ 90+ | Voll unterstützt |
+
+---
+
+## 🆘 Support
+
+### **Technische Probleme**
+- 📧 **E-Mail:** webmaster@feuerwehrverein-raura.ch
+- 🐛 **GitHub Issues:** [Issue erstellen](https://github.com/Feuerwehrverein-Raura/Homepage/issues/new)
+
+### **Inhaltliche Fragen**
+- 👤 **René Käslin** (Präsident): rene.kaeslin@feuerwehrverein-raura.ch
+- 📝 **Stefan Müller** (Aktuar): stefan.mueller@feuerwehrverein-raura.ch
+
+### **Häufige Probleme**
+- ❌ **Website nicht erreichbar:** Warte 5-10 Minuten nach Änderungen
+- 📧 **E-Mail-Client öffnet nicht:** Browser-Einstellungen prüfen
+- 📅 **Kalender lädt nicht:** Cache leeren und neu laden
+
+---
+
+## 📄 Lizenz
+
+Dieses Projekt steht unter der MIT-Lizenz. Details in der [LICENSE](./LICENSE) Datei.
+
+---
+
+## 🏆 Credits
+
 **Entwickelt mit ❤️ für den Feuerwehrverein Raura Kaiseraugst**
+
+- 🎨 **Design:** Tailwind CSS
+- ⚡ **Hosting:** GitHub Pages
+- 🤖 **Automation:** GitHub Actions
+- 📱 **Icons:** Unicode Emojis
+
+---
+
+## 🔗 Wichtige Links
+
+| Link | URL | Beschreibung |
+|------|-----|--------------|
+| 🌐 **Website** | https://feuerwehrverein-raura.github.io/Homepage/ | Live-Website |
+| 📅 **Kalender** | webcal://feuerwehrverein-raura.github.io/Homepage/calendar.ics | Abonnierbar |
+| 📊 **Repository** | https://github.com/Feuerwehrverein-Raura/Homepage | Quellcode |
+| 🔄 **Actions** | https://github.com/Feuerwehrverein-Raura/Homepage/actions | Workflows |
+| 📈 **Insights** | https://github.com/Feuerwehrverein-Raura/Homepage/pulse | Statistiken |
+
+---
+
+**🔥 Tradition • Kameradschaft • Gemeinschaft 🔥**
+
+---
+
+*Letzte Aktualisierung: $(date +'%B %Y')*
