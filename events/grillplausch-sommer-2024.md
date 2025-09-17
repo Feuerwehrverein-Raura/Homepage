@@ -7,7 +7,8 @@ endDate: 2024-06-17T22:00:00
 location: Kurzenbettli 23, 4302 Augst BL (bei der Schiessanlage)
 category: Gesellschaftsanlass
 organizer: Edi Grossenbacher
-email: kontakt@feuerwehrverein-raura.ch
+email: aktuar@fwv-raura.ch
+telephoe: +41 76 519 99 70
 registrationRequired: true
 registrationDeadline: 2024-06-12T23:59:59
 maxParticipants: 50
