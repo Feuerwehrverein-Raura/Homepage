@@ -358,18 +358,121 @@
                 </div>
                 <div class="bg-white bg-opacity-10 rounded-lg p-8">
                     <h4 class="text-xl font-bold mb-6">Schnellkontakt</h4>
-                    <form class="space-y-4">
+                    <form id="contact-form" class="space-y-4">
                         <div>
-                            <input type="text" placeholder="Name" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white">
+                            <input type="text" id="contact-name" placeholder="Name" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white">
                         </div>
                         <div>
-                            <input type="email" placeholder="E-Mail" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white">
+                            <input type="email" id="contact-email" placeholder="E-Mail" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white">
                         </div>
                         <div>
-                            <textarea rows="4" placeholder="Nachricht" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white resize-none"></textarea>
+                            <select id="contact-subject" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-white">
+                                <option value="" class="text-gray-800">Betreff auswählen...</option>
+                                <option value="Mitgliedschaft" class="text-gray-800">Mitgliedschaft</option>
+                                <option value="Veranstaltung" class="text-gray-800">Fragen zu Veranstaltungen</option>
+                                <option value="Zusammenarbeit" class="text-gray-800">Zusammenarbeit</option>
+                                <option value="Allgemein" class="text-gray-800">Allgemeine Anfrage</option>
+                            </select>
                         </div>
-                        <button type="submit" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors">
-                            Nachricht senden
+                        
+                        <!-- Mitgliedschaftsformular (nur bei Auswahl "Mitgliedschaft" sichtbar) -->
+                        <div id="membership-form" class="hidden space-y-4 border-t border-white border-opacity-20 pt-4">
+                            <div class="text-sm text-fire-100 mb-4">
+                                <p class="font-semibold mb-2">📋 Beitrittsformular</p>
+                                <p class="text-xs">
+                                    Aktive Feuerwehr-Mitglieder werden sofort aufgenommen. 
+                                    Andere Interessierte werden an der ordentlichen GV bestätigt.
+                                </p>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <input type="text" id="member-lastname" placeholder="Nachname *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                                <div>
+                                    <input type="text" id="member-firstname" placeholder="Vorname *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <input type="text" id="member-street" placeholder="Strasse und Hausnummer *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
+                            
+                            <div>
+                                <input type="text" id="member-city" placeholder="PLZ und Ort *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <input type="tel" id="member-phone" placeholder="Telefonnummer *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                                <div>
+                                    <input type="tel" id="member-mobile" placeholder="Mobilnummer" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <input type="email" id="member-email-addr" placeholder="E-Mail-Adresse *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-fire-200 mb-2">Angehörige/r der Feuerwehr Raurica? *</label>
+                                <div class="flex flex-wrap gap-4">
+                                    <label class="flex items-center text-sm text-fire-100">
+                                        <input type="radio" name="firefighter-status" value="active" class="mr-2 text-fire-500 focus:ring-fire-500">
+                                        Ja (aktiv)
+                                    </label>
+                                    <label class="flex items-center text-sm text-fire-100">
+                                        <input type="radio" name="firefighter-status" value="former" class="mr-2 text-fire-500 focus:ring-fire-500">
+                                        Ehemalige/r
+                                    </label>
+                                    <label class="flex items-center text-sm text-fire-100">
+                                        <input type="radio" name="firefighter-status" value="no" class="mr-2 text-fire-500 focus:ring-fire-500">
+                                        Nein
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm text-fire-200 mb-2">Zustellung der Korrespondenz *</label>
+                                <div class="flex gap-4 mb-2">
+                                    <label class="flex items-center text-sm text-fire-100">
+                                        <input type="radio" name="correspondence-method" value="post" class="mr-2 text-fire-500 focus:ring-fire-500">
+                                        Post
+                                    </label>
+                                    <label class="flex items-center text-sm text-fire-100">
+                                        <input type="radio" name="correspondence-method" value="email" class="mr-2 text-fire-500 focus:ring-fire-500">
+                                        E-Mail
+                                    </label>
+                                </div>
+                                
+                                <div id="correspondence-details" class="hidden">
+                                    <label class="block text-xs text-fire-200 mb-2">Wohin soll die Korrespondenz zugestellt werden?</label>
+                                    <div class="flex flex-col gap-2">
+                                        <label class="flex items-center text-sm text-fire-100">
+                                            <input type="radio" name="correspondence-address" value="main" class="mr-2 text-fire-500 focus:ring-fire-500">
+                                            Hauptadresse/E-Mail (wie oben angegeben)
+                                        </label>
+                                        <label class="flex items-center text-sm text-fire-100">
+                                            <input type="radio" name="correspondence-address" value="other" class="mr-2 text-fire-500 focus:ring-fire-500">
+                                            Andere:
+                                        </label>
+                                        <div id="other-address-field" class="hidden ml-6">
+                                            <input type="text" id="member-other-address" placeholder="Andere Adresse/E-Mail" class="w-full px-3 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Normale Nachricht (nur bei anderen Betreff-Optionen sichtbar) -->
+                        <div id="general-message" class="hidden">
+                            <textarea id="contact-message" rows="4" placeholder="Nachricht" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white resize-none"></textarea>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors flex items-center justify-center space-x-2">
+                            <span>📧</span>
+                            <span>E-Mail senden</span>
                         </button>
                     </form>
                 </div>
@@ -479,11 +582,10 @@
 
             parseMarkdownMember(content, filename = '') {
                 try {
-                    // Verschiedene Frontmatter-Varianten unterstützen
                     const patterns = [
-                        /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/,  // Standard
-                        /^---\r?\n([\s\S]*?)\r?\n---\r?\n?$/,         // Nur Frontmatter
-                        /^([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/          // Frontmatter am Ende
+                        /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/,
+                        /^---\r?\n([\s\S]*?)\r?\n---\r?\n?$/,
+                        /^([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/
                     ];
 
                     let frontmatterMatch = null;
@@ -494,32 +596,22 @@
 
                     if (!frontmatterMatch) {
                         console.warn(`⚠️ ${filename}: Kein Frontmatter gefunden`);
-                        console.log('📝 Inhalt (erste 200 Zeichen):', content.substring(0, 200));
                         return null;
                     }
 
                     const [, frontmatterStr, description = ''] = frontmatterMatch;
-                    console.log(`📋 ${filename}: Frontmatter gefunden (${frontmatterStr.length} Zeichen)`);
-                    
                     const frontmatter = this.parseFrontmatter(frontmatterStr);
                     
-                    // Validierung
                     if (!frontmatter.name || !frontmatter.position) {
-                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen:`, {
-                            name: frontmatter.name,
-                            position: frontmatter.position
-                        });
+                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen`);
                         return null;
                     }
                     
-                    const member = {
+                    return {
                         ...frontmatter,
                         description: description.trim(),
                         _source: filename
                     };
-
-                    console.log(`✅ ${filename}: Member erstellt:`, member);
-                    return member;
                     
                 } catch (error) {
                     console.error(`❌ ${filename}: Parse-Fehler:`, error);
@@ -531,10 +623,7 @@
                 const result = {};
                 const lines = frontmatterStr.split(/\r?\n/).filter(line => line.trim());
                 
-                console.log('🔍 Parse Frontmatter Lines:', lines);
-                
                 for (const line of lines) {
-                    // Skip comments and empty lines
                     if (line.trim().startsWith('#') || !line.trim()) continue;
                     
                     const colonIndex = line.indexOf(':');
@@ -545,51 +634,36 @@
                     
                     if (!key) continue;
                     
-                    // Remove quotes if present
                     if ((value.startsWith('"') && value.endsWith('"')) || 
                         (value.startsWith("'") && value.endsWith("'"))) {
                         value = value.slice(1, -1);
                     }
                     
-                    // Convert to number if it's the order field
                     if (key === 'order' && !isNaN(value) && value !== '') {
                         value = parseInt(value);
                     }
                     
                     result[key] = value;
-                    console.log(`📝 ${key}: ${value}`);
                 }
                 
                 return result;
             }
 
             renderVorstand() {
-                console.log('🎨 Rendere Vorstand...');
-                
                 const container = document.getElementById('vorstand-container');
                 const loading = document.getElementById('vorstand-loading');
                 const error = document.getElementById('vorstand-error');
                 const fallback = document.getElementById('vorstand-fallback');
                 
-                // Alle verstecken
                 [loading, error, fallback].forEach(el => el?.classList.add('hidden'));
                 
                 if (this.vorstandMembers.length === 0) {
-                    console.warn('⚠️ Keine Mitglieder zum Rendern - zeige Fallback');
                     this.showFallback();
                     return;
                 }
 
                 container.classList.remove('hidden');
-                
-                const membersHtml = this.vorstandMembers.map((member, index) => {
-                    console.log(`👤 Rendere: ${member.name} (${index + 1}/${this.vorstandMembers.length})`);
-                    return this.createMemberHTML(member);
-                }).join('');
-                
-                container.innerHTML = membersHtml;
-                
-                console.log(`✅ ${this.vorstandMembers.length} Vorstandsmitglieder erfolgreich angezeigt`);
+                container.innerHTML = this.vorstandMembers.map(member => this.createMemberHTML(member)).join('');
             }
 
             createMemberHTML(member) {
@@ -605,8 +679,8 @@
                         <div class="relative">
                             ${image ? `
                                 <img src="${image}" alt="${member.name}" class="w-12 h-12 rounded-full object-cover border-2 border-gray-200" 
-                                     onload="this.nextElementSibling.style.display='none'; console.log('🖼️ Bild geladen: ${image}');"
-                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; console.log('❌ Bild fehlt: ${image}');">
+                                     onload="this.nextElementSibling.style.display='none';"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                             ` : ''}
                             <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg border-2 border-gray-200" 
                                  style="display: ${image ? 'none' : 'flex'};">
@@ -632,8 +706,6 @@
             }
 
             showError() {
-                console.log('❌ Zeige Fehler-Ansicht');
-                
                 const loading = document.getElementById('vorstand-loading');
                 const error = document.getElementById('vorstand-error');
                 const container = document.getElementById('vorstand-container');
@@ -642,16 +714,13 @@
                 [loading, container, fallback].forEach(el => el?.classList.add('hidden'));
                 error?.classList.remove('hidden');
                 
-                // Retry Button Event Listener
                 const retryBtn = document.getElementById('retry-vorstand');
                 if (retryBtn) {
                     retryBtn.onclick = () => {
-                        console.log('🔄 Wiederhole Laden...');
                         this.retryCount++;
                         if (this.retryCount <= this.maxRetries) {
                             this.init();
                         } else {
-                            console.log('🛑 Max. Versuche erreicht - zeige Fallback');
                             this.showFallback();
                         }
                     };
@@ -659,8 +728,6 @@
             }
 
             showFallback() {
-                console.log('🔧 Zeige Fallback-Ansicht');
-                
                 const loading = document.getElementById('vorstand-loading');
                 const error = document.getElementById('vorstand-error');
                 const container = document.getElementById('vorstand-container');
@@ -668,12 +735,224 @@
                 
                 [loading, error, container].forEach(el => el?.classList.add('hidden'));
                 fallback?.classList.remove('hidden');
-                
-                console.log('✅ Fallback-Ansicht aktiv');
             }
         }
 
-        // Mobile menu toggle
+        // Setup contact form
+        function setupContactForm() {
+            const contactForm = document.getElementById('contact-form');
+            const subjectSelect = document.getElementById('contact-subject');
+            
+            if (contactForm && subjectSelect) {
+                subjectSelect.addEventListener('change', function() {
+                    toggleMembershipForm(this.value === 'Mitgliedschaft');
+                });
+                
+                contactForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    sendContactEmail();
+                });
+                
+                const correspondenceMethods = document.querySelectorAll('input[name="correspondence-method"]');
+                correspondenceMethods.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        const detailsDiv = document.getElementById('correspondence-details');
+                        if (this.checked) {
+                            detailsDiv.classList.remove('hidden');
+                            const mainRadio = document.querySelector('input[name="correspondence-address"][value="main"]');
+                            if (mainRadio) mainRadio.checked = true;
+                        }
+                    });
+                });
+                
+                const addressRadios = document.querySelectorAll('input[name="correspondence-address"]');
+                addressRadios.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        const otherField = document.getElementById('other-address-field');
+                        if (this.value === 'other') {
+                            otherField.classList.remove('hidden');
+                        } else {
+                            otherField.classList.add('hidden');
+                        }
+                    });
+                });
+            }
+        }
+
+        function toggleMembershipForm(showMembership) {
+            const membershipForm = document.getElementById('membership-form');
+            const generalMessage = document.getElementById('general-message');
+            
+            if (showMembership) {
+                membershipForm.classList.remove('hidden');
+                generalMessage.classList.add('hidden');
+            } else {
+                membershipForm.classList.add('hidden');
+                generalMessage.classList.remove('hidden');
+            }
+        }
+
+        function sendContactEmail() {
+            const name = document.getElementById('contact-name').value.trim();
+            const email = document.getElementById('contact-email').value.trim();
+            const subject = document.getElementById('contact-subject').value;
+
+            if (!name || !email || !subject) {
+                alert('Bitte füllen Sie mindestens Name, E-Mail und Betreff aus.');
+                return;
+            }
+
+            let mailtoLink, successMessage;
+
+            if (subject === 'Mitgliedschaft') {
+                const result = generateMembershipEmail(name, email);
+                if (!result) return;
+                mailtoLink = result.mailtoLink;
+                successMessage = result.successMessage;
+            } else {
+                const message = document.getElementById('contact-message').value.trim();
+                if (!message) {
+                    alert('Bitte geben Sie eine Nachricht ein.');
+                    return;
+                }
+                
+                const result = generateGeneralEmail(name, email, subject, message);
+                mailtoLink = result.mailtoLink;
+                successMessage = result.successMessage;
+            }
+
+            window.location.href = mailtoLink;
+
+            setTimeout(() => {
+                alert(successMessage);
+                resetContactForm();
+            }, 500);
+        }
+
+        function generateMembershipEmail(name, email) {
+            const lastname = document.getElementById('member-lastname').value.trim();
+            const firstname = document.getElementById('member-firstname').value.trim();
+            const street = document.getElementById('member-street').value.trim();
+            const city = document.getElementById('member-city').value.trim();
+            const phone = document.getElementById('member-phone').value.trim();
+            const mobile = document.getElementById('member-mobile').value.trim();
+            const memberEmail = document.getElementById('member-email-addr').value.trim();
+            
+            const firefighterStatus = document.querySelector('input[name="firefighter-status"]:checked');
+            const correspondenceMethod = document.querySelector('input[name="correspondence-method"]:checked');
+            const correspondenceAddress = document.querySelector('input[name="correspondence-address"]:checked');
+            const otherAddress = document.getElementById('member-other-address').value.trim();
+
+            const requiredFields = [lastname, firstname, street, city, phone, memberEmail];
+            if (requiredFields.some(field => !field) || !firefighterStatus || !correspondenceMethod) {
+                alert('Bitte füllen Sie alle Pflichtfelder (*) aus.');
+                return null;
+            }
+
+            const subjectLine = 'Beitrittsantrag - Feuerwehrverein Raura';
+            
+            const firefighterStatusText = {
+                'active': 'Ja (aktiv)',
+                'former': 'Ehemalige/r',
+                'no': 'Nein'
+            };
+
+            const correspondenceMethodText = correspondenceMethod.value === 'post' ? 'Post' : 'E-Mail';
+            
+            let correspondenceDetails = '';
+            if (correspondenceAddress) {
+                if (correspondenceAddress.value === 'main') {
+                    correspondenceDetails = correspondenceMethod.value === 'post' 
+                        ? 'Hauptadresse (wie oben angegeben)'
+                        : 'Haupt-E-Mail (wie oben angegeben)';
+                } else if (correspondenceAddress.value === 'other' && otherAddress) {
+                    correspondenceDetails = `Andere: ${otherAddress}`;
+                }
+            }
+
+            const body = `Sehr geehrter Herr Müller,
+
+hiermit beantrage ich die Aufnahme in den Feuerwehrverein Raura Kaiseraugst.
+
+PERSÖNLICHE DATEN:
+Name: ${lastname}
+Vorname: ${firstname}
+Strasse: ${street}
+PLZ und Ort: ${city}
+Telefonnummer: ${phone}
+${mobile ? `Mobilnummer: ${mobile}` : 'Mobilnummer: -'}
+E-Mail-Adresse: ${memberEmail}
+
+FEUERWEHR-ZUGEHÖRIGKEIT:
+Angehörige/r der Feuerwehr Raurica: ${firefighterStatusText[firefighterStatus.value]}
+
+KORRESPONDENZ:
+Zustellung der Korrespondenz: ${correspondenceMethodText}
+${correspondenceDetails ? `Zustelladresse: ${correspondenceDetails}` : ''}
+
+KONTAKT FÜR RÜCKFRAGEN:
+Name: ${name}
+E-Mail: ${email}
+
+Mit freundlichen Grüssen
+${name}
+
+---
+Formular erstellt über: www.fwv-raura.ch
+Version: ${new Date().toLocaleDateString('de-DE')}`;
+
+            const mailtoLink = `mailto:aktuar@fwv-raura.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+            
+            return {
+                mailtoLink,
+                successMessage: 'Beitrittsantrag wurde an Ihren E-Mail-Client weitergeleitet.\n\nBitte senden Sie die E-Mail an den Aktuar Stefan Müller ab.\n\nAktive Feuerwehr-Mitglieder werden sofort aufgenommen,\nandere Interessierte werden an der nächsten GV bestätigt.'
+            };
+        }
+
+        function generateGeneralEmail(name, email, subject, message) {
+            const subjectLine = `Kontaktanfrage: ${subject}`;
+            const body = `Hallo,
+
+ich möchte gerne Kontakt mit dem Feuerwehrverein Raura aufnehmen.
+
+BETREFF: ${subject}
+
+MEINE KONTAKTDATEN:
+Name: ${name}
+E-Mail: ${email}
+
+NACHRICHT:
+${message}
+
+Mit freundlichen Grüssen
+${name}`;
+
+            const mailtoLink = `mailto:kontakt@fwv-raura.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+            
+            return {
+                mailtoLink,
+                successMessage: 'E-Mail-Client wurde geöffnet. Bitte senden Sie die E-Mail ab.'
+            };
+        }
+
+        function resetContactForm() {
+            document.getElementById('contact-name').value = '';
+            document.getElementById('contact-email').value = '';
+            document.getElementById('contact-subject').value = '';
+            document.getElementById('contact-message').value = '';
+            
+            const membershipInputs = document.querySelectorAll('#membership-form input[type="text"], #membership-form input[type="email"], #membership-form input[type="tel"]');
+            membershipInputs.forEach(input => input.value = '');
+            
+            const membershipRadios = document.querySelectorAll('#membership-form input[type="radio"]');
+            membershipRadios.forEach(radio => radio.checked = false);
+            
+            document.getElementById('membership-form').classList.add('hidden');
+            document.getElementById('general-message').classList.add('hidden');
+            document.getElementById('correspondence-details').classList.add('hidden');
+            document.getElementById('other-address-field').classList.add('hidden');
+        }
+
         function setupMobileMenu() {
             const mobileMenuBtn = document.getElementById('mobile-menu-btn');
             const mobileMenu = document.getElementById('mobile-menu');
@@ -681,12 +960,10 @@
             if (mobileMenuBtn && mobileMenu) {
                 mobileMenuBtn.addEventListener('click', () => {
                     mobileMenu.classList.toggle('hidden');
-                    console.log('📱 Mobile Menu toggled');
                 });
             }
         }
 
-        // Smooth scrolling for navigation links
         function setupSmoothScrolling() {
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
@@ -697,66 +974,33 @@
                             behavior: 'smooth',
                             block: 'start'
                         });
-                        // Close mobile menu if open
                         const mobileMenu = document.getElementById('mobile-menu');
                         mobileMenu?.classList.add('hidden');
-                        console.log('🔗 Smooth scroll zu:', this.getAttribute('href'));
                     }
                 });
             });
         }
 
-        // Logo fallback
         function setupLogoFallback() {
             const logos = document.querySelectorAll('img[alt*="Logo"]');
             logos.forEach((logo, index) => {
                 logo.onerror = function() {
-                    console.log(`🖼️ Logo ${index + 1} nicht gefunden, zeige Fallback`);
                     this.style.display = 'none';
                     const fallback = this.nextElementSibling;
                     if (fallback) {
                         fallback.style.display = 'flex';
                     }
                 };
-                
-                logo.onload = function() {
-                    console.log(`✅ Logo ${index + 1} erfolgreich geladen`);
-                };
             });
         }
 
-        // Page initialization
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM Content Loaded - Initialisiere Seite...');
-            
-            // Setup all components
             setupMobileMenu();
             setupSmoothScrolling();
             setupLogoFallback();
-            
-            // Initialize Vorstand Manager
-            console.log('👥 Starte Vorstand Manager...');
+            setupContactForm();
             window.vorstandManager = new VorstandManager();
-            
-            console.log('✅ Seiten-Initialisierung abgeschlossen');
         });
-
-        // Global error handler
-        window.addEventListener('error', function(e) {
-            console.error('🚨 JavaScript Fehler:', {
-                message: e.message,
-                filename: e.filename,
-                line: e.lineno,
-                column: e.colno,
-                error: e.error
-            });
-        });
-
-        // Network status
-        window.addEventListener('online', () => console.log('🌐 Online'));
-        window.addEventListener('offline', () => console.log('📴 Offline'));
-
-        console.log('📜 JavaScript vollständig geladen');
     </script>
 </body>
 </html>
