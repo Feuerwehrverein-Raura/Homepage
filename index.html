@@ -34,10 +34,8 @@
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
                 <div class="flex items-center space-x-3">
-                    <!-- Logo-Bild (anpassen je nach deinem Dateinamen) -->
                     <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-fire-300 shadow-lg bg-white">
                         <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="w-full h-full object-contain p-1">
-                        <!-- Fallback falls Bild nicht lädt -->
                         <div class="w-full h-full bg-fire-500 flex items-center justify-center text-white font-bold text-lg" style="display: none;">
                             FW
                         </div>
@@ -60,7 +58,6 @@
                     </svg>
                 </button>
             </div>
-            <!-- Mobile Menu -->
             <div id="mobile-menu" class="hidden md:hidden pb-4">
                 <div class="flex flex-col space-y-2">
                     <a href="#home" class="hover:text-fire-200 transition-colors py-2">Home</a>
@@ -78,7 +75,6 @@
     <section id="home" class="bg-gradient-to-br from-fire-600 to-fire-800 text-white py-20">
         <div class="container mx-auto px-4 text-center">
             <div class="max-w-4xl mx-auto">
-                <!-- Großes Logo im Hero -->
                 <div class="mb-8 flex justify-center">
                     <div class="w-32 h-32 rounded-full overflow-hidden border-4 border-white border-opacity-30 shadow-2xl bg-white">
                         <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="w-full h-full object-contain p-2">
@@ -144,15 +140,95 @@
                         <span class="ml-2 text-gray-600">Lade Vorstandsinformationen...</span>
                     </div>
                     
-                    <!-- Vorstand Container (wird dynamisch gefüllt) -->
-                    <ul id="vorstand-container" class="hidden grid gap-4 sm:grid-cols-2">
-                        <!-- Vorstandsmitglieder werden hier dynamisch eingefügt -->
-                    </ul>
+                    <!-- Vorstand Container -->
+                    <div id="vorstand-container" class="hidden space-y-4">
+                        <!-- Vorstandsmitglieder werden hier eingefügt -->
+                    </div>
                     
                     <!-- Error Message -->
                     <div id="vorstand-error" class="hidden text-center py-8">
-                        <p class="text-red-600 mb-4">Fehler beim Laden der Vorstandsinformationen.</p>
-                        <p class="text-gray-600 text-sm">Bitte versuchen Sie es später erneut oder kontaktieren Sie uns direkt.</p>
+                        <div class="text-red-600 mb-4">
+                            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="font-semibold">Vorstandsinformationen konnten nicht geladen werden</p>
+                        </div>
+                        <p class="text-gray-600 text-sm mb-4">
+                            Möglicherweise sind die Markdown-Dateien nicht verfügbar oder es gab einen Netzwerkfehler.
+                        </p>
+                        <button id="retry-vorstand" class="bg-fire-500 text-white px-4 py-2 rounded hover:bg-fire-600 transition-colors">
+                            Erneut versuchen
+                        </button>
+                    </div>
+                    
+                    <!-- Fallback Content -->
+                    <div id="vorstand-fallback" class="hidden space-y-4">
+                        <div class="flex items-center gap-4 border-l-4 border-fire-500 pl-4">
+                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg">
+                                R
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800">René Käslin</p>
+                                <p class="text-fire-600 text-sm">Präsident</p>
+                                <a href="mailto:praesident@fwv-raura.ch" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ✉ praesident@fwv-raura.ch
+                                </a>
+                                <a href="tel:+41618130316" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ☎ +41 61 813 03 16
+                                </a>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 border-l-4 border-fire-500 pl-4">
+                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg">
+                                S
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800">Stefan Müller</p>
+                                <p class="text-fire-600 text-sm">Aktuar</p>
+                                <a href="mailto:aktuar@fwv-raura.ch" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ✉ aktuar@fwv-raura.ch
+                                </a>
+                                <a href="tel:+41765199970" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ☎ +41 76 519 99 70
+                                </a>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 border-l-4 border-fire-500 pl-4">
+                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg">
+                                G
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800">Giuseppe Costanza</p>
+                                <p class="text-fire-600 text-sm">Kassier</p>
+                                <a href="mailto:kassier@fwv-raura.ch" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ✉ kassier@fwv-raura.ch
+                                </a>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 border-l-4 border-fire-500 pl-4">
+                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg">
+                                E
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800">Edi Grossenbacher</p>
+                                <p class="text-fire-600 text-sm">Materialwart</p>
+                                <a href="mailto:materialwart@fwv-raura.ch" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ✉ materialwart@fwv-raura.ch
+                                </a>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 border-l-4 border-fire-500 pl-4">
+                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg">
+                                U
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800">Urs Michel</p>
+                                <p class="text-fire-600 text-sm">Beisitzer</p>
+                                <a href="mailto:beisitzer@fwv-raura.ch" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ✉ beisitzer@fwv-raura.ch
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -320,19 +396,29 @@
     </footer>
 
     <script>
-        // Vorstand Management Class
+        console.log('🔥 Feuerwehrverein Raura - Website gestartet');
+
         class VorstandManager {
             constructor() {
                 this.vorstandMembers = [];
+                this.retryCount = 0;
+                this.maxRetries = 3;
                 this.init();
             }
 
             async init() {
+                console.log('📋 Initialisiere Vorstand-System...');
+                
                 try {
                     await this.loadVorstandMembers();
-                    this.renderVorstand();
+                    if (this.vorstandMembers.length > 0) {
+                        this.renderVorstand();
+                    } else {
+                        console.warn('⚠️ Keine Vorstandsmitglieder geladen - zeige Fallback');
+                        this.showFallback();
+                    }
                 } catch (error) {
-                    console.error('Fehler beim Initialisieren des Vorstands:', error);
+                    console.error('❌ Fehler beim Initialisieren:', error);
                     this.showError();
                 }
             }
@@ -340,84 +426,117 @@
             async loadVorstandMembers() {
                 const memberFiles = [
                     'vorstand/praesident.md',
-                    'vorstand/aktuar.md',
+                    'vorstand/aktuar.md', 
                     'vorstand/kassier.md',
                     'vorstand/materialwart.md',
                     'vorstand/beisitzer.md'
                 ];
 
-                try {
-                    const promises = memberFiles.map(file => this.loadMemberFromFile(file));
-                    const results = await Promise.allSettled(promises);
-                    
-                    this.vorstandMembers = results
-                        .filter(result => result.status === 'fulfilled' && result.value !== null)
-                        .map(result => result.value)
-                        .sort((a, b) => (a.order || 999) - (b.order || 999));
-                        
-                    console.log('Vorstandsmitglieder geladen:', this.vorstandMembers);
-                        
-                } catch (error) {
-                    console.error('Fehler beim Laden der Vorstandsmitglieder:', error);
-                    throw error;
-                }
-            }
+                console.log('📂 Lade Markdown-Dateien:', memberFiles);
 
-            async loadMemberFromFile(filepath) {
-                try {
-                    const response = await fetch(filepath);
-                    if (!response.ok) {
-                        console.warn(`Datei ${filepath} nicht gefunden (${response.status})`);
+                const promises = memberFiles.map(async (file, index) => {
+                    try {
+                        console.log(`📄 Lade: ${file}`);
+                        const response = await fetch(file);
+                        
+                        if (!response.ok) {
+                            console.warn(`⚠️ ${file}: HTTP ${response.status} ${response.statusText}`);
+                            return null;
+                        }
+                        
+                        const content = await response.text();
+                        console.log(`✅ ${file}: ${content.length} Zeichen geladen`);
+                        
+                        if (!content.trim()) {
+                            console.warn(`⚠️ ${file}: Datei ist leer`);
+                            return null;
+                        }
+                        
+                        const member = this.parseMarkdownMember(content, file);
+                        if (member) {
+                            console.log(`👤 Parsed: ${member.name} (${member.position})`);
+                            return member;
+                        } else {
+                            console.warn(`⚠️ ${file}: Konnte nicht geparst werden`);
+                            return null;
+                        }
+                        
+                    } catch (error) {
+                        console.error(`❌ Fehler beim Laden von ${file}:`, error);
                         return null;
                     }
-                    
-                    const content = await response.text();
-                    const member = this.parseMarkdownMember(content);
-                    
-                    if (!member) {
-                        console.warn(`Konnte ${filepath} nicht parsen`);
-                        return null;
-                    }
-                    
-                    return member;
-                } catch (error) {
-                    console.warn(`Fehler beim Laden von ${filepath}:`, error);
-                    return null;
-                }
+                });
+
+                const results = await Promise.allSettled(promises);
+                this.vorstandMembers = results
+                    .filter(result => result.status === 'fulfilled' && result.value !== null)
+                    .map(result => result.value)
+                    .sort((a, b) => (a.order || 999) - (b.order || 999));
+
+                console.log(`🎯 ${this.vorstandMembers.length} Vorstandsmitglieder erfolgreich geladen:`, 
+                    this.vorstandMembers.map(m => `${m.name} (${m.position})`));
             }
 
-            parseMarkdownMember(content) {
+            parseMarkdownMember(content, filename = '') {
                 try {
-                    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+                    // Verschiedene Frontmatter-Varianten unterstützen
+                    const patterns = [
+                        /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/,  // Standard
+                        /^---\r?\n([\s\S]*?)\r?\n---\r?\n?$/,         // Nur Frontmatter
+                        /^([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/          // Frontmatter am Ende
+                    ];
+
+                    let frontmatterMatch = null;
+                    for (const pattern of patterns) {
+                        frontmatterMatch = content.match(pattern);
+                        if (frontmatterMatch) break;
+                    }
+
                     if (!frontmatterMatch) {
-                        console.warn('Kein gültiges Frontmatter gefunden');
+                        console.warn(`⚠️ ${filename}: Kein Frontmatter gefunden`);
+                        console.log('📝 Inhalt (erste 200 Zeichen):', content.substring(0, 200));
                         return null;
                     }
 
-                    const [, frontmatterStr, description] = frontmatterMatch;
+                    const [, frontmatterStr, description = ''] = frontmatterMatch;
+                    console.log(`📋 ${filename}: Frontmatter gefunden (${frontmatterStr.length} Zeichen)`);
+                    
                     const frontmatter = this.parseFrontmatter(frontmatterStr);
                     
-                    // Validierung der Pflichtfelder
+                    // Validierung
                     if (!frontmatter.name || !frontmatter.position) {
-                        console.warn('Pflichtfelder (name, position) fehlen');
+                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen:`, {
+                            name: frontmatter.name,
+                            position: frontmatter.position
+                        });
                         return null;
                     }
                     
-                    return {
+                    const member = {
                         ...frontmatter,
-                        description: description.trim()
+                        description: description.trim(),
+                        _source: filename
                     };
+
+                    console.log(`✅ ${filename}: Member erstellt:`, member);
+                    return member;
+                    
                 } catch (error) {
-                    console.warn('Fehler beim Parsen des Markdown-Inhalts:', error);
+                    console.error(`❌ ${filename}: Parse-Fehler:`, error);
                     return null;
                 }
             }
 
             parseFrontmatter(frontmatterStr) {
                 const result = {};
-                const lines = frontmatterStr.split(/\r?\n/);
+                const lines = frontmatterStr.split(/\r?\n/).filter(line => line.trim());
+                
+                console.log('🔍 Parse Frontmatter Lines:', lines);
                 
                 for (const line of lines) {
+                    // Skip comments and empty lines
+                    if (line.trim().startsWith('#') || !line.trim()) continue;
+                    
                     const colonIndex = line.indexOf(':');
                     if (colonIndex === -1) continue;
                     
@@ -426,51 +545,71 @@
                     
                     if (!key) continue;
                     
+                    // Remove quotes if present
+                    if ((value.startsWith('"') && value.endsWith('"')) || 
+                        (value.startsWith("'") && value.endsWith("'"))) {
+                        value = value.slice(1, -1);
+                    }
+                    
                     // Convert to number if it's the order field
                     if (key === 'order' && !isNaN(value) && value !== '') {
                         value = parseInt(value);
                     }
                     
                     result[key] = value;
+                    console.log(`📝 ${key}: ${value}`);
                 }
                 
                 return result;
             }
 
             renderVorstand() {
+                console.log('🎨 Rendere Vorstand...');
+                
                 const container = document.getElementById('vorstand-container');
                 const loading = document.getElementById('vorstand-loading');
                 const error = document.getElementById('vorstand-error');
+                const fallback = document.getElementById('vorstand-fallback');
                 
-                // Alle Status-Elemente verstecken
-                loading.classList.add('hidden');
-                error.classList.add('hidden');
-                container.classList.add('hidden');
+                // Alle verstecken
+                [loading, error, fallback].forEach(el => el?.classList.add('hidden'));
                 
                 if (this.vorstandMembers.length === 0) {
-                    this.showError();
+                    console.warn('⚠️ Keine Mitglieder zum Rendern - zeige Fallback');
+                    this.showFallback();
                     return;
                 }
 
                 container.classList.remove('hidden');
-                container.innerHTML = this.vorstandMembers.map(member => this.createMemberHTML(member)).join('');
                 
-                console.log(`${this.vorstandMembers.length} Vorstandsmitglieder angezeigt`);
+                const membersHtml = this.vorstandMembers.map((member, index) => {
+                    console.log(`👤 Rendere: ${member.name} (${index + 1}/${this.vorstandMembers.length})`);
+                    return this.createMemberHTML(member);
+                }).join('');
+                
+                container.innerHTML = membersHtml;
+                
+                console.log(`✅ ${this.vorstandMembers.length} Vorstandsmitglieder erfolgreich angezeigt`);
             }
 
             createMemberHTML(member) {
                 const fallbackImage = member.name ? member.name.charAt(0).toUpperCase() : '?';
                 const email = member.email || '';
                 const phone = member.phone || '';
-                const image = member.image || 'images/default-avatar.png';
+                const image = member.image || '';
+                const description = member.description || '';
                 
                 return `
-                    <li class="flex items-center gap-4 border-l-4 border-fire-500 pl-4 hover:bg-gray-50 rounded-md transition-colors p-2" title="${member.description || ''}">
+                    <div class="flex items-center gap-4 border-l-4 border-fire-500 pl-4 hover:bg-gray-50 rounded-md transition-colors p-2" 
+                         ${description ? `title="${description}"` : ''}>
                         <div class="relative">
-                            <img src="${image}" alt="${member.name}" class="w-12 h-12 rounded-full object-cover border-2 border-gray-200" 
-                                 onload="this.nextElementSibling.style.display='none';"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg border-2 border-gray-200" style="display: none;">
+                            ${image ? `
+                                <img src="${image}" alt="${member.name}" class="w-12 h-12 rounded-full object-cover border-2 border-gray-200" 
+                                     onload="this.nextElementSibling.style.display='none'; console.log('🖼️ Bild geladen: ${image}');"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'; console.log('❌ Bild fehlt: ${image}');">
+                            ` : ''}
+                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg border-2 border-gray-200" 
+                                 style="display: ${image ? 'none' : 'flex'};">
                                 ${fallbackImage}
                             </div>
                         </div>
@@ -483,66 +622,141 @@
                                 </a>
                             ` : ''}
                             ${phone ? `
-                                <a href="tel:${phone}" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                <a href="tel:${phone.replace(/\s/g, '')}" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
                                     ☎ ${phone}
                                 </a>
                             ` : ''}
                         </div>
-                    </li>
+                    </div>
                 `;
             }
 
             showError() {
+                console.log('❌ Zeige Fehler-Ansicht');
+                
                 const loading = document.getElementById('vorstand-loading');
                 const error = document.getElementById('vorstand-error');
                 const container = document.getElementById('vorstand-container');
+                const fallback = document.getElementById('vorstand-fallback');
                 
-                loading.classList.add('hidden');
-                container.classList.add('hidden');
-                error.classList.remove('hidden');
+                [loading, container, fallback].forEach(el => el?.classList.add('hidden'));
+                error?.classList.remove('hidden');
                 
-                console.log('Fehler-Ansicht wird angezeigt');
+                // Retry Button Event Listener
+                const retryBtn = document.getElementById('retry-vorstand');
+                if (retryBtn) {
+                    retryBtn.onclick = () => {
+                        console.log('🔄 Wiederhole Laden...');
+                        this.retryCount++;
+                        if (this.retryCount <= this.maxRetries) {
+                            this.init();
+                        } else {
+                            console.log('🛑 Max. Versuche erreicht - zeige Fallback');
+                            this.showFallback();
+                        }
+                    };
+                }
+            }
+
+            showFallback() {
+                console.log('🔧 Zeige Fallback-Ansicht');
+                
+                const loading = document.getElementById('vorstand-loading');
+                const error = document.getElementById('vorstand-error');
+                const container = document.getElementById('vorstand-container');
+                const fallback = document.getElementById('vorstand-fallback');
+                
+                [loading, error, container].forEach(el => el?.classList.add('hidden'));
+                fallback?.classList.remove('hidden');
+                
+                console.log('✅ Fallback-Ansicht aktiv');
             }
         }
 
-        // Logo-Fallback wenn Bild nicht lädt
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize Vorstand Manager
-            new VorstandManager();
-            
-            // Logo fallback
-            const logos = document.querySelectorAll('img[alt*="Logo"]');
-            logos.forEach(logo => {
-                logo.onerror = function() {
-                    this.style.display = 'none';
-                    this.nextElementSibling.style.display = 'flex';
-                };
-            });
-        });
-
         // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-        const mobileMenu = document.getElementById('mobile-menu');
-        
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
+        function setupMobileMenu() {
+            const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            if (mobileMenuBtn && mobileMenu) {
+                mobileMenuBtn.addEventListener('click', () => {
+                    mobileMenu.classList.toggle('hidden');
+                    console.log('📱 Mobile Menu toggled');
+                });
+            }
+        }
 
         // Smooth scrolling for navigation links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                    // Close mobile menu if open
-                    mobileMenu.classList.add('hidden');
-                }
+        function setupSmoothScrolling() {
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                        // Close mobile menu if open
+                        const mobileMenu = document.getElementById('mobile-menu');
+                        mobileMenu?.classList.add('hidden');
+                        console.log('🔗 Smooth scroll zu:', this.getAttribute('href'));
+                    }
+                });
+            });
+        }
+
+        // Logo fallback
+        function setupLogoFallback() {
+            const logos = document.querySelectorAll('img[alt*="Logo"]');
+            logos.forEach((logo, index) => {
+                logo.onerror = function() {
+                    console.log(`🖼️ Logo ${index + 1} nicht gefunden, zeige Fallback`);
+                    this.style.display = 'none';
+                    const fallback = this.nextElementSibling;
+                    if (fallback) {
+                        fallback.style.display = 'flex';
+                    }
+                };
+                
+                logo.onload = function() {
+                    console.log(`✅ Logo ${index + 1} erfolgreich geladen`);
+                };
+            });
+        }
+
+        // Page initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM Content Loaded - Initialisiere Seite...');
+            
+            // Setup all components
+            setupMobileMenu();
+            setupSmoothScrolling();
+            setupLogoFallback();
+            
+            // Initialize Vorstand Manager
+            console.log('👥 Starte Vorstand Manager...');
+            window.vorstandManager = new VorstandManager();
+            
+            console.log('✅ Seiten-Initialisierung abgeschlossen');
+        });
+
+        // Global error handler
+        window.addEventListener('error', function(e) {
+            console.error('🚨 JavaScript Fehler:', {
+                message: e.message,
+                filename: e.filename,
+                line: e.lineno,
+                column: e.colno,
+                error: e.error
             });
         });
+
+        // Network status
+        window.addEventListener('online', () => console.log('🌐 Online'));
+        window.addEventListener('offline', () => console.log('📴 Offline'));
+
+        console.log('📜 JavaScript vollständig geladen');
     </script>
 </body>
 </html>
