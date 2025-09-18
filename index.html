@@ -328,8 +328,13 @@
             }
 
             async init() {
-                await this.loadVorstandMembers();
-                this.renderVorstand();
+                try {
+                    await this.loadVorstandMembers();
+                    this.renderVorstand();
+                } catch (error) {
+                    console.error('Fehler beim Initialisieren des Vorstands:', error);
+                    this.showError();
+                }
             }
 
             async loadVorstandMembers() {
@@ -343,15 +348,18 @@
 
                 try {
                     const promises = memberFiles.map(file => this.loadMemberFromFile(file));
-                    const results = await Promise.all(promises);
+                    const results = await Promise.allSettled(promises);
                     
                     this.vorstandMembers = results
-                        .filter(member => member !== null)
-                        .sort((a, b) => a.order - b.order);
+                        .filter(result => result.status === 'fulfilled' && result.value !== null)
+                        .map(result => result.value)
+                        .sort((a, b) => (a.order || 999) - (b.order || 999));
+                        
+                    console.log('Vorstandsmitglieder geladen:', this.vorstandMembers);
                         
                 } catch (error) {
                     console.error('Fehler beim Laden der Vorstandsmitglieder:', error);
-                    this.showError();
+                    throw error;
                 }
             }
 
@@ -359,46 +367,71 @@
                 try {
                     const response = await fetch(filepath);
                     if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                        console.warn(`Datei ${filepath} nicht gefunden (${response.status})`);
+                        return null;
                     }
                     
                     const content = await response.text();
-                    return this.parseMarkdownMember(content);
+                    const member = this.parseMarkdownMember(content);
+                    
+                    if (!member) {
+                        console.warn(`Konnte ${filepath} nicht parsen`);
+                        return null;
+                    }
+                    
+                    return member;
                 } catch (error) {
-                    console.warn(`Konnte ${filepath} nicht laden:`, error);
+                    console.warn(`Fehler beim Laden von ${filepath}:`, error);
                     return null;
                 }
             }
 
             parseMarkdownMember(content) {
-                const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-                if (!frontmatterMatch) return null;
+                try {
+                    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+                    if (!frontmatterMatch) {
+                        console.warn('Kein gültiges Frontmatter gefunden');
+                        return null;
+                    }
 
-                const [, frontmatterStr, description] = frontmatterMatch;
-                const frontmatter = this.parseFrontmatter(frontmatterStr);
-                
-                return {
-                    ...frontmatter,
-                    description: description.trim()
-                };
+                    const [, frontmatterStr, description] = frontmatterMatch;
+                    const frontmatter = this.parseFrontmatter(frontmatterStr);
+                    
+                    // Validierung der Pflichtfelder
+                    if (!frontmatter.name || !frontmatter.position) {
+                        console.warn('Pflichtfelder (name, position) fehlen');
+                        return null;
+                    }
+                    
+                    return {
+                        ...frontmatter,
+                        description: description.trim()
+                    };
+                } catch (error) {
+                    console.warn('Fehler beim Parsen des Markdown-Inhalts:', error);
+                    return null;
+                }
             }
 
             parseFrontmatter(frontmatterStr) {
                 const result = {};
-                const lines = frontmatterStr.split('\n');
+                const lines = frontmatterStr.split(/\r?\n/);
                 
                 for (const line of lines) {
-                    const [key, ...valueParts] = line.split(':');
-                    if (key && valueParts.length > 0) {
-                        let value = valueParts.join(':').trim();
-                        
-                        // Convert to number if it's the order field
-                        if (key.trim() === 'order' && !isNaN(value)) {
-                            value = parseInt(value);
-                        }
-                        
-                        result[key.trim()] = value;
+                    const colonIndex = line.indexOf(':');
+                    if (colonIndex === -1) continue;
+                    
+                    const key = line.substring(0, colonIndex).trim();
+                    let value = line.substring(colonIndex + 1).trim();
+                    
+                    if (!key) continue;
+                    
+                    // Convert to number if it's the order field
+                    if (key === 'order' && !isNaN(value) && value !== '') {
+                        value = parseInt(value);
                     }
+                    
+                    result[key] = value;
                 }
                 
                 return result;
@@ -407,36 +440,51 @@
             renderVorstand() {
                 const container = document.getElementById('vorstand-container');
                 const loading = document.getElementById('vorstand-loading');
+                const error = document.getElementById('vorstand-error');
+                
+                // Alle Status-Elemente verstecken
+                loading.classList.add('hidden');
+                error.classList.add('hidden');
+                container.classList.add('hidden');
                 
                 if (this.vorstandMembers.length === 0) {
                     this.showError();
                     return;
                 }
 
-                loading.classList.add('hidden');
                 container.classList.remove('hidden');
-                
                 container.innerHTML = this.vorstandMembers.map(member => this.createMemberHTML(member)).join('');
+                
+                console.log(`${this.vorstandMembers.length} Vorstandsmitglieder angezeigt`);
             }
 
             createMemberHTML(member) {
+                const fallbackImage = member.name ? member.name.charAt(0).toUpperCase() : '?';
+                const email = member.email || '';
+                const phone = member.phone || '';
+                const image = member.image || 'images/default-avatar.png';
+                
                 return `
-                    <li class="flex items-center gap-4 border-l-4 border-fire-500 pl-4 hover:bg-gray-50 rounded-md transition-colors" title="${member.description}">
-                        <img src="${member.image}" alt="${member.name.charAt(0)}" class="w-12 h-12 rounded-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg" style="display: none;">
-                            ${member.name.charAt(0)}
+                    <li class="flex items-center gap-4 border-l-4 border-fire-500 pl-4 hover:bg-gray-50 rounded-md transition-colors p-2" title="${member.description || ''}">
+                        <div class="relative">
+                            <img src="${image}" alt="${member.name}" class="w-12 h-12 rounded-full object-cover border-2 border-gray-200" 
+                                 onload="this.nextElementSibling.style.display='none';"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="w-12 h-12 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg border-2 border-gray-200" style="display: none;">
+                                ${fallbackImage}
+                            </div>
                         </div>
-                        <div class="flex-1">
-                            <p class="font-semibold text-gray-800">${member.name}</p>
-                            <p class="text-fire-600">${member.position}</p>
-                            ${member.email ? `
-                                <a href="mailto:${member.email}" class="text-sm text-gray-600 hover:text-fire-600 transition-colors block">
-                                    ✉ ${member.email}
+                        <div class="flex-1 min-w-0">
+                            <p class="font-semibold text-gray-800 truncate">${member.name}</p>
+                            <p class="text-fire-600 text-sm">${member.position}</p>
+                            ${email ? `
+                                <a href="mailto:${email}" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block truncate">
+                                    ✉ ${email}
                                 </a>
                             ` : ''}
-                            ${member.phone ? `
-                                <a href="tel:${member.phone}" class="text-sm text-gray-600 hover:text-fire-600 transition-colors block">
-                                    ☎ ${member.phone}
+                            ${phone ? `
+                                <a href="tel:${phone}" class="text-xs text-gray-600 hover:text-fire-600 transition-colors block">
+                                    ☎ ${phone}
                                 </a>
                             ` : ''}
                         </div>
@@ -447,9 +495,13 @@
             showError() {
                 const loading = document.getElementById('vorstand-loading');
                 const error = document.getElementById('vorstand-error');
+                const container = document.getElementById('vorstand-container');
                 
                 loading.classList.add('hidden');
+                container.classList.add('hidden');
                 error.classList.remove('hidden');
+                
+                console.log('Fehler-Ansicht wird angezeigt');
             }
         }
 
