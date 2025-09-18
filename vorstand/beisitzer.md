@@ -1,4 +1,3 @@
-
 ---
 position: Beisitzer
 name: Urs Michel
