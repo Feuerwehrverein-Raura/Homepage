@@ -3,7 +3,7 @@
 position: Materialwart
 name: Edi Grossenbacher
 email: materialwart@fwv-raura.ch
-phone: 
+phone: +41 79 302 71 35
 image: images/materialwart.png
 order: 4
 ---
