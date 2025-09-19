@@ -8,7 +8,7 @@ X-WR-CALDESC:Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst
 X-WR-TIMEZONE:Europe/Zurich
 BEGIN:VEVENT
 UID:chilbi-2024@feuerwehrverein-raura.ch
-DTSTAMP:20250919T191954Z
+DTSTAMP:20250919T192109Z
 DTSTART:20241014T140000Z
 DTEND:20241015T220000Z
 SUMMARY:Chilbi 2024
@@ -20,7 +20,7 @@ STATUS:CONFIRMED
 END:VEVENT
 BEGIN:VEVENT
 UID:chilbi-2025@feuerwehrverein-raura.ch
-DTSTAMP:20250919T191954Z
+DTSTAMP:20250919T192109Z
 DTSTART:20251018T120000Z
 DTEND:20251019T220000Z
 SUMMARY:Chilbi 2025
@@ -32,13 +32,13 @@ STATUS:CONFIRMED
 END:VEVENT
 BEGIN:VEVENT
 UID:grillplausch-sommer-2024@feuerwehrverein-raura.ch
-DTSTAMP:20250919T191954Z
+DTSTAMP:20250919T192109Z
 DTSTART:20240617T160000Z
 DTEND:20240617T220000Z
 SUMMARY:Grillplausch bei Edi Grossenbacher
 DESCRIPTION:Grillplausch bei Edi Grossenbacher\n\nHiermit lädt der Vorstand alle Mitglieder zum gemütlichen Grillplausch bei Edi Grossenbacher ein.\n\nDetails\n\n- Essen und Getränke werden gestellt\n- Salate und Desserts können gerne mitgebracht werden\n- Bitte teilt uns mit\, wer was mitbringen möchte\n\nAnfahrt\n\nAdresse: Kurzenbettli 23\, 4302 Augst BL  \nLage: Bei der Schiessanlage Augst\n\nAnmeldung\n\nAnmeldung erforderlich bis: 12. Juni 2024\n\nAnmeldung bei René Käslin oder via Nextcloud:  \nhttps://nextcloud.fwv-raura.ch/apps/polls/s/OMXgGwSM\n\nWir freuen uns über zahlreiches Erscheinen!
 LOCATION:Kurzenbettli 23, 4302 Augst BL (bei der Schiessanlage)
-ORGANIZER;CN=Edi Grossenbacher:mailto:aktuar@fwv-raura.ch
+ORGANIZER;CN=Edi Grossenbacher:mailto:materialwart@fwv-raura.ch
 CATEGORIES:Gesellschaftsanlass
 STATUS:CONFIRMED
 END:VEVENT
