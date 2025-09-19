@@ -825,7 +825,7 @@
                 
                 document.getElementById('modal-title').textContent = event.title;
                 document.getElementById('modal-meta').innerHTML = `
-                    <span>📅 ${this.formatDate(event.startDate)}</span>
+                    <span>📅 ${this.formatDateLong(event.startDate)}</span>
                     <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
                     <span>📍 ${event.location}</span>
                     <span>👤 ${event.organizer}</span>
@@ -932,6 +932,22 @@
                     
                     shiftsContainer.innerHTML = event.shifts.map(shift => {
                         console.log('📝 Erstelle Schicht-HTML für:', shift);
+                        
+                        // Format shift date if it's a valid date string
+                        let shiftDateFormatted = shift.date || 'TBD';
+                        if (shift.date && shift.date !== 'TBD') {
+                            try {
+                                // Try to parse the date (format: 2025-10-18)
+                                const dateObj = new Date(shift.date + 'T00:00:00');
+                                if (!isNaN(dateObj.getTime())) {
+                                    shiftDateFormatted = this.formatDate(dateObj);
+                                }
+                            } catch (e) {
+                                // Keep original date if parsing fails
+                                console.warn('Could not parse shift date:', shift.date);
+                            }
+                        }
+                        
                         return `
                         <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                             <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
@@ -939,7 +955,7 @@
                                 <div class="flex justify-between items-start">
                                     <div>
                                         <p class="font-medium text-gray-800">${shift.name || 'Unnamed Shift'}</p>
-                                        <p class="text-sm text-gray-600">${shift.date || 'TBD'} • ${shift.time || 'TBD'}</p>
+                                        <p class="text-sm text-gray-600">${shiftDateFormatted} • ${shift.time || 'TBD'}</p>
                                         <p class="text-xs text-gray-500">${shift.description || 'Keine Beschreibung'}</p>
                                     </div>
                                     <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
@@ -997,7 +1013,21 @@
                     
                     const selectedShiftDetails = event.shifts
                         .filter(shift => this.selectedShifts.includes(shift.id))
-                        .map(shift => `• ${shift.name} (${shift.date}, ${shift.time}) - ${shift.description}`)
+                        .map(shift => {
+                            // Format shift date for email
+                            let shiftDateFormatted = shift.date || 'TBD';
+                            if (shift.date && shift.date !== 'TBD') {
+                                try {
+                                    const dateObj = new Date(shift.date + 'T00:00:00');
+                                    if (!isNaN(dateObj.getTime())) {
+                                        shiftDateFormatted = this.formatDate(dateObj);
+                                    }
+                                } catch (e) {
+                                    // Keep original date if parsing fails
+                                }
+                            }
+                            return `• ${shift.name} (${shiftDateFormatted}, ${shift.time}) - ${shift.description}`;
+                        })
                         .join('\n');
 
                     body = `Hallo ${event.organizer},
@@ -1193,6 +1223,14 @@ ${name}`;
             }
 
             formatDate(date) {
+                return new Intl.DateTimeFormat('de-DE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                }).format(date);
+            }
+
+            formatDateLong(date) {
                 return new Intl.DateTimeFormat('de-DE', {
                     year: 'numeric',
                     month: 'long',
