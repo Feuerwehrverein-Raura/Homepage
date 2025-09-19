@@ -7,7 +7,7 @@ endDate: 2025-10-19T22:00:00
 location: Roter Schopf, Kaiseraugst
 category: Hauptveranstaltung
 organizer: Stefan Müller
-email: aktuar@fwv-raura.ch
+email: stefan+fwv-raura@juroct.ch
 registrationRequired: true
 registrationDeadline: 2025-10-04T23:59:59
 cost: Kostenlos
