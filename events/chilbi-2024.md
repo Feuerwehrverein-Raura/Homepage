@@ -7,7 +7,7 @@ endDate: 2024-10-15T22:00:00
 location: Roter Schopf, Kaiseraugst
 category: Hauptveranstaltung
 organizer: René Käslin
-email: rene.kaeslin@feuerwehrverein-raura.ch
+email: praesident@fwv-raura.ch
 registrationRequired: true
 registrationDeadline: 2024-10-04T23:59:59
 cost: Kostenlos
