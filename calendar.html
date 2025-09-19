@@ -168,6 +168,7 @@
             }
 
             async init() {
+                console.log('📅 Kalender wird initialisiert...');
                 await this.loadEvents();
                 this.setupEventListeners();
                 this.render();
@@ -176,59 +177,182 @@
 
             async loadEvents() {
                 try {
-                    // In a real GitHub Pages setup, you would fetch from your events folder
-                    // For now, we'll use sample data
-                    this.events = this.getSampleEvents();
+                    // Lade alle Event-Dateien aus dem events/ Ordner
+                    const eventFiles = [
+                        'events/chilbi-2024.md',
+                        'events/grillplausch-sommer-2024.md',
+                        'events/chilbi-2025.md'
+                    ];
+
+                    console.log('📂 Lade Event-Dateien:', eventFiles);
+
+                    const promises = eventFiles.map(async (file) => {
+                        try {
+                            console.log(`📄 Lade: ${file}`);
+                            const response = await fetch(file);
+                            
+                            if (!response.ok) {
+                                console.warn(`⚠️ ${file}: HTTP ${response.status}`);
+                                return null;
+                            }
+                            
+                            const content = await response.text();
+                            if (!content.trim()) {
+                                console.warn(`⚠️ ${file}: Datei ist leer`);
+                                return null;
+                            }
+                            
+                            const event = this.parseMarkdownEvent(content, file);
+                            if (event) {
+                                console.log(`✅ Event geladen: ${event.title}`);
+                                return event;
+                            }
+                            
+                            return null;
+                        } catch (error) {
+                            console.error(`❌ Fehler beim Laden von ${file}:`, error);
+                            return null;
+                        }
+                    });
+
+                    const results = await Promise.allSettled(promises);
+                    this.events = results
+                        .filter(result => result.status === 'fulfilled' && result.value !== null)
+                        .map(result => result.value);
+
+                    console.log(`🎯 ${this.events.length} Events erfolgreich geladen:`, 
+                        this.events.map(e => `${e.title} (${e.startDate.toDateString()})`));
+
                 } catch (error) {
-                    console.error('Fehler beim Laden der Veranstaltungen:', error);
+                    console.error('❌ Fehler beim Laden der Events:', error);
                     this.events = [];
                 }
             }
 
-            getSampleEvents() {
-                const now = new Date();
-                return [
-                    {
-                        id: 'chilbi-2024',
-                        title: 'Chilbi 2024',
-                        description: 'Traditionelle Chilbi mit Festbetrieb im Roten Schopf',
-                        startDate: new Date(2024, 9, 14, 14, 0), // 14. Oktober 2024, 14:00
-                        endDate: new Date(2024, 9, 15, 22, 0),   // 15. Oktober 2024, 22:00
-                        location: 'Roter Schopf, Kaiseraugst',
-                        category: 'Hauptveranstaltung',
-                        organizer: 'René Käslin'
-                    },
-                    {
-                        id: 'grillplausch-sommer',
-                        title: 'Grillplausch',
-                        description: 'Geselliger Grillplausch für alle Mitglieder und Familien',
-                        startDate: new Date(2024, 6, 20, 16, 0), // 20. Juli 2024, 16:00
-                        endDate: new Date(2024, 6, 20, 22, 0),   // 20. Juli 2024, 22:00
-                        location: 'Kurzenbettli 23, Augst',
-                        category: 'Gesellschaftsanlass',
-                        organizer: 'Edi Grossenbacher'
-                    },
-                    {
-                        id: 'vereinsausflug-2024',
-                        title: 'Vereinsausflug',
-                        description: 'Weinverkostung und Ausflug für alle Mitglieder',
-                        startDate: new Date(2024, 10, 15, 9, 0), // 15. November 2024, 9:00
-                        endDate: new Date(2024, 10, 15, 18, 0),  // 15. November 2024, 18:00
-                        location: 'Wird noch bekannt gegeben',
-                        category: 'Ausflug',
-                        organizer: 'Vereinsvorstand'
-                    },
-                    {
-                        id: 'vorstandssitzung-q4',
-                        title: 'Vorstandssitzung Q4',
-                        description: 'Quartalsweise Vorstandssitzung',
-                        startDate: new Date(2024, 11, 5, 19, 0), // 5. Dezember 2024, 19:00
-                        endDate: new Date(2024, 11, 5, 21, 0),   // 5. Dezember 2024, 21:00
-                        location: 'Vereinslokal',
-                        category: 'Vereinsintern',
-                        organizer: 'René Käslin'
+            parseMarkdownEvent(content, filename = '') {
+                try {
+                    // Parse Frontmatter
+                    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+                    if (!frontmatterMatch) {
+                        console.warn(`⚠️ ${filename}: Kein Frontmatter gefunden`);
+                        return null;
                     }
-                ];
+
+                    const [, frontmatterStr, markdownContent] = frontmatterMatch;
+                    const frontmatter = this.parseFrontmatter(frontmatterStr);
+                    
+                    if (!frontmatter.id || !frontmatter.title || !frontmatter.startDate || !frontmatter.endDate) {
+                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen`);
+                        return null;
+                    }
+
+                    return {
+                        ...frontmatter,
+                        description: markdownContent.trim(),
+                        startDate: new Date(frontmatter.startDate),
+                        endDate: new Date(frontmatter.endDate),
+                        registrationDeadline: frontmatter.registrationDeadline ? 
+                            new Date(frontmatter.registrationDeadline) : null,
+                        _source: filename
+                    };
+                    
+                } catch (error) {
+                    console.error(`❌ ${filename}: Parse-Fehler:`, error);
+                    return null;
+                }
+            }
+
+            parseFrontmatter(frontmatterStr) {
+                const result = {};
+                const lines = frontmatterStr.split(/\r?\n/);
+                
+                let currentKey = null;
+                let currentValue = '';
+                let inArray = false;
+                let inShifts = false;
+                let currentShift = null;
+                let shifts = [];
+
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    
+                    if (!trimmedLine || trimmedLine.startsWith('#')) continue;
+                    
+                    // Handle shifts array
+                    if (trimmedLine === 'shifts:') {
+                        inShifts = true;
+                        shifts = [];
+                        continue;
+                    }
+                    
+                    if (inShifts) {
+                        if (trimmedLine.startsWith('- id:')) {
+                            // Save previous shift
+                            if (currentShift) {
+                                shifts.push(currentShift);
+                            }
+                            // Start new shift
+                            currentShift = { id: trimmedLine.replace('- id:', '').trim() };
+                        } else if (currentShift && trimmedLine.startsWith('- ')) {
+                            const [key, ...valueParts] = trimmedLine.substring(2).split(':');
+                            const value = valueParts.join(':').trim();
+                            if (key && value) {
+                                currentShift[key.trim()] = value;
+                            }
+                        } else if (!trimmedLine.startsWith(' ') && !trimmedLine.startsWith('-') && trimmedLine.includes(':')) {
+                            // End of shifts array
+                            if (currentShift) {
+                                shifts.push(currentShift);
+                                currentShift = null;
+                            }
+                            inShifts = false;
+                            result.shifts = shifts;
+                            
+                            // Process current line as regular frontmatter
+                            const colonIndex = trimmedLine.indexOf(':');
+                            const key = trimmedLine.substring(0, colonIndex).trim();
+                            let value = trimmedLine.substring(colonIndex + 1).trim();
+                            
+                            if (value.startsWith('[') && value.endsWith(']')) {
+                                value = value.slice(1, -1).split(',').map(s => s.trim());
+                            }
+                            
+                            if (value === 'true') value = true;
+                            if (value === 'false') value = false;
+                            
+                            result[key] = value;
+                        }
+                        continue;
+                    }
+                    
+                    // Handle regular frontmatter
+                    const colonIndex = trimmedLine.indexOf(':');
+                    if (colonIndex === -1) continue;
+                    
+                    const key = trimmedLine.substring(0, colonIndex).trim();
+                    let value = trimmedLine.substring(colonIndex + 1).trim();
+                    
+                    if (!key) continue;
+                    
+                    // Handle arrays
+                    if (value.startsWith('[') && value.endsWith(']')) {
+                        value = value.slice(1, -1).split(',').map(s => s.trim());
+                    }
+                    
+                    // Handle booleans
+                    if (value === 'true') value = true;
+                    if (value === 'false') value = false;
+                    
+                    result[key] = value;
+                }
+                
+                // Don't forget the last shift if we were parsing shifts
+                if (inShifts && currentShift) {
+                    shifts.push(currentShift);
+                    result.shifts = shifts;
+                }
+                
+                return result;
             }
 
             setupEventListeners() {
@@ -337,7 +461,7 @@
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between">
                             <div class="flex-1">
                                 <h3 class="text-xl font-bold text-gray-800 mb-2">${event.title}</h3>
-                                <p class="text-gray-600 mb-3">${event.description}</p>
+                                <p class="text-gray-600 mb-3">${event.subtitle || ''}</p>
                                 <div class="flex flex-wrap gap-4 text-sm text-gray-500">
                                     <span>📅 ${this.formatDate(event.startDate)}</span>
                                     <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
@@ -346,7 +470,7 @@
                             </div>
                             <div class="mt-4 md:mt-0">
                                 <span class="px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
-                                    ${event.category}
+                                    ${event.category || 'Event'}
                                 </span>
                             </div>
                         </div>
@@ -366,9 +490,11 @@
                 return this.events.filter(event => {
                     const eventStart = new Date(event.startDate);
                     const eventEnd = new Date(event.endDate);
-                    return date >= eventStart.toDateString() && date <= eventEnd.toDateString() ||
-                           this.isSameDay(date, eventStart) || 
-                           (date >= eventStart && date <= eventEnd);
+                    
+                    // Event läuft an diesem Tag
+                    return (this.isSameDay(date, eventStart) || 
+                            this.isSameDay(date, eventEnd) ||
+                            (date >= eventStart && date <= eventEnd));
                 });
             }
 
@@ -380,7 +506,8 @@
                 document.getElementById('modal-title').textContent = event.title;
                 document.getElementById('modal-content').innerHTML = `
                     <div class="space-y-3">
-                        <p class="text-gray-600">${event.description}</p>
+                        ${event.subtitle ? `<p class="text-fire-600 font-medium">${event.subtitle}</p>` : ''}
+                        <p class="text-gray-600">${event.description.split('\n')[0]}</p>
                         <div class="grid grid-cols-1 gap-3 text-sm">
                             <div class="flex items-center">
                                 <span class="font-semibold text-gray-700 w-20">Datum:</span>
@@ -396,12 +523,24 @@
                             </div>
                             <div class="flex items-center">
                                 <span class="font-semibold text-gray-700 w-20">Kategorie:</span>
-                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category}</span>
+                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category || 'Event'}</span>
                             </div>
                             <div class="flex items-center">
                                 <span class="font-semibold text-gray-700 w-20">Kontakt:</span>
                                 <span>${event.organizer}</span>
                             </div>
+                            ${event.cost ? `
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-gray-700 w-20">Kosten:</span>
+                                    <span>${event.cost}</span>
+                                </div>
+                            ` : ''}
+                            ${event.registrationRequired ? `
+                                <div class="flex items-center">
+                                    <span class="font-semibold text-gray-700 w-20">Anmeldung:</span>
+                                    <span class="text-fire-600">Erforderlich</span>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -444,11 +583,7 @@
             }
 
             subscribeCalendar() {
-                const icsData = this.generateICS(this.events);
-                const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
-                const url = window.URL.createObjectURL(blob);
-                
-                // Create webcal link for subscription
+                const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
                 const webcalUrl = 'webcal://' + window.location.host + window.location.pathname.replace(/\/[^\/]*$/, '') + '/calendar.ics';
                 
                 alert(`Kalender-Abonnement:\n\nFügen Sie diese URL zu Ihrem Kalender hinzu:\n${webcalUrl}\n\nOder laden Sie die ICS-Datei herunter und importieren Sie sie manuell.`);
@@ -495,6 +630,7 @@
                     const dtstart = this.formatDateForICS(event.startDate);
                     const dtend = this.formatDateForICS(event.endDate);
                     const dtstamp = this.formatDateForICS(now);
+                    const description = event.description.replace(/\n/g, '\\n').replace(/,/g, '\\,');
 
                     ics.push(
                         'BEGIN:VEVENT',
@@ -503,10 +639,10 @@
                         `DTSTART:${dtstart}`,
                         `DTEND:${dtend}`,
                         `SUMMARY:${event.title}`,
-                        `DESCRIPTION:${event.description.replace(/\n/g, '\\n')}`,
+                        `DESCRIPTION:${description}`,
                         `LOCATION:${event.location}`,
-                        `ORGANIZER;CN=${event.organizer}:mailto:kontakt@feuerwehrverein-raura.ch`,
-                        `CATEGORIES:${event.category}`,
+                        `ORGANIZER;CN=${event.organizer}:mailto:${event.email || 'kontakt@fwv-raura.ch'}`,
+                        `CATEGORIES:${event.category || 'Event'}`,
                         'STATUS:CONFIRMED',
                         'END:VEVENT'
                     );
