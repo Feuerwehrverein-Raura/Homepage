@@ -3,7 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feuerwehrverein Raura</title>
+    <meta name="description" content="Feuerwehrverein Raura Kaiseraugst - Tradition, Kameradschaft und Gemeinschaft. Alle Informationen zu Veranstaltungen, Terminen und Vereinsaktivitäten.">
+    <meta name="keywords" content="Feuerwehrverein, Raura, Kaiseraugst, Feuerwehr, Verein, Chilbi, Veranstaltungen, Kameradschaft">
+    <meta name="author" content="Feuerwehrverein Raura Kaiseraugst">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://feuerwehrverein-raura.github.io/Homepage/">
+    <meta property="og:title" content="Feuerwehrverein Raura Kaiseraugst">
+    <meta property="og:description" content="Tradition, Kameradschaft und Gemeinschaft seit vielen Jahren. Alle Informationen zu Veranstaltungen und Vereinsaktivitäten.">
+    <meta property="og:image" content="https://feuerwehrverein-raura.github.io/Homepage/images/logo.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://feuerwehrverein-raura.github.io/Homepage/">
+    <meta property="twitter:title" content="Feuerwehrverein Raura Kaiseraugst">
+    <meta property="twitter:description" content="Tradition, Kameradschaft und Gemeinschaft seit vielen Jahren.">
+    <meta property="twitter:image" content="https://feuerwehrverein-raura.github.io/Homepage/images/logo.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+    <link rel="apple-touch-icon" href="images/logo.png">
+    
+    <title>Feuerwehrverein Raura Kaiseraugst</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -42,14 +65,15 @@
                     </div>
                     <div>
                         <h1 class="text-xl font-bold">Feuerwehrverein Raura</h1>
+                        <p class="text-fire-200 text-sm">Kaiseraugst</p>
                     </div>
                 </div>
                 <div class="hidden md:flex space-x-6">
-                    <a href="#home" class="hover:text-fire-200 transition-colors">Home</a>
+                    <a href="#home" class="text-fire-200 font-semibold">Home</a>
                     <a href="#about" class="hover:text-fire-200 transition-colors">Über uns</a>
                     <a href="#events" class="hover:text-fire-200 transition-colors">Termine</a>
-                    <a href="calendar.html" class="hover:text-fire-200 transition-colors">Kalender</a>
-                    <a href="events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                    <a href="./calendar.html" class="hover:text-fire-200 transition-colors">Kalender</a>
+                    <a href="./events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
                     <a href="#contact" class="hover:text-fire-200 transition-colors">Kontakt</a>
                 </div>
                 <button id="mobile-menu-btn" class="md:hidden">
@@ -60,11 +84,11 @@
             </div>
             <div id="mobile-menu" class="hidden md:hidden pb-4">
                 <div class="flex flex-col space-y-2">
-                    <a href="#home" class="hover:text-fire-200 transition-colors py-2">Home</a>
+                    <a href="#home" class="text-fire-200 py-2">Home</a>
                     <a href="#about" class="hover:text-fire-200 transition-colors py-2">Über uns</a>
                     <a href="#events" class="hover:text-fire-200 transition-colors py-2">Termine</a>
-                    <a href="calendar.html" class="hover:text-fire-200 transition-colors py-2">Kalender</a>
-                    <a href="events.html" class="hover:text-fire-200 transition-colors py-2">Veranstaltungen</a>
+                    <a href="./calendar.html" class="hover:text-fire-200 transition-colors py-2">Kalender</a>
+                    <a href="./events.html" class="hover:text-fire-200 transition-colors py-2">Veranstaltungen</a>
                     <a href="#contact" class="hover:text-fire-200 transition-colors py-2">Kontakt</a>
                 </div>
             </div>
@@ -89,11 +113,16 @@
                     Wir sind mehr als nur ein Verein.
                 </p>
                 <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                    <a href="calendar.html" class="bg-white text-fire-700 px-8 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors">
-                        Kalender
+                    <a href="./calendar.html" class="bg-white text-fire-700 px-8 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors">
+                        📅 Kalender
                     </a>
                     <a href="#about" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-fire-700 transition-colors">
                         Mehr erfahren
+                    </a>
+                    <a href="https://chat.whatsapp.com/GRUPPENLINK" target="_blank" rel="noopener noreferrer" 
+                       class="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors inline-flex items-center space-x-2">
+                        <span>💬</span>
+                        <span>WhatsApp Gruppe</span>
                     </a>
                 </div>
             </div>
@@ -128,6 +157,10 @@
                         <div class="flex items-center">
                             <div class="w-3 h-3 bg-fire-500 rounded-full mr-3"></div>
                             <span class="text-gray-700">Gesellige Grillplausch-Events</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-fire-500 rounded-full mr-3"></div>
+                            <span class="text-gray-700">WhatsApp-Gruppe für schnelle Kommunikation</span>
                         </div>
                     </div>
                 </div>
@@ -251,16 +284,16 @@
                                 <span class="text-2xl">🎪</span>
                             </div>
                             <div>
-                                <h3 class="text-xl font-bold">Chilbi 2024</h3>
+                                <h3 class="text-xl font-bold">Chilbi 2025</h3>
                                 <p class="text-fire-100">Roter Schopf</p>
                             </div>
                         </div>
                         <p class="text-fire-100 mb-4">
                             Unsere traditionelle Chilbi mit Festbetrieb, Essen und Trinken 
-                            für die ganze Familie.
+                            für die ganze Familie. Helfer werden gesucht!
                         </p>
                         <div class="text-sm text-fire-200">
-                            <p>📅 Oktober 2024 (Datum folgt)</p>
+                            <p>📅 18.-19. Oktober 2025</p>
                             <p>📍 Roter Schopf, Kaiseraugst</p>
                         </div>
                     </div>
@@ -283,7 +316,7 @@
                             Datum wird noch bekannt gegeben.
                         </p>
                         <div class="text-sm text-blue-200">
-                            <p>📅 Herbst 2024 (nach der Weinlese)</p>
+                            <p>📅 Herbst 2025 (nach der Weinlese)</p>
                             <p>📍 Ort wird bekannt gegeben</p>
                         </div>
                     </div>
@@ -306,14 +339,14 @@
                             Essen und Getränke werden gestellt.
                         </p>
                         <div class="text-sm text-green-200">
-                            <p>📅 Sommer 2024</p>
+                            <p>📅 Sommer 2025</p>
                             <p>📍 Bei Vereinsmitgliedern</p>
                         </div>
                     </div>
                 </div>
             </div>
             <div class="text-center mt-8">
-                <a href="events.html" class="bg-fire-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-fire-600 transition-colors">
+                <a href="./events.html" class="bg-fire-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-fire-600 transition-colors">
                     Alle Veranstaltungen
                 </a>
             </div>
@@ -354,6 +387,19 @@
                                 <p class="text-fire-200">Kaiseraugst, Aargau, Schweiz</p>
                             </div>
                         </div>
+                        <div class="flex items-start">
+                            <div class="w-6 h-6 bg-fire-500 rounded-full flex items-center justify-center mr-4 mt-1 flex-shrink-0">
+                                <span class="text-white text-sm">💬</span>
+                            </div>
+                            <div>
+                                <p class="font-semibold">WhatsApp Gruppe</p>
+                                <a href="https://chat.whatsapp.com/GRUPPENLINK" target="_blank" rel="noopener noreferrer" 
+                                   class="text-fire-200 hover:text-white transition-colors inline-flex items-center space-x-1">
+                                    <span>Gruppe beitreten</span>
+                                    <span class="text-xs">↗</span>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="bg-white bg-opacity-10 rounded-lg p-8">
@@ -373,96 +419,6 @@
                                 <option value="Zusammenarbeit" class="text-gray-800">Zusammenarbeit</option>
                                 <option value="Allgemein" class="text-gray-800">Allgemeine Anfrage</option>
                             </select>
-                        </div>
-                        
-                        <!-- Mitgliedschaftsformular (nur bei Auswahl "Mitgliedschaft" sichtbar) -->
-                        <div id="membership-form" class="hidden space-y-4 border-t border-white border-opacity-20 pt-4">
-                            <div class="text-sm text-fire-100 mb-4">
-                                <p class="font-semibold mb-2">📋 Beitrittsformular</p>
-                                <p class="text-xs">
-                                    Aktive Feuerwehr-Mitglieder werden sofort aufgenommen. 
-                                    Andere Interessierte werden an der ordentlichen GV bestätigt.
-                                </p>
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <input type="text" id="member-lastname" placeholder="Nachname *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                                </div>
-                                <div>
-                                    <input type="text" id="member-firstname" placeholder="Vorname *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <input type="text" id="member-street" placeholder="Strasse und Hausnummer *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                            </div>
-                            
-                            <div>
-                                <input type="text" id="member-city" placeholder="PLZ und Ort *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                            </div>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <input type="tel" id="member-phone" placeholder="Telefonnummer *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                                </div>
-                                <div>
-                                    <input type="tel" id="member-mobile" placeholder="Mobilnummer" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <input type="email" id="member-email-addr" placeholder="E-Mail-Adresse *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm text-fire-200 mb-2">Angehörige/r der Feuerwehr Raurica? *</label>
-                                <div class="flex flex-wrap gap-4">
-                                    <label class="flex items-center text-sm text-fire-100">
-                                        <input type="radio" name="firefighter-status" value="active" class="mr-2 text-fire-500 focus:ring-fire-500">
-                                        Ja (aktiv)
-                                    </label>
-                                    <label class="flex items-center text-sm text-fire-100">
-                                        <input type="radio" name="firefighter-status" value="former" class="mr-2 text-fire-500 focus:ring-fire-500">
-                                        Ehemalige/r
-                                    </label>
-                                    <label class="flex items-center text-sm text-fire-100">
-                                        <input type="radio" name="firefighter-status" value="no" class="mr-2 text-fire-500 focus:ring-fire-500">
-                                        Nein
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm text-fire-200 mb-2">Zustellung der Korrespondenz *</label>
-                                <div class="flex gap-4 mb-2">
-                                    <label class="flex items-center text-sm text-fire-100">
-                                        <input type="radio" name="correspondence-method" value="post" class="mr-2 text-fire-500 focus:ring-fire-500">
-                                        Post
-                                    </label>
-                                    <label class="flex items-center text-sm text-fire-100">
-                                        <input type="radio" name="correspondence-method" value="email" class="mr-2 text-fire-500 focus:ring-fire-500">
-                                        E-Mail
-                                    </label>
-                                </div>
-                                
-                                <div id="correspondence-details" class="hidden">
-                                    <label class="block text-xs text-fire-200 mb-2">Wohin soll die Korrespondenz zugestellt werden?</label>
-                                    <div class="flex flex-col gap-2">
-                                        <label class="flex items-center text-sm text-fire-100">
-                                            <input type="radio" name="correspondence-address" value="main" class="mr-2 text-fire-500 focus:ring-fire-500">
-                                            Hauptadresse/E-Mail (wie oben angegeben)
-                                        </label>
-                                        <label class="flex items-center text-sm text-fire-100">
-                                            <input type="radio" name="correspondence-address" value="other" class="mr-2 text-fire-500 focus:ring-fire-500">
-                                            Andere:
-                                        </label>
-                                        <div id="other-address-field" class="hidden ml-6">
-                                            <input type="text" id="member-other-address" placeholder="Andere Adresse/E-Mail" class="w-full px-3 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                         
                         <!-- Normale Nachricht (nur bei anderen Betreff-Optionen sichtbar) -->
@@ -492,6 +448,16 @@
                 </div>
             </div>
             <p class="text-gray-400 mb-4">Tradition • Kameradschaft • Gemeinschaft</p>
+            
+            <!-- WhatsApp Group Link -->
+            <div class="mb-4">
+                <a href="https://chat.whatsapp.com/GRUPPENLINK" target="_blank" rel="noopener noreferrer" 
+                   class="inline-flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    <span class="text-xl">💬</span>
+                    <span>WhatsApp Gruppe beitreten</span>
+                </a>
+            </div>
+            
             <div class="border-t border-gray-700 pt-4 text-sm text-gray-500">
                 <p>&copy; 2024 Feuerwehrverein Raura Kaiseraugst. Alle Rechte vorbehalten.</p>
             </div>
@@ -499,7 +465,7 @@
     </footer>
 
     <script>
-        console.log('🔥 Feuerwehrverein Raura - Website gestartet');
+        console.log('🔥 Feuerwehrverein Raura - Website v3 gestartet');
 
         class VorstandManager {
             constructor() {
@@ -537,7 +503,7 @@
 
                 console.log('📂 Lade Markdown-Dateien:', memberFiles);
 
-                const promises = memberFiles.map(async (file, index) => {
+                const promises = memberFiles.map(async (file) => {
                     try {
                         console.log(`📄 Lade: ${file}`);
                         const response = await fetch(file);
@@ -752,42 +718,15 @@
                     e.preventDefault();
                     sendContactEmail();
                 });
-                
-                const correspondenceMethods = document.querySelectorAll('input[name="correspondence-method"]');
-                correspondenceMethods.forEach(radio => {
-                    radio.addEventListener('change', function() {
-                        const detailsDiv = document.getElementById('correspondence-details');
-                        if (this.checked) {
-                            detailsDiv.classList.remove('hidden');
-                            const mainRadio = document.querySelector('input[name="correspondence-address"][value="main"]');
-                            if (mainRadio) mainRadio.checked = true;
-                        }
-                    });
-                });
-                
-                const addressRadios = document.querySelectorAll('input[name="correspondence-address"]');
-                addressRadios.forEach(radio => {
-                    radio.addEventListener('change', function() {
-                        const otherField = document.getElementById('other-address-field');
-                        if (this.value === 'other') {
-                            otherField.classList.remove('hidden');
-                        } else {
-                            otherField.classList.add('hidden');
-                        }
-                    });
-                });
             }
         }
 
         function toggleMembershipForm(showMembership) {
-            const membershipForm = document.getElementById('membership-form');
             const generalMessage = document.getElementById('general-message');
             
             if (showMembership) {
-                membershipForm.classList.remove('hidden');
                 generalMessage.classList.add('hidden');
             } else {
-                membershipForm.classList.add('hidden');
                 generalMessage.classList.remove('hidden');
             }
         }
@@ -830,82 +769,26 @@
         }
 
         function generateMembershipEmail(name, email) {
-            const lastname = document.getElementById('member-lastname').value.trim();
-            const firstname = document.getElementById('member-firstname').value.trim();
-            const street = document.getElementById('member-street').value.trim();
-            const city = document.getElementById('member-city').value.trim();
-            const phone = document.getElementById('member-phone').value.trim();
-            const mobile = document.getElementById('member-mobile').value.trim();
-            const memberEmail = document.getElementById('member-email-addr').value.trim();
+            const subjectLine = 'Interesse an Mitgliedschaft - Feuerwehrverein Raura';
             
-            const firefighterStatus = document.querySelector('input[name="firefighter-status"]:checked');
-            const correspondenceMethod = document.querySelector('input[name="correspondence-method"]:checked');
-            const correspondenceAddress = document.querySelector('input[name="correspondence-address"]:checked');
-            const otherAddress = document.getElementById('member-other-address').value.trim();
+            const body = `Hallo,
 
-            const requiredFields = [lastname, firstname, street, city, phone, memberEmail];
-            if (requiredFields.some(field => !field) || !firefighterStatus || !correspondenceMethod) {
-                alert('Bitte füllen Sie alle Pflichtfelder (*) aus.');
-                return null;
-            }
+ich interessiere mich für eine Mitgliedschaft im Feuerwehrverein Raura Kaiseraugst.
 
-            const subjectLine = 'Beitrittsantrag - Feuerwehrverein Raura';
-            
-            const firefighterStatusText = {
-                'active': 'Ja (aktiv)',
-                'former': 'Ehemalige/r',
-                'no': 'Nein'
-            };
-
-            const correspondenceMethodText = correspondenceMethod.value === 'post' ? 'Post' : 'E-Mail';
-            
-            let correspondenceDetails = '';
-            if (correspondenceAddress) {
-                if (correspondenceAddress.value === 'main') {
-                    correspondenceDetails = correspondenceMethod.value === 'post' 
-                        ? 'Hauptadresse (wie oben angegeben)'
-                        : 'Haupt-E-Mail (wie oben angegeben)';
-                } else if (correspondenceAddress.value === 'other' && otherAddress) {
-                    correspondenceDetails = `Andere: ${otherAddress}`;
-                }
-            }
-
-            const body = `Sehr geehrter Herr Müller,
-
-hiermit beantrage ich die Aufnahme in den Feuerwehrverein Raura Kaiseraugst.
-
-PERSÖNLICHE DATEN:
-Name: ${lastname}
-Vorname: ${firstname}
-Strasse: ${street}
-PLZ und Ort: ${city}
-Telefonnummer: ${phone}
-${mobile ? `Mobilnummer: ${mobile}` : 'Mobilnummer: -'}
-E-Mail-Adresse: ${memberEmail}
-
-FEUERWEHR-ZUGEHÖRIGKEIT:
-Angehörige/r der Feuerwehr Raurica: ${firefighterStatusText[firefighterStatus.value]}
-
-KORRESPONDENZ:
-Zustellung der Korrespondenz: ${correspondenceMethodText}
-${correspondenceDetails ? `Zustelladresse: ${correspondenceDetails}` : ''}
-
-KONTAKT FÜR RÜCKFRAGEN:
+MEINE KONTAKTDATEN:
 Name: ${name}
 E-Mail: ${email}
 
+Bitte senden Sie mir weitere Informationen zum Beitritt und den Vereinsaktivitäten.
+
 Mit freundlichen Grüssen
-${name}
+${name}`;
 
----
-Formular erstellt über: www.fwv-raura.ch
-Version: ${new Date().toLocaleDateString('de-DE')}`;
-
-            const mailtoLink = `mailto:stefan+fwv-raura@juroct.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+            const mailtoLink = `mailto:kontakt@fwv-raura.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
             
             return {
                 mailtoLink,
-                successMessage: 'Beitrittsantrag wurde an Ihren E-Mail-Client weitergeleitet.\n\nBitte senden Sie die E-Mail an den Aktuar Stefan Müller ab.\n\nAktive Feuerwehr-Mitglieder werden sofort aufgenommen,\nandere Interessierte werden an der nächsten GV bestätigt.'
+                successMessage: 'Mitgliedschaftsanfrage wurde an Ihren E-Mail-Client weitergeleitet.\n\nBitte senden Sie die E-Mail ab.'
             };
         }
 
@@ -941,16 +824,7 @@ ${name}`;
             document.getElementById('contact-subject').value = '';
             document.getElementById('contact-message').value = '';
             
-            const membershipInputs = document.querySelectorAll('#membership-form input[type="text"], #membership-form input[type="email"], #membership-form input[type="tel"]');
-            membershipInputs.forEach(input => input.value = '');
-            
-            const membershipRadios = document.querySelectorAll('#membership-form input[type="radio"]');
-            membershipRadios.forEach(radio => radio.checked = false);
-            
-            document.getElementById('membership-form').classList.add('hidden');
             document.getElementById('general-message').classList.add('hidden');
-            document.getElementById('correspondence-details').classList.add('hidden');
-            document.getElementById('other-address-field').classList.add('hidden');
         }
 
         function setupMobileMenu() {
@@ -983,7 +857,7 @@ ${name}`;
 
         function setupLogoFallback() {
             const logos = document.querySelectorAll('img[alt*="Logo"]');
-            logos.forEach((logo, index) => {
+            logos.forEach((logo) => {
                 logo.onerror = function() {
                     this.style.display = 'none';
                     const fallback = this.nextElementSibling;
