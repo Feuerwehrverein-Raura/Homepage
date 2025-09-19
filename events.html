@@ -231,6 +231,7 @@
             }
 
             async init() {
+                console.log('🔄 Initialisiere Event-System...');
                 await this.loadEvents();
                 this.setupEventListeners();
                 this.filterEvents();
@@ -240,159 +241,260 @@
 
             async loadEvents() {
                 try {
+                    console.log('📂 Lade Events aus Markdown-Dateien...');
                     this.events = await this.loadEventsFromMarkdown();
+                    console.log(`✅ ${this.events.length} Events erfolgreich geladen:`, 
+                        this.events.map(e => `${e.title} (${e.id})`));
                 } catch (error) {
-                    console.error('Fehler beim Laden der Veranstaltungen:', error);
-                    this.events = [];
+                    console.error('❌ Fehler beim Laden der Veranstaltungen:', error);
+                    this.events = await this.getFallbackEvents();
                 }
             }
 
             async loadEventsFromMarkdown() {
+                // Liste aller Event-Dateien (manuell gepflegt oder dynamisch erweitert)
+                const eventFiles = [
+                    'events/chilbi-2024.md',
+                    'events/chilbi-2025.md',
+                    'events/grillplausch-sommer-2024.md',
+                    // Weitere Event-Dateien hier hinzufügen
+                ];
+
+                const promises = eventFiles.map(async (file) => {
+                    try {
+                        console.log(`📄 Lade: ${file}`);
+                        const response = await fetch(file);
+                        
+                        if (!response.ok) {
+                            console.warn(`⚠️ ${file}: HTTP ${response.status}`);
+                            return null;
+                        }
+                        
+                        const content = await response.text();
+                        
+                        if (!content.trim()) {
+                            console.warn(`⚠️ ${file}: Datei ist leer`);
+                            return null;
+                        }
+                        
+                        const event = this.parseMarkdownEvent(content, file);
+                        if (event) {
+                            console.log(`✅ Parsed: ${event.title}`);
+                            return event;
+                        }
+                        
+                    } catch (error) {
+                        console.error(`❌ Fehler beim Laden von ${file}:`, error);
+                        return null;
+                    }
+                });
+
+                const results = await Promise.allSettled(promises);
+                return results
+                    .filter(result => result.status === 'fulfilled' && result.value !== null)
+                    .map(result => result.value)
+                    .sort((a, b) => a.startDate - b.startDate);
+            }
+
+            parseMarkdownEvent(content, filename = '') {
+                try {
+                    // Frontmatter pattern matching
+                    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+                    
+                    if (!frontmatterMatch) {
+                        console.warn(`⚠️ ${filename}: Kein Frontmatter gefunden`);
+                        return null;
+                    }
+
+                    const [, frontmatterStr, markdownContent] = frontmatterMatch;
+                    const frontmatter = this.parseFrontmatter(frontmatterStr);
+                    
+                    // Pflichtfelder validieren
+                    if (!frontmatter.id || !frontmatter.title || !frontmatter.startDate || !frontmatter.endDate) {
+                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen`);
+                        return null;
+                    }
+                    
+                    return {
+                        ...frontmatter,
+                        description: this.parseMarkdownDescription(markdownContent.trim()),
+                        startDate: new Date(frontmatter.startDate),
+                        endDate: new Date(frontmatter.endDate),
+                        registrationDeadline: frontmatter.registrationDeadline ? 
+                            new Date(frontmatter.registrationDeadline) : null,
+                        _source: filename
+                    };
+                    
+                } catch (error) {
+                    console.error(`❌ ${filename}: Parse-Fehler:`, error);
+                    return null;
+                }
+            }
+
+            parseFrontmatter(frontmatterStr) {
+                const result = {};
+                const lines = frontmatterStr.split(/\r?\n/).filter(line => line.trim());
+                
+                let currentKey = null;
+                let currentValue = '';
+                let inArrayOrObject = false;
+                let arrayDepth = 0;
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    
+                    // Skip comments
+                    if (line.trim().startsWith('#')) continue;
+                    
+                    // Handle array/object continuation
+                    if (inArrayOrObject) {
+                        currentValue += '\n' + line;
+                        
+                        // Count array depth
+                        arrayDepth += (line.match(/- /g) || []).length;
+                        
+                        // Check if array/object is complete
+                        const nextLine = lines[i + 1];
+                        if (!nextLine || (!nextLine.startsWith(' ') && !nextLine.startsWith('-') && nextLine.includes(':'))) {
+                            // Process the complete value
+                            result[currentKey] = this.parseComplexValue(currentValue);
+                            inArrayOrObject = false;
+                            currentKey = null;
+                            currentValue = '';
+                            arrayDepth = 0;
+                        }
+                        continue;
+                    }
+                    
+                    const colonIndex = line.indexOf(':');
+                    if (colonIndex === -1) continue;
+                    
+                    const key = line.substring(0, colonIndex).trim();
+                    let value = line.substring(colonIndex + 1).trim();
+                    
+                    if (!key) continue;
+                    
+                    // Handle multiline values (arrays, objects)
+                    if (!value || value === '|' || value === '>') {
+                        currentKey = key;
+                        currentValue = value;
+                        inArrayOrObject = true;
+                        continue;
+                    }
+                    
+                    // Parse simple values
+                    result[key] = this.parseSimpleValue(value);
+                }
+                
+                return result;
+            }
+
+            parseComplexValue(value) {
+                try {
+                    // Handle shifts array
+                    if (value.includes('- id:')) {
+                        const shifts = [];
+                        const shiftBlocks = value.split(/\n\s*- id:/);
+                        
+                        for (let i = 1; i < shiftBlocks.length; i++) {
+                            const shiftStr = '- id:' + shiftBlocks[i];
+                            const shift = {};
+                            
+                            const shiftLines = shiftStr.split('\n');
+                            for (const line of shiftLines) {
+                                const trimmed = line.trim();
+                                if (trimmed.startsWith('id:')) {
+                                    shift.id = trimmed.replace('id:', '').trim();
+                                } else if (trimmed.startsWith('name:')) {
+                                    shift.name = trimmed.replace('name:', '').trim();
+                                } else if (trimmed.startsWith('date:')) {
+                                    shift.date = trimmed.replace('date:', '').trim();
+                                } else if (trimmed.startsWith('time:')) {
+                                    shift.time = trimmed.replace('time:', '').trim();
+                                } else if (trimmed.startsWith('needed:')) {
+                                    shift.needed = parseInt(trimmed.replace('needed:', '').trim());
+                                } else if (trimmed.startsWith('description:')) {
+                                    shift.description = trimmed.replace('description:', '').trim();
+                                }
+                            }
+                            
+                            if (shift.id && shift.name) {
+                                shifts.push(shift);
+                            }
+                        }
+                        return shifts;
+                    }
+                    
+                    // Handle simple arrays
+                    if (value.includes('[') && value.includes(']')) {
+                        const match = value.match(/\[(.*)\]/);
+                        if (match) {
+                            return match[1].split(',').map(s => s.trim().replace(/['"]/g, ''));
+                        }
+                    }
+                    
+                    return value.trim();
+                } catch (error) {
+                    console.warn('Fehler beim Parsen von komplexem Wert:', error);
+                    return value;
+                }
+            }
+
+            parseSimpleValue(value) {
+                // Remove quotes
+                if ((value.startsWith('"') && value.endsWith('"')) || 
+                    (value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.slice(1, -1);
+                }
+                
+                // Parse booleans
+                if (value === 'true') return true;
+                if (value === 'false') return false;
+                
+                // Parse numbers
+                if (!isNaN(value) && value !== '' && !isNaN(parseFloat(value))) {
+                    return parseFloat(value);
+                }
+                
+                // Parse arrays
+                if (value.startsWith('[') && value.endsWith(']')) {
+                    const arrayContent = value.slice(1, -1);
+                    return arrayContent.split(',').map(s => s.trim().replace(/['"]/g, ''));
+                }
+                
+                return value;
+            }
+
+            parseMarkdownDescription(markdown) {
+                // Simple markdown to plain text conversion for preview
+                return markdown
+                    .replace(/^#{1,6}\s+/gm, '') // Remove headers
+                    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+                    .replace(/\*(.*?)\*/g, '$1') // Remove italic
+                    .replace(/- /g, '• ') // Convert lists
+                    .replace(/\n\n+/g, '\n\n') // Normalize newlines
+                    .substring(0, 300); // Limit length for preview
+            }
+
+            async getFallbackEvents() {
+                // Fallback events wenn Markdown-Dateien nicht geladen werden können
+                console.log('⚠️ Verwende Fallback-Events');
                 return [
                     {
-                        id: 'chilbi-2024',
-                        title: 'Chilbi 2024',
+                        id: 'chilbi-fallback',
+                        title: 'Chilbi 2025',
                         subtitle: 'Traditionelle Dorfchilbi',
-                        description: 'Unsere traditionelle Chilbi findet auch dieses Jahr wieder im Roten Schopf statt. Wir verwandeln das Vereinslokal in ein gemütliches Festlokal für die ganze Familie.\n\nProgramm:\n- Samstag: 14:00 - 22:00 Uhr - Festbetrieb mit warmen Speisen\n- Sonntag: 12:00 - 22:00 Uhr - Familientag mit besonderen Angeboten\n\nHelfer gesucht: Wir suchen noch Helfer für verschiedene Schichten.',
-                        startDate: new Date(2024, 9, 14, 14, 0),
-                        endDate: new Date(2024, 9, 15, 22, 0),
+                        description: 'Unsere traditionelle Chilbi im Roten Schopf. Details werden geladen...',
+                        startDate: new Date(2025, 9, 18, 12, 0),
+                        endDate: new Date(2025, 9, 19, 22, 0),
                         location: 'Roter Schopf, Kaiseraugst',
                         category: 'Hauptveranstaltung',
-                        organizer: 'René Käslin',
-                        email: 'rene.kaeslin@feuerwehrverein-raura.ch',
+                        organizer: 'Stefan Müller',
+                        email: 'aktuar@fwv-raura.ch',
                         status: 'confirmed',
                         registrationRequired: true,
-                        registrationDeadline: new Date(2024, 9, 4),
                         cost: 'Kostenlos',
-                        tags: ['Chilbi', 'Familie', 'Essen', 'Tradition'],
-                        // Schichten für Helfer
-                        shifts: [
-                            {
-                                id: 'aufbau-1',
-                                name: 'Aufbau 1',
-                                date: '05.10.2024',
-                                time: '17:00 Uhr',
-                                needed: 5,
-                                description: 'Grundaufbau und Vorbereitung'
-                            },
-                            {
-                                id: 'aufbau-2',
-                                name: 'Aufbau 2',
-                                date: '12.10.2024',
-                                time: 'Abends (Zeit folgt)',
-                                needed: 5,
-                                description: 'Dekoration und finale Vorbereitungen'
-                            },
-                            {
-                                id: 'samstag-1',
-                                name: 'Samstag Schicht 1',
-                                date: '14.10.2024',
-                                time: '14:00-18:00',
-                                needed: 3,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'samstag-2',
-                                name: 'Samstag Schicht 2',
-                                date: '14.10.2024',
-                                time: '18:00-22:00',
-                                needed: 5,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'samstag-3',
-                                name: 'Samstag Schicht 3',
-                                date: '14.10.2024',
-                                time: '22:00-Open End',
-                                needed: 5,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'sonntag-1',
-                                name: 'Sonntag Schicht 1',
-                                date: '15.10.2024',
-                                time: '12:00-17:00',
-                                needed: 3,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'sonntag-2',
-                                name: 'Sonntag Schicht 2',
-                                date: '15.10.2024',
-                                time: '17:00-22:00',
-                                needed: 5,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'abbau-1',
-                                name: 'Abbau 1',
-                                date: '16.10.2024',
-                                time: 'Abends (Zeit folgt)',
-                                needed: 5,
-                                description: 'Erste Aufräumarbeiten'
-                            },
-                            {
-                                id: 'abbau-2',
-                                name: 'Abbau 2',
-                                date: '18.10.2024',
-                                time: 'Abends (Zeit folgt)',
-                                needed: 15,
-                                description: 'Kompletter Abbau und Räumung'
-                            }
-                        ]
-                    },
-                    {
-                        id: 'grillplausch-sommer-2024',
-                        title: 'Grillplausch bei Edi Grossenbacher',
-                        subtitle: 'Geselliger Sommerevent',
-                        description: 'Hiermit lädt der Vorstand alle Mitglieder zum gemütlichen Grillplausch bei Edi Grossenbacher ein.\n\nDetails:\n- Essen und Getränke werden gestellt\n- Salate und Desserts können gerne mitgebracht werden\n\nAnfahrt: Kurzenbettli 23, bei der Schiessanlage Augst',
-                        startDate: new Date(2024, 5, 17, 16, 0),
-                        endDate: new Date(2024, 5, 17, 22, 0),
-                        location: 'Kurzenbettli 23, 4302 Augst BL',
-                        category: 'Gesellschaftsanlass',
-                        organizer: 'Edi Grossenbacher',
-                        email: 'kontakt@feuerwehrverein-raura.ch',
-                        status: 'past',
-                        registrationRequired: true,
-                        registrationDeadline: new Date(2024, 5, 12),
-                        cost: 'Kostenlos',
-                        tags: ['Grillen', 'Geselligkeit', 'Sommer', 'Familie'],
-                        // Keine Schichten, normale Anmeldung
-                        participantRegistration: true
-                    },
-                    {
-                        id: 'vereinsausflug-2024',
-                        title: 'Vereinsausflug 2024',
-                        subtitle: 'Weinverkostung und Kultur',
-                        description: 'Der diesjährige Vereinsausflug findet später als geplant statt, da die ursprünglich geplante Weinverkostung wegen der Weinlese nicht im September durchgeführt werden kann.\n\nProgramm wird noch bekannt gegeben:\n- Weinverkostung bei einem regionalen Winzer\n- Gemeinsames Mittagessen\n- Besichtigung kultureller Sehenswürdigkeiten\n\nWir hoffen trotzdem auf rege Teilnahme!',
-                        startDate: new Date(2024, 10, 15, 9, 0),
-                        endDate: new Date(2024, 10, 15, 18, 0),
-                        location: 'Wird noch bekannt gegeben',
-                        category: 'Ausflug',
-                        organizer: 'Vereinsvorstand',
-                        email: 'vorstand@feuerwehrverein-raura.ch',
-                        status: 'planned',
-                        registrationRequired: true,
-                        registrationDeadline: new Date(2024, 10, 1),
-                        cost: 'CHF 35.- pro Person',
-                        tags: ['Ausflug', 'Wein', 'Kultur', 'Geselligkeit'],
-                        participantRegistration: true
-                    },
-                    {
-                        id: 'vorstandssitzung-q4-2024',
-                        title: 'Vorstandssitzung Q4',
-                        subtitle: 'Interne Besprechung',
-                        description: 'Quartalsweise Vorstandssitzung zur Besprechung aktueller Vereinsangelegenheiten.\n\nTraktanden:\n- Rückblick Chilbi 2024\n- Planung Vereinsausflug\n- Budget 2025\n- Mitgliederwerbung\n\nNur für Vorstandsmitglieder.',
-                        startDate: new Date(2024, 11, 5, 19, 0),
-                        endDate: new Date(2024, 11, 5, 21, 0),
-                        location: 'Vereinslokal',
-                        category: 'Vereinsintern',
-                        organizer: 'René Käslin',
-                        email: 'rene.kaeslin@feuerwehrverein-raura.ch',
-                        status: 'confirmed',
-                        registrationRequired: false,
-                        cost: 'Kostenlos',
-                        tags: ['Vorstand', 'Planung', 'Intern']
+                        tags: ['Chilbi', 'Familie', 'Helfer']
                     }
                 ];
             }
@@ -493,7 +595,7 @@
                         event.description.toLowerCase().includes(this.searchQuery) ||
                         event.location.toLowerCase().includes(this.searchQuery) ||
                         event.organizer.toLowerCase().includes(this.searchQuery) ||
-                        event.tags.some(tag => tag.toLowerCase().includes(this.searchQuery))
+                        (event.tags && event.tags.some(tag => tag.toLowerCase().includes(this.searchQuery)))
                     );
                 }
 
@@ -551,9 +653,7 @@
                                     <div class="flex items-start justify-between mb-3">
                                         <div>
                                             <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
-                                        <div>
-                                            <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
-                                            <p class="text-fire-600 font-medium">${event.subtitle}</p>
+                                            <p class="text-fire-600 font-medium">${event.subtitle || ''}</p>
                                         </div>
                                         <div class="flex space-x-2">
                                             ${statusBadge}
@@ -589,7 +689,7 @@
                                     </div>
                                     
                                     <div class="flex flex-wrap gap-2">
-                                        ${event.tags.map(tag => `
+                                        ${(event.tags || []).map(tag => `
                                             <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
                                                 ${tag}
                                             </span>
@@ -599,9 +699,9 @@
                                 
                                 <div class="mt-4 lg:mt-0 lg:ml-6 flex-shrink-0">
                                     <span class="inline-block px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
-                                        ${event.category}
+                                        ${event.category || 'Event'}
                                     </span>
-                                    ${event.cost !== 'Kostenlos' ? `
+                                    ${event.cost && event.cost !== 'Kostenlos' ? `
                                         <div class="mt-2 text-lg font-bold text-fire-600">
                                             ${event.cost}
                                         </div>
@@ -630,7 +730,7 @@
                                 </div>
                             </div>
                             
-                            <p class="text-fire-600 text-sm font-medium mb-3">${event.subtitle}</p>
+                            <p class="text-fire-600 text-sm font-medium mb-3">${event.subtitle || ''}</p>
                             
                             <div class="text-sm text-gray-600 mb-4">
                                 ${this.truncateText(event.description, 120)}
@@ -649,9 +749,9 @@
                             
                             <div class="flex justify-between items-center">
                                 <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded-full text-xs font-medium">
-                                    ${event.category}
+                                    ${event.category || 'Event'}
                                 </span>
-                                ${event.cost !== 'Kostenlos' ? `
+                                ${event.cost && event.cost !== 'Kostenlos' ? `
                                     <span class="text-fire-600 font-bold text-sm">${event.cost}</span>
                                 ` : ''}
                             </div>
@@ -707,9 +807,9 @@
 
                 document.getElementById('modal-content').innerHTML = `
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">${event.subtitle}</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">${event.subtitle || ''}</h3>
                         <div class="prose max-w-none">
-                            ${this.parseMarkdown(event.description)}
+                            ${this.parseMarkdownToHTML(event.description)}
                         </div>
                     </div>
                     
@@ -719,11 +819,11 @@
                             <div class="space-y-2 text-sm">
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Kategorie:</span>
-                                    <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category}</span>
+                                    <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category || 'Event'}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Kosten:</span>
-                                    <span class="font-medium">${event.cost}</span>
+                                    <span class="font-medium">${event.cost || 'Nicht angegeben'}</span>
                                 </div>
                                 ${event.registrationRequired ? `
                                     <div class="flex justify-between">
@@ -755,7 +855,7 @@
                         </div>
                     </div>
                     
-                    ${event.tags.length > 0 ? `
+                    ${(event.tags && event.tags.length > 0) ? `
                         <div class="mb-6">
                             <h4 class="font-semibold text-gray-800 mb-2">Tags</h4>
                             <div class="flex flex-wrap gap-2">
@@ -901,7 +1001,7 @@ VERANSTALTUNG: ${event.title}
 DATUM: ${this.formatDate(event.startDate)}
 ZEIT: ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}
 ORT: ${event.location}
-${event.cost !== 'Kostenlos' ? `KOSTEN: ${event.cost}` : ''}
+${event.cost && event.cost !== 'Kostenlos' ? `KOSTEN: ${event.cost}` : ''}
 
 ANMELDUNG:
 Name: ${name}
@@ -1041,7 +1141,7 @@ ${name}`;
                 window.URL.revokeObjectURL(url);
             }
 
-            parseMarkdown(text) {
+            parseMarkdownToHTML(text) {
                 return text
                     .replace(/\n\n/g, '</p><p class="mb-3">')
                     .replace(/\n- /g, '</p><li class="ml-4">• ')
