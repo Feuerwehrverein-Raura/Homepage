@@ -38,13 +38,6 @@ shifts:
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
   
-  - id: samstag-kasse-12-14
-    name: Kasse Samstag 12:00-14:00
-    date: 2025-10-18
-    time: 12:00-14:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
   - id: samstag-bar-14-16
     name: Bar Samstag 14:00-16:00
     date: 2025-10-18
@@ -58,14 +51,7 @@ shifts:
     time: 14:00-16:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
-  
-  - id: samstag-kasse-14-16
-    name: Kasse Samstag 14:00-16:00
-    date: 2025-10-18
-    time: 14:00-16:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
+
   - id: samstag-bar-16-18
     name: Bar Samstag 16:00-18:00
     date: 2025-10-18
@@ -79,13 +65,6 @@ shifts:
     time: 16:00-18:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
-  
-  - id: samstag-kasse-16-18
-    name: Kasse Samstag 16:00-18:00
-    date: 2025-10-18
-    time: 16:00-18:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
   
   - id: samstag-bar-18-20
     name: Bar Samstag 18:00-20:00
@@ -101,13 +80,6 @@ shifts:
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
   
-  - id: samstag-kasse-18-20
-    name: Kasse Samstag 18:00-20:00
-    date: 2025-10-18
-    time: 18:00-20:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
   - id: samstag-bar-20-22
     name: Bar Samstag 20:00-22:00
     date: 2025-10-18
@@ -122,13 +94,6 @@ shifts:
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
   
-  - id: samstag-kasse-20-22
-    name: Kasse Samstag 20:00-22:00
-    date: 2025-10-18
-    time: 20:00-22:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
   - id: samstag-bar-22-open
     name: Bar Samstag 22:00-Open End
     date: 2025-10-18
@@ -142,13 +107,6 @@ shifts:
     time: 22:00-Open End
     needed: 2
     description: Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)
-  
-  - id: samstag-kasse-22-open
-    name: Kasse Samstag 22:00-Open End
-    date: 2025-10-18
-    time: 22:00-Open End
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben (bis Betriebsschluss)
   
   # Sonntag Schichten
   - id: sonntag-bar-12-14
@@ -165,13 +123,6 @@ shifts:
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
   
-  - id: sonntag-kasse-12-14
-    name: Kasse Sonntag 12:00-14:00
-    date: 2025-10-19
-    time: 12:00-14:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
   - id: sonntag-bar-14-16
     name: Bar Sonntag 14:00-16:00
     date: 2025-10-19
@@ -185,14 +136,7 @@ shifts:
     time: 14:00-16:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
-  
-  - id: sonntag-kasse-14-16
-    name: Kasse Sonntag 14:00-16:00
-    date: 2025-10-19
-    time: 14:00-16:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
+
   - id: sonntag-bar-16-18
     name: Bar Sonntag 16:00-18:00
     date: 2025-10-19
@@ -206,14 +150,7 @@ shifts:
     time: 16:00-18:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
-  
-  - id: sonntag-kasse-16-18
-    name: Kasse Sonntag 16:00-18:00
-    date: 2025-10-19
-    time: 16:00-18:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
+
   - id: sonntag-bar-18-20
     name: Bar Sonntag 18:00-20:00
     date: 2025-10-19
@@ -227,14 +164,7 @@ shifts:
     time: 18:00-20:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
-  
-  - id: sonntag-kasse-18-20
-    name: Kasse Sonntag 18:00-20:00
-    date: 2025-10-19
-    time: 18:00-20:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
+
   - id: sonntag-bar-20-22
     name: Bar Sonntag 20:00-22:00
     date: 2025-10-19
@@ -248,14 +178,7 @@ shifts:
     time: 20:00-22:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
-  
-  - id: sonntag-kasse-20-22
-    name: Kasse Sonntag 20:00-22:00
-    date: 2025-10-19
-    time: 20:00-22:00
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben
-  
+
   - id: sonntag-bar-22-open
     name: Bar Sonntag 22:00-Open End
     date: 2025-10-19
@@ -269,14 +192,7 @@ shifts:
     time: 22:00-Open End
     needed: 2
     description: Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)
-  
-  - id: sonntag-kasse-22-open
-    name: Kasse Sonntag 22:00-Open End
-    date: 2025-10-19
-    time: 22:00-Open End
-    needed: 2
-    description: Kasse - Geld kassieren und Bons ausgeben (bis Betriebsschluss)
-  
+
   # Abbau
   - id: abbau
     name: Abbau
@@ -294,7 +210,7 @@ Unsere traditionelle Chilbi findet auch dieses Jahr wieder im Roten Schopf statt
 
 **Samstag, 18. Oktober 2025**
 - 12:00 - 22:00+ Uhr - Festbetrieb mit warmen Speisen und Getränken
-- Live-Musik und geselliger Abend
+- Geselliger Abend
 
 **Sonntag, 19. Oktober 2025**  
 - 12:00 - 22:00+ Uhr - Familientag mit besonderen Angeboten
