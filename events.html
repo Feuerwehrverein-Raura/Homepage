@@ -1,4 +1,64 @@
-<!DOCTYPE html>
+setupRegistrationSection(event) {
+                const registrationSection = document.getElementById('registration-section');
+                const shiftSelection = document.getElementById('shift-selection');
+                const shiftsContainer = document.getElementById('shifts-container');
+                const participantsSection = document.getElementById('participants-section');
+
+                // Check if registration is possible
+                const now = new Date();
+                const canRegister = event.registrationRequired && 
+                    (!event.registrationDeadline || event.registrationDeadline > now) &&
+                    event.endDate > now;
+
+                if (!canRegister) {
+                    registrationSection.classList.add('hidden');
+                    return;
+                }
+
+                registrationSection.classList.remove('hidden');
+
+                // Setup shifts if available - WICHTIG: Nur verfügbare Schichten anzeigen
+                if (event.shifts && event.shifts.length > 0) {
+                    shiftSelection.classList.remove('hidden');
+                    participantsSection.classList.add('hidden');
+                    
+                    // Verwende availableShiftsForRegistration statt alle shifts
+                    const availableShifts = event.availableShiftsForRegistration || event.shifts;
+                    
+                    if (availableShifts.length === 0) {
+                        shiftsContainer.innerHTML = `
+                            <div class="text-center py-8 bg-red-50 border border-red-200 rounded-lg">
+                                <div class="text-red-600 text-lg font-semibold mb-2">🚫 Alle Schichten besetzt</div>
+                                <p class="text-red-700 text-sm">
+                                    Derzeit sind alle Helfer-Schichten für diese Veranstaltung bereits vollständig besetzt.
+                                    Bei Fragen wenden Sie sich an ${event.organizer}.
+                                </p>
+                            </div>
+                        `;
+                    } else {
+                        shiftsContainer.innerHTML = availableShifts.map(shift => {
+                            const assigned = event.assignments[shift.id] || [];
+                            const remaining = shift.needed - assigned.length;
+                            
+                            return `
+                                <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                                    <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
+                                    <div class="flex-1">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <p class="font-medium text-gray-800">${shift.name}</p>
+                                                <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
+                                                <p class="text-xs text-gray-500">${shift.description}</p>
+                                                ${assigned.length > 0 ? `
+                                                    <p class="text-xs text-green-600 mt-1">
+                                                        Bereits angemeldet: ${assigned.join(', ')}
+                                                    </p>
+                                                ` : ''}
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
+                                                    ${remaining} von ${shift.needed} frei
+                                                <!DOCTYPE html>
 <html lang="de" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
@@ -298,6 +358,7 @@
                         hasAssignments: true,
                         assignmentsFile: 'events/chilbi-2025-assignments.md',
                         shifts: [
+                            // Aufbau
                             {
                                 id: 'aufbau',
                                 name: 'Aufbau',
@@ -306,6 +367,8 @@
                                 needed: 5,
                                 description: 'Grundaufbau und Vorbereitung des Roten Schopfs'
                             },
+                            
+                            // Samstag Schichten - alle 18 Schichten (6 Zeiten x 3 Bereiche)
                             {
                                 id: 'samstag-bar-12-14',
                                 name: 'Bar Samstag 12:00-14:00',
@@ -331,6 +394,78 @@
                                 description: 'Kasse - Geld kassieren und Bons ausgeben'
                             },
                             {
+                                id: 'samstag-bar-14-16',
+                                name: 'Bar Samstag 14:00-16:00',
+                                date: '18.10.2025',
+                                time: '14:00-16:00',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten'
+                            },
+                            {
+                                id: 'samstag-kueche-14-16',
+                                name: 'Küche Samstag 14:00-16:00',
+                                date: '18.10.2025',
+                                time: '14:00-16:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'samstag-kasse-14-16',
+                                name: 'Kasse Samstag 14:00-16:00',
+                                date: '18.10.2025',
+                                time: '14:00-16:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'samstag-bar-16-18',
+                                name: 'Bar Samstag 16:00-18:00',
+                                date: '18.10.2025',
+                                time: '16:00-18:00',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten'
+                            },
+                            {
+                                id: 'samstag-kueche-16-18',
+                                name: 'Küche Samstag 16:00-18:00',
+                                date: '18.10.2025',
+                                time: '16:00-18:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'samstag-kasse-16-18',
+                                name: 'Kasse Samstag 16:00-18:00',
+                                date: '18.10.2025',
+                                time: '16:00-18:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'samstag-bar-18-20',
+                                name: 'Bar Samstag 18:00-20:00',
+                                date: '18.10.2025',
+                                time: '18:00-20:00',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten'
+                            },
+                            {
+                                id: 'samstag-kueche-18-20',
+                                name: 'Küche Samstag 18:00-20:00',
+                                date: '18.10.2025',
+                                time: '18:00-20:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'samstag-kasse-18-20',
+                                name: 'Kasse Samstag 18:00-20:00',
+                                date: '18.10.2025',
+                                time: '18:00-20:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
                                 id: 'samstag-bar-20-22',
                                 name: 'Bar Samstag 20:00-22:00',
                                 date: '18.10.2025',
@@ -339,6 +474,48 @@
                                 description: 'Bar - Getränke ausgeben und zubereiten'
                             },
                             {
+                                id: 'samstag-kueche-20-22',
+                                name: 'Küche Samstag 20:00-22:00',
+                                date: '18.10.2025',
+                                time: '20:00-22:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'samstag-kasse-20-22',
+                                name: 'Kasse Samstag 20:00-22:00',
+                                date: '18.10.2025',
+                                time: '20:00-22:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'samstag-bar-22-open',
+                                name: 'Bar Samstag 22:00-Open End',
+                                date: '18.10.2025',
+                                time: '22:00-Open End',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten (bis Betriebsschluss)'
+                            },
+                            {
+                                id: 'samstag-kueche-22-open',
+                                name: 'Küche Samstag 22:00-Open End',
+                                date: '18.10.2025',
+                                time: '22:00-Open End',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)'
+                            },
+                            {
+                                id: 'samstag-kasse-22-open',
+                                name: 'Kasse Samstag 22:00-Open End',
+                                date: '18.10.2025',
+                                time: '22:00-Open End',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben (bis Betriebsschluss)'
+                            },
+                            
+                            // Sonntag Schichten - alle 18 Schichten (6 Zeiten x 3 Bereiche)
+                            {
                                 id: 'sonntag-bar-12-14',
                                 name: 'Bar Sonntag 12:00-14:00',
                                 date: '19.10.2025',
@@ -346,6 +523,144 @@
                                 needed: 2,
                                 description: 'Bar - Getränke ausgeben und zubereiten'
                             },
+                            {
+                                id: 'sonntag-kueche-12-14',
+                                name: 'Küche Sonntag 12:00-14:00',
+                                date: '19.10.2025',
+                                time: '12:00-14:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'sonntag-kasse-12-14',
+                                name: 'Kasse Sonntag 12:00-14:00',
+                                date: '19.10.2025',
+                                time: '12:00-14:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'sonntag-bar-14-16',
+                                name: 'Bar Sonntag 14:00-16:00',
+                                date: '19.10.2025',
+                                time: '14:00-16:00',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten'
+                            },
+                            {
+                                id: 'sonntag-kueche-14-16',
+                                name: 'Küche Sonntag 14:00-16:00',
+                                date: '19.10.2025',
+                                time: '14:00-16:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'sonntag-kasse-14-16',
+                                name: 'Kasse Sonntag 14:00-16:00',
+                                date: '19.10.2025',
+                                time: '14:00-16:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'sonntag-bar-16-18',
+                                name: 'Bar Sonntag 16:00-18:00',
+                                date: '19.10.2025',
+                                time: '16:00-18:00',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten'
+                            },
+                            {
+                                id: 'sonntag-kueche-16-18',
+                                name: 'Küche Sonntag 16:00-18:00',
+                                date: '19.10.2025',
+                                time: '16:00-18:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'sonntag-kasse-16-18',
+                                name: 'Kasse Sonntag 16:00-18:00',
+                                date: '19.10.2025',
+                                time: '16:00-18:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'sonntag-bar-18-20',
+                                name: 'Bar Sonntag 18:00-20:00',
+                                date: '19.10.2025',
+                                time: '18:00-20:00',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten'
+                            },
+                            {
+                                id: 'sonntag-kueche-18-20',
+                                name: 'Küche Sonntag 18:00-20:00',
+                                date: '19.10.2025',
+                                time: '18:00-20:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'sonntag-kasse-18-20',
+                                name: 'Kasse Sonntag 18:00-20:00',
+                                date: '19.10.2025',
+                                time: '18:00-20:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'sonntag-bar-20-22',
+                                name: 'Bar Sonntag 20:00-22:00',
+                                date: '19.10.2025',
+                                time: '20:00-22:00',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten'
+                            },
+                            {
+                                id: 'sonntag-kueche-20-22',
+                                name: 'Küche Sonntag 20:00-22:00',
+                                date: '19.10.2025',
+                                time: '20:00-22:00',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben'
+                            },
+                            {
+                                id: 'sonntag-kasse-20-22',
+                                name: 'Kasse Sonntag 20:00-22:00',
+                                date: '19.10.2025',
+                                time: '20:00-22:00',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben'
+                            },
+                            {
+                                id: 'sonntag-bar-22-open',
+                                name: 'Bar Sonntag 22:00-Open End',
+                                date: '19.10.2025',
+                                time: '22:00-Open End',
+                                needed: 2,
+                                description: 'Bar - Getränke ausgeben und zubereiten (bis Betriebsschluss)'
+                            },
+                            {
+                                id: 'sonntag-kueche-22-open',
+                                name: 'Küche Sonntag 22:00-Open End',
+                                date: '19.10.2025',
+                                time: '22:00-Open End',
+                                needed: 2,
+                                description: 'Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)'
+                            },
+                            {
+                                id: 'sonntag-kasse-22-open',
+                                name: 'Kasse Sonntag 22:00-Open End',
+                                date: '19.10.2025',
+                                time: '22:00-Open End',
+                                needed: 2,
+                                description: 'Kasse - Geld kassieren und Bons ausgeben (bis Betriebsschluss)'
+                            },
+                            
+                            // Abbau
                             {
                                 id: 'abbau',
                                 name: 'Abbau',
@@ -1329,47 +1644,34 @@
                 doc.save(`arbeitsplan-${event.id}.pdf`);
             }
 
-            setupRegistrationSection(event) {
-                const registrationSection = document.getElementById('registration-section');
-                const shiftSelection = document.getElementById('shift-selection');
-                const shiftsContainer = document.getElementById('shifts-container');
-                const participantsSection = document.getElementById('participants-section');
-
-                // Check if registration is possible
-                const now = new Date();
-                const canRegister = event.registrationRequired && 
-                    (!event.registrationDeadline || event.registrationDeadline > now) &&
-                    event.endDate > now;
-
-                if (!canRegister) {
-                    registrationSection.classList.add('hidden');
-                    return;
-                }
-
-                registrationSection.classList.remove('hidden');
-
-                // Setup shifts if available
-                if (event.shifts && event.shifts.length > 0) {
-                    shiftSelection.classList.remove('hidden');
-                    participantsSection.classList.add('hidden');
-                    
-                    shiftsContainer.innerHTML = event.shifts.map(shift => `
-                        <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                            <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
-                            <div class="flex-1">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <p class="font-medium text-gray-800">${shift.name}</p>
-                                        <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
-                                        <p class="text-xs text-gray-500">${shift.description}</p>
+                                                <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
+                                                    ${remaining} von ${shift.needed} frei
+                                                </span>
+                                                ${remaining === 1 ? `
+                                                    <div class="text-xs text-orange-600 mt-1 font-medium">⚠️ Nur noch 1 Platz!</div>
+                                                ` : ''}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
-                                        ${shift.needed} benötigt
-                                    </span>
+                                </label>
+                            `;
+                        }).join('');
+                        
+                        // Zeige Hinweis wenn viele Schichten schon voll sind
+                        const totalShifts = event.shifts.length;
+                        const availableCount = availableShifts.length;
+                        const fullShifts = totalShifts - availableCount;
+                        
+                        if (fullShifts > 0) {
+                            shiftsContainer.innerHTML += `
+                                <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <div class="text-sm text-yellow-800">
+                                        <strong>ℹ️ Hinweis:</strong> ${fullShifts} von ${totalShifts} Schichten sind bereits vollständig besetzt und werden daher nicht zur Anmeldung angezeigt.
+                                    </div>
                                 </div>
-                            </div>
-                        </label>
-                    `).join('');
+                            `;
+                        }
+                    }
                 } else if (event.participantRegistration) {
                     shiftSelection.classList.add('hidden');
                     participantsSection.classList.remove('hidden');
