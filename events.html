@@ -1,64 +1,4 @@
-setupRegistrationSection(event) {
-                const registrationSection = document.getElementById('registration-section');
-                const shiftSelection = document.getElementById('shift-selection');
-                const shiftsContainer = document.getElementById('shifts-container');
-                const participantsSection = document.getElementById('participants-section');
-
-                // Check if registration is possible
-                const now = new Date();
-                const canRegister = event.registrationRequired && 
-                    (!event.registrationDeadline || event.registrationDeadline > now) &&
-                    event.endDate > now;
-
-                if (!canRegister) {
-                    registrationSection.classList.add('hidden');
-                    return;
-                }
-
-                registrationSection.classList.remove('hidden');
-
-                // Setup shifts if available - WICHTIG: Nur verfügbare Schichten anzeigen
-                if (event.shifts && event.shifts.length > 0) {
-                    shiftSelection.classList.remove('hidden');
-                    participantsSection.classList.add('hidden');
-                    
-                    // Verwende availableShiftsForRegistration statt alle shifts
-                    const availableShifts = event.availableShiftsForRegistration || event.shifts;
-                    
-                    if (availableShifts.length === 0) {
-                        shiftsContainer.innerHTML = `
-                            <div class="text-center py-8 bg-red-50 border border-red-200 rounded-lg">
-                                <div class="text-red-600 text-lg font-semibold mb-2">🚫 Alle Schichten besetzt</div>
-                                <p class="text-red-700 text-sm">
-                                    Derzeit sind alle Helfer-Schichten für diese Veranstaltung bereits vollständig besetzt.
-                                    Bei Fragen wenden Sie sich an ${event.organizer}.
-                                </p>
-                            </div>
-                        `;
-                    } else {
-                        shiftsContainer.innerHTML = availableShifts.map(shift => {
-                            const assigned = event.assignments[shift.id] || [];
-                            const remaining = shift.needed - assigned.length;
-                            
-                            return `
-                                <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                                    <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
-                                    <div class="flex-1">
-                                        <div class="flex justify-between items-start">
-                                            <div>
-                                                <p class="font-medium text-gray-800">${shift.name}</p>
-                                                <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
-                                                <p class="text-xs text-gray-500">${shift.description}</p>
-                                                ${assigned.length > 0 ? `
-                                                    <p class="text-xs text-green-600 mt-1">
-                                                        Bereits angemeldet: ${assigned.join(', ')}
-                                                    </p>
-                                                ` : ''}
-                                            </div>
-                                            <div class="text-right">
-                                                <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
-                                                    ${remaining} von ${shift.needed} frei
-                                                <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="de" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
@@ -131,38 +71,6 @@ setupRegistrationSection(event) {
         </div>
     </section>
 
-    <!-- Filters and Search -->
-    <section class="bg-white shadow-sm py-6">
-        <div class="container mx-auto px-4">
-            <div class="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
-                <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                    <div class="relative">
-                        <input type="text" id="search-input" placeholder="Veranstaltungen suchen..." 
-                               class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500 w-full sm:w-64">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <span class="text-gray-400">🔍</span>
-                        </div>
-                    </div>
-                    <select id="category-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
-                        <option value="">Alle Kategorien</option>
-                        <option value="Hauptveranstaltung">Hauptveranstaltung</option>
-                        <option value="Gesellschaftsanlass">Gesellschaftsanlass</option>
-                        <option value="Ausflug">Ausflug</option>
-                        <option value="Vereinsintern">Vereinsintern</option>
-                    </select>
-                </div>
-                <div class="flex space-x-2">
-                    <button id="list-view-btn" class="p-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
-                        <span class="text-xl">📋</span>
-                    </button>
-                    <button id="grid-view-btn" class="p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
-                        <span class="text-xl">⊞</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <!-- Events List -->
     <section class="py-8">
         <div class="container mx-auto px-4">
@@ -181,7 +89,7 @@ setupRegistrationSection(event) {
 
     <!-- Event Detail Modal -->
     <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div class="relative">
                 <!-- Modal Header -->
                 <div id="modal-header" class="bg-gradient-to-r from-fire-500 to-fire-600 text-white p-6 rounded-t-lg">
@@ -194,6 +102,36 @@ setupRegistrationSection(event) {
                 <div class="p-6">
                     <div id="modal-content" class="prose max-w-none">
                         <!-- Event details will be loaded here -->
+                    </div>
+                    
+                    <!-- Shift Planning Section (only for events with shifts) -->
+                    <div id="shift-planning-section" class="hidden mt-8 border-t pt-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl font-bold text-gray-800">📋 Schichtplanung</h3>
+                            <div class="flex space-x-2">
+                                <button id="view-arbeitsplan" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2">
+                                    <span>📋</span>
+                                    <span>Arbeitsplan anzeigen</span>
+                                </button>
+                                <button id="download-arbeitsplan-pdf" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2">
+                                    <span>📄</span>
+                                    <span>PDF generieren</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Shift Overview -->
+                        <div id="shift-overview" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <!-- Shift statistics will be populated -->
+                        </div>
+                        
+                        <!-- Critical Shifts Warning -->
+                        <div id="critical-shifts" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <h4 class="font-bold text-red-800 mb-2">⚠️ Kritische Schichten</h4>
+                            <div id="critical-shifts-list" class="text-red-700 text-sm">
+                                <!-- Critical shifts will be listed here -->
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Registration Section -->
@@ -255,14 +193,6 @@ setupRegistrationSection(event) {
                             <span>⬇️</span>
                             <span>ICS herunterladen</span>
                         </button>
-                        <button id="view-full-assignments" class="hidden flex-1 bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center space-x-2">
-                            <span>📋</span>
-                            <span>Vollständiger Arbeitsplan</span>
-                        </button>
-                        <button id="download-assignments-pdf" class="hidden flex-1 bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center space-x-2">
-                            <span>📄</span>
-                            <span>PDF Arbeitsplan</span>
-                        </button>
                         <button id="share-event" class="flex-1 border border-fire-500 text-fire-500 px-4 py-3 rounded-lg hover:bg-fire-50 transition-colors flex items-center justify-center space-x-2">
                             <span>📤</span>
                             <span>Teilen</span>
@@ -276,19 +206,37 @@ setupRegistrationSection(event) {
         </div>
     </div>
 
-    <!-- Assignments Full View Modal (NEW) -->
-    <div id="assignments-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto">
+    <!-- Arbeitsplan Modal -->
+    <div id="arbeitsplan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-60 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
             <div class="relative">
+                <!-- Modal Header -->
                 <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-lg">
-                    <button id="close-assignments-modal" class="absolute top-4 right-4 text-white hover:text-blue-200 text-2xl">×</button>
-                    <h2 id="assignments-modal-title" class="text-2xl font-bold mb-2">📋 Arbeitsplan</h2>
-                    <div id="assignments-modal-meta" class="text-blue-100 text-sm"></div>
+                    <button id="close-arbeitsplan-modal" class="absolute top-4 right-4 text-white hover:text-blue-200 text-2xl">×</button>
+                    <h2 id="arbeitsplan-title" class="text-2xl font-bold mb-2">📋 Arbeitsplan</h2>
+                    <div id="arbeitsplan-meta" class="text-blue-100 text-sm">
+                        <span id="arbeitsplan-status"></span>
+                    </div>
                 </div>
                 
+                <!-- Modal Content -->
                 <div class="p-6">
-                    <div id="assignments-content" class="space-y-6">
-                        <!-- Assignments will be loaded here -->
+                    <div id="arbeitsplan-content" class="space-y-6">
+                        <!-- Arbeitsplan content will be loaded here -->
+                    </div>
+                    
+                    <div class="mt-6 flex space-x-3">
+                        <button id="download-arbeitsplan-pdf-2" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2">
+                            <span>📄</span>
+                            <span>PDF generieren</span>
+                        </button>
+                        <button id="edit-arbeitsplan" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2">
+                            <span>✏️</span>
+                            <span>Arbeitsplan bearbeiten</span>
+                        </button>
+                        <button id="close-arbeitsplan-modal-btn" class="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                            Schließen
+                        </button>
                     </div>
                 </div>
             </div>
@@ -309,11 +257,9 @@ setupRegistrationSection(event) {
                 this.events = [];
                 this.filteredEvents = [];
                 this.currentFilter = 'all';
-                this.currentCategory = '';
-                this.searchQuery = '';
-                this.viewMode = 'list';
                 this.selectedEvent = null;
                 this.selectedShifts = [];
+                this.arbeitsplanData = {};
                 
                 this.init();
             }
@@ -329,6 +275,8 @@ setupRegistrationSection(event) {
             async loadEvents() {
                 try {
                     this.events = await this.loadEventsFromMarkdown();
+                    // Load associated arbeitsplan files
+                    await this.loadArbeitsplanData();
                 } catch (error) {
                     console.error('Fehler beim Laden der Veranstaltungen:', error);
                     this.events = [];
@@ -336,15 +284,15 @@ setupRegistrationSection(event) {
             }
 
             async loadEventsFromMarkdown() {
-                // Enhanced sample data with assignments integration
+                // Include the Chilbi 2025 event from the documents
                 return [
                     {
                         id: 'chilbi-2025',
                         title: 'Chilbi 2025',
                         subtitle: 'Traditionelle Dorfchilbi',
-                        description: 'Unsere traditionelle Chilbi findet auch dieses Jahr wieder im Roten Schopf statt. Wir verwandeln das Vereinslokal in ein gemütliches Festlokal für die ganze Familie.\n\nProgramm:\n- Samstag: 12:00 - 22:00 Uhr - Festbetrieb mit warmen Speisen\n- Sonntag: 12:00 - 22:00 Uhr - Familientag mit besonderen Angeboten\n\nHelfer gesucht: Wir suchen noch Helfer für verschiedene Schichten.',
-                        startDate: new Date(2025, 9, 18, 12, 0),
-                        endDate: new Date(2025, 9, 19, 22, 0),
+                        description: 'Unsere traditionelle Chilbi findet auch dieses Jahr wieder im Roten Schopf statt. Wir verwandeln das Vereinslokal in ein gemütliches Festlokal für die ganze Familie.',
+                        startDate: new Date(2025, 9, 18, 12, 0), // 18. Oktober 2025
+                        endDate: new Date(2025, 9, 19, 22, 0),   // 19. Oktober 2025
                         location: 'Roter Schopf, Kaiseraugst',
                         category: 'Hauptveranstaltung',
                         organizer: 'Stefan Müller',
@@ -354,25 +302,22 @@ setupRegistrationSection(event) {
                         registrationDeadline: new Date(2025, 9, 4),
                         cost: 'Kostenlos',
                         tags: ['Chilbi', 'Familie', 'Essen', 'Tradition', 'Helfer'],
-                        // NEU: Assignments integration
-                        hasAssignments: true,
-                        assignmentsFile: 'events/chilbi-2025-assignments.md',
+                        hasShifts: true,
+                        arbeitsplanFile: 'events/chilbi-2025-assignments.md',
                         shifts: [
-                            // Aufbau
                             {
                                 id: 'aufbau',
                                 name: 'Aufbau',
-                                date: '16.10.2025',
+                                date: '2025-10-16',
                                 time: '17:00-20:00',
                                 needed: 5,
                                 description: 'Grundaufbau und Vorbereitung des Roten Schopfs'
                             },
-                            
-                            // Samstag Schichten - alle 18 Schichten (6 Zeiten x 3 Bereiche)
+                            // Samstag Schichten
                             {
                                 id: 'samstag-bar-12-14',
                                 name: 'Bar Samstag 12:00-14:00',
-                                date: '18.10.2025',
+                                date: '2025-10-18',
                                 time: '12:00-14:00',
                                 needed: 2,
                                 description: 'Bar - Getränke ausgeben und zubereiten'
@@ -380,7 +325,7 @@ setupRegistrationSection(event) {
                             {
                                 id: 'samstag-kueche-12-14',
                                 name: 'Küche Samstag 12:00-14:00',
-                                date: '18.10.2025',
+                                date: '2025-10-18',
                                 time: '12:00-14:00',
                                 needed: 2,
                                 description: 'Küche - Essen zubereiten und ausgeben'
@@ -388,313 +333,54 @@ setupRegistrationSection(event) {
                             {
                                 id: 'samstag-kasse-12-14',
                                 name: 'Kasse Samstag 12:00-14:00',
-                                date: '18.10.2025',
+                                date: '2025-10-18',
                                 time: '12:00-14:00',
                                 needed: 2,
                                 description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'samstag-bar-14-16',
-                                name: 'Bar Samstag 14:00-16:00',
-                                date: '18.10.2025',
-                                time: '14:00-16:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'samstag-kueche-14-16',
-                                name: 'Küche Samstag 14:00-16:00',
-                                date: '18.10.2025',
-                                time: '14:00-16:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'samstag-kasse-14-16',
-                                name: 'Kasse Samstag 14:00-16:00',
-                                date: '18.10.2025',
-                                time: '14:00-16:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'samstag-bar-16-18',
-                                name: 'Bar Samstag 16:00-18:00',
-                                date: '18.10.2025',
-                                time: '16:00-18:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'samstag-kueche-16-18',
-                                name: 'Küche Samstag 16:00-18:00',
-                                date: '18.10.2025',
-                                time: '16:00-18:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'samstag-kasse-16-18',
-                                name: 'Kasse Samstag 16:00-18:00',
-                                date: '18.10.2025',
-                                time: '16:00-18:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'samstag-bar-18-20',
-                                name: 'Bar Samstag 18:00-20:00',
-                                date: '18.10.2025',
-                                time: '18:00-20:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'samstag-kueche-18-20',
-                                name: 'Küche Samstag 18:00-20:00',
-                                date: '18.10.2025',
-                                time: '18:00-20:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'samstag-kasse-18-20',
-                                name: 'Kasse Samstag 18:00-20:00',
-                                date: '18.10.2025',
-                                time: '18:00-20:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'samstag-bar-20-22',
-                                name: 'Bar Samstag 20:00-22:00',
-                                date: '18.10.2025',
-                                time: '20:00-22:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'samstag-kueche-20-22',
-                                name: 'Küche Samstag 20:00-22:00',
-                                date: '18.10.2025',
-                                time: '20:00-22:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'samstag-kasse-20-22',
-                                name: 'Kasse Samstag 20:00-22:00',
-                                date: '18.10.2025',
-                                time: '20:00-22:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'samstag-bar-22-open',
-                                name: 'Bar Samstag 22:00-Open End',
-                                date: '18.10.2025',
-                                time: '22:00-Open End',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten (bis Betriebsschluss)'
-                            },
-                            {
-                                id: 'samstag-kueche-22-open',
-                                name: 'Küche Samstag 22:00-Open End',
-                                date: '18.10.2025',
-                                time: '22:00-Open End',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)'
-                            },
-                            {
-                                id: 'samstag-kasse-22-open',
-                                name: 'Kasse Samstag 22:00-Open End',
-                                date: '18.10.2025',
-                                time: '22:00-Open End',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben (bis Betriebsschluss)'
-                            },
-                            
-                            // Sonntag Schichten - alle 18 Schichten (6 Zeiten x 3 Bereiche)
-                            {
-                                id: 'sonntag-bar-12-14',
-                                name: 'Bar Sonntag 12:00-14:00',
-                                date: '19.10.2025',
-                                time: '12:00-14:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'sonntag-kueche-12-14',
-                                name: 'Küche Sonntag 12:00-14:00',
-                                date: '19.10.2025',
-                                time: '12:00-14:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'sonntag-kasse-12-14',
-                                name: 'Kasse Sonntag 12:00-14:00',
-                                date: '19.10.2025',
-                                time: '12:00-14:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'sonntag-bar-14-16',
-                                name: 'Bar Sonntag 14:00-16:00',
-                                date: '19.10.2025',
-                                time: '14:00-16:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'sonntag-kueche-14-16',
-                                name: 'Küche Sonntag 14:00-16:00',
-                                date: '19.10.2025',
-                                time: '14:00-16:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'sonntag-kasse-14-16',
-                                name: 'Kasse Sonntag 14:00-16:00',
-                                date: '19.10.2025',
-                                time: '14:00-16:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'sonntag-bar-16-18',
-                                name: 'Bar Sonntag 16:00-18:00',
-                                date: '19.10.2025',
-                                time: '16:00-18:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'sonntag-kueche-16-18',
-                                name: 'Küche Sonntag 16:00-18:00',
-                                date: '19.10.2025',
-                                time: '16:00-18:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'sonntag-kasse-16-18',
-                                name: 'Kasse Sonntag 16:00-18:00',
-                                date: '19.10.2025',
-                                time: '16:00-18:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'sonntag-bar-18-20',
-                                name: 'Bar Sonntag 18:00-20:00',
-                                date: '19.10.2025',
-                                time: '18:00-20:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'sonntag-kueche-18-20',
-                                name: 'Küche Sonntag 18:00-20:00',
-                                date: '19.10.2025',
-                                time: '18:00-20:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'sonntag-kasse-18-20',
-                                name: 'Kasse Sonntag 18:00-20:00',
-                                date: '19.10.2025',
-                                time: '18:00-20:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'sonntag-bar-20-22',
-                                name: 'Bar Sonntag 20:00-22:00',
-                                date: '19.10.2025',
-                                time: '20:00-22:00',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten'
-                            },
-                            {
-                                id: 'sonntag-kueche-20-22',
-                                name: 'Küche Sonntag 20:00-22:00',
-                                date: '19.10.2025',
-                                time: '20:00-22:00',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben'
-                            },
-                            {
-                                id: 'sonntag-kasse-20-22',
-                                name: 'Kasse Sonntag 20:00-22:00',
-                                date: '19.10.2025',
-                                time: '20:00-22:00',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben'
-                            },
-                            {
-                                id: 'sonntag-bar-22-open',
-                                name: 'Bar Sonntag 22:00-Open End',
-                                date: '19.10.2025',
-                                time: '22:00-Open End',
-                                needed: 2,
-                                description: 'Bar - Getränke ausgeben und zubereiten (bis Betriebsschluss)'
-                            },
-                            {
-                                id: 'sonntag-kueche-22-open',
-                                name: 'Küche Sonntag 22:00-Open End',
-                                date: '19.10.2025',
-                                time: '22:00-Open End',
-                                needed: 2,
-                                description: 'Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)'
-                            },
-                            {
-                                id: 'sonntag-kasse-22-open',
-                                name: 'Kasse Sonntag 22:00-Open End',
-                                date: '19.10.2025',
-                                time: '22:00-Open End',
-                                needed: 2,
-                                description: 'Kasse - Geld kassieren und Bons ausgeben (bis Betriebsschluss)'
-                            },
-                            
-                            // Abbau
-                            {
-                                id: 'abbau',
-                                name: 'Abbau',
-                                date: '20.10.2025',
-                                time: '18:00-21:00',
-                                needed: 5,
-                                description: 'Abbau und Aufräumarbeiten nach der Chilbi'
                             }
-                        ],
-                        // Real assignments (loaded from assignments.md file)
-                        assignments: {
-                            // Leer - alle Schichten offen, bereit für Anmeldungen
-                        }
+                            // ... weitere Schichten können hier hinzugefügt werden
+                        ]
                     },
+                    // Weitere Events...
                     {
-                        id: 'grillplausch-sommer-2025',
+                        id: 'grillplausch-sommer-2024',
                         title: 'Grillplausch bei Edi Grossenbacher',
                         subtitle: 'Geselliger Sommerevent',
-                        description: 'Hiermit lädt der Vorstand alle Mitglieder zum gemütlichen Grillplausch bei Edi Grossenbacher ein.\n\nDetails:\n- Essen und Getränke werden gestellt\n- Salate und Desserts können gerne mitgebracht werden\n\nAnfahrt: Kurzenbettli 23, bei der Schiessanlage Augst',
-                        startDate: new Date(2025, 5, 17, 16, 0),
-                        endDate: new Date(2025, 5, 17, 22, 0),
+                        description: 'Hiermit lädt der Vorstand alle Mitglieder zum gemütlichen Grillplausch bei Edi Grossenbacher ein.',
+                        startDate: new Date(2024, 5, 17, 16, 0),
+                        endDate: new Date(2024, 5, 17, 22, 0),
                         location: 'Kurzenbettli 23, 4302 Augst BL',
                         category: 'Gesellschaftsanlass',
                         organizer: 'Edi Grossenbacher',
-                        email: 'materialwart@fwv-raura.ch',
-                        status: 'confirmed',
+                        email: 'aktuar@fwv-raura.ch',
+                        status: 'past',
                         registrationRequired: true,
-                        registrationDeadline: new Date(2025, 5, 12),
+                        registrationDeadline: new Date(2024, 5, 12),
                         cost: 'Kostenlos',
                         tags: ['Grillen', 'Geselligkeit', 'Sommer', 'Familie'],
-                        participantRegistration: true,
-                        hasAssignments: false
+                        participantRegistration: true
                     }
                 ];
+            }
+
+            async loadArbeitsplanData() {
+                for (const event of this.events) {
+                    if (event.hasShifts && event.arbeitsplanFile) {
+                        try {
+                            console.log(`Lade Arbeitsplan: ${event.arbeitsplanFile}`);
+                            // In einer echten Implementierung würde hier die Markdown-Datei geladen
+                            // Für Demo-Zwecke erstellen wir Mock-Daten
+                            this.arbeitsplanData[event.id] = {
+                                assignments: {},
+                                lastUpdated: new Date(),
+                                totalShifts: event.shifts?.length || 0,
+                                filledShifts: 0
+                            };
+                        } catch (error) {
+                            console.warn(`Konnte Arbeitsplan für ${event.id} nicht laden:`, error);
+                        }
+                    }
+                }
             }
 
             setupEventListeners() {
@@ -708,52 +394,31 @@ setupRegistrationSection(event) {
                     });
                 });
 
-                // Search and filters
-                document.getElementById('search-input').addEventListener('input', (e) => {
-                    this.searchQuery = e.target.value.toLowerCase();
-                    this.filterEvents();
-                    this.renderEvents();
-                });
-
-                document.getElementById('category-filter').addEventListener('change', (e) => {
-                    this.currentCategory = e.target.value;
-                    this.filterEvents();
-                    this.renderEvents();
-                });
-
-                // View mode buttons
-                document.getElementById('list-view-btn').addEventListener('click', () => {
-                    this.viewMode = 'list';
-                    this.updateViewButtons();
-                    this.renderEvents();
-                });
-
-                document.getElementById('grid-view-btn').addEventListener('click', () => {
-                    this.viewMode = 'grid';
-                    this.updateViewButtons();
-                    this.renderEvents();
-                });
-
                 // Modal controls
                 document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
                 document.getElementById('close-modal-btn').addEventListener('click', () => this.closeModal());
                 document.getElementById('download-event-ics').addEventListener('click', () => this.downloadEventICS());
                 document.getElementById('share-event').addEventListener('click', () => this.shareEvent());
                 
-                // NEW: Assignments controls
-                document.getElementById('view-full-assignments').addEventListener('click', () => this.showAssignmentsModal());
-                document.getElementById('download-assignments-pdf').addEventListener('click', () => this.downloadAssignmentsPDF());
-                document.getElementById('close-assignments-modal').addEventListener('click', () => this.closeAssignmentsModal());
-                
                 // Registration
                 document.getElementById('send-registration-email').addEventListener('click', () => this.sendRegistrationEmail());
+                
+                // Shift planning
+                document.getElementById('view-arbeitsplan').addEventListener('click', () => this.showArbeitsplanModal());
+                document.getElementById('download-arbeitsplan-pdf').addEventListener('click', () => this.generateArbeitsplanPDF());
+                document.getElementById('download-arbeitsplan-pdf-2').addEventListener('click', () => this.generateArbeitsplanPDF());
+                
+                // Arbeitsplan modal
+                document.getElementById('close-arbeitsplan-modal').addEventListener('click', () => this.closeArbeitsplanModal());
+                document.getElementById('close-arbeitsplan-modal-btn').addEventListener('click', () => this.closeArbeitsplanModal());
+                document.getElementById('edit-arbeitsplan').addEventListener('click', () => this.editArbeitsplan());
                 
                 document.getElementById('event-modal').addEventListener('click', (e) => {
                     if (e.target.id === 'event-modal') this.closeModal();
                 });
-
-                document.getElementById('assignments-modal').addEventListener('click', (e) => {
-                    if (e.target.id === 'assignments-modal') this.closeAssignmentsModal();
+                
+                document.getElementById('arbeitsplan-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'arbeitsplan-modal') this.closeArbeitsplanModal();
                 });
             }
 
@@ -766,19 +431,6 @@ setupRegistrationSection(event) {
                 });
             }
 
-            updateViewButtons() {
-                const listBtn = document.getElementById('list-view-btn');
-                const gridBtn = document.getElementById('grid-view-btn');
-                
-                if (this.viewMode === 'list') {
-                    listBtn.className = 'p-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors';
-                    gridBtn.className = 'p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors';
-                } else {
-                    listBtn.className = 'p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors';
-                    gridBtn.className = 'p-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors';
-                }
-            }
-
             filterEvents() {
                 const now = new Date();
                 let filtered = [...this.events];
@@ -788,22 +440,6 @@ setupRegistrationSection(event) {
                     filtered = filtered.filter(event => event.startDate > now);
                 } else if (this.currentFilter === 'past') {
                     filtered = filtered.filter(event => event.endDate < now);
-                }
-
-                // Category filter
-                if (this.currentCategory) {
-                    filtered = filtered.filter(event => event.category === this.currentCategory);
-                }
-
-                // Search filter
-                if (this.searchQuery) {
-                    filtered = filtered.filter(event => 
-                        event.title.toLowerCase().includes(this.searchQuery) ||
-                        event.description.toLowerCase().includes(this.searchQuery) ||
-                        event.location.toLowerCase().includes(this.searchQuery) ||
-                        event.organizer.toLowerCase().includes(this.searchQuery) ||
-                        event.tags.some(tag => tag.toLowerCase().includes(this.searchQuery))
-                    );
                 }
 
                 // Sort by date
@@ -828,14 +464,8 @@ setupRegistrationSection(event) {
                 }
 
                 noEventsMsg.classList.add('hidden');
-
-                if (this.viewMode === 'list') {
-                    container.className = 'space-y-6';
-                    container.innerHTML = this.filteredEvents.map(event => this.createEventListItem(event)).join('');
-                } else {
-                    container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
-                    container.innerHTML = this.filteredEvents.map(event => this.createEventGridItem(event)).join('');
-                }
+                container.className = 'space-y-6';
+                container.innerHTML = this.filteredEvents.map(event => this.createEventListItem(event)).join('');
 
                 // Add click listeners
                 container.querySelectorAll('[data-event-id]').forEach(el => {
@@ -850,6 +480,7 @@ setupRegistrationSection(event) {
                 const isPast = event.endDate < new Date();
                 const statusBadge = this.getStatusBadge(event);
                 const registrationBadge = this.getRegistrationBadge(event);
+                const shiftBadge = this.getShiftBadge(event);
                 
                 return `
                     <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
@@ -862,18 +493,16 @@ setupRegistrationSection(event) {
                                             <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
                                             <p class="text-fire-600 font-medium">${event.subtitle}</p>
                                         </div>
-                                        <div class="flex space-x-2">
+                                        <div class="flex flex-wrap gap-2">
                                             ${statusBadge}
                                             ${registrationBadge}
+                                            ${shiftBadge}
                                         </div>
                                     </div>
                                     
                                     <div class="prose prose-sm max-w-none mb-4 text-gray-600">
                                         ${this.truncateText(event.description, 200)}
                                     </div>
-                                    
-                                    <!-- NEU: Schichtplan-Übersicht für Helfer-Events -->
-                                    ${event.hasAssignments ? this.createCompactAssignmentsView(event) : ''}
                                     
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-500 mb-4">
                                         <div class="space-y-2">
@@ -923,117 +552,6 @@ setupRegistrationSection(event) {
                 `;
             }
 
-            createCompactAssignmentsView(event) {
-                if (!event.shifts || !event.assignments) return '';
-
-                let totalSlots = 0;
-                let filledSlots = 0;
-                
-                event.shifts.forEach(shift => {
-                    totalSlots += shift.needed;
-                    const assigned = event.assignments[shift.id] || [];
-                    filledSlots += assigned.length;
-                });
-
-                const percentage = Math.round((filledSlots / totalSlots) * 100);
-                const openSlots = totalSlots - filledSlots;
-
-                return `
-                    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div class="flex justify-between items-center mb-2">
-                            <h4 class="font-semibold text-gray-800 text-sm">📋 Schichtplan-Status</h4>
-                            <span class="text-sm font-medium ${percentage >= 80 ? 'text-green-600' : percentage >= 50 ? 'text-yellow-600' : 'text-red-600'}">
-                                ${filledSlots}/${totalSlots} (${percentage}%)
-                            </span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
-                            <div class="h-2 rounded-full transition-all duration-300 ${percentage >= 80 ? 'bg-green-500' : percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'}" 
-                                 style="width: ${percentage}%"></div>
-                        </div>
-                        <div class="text-xs text-gray-600">
-                            ${openSlots > 0 ? `${openSlots} Plätze noch offen` : 'Alle Schichten besetzt'} • ${event.shifts.length} Schichten total
-                        </div>
-                    </div>
-                `;
-            }
-
-            createEventGridItem(event) {
-                const isPast = event.endDate < new Date();
-                const statusBadge = this.getStatusBadge(event);
-                const registrationBadge = this.getRegistrationBadge(event);
-                
-                return `
-                    <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
-                         data-event-id="${event.id}">
-                        <div class="p-6">
-                            <div class="flex justify-between items-start mb-3">
-                                <h3 class="text-lg font-bold text-gray-800 leading-tight">${event.title}</h3>
-                                <div class="flex flex-col space-y-1">
-                                    ${statusBadge}
-                                    ${registrationBadge}
-                                </div>
-                            </div>
-                            
-                            <p class="text-fire-600 text-sm font-medium mb-3">${event.subtitle}</p>
-                            
-                            <div class="text-sm text-gray-600 mb-4">
-                                ${this.truncateText(event.description, 120)}
-                            </div>
-                            
-                            <!-- NEU: Mini Schichtplan für Grid View -->
-                            ${event.hasAssignments ? this.createMiniAssignmentsView(event) : ''}
-                            
-                            <div class="space-y-2 text-sm text-gray-500 mb-4">
-                                <div class="flex items-center">
-                                    <span class="mr-2">📅</span>
-                                    <span>${this.formatDate(event.startDate)}</span>
-                                </div>
-                                <div class="flex items-center">
-                                    <span class="mr-2">📍</span>
-                                    <span class="truncate">${event.location}</span>
-                                </div>
-                            </div>
-                            
-                            <div class="flex justify-between items-center">
-                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded-full text-xs font-medium">
-                                    ${event.category}
-                                </span>
-                                ${event.cost !== 'Kostenlos' ? `
-                                    <span class="text-fire-600 font-bold text-sm">${event.cost}</span>
-                                ` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            createMiniAssignmentsView(event) {
-                if (!event.shifts || !event.assignments) return '';
-
-                let totalSlots = 0;
-                let filledSlots = 0;
-                
-                event.shifts.forEach(shift => {
-                    totalSlots += shift.needed;
-                    const assigned = event.assignments[shift.id] || [];
-                    filledSlots += assigned.length;
-                });
-
-                const percentage = Math.round((filledSlots / totalSlots) * 100);
-
-                return `
-                    <div class="mb-3 p-2 bg-blue-50 rounded">
-                        <div class="flex justify-between items-center text-xs mb-1">
-                            <span class="font-medium text-gray-700">Schichtplan</span>
-                            <span class="${percentage >= 80 ? 'text-green-600' : 'text-red-600'}">${filledSlots}/${totalSlots}</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded h-1">
-                            <div class="h-1 rounded ${percentage >= 80 ? 'bg-green-500' : 'bg-red-500'}" style="width: ${percentage}%"></div>
-                        </div>
-                    </div>
-                `;
-            }
-
             getStatusBadge(event) {
                 const now = new Date();
                 
@@ -1064,6 +582,23 @@ setupRegistrationSection(event) {
                 return '';
             }
 
+            getShiftBadge(event) {
+                if (!event.hasShifts || !event.shifts) return '';
+                
+                const arbeitsplan = this.arbeitsplanData[event.id];
+                if (!arbeitsplan) return '';
+                
+                const totalShifts = arbeitsplan.totalShifts;
+                const filledShifts = arbeitsplan.filledShifts;
+                const percentage = totalShifts > 0 ? Math.round((filledShifts / totalShifts) * 100) : 0;
+                
+                let badgeClass = 'bg-red-100 text-red-800';
+                if (percentage >= 80) badgeClass = 'bg-green-100 text-green-800';
+                else if (percentage >= 50) badgeClass = 'bg-yellow-100 text-yellow-800';
+                
+                return `<span class="px-2 py-1 ${badgeClass} rounded-full text-xs font-medium">📋 ${percentage}% besetzt</span>`;
+            }
+
             showEventModal(eventId) {
                 const event = this.events.find(e => e.id === eventId);
                 if (!event) return;
@@ -1086,9 +621,6 @@ setupRegistrationSection(event) {
                             ${this.parseMarkdown(event.description)}
                         </div>
                     </div>
-                    
-                    <!-- NEU: Schichtplan-Integration -->
-                    ${event.hasAssignments ? this.createAssignmentsSection(event) : ''}
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <div class="space-y-3">
@@ -1146,532 +678,104 @@ setupRegistrationSection(event) {
                     ` : ''}
                 `;
 
-                // Show/hide assignment buttons
-                const viewAssignmentsBtn = document.getElementById('view-full-assignments');
-                const downloadPDFBtn = document.getElementById('download-assignments-pdf');
+                // Show shift planning section if applicable
+                this.setupShiftPlanningSection(event);
                 
-                if (event.hasAssignments) {
-                    viewAssignmentsBtn.classList.remove('hidden');
-                    downloadPDFBtn.classList.remove('hidden');
-                } else {
-                    viewAssignmentsBtn.classList.add('hidden');
-                    downloadPDFBtn.classList.add('hidden');
-                }
-
                 // Show registration section if applicable
                 this.setupRegistrationSection(event);
                 
                 document.getElementById('event-modal').classList.remove('hidden');
             }
 
-            createAssignmentsSection(event) {
-                if (!event.shifts || !event.assignments) return '';
-
-                // Berechne Statistiken
-                let totalSlots = 0;
-                let filledSlots = 0;
+            setupShiftPlanningSection(event) {
+                const shiftPlanningSection = document.getElementById('shift-planning-section');
                 
-                event.shifts.forEach(shift => {
-                    totalSlots += shift.needed;
-                    const assigned = event.assignments[shift.id] || [];
-                    filledSlots += assigned.length;
-                });
-
-                const percentage = Math.round((filledSlots / totalSlots) * 100);
-                const openSlots = totalSlots - filledSlots;
-
-                return `
-                    <div class="mb-6 border-t pt-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h4 class="text-xl font-bold text-gray-800">📋 Schichtplan-Übersicht</h4>
-                            <div class="text-right">
-                                <div class="text-sm text-gray-600">Besetzung</div>
-                                <div class="text-lg font-bold ${percentage >= 80 ? 'text-green-600' : percentage >= 50 ? 'text-yellow-600' : 'text-red-600'}">
-                                    ${filledSlots}/${totalSlots} (${percentage}%)
-                                </div>
-                                ${openSlots > 0 ? `<div class="text-xs text-red-500">${openSlots} Plätze offen</div>` : '<div class="text-xs text-green-500">Vollständig besetzt</div>'}
-                            </div>
-                        </div>
-
-                        <!-- Fortschrittsbalken -->
-                        <div class="mb-4">
-                            <div class="w-full bg-gray-200 rounded-full h-3">
-                                <div class="h-3 rounded-full transition-all duration-300 ${percentage >= 80 ? 'bg-green-500' : percentage >= 50 ? 'bg-yellow-500' : 'bg-red-500'}" 
-                                     style="width: ${percentage}%"></div>
-                            </div>
-                            <div class="flex justify-between text-xs text-gray-500 mt-1">
-                                <span>0</span>
-                                <span>${totalSlots} Plätze</span>
-                            </div>
-                        </div>
-
-                        <!-- Kompakte Schichtübersicht -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            ${this.createShiftSummaryByCategory(event)}
-                        </div>
-
-                        <!-- Kritische Bereiche -->
-                        ${this.createCriticalAreas(event)}
+                if (!event.hasShifts || !event.shifts) {
+                    shiftPlanningSection.classList.add('hidden');
+                    return;
+                }
+                
+                shiftPlanningSection.classList.remove('hidden');
+                
+                // Setup shift overview
+                const arbeitsplan = this.arbeitsplanData[event.id] || { 
+                    totalShifts: event.shifts.length, 
+                    filledShifts: 0 
+                };
+                
+                const shiftOverview = document.getElementById('shift-overview');
+                shiftOverview.innerHTML = `
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-blue-600">${arbeitsplan.totalShifts}</div>
+                        <div class="text-sm text-blue-800">Schichten gesamt</div>
+                    </div>
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-green-600">${arbeitsplan.filledShifts}</div>
+                        <div class="text-sm text-green-800">Besetzt</div>
+                    </div>
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-red-600">${arbeitsplan.totalShifts - arbeitsplan.filledShifts}</div>
+                        <div class="text-sm text-red-800">Offen</div>
                     </div>
                 `;
+                
+                // Show critical shifts if any
+                const criticalShifts = event.shifts.filter(shift => {
+                    const assignments = arbeitsplan.assignments[shift.id] || [];
+                    return assignments.length === 0;
+                });
+                
+                const criticalShiftsDiv = document.getElementById('critical-shifts');
+                if (criticalShifts.length > 0) {
+                    criticalShiftsDiv.classList.remove('hidden');
+                    document.getElementById('critical-shifts-list').innerHTML = 
+                        criticalShifts.map(shift => `• ${shift.name} (${shift.date}, ${shift.time})`).join('<br>');
+                } else {
+                    criticalShiftsDiv.classList.add('hidden');
+                }
             }
 
-            createShiftSummaryByCategory(event) {
-                const categories = {
-                    'Aufbau': [],
-                    'Samstag': [],
-                    'Sonntag': [],
-                    'Abbau': []
-                };
+            setupRegistrationSection(event) {
+                const registrationSection = document.getElementById('registration-section');
+                const shiftSelection = document.getElementById('shift-selection');
+                const participantsSection = document.getElementById('participants-section');
 
-                // Gruppiere Schichten
-                event.shifts.forEach(shift => {
-                    if (shift.id.includes('aufbau')) {
-                        categories['Aufbau'].push(shift);
-                    } else if (shift.id.includes('samstag')) {
-                        categories['Samstag'].push(shift);
-                    } else if (shift.id.includes('sonntag')) {
-                        categories['Sonntag'].push(shift);
-                    } else if (shift.id.includes('abbau')) {
-                        categories['Abbau'].push(shift);
-                    }
-                });
+                // Check if registration is possible
+                const now = new Date();
+                const canRegister = event.registrationRequired && 
+                    (!event.registrationDeadline || event.registrationDeadline > now) &&
+                    event.endDate > now;
 
-                return Object.entries(categories)
-                    .filter(([cat, shifts]) => shifts.length > 0)
-                    .map(([category, shifts]) => {
-                        let totalNeeded = 0;
-                        let totalFilled = 0;
+                if (!canRegister) {
+                    registrationSection.classList.add('hidden');
+                    return;
+                }
 
-                        shifts.forEach(shift => {
-                            totalNeeded += shift.needed;
-                            const assigned = event.assignments[shift.id] || [];
-                            totalFilled += assigned.length;
-                        });
+                registrationSection.classList.remove('hidden');
 
-                        const percentage = totalNeeded > 0 ? Math.round((totalFilled / totalNeeded) * 100) : 0;
-                        const isComplete = totalFilled >= totalNeeded;
-
-                        return `
-                            <div class="border rounded-lg p-3 ${isComplete ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}">
-                                <div class="flex justify-between items-center">
-                                    <h5 class="font-semibold text-gray-800">${category}</h5>
-                                    <span class="text-sm ${isComplete ? 'text-green-600' : 'text-red-600'} font-medium">
-                                        ${totalFilled}/${totalNeeded}
+                // Setup shifts if available
+                if (event.shifts && event.shifts.length > 0) {
+                    shiftSelection.classList.remove('hidden');
+                    participantsSection.classList.add('hidden');
+                    
+                    const shiftsContainer = document.getElementById('shifts-container');
+                    shiftsContainer.innerHTML = event.shifts.map(shift => `
+                        <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="font-medium text-gray-800">${shift.name}</p>
+                                        <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
+                                        <p class="text-xs text-gray-500">${shift.description}</p>
+                                    </div>
+                                    <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
+                                        ${shift.needed} benötigt
                                     </span>
                                 </div>
-                                <div class="mt-2">
-                                    <div class="w-full bg-gray-200 rounded-full h-2">
-                                        <div class="h-2 rounded-full ${isComplete ? 'bg-green-500' : 'bg-red-500'}" 
-                                             style="width: ${percentage}%"></div>
-                                    </div>
-                                </div>
-                                <div class="text-xs text-gray-600 mt-1">
-                                    ${shifts.length} Schichten • ${percentage}% besetzt
-                                </div>
                             </div>
-                        `;
-                    }).join('');
-            }
-
-            createCriticalAreas(event) {
-                const criticalShifts = event.shifts.filter(shift => {
-                    const assigned = event.assignments[shift.id] || [];
-                    return assigned.length === 0; // Völlig unbesetzte Schichten
-                });
-
-                if (criticalShifts.length === 0) return '';
-
-                return `
-                    <div class="border border-red-200 bg-red-50 rounded-lg p-4">
-                        <h5 class="font-semibold text-red-800 mb-2">⚠️ Kritische Bereiche (${criticalShifts.length} unbesetzte Schichten)</h5>
-                        <div class="text-sm text-red-700">
-                            ${criticalShifts.slice(0, 3).map(shift => `
-                                <div>• ${shift.name} (${shift.needed} Personen benötigt)</div>
-                            `).join('')}
-                            ${criticalShifts.length > 3 ? `<div class="text-red-600 mt-1">... und ${criticalShifts.length - 3} weitere</div>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // NEU: Vollständiger Arbeitsplan Modal
-            showAssignmentsModal() {
-                if (!this.selectedEvent || !this.selectedEvent.hasAssignments) return;
-
-                const event = this.selectedEvent;
-                
-                document.getElementById('assignments-modal-title').textContent = `Arbeitsplan ${event.title}`;
-                document.getElementById('assignments-modal-meta').innerHTML = `
-                    ${this.formatDate(event.startDate)} - ${this.formatDate(event.endDate)} • ${event.location}
-                `;
-
-                document.getElementById('assignments-content').innerHTML = this.createFullAssignmentsView(event);
-                document.getElementById('assignments-modal').classList.remove('hidden');
-            }
-
-            createFullAssignmentsView(event) {
-                if (!event.shifts || !event.assignments) return '<p>Keine Schichtdaten verfügbar.</p>';
-
-                // Gruppiere Schichten nach Kategorien
-                const categories = {
-                    'Aufbau': [],
-                    'Samstag': [],
-                    'Sonntag': [],
-                    'Abbau': []
-                };
-
-                event.shifts.forEach(shift => {
-                    if (shift.id.includes('aufbau')) {
-                        categories['Aufbau'].push(shift);
-                    } else if (shift.id.includes('samstag')) {
-                        categories['Samstag'].push(shift);
-                    } else if (shift.id.includes('sonntag')) {
-                        categories['Sonntag'].push(shift);
-                    } else if (shift.id.includes('abbau')) {
-                        categories['Abbau'].push(shift);
-                    }
-                });
-
-                let html = '';
-
-                // Aufbau Sektion
-                if (categories['Aufbau'].length > 0) {
-                    html += `
-                        <div class="mb-8">
-                            <h3 class="text-xl font-bold text-gray-800 mb-4">🔨 Aufbau</h3>
-                            ${categories['Aufbau'].map(shift => {
-                                const assigned = event.assignments[shift.id] || [];
-                                const remaining = shift.needed - assigned.length;
-                                return `
-                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                                        <div class="flex justify-between items-center mb-2">
-                                            <h4 class="font-semibold">${shift.name}</h4>
-                                            <span class="text-sm text-gray-600">${shift.date} • ${shift.time}</span>
-                                        </div>
-                                        <div class="text-sm text-gray-600 mb-3">${shift.description}</div>
-                                        <div class="space-y-1">
-                                            ${assigned.map(person => `<div class="text-green-700">✅ ${person}</div>`).join('')}
-                                            ${Array(remaining).fill().map(() => '<div class="text-red-600">❌ [OFFEN]</div>').join('')}
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    `;
-                }
-
-                // Samstag/Sonntag als Tabelle
-                ['Samstag', 'Sonntag'].forEach(day => {
-                    if (categories[day].length > 0) {
-                        html += this.createDayTable(day, categories[day], event);
-                    }
-                });
-
-                // Abbau Sektion
-                if (categories['Abbau'].length > 0) {
-                    html += `
-                        <div class="mb-8">
-                            <h3 class="text-xl font-bold text-gray-800 mb-4">🛠️ Abbau</h3>
-                            ${categories['Abbau'].map(shift => {
-                                const assigned = event.assignments[shift.id] || [];
-                                const remaining = shift.needed - assigned.length;
-                                return `
-                                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-                                        <div class="flex justify-between items-center mb-2">
-                                            <h4 class="font-semibold">${shift.name}</h4>
-                                            <span class="text-sm text-gray-600">${shift.date} • ${shift.time}</span>
-                                        </div>
-                                        <div class="text-sm text-gray-600 mb-3">${shift.description}</div>
-                                        <div class="space-y-1">
-                                            ${assigned.map(person => `<div class="text-green-700">✅ ${person}</div>`).join('')}
-                                            ${Array(remaining).fill().map(() => '<div class="text-red-600">❌ [OFFEN]</div>').join('')}
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    `;
-                }
-
-                return html;
-            }
-
-            createDayTable(day, shifts, event) {
-                // Gruppiere nach Zeitslots
-                const timeSlots = {};
-                shifts.forEach(shift => {
-                    if (!timeSlots[shift.time]) {
-                        timeSlots[shift.time] = { bar: null, kueche: null, kasse: null };
-                    }
-                    
-                    if (shift.id.includes('bar')) {
-                        timeSlots[shift.time].bar = shift;
-                    } else if (shift.id.includes('kueche')) {
-                        timeSlots[shift.time].kueche = shift;
-                    } else if (shift.id.includes('kasse')) {
-                        timeSlots[shift.time].kasse = shift;
-                    }
-                });
-
-                return `
-                    <div class="mb-8">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">🎪 ${day}</h3>
-                        <div class="overflow-x-auto">
-                            <table class="w-full border border-gray-300 rounded-lg overflow-hidden">
-                                <thead class="bg-fire-500 text-white">
-                                    <tr>
-                                        <th class="p-3 text-left border-r border-fire-400">Zeit</th>
-                                        <th class="p-3 text-left border-r border-fire-400">Küche</th>
-                                        <th class="p-3 text-left border-r border-fire-400">Bar</th>
-                                        <th class="p-3 text-left">Service / Kasse</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${Object.entries(timeSlots).sort().map(([time, slots]) => `
-                                        <tr class="border-b border-gray-200 hover:bg-gray-50">
-                                            <td class="p-3 font-medium border-r border-gray-200">${time}</td>
-                                            <td class="p-3 border-r border-gray-200">
-                                                ${this.renderTableCell(slots.kueche, event)}
-                                            </td>
-                                            <td class="p-3 border-r border-gray-200">
-                                                ${this.renderTableCell(slots.bar, event)}
-                                            </td>
-                                            <td class="p-3">
-                                                ${this.renderTableCell(slots.kasse, event)}
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="mt-2 text-sm text-gray-600">
-                            <strong>Springer:</strong> Stefan Müller
-                        </div>
-                    </div>
-                `;
-            }
-
-            renderTableCell(shift, event) {
-                if (!shift) return '<span class="text-gray-400">-</span>';
-                
-                const assigned = event.assignments[shift.id] || [];
-                const remaining = shift.needed - assigned.length;
-                
-                return `
-                    <div class="space-y-1">
-                        ${assigned.map(person => `<div class="text-green-700">• ${person}</div>`).join('')}
-                        ${Array(remaining).fill().map(() => '<div class="text-red-600 italic">• [OFFEN]</div>').join('')}
-                    </div>
-                `;
-            }
-
-            closeAssignmentsModal() {
-                document.getElementById('assignments-modal').classList.add('hidden');
-            }
-
-            downloadAssignmentsPDF() {
-                if (!this.selectedEvent || !this.selectedEvent.hasAssignments) return;
-
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                const event = this.selectedEvent;
-
-                // Header
-                doc.setFontSize(16);
-                doc.setFont(undefined, 'bold');
-                doc.text('Feuerwehrverein Raura, Kaiseraugst', 20, 20);
-                
-                doc.setFontSize(14);
-                doc.text(`Arbeitsplan ${event.title}`, 20, 35);
-
-                let yPos = 50;
-
-                // Aufbau Section
-                const aufbauShifts = event.shifts.filter(s => s.id.includes('aufbau'));
-                if (aufbauShifts.length > 0) {
-                    doc.setFont(undefined, 'bold');
-                    const aufbauShift = aufbauShifts[0];
-                    doc.text(`Aufbau ${aufbauShift.date} ab ${aufbauShift.time.split('-')[0]} für ${event.title}`, 20, yPos);
-                    yPos += 10;
-
-                    const aufbauAssigned = event.assignments[aufbauShift.id] || [];
-                    aufbauAssigned.forEach(person => {
-                        doc.setFont(undefined, 'normal');
-                        doc.text(`- ${person}`, 25, yPos);
-                        yPos += 7;
-                    });
-                    yPos += 10;
-                }
-
-                // Samstag Section
-                const samstagShifts = event.shifts.filter(s => s.id.includes('samstag'));
-                if (samstagShifts.length > 0) {
-                    doc.setFont(undefined, 'bold');
-                    doc.text('Samstag,18.10.2025', 20, yPos);
-                    doc.text('Küche', 70, yPos);
-                    doc.text('Bar', 120, yPos);
-                    doc.text('Service / Kasse', 160, yPos);
-                    yPos += 10;
-
-                    // Group by time slots
-                    const timeSlots = new Set();
-                    samstagShifts.forEach(shift => {
-                        timeSlots.add(shift.time);
-                    });
-
-                    Array.from(timeSlots).sort().forEach(time => {
-                        doc.setFont(undefined, 'normal');
-                        doc.text(time, 20, yPos);
-
-                        const kueche = samstagShifts.find(s => s.time === time && s.id.includes('kueche'));
-                        const bar = samstagShifts.find(s => s.time === time && s.id.includes('bar'));
-                        const kasse = samstagShifts.find(s => s.time === time && s.id.includes('kasse'));
-
-                        let maxLines = 0;
-
-                        if (kueche) {
-                            const kuecheAssigned = event.assignments[kueche.id] || [];
-                            kuecheAssigned.forEach((person, idx) => {
-                                doc.text(`- ${person}`, 70, yPos + (idx * 5));
-                            });
-                            maxLines = Math.max(maxLines, kuecheAssigned.length);
-                        }
-
-                        if (bar) {
-                            const barAssigned = event.assignments[bar.id] || [];
-                            barAssigned.forEach((person, idx) => {
-                                doc.text(`- ${person}`, 120, yPos + (idx * 5));
-                            });
-                            maxLines = Math.max(maxLines, barAssigned.length);
-                        }
-
-                        if (kasse) {
-                            const kasseAssigned = event.assignments[kasse.id] || [];
-                            kasseAssigned.forEach((person, idx) => {
-                                doc.text(`- ${person}`, 160, yPos + (idx * 5));
-                            });
-                            maxLines = Math.max(maxLines, kasseAssigned.length);
-                        }
-
-                        yPos += Math.max(10, maxLines * 5 + 5);
-                    });
-
-                    doc.setFont(undefined, 'bold');
-                    doc.text('Springer: Stefan Müller', 20, yPos);
-                    yPos += 20;
-                }
-
-                // New page if needed
-                if (yPos > 250) {
-                    doc.addPage();
-                    yPos = 20;
-                }
-
-                // Sonntag Section (similar structure)
-                const sonntagShifts = event.shifts.filter(s => s.id.includes('sonntag'));
-                if (sonntagShifts.length > 0) {
-                    doc.setFont(undefined, 'bold');
-                    doc.text('Sonntag,19.10.2025', 20, yPos);
-                    doc.text('Küche', 70, yPos);
-                    doc.text('Bar', 120, yPos);
-                    doc.text('Service / Kasse', 160, yPos);
-                    yPos += 10;
-
-                    const timeSlots = new Set();
-                    sonntagShifts.forEach(shift => {
-                        timeSlots.add(shift.time);
-                    });
-
-                    Array.from(timeSlots).sort().forEach(time => {
-                        doc.setFont(undefined, 'normal');
-                        doc.text(time, 20, yPos);
-
-                        const kueche = sonntagShifts.find(s => s.time === time && s.id.includes('kueche'));
-                        const bar = sonntagShifts.find(s => s.time === time && s.id.includes('bar'));
-                        const kasse = sonntagShifts.find(s => s.time === time && s.id.includes('kasse'));
-
-                        let maxLines = 0;
-
-                        if (kueche) {
-                            const kuecheAssigned = event.assignments[kueche.id] || [];
-                            kuecheAssigned.forEach((person, idx) => {
-                                doc.text(`- ${person}`, 70, yPos + (idx * 5));
-                            });
-                            maxLines = Math.max(maxLines, kuecheAssigned.length);
-                        }
-
-                        if (bar) {
-                            const barAssigned = event.assignments[bar.id] || [];
-                            barAssigned.forEach((person, idx) => {
-                                doc.text(`- ${person}`, 120, yPos + (idx * 5));
-                            });
-                            maxLines = Math.max(maxLines, barAssigned.length);
-                        }
-
-                        if (kasse) {
-                            const kasseAssigned = event.assignments[kasse.id] || [];
-                            kasseAssigned.forEach((person, idx) => {
-                                doc.text(`- ${person}`, 160, yPos + (idx * 5));
-                            });
-                            maxLines = Math.max(maxLines, kasseAssigned.length);
-                        }
-
-                        yPos += Math.max(10, maxLines * 5 + 5);
-                    });
-
-                    doc.setFont(undefined, 'bold');
-                    doc.text('Springer: Stefan Müller', 20, yPos);
-                    yPos += 20;
-                }
-
-                // Abbau Section
-                const abbauShifts = event.shifts.filter(s => s.id.includes('abbau'));
-                if (abbauShifts.length > 0) {
-                    const abbauShift = abbauShifts[0];
-                    doc.setFont(undefined, 'bold');
-                    doc.text(`${abbauShift.date}: Abbauen ab ${abbauShift.time.split('-')[0]} Uhr`, 20, yPos);
-                    yPos += 10;
-
-                    const abbauAssigned = event.assignments[abbauShift.id] || [];
-                    abbauAssigned.forEach(person => {
-                        doc.setFont(undefined, 'normal');
-                        doc.text(`- ${person}`, 25, yPos);
-                        yPos += 7;
-                    });
-                }
-
-                doc.save(`arbeitsplan-${event.id}.pdf`);
-            }
-
-                                                <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
-                                                    ${remaining} von ${shift.needed} frei
-                                                </span>
-                                                ${remaining === 1 ? `
-                                                    <div class="text-xs text-orange-600 mt-1 font-medium">⚠️ Nur noch 1 Platz!</div>
-                                                ` : ''}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </label>
-                            `;
-                        }).join('');
-                        
-                        // Zeige Hinweis wenn viele Schichten schon voll sind
-                        const totalShifts = event.shifts.length;
-                        const availableCount = availableShifts.length;
-                        const fullShifts = totalShifts - availableCount;
-                        
-                        if (fullShifts > 0) {
-                            shiftsContainer.innerHTML += `
-                                <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                    <div class="text-sm text-yellow-800">
-                                        <strong>ℹ️ Hinweis:</strong> ${fullShifts} von ${totalShifts} Schichten sind bereits vollständig besetzt und werden daher nicht zur Anmeldung angezeigt.
-                                    </div>
-                                </div>
-                            `;
-                        }
-                    }
+                        </label>
+                    `).join('');
                 } else if (event.participantRegistration) {
                     shiftSelection.classList.add('hidden');
                     participantsSection.classList.remove('hidden');
@@ -1682,6 +786,475 @@ setupRegistrationSection(event) {
 
                 // Make eventsManager globally accessible for checkbox events
                 window.eventsManager = this;
+            }
+
+            showArbeitsplanModal() {
+                if (!this.selectedEvent || !this.selectedEvent.hasShifts) return;
+                
+                const event = this.selectedEvent;
+                const arbeitsplan = this.arbeitsplanData[event.id];
+                
+                document.getElementById('arbeitsplan-title').textContent = `Arbeitsplan ${event.title}`;
+                document.getElementById('arbeitsplan-status').textContent = 
+                    `Stand: ${new Date().toLocaleDateString('de-DE')} • ${arbeitsplan?.filledShifts || 0} von ${arbeitsplan?.totalShifts || 0} Schichten besetzt`;
+                
+                // Generate arbeitsplan content
+                const content = this.generateArbeitsplanHTML(event);
+                document.getElementById('arbeitsplan-content').innerHTML = content;
+                
+                document.getElementById('arbeitsplan-modal').classList.remove('hidden');
+            }
+
+            generateArbeitsplanHTML(event) {
+                const arbeitsplan = this.arbeitsplanData[event.id] || { assignments: {} };
+                
+                let html = `
+                    <div class="mb-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">📊 Übersicht</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                                <div class="text-2xl font-bold text-blue-600">${event.shifts?.length || 0}</div>
+                                <div class="text-sm text-blue-800">Schichten gesamt</div>
+                            </div>
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                                <div class="text-2xl font-bold text-green-600">${arbeitsplan.filledShifts || 0}</div>
+                                <div class="text-sm text-green-800">Besetzt</div>
+                            </div>
+                            <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+                                <div class="text-2xl font-bold text-red-600">${(event.shifts?.length || 0) - (arbeitsplan.filledShifts || 0)}</div>
+                                <div class="text-sm text-red-800">Offen</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Group shifts by date and type
+                const shiftsByDate = {};
+                if (event.shifts) {
+                    event.shifts.forEach(shift => {
+                        if (!shiftsByDate[shift.date]) {
+                            shiftsByDate[shift.date] = {};
+                        }
+                        
+                        // Extract time and type from shift name
+                        const timeMatch = shift.time.match(/(\d+:\d+)-(\d+:\d+|Open End)/);
+                        const time = timeMatch ? timeMatch[0] : shift.time;
+                        
+                        if (!shiftsByDate[shift.date][time]) {
+                            shiftsByDate[shift.date][time] = {};
+                        }
+                        
+                        // Determine shift type (Bar, Küche, Kasse, etc.)
+                        let type = 'Sonstige';
+                        if (shift.name.toLowerCase().includes('bar')) type = 'Bar';
+                        else if (shift.name.toLowerCase().includes('küche')) type = 'Küche';
+                        else if (shift.name.toLowerCase().includes('kasse')) type = 'Kasse';
+                        else if (shift.name.toLowerCase().includes('aufbau')) type = 'Aufbau';
+                        else if (shift.name.toLowerCase().includes('abbau')) type = 'Abbau';
+                        
+                        shiftsByDate[shift.date][time][type] = {
+                            shift: shift,
+                            assignments: arbeitsplan.assignments[shift.id] || []
+                        };
+                    });
+                }
+                
+                // Generate HTML for each date
+                Object.keys(shiftsByDate).sort().forEach(date => {
+                    const dateObj = new Date(date);
+                    const dayName = dateObj.toLocaleDateString('de-DE', { weekday: 'long' });
+                    const formattedDate = dateObj.toLocaleDateString('de-DE');
+                    
+                    html += `
+                        <div class="mb-8">
+                            <h3 class="text-lg font-bold text-gray-800 mb-4">${dayName}, ${formattedDate}</h3>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="w-full border-collapse border border-gray-300">
+                                    <thead>
+                                        <tr class="bg-gray-100">
+                                            <th class="border border-gray-300 px-4 py-2 text-left">Zeit</th>
+                                            <th class="border border-gray-300 px-4 py-2 text-left">Küche</th>
+                                            <th class="border border-gray-300 px-4 py-2 text-left">Bar</th>
+                                            <th class="border border-gray-300 px-4 py-2 text-left">Service / Kasse</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                `;
+                
+                Object.keys(shiftsByDate[date]).sort().forEach(time => {
+                    const timeShifts = shiftsByDate[date][time];
+                    
+                    html += `
+                        <tr>
+                            <td class="border border-gray-300 px-4 py-2 font-medium">${time}</td>
+                            <td class="border border-gray-300 px-4 py-2">
+                                ${this.formatShiftAssignments(timeShifts['Küche'])}
+                            </td>
+                            <td class="border border-gray-300 px-4 py-2">
+                                ${this.formatShiftAssignments(timeShifts['Bar'])}
+                            </td>
+                            <td class="border border-gray-300 px-4 py-2">
+                                ${this.formatShiftAssignments(timeShifts['Kasse'])}
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                `;
+                });
+                
+                return html;
+            }
+
+            formatShiftAssignments(shiftData) {
+                if (!shiftData) return '-';
+                
+                const assignments = shiftData.assignments || [];
+                const needed = shiftData.shift.needed;
+                
+                let html = '';
+                
+                // Show assigned people
+                assignments.forEach(person => {
+                    html += `<div class="text-green-600">✅ ${person}</div>`;
+                });
+                
+                // Show open positions
+                const openPositions = needed - assignments.length;
+                for (let i = 0; i < openPositions; i++) {
+                    html += `<div class="text-red-600">❌ Offen</div>`;
+                }
+                
+                if (html === '') {
+                    html = `<div class="text-red-600">❌ ${needed} Helfer gesucht</div>`;
+                }
+                
+                return html;
+            }
+
+            async generateArbeitsplanPDF() {
+                if (!this.selectedEvent || !this.selectedEvent.hasShifts) return;
+                
+                const event = this.selectedEvent;
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                try {
+                    // Try to load and add logo
+                    await this.addLogoToPDF(doc);
+                } catch (error) {
+                    console.warn('Logo konnte nicht geladen werden:', error);
+                }
+                
+                // Header with logo space
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.text('Feuerwehrverein Raura, Kaiseraugst', 60, 25);
+                
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'normal');
+                doc.text(`Arbeitsplan ${event.title}`, 60, 35);
+                
+                // Date and event info
+                doc.setFontSize(10);
+                doc.text(`Datum: ${event.startDate.toLocaleDateString('de-DE')} - ${event.endDate.toLocaleDateString('de-DE')}`, 60, 45);
+                doc.text(`Ort: ${event.location}`, 60, 52);
+                doc.text(`Erstellt: ${new Date().toLocaleDateString('de-DE')} ${new Date().toLocaleTimeString('de-DE')}`, 60, 59);
+                
+                let yPos = 75;
+                
+                // Aufbau section
+                const aufbauShifts = event.shifts.filter(s => s.name.toLowerCase().includes('aufbau'));
+                if (aufbauShifts.length > 0) {
+                    yPos = this.addAufbauSection(doc, aufbauShifts, event, yPos);
+                }
+                
+                // Daily shift tables - proper table format
+                const dates = [...new Set(event.shifts.map(s => s.date))].sort();
+                
+                dates.forEach(date => {
+                    const dateObj = new Date(date);
+                    const dayName = dateObj.toLocaleDateString('de-DE', { weekday: 'long' });
+                    const formattedDate = dateObj.toLocaleDateString('de-DE');
+                    
+                    // Skip if this is Aufbau or Abbau day
+                    const dayShifts = event.shifts.filter(s => s.date === date && 
+                        !s.name.toLowerCase().includes('aufbau') && 
+                        !s.name.toLowerCase().includes('abbau'));
+                    
+                    if (dayShifts.length === 0) return;
+                    
+                    // Check if we need a new page
+                    if (yPos > 200) {
+                        doc.addPage();
+                        yPos = 20;
+                    }
+                    
+                    yPos = this.addDayShiftTable(doc, dayShifts, event, dayName, formattedDate, yPos);
+                });
+                
+                // Abbau section
+                const abbauShifts = event.shifts.filter(s => s.name.toLowerCase().includes('abbau'));
+                if (abbauShifts.length > 0) {
+                    yPos = this.addAbbauSection(doc, abbauShifts, event, yPos);
+                }
+                
+                // Save PDF
+                doc.save(`Arbeitsplan_${event.title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+            }
+
+            async addLogoToPDF(doc) {
+                return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    
+                    img.onload = () => {
+                        try {
+                            // Create canvas to convert image
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            
+                            // Set canvas size
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            
+                            // Draw image on canvas
+                            ctx.drawImage(img, 0, 0);
+                            
+                            // Get image data
+                            const dataURL = canvas.toDataURL('image/png');
+                            
+                            // Add to PDF (top left, 40x40mm size)
+                            doc.addImage(dataURL, 'PNG', 10, 10, 40, 40);
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+                    
+                    img.onerror = () => reject(new Error('Logo could not be loaded'));
+                    
+                    // Try to load logo
+                    img.src = 'images/logo.png';
+                    
+                    // Fallback timeout
+                    setTimeout(() => reject(new Error('Logo loading timeout')), 3000);
+                });
+            }
+
+            addAufbauSection(doc, aufbauShifts, event, yPos) {
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('Aufbau', 20, yPos);
+                yPos += 8;
+                
+                aufbauShifts.forEach(shift => {
+                    doc.setFont(undefined, 'normal');
+                    doc.setFontSize(10);
+                    doc.text(`${shift.date} ab ${shift.time} (${shift.needed} Personen benötigt)`, 20, yPos);
+                    yPos += 6;
+                    
+                    const assignments = this.arbeitsplanData[event.id]?.assignments[shift.id] || [];
+                    
+                    // Create table for Aufbau
+                    const tableData = [];
+                    
+                    // Add assigned people
+                    assignments.forEach(person => {
+                        tableData.push([person]);
+                    });
+                    
+                    // Add open positions
+                    const openPositions = shift.needed - assignments.length;
+                    for (let i = 0; i < openPositions; i++) {
+                        tableData.push(['[OFFEN]']);
+                    }
+                    
+                    // Draw simple table
+                    const startY = yPos;
+                    tableData.forEach((row, index) => {
+                        doc.rect(25, yPos, 60, 6);
+                        doc.text(`- ${row[0]}`, 27, yPos + 4);
+                        yPos += 6;
+                    });
+                });
+                
+                return yPos + 10;
+            }
+
+            addDayShiftTable(doc, dayShifts, event, dayName, formattedDate, yPos) {
+                // Title
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text(`${dayName}, ${formattedDate}`, 20, yPos);
+                yPos += 10;
+                
+                // Table setup
+                const tableStartX = 20;
+                const tableWidth = 170;
+                const colWidths = [30, 46, 46, 48]; // Zeit, Küche, Bar, Service/Kasse
+                const rowHeight = 8;
+                
+                // Table header
+                doc.setFillColor(240, 240, 240); // Light gray background
+                doc.rect(tableStartX, yPos, tableWidth, rowHeight, 'F');
+                
+                doc.setFont(undefined, 'bold');
+                doc.setFontSize(10);
+                
+                let currentX = tableStartX;
+                const headers = ['Zeit', 'Küche', 'Bar', 'Service / Kasse'];
+                headers.forEach((header, index) => {
+                    doc.rect(currentX, yPos, colWidths[index], rowHeight);
+                    doc.text(header, currentX + 2, yPos + 5.5);
+                    currentX += colWidths[index];
+                });
+                
+                yPos += rowHeight;
+                
+                // Group shifts by time
+                const timeGroups = {};
+                dayShifts.forEach(shift => {
+                    if (!timeGroups[shift.time]) {
+                        timeGroups[shift.time] = { küche: [], bar: [], kasse: [] };
+                    }
+                    
+                    const assignments = this.arbeitsplanData[event.id]?.assignments[shift.id] || [];
+                    
+                    if (shift.name.toLowerCase().includes('küche')) {
+                        timeGroups[shift.time].küche = assignments;
+                    } else if (shift.name.toLowerCase().includes('bar')) {
+                        timeGroups[shift.time].bar = assignments;
+                    } else if (shift.name.toLowerCase().includes('kasse')) {
+                        timeGroups[shift.time].kasse = assignments;
+                    }
+                });
+                
+                // Table rows
+                doc.setFont(undefined, 'normal');
+                doc.setFontSize(9);
+                
+                Object.keys(timeGroups).sort().forEach(time => {
+                    const group = timeGroups[time];
+                    
+                    // Calculate row height based on content
+                    const maxItems = Math.max(
+                        group.küche.length || 1,
+                        group.bar.length || 1,
+                        group.kasse.length || 1
+                    );
+                    const dynamicRowHeight = Math.max(rowHeight, maxItems * 4 + 4);
+                    
+                    currentX = tableStartX;
+                    
+                    // Draw cells and borders
+                    headers.forEach((header, index) => {
+                        doc.rect(currentX, yPos, colWidths[index], dynamicRowHeight);
+                        currentX += colWidths[index];
+                    });
+                    
+                    // Fill content
+                    currentX = tableStartX;
+                    
+                    // Zeit
+                    doc.text(time, currentX + 2, yPos + 5.5);
+                    currentX += colWidths[0];
+                    
+                    // Küche
+                    if (group.küche.length > 0) {
+                        group.küche.forEach((person, index) => {
+                            doc.text(`- ${person}`, currentX + 2, yPos + 5.5 + (index * 4));
+                        });
+                    } else {
+                        doc.text('-', currentX + 2, yPos + 5.5);
+                    }
+                    currentX += colWidths[1];
+                    
+                    // Bar
+                    if (group.bar.length > 0) {
+                        group.bar.forEach((person, index) => {
+                            doc.text(`- ${person}`, currentX + 2, yPos + 5.5 + (index * 4));
+                        });
+                    } else {
+                        doc.text('-', currentX + 2, yPos + 5.5);
+                    }
+                    currentX += colWidths[2];
+                    
+                    // Service/Kasse
+                    if (group.kasse.length > 0) {
+                        group.kasse.forEach((person, index) => {
+                            doc.text(`- ${person}`, currentX + 2, yPos + 5.5 + (index * 4));
+                        });
+                    } else {
+                        doc.text('-', currentX + 2, yPos + 5.5);
+                    }
+                    
+                    yPos += dynamicRowHeight;
+                });
+                
+                return yPos + 15;
+            }
+
+            addAbbauSection(doc, abbauShifts, event, yPos) {
+                // Check if we need a new page
+                if (yPos > 230) {
+                    doc.addPage();
+                    yPos = 20;
+                }
+                
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text('Abbau', 20, yPos);
+                yPos += 8;
+                
+                abbauShifts.forEach(shift => {
+                    doc.setFont(undefined, 'normal');
+                    doc.setFontSize(10);
+                    doc.text(`${shift.date} ab ${shift.time} (${shift.needed} Personen benötigt)`, 20, yPos);
+                    yPos += 6;
+                    
+                    const assignments = this.arbeitsplanData[event.id]?.assignments[shift.id] || [];
+                    
+                    // Create table for Abbau
+                    const tableData = [];
+                    
+                    // Add assigned people
+                    assignments.forEach(person => {
+                        tableData.push([person]);
+                    });
+                    
+                    // Add open positions
+                    const openPositions = shift.needed - assignments.length;
+                    for (let i = 0; i < openPositions; i++) {
+                        tableData.push(['[OFFEN]']);
+                    }
+                    
+                    // Draw simple table
+                    tableData.forEach((row, index) => {
+                        doc.rect(25, yPos, 60, 6);
+                        doc.text(`- ${row[0]}`, 27, yPos + 4);
+                        yPos += 6;
+                    });
+                });
+                
+                return yPos + 10;
+            }
+
+            closeArbeitsplanModal() {
+                document.getElementById('arbeitsplan-modal').classList.add('hidden');
+            }
+
+            editArbeitsplan() {
+                const event = this.selectedEvent;
+                if (!event || !event.arbeitsplanFile) return;
+                
+                alert(`Um den Arbeitsplan zu bearbeiten, öffnen Sie die Datei:\n\n${event.arbeitsplanFile}\n\nTragen Sie die Helfer manuell in die entsprechenden Schichten ein und speichern Sie die Datei.`);
             }
 
             toggleShift(shiftId) {
