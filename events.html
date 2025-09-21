@@ -231,7 +231,6 @@
             }
 
             async init() {
-                console.log('🔄 Initialisiere Event-System...');
                 await this.loadEvents();
                 this.setupEventListeners();
                 this.filterEvents();
@@ -241,66 +240,126 @@
 
             async loadEvents() {
                 try {
-                    console.log('📂 Lade Events aus Markdown-Dateien...');
                     this.events = await this.loadEventsFromMarkdown();
-                    console.log(`✅ ${this.events.length} Events erfolgreich geladen:`, 
-                        this.events.map(e => `${e.title} (${e.id})`));
                 } catch (error) {
-                    console.error('❌ Fehler beim Laden der Veranstaltungen:', error);
-                    this.events = await this.getFallbackEvents();
+                    console.error('Fehler beim Laden der Veranstaltungen:', error);
+                    this.events = [];
                 }
             }
 
             async loadEventsFromMarkdown() {
-                // Liste aller Event-Dateien (manuell gepflegt oder dynamisch erweitert)
+                try {
+                    // Lade die automatisch generierte Dateiliste
+                    console.log('📂 Lade events-list.json...');
+                    const listResponse = await fetch('events-list.json');
+                    
+                    let eventFiles = [];
+                    
+                    if (listResponse.ok) {
+                        const eventsList = await listResponse.json();
+                        eventFiles = eventsList.files || [];
+                        console.log(`✅ Automatische Dateiliste geladen: ${eventFiles.length} Dateien`);
+                        console.log(`📅 Generiert am: ${eventsList.generated}`);
+                    } else {
+                        // Fallback zur manuellen Liste
+                        console.warn('⚠️ events-list.json nicht gefunden, verwende Fallback-Liste');
+                        eventFiles = [
+                            'events/chilbi-2024.md',
+                            'events/chilbi-2025.md',
+                            'events/grillplausch-sommer-2024.md'
+                        ];
+                    }
+
+                    if (eventFiles.length === 0) {
+                        console.warn('⚠️ Keine Event-Dateien in der Liste gefunden');
+                        return [];
+                    }
+
+                    console.log('📂 Lade Event-Dateien:', eventFiles);
+
+                    // Paralleles Laden aller Dateien für bessere Performance
+                    const promises = eventFiles.map(async (file) => {
+                        try {
+                            console.log(`📄 Lade: ${file}`);
+                            const response = await fetch(file);
+                            
+                            if (!response.ok) {
+                                console.warn(`⚠️ ${file}: HTTP ${response.status} ${response.statusText}`);
+                                return null;
+                            }
+                            
+                            const content = await response.text();
+                            console.log(`✅ ${file}: ${content.length} Zeichen geladen`);
+                            
+                            if (!content.trim()) {
+                                console.warn(`⚠️ ${file}: Datei ist leer`);
+                                return null;
+                            }
+                            
+                            const event = this.parseMarkdownEvent(content, file);
+                            if (event) {
+                                console.log(`📅 Event geladen: ${event.title} (${event.shifts ? event.shifts.length : 0} Schichten)`);
+                                return event;
+                            } else {
+                                console.warn(`⚠️ ${file}: Konnte nicht geparst werden`);
+                                return null;
+                            }
+                            
+                        } catch (error) {
+                            console.error(`❌ Fehler beim Laden von ${file}:`, error);
+                            return null;
+                        }
+                    });
+
+                    const results = await Promise.all(promises);
+                    const loadedEvents = results.filter(event => event !== null);
+
+                    console.log(`🎯 ${loadedEvents.length} Events erfolgreich geladen`);
+                    
+                    // Sortiere Events nach Startdatum
+                    loadedEvents.sort((a, b) => a.startDate - b.startDate);
+                    
+                    return loadedEvents;
+                    
+                } catch (error) {
+                    console.error('❌ Fehler beim Laden der Event-Liste:', error);
+                    // Fallback zur manuellen Liste
+                    console.log('🔄 Verwende Fallback-Eventliste...');
+                    return this.loadFallbackEvents();
+                }
+            }
+
+            async loadFallbackEvents() {
+                // Fallback für den Fall, dass die automatische Liste nicht funktioniert
                 const eventFiles = [
                     'events/chilbi-2024.md',
                     'events/chilbi-2025.md',
-                    'events/grillplausch-sommer-2024.md',
-                    // Weitere Event-Dateien hier hinzufügen
+                    'events/grillplausch-sommer-2024.md'
                 ];
 
-                const promises = eventFiles.map(async (file) => {
+                const events = [];
+                for (const file of eventFiles) {
                     try {
-                        console.log(`📄 Lade: ${file}`);
                         const response = await fetch(file);
-                        
-                        if (!response.ok) {
-                            console.warn(`⚠️ ${file}: HTTP ${response.status}`);
-                            return null;
+                        if (response.ok) {
+                            const content = await response.text();
+                            const event = this.parseMarkdownEvent(content, file);
+                            if (event) {
+                                events.push(event);
+                            }
                         }
-                        
-                        const content = await response.text();
-                        
-                        if (!content.trim()) {
-                            console.warn(`⚠️ ${file}: Datei ist leer`);
-                            return null;
-                        }
-                        
-                        const event = this.parseMarkdownEvent(content, file);
-                        if (event) {
-                            console.log(`✅ Parsed: ${event.title}`);
-                            return event;
-                        }
-                        
                     } catch (error) {
-                        console.error(`❌ Fehler beim Laden von ${file}:`, error);
-                        return null;
+                        console.warn(`Fallback: Konnte ${file} nicht laden:`, error);
                     }
-                });
+                }
 
-                const results = await Promise.allSettled(promises);
-                return results
-                    .filter(result => result.status === 'fulfilled' && result.value !== null)
-                    .map(result => result.value)
-                    .sort((a, b) => a.startDate - b.startDate);
+                return events;
             }
 
             parseMarkdownEvent(content, filename = '') {
                 try {
-                    // Frontmatter pattern matching
+                    // Parse Frontmatter
                     const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-                    
                     if (!frontmatterMatch) {
                         console.warn(`⚠️ ${filename}: Kein Frontmatter gefunden`);
                         return null;
@@ -309,21 +368,25 @@
                     const [, frontmatterStr, markdownContent] = frontmatterMatch;
                     const frontmatter = this.parseFrontmatter(frontmatterStr);
                     
-                    // Pflichtfelder validieren
-                    if (!frontmatter.id || !frontmatter.title || !frontmatter.startDate || !frontmatter.endDate) {
-                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen`);
+                    if (!frontmatter.id || !frontmatter.title || !frontmatter.startDate) {
+                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen (id: ${frontmatter.id}, title: ${frontmatter.title}, startDate: ${frontmatter.startDate})`);
                         return null;
                     }
-                    
-                    return {
+
+                    const event = {
                         ...frontmatter,
-                        description: this.parseMarkdownDescription(markdownContent.trim()),
+                        description: markdownContent.trim(),
                         startDate: new Date(frontmatter.startDate),
                         endDate: new Date(frontmatter.endDate),
                         registrationDeadline: frontmatter.registrationDeadline ? 
                             new Date(frontmatter.registrationDeadline) : null,
+                        tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : [],
+                        shifts: Array.isArray(frontmatter.shifts) ? frontmatter.shifts : [],
                         _source: filename
                     };
+
+                    console.log(`📊 Event Details: ${event.title} - Shifts: ${event.shifts.length}`);
+                    return event;
                     
                 } catch (error) {
                     console.error(`❌ ${filename}: Parse-Fehler:`, error);
@@ -333,140 +396,110 @@
 
             parseFrontmatter(frontmatterStr) {
                 const result = {};
-                const lines = frontmatterStr.split(/\r?\n/).filter(line => line.trim());
+                const lines = frontmatterStr.split(/\r?\n/);
+                let i = 0;
                 
-                let currentKey = null;
-                let currentValue = '';
-                let inArrayOrObject = false;
-                let arrayDepth = 0;
-                
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
+                while (i < lines.length) {
+                    const line = lines[i].trim();
                     
-                    // Skip comments
-                    if (line.trim().startsWith('#')) continue;
-                    
-                    // Handle array/object continuation
-                    if (inArrayOrObject) {
-                        currentValue += '\n' + line;
-                        
-                        // Count array depth
-                        arrayDepth += (line.match(/- /g) || []).length;
-                        
-                        // Check if array/object is complete
-                        const nextLine = lines[i + 1];
-                        if (!nextLine || (!nextLine.startsWith(' ') && !nextLine.startsWith('-') && nextLine.includes(':'))) {
-                            // Process the complete value
-                            result[currentKey] = this.parseComplexValue(currentValue);
-                            inArrayOrObject = false;
-                            currentKey = null;
-                            currentValue = '';
-                            arrayDepth = 0;
-                        }
+                    // Skip comments and empty lines
+                    if (!line || line.startsWith('#')) {
+                        i++;
                         continue;
                     }
                     
                     const colonIndex = line.indexOf(':');
-                    if (colonIndex === -1) continue;
-                    
-                    const key = line.substring(0, colonIndex).trim();
-                    let value = line.substring(colonIndex + 1).trim();
-                    
-                    if (!key) continue;
-                    
-                    // Handle multiline values (arrays, objects)
-                    if (!value || value === '|' || value === '>') {
-                        currentKey = key;
-                        currentValue = value;
-                        inArrayOrObject = true;
+                    if (colonIndex === -1) {
+                        i++;
                         continue;
                     }
                     
-                    // Parse simple values
-                    result[key] = this.parseSimpleValue(value);
+                    const key = line.substring(0, colonIndex).trim();
+                    const value = line.substring(colonIndex + 1).trim();
+                    
+                    // Handle special cases
+                    if (key === 'shifts' && !value) {
+                        // Parse shifts array
+                        const shifts = [];
+                        i++; // Move to next line
+                        
+                        while (i < lines.length) {
+                            const shiftLine = lines[i].trim();
+                            
+                            // Check if this is the start of a new shift
+                            if (shiftLine.startsWith('- id:')) {
+                                const shift = {};
+                                
+                                // Parse shift properties
+                                while (i < lines.length) {
+                                    const currentLine = lines[i].trim();
+                                    
+                                    if (currentLine.startsWith('- id:')) {
+                                        shift.id = currentLine.replace('- id:', '').trim();
+                                    } else if (currentLine.startsWith('name:')) {
+                                        shift.name = currentLine.replace('name:', '').trim();
+                                    } else if (currentLine.startsWith('date:')) {
+                                        shift.date = currentLine.replace('date:', '').trim();
+                                    } else if (currentLine.startsWith('time:')) {
+                                        shift.time = currentLine.replace('time:', '').trim();
+                                    } else if (currentLine.startsWith('needed:')) {
+                                        shift.needed = parseInt(currentLine.replace('needed:', '').trim());
+                                    } else if (currentLine.startsWith('description:')) {
+                                        shift.description = currentLine.replace('description:', '').trim();
+                                    } else if (currentLine.startsWith('-') && !currentLine.startsWith('- id:')) {
+                                        // This is a new shift, break and don't increment i
+                                        break;
+                                    } else if (currentLine && !currentLine.startsWith(' ') && currentLine.includes(':') && !currentLine.startsWith('- ')) {
+                                        // This is a new frontmatter key, break and don't increment i
+                                        break;
+                                    }
+                                    
+                                    i++;
+                                    
+                                    // Check if next line starts a new shift or ends shifts
+                                    if (i < lines.length) {
+                                        const nextLine = lines[i].trim();
+                                        if (nextLine.startsWith('- id:') || 
+                                            (nextLine && !nextLine.startsWith(' ') && nextLine.includes(':') && !nextLine.startsWith('- '))) {
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                if (shift.id) {
+                                    shifts.push(shift);
+                                }
+                                continue;
+                            }
+                            
+                            // If we hit a non-shift line, we're done with shifts
+                            if (shiftLine && !shiftLine.startsWith(' ') && shiftLine.includes(':') && !shiftLine.startsWith('- ')) {
+                                break;
+                            }
+                            
+                            i++;
+                        }
+                        
+                        result[key] = shifts;
+                        console.log(`📊 Parsed ${shifts.length} shifts for key: ${key}`);
+                        continue; // Don't increment i again
+                    } else if (key === 'tags' && value.startsWith('[') && value.endsWith(']')) {
+                        // Parse tags array [tag1, tag2, tag3]
+                        result[key] = value.slice(1, -1).split(',').map(s => s.trim());
+                    } else {
+                        // Parse simple values
+                        result[key] = this.parseSimpleValue(value);
+                    }
+                    
+                    i++;
                 }
                 
                 return result;
             }
 
-            parseComplexValue(value) {
-                try {
-                    // Handle shifts array - improved parsing
-                    if (value.includes('- id:')) {
-                        console.log('🔄 Parse shifts array...');
-                        const shifts = [];
-                        
-                        // Split by shift entries but keep the delimiter
-                        const shiftEntries = value.split(/(?=\s*- id:)/g).filter(entry => entry.trim());
-                        
-                        for (const entry of shiftEntries) {
-                            const shift = {};
-                            const lines = entry.split('\n');
-                            
-                            for (const line of lines) {
-                                const trimmed = line.trim();
-                                if (!trimmed || trimmed.startsWith('#')) continue;
-                                
-                                const colonIndex = trimmed.indexOf(':');
-                                if (colonIndex === -1) continue;
-                                
-                                const key = trimmed.substring(0, colonIndex).replace(/^-\s*/, '').trim();
-                                let shiftValue = trimmed.substring(colonIndex + 1).trim();
-                                
-                                // Remove quotes if present
-                                if ((shiftValue.startsWith('"') && shiftValue.endsWith('"')) || 
-                                    (shiftValue.startsWith("'") && shiftValue.endsWith("'"))) {
-                                    shiftValue = shiftValue.slice(1, -1);
-                                }
-                                
-                                switch(key) {
-                                    case 'id':
-                                        shift.id = shiftValue;
-                                        break;
-                                    case 'name':
-                                        shift.name = shiftValue;
-                                        break;
-                                    case 'date':
-                                        shift.date = shiftValue;
-                                        break;
-                                    case 'time':
-                                        shift.time = shiftValue;
-                                        break;
-                                    case 'needed':
-                                        shift.needed = parseInt(shiftValue) || 1;
-                                        break;
-                                    case 'description':
-                                        shift.description = shiftValue;
-                                        break;
-                                }
-                            }
-                            
-                            if (shift.id && shift.name) {
-                                shifts.push(shift);
-                                console.log(`✅ Parsed shift: ${shift.name} (${shift.id})`);
-                            }
-                        }
-                        
-                        console.log(`📊 Total shifts parsed: ${shifts.length}`);
-                        return shifts;
-                    }
-                    
-                    // Handle simple arrays
-                    if (value.includes('[') && value.includes(']')) {
-                        const match = value.match(/\[(.*)\]/);
-                        if (match) {
-                            return match[1].split(',').map(s => s.trim().replace(/['"]/g, ''));
-                        }
-                    }
-                    
-                    return value.trim();
-                } catch (error) {
-                    console.error('❌ Fehler beim Parsen von komplexem Wert:', error, 'Value:', value);
-                    return value;
-                }
-            }
-
             parseSimpleValue(value) {
+                if (!value) return '';
+                
                 // Remove quotes
                 if ((value.startsWith('"') && value.endsWith('"')) || 
                     (value.startsWith("'") && value.endsWith("'"))) {
@@ -477,52 +510,12 @@
                 if (value === 'true') return true;
                 if (value === 'false') return false;
                 
-                // Parse numbers
-                if (!isNaN(value) && value !== '' && !isNaN(parseFloat(value))) {
-                    return parseFloat(value);
-                }
-                
-                // Parse arrays
-                if (value.startsWith('[') && value.endsWith(']')) {
-                    const arrayContent = value.slice(1, -1);
-                    return arrayContent.split(',').map(s => s.trim().replace(/['"]/g, ''));
+                // Parse numbers (but keep strings that are actually meant to be strings)
+                if (!isNaN(value) && value !== '' && !value.includes('-') && !value.includes(':')) {
+                    return parseInt(value);
                 }
                 
                 return value;
-            }
-
-            parseMarkdownDescription(markdown) {
-                // Simple markdown to plain text conversion for preview
-                return markdown
-                    .replace(/^#{1,6}\s+/gm, '') // Remove headers
-                    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
-                    .replace(/\*(.*?)\*/g, '$1') // Remove italic
-                    .replace(/- /g, '• ') // Convert lists
-                    .replace(/\n\n+/g, '\n\n') // Normalize newlines
-                    .substring(0, 300); // Limit length for preview
-            }
-
-            async getFallbackEvents() {
-                // Fallback events wenn Markdown-Dateien nicht geladen werden können
-                console.log('⚠️ Verwende Fallback-Events');
-                return [
-                    {
-                        id: 'chilbi-fallback',
-                        title: 'Chilbi 2025',
-                        subtitle: 'Traditionelle Dorfchilbi',
-                        description: 'Unsere traditionelle Chilbi im Roten Schopf. Details werden geladen...',
-                        startDate: new Date(2025, 9, 18, 12, 0),
-                        endDate: new Date(2025, 9, 19, 22, 0),
-                        location: 'Roter Schopf, Kaiseraugst',
-                        category: 'Hauptveranstaltung',
-                        organizer: 'Stefan Müller',
-                        email: 'aktuar@fwv-raura.ch',
-                        status: 'confirmed',
-                        registrationRequired: true,
-                        cost: 'Kostenlos',
-                        tags: ['Chilbi', 'Familie', 'Helfer']
-                    }
-                ];
             }
 
             setupEventListeners() {
@@ -621,7 +614,7 @@
                         event.description.toLowerCase().includes(this.searchQuery) ||
                         event.location.toLowerCase().includes(this.searchQuery) ||
                         event.organizer.toLowerCase().includes(this.searchQuery) ||
-                        (event.tags && event.tags.some(tag => tag.toLowerCase().includes(this.searchQuery)))
+                        event.tags.some(tag => tag.toLowerCase().includes(this.searchQuery))
                     );
                 }
 
@@ -679,7 +672,7 @@
                                     <div class="flex items-start justify-between mb-3">
                                         <div>
                                             <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
-                                            <p class="text-fire-600 font-medium">${event.subtitle || ''}</p>
+                                            <p class="text-fire-600 font-medium">${event.subtitle}</p>
                                         </div>
                                         <div class="flex space-x-2">
                                             ${statusBadge}
@@ -715,7 +708,7 @@
                                     </div>
                                     
                                     <div class="flex flex-wrap gap-2">
-                                        ${(event.tags || []).map(tag => `
+                                        ${event.tags.map(tag => `
                                             <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
                                                 ${tag}
                                             </span>
@@ -725,9 +718,9 @@
                                 
                                 <div class="mt-4 lg:mt-0 lg:ml-6 flex-shrink-0">
                                     <span class="inline-block px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
-                                        ${event.category || 'Event'}
+                                        ${event.category}
                                     </span>
-                                    ${event.cost && event.cost !== 'Kostenlos' ? `
+                                    ${event.cost !== 'Kostenlos' ? `
                                         <div class="mt-2 text-lg font-bold text-fire-600">
                                             ${event.cost}
                                         </div>
@@ -756,7 +749,7 @@
                                 </div>
                             </div>
                             
-                            <p class="text-fire-600 text-sm font-medium mb-3">${event.subtitle || ''}</p>
+                            <p class="text-fire-600 text-sm font-medium mb-3">${event.subtitle}</p>
                             
                             <div class="text-sm text-gray-600 mb-4">
                                 ${this.truncateText(event.description, 120)}
@@ -775,9 +768,9 @@
                             
                             <div class="flex justify-between items-center">
                                 <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded-full text-xs font-medium">
-                                    ${event.category || 'Event'}
+                                    ${event.category}
                                 </span>
-                                ${event.cost && event.cost !== 'Kostenlos' ? `
+                                ${event.cost !== 'Kostenlos' ? `
                                     <span class="text-fire-600 font-bold text-sm">${event.cost}</span>
                                 ` : ''}
                             </div>
@@ -825,7 +818,7 @@
                 
                 document.getElementById('modal-title').textContent = event.title;
                 document.getElementById('modal-meta').innerHTML = `
-                    <span>📅 ${this.formatDateLong(event.startDate)}</span>
+                    <span>📅 ${this.formatDate(event.startDate)}</span>
                     <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
                     <span>📍 ${event.location}</span>
                     <span>👤 ${event.organizer}</span>
@@ -833,9 +826,9 @@
 
                 document.getElementById('modal-content').innerHTML = `
                     <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">${event.subtitle || ''}</h3>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">${event.subtitle}</h3>
                         <div class="prose max-w-none">
-                            ${this.parseMarkdownToHTML(event.description)}
+                            ${this.parseMarkdown(event.description)}
                         </div>
                     </div>
                     
@@ -845,11 +838,11 @@
                             <div class="space-y-2 text-sm">
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Kategorie:</span>
-                                    <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category || 'Event'}</span>
+                                    <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-600">Kosten:</span>
-                                    <span class="font-medium">${event.cost || 'Nicht angegeben'}</span>
+                                    <span class="font-medium">${event.cost}</span>
                                 </div>
                                 ${event.registrationRequired ? `
                                     <div class="flex justify-between">
@@ -881,7 +874,7 @@
                         </div>
                     </div>
                     
-                    ${(event.tags && event.tags.length > 0) ? `
+                    ${event.tags.length > 0 ? `
                         <div class="mb-6">
                             <h4 class="font-semibold text-gray-800 mb-2">Tags</h4>
                             <div class="flex flex-wrap gap-2">
@@ -907,9 +900,6 @@
                 const shiftsContainer = document.getElementById('shifts-container');
                 const participantsSection = document.getElementById('participants-section');
 
-                console.log('🔄 Setup Registration für Event:', event.title);
-                console.log('📋 Event shifts:', event.shifts);
-
                 // Check if registration is possible
                 const now = new Date();
                 const canRegister = event.registrationRequired && 
@@ -917,7 +907,6 @@
                     event.endDate > now;
 
                 if (!canRegister) {
-                    console.log('❌ Anmeldung nicht möglich für:', event.title);
                     registrationSection.classList.add('hidden');
                     return;
                 }
@@ -925,52 +914,31 @@
                 registrationSection.classList.remove('hidden');
 
                 // Setup shifts if available
-                if (event.shifts && Array.isArray(event.shifts) && event.shifts.length > 0) {
-                    console.log(`✅ ${event.shifts.length} Schichten gefunden, zeige Schichtauswahl`);
+                if (event.shifts && event.shifts.length > 0) {
                     shiftSelection.classList.remove('hidden');
                     participantsSection.classList.add('hidden');
                     
-                    shiftsContainer.innerHTML = event.shifts.map(shift => {
-                        console.log('📝 Erstelle Schicht-HTML für:', shift);
-                        
-                        // Format shift date if it's a valid date string
-                        let shiftDateFormatted = shift.date || 'TBD';
-                        if (shift.date && shift.date !== 'TBD') {
-                            try {
-                                // Try to parse the date (format: 2025-10-18)
-                                const dateObj = new Date(shift.date + 'T00:00:00');
-                                if (!isNaN(dateObj.getTime())) {
-                                    shiftDateFormatted = this.formatDate(dateObj);
-                                }
-                            } catch (e) {
-                                // Keep original date if parsing fails
-                                console.warn('Could not parse shift date:', shift.date);
-                            }
-                        }
-                        
-                        return `
+                    shiftsContainer.innerHTML = event.shifts.map(shift => `
                         <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
                             <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
                             <div class="flex-1">
                                 <div class="flex justify-between items-start">
                                     <div>
-                                        <p class="font-medium text-gray-800">${shift.name || 'Unnamed Shift'}</p>
-                                        <p class="text-sm text-gray-600">${shiftDateFormatted} • ${shift.time || 'TBD'}</p>
-                                        <p class="text-xs text-gray-500">${shift.description || 'Keine Beschreibung'}</p>
+                                        <p class="font-medium text-gray-800">${shift.name}</p>
+                                        <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
+                                        <p class="text-xs text-gray-500">${shift.description}</p>
                                     </div>
                                     <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
-                                        ${shift.needed || 1} benötigt
+                                        ${shift.needed} benötigt
                                     </span>
                                 </div>
                             </div>
                         </label>
-                    `}).join('');
+                    `).join('');
                 } else if (event.participantRegistration) {
-                    console.log('✅ Teilnehmer-Anmeldung verfügbar');
                     shiftSelection.classList.add('hidden');
                     participantsSection.classList.remove('hidden');
                 } else {
-                    console.log('⚠️ Weder Schichten noch Teilnehmer-Anmeldung verfügbar');
                     shiftSelection.classList.add('hidden');
                     participantsSection.classList.add('hidden');
                 }
@@ -1013,21 +981,7 @@
                     
                     const selectedShiftDetails = event.shifts
                         .filter(shift => this.selectedShifts.includes(shift.id))
-                        .map(shift => {
-                            // Format shift date for email
-                            let shiftDateFormatted = shift.date || 'TBD';
-                            if (shift.date && shift.date !== 'TBD') {
-                                try {
-                                    const dateObj = new Date(shift.date + 'T00:00:00');
-                                    if (!isNaN(dateObj.getTime())) {
-                                        shiftDateFormatted = this.formatDate(dateObj);
-                                    }
-                                } catch (e) {
-                                    // Keep original date if parsing fails
-                                }
-                            }
-                            return `• ${shift.name} (${shiftDateFormatted}, ${shift.time}) - ${shift.description}`;
-                        })
+                        .map(shift => `• ${shift.name} (${shift.date}, ${shift.time}) - ${shift.description}`)
                         .join('\n');
 
                     body = `Hallo ${event.organizer},
@@ -1066,7 +1020,7 @@ VERANSTALTUNG: ${event.title}
 DATUM: ${this.formatDate(event.startDate)}
 ZEIT: ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}
 ORT: ${event.location}
-${event.cost && event.cost !== 'Kostenlos' ? `KOSTEN: ${event.cost}` : ''}
+${event.cost !== 'Kostenlos' ? `KOSTEN: ${event.cost}` : ''}
 
 ANMELDUNG:
 Name: ${name}
@@ -1206,7 +1160,7 @@ ${name}`;
                 window.URL.revokeObjectURL(url);
             }
 
-            parseMarkdownToHTML(text) {
+            parseMarkdown(text) {
                 return text
                     .replace(/\n\n/g, '</p><p class="mb-3">')
                     .replace(/\n- /g, '</p><li class="ml-4">• ')
@@ -1223,14 +1177,6 @@ ${name}`;
             }
 
             formatDate(date) {
-                return new Intl.DateTimeFormat('de-DE', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                }).format(date);
-            }
-
-            formatDateLong(date) {
                 return new Intl.DateTimeFormat('de-DE', {
                     year: 'numeric',
                     month: 'long',
