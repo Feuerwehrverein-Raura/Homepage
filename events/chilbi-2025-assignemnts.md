@@ -21,8 +21,7 @@
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
-- Edi Grossenbacher
-- **[OFFEN - 1 Platz]**
+- **[OFFEN - 2 Plätze]**
 
 ### samstag-kasse-12-14 (12:00-14:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
@@ -140,7 +139,7 @@
 
 ## Statistik
 - **Aufbau:** 3/5 zugeteilt (2 offen)
-- **Samstag Schichten:** 1/36 zugeteilt (35 offen)
+- **Samstag Schichten:** 0/36 zugeteilt (36 offen)
 - **Sonntag Schichten:** 0/36 zugeteilt (36 offen)  
 - **Abbau:** 0/5 zugeteilt (5 offen)
 - **GESAMT:** 4/82 Plätze zugeteilt (**78 Plätze noch offen**)
