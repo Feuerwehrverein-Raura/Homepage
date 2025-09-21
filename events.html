@@ -248,153 +248,210 @@
             }
 
             async loadEventsFromMarkdown() {
-                return [
-                    {
-                        id: 'chilbi-2024',
-                        title: 'Chilbi 2024',
-                        subtitle: 'Traditionelle Dorfchilbi',
-                        description: 'Unsere traditionelle Chilbi findet auch dieses Jahr wieder im Roten Schopf statt. Wir verwandeln das Vereinslokal in ein gemütliches Festlokal für die ganze Familie.\n\nProgramm:\n- Samstag: 14:00 - 22:00 Uhr - Festbetrieb mit warmen Speisen\n- Sonntag: 12:00 - 22:00 Uhr - Familientag mit besonderen Angeboten\n\nHelfer gesucht: Wir suchen noch Helfer für verschiedene Schichten.',
-                        startDate: new Date(2024, 9, 14, 14, 0),
-                        endDate: new Date(2024, 9, 15, 22, 0),
-                        location: 'Roter Schopf, Kaiseraugst',
-                        category: 'Hauptveranstaltung',
-                        organizer: 'René Käslin',
-                        email: 'rene.kaeslin@feuerwehrverein-raura.ch',
-                        status: 'confirmed',
-                        registrationRequired: true,
-                        registrationDeadline: new Date(2024, 9, 4),
-                        cost: 'Kostenlos',
-                        tags: ['Chilbi', 'Familie', 'Essen', 'Tradition'],
-                        // Schichten für Helfer
-                        shifts: [
-                            {
-                                id: 'aufbau-1',
-                                name: 'Aufbau 1',
-                                date: '05.10.2024',
-                                time: '17:00 Uhr',
-                                needed: 5,
-                                description: 'Grundaufbau und Vorbereitung'
-                            },
-                            {
-                                id: 'aufbau-2',
-                                name: 'Aufbau 2',
-                                date: '12.10.2024',
-                                time: 'Abends (Zeit folgt)',
-                                needed: 5,
-                                description: 'Dekoration und finale Vorbereitungen'
-                            },
-                            {
-                                id: 'samstag-1',
-                                name: 'Samstag Schicht 1',
-                                date: '14.10.2024',
-                                time: '14:00-18:00',
-                                needed: 3,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'samstag-2',
-                                name: 'Samstag Schicht 2',
-                                date: '14.10.2024',
-                                time: '18:00-22:00',
-                                needed: 5,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'samstag-3',
-                                name: 'Samstag Schicht 3',
-                                date: '14.10.2024',
-                                time: '22:00-Open End',
-                                needed: 5,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'sonntag-1',
-                                name: 'Sonntag Schicht 1',
-                                date: '15.10.2024',
-                                time: '12:00-17:00',
-                                needed: 3,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'sonntag-2',
-                                name: 'Sonntag Schicht 2',
-                                date: '15.10.2024',
-                                time: '17:00-22:00',
-                                needed: 5,
-                                description: 'Bar, Küche oder Kasse'
-                            },
-                            {
-                                id: 'abbau-1',
-                                name: 'Abbau 1',
-                                date: '16.10.2024',
-                                time: 'Abends (Zeit folgt)',
-                                needed: 5,
-                                description: 'Erste Aufräumarbeiten'
-                            },
-                            {
-                                id: 'abbau-2',
-                                name: 'Abbau 2',
-                                date: '18.10.2024',
-                                time: 'Abends (Zeit folgt)',
-                                needed: 15,
-                                description: 'Kompletter Abbau und Räumung'
-                            }
-                        ]
-                    },
-                    {
-                        id: 'grillplausch-sommer-2024',
-                        title: 'Grillplausch bei Edi Grossenbacher',
-                        subtitle: 'Geselliger Sommerevent',
-                        description: 'Hiermit lädt der Vorstand alle Mitglieder zum gemütlichen Grillplausch bei Edi Grossenbacher ein.\n\nDetails:\n- Essen und Getränke werden gestellt\n- Salate und Desserts können gerne mitgebracht werden\n\nAnfahrt: Kurzenbettli 23, bei der Schiessanlage Augst',
-                        startDate: new Date(2024, 5, 17, 16, 0),
-                        endDate: new Date(2024, 5, 17, 22, 0),
-                        location: 'Kurzenbettli 23, 4302 Augst BL',
-                        category: 'Gesellschaftsanlass',
-                        organizer: 'Edi Grossenbacher',
-                        email: 'kontakt@feuerwehrverein-raura.ch',
-                        status: 'past',
-                        registrationRequired: true,
-                        registrationDeadline: new Date(2024, 5, 12),
-                        cost: 'Kostenlos',
-                        tags: ['Grillen', 'Geselligkeit', 'Sommer', 'Familie'],
-                        // Keine Schichten, normale Anmeldung
-                        participantRegistration: true
-                    },
-                    {
-                        id: 'vereinsausflug-2024',
-                        title: 'Vereinsausflug 2024',
-                        subtitle: 'Weinverkostung und Kultur',
-                        description: 'Der diesjährige Vereinsausflug findet später als geplant statt, da die ursprünglich geplante Weinverkostung wegen der Weinlese nicht im September durchgeführt werden kann.\n\nProgramm wird noch bekannt gegeben:\n- Weinverkostung bei einem regionalen Winzer\n- Gemeinsames Mittagessen\n- Besichtigung kultureller Sehenswürdigkeiten\n\nWir hoffen trotzdem auf rege Teilnahme!',
-                        startDate: new Date(2024, 10, 15, 9, 0),
-                        endDate: new Date(2024, 10, 15, 18, 0),
-                        location: 'Wird noch bekannt gegeben',
-                        category: 'Ausflug',
-                        organizer: 'Vereinsvorstand',
-                        email: 'vorstand@feuerwehrverein-raura.ch',
-                        status: 'planned',
-                        registrationRequired: true,
-                        registrationDeadline: new Date(2024, 10, 1),
-                        cost: 'CHF 35.- pro Person',
-                        tags: ['Ausflug', 'Wein', 'Kultur', 'Geselligkeit'],
-                        participantRegistration: true
-                    },
-                    {
-                        id: 'vorstandssitzung-q4-2024',
-                        title: 'Vorstandssitzung Q4',
-                        subtitle: 'Interne Besprechung',
-                        description: 'Quartalsweise Vorstandssitzung zur Besprechung aktueller Vereinsangelegenheiten.\n\nTraktanden:\n- Rückblick Chilbi 2024\n- Planung Vereinsausflug\n- Budget 2025\n- Mitgliederwerbung\n\nNur für Vorstandsmitglieder.',
-                        startDate: new Date(2024, 11, 5, 19, 0),
-                        endDate: new Date(2024, 11, 5, 21, 0),
-                        location: 'Vereinslokal',
-                        category: 'Vereinsintern',
-                        organizer: 'René Käslin',
-                        email: 'rene.kaeslin@feuerwehrverein-raura.ch',
-                        status: 'confirmed',
-                        registrationRequired: false,
-                        cost: 'Kostenlos',
-                        tags: ['Vorstand', 'Planung', 'Intern']
-                    }
+                const eventFiles = [
+                    'events/chilbi-2024.md',
+                    'events/grillplausch-sommer-2024.md',
+                    'events/chilbi-2025.md'
                 ];
+
+                console.log('📂 Lade Event-Dateien:', eventFiles);
+                const events = [];
+
+                for (const file of eventFiles) {
+                    try {
+                        console.log(`📄 Lade: ${file}`);
+                        const response = await fetch(file);
+                        
+                        if (!response.ok) {
+                            console.warn(`⚠️ ${file}: HTTP ${response.status} ${response.statusText}`);
+                            continue;
+                        }
+                        
+                        const content = await response.text();
+                        console.log(`✅ ${file}: ${content.length} Zeichen geladen`);
+                        
+                        if (!content.trim()) {
+                            console.warn(`⚠️ ${file}: Datei ist leer`);
+                            continue;
+                        }
+                        
+                        const event = this.parseMarkdownEvent(content, file);
+                        if (event) {
+                            console.log(`📅 Event geladen: ${event.title}`);
+                            events.push(event);
+                        } else {
+                            console.warn(`⚠️ ${file}: Konnte nicht geparst werden`);
+                        }
+                        
+                    } catch (error) {
+                        console.error(`❌ Fehler beim Laden von ${file}:`, error);
+                    }
+                }
+
+                console.log(`🎯 ${events.length} Events erfolgreich geladen`);
+                return events;
+            }
+
+            parseMarkdownEvent(content, filename = '') {
+                try {
+                    // Parse Frontmatter
+                    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+                    if (!frontmatterMatch) {
+                        console.warn(`⚠️ ${filename}: Kein Frontmatter gefunden`);
+                        return null;
+                    }
+
+                    const [, frontmatterStr, markdownContent] = frontmatterMatch;
+                    const frontmatter = this.parseFrontmatter(frontmatterStr);
+                    
+                    if (!frontmatter.id || !frontmatter.title || !frontmatter.startDate) {
+                        console.warn(`⚠️ ${filename}: Pflichtfelder fehlen`);
+                        return null;
+                    }
+
+                    return {
+                        ...frontmatter,
+                        description: markdownContent.trim(),
+                        startDate: new Date(frontmatter.startDate),
+                        endDate: new Date(frontmatter.endDate),
+                        registrationDeadline: frontmatter.registrationDeadline ? 
+                            new Date(frontmatter.registrationDeadline) : null,
+                        tags: frontmatter.tags || [],
+                        shifts: frontmatter.shifts || [],
+                        _source: filename
+                    };
+                    
+                } catch (error) {
+                    console.error(`❌ ${filename}: Parse-Fehler:`, error);
+                    return null;
+                }
+            }
+
+            parseFrontmatter(frontmatterStr) {
+                const result = {};
+                const lines = frontmatterStr.split(/\r?\n/);
+                let currentKey = null;
+                let currentValue = '';
+                let inArray = false;
+                let inObject = false;
+                let objectLevel = 0;
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    
+                    // Skip comments and empty lines
+                    if (line.trim().startsWith('#') || !line.trim()) continue;
+                    
+                    // Check if we're continuing a multi-line value
+                    if (currentKey && (inArray || inObject || line.startsWith('  '))) {
+                        if (line.includes('- id:')) {
+                            // Start of new array item in shifts
+                            if (currentValue.trim()) {
+                                result[currentKey] = this.parseYamlValue(currentValue.trim());
+                            }
+                            currentValue = line;
+                        } else {
+                            currentValue += '\n' + line;
+                        }
+                        
+                        // Check if object/array ends
+                        if (inObject) {
+                            if (line.includes(':')) objectLevel++;
+                            if (objectLevel > 0 && !line.startsWith('  ')) {
+                                inObject = false;
+                                objectLevel = 0;
+                            }
+                        }
+                        continue;
+                    }
+                    
+                    // Finish previous key if we have one
+                    if (currentKey && currentValue.trim()) {
+                        result[currentKey] = this.parseYamlValue(currentValue.trim());
+                    }
+                    
+                    // Parse new key-value pair
+                    const colonIndex = line.indexOf(':');
+                    if (colonIndex === -1) continue;
+                    
+                    currentKey = line.substring(0, colonIndex).trim();
+                    currentValue = line.substring(colonIndex + 1).trim();
+                    
+                    // Check if this starts an array or object
+                    inArray = currentValue === '' && (currentKey === 'tags' || currentKey === 'shifts');
+                    inObject = currentValue === '' && currentKey === 'shifts';
+                    objectLevel = 0;
+                    
+                    // If value is complete on this line, process it immediately
+                    if (!inArray && !inObject && currentValue) {
+                        result[currentKey] = this.parseYamlValue(currentValue);
+                        currentKey = null;
+                        currentValue = '';
+                    }
+                }
+                
+                // Process final key-value pair
+                if (currentKey && currentValue.trim()) {
+                    result[currentKey] = this.parseYamlValue(currentValue.trim());
+                }
+                
+                return result;
+            }
+
+            parseYamlValue(value) {
+                // Handle arrays like [tag1, tag2, tag3]
+                if (value.startsWith('[') && value.endsWith(']')) {
+                    return value.slice(1, -1).split(',').map(s => s.trim());
+                }
+                
+                // Handle multi-line shifts array
+                if (value.includes('- id:')) {
+                    const shifts = [];
+                    const shiftBlocks = value.split('\n- id:').filter(block => block.trim());
+                    
+                    shiftBlocks.forEach((block, index) => {
+                        if (index > 0) block = '- id:' + block;
+                        const shift = {};
+                        const lines = block.split('\n');
+                        
+                        lines.forEach(line => {
+                            const cleanLine = line.replace(/^[\s-]*/, '').trim();
+                            const colonIndex = cleanLine.indexOf(':');
+                            if (colonIndex > -1) {
+                                const key = cleanLine.substring(0, colonIndex).trim();
+                                let val = cleanLine.substring(colonIndex + 1).trim();
+                                
+                                // Convert numeric values
+                                if (key === 'needed' && !isNaN(val)) {
+                                    val = parseInt(val);
+                                }
+                                
+                                shift[key] = val;
+                            }
+                        });
+                        
+                        if (shift.id) {
+                            shifts.push(shift);
+                        }
+                    });
+                    
+                    return shifts;
+                }
+                
+                // Remove quotes
+                if ((value.startsWith('"') && value.endsWith('"')) || 
+                    (value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.slice(1, -1);
+                }
+                
+                // Parse booleans
+                if (value === 'true') return true;
+                if (value === 'false') return false;
+                
+                // Parse numbers
+                if (!isNaN(value) && value !== '') return parseInt(value);
+                
+                return value;
             }
 
             setupEventListeners() {
