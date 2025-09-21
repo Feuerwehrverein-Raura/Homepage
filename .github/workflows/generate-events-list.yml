@@ -1,0 +1,72 @@
+name: Generate Events List
+
+on:
+  push:
+    paths: ['events/**']
+  schedule:
+    - cron: '0 6 * * *' # Täglich um 6:00 Uhr
+  workflow_dispatch: # Manueller Trigger
+
+jobs:
+  generate-events-list:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Generate events list JSON
+        run: |
+          echo "📂 Scanne events/ Verzeichnis..."
+          
+          # Erstelle events-list.json
+          echo '{' > events-list.json
+          echo '  "generated": "'$(date -Iseconds)'",' >> events-list.json
+          echo '  "files": [' >> events-list.json
+          
+          # Finde alle .md Dateien im events/ Ordner
+          first=true
+          for file in events/*.md; do
+            if [[ -f "$file" ]]; then
+              if [[ "$first" = false ]]; then
+                echo ',' >> events-list.json
+              fi
+              echo -n "    \"$file\"" >> events-list.json
+              first=false
+              echo "✅ Gefunden: $file"
+            fi
+          done
+          
+          echo '' >> events-list.json
+          echo '  ]' >> events-list.json
+          echo '}' >> events-list.json
+          
+          echo "📄 Erstellte events-list.json:"
+          cat events-list.json
+          
+          # Überprüfe ob Dateien gefunden wurden
+          file_count=$(ls -1 events/*.md 2>/dev/null | wc -l)
+          echo "📊 Anzahl gefundener Event-Dateien: $file_count"
+          
+          if [ $file_count -eq 0 ]; then
+            echo "⚠️ Keine Event-Dateien gefunden!"
+            exit 1
+          fi
+      
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # Füge events-list.json hinzu
+          git add events-list.json
+          
+          # Prüfe ob es Änderungen gibt
+          if git diff --staged --quiet; then
+            echo "📋 Keine Änderungen an events-list.json"
+          else
+            echo "🔄 events-list.json wurde aktualisiert"
+            git commit -m "🤖 Auto-update events-list.json
+            
+            📅 $(ls -1 events/*.md | wc -l) Event-Dateien gefunden:
+            $(ls -1 events/*.md | sed 's/^/- /')"
+            git push
+          fi
