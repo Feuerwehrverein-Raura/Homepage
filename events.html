@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Veranstaltungen - Feuerwehrverein Raura Kaiseraugst</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -71,6 +70,38 @@
         </div>
     </section>
 
+    <!-- Filters and Search -->
+    <section class="bg-white shadow-sm py-6">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col lg:flex-row justify-between items-center space-y-4 lg:space-y-0">
+                <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="Veranstaltungen suchen..." 
+                               class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500 w-full sm:w-64">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-400">🔍</span>
+                        </div>
+                    </div>
+                    <select id="category-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <option value="">Alle Kategorien</option>
+                        <option value="Hauptveranstaltung">Hauptveranstaltung</option>
+                        <option value="Gesellschaftsanlass">Gesellschaftsanlass</option>
+                        <option value="Ausflug">Ausflug</option>
+                        <option value="Vereinsintern">Vereinsintern</option>
+                    </select>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="list-view-btn" class="p-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
+                        <span class="text-xl">📋</span>
+                    </button>
+                    <button id="grid-view-btn" class="p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+                        <span class="text-xl">⊞</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Events List -->
     <section class="py-8">
         <div class="container mx-auto px-4">
@@ -102,36 +133,6 @@
                 <div class="p-6">
                     <div id="modal-content" class="prose max-w-none">
                         <!-- Event details will be loaded here -->
-                    </div>
-                    
-                    <!-- Shift Planning Section -->
-                    <div id="shift-planning-section" class="hidden mt-8 border-t pt-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-xl font-bold text-gray-800">📋 Schichtplanung</h3>
-                            <div class="flex space-x-2">
-                                <button id="view-arbeitsplan" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2">
-                                    <span>📋</span>
-                                    <span>Arbeitsplan anzeigen</span>
-                                </button>
-                                <button id="download-arbeitsplan-pdf" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2">
-                                    <span>📄</span>
-                                    <span>PDF generieren</span>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Shift Overview -->
-                        <div id="shift-overview" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                            <!-- Shift statistics will be populated -->
-                        </div>
-                        
-                        <!-- Critical Shifts Warning -->
-                        <div id="critical-shifts" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                            <h4 class="font-bold text-red-800 mb-2">⚠️ Kritische Schichten</h4>
-                            <div id="critical-shifts-list" class="text-red-700 text-sm">
-                                <!-- Critical shifts will be listed here -->
-                            </div>
-                        </div>
                     </div>
                     
                     <!-- Registration Section -->
@@ -206,43 +207,6 @@
         </div>
     </div>
 
-    <!-- Arbeitsplan Modal -->
-    <div id="arbeitsplan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-60 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="relative">
-                <!-- Modal Header -->
-                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-t-lg">
-                    <button id="close-arbeitsplan-modal" class="absolute top-4 right-4 text-white hover:text-blue-200 text-2xl">×</button>
-                    <h2 id="arbeitsplan-title" class="text-2xl font-bold mb-2">📋 Arbeitsplan</h2>
-                    <div id="arbeitsplan-meta" class="text-blue-100 text-sm">
-                        <span id="arbeitsplan-status"></span>
-                    </div>
-                </div>
-                
-                <!-- Modal Content -->
-                <div class="p-6">
-                    <div id="arbeitsplan-content" class="space-y-6">
-                        <!-- Arbeitsplan content will be loaded here -->
-                    </div>
-                    
-                    <div class="mt-6 flex space-x-3">
-                        <button id="download-arbeitsplan-pdf-2" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2">
-                            <span>📄</span>
-                            <span>PDF generieren</span>
-                        </button>
-                        <button id="edit-arbeitsplan" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2">
-                            <span>✏️</span>
-                            <span>Arbeitsplan bearbeiten</span>
-                        </button>
-                        <button id="close-arbeitsplan-modal-btn" class="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
-                            Schließen
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Loading Indicator -->
     <div id="loading" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-40">
         <div class="text-center">
@@ -251,7 +215,871 @@
         </div>
     </div>
 
-    <!-- Include the JavaScript file separately -->
-    <script src="events.js"></script>
+    <script>
+        class EventsManager {
+            constructor() {
+                this.events = [];
+                this.filteredEvents = [];
+                this.currentFilter = 'all';
+                this.currentCategory = '';
+                this.searchQuery = '';
+                this.viewMode = 'list';
+                this.selectedEvent = null;
+                this.selectedShifts = [];
+                
+                this.init();
+            }
+
+            async init() {
+                await this.loadEvents();
+                this.setupEventListeners();
+                this.filterEvents();
+                this.renderEvents();
+                document.getElementById('loading').classList.add('hidden');
+            }
+
+            async loadEvents() {
+                try {
+                    this.events = await this.loadEventsFromMarkdown();
+                } catch (error) {
+                    console.error('Fehler beim Laden der Veranstaltungen:', error);
+                    this.events = [];
+                }
+            }
+
+            async loadEventsFromMarkdown() {
+                return [
+                    {
+                        id: 'chilbi-2024',
+                        title: 'Chilbi 2024',
+                        subtitle: 'Traditionelle Dorfchilbi',
+                        description: 'Unsere traditionelle Chilbi findet auch dieses Jahr wieder im Roten Schopf statt. Wir verwandeln das Vereinslokal in ein gemütliches Festlokal für die ganze Familie.\n\nProgramm:\n- Samstag: 14:00 - 22:00 Uhr - Festbetrieb mit warmen Speisen\n- Sonntag: 12:00 - 22:00 Uhr - Familientag mit besonderen Angeboten\n\nHelfer gesucht: Wir suchen noch Helfer für verschiedene Schichten.',
+                        startDate: new Date(2024, 9, 14, 14, 0),
+                        endDate: new Date(2024, 9, 15, 22, 0),
+                        location: 'Roter Schopf, Kaiseraugst',
+                        category: 'Hauptveranstaltung',
+                        organizer: 'René Käslin',
+                        email: 'rene.kaeslin@feuerwehrverein-raura.ch',
+                        status: 'confirmed',
+                        registrationRequired: true,
+                        registrationDeadline: new Date(2024, 9, 4),
+                        cost: 'Kostenlos',
+                        tags: ['Chilbi', 'Familie', 'Essen', 'Tradition'],
+                        // Schichten für Helfer
+                        shifts: [
+                            {
+                                id: 'aufbau-1',
+                                name: 'Aufbau 1',
+                                date: '05.10.2024',
+                                time: '17:00 Uhr',
+                                needed: 5,
+                                description: 'Grundaufbau und Vorbereitung'
+                            },
+                            {
+                                id: 'aufbau-2',
+                                name: 'Aufbau 2',
+                                date: '12.10.2024',
+                                time: 'Abends (Zeit folgt)',
+                                needed: 5,
+                                description: 'Dekoration und finale Vorbereitungen'
+                            },
+                            {
+                                id: 'samstag-1',
+                                name: 'Samstag Schicht 1',
+                                date: '14.10.2024',
+                                time: '14:00-18:00',
+                                needed: 3,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'samstag-2',
+                                name: 'Samstag Schicht 2',
+                                date: '14.10.2024',
+                                time: '18:00-22:00',
+                                needed: 5,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'samstag-3',
+                                name: 'Samstag Schicht 3',
+                                date: '14.10.2024',
+                                time: '22:00-Open End',
+                                needed: 5,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'sonntag-1',
+                                name: 'Sonntag Schicht 1',
+                                date: '15.10.2024',
+                                time: '12:00-17:00',
+                                needed: 3,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'sonntag-2',
+                                name: 'Sonntag Schicht 2',
+                                date: '15.10.2024',
+                                time: '17:00-22:00',
+                                needed: 5,
+                                description: 'Bar, Küche oder Kasse'
+                            },
+                            {
+                                id: 'abbau-1',
+                                name: 'Abbau 1',
+                                date: '16.10.2024',
+                                time: 'Abends (Zeit folgt)',
+                                needed: 5,
+                                description: 'Erste Aufräumarbeiten'
+                            },
+                            {
+                                id: 'abbau-2',
+                                name: 'Abbau 2',
+                                date: '18.10.2024',
+                                time: 'Abends (Zeit folgt)',
+                                needed: 15,
+                                description: 'Kompletter Abbau und Räumung'
+                            }
+                        ]
+                    },
+                    {
+                        id: 'grillplausch-sommer-2024',
+                        title: 'Grillplausch bei Edi Grossenbacher',
+                        subtitle: 'Geselliger Sommerevent',
+                        description: 'Hiermit lädt der Vorstand alle Mitglieder zum gemütlichen Grillplausch bei Edi Grossenbacher ein.\n\nDetails:\n- Essen und Getränke werden gestellt\n- Salate und Desserts können gerne mitgebracht werden\n\nAnfahrt: Kurzenbettli 23, bei der Schiessanlage Augst',
+                        startDate: new Date(2024, 5, 17, 16, 0),
+                        endDate: new Date(2024, 5, 17, 22, 0),
+                        location: 'Kurzenbettli 23, 4302 Augst BL',
+                        category: 'Gesellschaftsanlass',
+                        organizer: 'Edi Grossenbacher',
+                        email: 'kontakt@feuerwehrverein-raura.ch',
+                        status: 'past',
+                        registrationRequired: true,
+                        registrationDeadline: new Date(2024, 5, 12),
+                        cost: 'Kostenlos',
+                        tags: ['Grillen', 'Geselligkeit', 'Sommer', 'Familie'],
+                        // Keine Schichten, normale Anmeldung
+                        participantRegistration: true
+                    },
+                    {
+                        id: 'vereinsausflug-2024',
+                        title: 'Vereinsausflug 2024',
+                        subtitle: 'Weinverkostung und Kultur',
+                        description: 'Der diesjährige Vereinsausflug findet später als geplant statt, da die ursprünglich geplante Weinverkostung wegen der Weinlese nicht im September durchgeführt werden kann.\n\nProgramm wird noch bekannt gegeben:\n- Weinverkostung bei einem regionalen Winzer\n- Gemeinsames Mittagessen\n- Besichtigung kultureller Sehenswürdigkeiten\n\nWir hoffen trotzdem auf rege Teilnahme!',
+                        startDate: new Date(2024, 10, 15, 9, 0),
+                        endDate: new Date(2024, 10, 15, 18, 0),
+                        location: 'Wird noch bekannt gegeben',
+                        category: 'Ausflug',
+                        organizer: 'Vereinsvorstand',
+                        email: 'vorstand@feuerwehrverein-raura.ch',
+                        status: 'planned',
+                        registrationRequired: true,
+                        registrationDeadline: new Date(2024, 10, 1),
+                        cost: 'CHF 35.- pro Person',
+                        tags: ['Ausflug', 'Wein', 'Kultur', 'Geselligkeit'],
+                        participantRegistration: true
+                    },
+                    {
+                        id: 'vorstandssitzung-q4-2024',
+                        title: 'Vorstandssitzung Q4',
+                        subtitle: 'Interne Besprechung',
+                        description: 'Quartalsweise Vorstandssitzung zur Besprechung aktueller Vereinsangelegenheiten.\n\nTraktanden:\n- Rückblick Chilbi 2024\n- Planung Vereinsausflug\n- Budget 2025\n- Mitgliederwerbung\n\nNur für Vorstandsmitglieder.',
+                        startDate: new Date(2024, 11, 5, 19, 0),
+                        endDate: new Date(2024, 11, 5, 21, 0),
+                        location: 'Vereinslokal',
+                        category: 'Vereinsintern',
+                        organizer: 'René Käslin',
+                        email: 'rene.kaeslin@feuerwehrverein-raura.ch',
+                        status: 'confirmed',
+                        registrationRequired: false,
+                        cost: 'Kostenlos',
+                        tags: ['Vorstand', 'Planung', 'Intern']
+                    }
+                ];
+            }
+
+            setupEventListeners() {
+                // Filter buttons
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.currentFilter = e.target.dataset.filter;
+                        this.updateFilterButtons();
+                        this.filterEvents();
+                        this.renderEvents();
+                    });
+                });
+
+                // Search and filters
+                document.getElementById('search-input').addEventListener('input', (e) => {
+                    this.searchQuery = e.target.value.toLowerCase();
+                    this.filterEvents();
+                    this.renderEvents();
+                });
+
+                document.getElementById('category-filter').addEventListener('change', (e) => {
+                    this.currentCategory = e.target.value;
+                    this.filterEvents();
+                    this.renderEvents();
+                });
+
+                // View mode buttons
+                document.getElementById('list-view-btn').addEventListener('click', () => {
+                    this.viewMode = 'list';
+                    this.updateViewButtons();
+                    this.renderEvents();
+                });
+
+                document.getElementById('grid-view-btn').addEventListener('click', () => {
+                    this.viewMode = 'grid';
+                    this.updateViewButtons();
+                    this.renderEvents();
+                });
+
+                // Modal controls
+                document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
+                document.getElementById('close-modal-btn').addEventListener('click', () => this.closeModal());
+                document.getElementById('download-event-ics').addEventListener('click', () => this.downloadEventICS());
+                document.getElementById('share-event').addEventListener('click', () => this.shareEvent());
+                
+                // Registration
+                document.getElementById('send-registration-email').addEventListener('click', () => this.sendRegistrationEmail());
+                
+                document.getElementById('event-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'event-modal') this.closeModal();
+                });
+            }
+
+            updateFilterButtons() {
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    const isActive = btn.dataset.filter === this.currentFilter;
+                    btn.className = isActive 
+                        ? 'filter-btn active bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors'
+                        : 'filter-btn border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white hover:text-fire-700 transition-colors';
+                });
+            }
+
+            updateViewButtons() {
+                const listBtn = document.getElementById('list-view-btn');
+                const gridBtn = document.getElementById('grid-view-btn');
+                
+                if (this.viewMode === 'list') {
+                    listBtn.className = 'p-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors';
+                    gridBtn.className = 'p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors';
+                } else {
+                    listBtn.className = 'p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors';
+                    gridBtn.className = 'p-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors';
+                }
+            }
+
+            filterEvents() {
+                const now = new Date();
+                let filtered = [...this.events];
+
+                // Time filter
+                if (this.currentFilter === 'upcoming') {
+                    filtered = filtered.filter(event => event.startDate > now);
+                } else if (this.currentFilter === 'past') {
+                    filtered = filtered.filter(event => event.endDate < now);
+                }
+
+                // Category filter
+                if (this.currentCategory) {
+                    filtered = filtered.filter(event => event.category === this.currentCategory);
+                }
+
+                // Search filter
+                if (this.searchQuery) {
+                    filtered = filtered.filter(event => 
+                        event.title.toLowerCase().includes(this.searchQuery) ||
+                        event.description.toLowerCase().includes(this.searchQuery) ||
+                        event.location.toLowerCase().includes(this.searchQuery) ||
+                        event.organizer.toLowerCase().includes(this.searchQuery) ||
+                        event.tags.some(tag => tag.toLowerCase().includes(this.searchQuery))
+                    );
+                }
+
+                // Sort by date
+                filtered.sort((a, b) => {
+                    if (this.currentFilter === 'past') {
+                        return b.startDate - a.startDate;
+                    }
+                    return a.startDate - b.startDate;
+                });
+
+                this.filteredEvents = filtered;
+            }
+
+            renderEvents() {
+                const container = document.getElementById('events-container');
+                const noEventsMsg = document.getElementById('no-events');
+
+                if (this.filteredEvents.length === 0) {
+                    container.innerHTML = '';
+                    noEventsMsg.classList.remove('hidden');
+                    return;
+                }
+
+                noEventsMsg.classList.add('hidden');
+
+                if (this.viewMode === 'list') {
+                    container.className = 'space-y-6';
+                    container.innerHTML = this.filteredEvents.map(event => this.createEventListItem(event)).join('');
+                } else {
+                    container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+                    container.innerHTML = this.filteredEvents.map(event => this.createEventGridItem(event)).join('');
+                }
+
+                // Add click listeners
+                container.querySelectorAll('[data-event-id]').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        const eventId = e.currentTarget.dataset.eventId;
+                        this.showEventModal(eventId);
+                    });
+                });
+            }
+
+            createEventListItem(event) {
+                const isPast = event.endDate < new Date();
+                const statusBadge = this.getStatusBadge(event);
+                const registrationBadge = this.getRegistrationBadge(event);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
+                         data-event-id="${event.id}">
+                        <div class="p-6">
+                            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-start justify-between mb-3">
+                                        <div>
+                                            <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
+                                            <p class="text-fire-600 font-medium">${event.subtitle}</p>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            ${statusBadge}
+                                            ${registrationBadge}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="prose prose-sm max-w-none mb-4 text-gray-600">
+                                        ${this.truncateText(event.description, 200)}
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-500 mb-4">
+                                        <div class="space-y-2">
+                                            <div class="flex items-center">
+                                                <span class="mr-2">📅</span>
+                                                <span>${this.formatDate(event.startDate)}</span>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="mr-2">⏰</span>
+                                                <span>${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <div class="flex items-center">
+                                                <span class="mr-2">📍</span>
+                                                <span>${event.location}</span>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="mr-2">👤</span>
+                                                <span>${event.organizer}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex flex-wrap gap-2">
+                                        ${event.tags.map(tag => `
+                                            <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                                                ${tag}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4 lg:mt-0 lg:ml-6 flex-shrink-0">
+                                    <span class="inline-block px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
+                                        ${event.category}
+                                    </span>
+                                    ${event.cost !== 'Kostenlos' ? `
+                                        <div class="mt-2 text-lg font-bold text-fire-600">
+                                            ${event.cost}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            createEventGridItem(event) {
+                const isPast = event.endDate < new Date();
+                const statusBadge = this.getStatusBadge(event);
+                const registrationBadge = this.getRegistrationBadge(event);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
+                         data-event-id="${event.id}">
+                        <div class="p-6">
+                            <div class="flex justify-between items-start mb-3">
+                                <h3 class="text-lg font-bold text-gray-800 leading-tight">${event.title}</h3>
+                                <div class="flex flex-col space-y-1">
+                                    ${statusBadge}
+                                    ${registrationBadge}
+                                </div>
+                            </div>
+                            
+                            <p class="text-fire-600 text-sm font-medium mb-3">${event.subtitle}</p>
+                            
+                            <div class="text-sm text-gray-600 mb-4">
+                                ${this.truncateText(event.description, 120)}
+                            </div>
+                            
+                            <div class="space-y-2 text-sm text-gray-500 mb-4">
+                                <div class="flex items-center">
+                                    <span class="mr-2">📅</span>
+                                    <span>${this.formatDate(event.startDate)}</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <span class="mr-2">📍</span>
+                                    <span class="truncate">${event.location}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center">
+                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded-full text-xs font-medium">
+                                    ${event.category}
+                                </span>
+                                ${event.cost !== 'Kostenlos' ? `
+                                    <span class="text-fire-600 font-bold text-sm">${event.cost}</span>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getStatusBadge(event) {
+                const now = new Date();
+                
+                if (event.endDate < now) {
+                    return '<span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">Vergangen</span>';
+                } else if (event.startDate <= now && event.endDate >= now) {
+                    return '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium animate-pulse">Läuft</span>';
+                } else if (event.registrationRequired && event.registrationDeadline && event.registrationDeadline < now) {
+                    return '<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">Anmeldung geschlossen</span>';
+                } else {
+                    return '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">Geplant</span>';
+                }
+            }
+
+            getRegistrationBadge(event) {
+                if (!event.registrationRequired) return '';
+                
+                const now = new Date();
+                if (event.registrationDeadline && event.registrationDeadline < now) return '';
+                if (event.endDate < now) return '';
+                
+                if (event.shifts && event.shifts.length > 0) {
+                    return '<span class="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs font-medium">👷 Helfer gesucht</span>';
+                } else if (event.participantRegistration) {
+                    return '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">📧 Anmeldung möglich</span>';
+                }
+                
+                return '';
+            }
+
+            showEventModal(eventId) {
+                const event = this.events.find(e => e.id === eventId);
+                if (!event) return;
+
+                this.selectedEvent = event;
+                this.selectedShifts = [];
+                
+                document.getElementById('modal-title').textContent = event.title;
+                document.getElementById('modal-meta').innerHTML = `
+                    <span>📅 ${this.formatDate(event.startDate)}</span>
+                    <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
+                    <span>📍 ${event.location}</span>
+                    <span>👤 ${event.organizer}</span>
+                `;
+
+                document.getElementById('modal-content').innerHTML = `
+                    <div class="mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">${event.subtitle}</h3>
+                        <div class="prose max-w-none">
+                            ${this.parseMarkdown(event.description)}
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="space-y-3">
+                            <h4 class="font-semibold text-gray-800">Veranstaltungsdetails</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Kategorie:</span>
+                                    <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Kosten:</span>
+                                    <span class="font-medium">${event.cost}</span>
+                                </div>
+                                ${event.registrationRequired ? `
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Anmeldung:</span>
+                                        <span class="text-fire-600">Erforderlich</span>
+                                    </div>
+                                ` : ''}
+                                ${event.registrationDeadline ? `
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Anmeldeschluss:</span>
+                                        <span>${this.formatDate(event.registrationDeadline)}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <h4 class="font-semibold text-gray-800">Kontakt</h4>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Organisator:</span>
+                                    <span class="font-medium">${event.organizer}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">E-Mail:</span>
+                                    <a href="mailto:${event.email}" class="text-fire-600 hover:text-fire-700">${event.email}</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${event.tags.length > 0 ? `
+                        <div class="mb-6">
+                            <h4 class="font-semibold text-gray-800 mb-2">Tags</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${event.tags.map(tag => `
+                                    <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
+                                        ${tag}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+
+                // Show registration section if applicable
+                this.setupRegistrationSection(event);
+                
+                document.getElementById('event-modal').classList.remove('hidden');
+            }
+
+            setupRegistrationSection(event) {
+                const registrationSection = document.getElementById('registration-section');
+                const shiftSelection = document.getElementById('shift-selection');
+                const shiftsContainer = document.getElementById('shifts-container');
+                const participantsSection = document.getElementById('participants-section');
+
+                // Check if registration is possible
+                const now = new Date();
+                const canRegister = event.registrationRequired && 
+                    (!event.registrationDeadline || event.registrationDeadline > now) &&
+                    event.endDate > now;
+
+                if (!canRegister) {
+                    registrationSection.classList.add('hidden');
+                    return;
+                }
+
+                registrationSection.classList.remove('hidden');
+
+                // Setup shifts if available
+                if (event.shifts && event.shifts.length > 0) {
+                    shiftSelection.classList.remove('hidden');
+                    participantsSection.classList.add('hidden');
+                    
+                    shiftsContainer.innerHTML = event.shifts.map(shift => `
+                        <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                            <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="font-medium text-gray-800">${shift.name}</p>
+                                        <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
+                                        <p class="text-xs text-gray-500">${shift.description}</p>
+                                    </div>
+                                    <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
+                                        ${shift.needed} benötigt
+                                    </span>
+                                </div>
+                            </div>
+                        </label>
+                    `).join('');
+                } else if (event.participantRegistration) {
+                    shiftSelection.classList.add('hidden');
+                    participantsSection.classList.remove('hidden');
+                } else {
+                    shiftSelection.classList.add('hidden');
+                    participantsSection.classList.add('hidden');
+                }
+
+                // Make eventsManager globally accessible for checkbox events
+                window.eventsManager = this;
+            }
+
+            toggleShift(shiftId) {
+                const index = this.selectedShifts.indexOf(shiftId);
+                if (index > -1) {
+                    this.selectedShifts.splice(index, 1);
+                } else {
+                    this.selectedShifts.push(shiftId);
+                }
+            }
+
+            sendRegistrationEmail() {
+                const event = this.selectedEvent;
+                if (!event) return;
+
+                // Get form data
+                const name = document.getElementById('reg-name').value.trim();
+                const email = document.getElementById('reg-email').value.trim();
+                const phone = document.getElementById('reg-phone').value.trim();
+                const notes = document.getElementById('reg-notes').value.trim();
+
+                // Validation
+                if (!name || !email) {
+                    alert('Bitte füllen Sie mindestens Name und E-Mail aus.');
+                    return;
+                }
+
+                // Build email content
+                let subject, body;
+
+                if (event.shifts && event.shifts.length > 0 && this.selectedShifts.length > 0) {
+                    // Helper registration with shifts
+                    subject = `Helfer-Anmeldung: ${event.title}`;
+                    
+                    const selectedShiftDetails = event.shifts
+                        .filter(shift => this.selectedShifts.includes(shift.id))
+                        .map(shift => `• ${shift.name} (${shift.date}, ${shift.time}) - ${shift.description}`)
+                        .join('\n');
+
+                    body = `Hallo ${event.organizer},
+
+hiermit melde ich mich als Helfer für folgende Schichten an:
+
+VERANSTALTUNG: ${event.title}
+DATUM: ${this.formatDate(event.startDate)}
+ORT: ${event.location}
+
+GEWÄHLTE SCHICHTEN:
+${selectedShiftDetails}
+
+MEINE KONTAKTDATEN:
+Name: ${name}
+E-Mail: ${email}
+${phone ? `Telefon: ${phone}` : ''}
+
+${notes ? `BEMERKUNGEN:\n${notes}` : ''}
+
+Vielen Dank für die Organisation!
+
+Mit freundlichen Grüssen
+${name}`;
+
+                } else if (event.participantRegistration) {
+                    // Participant registration
+                    const participants = document.getElementById('reg-participants').value || '1';
+                    subject = `Anmeldung: ${event.title}`;
+                    
+                    body = `Hallo ${event.organizer},
+
+hiermit melde ich mich für die Veranstaltung an:
+
+VERANSTALTUNG: ${event.title}
+DATUM: ${this.formatDate(event.startDate)}
+ZEIT: ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}
+ORT: ${event.location}
+${event.cost !== 'Kostenlos' ? `KOSTEN: ${event.cost}` : ''}
+
+ANMELDUNG:
+Name: ${name}
+E-Mail: ${email}
+${phone ? `Telefon: ${phone}` : ''}
+${event.participantRegistration && participants !== '1' ? `Anzahl Personen: ${participants}` : ''}
+
+${notes ? `BEMERKUNGEN:\n${notes}` : ''}
+
+Vielen Dank für die Organisation!
+
+Mit freundlichen Grüssen
+${name}`;
+
+                } else {
+                    // General registration
+                    subject = `Anmeldung: ${event.title}`;
+                    body = `Hallo ${event.organizer},
+
+hiermit melde ich mich für die Veranstaltung an:
+
+VERANSTALTUNG: ${event.title}
+DATUM: ${this.formatDate(event.startDate)}
+
+KONTAKTDATEN:
+Name: ${name}
+E-Mail: ${email}
+${phone ? `Telefon: ${phone}` : ''}
+
+${notes ? `BEMERKUNGEN:\n${notes}` : ''}
+
+Mit freundlichen Grüssen
+${name}`;
+                }
+
+                // Create mailto link
+                const mailtoLink = `mailto:${event.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                
+                // Open email client
+                window.location.href = mailtoLink;
+
+                // Show success message
+                setTimeout(() => {
+                    alert('E-Mail-Client wurde geöffnet. Bitte senden Sie die E-Mail ab.');
+                }, 500);
+            }
+
+            closeModal() {
+                document.getElementById('event-modal').classList.add('hidden');
+                this.selectedEvent = null;
+                this.selectedShifts = [];
+                
+                // Reset form
+                document.getElementById('reg-name').value = '';
+                document.getElementById('reg-email').value = '';
+                document.getElementById('reg-phone').value = '';
+                document.getElementById('reg-notes').value = '';
+                
+                // Uncheck all shift checkboxes
+                document.querySelectorAll('.shift-checkbox').forEach(cb => cb.checked = false);
+            }
+
+            downloadEventICS() {
+                if (!this.selectedEvent) return;
+                const icsData = this.generateICS([this.selectedEvent]);
+                this.downloadICS(icsData, `${this.selectedEvent.id}.ics`);
+            }
+
+            shareEvent() {
+                if (!this.selectedEvent) return;
+                
+                const url = `${window.location.origin}${window.location.pathname}#event-${this.selectedEvent.id}`;
+                const text = `${this.selectedEvent.title} - ${this.formatDate(this.selectedEvent.startDate)}`;
+                
+                if (navigator.share) {
+                    navigator.share({
+                        title: this.selectedEvent.title,
+                        text: text,
+                        url: url
+                    });
+                } else {
+                    navigator.clipboard.writeText(`${text}\n${url}`).then(() => {
+                        alert('Link wurde in die Zwischenablage kopiert!');
+                    });
+                }
+            }
+
+            generateICS(events) {
+                const now = new Date();
+                let ics = [
+                    'BEGIN:VCALENDAR',
+                    'VERSION:2.0',
+                    'PRODID:-//Feuerwehrverein Raura Kaiseraugst//Vereinskalender//DE',
+                    'CALSCALE:GREGORIAN',
+                    'METHOD:PUBLISH',
+                    'X-WR-CALNAME:Feuerwehrverein Raura Kaiseraugst',
+                    'X-WR-CALDESC:Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst',
+                    'X-WR-TIMEZONE:Europe/Zurich'
+                ];
+
+                events.forEach(event => {
+                    const uid = `${event.id}@feuerwehrverein-raura.ch`;
+                    const dtstart = this.formatDateForICS(event.startDate);
+                    const dtend = this.formatDateForICS(event.endDate);
+                    const dtstamp = this.formatDateForICS(now);
+                    const description = event.description.replace(/\n/g, '\\n');
+
+                    ics.push(
+                        'BEGIN:VEVENT',
+                        `UID:${uid}`,
+                        `DTSTAMP:${dtstamp}`,
+                        `DTSTART:${dtstart}`,
+                        `DTEND:${dtend}`,
+                        `SUMMARY:${event.title}`,
+                        `DESCRIPTION:${description}`,
+                        `LOCATION:${event.location}`,
+                        `ORGANIZER;CN=${event.organizer}:mailto:${event.email}`,
+                        `CATEGORIES:${event.category}`,
+                        'STATUS:CONFIRMED',
+                        'END:VEVENT'
+                    );
+                });
+
+                ics.push('END:VCALENDAR');
+                return ics.join('\r\n');
+            }
+
+            downloadICS(icsData, filename) {
+                const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }
+
+            parseMarkdown(text) {
+                return text
+                    .replace(/\n\n/g, '</p><p class="mb-3">')
+                    .replace(/\n- /g, '</p><li class="ml-4">• ')
+                    .replace(/\n/g, '<br>')
+                    .replace(/^(.+)$/gm, '<p class="mb-3">$1</p>')
+                    .replace(/(<li.*<\/li>)/gs, '<ul class="mb-3 list-none">$1</ul>')
+                    .replace(/<p class="mb-3"><\/p>/g, '');
+            }
+
+            truncateText(text, maxLength) {
+                const plainText = text.replace(/\n/g, ' ').trim();
+                if (plainText.length <= maxLength) return plainText;
+                return plainText.substring(0, maxLength) + '...';
+            }
+
+            formatDate(date) {
+                return new Intl.DateTimeFormat('de-DE', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
+                }).format(date);
+            }
+
+            formatTime(date) {
+                return new Intl.DateTimeFormat('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            }
+
+            formatDateForICS(date) {
+                return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            }
+        }
+
+        // Initialize events manager when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new EventsManager();
+        });
+    </script>
 </body>
 </html>
