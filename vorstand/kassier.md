@@ -2,7 +2,7 @@
 position: Kassier
 name: Giuseppe Costanza
 email: kassier@fwv-raura.ch
-phone: 
+phone: +41 79 501 71 20
 image: images/kassier.png
 order: 3
 ---
