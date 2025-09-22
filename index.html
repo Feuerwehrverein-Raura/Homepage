@@ -353,66 +353,76 @@
         </div>
     </section>
 
-    <!-- Contact Section -->
-    <section id="contact" class="py-16 bg-fire-700 text-white">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold mb-4">Kontakt & Mitgliedschaft</h2>
-                <div class="w-24 h-1 bg-white mx-auto"></div>
-            </div>
-            <div class="grid md:grid-cols-2 gap-12">
-                <div>
-                    <h3 class="text-2xl font-bold mb-6">Interessiert mitzumachen?</h3>
-                    <p class="text-fire-100 mb-6 leading-relaxed">
-                        Wir sind immer auf der Suche nach neuen Mitgliedern, die unsere 
-                        Vereinsgemeinschaft bereichern möchten. Ob aktive oder ehemalige 
-                        Feuerwehrleute oder einfach interessierte Bürger - alle sind willkommen!
-                    </p>
+<!-- Kontaktformular Sektion -->
+<section id="contact" class="py-16 bg-gradient-to-br from-fire-600 via-fire-700 to-fire-800">
+    <div class="container mx-auto px-4">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-white mb-4">Kontakt</h2>
+            <p class="text-fire-100 max-w-2xl mx-auto">
+                Haben Sie Fragen oder möchten Sie Mitglied werden? Kontaktieren Sie uns!
+            </p>
+        </div>
+        
+        <div class="max-w-4xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Kontaktinformationen -->
+                <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-xl p-6 border border-white border-opacity-20">
+                    <h3 class="text-xl font-semibold text-white mb-6">Kontaktinformationen</h3>
+                    
                     <div class="space-y-4">
-                        <div class="flex items-start">
-                            <div class="w-6 h-6 bg-fire-500 rounded-full flex items-center justify-center mr-4 mt-1 flex-shrink-0">
-                                <span class="text-white text-sm">📧</span>
-                            </div>
+                        <div class="flex items-start space-x-3">
+                            <div class="w-5 h-5 text-fire-200 mt-1">📍</div>
                             <div>
-                                <p class="font-semibold">E-Mail</p>
-                                <p class="text-fire-200">kontakt@fwv-raura.ch</p>
+                                <p class="text-white font-medium">Adresse</p>
+                                <p class="text-fire-200 text-sm">Feuerwehrverein Raura<br>4303 Kaiseraugst</p>
                             </div>
                         </div>
-                        <div class="flex items-start">
-                            <div class="w-6 h-6 bg-fire-500 rounded-full flex items-center justify-center mr-4 mt-1 flex-shrink-0">
-                                <span class="text-white text-sm">📍</span>
-                            </div>
+                        
+                        <div class="flex items-start space-x-3">
+                            <div class="w-5 h-5 text-fire-200 mt-1">📧</div>
                             <div>
-                                <p class="font-semibold">Adresse</p>
-                                <p class="text-fire-200">Kaiseraugst, Aargau, Schweiz</p>
+                                <p class="text-white font-medium">E-Mail</p>
+                                <p class="text-fire-200 text-sm">kontakt@fwv-raura.ch</p>
                             </div>
                         </div>
-                        <div class="flex items-start">
-                            <div class="w-6 h-6 bg-fire-500 rounded-full flex items-center justify-center mr-4 mt-1 flex-shrink-0">
-                                <span class="text-white text-sm">💬</span>
-                            </div>
+                        
+                        <div class="flex items-start space-x-3">
+                            <div class="w-5 h-5 text-fire-200 mt-1">👤</div>
                             <div>
-                                <p class="font-semibold">WhatsApp Gruppe</p>
-                                <a href="https://chat.whatsapp.com/EC9AaXNofvr25mIG3wxdhj" target="_blank" rel="noopener noreferrer" 
-                                   class="text-fire-200 hover:text-white transition-colors inline-flex items-center space-x-1">
-                                    <span>Gruppe beitreten</span>
-                                    <span class="text-xs">↗</span>
-                                </a>
+                                <p class="text-white font-medium">Aktuar</p>
+                                <p class="text-fire-200 text-sm">Stefan Müller<br>Rosenweg 9<br>4303 Kaiseraugst</p>
+                                <p class="text-fire-200 text-sm">aktuar@fwv-raura.ch</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-start space-x-3">
+                            <div class="w-5 h-5 text-fire-200 mt-1">🌐</div>
+                            <div>
+                                <p class="text-white font-medium">Website</p>
+                                <p class="text-fire-200 text-sm">www.fwv-raura.ch</p>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="bg-white bg-opacity-10 rounded-lg p-8">
-                    <h4 class="text-xl font-bold mb-6">Schnellkontakt</h4>
+                
+                <!-- Kontaktformular -->
+                <div class="bg-white bg-opacity-10 backdrop-blur-sm rounded-xl p-6 border border-white border-opacity-20">
+                    <h3 class="text-xl font-semibold text-white mb-6">Nachricht senden</h3>
+                    
                     <form id="contact-form" class="space-y-4">
-                        <div>
-                            <input type="text" id="contact-name" placeholder="Name" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white">
+                        <!-- Basis-Kontaktdaten -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <input type="text" id="contact-name" placeholder="Ihr Name *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
+                            <div>
+                                <input type="email" id="contact-email" placeholder="Ihre E-Mail *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
                         </div>
+                        
+                        <!-- Betreff -->
                         <div>
-                            <input type="email" id="contact-email" placeholder="E-Mail" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white">
-                        </div>
-                        <div>
-                            <select id="contact-subject" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-white">
+                            <select id="contact-subject" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-white text-sm">
                                 <option value="" class="text-gray-800">Betreff auswählen...</option>
                                 <option value="Mitgliedschaft" class="text-gray-800">Mitgliedschaft</option>
                                 <option value="Veranstaltung" class="text-gray-800">Fragen zu Veranstaltungen</option>
@@ -421,21 +431,367 @@
                             </select>
                         </div>
                         
-                        <!-- Normale Nachricht (nur bei anderen Betreff-Optionen sichtbar) -->
-                        <div id="general-message" class="hidden">
-                            <textarea id="contact-message" rows="4" placeholder="Nachricht" class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white resize-none"></textarea>
+                        <!-- Allgemeine Nachricht (wird bei Mitgliedschaft ausgeblendet) -->
+                        <div id="general-message">
+                            <textarea id="contact-message" rows="4" placeholder="Ihre Nachricht *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm resize-none"></textarea>
                         </div>
                         
-                        <button type="submit" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors flex items-center justify-center space-x-2">
-                            <span>📧</span>
-                            <span>E-Mail senden</span>
-                        </button>
+                        <!-- Vollständiges Mitgliedschaftsformular -->
+                        <div id="membership-form" class="hidden space-y-4 border-t border-white border-opacity-20 pt-4">
+                            <div class="text-sm text-fire-100 mb-4">
+                                <p class="font-semibold mb-2">📋 Beitrittsformular</p>
+                                <p class="text-xs">
+                                    Aktive Feuerwehr-Mitglieder werden sofort aufgenommen. 
+                                    Andere Interessierte werden an der ordentlichen GV bestätigt.
+                                </p>
+                            </div>
+                            
+                            <!-- Name und Vorname -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <input type="text" id="member-lastname" placeholder="Nachname *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                                <div>
+                                    <input type="text" id="member-firstname" placeholder="Vorname *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                            </div>
+                            
+                            <!-- Adresse -->
+                            <div>
+                                <input type="text" id="member-street" placeholder="Strasse *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
+                            
+                            <div>
+                                <input type="text" id="member-city" placeholder="PLZ und Ort *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
+                            
+                            <!-- Telefonnummern -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <input type="tel" id="member-phone" placeholder="Telefonnummer *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                                <div>
+                                    <input type="tel" id="member-mobile" placeholder="Mobilnummer" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                </div>
+                            </div>
+                            
+                            <!-- E-Mail für Mitglied -->
+                            <div>
+                                <input type="email" id="member-email" placeholder="E-Mail-Adresse *" required class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                            </div>
+                            
+                            <!-- Feuerwehr-Status -->
+                            <div>
+                                <label class="block text-fire-100 text-sm mb-2">Angehörige/r der Feuerwehr Raurica? *</label>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <label class="flex items-center space-x-2 text-fire-100 text-sm">
+                                        <input type="radio" name="firefighter-status" value="active" required class="text-fire-600">
+                                        <span>Ja</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 text-fire-100 text-sm">
+                                        <input type="radio" name="firefighter-status" value="former" required class="text-fire-600">
+                                        <span>Ehemalige/r</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 text-fire-100 text-sm">
+                                        <input type="radio" name="firefighter-status" value="no" required class="text-fire-600">
+                                        <span>Nein</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Korrespondenz -->
+                            <div>
+                                <label class="block text-fire-100 text-sm mb-2">Zustellung der Korrespondenz *</label>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+                                    <label class="flex items-center space-x-2 text-fire-100 text-sm">
+                                        <input type="radio" name="correspondence-method" value="post" required class="text-fire-600">
+                                        <span>Post</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 text-fire-100 text-sm">
+                                        <input type="radio" name="correspondence-method" value="email" required class="text-fire-600">
+                                        <span>E-Mail</span>
+                                    </label>
+                                </div>
+                                
+                                <!-- Zustelladresse -->
+                                <div id="correspondence-address" class="hidden">
+                                    <label class="block text-fire-100 text-xs mb-2">Zustelladresse:</label>
+                                    <div class="space-y-2">
+                                        <label class="flex items-center space-x-2 text-fire-100 text-xs">
+                                            <input type="radio" name="correspondence-address" value="main" class="text-fire-600">
+                                            <span id="main-address-text">Hauptadresse</span>
+                                        </label>
+                                        <label class="flex items-center space-x-2 text-fire-100 text-xs">
+                                            <input type="radio" name="correspondence-address" value="other" class="text-fire-600">
+                                            <span>Andere:</span>
+                                        </label>
+                                        <input type="text" id="other-address" placeholder="Alternative Adresse/E-Mail" disabled class="w-full px-3 py-1 rounded bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-1 focus:ring-white text-xs">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <div class="pt-4">
+                            <button type="submit" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition duration-300 shadow-lg">
+                                <span id="submit-text">Nachricht senden</span>
+                            </button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    initializeContactForm();
+});
+
+function initializeContactForm() {
+    const contactForm = document.getElementById('contact-form');
+    const subjectSelect = document.getElementById('contact-subject');
+    const correspondenceMethodRadios = document.querySelectorAll('input[name="correspondence-method"]');
+    const correspondenceAddressRadios = document.querySelectorAll('input[name="correspondence-address"]');
+    const otherAddressInput = document.getElementById('other-address');
+    
+    if (contactForm && subjectSelect) {
+        // Betreff-Änderung
+        subjectSelect.addEventListener('change', function() {
+            toggleMembershipForm(this.value === 'Mitgliedschaft');
+        });
+        
+        // Korrespondenz-Methode Änderung
+        correspondenceMethodRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                updateCorrespondenceOptions(this.value);
+            });
+        });
+        
+        // Korrespondenz-Adresse Änderung
+        correspondenceAddressRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                otherAddressInput.disabled = this.value !== 'other';
+                if (this.value !== 'other') {
+                    otherAddressInput.value = '';
+                }
+            });
+        });
+        
+        // Formular-Submit
+        contactForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            sendContactEmail();
+        });
+    }
+}
+
+function toggleMembershipForm(showMembership) {
+    const generalMessage = document.getElementById('general-message');
+    const membershipForm = document.getElementById('membership-form');
+    const submitText = document.getElementById('submit-text');
+    const contactMessageField = document.getElementById('contact-message');
+    
+    if (showMembership) {
+        generalMessage.classList.add('hidden');
+        membershipForm.classList.remove('hidden');
+        submitText.textContent = 'Beitrittsantrag senden';
+        // Entferne required von allgemeiner Nachricht
+        contactMessageField.removeAttribute('required');
+        
+        // Füge required zu Mitgliedschaftsfeldern hinzu
+        const requiredFields = membershipForm.querySelectorAll('input[placeholder*="*"]');
+        requiredFields.forEach(field => field.setAttribute('required', true));
+    } else {
+        generalMessage.classList.remove('hidden');
+        membershipForm.classList.add('hidden');
+        submitText.textContent = 'Nachricht senden';
+        // Füge required zur allgemeinen Nachricht hinzu
+        contactMessageField.setAttribute('required', true);
+        
+        // Entferne required von Mitgliedschaftsfeldern
+        const membershipFields = membershipForm.querySelectorAll('input');
+        membershipFields.forEach(field => field.removeAttribute('required'));
+    }
+}
+
+function updateCorrespondenceOptions(method) {
+    const correspondenceAddress = document.getElementById('correspondence-address');
+    const mainAddressText = document.getElementById('main-address-text');
+    
+    correspondenceAddress.classList.remove('hidden');
+    
+    if (method === 'post') {
+        mainAddressText.textContent = 'Hauptadresse (wie oben angegeben)';
+    } else {
+        mainAddressText.textContent = 'Haupt-E-Mail (wie oben angegeben)';
+    }
+    
+    // Reset selections
+    const addressRadios = document.querySelectorAll('input[name="correspondence-address"]');
+    addressRadios.forEach(radio => radio.checked = false);
+    document.getElementById('other-address').disabled = true;
+    document.getElementById('other-address').value = '';
+}
+
+function sendContactEmail() {
+    const name = document.getElementById('contact-name').value.trim();
+    const email = document.getElementById('contact-email').value.trim();
+    const subject = document.getElementById('contact-subject').value;
+
+    if (!name || !email || !subject) {
+        alert('Bitte füllen Sie mindestens Name, E-Mail und Betreff aus.');
+        return;
+    }
+
+    let mailtoLink, successMessage;
+
+    if (subject === 'Mitgliedschaft') {
+        const result = generateMembershipEmail(name, email);
+        if (!result) return;
+        mailtoLink = result.mailtoLink;
+        successMessage = result.successMessage;
+    } else {
+        const message = document.getElementById('contact-message').value.trim();
+        if (!message) {
+            alert('Bitte geben Sie eine Nachricht ein.');
+            return;
+        }
+        
+        const result = generateGeneralEmail(name, email, subject, message);
+        mailtoLink = result.mailtoLink;
+        successMessage = result.successMessage;
+    }
+
+    window.location.href = mailtoLink;
+
+    setTimeout(() => {
+        alert(successMessage);
+        resetContactForm();
+    }, 500);
+}
+
+function generateMembershipEmail(name, email) {
+    // Alle erforderlichen Felder prüfen
+    const lastname = document.getElementById('member-lastname').value.trim();
+    const firstname = document.getElementById('member-firstname').value.trim();
+    const street = document.getElementById('member-street').value.trim();
+    const city = document.getElementById('member-city').value.trim();
+    const phone = document.getElementById('member-phone').value.trim();
+    const mobile = document.getElementById('member-mobile').value.trim();
+    const memberEmail = document.getElementById('member-email').value.trim();
+    const firefighterStatus = document.querySelector('input[name="firefighter-status"]:checked');
+    const correspondenceMethod = document.querySelector('input[name="correspondence-method"]:checked');
+    const correspondenceAddress = document.querySelector('input[name="correspondence-address"]:checked');
+    const otherAddress = document.getElementById('other-address').value.trim();
+
+    // Validierung
+    if (!lastname || !firstname || !street || !city || !phone || !memberEmail || 
+        !firefighterStatus || !correspondenceMethod || !correspondenceAddress) {
+        alert('Bitte füllen Sie alle Pflichtfelder (*) aus.');
+        return null;
+    }
+
+    if (correspondenceAddress.value === 'other' && !otherAddress) {
+        alert('Bitte geben Sie eine alternative Adresse/E-Mail ein.');
+        return null;
+    }
+
+    const subjectLine = 'Beitrittsantrag - Feuerwehrverein Raura';
+    
+    const firefighterStatusText = {
+        'active': 'Ja (aktiv)',
+        'former': 'Ehemalige/r',
+        'no': 'Nein'
+    };
+
+    const correspondenceMethodText = correspondenceMethod.value === 'post' ? 'Post' : 'E-Mail';
+    
+    let correspondenceDetails = '';
+    if (correspondenceAddress.value === 'main') {
+        correspondenceDetails = correspondenceMethod.value === 'post' 
+            ? 'Hauptadresse (wie oben angegeben)'
+            : 'Haupt-E-Mail (wie oben angegeben)';
+    } else if (correspondenceAddress.value === 'other') {
+        correspondenceDetails = `Andere: ${otherAddress}`;
+    }
+
+    const body = `Sehr geehrte Damen und Herren,
+
+hiermit beantrage ich die Aufnahme in den Feuerwehrverein Raura Kaiseraugst.
+
+PERSÖNLICHE DATEN:
+Name: ${lastname}
+Vorname: ${firstname}
+Strasse: ${street}
+PLZ und Ort: ${city}
+Telefonnummer: ${phone}
+${mobile ? `Mobilnummer: ${mobile}` : 'Mobilnummer: -'}
+E-Mail-Adresse: ${memberEmail}
+
+FEUERWEHR-ZUGEHÖRIGKEIT:
+Angehörige/r der Feuerwehr Raurica: ${firefighterStatusText[firefighterStatus.value]}
+
+KORRESPONDENZ:
+Zustellung der Korrespondenz: ${correspondenceMethodText}
+${correspondenceDetails ? `Zustelladresse: ${correspondenceDetails}` : ''}
+
+KONTAKT FÜR RÜCKFRAGEN:
+Name: ${name}
+E-Mail: ${email}
+
+Mit freundlichen Grüssen
+${name}
+
+---
+Formular erstellt über: www.fwv-raura.ch
+Version: ${new Date().toLocaleDateString('de-DE')}`;
+
+    // E-Mail an sowohl Aktuar als auch Kassier
+    const mailtoLink = `mailto:aktuar@fwv-raura.ch,kassier@fwv-raura.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+    
+    return {
+        mailtoLink,
+        successMessage: 'Beitrittsantrag wurde an Ihren E-Mail-Client weitergeleitet.\n\nBitte senden Sie die E-Mail an den Aktuar und Kassier ab.\n\nAktive Feuerwehr-Mitglieder werden sofort aufgenommen,\nandere Interessierte werden an der nächsten GV bestätigt.'
+    };
+}
+
+function generateGeneralEmail(name, email, subject, message) {
+    const subjectLine = `Kontaktanfrage: ${subject}`;
+    const body = `Hallo,
+
+ich möchte gerne Kontakt mit dem Feuerwehrverein Raura aufnehmen.
+
+BETREFF: ${subject}
+
+MEINE KONTAKTDATEN:
+Name: ${name}
+E-Mail: ${email}
+
+NACHRICHT:
+${message}
+
+Mit freundlichen Grüssen
+${name}`;
+
+    const mailtoLink = `mailto:kontakt@fwv-raura.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+    
+    return {
+        mailtoLink,
+        successMessage: 'E-Mail-Client wurde geöffnet. Bitte senden Sie die E-Mail ab.'
+    };
+}
+
+function resetContactForm() {
+    document.getElementById('contact-form').reset();
+    document.getElementById('general-message').classList.remove('hidden');
+    document.getElementById('membership-form').classList.add('hidden');
+    document.getElementById('submit-text').textContent = 'Nachricht senden';
+    document.getElementById('correspondence-address').classList.add('hidden');
+    document.getElementById('other-address').disabled = true;
+}
+</script>
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-8">
         <div class="container mx-auto px-4 text-center">
