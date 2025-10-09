@@ -23,16 +23,10 @@
 ### samstag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
-### samstag-kasse-12-14 (12:00-14:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
 ### samstag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-kueche-14-16 (14:00-16:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
-### samstag-kasse-14-16 (14:00-16:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-16-18 (16:00-18:00) - 2 Personen benötigt
@@ -41,16 +35,10 @@
 ### samstag-kueche-16-18 (16:00-18:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
-### samstag-kasse-16-18 (16:00-18:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
 ### samstag-bar-18-20 (18:00-20:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
-### samstag-kasse-18-20 (18:00-20:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
@@ -59,16 +47,10 @@
 ### samstag-kueche-20-22 (20:00-22:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
-### samstag-kasse-20-22 (20:00-22:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
 ### samstag-bar-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-kueche-22-open (22:00-Open End) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
-### samstag-kasse-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ---
@@ -81,16 +63,10 @@
 ### sonntag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
-### sonntag-kasse-12-14 (12:00-14:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
 ### sonntag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-14-16 (14:00-16:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
-### sonntag-kasse-14-16 (14:00-16:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-bar-16-18 (16:00-18:00) - 2 Personen benötigt
@@ -99,16 +75,10 @@
 ### sonntag-kueche-16-18 (16:00-18:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
-### sonntag-kasse-16-18 (16:00-18:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
 ### sonntag-bar-18-20 (18:00-20:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
-### sonntag-kasse-18-20 (18:00-20:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
@@ -117,16 +87,10 @@
 ### sonntag-kueche-20-22 (20:00-22:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
-### sonntag-kasse-20-22 (20:00-22:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
 ### sonntag-bar-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-22-open (22:00-Open End) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
-
-### sonntag-kasse-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ---
@@ -139,10 +103,10 @@
 
 ## Statistik
 - **Aufbau:** 3/5 zugeteilt (2 offen)
-- **Samstag Schichten:** 0/36 zugeteilt (36 offen)
-- **Sonntag Schichten:** 0/36 zugeteilt (36 offen)  
+- **Samstag Schichten:** 0/24 zugeteilt (24 offen)
+- **Sonntag Schichten:** 0/24 zugeteilt (24 offen)  
 - **Abbau:** 0/5 zugeteilt (5 offen)
-- **GESAMT:** 4/82 Plätze zugeteilt (**78 Plätze noch offen**)
+- **GESAMT:** 3/58 Plätze zugeteilt (**55 Plätze noch offen**)
 
 ---
 
