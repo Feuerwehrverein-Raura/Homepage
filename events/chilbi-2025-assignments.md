@@ -8,9 +8,9 @@
 
 ## Aufbau
 ### aufbau (16.10.2025, 17:00-20:00) - 5 Personen benötigt
-- ✅ René Käslin
-- ✅ Stefan Müller
-- ✅ Giuseppe Costanza
+- René Käslin
+- Stefan Müller
+- Giuseppe Costanza
 - **[OFFEN - 2 Plätze]**
 
 

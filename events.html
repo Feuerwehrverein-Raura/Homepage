@@ -429,8 +429,8 @@
                             }
                         }
                         
-                        // Reset bei neuen Sections
-                        if (line.startsWith('##') || line.startsWith('---')) {
+                        // Reset bei neuen Sections (nur bei ##, nicht bei ---)
+                        if (line.startsWith('##')) {
                             if (currentShiftId) {
                                 console.log(`🔚 Ende von Schicht: ${currentShiftId}`);
                             }
