@@ -29,10 +29,28 @@ class EventsManager {
     }
 
     async loadEventsFromMarkdown() {
-        const eventFiles = [
-            'events/chilbi-2025.md',
-            'events/grillplausch-sommer-2024.md'
-        ];
+        // Lade die automatisch generierte Event-Liste
+        let eventFiles = [];
+        try {
+            const listResponse = await fetch('events-list.json');
+            if (listResponse.ok) {
+                const listData = await listResponse.json();
+                eventFiles = listData.files;
+                console.log(`📋 Event-Liste geladen: ${eventFiles.length} Dateien`);
+            } else {
+                console.warn('⚠️ events-list.json nicht gefunden, verwende Fallback');
+                eventFiles = [
+                    'events/chilbi-2025.md',
+                    'events/grillplausch-sommer-2024.md'
+                ];
+            }
+        } catch (error) {
+            console.warn('⚠️ Fehler beim Laden der Event-Liste:', error);
+            eventFiles = [
+                'events/chilbi-2025.md',
+                'events/grillplausch-sommer-2024.md'
+            ];
+        }
 
         const events = [];
         
@@ -292,33 +310,58 @@ class EventsManager {
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 
-                if (event.shifts) {
-                    for (const shift of event.shifts) {
-                        if (line.includes(shift.id) || 
-                            (shift.name && line.toLowerCase().includes(shift.name.toLowerCase())) ||
-                            (line.includes(shift.time) && line.includes('Bar') && shift.name.includes('Bar')) ||
-                            (line.includes(shift.time) && line.includes('Küche') && shift.name.includes('Küche')) ||
-                            (line.includes(shift.time) && line.includes('Kasse') && shift.name.includes('Kasse'))) {
-                            currentShiftId = shift.id;
-                            assignments[currentShiftId] = assignments[currentShiftId] || [];
-                            break;
+                // Erkenne Schicht-Header (### schicht-id)
+                if (line.startsWith('### ')) {
+                    const headerText = line.replace('### ', '').toLowerCase();
+                    
+                    // Suche nach passender Schicht-ID
+                    if (event.shifts) {
+                        for (const shift of event.shifts) {
+                            if (headerText.includes(shift.id) || 
+                                headerText.includes(shift.id.replace(/-/g, ''))) {
+                                currentShiftId = shift.id;
+                                assignments[currentShiftId] = assignments[currentShiftId] || [];
+                                console.log(`📋 Gefundene Schicht: ${shift.id}`);
+                                break;
+                            }
                         }
                     }
                 }
                 
-                if (currentShiftId && line.startsWith('- ✅')) {
-                    const name = line.replace('- ✅', '').trim();
-                    if (name && !assignments[currentShiftId].includes(name)) {
+                // Sammle zugeteilte Personen
+                if (currentShiftId && line.startsWith('- ') && 
+                    !line.includes('**[OFFEN') && 
+                    !line.includes('Personen benötigt')) {
+                    
+                    let name = line.replace('- ', '').trim();
+                    
+                    // Entferne ✅ falls vorhanden
+                    if (name.startsWith('✅')) {
+                        name = name.replace('✅', '').trim();
+                    }
+                    
+                    // Ignoriere leere Namen oder OFFEN-Plätze
+                    if (name && 
+                        !name.includes('[OFFEN') && 
+                        !name.includes('**[OFFEN') && 
+                        name !== '**[OFFEN - 2 Plätze]**' &&
+                        !assignments[currentShiftId].includes(name)) {
+                        
                         assignments[currentShiftId].push(name);
+                        console.log(`👤 ${currentShiftId}: ${name}`);
                     }
                 }
                 
+                // Reset bei neuen Sections
                 if (line.startsWith('##') || line.startsWith('---')) {
                     currentShiftId = null;
                 }
             }
             
+            // Berechne Gesamtzahl zugeteilter Schichten
             filledShifts = Object.values(assignments).reduce((sum, arr) => sum + arr.length, 0);
+            
+            console.log(`📊 Arbeitsplan geparst: ${filledShifts} Personen auf ${Object.keys(assignments).length} Schichten verteilt`);
             
         } catch (error) {
             console.error('Fehler beim Parsen des Arbeitsplans:', error);
