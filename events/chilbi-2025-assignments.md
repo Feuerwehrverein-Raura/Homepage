@@ -11,6 +11,7 @@
 - René Käslin
 - Stefan Müller
 - Giuseppe Costanza
+- Brigitte Käslin
 - **[OFFEN - 2 Plätze]**
 
 ## Samstag, 18.10.2025
@@ -19,6 +20,7 @@
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
+- Brigitte Käslin
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
@@ -34,9 +36,12 @@
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-18-20 (18:00-20:00) - 2 Personen benötigt
+- Edi Grossenbacher
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
+- Helen Grossenbacher
+- Ursula Baumgartner
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
@@ -77,18 +82,21 @@
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
+- Brigitte Käslin
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-20-22 (20:00-22:00) - 2 Personen benötigt
+- Brigitte Käslin
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-bar-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-22-open (22:00-Open End) - 2 Personen benötigt
+- Brigitte Käslin
 - **[OFFEN - 2 Plätze]**
 
 ---
