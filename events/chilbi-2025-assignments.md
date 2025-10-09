@@ -11,7 +11,7 @@
 - René Käslin
 - Stefan Müller
 - Giuseppe Costanza
-- **[OFFEN - 2 Plätze]**
+
 
 ---
 
