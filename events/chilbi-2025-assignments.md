@@ -12,7 +12,7 @@
 - Stefan Müller
 - Giuseppe Costanza
 - Brigitte Käslin
-- **[OFFEN - 2 Plätze]**
+- **[OFFEN - 1 Platz]**
 
 ## Samstag, 18.10.2025
 
@@ -21,7 +21,7 @@
 
 ### samstag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
 - Brigitte Käslin
-- **[OFFEN - 2 Plätze]**
+- **[OFFEN - 1 Platz]**
 
 ### samstag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
@@ -37,7 +37,7 @@
 
 ### samstag-bar-18-20 (18:00-20:00) - 2 Personen benötigt
 - Edi Grossenbacher
-- **[OFFEN - 2 Plätze]**
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
 - Helen Grossenbacher
@@ -82,21 +82,21 @@
 
 ### sonntag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
 - Brigitte Käslin
-- **[OFFEN - 2 Plätze]**
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-20-22 (20:00-22:00) - 2 Personen benötigt
 - Brigitte Käslin
-- **[OFFEN - 2 Plätze]**
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-bar-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-22-open (22:00-Open End) - 2 Personen benötigt
 - Brigitte Käslin
-- **[OFFEN - 2 Plätze]**
+- **[OFFEN - 1 Platz]**
 
 ---
 
@@ -107,11 +107,11 @@
 ---
 
 ## Statistik
-- **Aufbau:** 3/5 zugeteilt (2 offen)
-- **Samstag Schichten:** 0/24 zugeteilt (24 offen)
-- **Sonntag Schichten:** 0/24 zugeteilt (24 offen)  
+- **Aufbau:** 4/5 zugeteilt (1 offen)
+- **Samstag Schichten:** 3/24 zugeteilt (21 offen)
+- **Sonntag Schichten:** 3/24 zugeteilt (21 offen)  
 - **Abbau:** 0/5 zugeteilt (5 offen)
-- **GESAMT:** 3/58 Plätze zugeteilt (**55 Plätze noch offen**)
+- **GESAMT:** 10/58 Plätze zugeteilt (**48 Plätze noch offen**)
 
 ---
 
