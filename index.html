@@ -853,6 +853,200 @@ ${name}`;
         vorstandError.classList.remove('hidden');
     }
 }
+        // EVENT LOADING FUNCTIONS
+async function loadUpcomingEvents() {
+    try {
+        console.log('🔄 Lade kommende Events...');
+        
+        let eventFiles = [];
+        try {
+            const listResponse = await fetch('events-list.json');
+            if (listResponse.ok) {
+                const listData = await listResponse.json();
+                eventFiles = listData.files;
+                console.log(`📋 Event-Liste geladen: ${eventFiles.length} Dateien`);
+            } else {
+                console.warn('⚠️ events-list.json nicht gefunden, verwende Fallback');
+                eventFiles = [
+                    'events/chilbi-2024.md',
+                    'events/chilbi-2025.md',
+                    'events/grillplausch-sommer-2024.md'
+                ];
+            }
+        } catch (error) {
+            console.warn('⚠️ Fehler beim Laden der Event-Liste:', error);
+            eventFiles = [
+                'events/chilbi-2024.md',
+                'events/chilbi-2025.md',
+                'events/grillplausch-sommer-2024.md'
+            ];
+        }
+
+        const events = [];
+        
+        for (const file of eventFiles) {
+            try {
+                const response = await fetch(file);
+                if (!response.ok) continue;
+                
+                const content = await response.text();
+                const event = parseEventMarkdown(content, file);
+                if (event) {
+                    events.push(event);
+                }
+            } catch (error) {
+                console.error(`Fehler beim Laden von ${file}:`, error);
+            }
+        }
+
+        const now = new Date();
+        const upcomingEvents = events
+            .filter(event => event.startDate > now)
+            .sort((a, b) => a.startDate - b.startDate)
+            .slice(0, 3);
+
+        renderUpcomingEvents(upcomingEvents);
+
+    } catch (error) {
+        console.error('Fehler beim Laden der Events:', error);
+        const container = document.getElementById('events-container');
+        if (container) {
+            container.innerHTML = '<p class="text-center text-gray-600 col-span-full">Events konnten nicht geladen werden.</p>';
+        }
+    }
+}
+
+function parseEventMarkdown(content, filename) {
+    try {
+        const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        if (!frontmatterMatch) return null;
+
+        const frontmatter = {};
+        const lines = frontmatterMatch[1].split(/\r?\n/);
+        
+        for (const line of lines) {
+            const match = line.match(/^(\w+):\s*(.+)$/);
+            if (match) {
+                frontmatter[match[1]] = match[2].trim();
+            }
+        }
+
+        const descriptionMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n\r?\n([\s\S]+)/);
+        let description = '';
+        if (descriptionMatch) {
+            const lines = descriptionMatch[1].split(/\r?\n/).filter(l => !l.startsWith('#'));
+            description = lines.slice(0, 3).join(' ').trim();
+        }
+
+        const shifts = [];
+        const shiftsMatch = content.match(/shifts:\r?\n((?:[ ]{2,}-.*\r?\n)+)/);
+        if (shiftsMatch) {
+            const shiftLines = shiftsMatch[1].split(/\r?\n/).filter(l => l.trim().startsWith('-'));
+            for (const line of shiftLines) {
+                const neededMatch = line.match(/needed:\s*(\d+)/);
+                if (neededMatch) {
+                    shifts.push({ needed: parseInt(neededMatch[1]) });
+                }
+            }
+        }
+
+        return {
+            id: frontmatter.id || filename.replace('events/', '').replace('.md', ''),
+            title: frontmatter.title || 'Unbenanntes Event',
+            subtitle: frontmatter.subtitle || '',
+            category: frontmatter.category || 'Allgemein',
+            startDate: new Date(frontmatter.startDate),
+            endDate: new Date(frontmatter.endDate),
+            location: frontmatter.location || '',
+            cost: frontmatter.cost || 'Kostenlos',
+            description: description,
+            shifts: shifts
+        };
+    } catch (error) {
+        console.error(`Fehler beim Parsen von ${filename}:`, error);
+        return null;
+    }
+}
+
+function renderUpcomingEvents(events) {
+    const container = document.getElementById('events-container');
+    
+    if (!container) {
+        console.error('Events-Container (#events-container) nicht gefunden!');
+        return;
+    }
+    
+    if (events.length === 0) {
+        container.innerHTML = '<div class="col-span-full text-center text-gray-600 py-8">Aktuell sind keine kommenden Termine geplant.</div>';
+        return;
+    }
+
+    container.innerHTML = events.map((event, index) => {
+        const colors = [
+            { from: 'fire-500', to: 'fire-600', light: 'fire-100', lighter: 'fire-200' },
+            { from: 'blue-500', to: 'blue-600', light: 'blue-100', lighter: 'blue-200' },
+            { from: 'green-500', to: 'green-600', light: 'green-100', lighter: 'green-200' }
+        ];
+        const color = colors[index % colors.length];
+
+        const emojiMap = {
+            'Hauptveranstaltung': '🎪',
+            'Gesellschaftsanlass': '🔥',
+            'Ausflug': '🚌',
+            'Vereinsintern': '👥'
+        };
+        const emoji = emojiMap[event.category] || '📅';
+
+        const dateStr = event.startDate.toLocaleDateString('de-CH', { 
+            year: 'numeric', 
+            month: 'long',
+            day: 'numeric'
+        });
+
+        const subtitle = event.subtitle || event.category;
+        const description = event.description 
+            ? event.description.substring(0, 120) + (event.description.length > 120 ? '...' : '')
+            : '';
+
+        let additionalInfo = `<p>📅 ${dateStr}</p>`;
+        if (event.location) {
+            additionalInfo += `<p>📍 ${event.location}</p>`;
+        }
+        
+        if (event.shifts && event.shifts.length > 0) {
+            const totalNeeded = event.shifts.reduce((sum, shift) => sum + (shift.needed || 0), 0);
+            if (totalNeeded > 0) {
+                additionalInfo += `<p>👥 ${totalNeeded}+ Helfer gesucht</p>`;
+            }
+        }
+
+        if (event.cost && event.cost !== 'Kostenlos') {
+            additionalInfo += `<p>💰 ${event.cost}</p>`;
+        }
+
+        return `
+            <div class="bg-gradient-to-br from-${color.from} to-${color.to} text-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform">
+                <div class="p-6">
+                    <div class="flex items-center mb-4">
+                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
+                            <span class="text-2xl">${emoji}</span>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold">${event.title}</h3>
+                            <p class="text-${color.light}">${subtitle}</p>
+                        </div>
+                    </div>
+                    ${description ? `<p class="text-${color.light} mb-4">${description}</p>` : ''}
+                    <div class="text-sm text-${color.lighter}">
+                        ${additionalInfo}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    console.log(`✅ ${events.length} Events angezeigt`);
+}
     </script>
 </body>
 </html>
