@@ -867,29 +867,31 @@ ${name}`;
         function displayVorstandMembers(members, container) {
             const membersHtml = members.map(member => {
                 const imageHtml = member.image 
-                    ? `<div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 mb-2">
+                    ? `<div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
                          <img src="${member.image}" alt="${member.name}" class="w-full h-full object-cover">
                        </div>`
-                    : `<div class="w-12 h-12 rounded-full bg-fire-500 flex items-center justify-center text-white font-bold text-sm mb-2">
+                    : `<div class="w-12 h-12 rounded-full bg-fire-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                          ${member.name.split(' ').map(n => n[0]).join('')}
                        </div>`;
 
                 const contactInfo = [];
                 if (member.email) {
-                    contactInfo.push(`<a href="mailto:${member.email}" class="text-fire-600 hover:text-fire-700 text-xs block">${member.email}</a>`);
+                    contactInfo.push(`<a href="mailto:${member.email}" class="text-fire-600 hover:text-fire-700 text-xs">📧 ${member.email}</a>`);
                 }
                 if (member.phone) {
-                    contactInfo.push(`<a href="tel:${member.phone}" class="text-fire-600 hover:text-fire-700 text-xs block">${member.phone}</a>`);
+                    contactInfo.push(`<a href="tel:${member.phone}" class="text-fire-600 hover:text-fire-700 text-xs">📞 ${member.phone}</a>`);
                 }
 
                 return `
-                    <div class="border border-gray-200 rounded p-1.5 hover:shadow-md transition-shadow max-w-xs mx-auto">
-                        <div class="text-center">
+                    <div class="border border-gray-200 rounded p-1.5 hover:shadow-md transition-shadow">
+                        <div class="flex items-center space-x-3">
                             ${imageHtml}
-                            <h5 class="font-semibold text-gray-800 text-sm">${member.position}</h5>
-                            <p class="text-gray-600 text-xs mb-2">${member.name}</p>
-                            <div class="space-y-0.5">
-                                ${contactInfo.join('')}
+                            <div class="flex-1 min-w-0">
+                                <h5 class="font-semibold text-gray-800 text-sm">${member.position}</h5>
+                                <p class="text-gray-600 text-xs mb-1">${member.name}</p>
+                                <div class="space-y-0.5">
+                                    ${contactInfo.join('<br>')}
+                                </div>
                             </div>
                         </div>
                     </div>
