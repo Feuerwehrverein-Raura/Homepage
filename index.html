@@ -867,29 +867,29 @@ ${name}`;
         function displayVorstandMembers(members, container) {
             const membersHtml = members.map(member => {
                 const imageHtml = member.image 
-                    ? `<div class="w-6 h-6 rounded-full overflow-hidden bg-gray-200 mb-1">
+                    ? `<div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 mb-2">
                          <img src="${member.image}" alt="${member.name}" class="w-full h-full object-cover">
                        </div>`
-                    : `<div class="w-6 h-6 rounded-full bg-fire-500 flex items-center justify-center text-white font-bold text-xs mb-1">
+                    : `<div class="w-12 h-12 rounded-full bg-fire-500 flex items-center justify-center text-white font-bold text-sm mb-2">
                          ${member.name.split(' ').map(n => n[0]).join('')}
                        </div>`;
 
                 const contactInfo = [];
                 if (member.email) {
-                    contactInfo.push(`<a href="mailto:${member.email}" class="text-fire-600 hover:text-fire-700" style="font-size: 10px;">📧 ${member.email}</a>`);
+                    contactInfo.push(`<a href="mailto:${member.email}" class="text-fire-600 hover:text-fire-700 text-xs block">${member.email}</a>`);
                 }
                 if (member.phone) {
-                    contactInfo.push(`<a href="tel:${member.phone}" class="text-fire-600 hover:text-fire-700" style="font-size: 10px;">📞 ${member.phone}</a>`);
+                    contactInfo.push(`<a href="tel:${member.phone}" class="text-fire-600 hover:text-fire-700 text-xs block">${member.phone}</a>`);
                 }
 
                 return `
-                    <div class="border border-gray-200 rounded p-2 hover:shadow-md transition-shadow">
+                    <div class="border border-gray-200 rounded p-1.5 hover:shadow-md transition-shadow max-w-xs mx-auto">
                         <div class="text-center">
                             ${imageHtml}
-                            <h5 class="font-semibold text-gray-800" style="font-size: 11px;">${member.position}</h5>
-                            <p class="text-gray-600 mb-1" style="font-size: 10px;">${member.name}</p>
+                            <h5 class="font-semibold text-gray-800 text-sm">${member.position}</h5>
+                            <p class="text-gray-600 text-xs mb-2">${member.name}</p>
                             <div class="space-y-0.5">
-                                ${contactInfo.join('<br>')}
+                                ${contactInfo.join('')}
                             </div>
                         </div>
                     </div>
