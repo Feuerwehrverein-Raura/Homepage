@@ -42,7 +42,6 @@
 ### samstag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
 - Helen Grossenbacher
 - Ursula Baumgartner
-- **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
