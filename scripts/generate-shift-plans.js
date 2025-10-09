@@ -1,11 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const SimplePDFGenerator = require('./simple-pdf-generator');
 
 class ShiftPlanGenerator {
     constructor() {
         this.events = [];
         this.assignments = new Map();
         this.mockAssignments = this.createMockAssignments();
+        this.pdfGenerator = new SimplePDFGenerator();
     }
 
     createMockAssignments() {
@@ -55,15 +57,37 @@ class ShiftPlanGenerator {
             await this.loadEvents();
             console.log(`Loaded ${this.events.length} events`);
             
+            // Load real assignments (falls back to mock if not available)
+            const allAssignments = await this.loadRealAssignments();
+            
+            // Initialize PDF generator
+            await this.pdfGenerator.initialize();
+            console.log('📄 PDF generator initialized');
+            
             for (const event of this.events) {
                 if (event.shifts && event.shifts.length > 0) {
+                    const assignments = allAssignments[event.id] || [];
+                    
+                    // Generate markdown
                     await this.generateShiftPlan(event);
+                    
+                    // Generate PDF
+                    await this.generateShiftPlanPDF(event, assignments);
                 }
             }
             
-            console.log('✅ Shift plans generated successfully');
+            // Generate overview PDF
+            await this.generateOverviewPDF(this.events, allAssignments);
+            
+            // Close PDF generator
+            await this.pdfGenerator.close();
+            
+            console.log('✅ Shift plans and PDFs generated successfully');
         } catch (error) {
             console.error('❌ Error generating shift plans:', error);
+            if (this.pdfGenerator) {
+                await this.pdfGenerator.close();
+            }
             process.exit(1);
         }
     }
@@ -298,9 +322,15 @@ ${criticalShifts.length > 0 ? this.generateCriticalSection(criticalShifts) : ''}
     }
 
     generateProgressBar(filled, total) {
+        if (total === 0) {
+            return `
+**Fortschritt:** 0%  
+\`░░░░░░░░░░░░░░░░░░░░\` ${filled}/${total}`;
+        }
+        
         const percentage = Math.round((filled / total) * 100);
-        const filledBlocks = Math.round((filled / total) * 20);
-        const emptyBlocks = 20 - filledBlocks;
+        const filledBlocks = Math.min(20, Math.max(0, Math.round((filled / total) * 20)));
+        const emptyBlocks = Math.max(0, 20 - filledBlocks);
         
         const bar = '█'.repeat(filledBlocks) + '░'.repeat(emptyBlocks);
         
@@ -484,6 +514,80 @@ ${criticalShifts.map(shift => `- **${shift.name}** (${shift.time}): ${shift.desc
 Diese Schichten haben noch **keine einzige Anmeldung**! Bitte meldet euch dringend an.
 
 ---`;
+    }
+
+    async generateShiftPlanPDF(event, assignments) {
+        try {
+            const markdownContent = this.createShiftPlanMarkdown(event, assignments);
+            const pdfPath = await this.pdfGenerator.generateShiftPlanPDF(event, assignments, markdownContent);
+            console.log(`📄 PDF generated: ${path.basename(pdfPath)}`);
+            return pdfPath;
+        } catch (error) {
+            console.error(`❌ Error generating PDF for ${event.id}:`, error);
+            throw error;
+        }
+    }
+
+    async generateOverviewPDF(events, allAssignments) {
+        try {
+            const pdfPath = await this.pdfGenerator.generateOverviewPDF(events, allAssignments);
+            console.log(`📄 Overview PDF generated: ${path.basename(pdfPath)}`);
+            return pdfPath;
+        } catch (error) {
+            console.error('❌ Error generating overview PDF:', error);
+            throw error;
+        }
+    }
+
+    parseAssignmentsFromMarkdown(content) {
+        const assignments = [];
+        const lines = content.split('\n');
+        let currentShiftId = null;
+        
+        for (const line of lines) {
+            const trimmed = line.trim();
+            
+            // Look for shift headers
+            const shiftMatch = trimmed.match(/### ([a-z-]+) \(/);
+            if (shiftMatch) {
+                currentShiftId = shiftMatch[1];
+                continue;
+            }
+            
+            // Look for assigned helpers (lines that start with -)
+            if (currentShiftId && trimmed.startsWith('- ') && !trimmed.includes('[OFFEN')) {
+                const helperName = trimmed.substring(2).trim();
+                if (helperName && !helperName.includes('**')) {
+                    assignments.push({
+                        shiftId: currentShiftId,
+                        name: helperName,
+                        email: `${helperName.toLowerCase().replace(' ', '.')}@example.com`,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        }
+        
+        return assignments;
+    }
+
+    async loadRealAssignments() {
+        const realAssignments = {};
+        
+        for (const event of this.events) {
+            const assignmentFile = path.join(__dirname, '..', 'events', `${event.id}-assignments.md`);
+            
+            if (fs.existsSync(assignmentFile)) {
+                const content = fs.readFileSync(assignmentFile, 'utf8');
+                realAssignments[event.id] = this.parseAssignmentsFromMarkdown(content);
+                console.log(`📋 Loaded ${realAssignments[event.id].length} assignments for ${event.id}`);
+            } else {
+                // Use mock assignments if no real assignments file exists
+                realAssignments[event.id] = this.mockAssignments[event.id] || [];
+            }
+        }
+        
+        return realAssignments;
     }
 }
 

@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbeitsplan Chilbi 2025</title>
+    <style>
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            font-size: 12px;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+            color: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            page-break-inside: avoid;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            height: 50px;
+            width: auto;
+        }
+
+        .header-text h1 {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .header-text h2 {
+            font-size: 16px;
+            font-weight: normal;
+            opacity: 0.9;
+        }
+
+        .header-right .info-box {
+            text-align: right;
+        }
+
+        .info-item {
+            margin-bottom: 3px;
+            font-size: 11px;
+        }
+
+        .stats-section {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            page-break-inside: avoid;
+        }
+
+        .stats-section h3 {
+            margin-bottom: 10px;
+            color: #d32f2f;
+            border-bottom: 1px solid #d32f2f;
+            padding-bottom: 3px;
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            text-align: center;
+            border-radius: 4px;
+        }
+
+        .stat-card.stat-good {
+            border-color: #4caf50;
+            background: #f1f8e9;
+        }
+
+        .stat-card.stat-warning {
+            border-color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .stat-card.stat-critical {
+            border-color: #f44336;
+            background: #ffebee;
+        }
+
+        .stat-number {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+
+        .stat-percentage {
+            font-size: 12px;
+            font-weight: bold;
+            color: #d32f2f;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 20px;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            height: 100%;
+            border-radius: 10px;
+        }
+
+        .progress-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            color: #333;
+            font-size: 10px;
+        }
+
+        .critical-section {
+            background: #ffebee;
+            border: 1px solid #f44336;
+            padding: 15px;
+            margin-bottom: 15px;
+            page-break-inside: avoid;
+        }
+
+        .critical-section h3 {
+            color: #d32f2f;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .critical-alert {
+            background: white;
+            padding: 10px;
+            border-left: 3px solid #f44336;
+        }
+
+        .critical-list {
+            list-style-type: none;
+            margin: 8px 0;
+        }
+
+        .critical-list li {
+            padding: 3px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 11px;
+        }
+
+        .critical-note {
+            margin-top: 10px;
+            padding: 8px;
+            background: #ffcdd2;
+            font-size: 10px;
+        }
+
+        .shift-category {
+            background: white;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            page-break-inside: avoid;
+        }
+
+        .shift-category h3 {
+            background: #d32f2f;
+            color: white;
+            padding: 10px 15px;
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .time-slot {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .time-slot:last-child {
+            border-bottom: none;
+        }
+
+        .time-slot h4 {
+            color: #d32f2f;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .shift-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+        }
+
+        .shift-table th {
+            background: #f5f5f5;
+            padding: 6px 4px;
+            text-align: left;
+            border: 1px solid #ddd;
+            font-weight: bold;
+            font-size: 10px;
+        }
+
+        .shift-table td {
+            padding: 5px 4px;
+            border: 1px solid #ddd;
+            font-size: 10px;
+            vertical-align: top;
+        }
+
+        .shift-table tr.status-complete {
+            background: #f1f8e9;
+        }
+
+        .shift-table tr.status-partial {
+            background: #fff3e0;
+        }
+
+        .shift-table tr.status-critical {
+            background: #ffebee;
+        }
+
+        .status-complete {
+            color: #2e7d32;
+            font-weight: bold;
+        }
+
+        .status-partial {
+            color: #f57c00;
+            font-weight: bold;
+        }
+
+        .status-critical {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+
+        .contact-section {
+            background: #f8f9fa;
+            padding: 15px;
+            border: 1px solid #ddd;
+            margin-top: 15px;
+            page-break-inside: avoid;
+        }
+
+        .contact-section h3 {
+            color: #d32f2f;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #d32f2f;
+            padding-bottom: 3px;
+            font-size: 14px;
+        }
+
+        .contact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .contact-card {
+            background: white;
+            padding: 10px;
+            border-left: 3px solid #d32f2f;
+        }
+
+        .contact-card h4 {
+            color: #d32f2f;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .contact-card p {
+            margin-bottom: 3px;
+            font-size: 10px;
+        }
+
+        .event-overview {
+            background: white;
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            page-break-inside: avoid;
+        }
+
+        .event-overview h3 {
+            color: #d32f2f;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .event-meta {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .event-meta span {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: #f5f5f5;
+        }
+
+        .event-status.confirmed {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+
+        .event-status.planning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .print-instructions {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .print-instructions h3 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+        .print-instructions kbd {
+            background: #f5f5f5;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-family: monospace;
+        }
+
+        /* Print specific styles */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                font-size: 10px;
+            }
+            
+            .header {
+                background: #d32f2f !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            
+            .stat-card.stat-good {
+                background: #f1f8e9 !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+
+            .stat-card.stat-warning {
+                background: #fff3e0 !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+
+            .stat-card.stat-critical {
+                background: #ffebee !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+            
+            .shift-category {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            
+            .time-slot {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .shift-category h3 {
+                background: #d32f2f !important;
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+            }
+        }
+
+        /* Page break helpers */
+        .page-break {
+            page-break-before: always;
+        }
+
+        .no-break {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <img src="../images/logo.png" alt="FWV Raura Logo" class="logo" onerror="this.style.display='none'">
+                <div class="header-text">
+                    <h1>Feuerwehrverein Raura</h1>
+                    <h2>📋 Arbeitsplan Chilbi 2025</h2>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="info-box">
+                    <div class="info-item"><strong>📅 Datum:</strong> 18. Oktober-19. Oktober 2025</div>
+                    <div class="info-item"><strong>📍 Ort:</strong> Roter Schopf, Kaiseraugst</div>
+                    <div class="info-item"><strong>⏰ Stand:</strong> 9.10.2025 17:32 Uhr</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Statistics Dashboard -->
+        <section class="stats-section">
+            <h3>📊 Übersicht</h3>
+            <div class="stats-grid">
+                <div class="stat-card stat-good">
+                    <div class="stat-number">2/1</div>
+                    <div class="stat-label">Besetzte Schichten</div>
+                    <div class="stat-percentage">200%</div>
+                </div>
+                <div class="stat-card stat-warning">
+                    <div class="stat-number">-1</div>
+                    <div class="stat-label">Offene Schichten</div>
+                </div>
+                <div class="stat-card stat-good">
+                    <div class="stat-number">0</div>
+                    <div class="stat-label">Kritische Bereiche</div>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: 200%"></div>
+                <div class="progress-text">200% belegt (2/1)</div>
+            </div>
+        </section>
+
+        
+
+        <!-- Shift Tables -->
+        
+            <section class="shift-category">
+                <h3>🔨 Aufbau</h3>
+                
+        <table class="shift-table">
+            <thead>
+                <tr>
+                    <th>Schicht</th>
+                    <th>Zeit</th>
+                    <th>Benötigt</th>
+                    <th>Zugewiesen</th>
+                    <th>Status</th>
+                    <th>Helfer</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="status-complete">
+                    <td><strong>undefined</strong></td>
+                    <td>undefined</td>
+                    <td>1</td>
+                    <td><strong>22</strong></td>
+                    <td class="status-complete">✅ Besetzt</td>
+                    <td>René Käslin, Stefan Müller, Giuseppe Costanza, Brigitte Käslin, Ralf Merten, Michèle Killer, Brigitte Käslin, Marijan Vukadin, Edi Grossenbacher, Marijan Vukadin, Helen Grossenbacher, Ursula Baumgartner, Raphael Kohler, Raphael Kohler, Ursula Meyer, Ursula Meyer ?, René Käslin, Brigitte Käslin, René Käslin, Brigitte Käslin, René Käslin, Brigitte Käslin</td>
+                </tr>
+            </tbody>
+        </table>
+            </section>
+
+        <!-- Contact Information -->
+        <section class="contact-section">
+            <h3>📞 Kontakt & Springer-System</h3>
+            <div class="contact-grid">
+                <div class="contact-card">
+                    <h4>Hauptspringer</h4>
+                    <p><strong>Stefan Müller (Aktuar)</strong></p>
+                    <p>📧 aktuar@fwv-raura.ch</p>
+                    <p>⏰ Verfügbar: Samstag & Sonntag ganztags</p>
+                </div>
+                <div class="contact-card">
+                    <h4>Schichtkoordination</h4>
+                    <p><strong>Stefan Müller</strong></p>
+                    <p>📧 stefan+fwv-raura@juroct.ch</p>
+                    <p>📅 Anmeldung bis: 17.10.2025</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Print Instructions -->
+        <div class="print-instructions no-print">
+            <h3>🖨️ PDF erstellen</h3>
+            <p><strong>So erstellen Sie ein PDF:</strong></p>
+            <ol>
+                <li>Drücken Sie <kbd>Ctrl+P</kbd> (Windows/Linux) oder <kbd>Cmd+P</kbd> (Mac)</li>
+                <li>Wählen Sie "Als PDF speichern" oder "Microsoft Print to PDF"</li>
+                <li>Klicken Sie auf "Speichern"</li>
+            </ol>
+            <p><em>Diese Anweisungen werden nicht mitgedruckt.</em></p>
+        </div>
+    </div>
+</body>
+</html>
