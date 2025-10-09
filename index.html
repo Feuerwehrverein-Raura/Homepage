@@ -244,23 +244,30 @@
         </div>
     </section>
 
-    <!-- Events Section -->
-    <section id="events" class="py-16 bg-white">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold text-gray-800 mb-4">Kommende Termine</h2>
-                <div class="w-24 h-1 bg-fire-500 mx-auto"></div>
-            </div>
-            <div id="upcoming-events-container" class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Events werden dynamisch geladen -->
-            </div>
-            <div class="text-center mt-8">
-                <a href="./events.html" class="bg-fire-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-fire-600 transition-colors">
-                    Alle Veranstaltungen
-                </a>
+<!-- Events Section -->
+<section id="events" class="py-16 bg-white">
+    <div class="container mx-auto px-4">
+        <div class="text-center mb-12">
+            <h2 class="text-4xl font-bold text-gray-800 mb-4">Kommende Termine</h2>
+            <div class="w-24 h-1 bg-fire-500 mx-auto"></div>
+        </div>
+        
+        <!-- Dynamischer Events-Container -->
+        <div id="events-container" class="grid md:grid-cols-3 gap-6">
+            <!-- Events werden hier dynamisch geladen -->
+            <div class="col-span-full text-center text-gray-600 py-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-fire-500 mx-auto mb-4"></div>
+                <p>Lade Termine...</p>
             </div>
         </div>
-    </section>
+        
+        <div class="text-center mt-8">
+            <a href="./events.html" class="bg-fire-500 text-white px-8 py-3 rounded-lg font-semibold hover:bg-fire-600 transition-colors inline-block">
+                Alle Veranstaltungen ansehen
+            </a>
+        </div>
+    </div>
+</section>
 
     <!-- Contact Section -->
     <section id="contact" class="py-16 bg-gradient-to-br from-fire-600 via-fire-700 to-fire-800">
