@@ -782,151 +782,77 @@ ${name}`;
             });
         }
 
-        async function loadVorstandMembers() {
-            const vorstandContainer = document.getElementById('vorstand-container');
-            const vorstandLoading = document.getElementById('vorstand-loading');
-            const vorstandError = document.getElementById('vorstand-error');
+       async function loadVorstandMembers() {
+    const vorstandContainer = document.getElementById('vorstand-container');
+    const vorstandLoading = document.getElementById('vorstand-loading');
+    const vorstandError = document.getElementById('vorstand-error');
 
-            const memberFiles = [
+    try {
+        console.log('🔄 Lade Vorstand...');
+        
+        // Lade die automatisch generierte Vorstand-Liste
+        let memberFiles = [];
+        try {
+            const listResponse = await fetch('vorstand-list.json');
+            if (listResponse.ok) {
+                const listData = await listResponse.json();
+                memberFiles = listData.files;
+                console.log(`📋 Vorstand-Liste geladen: ${memberFiles.length} Dateien`);
+            } else {
+                console.warn('⚠️ vorstand-list.json nicht gefunden, verwende Fallback');
+                memberFiles = [
+                    'vorstand/praesident.md',
+                    'vorstand/vizepraesident.md',
+                    'vorstand/aktuar.md',
+                    'vorstand/kassier.md',
+                    'vorstand/beisitzer.md'
+                ];
+            }
+        } catch (error) {
+            console.warn('⚠️ Fehler beim Laden der Vorstand-Liste:', error);
+            memberFiles = [
                 'vorstand/praesident.md',
-                'vorstand/materialwart.md', 
+                'vorstand/vizepraesident.md',
                 'vorstand/aktuar.md',
                 'vorstand/kassier.md',
                 'vorstand/beisitzer.md'
             ];
+        }
 
+        const members = [];
+        
+        for (const file of memberFiles) {
             try {
-                const members = [];
-                
-                for (const file of memberFiles) {
-                    try {
-                        const member = await loadMemberFromFile(file);
-                        if (member) {
-                            members.push(member);
-                        }
-                    } catch (error) {
-                        console.warn(`Konnte ${file} nicht laden:`, error.message);
-                    }
+                const member = await loadMemberFromFile(file);
+                if (member) {
+                    members.push(member);
                 }
-
-                if (members.length === 0) {
-                    throw new Error('Keine Vorstandsmitglieder gefunden');
-                }
-
-                // Nach order sortieren, falls verfügbar
-                members.sort((a, b) => {
-                    const orderA = a.order || 999;
-                    const orderB = b.order || 999;
-                    return orderA - orderB;
-                });
-
-                displayVorstandMembers(members, vorstandContainer);
-                
-                vorstandLoading.classList.add('hidden');
-                vorstandContainer.classList.remove('hidden');
-
             } catch (error) {
-                console.error('Fehler beim Laden der Vorstandsmitglieder:', error);
-                vorstandLoading.classList.add('hidden');
-                vorstandError.classList.remove('hidden');
+                console.warn(`Konnte ${file} nicht laden:`, error.message);
             }
         }
 
-        async function loadMemberFromFile(filename) {
-            const response = await fetch(filename);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const content = await response.text();
-            return parseMemberMarkdown(content);
+        if (members.length === 0) {
+            throw new Error('Keine Vorstandsmitglieder gefunden');
         }
 
-        function parseMemberMarkdown(content) {
-            const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/;
-            const match = content.match(frontmatterRegex);
-            
-            if (!match) {
-                throw new Error('Ungültiges Markdown-Format (Frontmatter fehlt)');
-            }
+        members.sort((a, b) => {
+            const orderA = a.order || 999;
+            const orderB = b.order || 999;
+            return orderA - orderB;
+        });
 
-            const [, frontmatter, body] = match;
-            const member = {};
+        displayVorstandMembers(members, vorstandContainer);
+        
+        vorstandLoading.classList.add('hidden');
+        vorstandContainer.classList.remove('hidden');
 
-            // Parse YAML-like frontmatter
-            frontmatter.split('\n').forEach(line => {
-                const [key, ...valueParts] = line.split(':');
-                if (key && valueParts.length > 0) {
-                    const value = valueParts.join(':').trim();
-                    const cleanKey = key.trim();
-                    
-                    // Convert numeric strings to numbers
-                    if (cleanKey === 'order' && !isNaN(value)) {
-                        member[cleanKey] = parseInt(value);
-                    } else {
-                        member[cleanKey] = value;
-                    }
-                }
-            });
-
-            member.content = body.trim();
-            return member;
-        }
-
-        function displayVorstandMembers(members, container) {
-            container.innerHTML = '';
-
-            members.forEach(member => {
-                const memberDiv = document.createElement('div');
-                memberDiv.className = 'flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors';
-
-                const avatarDiv = document.createElement('div');
-                avatarDiv.className = 'w-12 h-12 bg-fire-100 rounded-full flex items-center justify-center flex-shrink-0';
-
-                if (member.image) {
-                    const img = document.createElement('img');
-                    img.src = member.image;
-                    img.alt = `${member.name || 'Vorstandsmitglied'}`;
-                    img.className = 'w-full h-full object-cover rounded-full';
-                    img.onerror = () => {
-                        img.style.display = 'none';
-                        avatarDiv.innerHTML = `<span class="text-fire-600 font-semibold text-lg">${(member.name || 'N').charAt(0).toUpperCase()}</span>`;
-                    };
-                    avatarDiv.appendChild(img);
-                } else {
-                    avatarDiv.innerHTML = `<span class="text-fire-600 font-semibold text-lg">${(member.name || 'N').charAt(0).toUpperCase()}</span>`;
-                }
-
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'flex-1';
-
-                const nameP = document.createElement('p');
-                nameP.className = 'font-semibold text-gray-800 text-sm';
-                nameP.textContent = member.name || 'Name nicht verfügbar';
-
-                const positionP = document.createElement('p');
-                positionP.className = 'text-fire-600 text-xs';
-                positionP.textContent = member.position || 'Position nicht verfügbar';
-
-                infoDiv.appendChild(nameP);
-                infoDiv.appendChild(positionP);
-
-                if (member.email) {
-                    const emailP = document.createElement('p');
-                    emailP.className = 'text-gray-500 text-xs';
-                    const emailLink = document.createElement('a');
-                    emailLink.href = `mailto:${member.email}`;
-                    emailLink.textContent = member.email;
-                    emailLink.className = 'hover:text-fire-600 transition-colors';
-                    emailP.appendChild(emailLink);
-                    infoDiv.appendChild(emailP);
-                }
-
-                memberDiv.appendChild(avatarDiv);
-                memberDiv.appendChild(infoDiv);
-                container.appendChild(memberDiv);
-            });
-        }
+    } catch (error) {
+        console.error('Fehler beim Laden der Vorstandsmitglieder:', error);
+        vorstandLoading.classList.add('hidden');
+        vorstandError.classList.remove('hidden');
+    }
+}
     </script>
 </body>
 </html>
