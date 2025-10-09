@@ -9,7 +9,7 @@ category: Hauptveranstaltung
 organizer: Stefan Müller
 email: stefan+fwv-raura@juroct.ch
 registrationRequired: true
-registrationDeadline: 2025-10-04T23:59:59
+registrationDeadline: 2025-10-17T23:59:59
 cost: Kostenlos
 status: confirmed
 tags: [Chilbi, Familie, Essen, Tradition, Helfer]
