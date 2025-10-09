@@ -84,21 +84,24 @@
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-bar-18-20 (18:00-20:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- René Käslin
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
 - Brigitte Käslin
 - **[OFFEN - 1 Platz]**
 
 ### sonntag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- René Käslin
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-kueche-20-22 (20:00-22:00) - 2 Personen benötigt
 - Brigitte Käslin
 - **[OFFEN - 1 Platz]**
 
 ### sonntag-bar-22-open (22:00-Open End) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- René Käslin
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-kueche-22-open (22:00-Open End) - 2 Personen benötigt
 - Brigitte Käslin
