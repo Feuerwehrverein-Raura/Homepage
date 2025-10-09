@@ -1,0 +1,67 @@
+name: Generate Vorstand List
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'vorstand/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-list:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+      
+      - name: Generate vorstand list
+        run: |
+          echo "🔍 Scanne vorstand/ Ordner..."
+          
+          # Erstelle JSON mit allen Vorstand-Dateien
+          echo '{
+            "generated": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",
+            "files": [' > vorstand-list.json
+          
+          # Finde alle .md Dateien außer README
+          first=true
+          for file in vorstand/*.md; do
+            # Ignoriere README
+            if [[ "$file" != "vorstand/README.md" ]]; then
+              if [ "$first" = true ]; then
+                first=false
+              else
+                echo ',' >> vorstand-list.json
+              fi
+              echo -n '      "'$file'"' >> vorstand-list.json
+            fi
+          done
+          
+          echo '
+            ]
+          }' >> vorstand-list.json
+          
+          echo "✅ vorstand-list.json erstellt:"
+          cat vorstand-list.json
+      
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          if [[ -n $(git status --porcelain vorstand-list.json) ]]; then
+            git add vorstand-list.json
+            git commit -m "🤖 Auto-update: Vorstand-Liste generiert"
+            git push
+            echo "✅ Änderungen gepusht"
+          else
+            echo "ℹ️ Keine Änderungen"
+          fi
