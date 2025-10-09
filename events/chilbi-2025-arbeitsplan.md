@@ -1,8 +1,8 @@
 ---
 parent_event: chilbi-2025
 title: Arbeitsplan Chilbi 2025
-generated: 2025-10-09T15:32:55.683Z
-last_updated: 2025-10-09T15:32:55.683Z
+generated: 2025-10-09T15:38:51.797Z
+last_updated: 2025-10-09T15:38:51.797Z
 total_shifts: 1
 filled_shifts: 15
 open_shifts: -14
@@ -14,7 +14,7 @@ critical_count: 0
 **Veranstaltung:** Chilbi 2025  
 **Datum:** 18. Oktober-19. Oktober 2025  
 **Ort:** Roter Schopf, Kaiseraugst  
-**Stand:** 9.10.2025, 17:32 Uhr
+**Stand:** 9.10.2025, 17:38 Uhr
 
 ## 📊 Übersicht
 
@@ -64,5 +64,5 @@ critical_count: 0
 
 ---
 
-*Letzte Aktualisierung: 9.10.2025, 17:32 Uhr*  
+*Letzte Aktualisierung: 9.10.2025, 17:38 Uhr*  
 *Automatisch generiert aus Event-Anmeldungen*

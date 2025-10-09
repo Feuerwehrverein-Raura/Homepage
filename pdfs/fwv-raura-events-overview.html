@@ -361,7 +361,46 @@
 
         .print-instructions h3 {
             color: #1976d2;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .print-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .print-btn {
+            background: linear-gradient(135deg, #1976d2, #1565c0);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .print-btn:hover {
+            background: linear-gradient(135deg, #1565c0, #0d47a1);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .print-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .print-btn.secondary {
+            background: linear-gradient(135deg, #757575, #616161);
+        }
+
+        .print-btn.secondary:hover {
+            background: linear-gradient(135deg, #616161, #424242);
         }
 
         .print-instructions kbd {
@@ -447,7 +486,7 @@
             </div>
             <div class="header-right">
                 <div class="info-box">
-                    <div class="info-item"><strong>📄 Generiert:</strong> 9.10.2025 17:33 Uhr</div>
+                    <div class="info-item"><strong>📄 Generiert:</strong> 9.10.2025 17:39 Uhr</div>
                     <div class="info-item"><strong>📊 Events:</strong> 1</div>
                 </div>
             </div>
@@ -483,17 +522,49 @@
             
         </section>
 
-        <!-- Print Instructions -->
+        <!-- Print Instructions and Button -->
         <div class="print-instructions no-print">
             <h3>🖨️ PDF erstellen</h3>
-            <p><strong>So erstellen Sie ein PDF:</strong></p>
+            <div class="print-buttons">
+                <button onclick="printToPDF()" class="print-btn">
+                    📄 Als PDF drucken
+                </button>
+                <button onclick="window.print()" class="print-btn secondary">
+                    🖨️ Drucken
+                </button>
+            </div>
+            <p><strong>Automatischer PDF-Export:</strong></p>
             <ol>
-                <li>Drücken Sie <kbd>Ctrl+P</kbd> (Windows/Linux) oder <kbd>Cmd+P</kbd> (Mac)</li>
-                <li>Wählen Sie "Als PDF speichern" oder "Microsoft Print to PDF"</li>
+                <li>Klicken Sie auf "Als PDF drucken"</li>
+                <li>Das Druckdialog öffnet sich automatisch</li>
+                <li>Wählen Sie "Als PDF speichern" als Ziel</li>
                 <li>Klicken Sie auf "Speichern"</li>
             </ol>
             <p><em>Diese Anweisungen werden nicht mitgedruckt.</em></p>
         </div>
+
+        <script>
+            function printToPDF() {
+                // Auto-open print dialog
+                window.print();
+            }
+
+            // Auto-focus for keyboard shortcuts
+            document.addEventListener('DOMContentLoaded', function() {
+                document.body.tabIndex = 0;
+                document.body.focus();
+                
+                // Add keyboard shortcut
+                document.addEventListener('keydown', function(e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+                        e.preventDefault();
+                        printToPDF();
+                    }
+                });
+                
+                console.log('📄 PDF-Export bereit! Drücken Sie Ctrl+P oder klicken Sie auf "Als PDF drucken"');
+            });
+        </script>
     </div>
 </body>
 </html>
