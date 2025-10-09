@@ -12,7 +12,7 @@
 - Stefan Müller
 - Giuseppe Costanza
 - Brigitte Käslin
-- **[OFFEN - 1 Platz]**
+- Ralf Merten
 
 ## Samstag, 18.10.2025
 
@@ -106,15 +106,19 @@
 
 ## Abbau
 ### abbau (20.10.2025, 18:00-21:00) - 5 Personen benötigt
-- **[OFFEN - 5 Plätze]**
+- René Käslin
+- Stefan Müller
+- Giuseppe Costanza
+- Brigitte Käslin
+- Ralf Merten
 
 ---
 
 ## Statistik
-- **Aufbau:** 4/5 zugeteilt (1 offen)
+- **Aufbau:** 5/5 zugeteilt
 - **Samstag Schichten:** 8/24 zugeteilt (16 offen)
 - **Sonntag Schichten:** 3/24 zugeteilt (21 offen)  
-- **Abbau:** 0/5 zugeteilt (5 offen)
+- **Abbau:** 5/5 zugeteilt
 - **GESAMT:** 15/58 Plätze zugeteilt (**43 Plätze noch offen**)
 
 ---
