@@ -365,12 +365,22 @@
                     const lines = content.split('\n');
                     let currentShiftId = null;
                     
+                    console.log('🔍 DEBUG: Starte Arbeitsplan-Parsing');
+                    console.log(`📄 Content Länge: ${content.length} Zeichen`);
+                    console.log(`📋 Anzahl Zeilen: ${lines.length}`);
+                    
                     for (let i = 0; i < lines.length; i++) {
                         const line = lines[i].trim();
+                        
+                        // Debug für Aufbau-Bereich
+                        if (i >= 8 && i <= 16) {
+                            console.log(`Zeile ${i+1}: "${line}"`);
+                        }
                         
                         // Erkenne Schicht-Header (### schicht-id)
                         if (line.startsWith('### ')) {
                             const headerText = line.replace('### ', '').toLowerCase();
+                            console.log(`🔍 Header gefunden: "${headerText}"`);
                             
                             // Suche nach passender Schicht-ID
                             if (event.shifts) {
@@ -379,7 +389,7 @@
                                         headerText.includes(shift.id.replace(/-/g, ''))) {
                                         currentShiftId = shift.id;
                                         assignments[currentShiftId] = assignments[currentShiftId] || [];
-                                        console.log(`📋 Gefundene Schicht: ${shift.id}`);
+                                        console.log(`📋 ✅ Matched zu Schicht: ${shift.id}`);
                                         break;
                                     }
                                 }
@@ -387,31 +397,43 @@
                         }
                         
                         // Sammle zugeteilte Personen
-                        if (currentShiftId && line.startsWith('- ') && 
-                            !line.includes('**[OFFEN') && 
-                            !line.includes('Personen benötigt')) {
+                        if (currentShiftId && line.startsWith('- ')) {
+                            console.log(`🔍 Prüfe Person-Zeile: "${line}" (Schicht: ${currentShiftId})`);
+                            console.log(`  - Enthält **[OFFEN: ${line.includes('**[OFFEN')}`);
+                            console.log(`  - Enthält Personen benötigt: ${line.includes('Personen benötigt')}`);
                             
-                            let name = line.replace('- ', '').trim();
-                            
-                            // Entferne ✅ falls vorhanden
-                            if (name.startsWith('✅')) {
-                                name = name.replace('✅', '').trim();
-                            }
-                            
-                            // Ignoriere leere Namen oder OFFEN-Plätze
-                            if (name && 
-                                !name.includes('[OFFEN') && 
-                                !name.includes('**[OFFEN') && 
-                                name !== '**[OFFEN - 2 Plätze]**' &&
-                                !assignments[currentShiftId].includes(name)) {
+                            if (!line.includes('**[OFFEN') && !line.includes('Personen benötigt')) {
+                                let name = line.replace('- ', '').trim();
+                                console.log(`  - Name vor ✅-Entfernung: "${name}"`);
                                 
-                                assignments[currentShiftId].push(name);
-                                console.log(`👤 ${currentShiftId}: ${name}`);
+                                // Entferne ✅ falls vorhanden
+                                if (name.startsWith('✅')) {
+                                    name = name.replace('✅', '').trim();
+                                    console.log(`  - Name nach ✅-Entfernung: "${name}"`);
+                                }
+                                
+                                // Ignoriere leere Namen oder OFFEN-Plätze
+                                if (name && 
+                                    !name.includes('[OFFEN') && 
+                                    !name.includes('**[OFFEN') && 
+                                    name !== '**[OFFEN - 2 Plätze]**' &&
+                                    !assignments[currentShiftId].includes(name)) {
+                                    
+                                    assignments[currentShiftId].push(name);
+                                    console.log(`👤 ✅ Person hinzugefügt: ${currentShiftId}: ${name}`);
+                                } else {
+                                    console.log(`  - ❌ Person nicht hinzugefügt (Grund: leer oder OFFEN)`);
+                                }
+                            } else {
+                                console.log(`  - ❌ Zeile übersprungen (OFFEN oder benötigt)`);
                             }
                         }
                         
                         // Reset bei neuen Sections
                         if (line.startsWith('##') || line.startsWith('---')) {
+                            if (currentShiftId) {
+                                console.log(`🔚 Ende von Schicht: ${currentShiftId}`);
+                            }
                             currentShiftId = null;
                         }
                     }
@@ -419,10 +441,12 @@
                     // Berechne Gesamtzahl zugeteilter Schichten
                     filledShifts = Object.values(assignments).reduce((sum, arr) => sum + arr.length, 0);
                     
-                    console.log(`📊 Arbeitsplan geparst: ${filledShifts} Personen auf ${Object.keys(assignments).length} Schichten verteilt`);
+                    console.log(`📊 Arbeitsplan-Parsing abgeschlossen:`);
+                    console.log(`   - ${filledShifts} Personen auf ${Object.keys(assignments).length} Schichten verteilt`);
+                    console.log(`   - Assignments:`, assignments);
                     
                 } catch (error) {
-                    console.error('Fehler beim Parsen des Arbeitsplans:', error);
+                    console.error('❌ Fehler beim Parsen des Arbeitsplans:', error);
                 }
                 
                 return {
