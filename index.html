@@ -506,12 +506,13 @@
     </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeContactForm();
-            setupMobileMenu();
-            setupSmoothScrolling();
-            loadVorstandMembers();
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    initializeContactForm();
+    setupMobileMenu();
+    setupSmoothScrolling();
+    loadVorstandMembers();
+    loadUpcomingEvents();  // ← NEU
+});
 
         function initializeContactForm() {
             const contactForm = document.getElementById('contact-form');
