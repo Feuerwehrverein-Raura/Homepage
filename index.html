@@ -783,7 +783,125 @@ ${name}`;
             });
         }
 
-       async function loadVorstandMembers() {
+        async function loadMemberFromFile(filename) {
+            try {
+                const response = await fetch(filename);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const content = await response.text();
+                const member = parseMemberMarkdown(content, filename);
+                
+                if (!member) {
+                    throw new Error('Konnte Markdown nicht parsen');
+                }
+                
+                console.log(`✅ ${filename} geladen: ${member.position}`);
+                return member;
+                
+            } catch (error) {
+                console.warn(`❌ Fehler beim Laden von ${filename}:`, error.message);
+                return null;
+            }
+        }
+
+        function parseMemberMarkdown(content, filename) {
+            try {
+                const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+                if (!frontmatterMatch) {
+                    console.warn(`Keine Frontmatter in ${filename}`);
+                    return null;
+                }
+
+                const frontmatter = {};
+                const yamlContent = frontmatterMatch[1];
+                const lines = yamlContent.split(/\r?\n/);
+                
+                for (const line of lines) {
+                    const match = line.match(/^(\w+):\s*(.+)$/);
+                    if (match) {
+                        const key = match[1];
+                        let value = match[2].trim();
+                        
+                        // Entferne Anführungszeichen falls vorhanden
+                        if ((value.startsWith('"') && value.endsWith('"')) || 
+                            (value.startsWith("'") && value.endsWith("'"))) {
+                            value = value.slice(1, -1);
+                        }
+                        
+                        // Konvertiere numerische Werte
+                        if (key === 'order' && !isNaN(value)) {
+                            value = parseInt(value);
+                        }
+                        
+                        frontmatter[key] = value;
+                    }
+                }
+
+                // Beschreibung aus dem Markdown-Content extrahieren
+                const descriptionMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n\r?\n([\s\S]+)/);
+                let description = '';
+                if (descriptionMatch) {
+                    description = descriptionMatch[1].trim();
+                    // Entferne Markdown-Syntax für bessere Darstellung
+                    description = description.replace(/#+\s/g, '').replace(/\*\*(.*?)\*\*/g, '$1');
+                }
+
+                return {
+                    position: frontmatter.position || 'Unbekannt',
+                    name: frontmatter.name || 'N/A',
+                    email: frontmatter.email || '',
+                    phone: frontmatter.phone || '',
+                    image: frontmatter.image || '',
+                    order: frontmatter.order || 999,
+                    description: description
+                };
+                
+            } catch (error) {
+                console.error(`Fehler beim Parsen von ${filename}:`, error);
+                return null;
+            }
+        }
+
+        function displayVorstandMembers(members, container) {
+            const membersHtml = members.map(member => {
+                const imageHtml = member.image 
+                    ? `<div class="w-16 h-16 rounded-full overflow-hidden bg-gray-200 mb-3">
+                         <img src="${member.image}" alt="${member.name}" class="w-full h-full object-cover">
+                       </div>`
+                    : `<div class="w-16 h-16 rounded-full bg-fire-500 flex items-center justify-center text-white font-bold text-xl mb-3">
+                         ${member.name.split(' ').map(n => n[0]).join('')}
+                       </div>`;
+
+                const contactInfo = [];
+                if (member.email) {
+                    contactInfo.push(`<a href="mailto:${member.email}" class="text-fire-600 hover:text-fire-700 text-sm">📧 E-Mail</a>`);
+                }
+                if (member.phone) {
+                    contactInfo.push(`<a href="tel:${member.phone}" class="text-fire-600 hover:text-fire-700 text-sm">📞 ${member.phone}</a>`);
+                }
+
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div class="text-center">
+                            ${imageHtml}
+                            <h5 class="font-semibold text-gray-800">${member.position}</h5>
+                            <p class="text-gray-600 text-sm mb-2">${member.name}</p>
+                            ${member.description ? `<p class="text-gray-500 text-xs mb-3 italic">${member.description}</p>` : ''}
+                            <div class="space-y-1">
+                                ${contactInfo.join('<br>')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = membersHtml;
+            console.log(`✅ ${members.length} Vorstandsmitglieder angezeigt`);
+        }
+
+        async function loadVorstandMembers() {
     const vorstandContainer = document.getElementById('vorstand-container');
     const vorstandLoading = document.getElementById('vorstand-loading');
     const vorstandError = document.getElementById('vorstand-error');
