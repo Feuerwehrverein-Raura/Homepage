@@ -17,7 +17,8 @@
 ## Samstag, 18.10.2025
 
 ### samstag-bar-12-14 (12:00-14:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Michèle Killer
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
 - Brigitte Käslin
@@ -30,27 +31,30 @@
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-16-18 (16:00-18:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Marijan Vukadin
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-16-18 (16:00-18:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-18-20 (18:00-20:00) - 2 Personen benötigt
 - Edi Grossenbacher
-- **[OFFEN - 1 Platz]**
+- Marijan Vukadin
 
 ### samstag-kueche-18-20 (18:00-20:00) - 2 Personen benötigt
 - Helen Grossenbacher
 - Ursula Baumgartner
 
 ### samstag-bar-20-22 (20:00-22:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Raphael Kohler
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-20-22 (20:00-22:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### samstag-bar-22-open (22:00-Open End) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Raphael Kohler
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
