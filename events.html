@@ -379,10 +379,16 @@
                         
                         // Erkenne Schicht-Header (### schicht-id)
                         if (line.startsWith('### ')) {
+                            // Wenn wir bereits eine Schicht verarbeiten, schließe sie ab
+                            if (currentShiftId) {
+                                console.log(`🔚 Ende von Schicht: ${currentShiftId} (neuer Header gefunden)`);
+                            }
+                            
                             const headerText = line.replace('### ', '').toLowerCase();
                             console.log(`🔍 Header gefunden: "${headerText}"`);
                             
                             // Suche nach passender Schicht-ID
+                            currentShiftId = null; // Reset zuerst
                             if (event.shifts) {
                                 for (const shift of event.shifts) {
                                     if (headerText.includes(shift.id) || 
@@ -395,9 +401,8 @@
                                 }
                             }
                         }
-                        
                         // Sammle zugeteilte Personen
-                        if (currentShiftId && line.startsWith('- ')) {
+                        else if (currentShiftId && line.startsWith('- ')) {
                             console.log(`🔍 Prüfe Person-Zeile: "${line}" (Schicht: ${currentShiftId})`);
                             console.log(`  - Enthält **[OFFEN: ${line.includes('**[OFFEN')}`);
                             console.log(`  - Enthält Personen benötigt: ${line.includes('Personen benötigt')}`);
@@ -428,13 +433,12 @@
                                 console.log(`  - ❌ Zeile übersprungen (OFFEN oder benötigt)`);
                             }
                         }
-                        
-                        // Reset bei neuen Sections (nur bei ##, nicht bei ---)
-                        if (line.startsWith('##')) {
+                        // Reset bei neuen Sections
+                        else if (line.startsWith('##') || line.startsWith('---')) {
                             if (currentShiftId) {
-                                console.log(`🔚 Ende von Schicht: ${currentShiftId}`);
+                                console.log(`🔚 Ende von Schicht: ${currentShiftId} (Sektion-Ende)`);
+                                currentShiftId = null;
                             }
-                            currentShiftId = null;
                         }
                     }
                     
