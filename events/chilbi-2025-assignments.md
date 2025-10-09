@@ -112,10 +112,10 @@
 
 ## Statistik
 - **Aufbau:** 4/5 zugeteilt (1 offen)
-- **Samstag Schichten:** 3/24 zugeteilt (21 offen)
+- **Samstag Schichten:** 8/24 zugeteilt (16 offen)
 - **Sonntag Schichten:** 3/24 zugeteilt (21 offen)  
 - **Abbau:** 0/5 zugeteilt (5 offen)
-- **GESAMT:** 10/58 Plätze zugeteilt (**48 Plätze noch offen**)
+- **GESAMT:** 15/58 Plätze zugeteilt (**43 Plätze noch offen**)
 
 ---
 
