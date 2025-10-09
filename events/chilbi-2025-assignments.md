@@ -13,9 +13,6 @@
 - Giuseppe Costanza
 - **[OFFEN - 2 Plätze]**
 
-
----
-
 ## Samstag, 18.10.2025
 
 ### samstag-bar-12-14 (12:00-14:00) - 2 Personen benötigt
