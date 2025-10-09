@@ -732,24 +732,50 @@ class EventsManager {
             shiftSelection.classList.remove('hidden');
             participantsSection.classList.add('hidden');
             
+            const arbeitsplan = this.arbeitsplanData[event.id] || { assignments: {} };
+            
             const shiftsContainer = document.getElementById('shifts-container');
-            shiftsContainer.innerHTML = event.shifts.map(shift => `
-                <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                    <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" onchange="window.eventsManager.toggleShift('${shift.id}')">
-                    <div class="flex-1">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <p class="font-medium text-gray-800">${shift.name}</p>
-                                <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
-                                <p class="text-xs text-gray-500">${shift.description}</p>
-                            </div>
-                            <span class="text-xs bg-fire-100 text-fire-800 px-2 py-1 rounded-full">
-                                ${shift.needed} benötigt
-                            </span>
+            shiftsContainer.innerHTML = event.shifts.map(shift => {
+                const assignments = arbeitsplan.assignments[shift.id] || [];
+                const remainingSpots = shift.needed - assignments.length;
+                const isFullyBooked = remainingSpots <= 0;
+                
+                let assignedHTML = '';
+                if (assignments.length > 0) {
+                    assignedHTML = `
+                        <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                            <p class="font-medium text-green-800 mb-1">Bereits zugewiesen:</p>
+                            ${assignments.map(person => `<span class="text-green-700">✅ ${person}</span>`).join('<br>')}
                         </div>
-                    </div>
-                </label>
-            `).join('');
+                    `;
+                }
+                
+                return `
+                    <label class="flex items-start space-x-3 p-3 border border-gray-200 rounded-lg ${isFullyBooked ? 'bg-gray-100 opacity-75' : 'hover:bg-gray-50 cursor-pointer'} transition-colors">
+                        <input type="checkbox" value="${shift.id}" class="shift-checkbox mt-1 text-fire-500 focus:ring-fire-500" 
+                               ${isFullyBooked ? 'disabled' : ''} 
+                               onchange="window.eventsManager.toggleShift('${shift.id}')">
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-800">${shift.name}</p>
+                                    <p class="text-sm text-gray-600">${shift.date} • ${shift.time}</p>
+                                    <p class="text-xs text-gray-500">${shift.description}</p>
+                                    ${assignedHTML}
+                                </div>
+                                <div class="ml-3 text-right">
+                                    <span class="text-xs ${isFullyBooked ? 'bg-red-100 text-red-800' : remainingSpots <= 2 ? 'bg-yellow-100 text-yellow-800' : 'bg-fire-100 text-fire-800'} px-2 py-1 rounded-full block mb-1">
+                                        ${isFullyBooked ? 'Voll besetzt' : `${remainingSpots} offen`}
+                                    </span>
+                                    <span class="text-xs text-gray-500">
+                                        ${shift.needed} gesamt
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </label>
+                `;
+            }).join('');
         } else if (event.participantRegistration) {
             shiftSelection.classList.add('hidden');
             participantsSection.classList.remove('hidden');
