@@ -67,13 +67,15 @@
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Ursula Meyer
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
 ### sonntag-kueche-14-16 (14:00-16:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Ursula Meyer ?
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-bar-16-18 (16:00-18:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**

@@ -1297,34 +1297,77 @@
                     </div>
                 `;
                 
-                // Group shifts by date
-                const shiftsByDate = {};
-                if (event.shifts) {
-                    event.shifts.forEach(shift => {
-                        if (!shiftsByDate[shift.date]) {
-                            shiftsByDate[shift.date] = {};
-                        }
-                        
-                        const timeMatch = shift.time.match(/(\d+:\d+)-(\d+:\d+|Open End)/);
-                        const time = timeMatch ? timeMatch[0] : shift.time;
-                        
-                        if (!shiftsByDate[shift.date][time]) {
-                            shiftsByDate[shift.date][time] = {};
-                        }
-                        
-                        let type = 'Sonstige';
-                        if (shift.name.toLowerCase().includes('bar')) type = 'Bar';
-                        else if (shift.name.toLowerCase().includes('küche')) type = 'Küche';
-                        else if (shift.name.toLowerCase().includes('kasse')) type = 'Kasse';
-                        else if (shift.name.toLowerCase().includes('aufbau')) type = 'Aufbau';
-                        else if (shift.name.toLowerCase().includes('abbau')) type = 'Abbau';
-                        
-                        shiftsByDate[shift.date][time][type] = {
-                            shift: shift,
-                            assignments: arbeitsplan.assignments[shift.id] || []
-                        };
-                    });
-                }
+        // Separate regular shifts from special shifts (Aufbau/Abbau)
+        const regularShifts = event.shifts ? event.shifts.filter(s => 
+            !s.name.toLowerCase().includes('aufbau') && 
+            !s.name.toLowerCase().includes('abbau')
+        ) : [];
+        
+        const specialShifts = event.shifts ? event.shifts.filter(s => 
+            s.name.toLowerCase().includes('aufbau') || 
+            s.name.toLowerCase().includes('abbau')
+        ) : [];
+        
+        // Add special shifts section
+        if (specialShifts.length > 0) {
+            specialShifts.forEach(shift => {
+                const assignments = arbeitsplan.assignments[shift.id] || [];
+                const isAufbau = shift.name.toLowerCase().includes('aufbau');
+                const title = isAufbau ? 'Aufbau' : 'Abbau';
+                
+                html += `
+                    <div class="mb-8">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">${title}</h3>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="font-medium">${shift.date} • ${shift.time}</span>
+                                <span class="text-sm text-gray-600">${shift.needed} Personen benötigt</span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                ${assignments.map(person => `
+                                    <div class="flex items-center space-x-2 bg-green-50 border border-green-200 rounded px-3 py-2">
+                                        <span class="text-green-600">✅</span>
+                                        <span class="text-green-800 font-medium">${person}</span>
+                                    </div>
+                                `).join('')}
+                                ${Array(Math.max(0, shift.needed - assignments.length)).fill().map(() => `
+                                    <div class="flex items-center space-x-2 bg-red-50 border border-red-200 rounded px-3 py-2">
+                                        <span class="text-red-600">❌</span>
+                                        <span class="text-red-700">Offen</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            ${shift.description ? `<p class="text-sm text-gray-600 mt-2">${shift.description}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        // Group regular shifts by date
+        const shiftsByDate = {};
+        regularShifts.forEach(shift => {
+            if (!shiftsByDate[shift.date]) {
+                shiftsByDate[shift.date] = {};
+            }
+            
+            const timeMatch = shift.time.match(/(\d+:\d+)-(\d+:\d+|Open End)/);
+            const time = timeMatch ? timeMatch[0] : shift.time;
+            
+            if (!shiftsByDate[shift.date][time]) {
+                shiftsByDate[shift.date][time] = {};
+            }
+            
+            let type = 'Service / Kasse';
+            if (shift.name.toLowerCase().includes('bar')) type = 'Bar';
+            else if (shift.name.toLowerCase().includes('küche')) type = 'Küche';
+            else if (shift.name.toLowerCase().includes('kasse')) type = 'Service / Kasse';
+            
+            shiftsByDate[shift.date][time][type] = {
+                shift: shift,
+                assignments: arbeitsplan.assignments[shift.id] || []
+            };
+        });
                 
                 Object.keys(shiftsByDate).sort().forEach(date => {
                     const dateObj = new Date(date);
