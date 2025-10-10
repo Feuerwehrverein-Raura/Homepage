@@ -18,8 +18,11 @@ class ICSGenerator {
         console.log(`📁 Found ${files.length} files in events directory`);
         
         for (const file of files) {
-            // Skip non-markdown files and assignment files
-            if (!file.endsWith('.md') || file.includes('assignment') || file === 'README.md') {
+            // Skip non-markdown files, assignment files, arbeitsplan files, and README
+            if (!file.endsWith('.md') || 
+                file.includes('assignment') || 
+                file.includes('arbeitsplan') ||
+                file === 'README.md') {
                 console.log(`⏭️  Skipping: ${file}`);
                 continue;
             }
