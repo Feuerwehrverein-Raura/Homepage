@@ -150,6 +150,7 @@
           };
 
           const generateQRCodeImage = () => {
+            const data = generateQRCodeData();
             return `data:image/svg+xml,${encodeURIComponent(`
               <svg width="166" height="166" xmlns="http://www.w3.org/2000/svg">
                 <rect width="166" height="166" fill="white"/>
@@ -174,6 +175,124 @@
               </svg>
             `)}`;
           };
+
+          const generateQRCodeData = () => {
+            const lines = [];
+            
+            // Header (obligatorisch)
+            lines.push('SPC');  // QRType
+            lines.push('0200'); // Version
+            lines.push('1');    // Coding (UTF-8 restricted)
+            
+            // Zahlungsempfänger (CdtrInf) - obligatorisch
+            lines.push(creditor.iban.replace(/\s/g, ''));
+            lines.push('S');  // Adress-Typ (Strukturiert)
+            lines.push(creditor.name);
+            lines.push(creditor.street);
+            lines.push(creditor.buildingNumber);
+            lines.push(creditor.postalCode);
+            lines.push(creditor.city);
+            lines.push(creditor.country);
+            
+            // 7 leere Zeilen für kombinierte Adresse (nicht verwendet)
+            for(let i = 0; i < 7; i++) lines.push('');
+            
+            // Betrag (CcyAmt)
+            lines.push(amount.amount || '');
+            lines.push(amount.currency);
+            
+            // Zahlungspflichtiger (UltmtDbtr) - optional, aber Struktur muss sein
+            lines.push('');  // Adress-Typ leer = nicht verwendet
+            lines.push('');  // Name
+            lines.push('');  // Strasse
+            lines.push('');  // Hausnummer
+            lines.push('');  // PLZ
+            lines.push('');  // Ort
+            lines.push('');  // Land
+            
+            // 7 leere Zeilen für kombinierte Adresse
+            for(let i = 0; i < 7; i++) lines.push('');
+            
+            // Referenz (RmtInf)
+            lines.push(reference.type);
+            lines.push(reference.reference.replace(/\s/g, '') || '');
+            
+            // Zusätzliche Informationen (AddInf)
+            lines.push(additionalInfo.unstructuredMessage || '');
+            lines.push('EPD');  // Trailer
+            lines.push('');     // Bill Information (leer)
+            
+            return lines.join('\r\n');
+          };
+
+          // QR Code Generator Hook
+          React.useEffect(() => {
+            const qrContainer = document.getElementById('qr-code-container');
+            if (qrContainer && typeof QRCode !== 'undefined') {
+              qrContainer.innerHTML = '';
+              
+              const qrData = generateQRCodeData();
+              
+              try {
+                new QRCode(qrContainer, {
+                  text: qrData,
+                  width: 174,   // 46mm bei 96 DPI ≈ 174px
+                  height: 174,
+                  colorDark: '#000000',
+                  colorLight: '#ffffff',
+                  correctLevel: QRCode.CorrectLevel.M  // Fehlerkorrekturstufe M (15%)
+                });
+                
+                // Swiss Cross hinzufügen
+                setTimeout(() => {
+                  const qrImg = qrContainer.querySelector('img');
+                  if (qrImg) {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = 174;
+                    canvas.height = 174;
+                    
+                    const img = new Image();
+                    img.onload = () => {
+                      ctx.drawImage(img, 0, 0);
+                      
+                      // Swiss Cross zeichnen (7x7mm = ca. 26px bei 96 DPI)
+                      const crossSize = 26;
+                      const crossX = (174 - crossSize) / 2;
+                      const crossY = (174 - crossSize) / 2;
+                      
+                      // Weisser Hintergrund
+                      ctx.fillStyle = '#ffffff';
+                      ctx.fillRect(crossX, crossY, crossSize, crossSize);
+                      
+                      // Schwarzer Rahmen
+                      ctx.strokeStyle = '#000000';
+                      ctx.lineWidth = 1;
+                      ctx.strokeRect(crossX, crossY, crossSize, crossSize);
+                      
+                      // Schweizer Kreuz
+                      ctx.fillStyle = '#000000';
+                      const crossThick = 5;
+                      const crossLen = 16;
+                      const centerX = crossX + crossSize / 2;
+                      const centerY = crossY + crossSize / 2;
+                      
+                      // Vertikaler Balken
+                      ctx.fillRect(centerX - crossThick / 2, centerY - crossLen / 2, crossThick, crossLen);
+                      // Horizontaler Balken
+                      ctx.fillRect(centerX - crossLen / 2, centerY - crossThick / 2, crossLen, crossThick);
+                      
+                      qrImg.src = canvas.toDataURL();
+                    };
+                    img.src = qrImg.src;
+                  }
+                }, 100);
+              } catch (error) {
+                console.error('QR Code generation error:', error);
+                qrContainer.innerHTML = '<div class="text-red-600 text-sm">QR Code konnte nicht generiert werden</div>';
+              }
+            }
+          }, [creditor, amount, reference, additionalInfo]);
 
           const formatIBAN = (iban) => {
             const clean = iban.replace(/\s/g, '');
