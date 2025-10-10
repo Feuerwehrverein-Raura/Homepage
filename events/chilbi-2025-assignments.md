@@ -35,10 +35,11 @@
 
 ### samstag-bar-16-18 (16:00-18:00) - 2 Personen benötigt
 - Marijan Vukadin
-- Stefan Müller
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-16-18 (16:00-18:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Stefan Müller
+- **[OFFEN - 1 Platz]**
 
 ### samstag-bar-18-20 (18:00-20:00) - 2 Personen benötigt
 - Edi Grossenbacher
