@@ -17,14 +17,16 @@
 ## Samstag, 18.10.2025
 
 ### samstag-bar-12-14 (12:00-14:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Ramon Kahl
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
 - Brigitte Käslin
 - **[OFFEN - 1 Platz]**
 
 ### samstag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Ramon Kahl
+- **[OFFEN - 1 Platz]**
 
 ### samstag-kueche-14-16 (14:00-16:00) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
