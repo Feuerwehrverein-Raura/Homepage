@@ -13,6 +13,8 @@
 - Giuseppe Costanza
 - Brigitte Käslin
 - Ralf Merten
+- Ramon Kahl
+- Paola Meixueiro 
 
 ## Samstag, 18.10.2025
 
@@ -118,6 +120,8 @@
 - Giuseppe Costanza
 - Brigitte Käslin
 - Ralf Merten
+- Ramon Kahl
+- Paola Meixueiro
 
 ---
 
