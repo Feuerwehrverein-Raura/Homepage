@@ -1,145 +1,319 @@
-# 📄 PDF-Generator für Feuerwehrverein Raura
+# 📄 PDF Output Directory
 
-Dieses Verzeichnis enthält die generierten druckbaren HTML-Dateien für die Schichtpläne und Event-Übersichten des Feuerwehrvereins Raura.
-
-## 🎯 Übersicht
-
-Die PDF-Funktionalität generiert druckoptimierte HTML-Dateien, die einfach in jeden Browser geladen und als PDF gedruckt werden können.
-
-### Generierte Dateien
-
-- **Event-Arbeitspläne**: `{event-id}-arbeitsplan.html`
-  - Detaillierte Schichtpläne für spezifische Events
-  - Übersichtliche Tabellen nach Kategorien (Aufbau, Samstag, Sonntag, Abbau)
-  - Status-Anzeigen für kritische Schichten
-  - Kontaktinformationen
-
-- **Gesamt-Übersicht**: `fwv-raura-events-overview.html`
-  - Übersicht über alle Events
-  - Zusammenfassung der Schicht-Statistiken
-  - Kritische Bereiche auf einen Blick
-
-## 🖨️ PDF erstellen
-
-### Schritt-für-Schritt Anleitung:
-
-1. **HTML-Datei öffnen**
-   - Doppelklick auf die gewünschte `.html` Datei
-   - Datei öffnet sich im Standard-Browser
-
-2. **Drucken starten**
-   - **Windows/Linux**: `Ctrl + P`
-   - **Mac**: `Cmd + P`
-
-3. **PDF-Optionen wählen**
-   - **Ziel**: "Als PDF speichern" oder "Microsoft Print to PDF"
-   - **Layout**: Hochformat (empfohlen)
-   - **Papierformat**: A4
-   - **Ränder**: Standard oder schmal
-
-4. **PDF speichern**
-   - Dateiname eingeben
-   - Speicherort wählen
-   - "Speichern" klicken
-
-## 🔧 Generierung
-
-### Automatische Generierung
-
-```bash
-# Alle Schichtpläne und PDFs generieren
-npm run generate-shifts
-
-# Oder direkt:
-node scripts/generate-shift-plans.js
-```
-
-### Test-Generierung
-
-```bash
-# Test-PDFs mit Beispieldaten generieren
-node scripts/test-pdf.js
-```
-
-## 📋 Features
-
-### ✅ Implementiert
-
-- **Druckoptimierte Layouts**: Speziell für A4-Druck optimiert
-- **Responsive Design**: Automatische Anpassung an verschiedene Bildschirmgrößen
-- **Farb-kodierte Status**: Grün (besetzt), Orange (teilweise), Rot (kritisch)
-- **Professionelle Gestaltung**: FWV Raura Branding und Logo
-- **Kategorisierte Schichten**: Aufbau, Tagesbetrieb, Abbau
-- **Statistik-Dashboard**: Visueller Fortschrittsbalken und Kennzahlen
-- **Kontaktinformationen**: Springer-System und Koordination
-- **Print-Anweisungen**: Eingebaute Hilfe für PDF-Erstellung
-
-### 🚀 Erweiterte Funktionen
-
-- **Kritische Schichten Hervorhebung**: Automatische Warnung bei unbesetzten Schichten
-- **Zeitslot-Gruppierung**: Übersichtliche Darstellung nach Uhrzeiten
-- **Bereich-Sortierung**: Bar, Küche, Kasse logisch angeordnet
-- **Fortschrittsanzeige**: Prozentuale Besetzung auf einen Blick
-
-## 🎨 Design-Features
-
-### Farbschema
-- **Hauptfarbe**: FWV Raura Rot (#d32f2f)
-- **Erfolg**: Grün (#4caf50) für vollständig besetzte Schichten
-- **Warnung**: Orange (#ff9800) für teilweise besetzte Schichten
-- **Kritisch**: Rot (#f44336) für unbesetzte Schichten
-
-### Layout
-- **Header**: Logo, Titel und Event-Informationen
-- **Dashboard**: Statistiken und Fortschrittsbalken
-- **Schicht-Tabellen**: Kategorisiert und farbkodiert
-- **Footer**: Kontaktinformationen und Springer-System
-
-## 🔄 Aktualisierung
-
-Die HTML-Dateien werden automatisch bei jeder Ausführung des Generators aktualisiert und enthalten:
-
-- **Zeitstempel**: Wann die Datei generiert wurde
-- **Aktuelle Daten**: Neueste Schicht-Anmeldungen
-- **Dynamische Statistiken**: Live-Berechnung der Besetzung
-
-## 📱 Browser-Kompatibilität
-
-Die generierten HTML-Dateien funktionieren in allen modernen Browsern:
-
-- ✅ Google Chrome (empfohlen für beste PDF-Qualität)
-- ✅ Mozilla Firefox
-- ✅ Microsoft Edge
-- ✅ Safari
-- ✅ Opera
-
-## 🛠️ Technische Details
-
-### Verwendete Technologien
-- **HTML5**: Semantische Struktur
-- **CSS3**: Moderne Styling-Features
-- **Print CSS**: Spezielle Regeln für Druckausgabe
-- **Responsive Design**: Flexibles Grid-System
-
-### Datei-Struktur
-```
-pdfs/
-├── README.md                           # Diese Datei
-├── {event-id}-arbeitsplan.html         # Event-spezifische Arbeitspläne
-├── test-event-arbeitsplan.html         # Test-Arbeitsplan
-└── fwv-raura-events-overview.html      # Gesamt-Übersicht
-```
-
-## 📞 Support
-
-Bei Fragen oder Problemen mit der PDF-Generierung:
-
-**Technischer Support**: Stefan Müller  
-📧 aktuar@fwv-raura.ch
-
-**Schichtkoordination**: Siehe jeweilige Event-Details  
+This directory contains automatically generated PDF work schedules (Arbeitspläne) for events with shift assignments.
 
 ---
 
-*Automatisch generiert durch den FWV Raura PDF-Generator*  
-*Letzte Aktualisierung: ${new Date().toLocaleDateString('de-DE')}*
+## 📁 Directory Contents
+
+### **Generated Files**
+
+```
+pdfs/
+├── arbeitsplan-[event-id].pdf      # Individual shift plan PDF
+├── arbeitsplan-[event-id].html     # HTML source for PDF
+└── overview-all-events.pdf         # Overview of all events
+```
+
+### **Examples**
+
+```
+pdfs/
+├── arbeitsplan-chilbi-2024.pdf
+├── arbeitsplan-chilbi-2024.html
+├── arbeitsplan-chilbi-2025.pdf
+├── arbeitsplan-chilbi-2025.html
+└── overview-all-events.pdf
+```
+
+---
+
+## 🎯 Purpose
+
+**Individual Event PDFs:**
+- Complete work schedule for a specific event
+- Includes all shifts grouped by category (Aufbau, Betrieb, Abbau)
+- Shows assigned personnel for each shift
+- Lists available "Springer" (flexible helpers)
+- Ready to print and distribute
+
+**Overview PDF:**
+- Summary of all upcoming events
+- Statistics for each event
+- Overview of staffing status
+- Planning tool for event coordinators
+
+---
+
+## 📋 PDF Format
+
+### **Structure**
+
+The PDFs follow the traditional "Arbeitsplan Chilbi" format:
+
+```
+┌─────────────────────────────────────────────────┐
+│  Feuerwehrverein Raura, Kaiseraugst             │
+│  Arbeitsplan [Event Title]                      │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  Aufbau [Date] ab [Time] für [Event]           │
+│  - Person 1                                      │
+│  - Person 2                                      │
+│  - ...                                           │
+│                                                  │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  [Day], [Date]    Küche      Bar      Kasse    │
+│  ─────────────────────────────────────────────  │
+│  12:00-14:00    - Name 1   - Name 2   - Name 3  │
+│                 -          -          -          │
+│  14:00-16:00    - Name 4   - Name 5   - Name 6  │
+│                 -          -          -          │
+│  ...                                             │
+│                                                  │
+├─────────────────────────────────────────────────┤
+│                                                  │
+│  Springer: Name 1, Name 2, ...                   │
+│                                                  │
+│  Abbau [Date]                                    │
+│  - Person X                                      │
+│  - Person Y                                      │
+│  - ...                                           │
+│                                                  │
+└─────────────────────────────────────────────────┘
+```
+
+### **Sections**
+
+1. **Header**
+   - Verein name and logo
+   - Event title and dates
+   
+2. **Aufbau (Setup)**
+   - Date and time
+   - List of assigned people
+   - Open positions marked
+
+3. **Betrieb (Operations)**
+   - Table format with time slots
+   - Columns: Küche, Bar, Service/Kasse
+   - Multiple rows for different time periods
+   - Empty rows for unassigned positions
+
+4. **Springer (Flexible Helpers)**
+   - List of people available for backup
+   - Can fill in for any position
+
+5. **Abbau (Teardown)**
+   - Date and time
+   - List of assigned people
+   - Open positions marked
+
+---
+
+## 🔧 Generation
+
+### **Automatic Generation**
+
+PDFs are generated by the script:
+```bash
+npm run generate-pdfs
+# or
+node scripts/generate-shift-plans.js
+```
+
+### **Requirements**
+
+**Input Files:**
+- `events/[event-id].md` - Event definition with shifts
+- `events/[event-id]-assignments.md` - Shift assignments
+
+**Dependencies:**
+- Puppeteer ^21.0.0
+- Node.js >= 14.0.0
+
+### **Process**
+
+1. Script reads event markdown files
+2. Parses shift definitions and assignments
+3. Generates HTML from template
+4. Converts HTML to PDF using Puppeteer
+5. Saves both HTML and PDF versions
+
+---
+
+## 📊 File Information
+
+### **PDF Specifications**
+
+- **Format:** A4 (210mm × 297mm)
+- **Orientation:** Portrait
+- **Margins:** 20mm all sides
+- **Font:** Arial, sans-serif
+- **Colors:** Black text, red accents
+
+### **Typical File Sizes**
+
+| File Type | Size Range |
+|-----------|------------|
+| Individual PDF | 30-60 KB |
+| Overview PDF | 40-80 KB |
+| HTML Source | 10-20 KB |
+
+---
+
+## 🔄 Usage
+
+### **Viewing PDFs**
+
+```bash
+# Open in default PDF viewer
+open pdfs/arbeitsplan-chilbi-2025.pdf        # macOS
+xdg-open pdfs/arbeitsplan-chilbi-2025.pdf    # Linux
+start pdfs/arbeitsplan-chilbi-2025.pdf       # Windows
+```
+
+### **Printing**
+
+**Recommended Print Settings:**
+- Paper: A4
+- Orientation: Portrait
+- Scale: 100%
+- Margins: Default
+- Quality: High
+
+### **Sharing**
+
+PDFs can be:
+- ✅ Emailed to event coordinators
+- ✅ Printed and posted at event location
+- ✅ Shared via cloud storage
+- ✅ Published on website (if desired)
+
+---
+
+## 🐛 Troubleshooting
+
+### **Problem: PDFs not generating**
+
+**Check:**
+```bash
+# Verify Puppeteer is installed
+npm list puppeteer
+
+# Reinstall if necessary
+npm install puppeteer
+
+# Run test script
+npm test
+```
+
+### **Problem: PDF layout is broken**
+
+**Solution:**
+- Check HTML source file
+- Verify CSS is properly included
+- Ensure all data is properly escaped
+- Test with smaller dataset first
+
+### **Problem: Missing personnel in PDF**
+
+**Check:**
+- Assignment file exists: `events/[event-id]-assignments.md`
+- Assignment format is correct
+- Shift IDs match between event and assignment files
+- Names are properly formatted
+
+---
+
+## 📝 HTML Templates
+
+### **HTML Source Files**
+
+The `.html` files in this directory are:
+- Intermediate files used for PDF generation
+- Can be opened in browser for preview
+- Useful for debugging layout issues
+- Can be styled independently if needed
+
+### **Template Customization**
+
+To modify the PDF layout:
+1. Edit template in `scripts/generate-shift-plans.js`
+2. Look for `generateHTML()` method
+3. Modify HTML structure or CSS
+4. Regenerate PDFs to see changes
+
+---
+
+## 🔒 Security & Privacy
+
+### **Important Notes**
+
+- ⚠️ PDFs contain names of volunteers
+- ⚠️ Consider privacy before publishing
+- ⚠️ PDFs should only be shared with authorized personnel
+- ⚠️ Not recommended to commit PDFs to public repo
+
+### **Recommendations**
+
+- ✅ Add `pdfs/*.pdf` to `.gitignore` if privacy is a concern
+- ✅ Generate PDFs locally for internal use
+- ✅ Use secure channels for distribution
+- ✅ Consider password-protecting sensitive PDFs
+
+---
+
+## 🔄 Maintenance
+
+### **Cleanup**
+
+```bash
+# Remove all generated PDFs
+rm pdfs/*.pdf
+
+# Remove all generated HTML
+rm pdfs/*.html
+
+# Remove all generated files
+rm pdfs/*
+```
+
+### **Regeneration**
+
+```bash
+# Regenerate all PDFs
+npm run generate-pdfs
+
+# This will:
+# - Scan all events in events/ directory
+# - Find corresponding assignment files
+# - Generate new PDFs for all events
+# - Create overview PDF
+```
+
+---
+
+## 📚 Related Documentation
+
+- [Main README](../README.md) - Project overview
+- [Events README](../events/README.md) - Event management
+- [Scripts README](../scripts/README.md) - Script documentation
+- [Schichtplan Manager](../schichtplan-manager.html) - Interactive tool
+
+---
+
+## 🆘 Support
+
+**Issues with PDF generation:**
+- 📧 Technical: webmaster@feuerwehrverein-raura.ch
+- 🐛 Bug Reports: [GitHub Issues](https://github.com/Feuerwehrverein-Raura/Homepage/issues)
+- 📖 Documentation: See [scripts/README.md](../scripts/README.md)
+
+---
+
+**Note:** This directory is primarily for generated output. Manual edits to files here will be overwritten when PDFs are regenerated.
+
+**Last Updated:** October 2025  
+**Maintained by:** Feuerwehrverein Raura IT Team
