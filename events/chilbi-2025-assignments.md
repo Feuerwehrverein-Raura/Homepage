@@ -17,8 +17,7 @@
 ## Samstag, 18.10.2025
 
 ### samstag-bar-12-14 (12:00-14:00) - 2 Personen benötigt
-- Michèle Killer
-- **[OFFEN - 1 Platz]**
+- **[OFFEN - 2 Plätze]**
 
 ### samstag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
 - Brigitte Käslin
@@ -64,7 +63,8 @@
 ## Sonntag, 19.10.2025
 
 ### sonntag-bar-12-14 (12:00-14:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Michèle Killer
+- **[OFFEN - 1 Platz]**
 
 ### sonntag-kueche-12-14 (12:00-14:00) - 2 Personen benötigt
 - Ursula Meyer
