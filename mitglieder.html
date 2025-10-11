@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mitgliederliste - Feuerwehrverein Raura</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -236,6 +237,12 @@
                     >
                         📥 CSV Export
                     </button>
+                    <button 
+                        onclick="exportToExcel()" 
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        📊 Excel Export
+                    </button>
                 </div>
             </div>
             
@@ -247,14 +254,23 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Vorname</th>
+                                <th>Anrede</th>
+                                <th>Geburtstag</th>
+                                <th>Alter</th>
                                 <th>Status</th>
                                 <th>Funktion</th>
-                                <th>Adresse</th>
+                                <th>Strasse</th>
+                                <th>PLZ</th>
+                                <th>Ort</th>
                                 <th>Telefon</th>
                                 <th>Mobile</th>
                                 <th>E-Mail</th>
+                                <th>Versand-Email</th>
                                 <th>Eintritt</th>
                                 <th>Jahre</th>
+                                <th>IBAN</th>
+                                <th>Zustellung</th>
+                                <th>Bemerkungen</th>
                             </tr>
                         </thead>
                         <tbody id="membersTableBody">
@@ -388,14 +404,23 @@
                     <tr>
                         <td class="font-semibold">${member.Name || '-'}</td>
                         <td>${member.Vorname || '-'}</td>
+                        <td>${member.Anrede || '-'}</td>
+                        <td>${member.Geburtstag || '-'}</td>
+                        <td>${member['Geburtstag (Alter)'] || '-'}</td>
                         <td><span class="status-badge ${statusClass}">${member.Status || '-'}</span></td>
                         <td>${member.Funktion || '-'}</td>
-                        <td>${member.Strasse ? `${member.Strasse}, ${member.PLZ} ${member.Ort}` : '-'}</td>
+                        <td>${member.Strasse || '-'}</td>
+                        <td>${member.PLZ || '-'}</td>
+                        <td>${member.Ort || '-'}</td>
                         <td>${member.Telefon || '-'}</td>
                         <td>${member.Mobile || '-'}</td>
                         <td>${member['E-Mail'] ? `<a href="mailto:${member['E-Mail']}" class="text-red-600 hover:underline">${member['E-Mail']}</a>` : '-'}</td>
+                        <td>${member['Versand-Email'] || '-'}</td>
                         <td>${member.Eintrittsdatum || '-'}</td>
                         <td>${member['Eintrittsdatum (Jahre)'] || '-'}</td>
+                        <td class="text-xs">${member.IBAN || '-'}</td>
+                        <td>${member.Zustellung || '-'}</td>
+                        <td class="text-xs">${member.Bemerkungen || '-'}</td>
                     </tr>
                 `;
             }).join('');
@@ -427,23 +452,42 @@
         
         // CSV Export
         function exportToCSV() {
-            const headers = ['Name', 'Vorname', 'Status', 'Funktion', 'Strasse', 'PLZ', 'Ort', 'Telefon', 'Mobile', 'E-Mail', 'Eintritt', 'Jahre'];
+            const headers = [
+                'Mitglied', 'Vorname', 'Name', 'Adresszusatz', 'Anrede', 
+                'Geburtstag', 'Alter', 'Eintrittsdatum', 'Jahre', 
+                'Status', 'Funktion', 'Austrittsdatum', 'Austrittsdatum (Jahre)',
+                'Strasse', 'PLZ', 'Ort', 
+                'Telefon', 'Mobile', 'E-Mail', 'Versand-Email', 
+                'IBAN', 'Zustellung', 'Bemerkungen', 'Geschlecht'
+            ];
             
             const csvContent = [
                 headers.join(';'),
                 ...CONFIG.membersData.map(m => [
-                    m.Name || '',
+                    m.Mitglied || '',
                     m.Vorname || '',
+                    m.Name || '',
+                    m.Adresszusatz || '',
+                    m.Anrede || '',
+                    m.Geburtstag || '',
+                    m['Geburtstag (Alter)'] || '',
+                    m.Eintrittsdatum || '',
+                    m['Eintrittsdatum (Jahre)'] || '',
                     m.Status || '',
                     m.Funktion || '',
+                    m.Austrittsdatum || '',
+                    m['Austrittsdatum (Jahre)'] || '',
                     m.Strasse || '',
                     m.PLZ || '',
                     m.Ort || '',
                     m.Telefon || '',
                     m.Mobile || '',
                     m['E-Mail'] || '',
-                    m.Eintrittsdatum || '',
-                    m['Eintrittsdatum (Jahre)'] || ''
+                    m['Versand-Email'] || '',
+                    m.IBAN || '',
+                    m.Zustellung || '',
+                    m.Bemerkungen || '',
+                    m.Geschlecht || ''
                 ].join(';'))
             ].join('\n');
             
@@ -452,6 +496,94 @@
             link.href = URL.createObjectURL(blob);
             link.download = `mitglieder_fwv_raura_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
+        }
+        
+        // Excel Export
+        function exportToExcel() {
+            // Erstelle Arbeitsblatt-Daten
+            const wsData = [
+                // Header
+                [
+                    'Mitglied', 'Vorname', 'Name', 'Adresszusatz', 'Anrede', 
+                    'Geburtstag', 'Alter', 'Eintrittsdatum', 'Jahre', 'Mitgliederbild',
+                    'Status', 'Funktion', 'Austrittsdatum', 'Austrittsdatum (Jahre)',
+                    'Strasse', 'PLZ', 'Ort', 
+                    'Telefon', 'Mobile', 'E-Mail', 'Versand-Email', 
+                    'IBAN', 'Zusatz bei Mann (r)', 'Zustellung', 'Bemerkungen', 'Geschlecht'
+                ],
+                // Datenzeilen
+                ...CONFIG.membersData.map(m => [
+                    m.Mitglied || '',
+                    m.Vorname || '',
+                    m.Name || '',
+                    m.Adresszusatz || '',
+                    m.Anrede || '',
+                    m.Geburtstag || '',
+                    m['Geburtstag (Alter)'] || '',
+                    m.Eintrittsdatum || '',
+                    m['Eintrittsdatum (Jahre)'] || '',
+                    m.Mitgliederbild || '',
+                    m.Status || '',
+                    m.Funktion || '',
+                    m.Austrittsdatum || '',
+                    m['Austrittsdatum (Jahre)'] || '',
+                    m.Strasse || '',
+                    m.PLZ || '',
+                    m.Ort || '',
+                    m.Telefon || '',
+                    m.Mobile || '',
+                    m['E-Mail'] || '',
+                    m['Versand-Email'] || '',
+                    m.IBAN || '',
+                    m['Zusatz bei Mann (r)'] || '',
+                    m.Zustellung || '',
+                    m.Bemerkungen || '',
+                    m.Geschlecht || ''
+                ])
+            ];
+            
+            // Erstelle Arbeitsblatt
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            
+            // Spaltenbreiten setzen
+            ws['!cols'] = [
+                { wch: 20 }, // Mitglied
+                { wch: 15 }, // Vorname
+                { wch: 15 }, // Name
+                { wch: 15 }, // Adresszusatz
+                { wch: 10 }, // Anrede
+                { wch: 12 }, // Geburtstag
+                { wch: 8 },  // Alter
+                { wch: 15 }, // Eintrittsdatum
+                { wch: 8 },  // Jahre
+                { wch: 15 }, // Mitgliederbild
+                { wch: 15 }, // Status
+                { wch: 20 }, // Funktion
+                { wch: 15 }, // Austrittsdatum
+                { wch: 10 }, // Austrittsdatum (Jahre)
+                { wch: 25 }, // Strasse
+                { wch: 8 },  // PLZ
+                { wch: 15 }, // Ort
+                { wch: 18 }, // Telefon
+                { wch: 18 }, // Mobile
+                { wch: 30 }, // E-Mail
+                { wch: 30 }, // Versand-Email
+                { wch: 30 }, // IBAN
+                { wch: 8 },  // Zusatz bei Mann (r)
+                { wch: 12 }, // Zustellung
+                { wch: 30 }, // Bemerkungen
+                { wch: 10 }  // Geschlecht
+            ];
+            
+            // Erstelle Arbeitsmappe
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Mitglieder');
+            
+            // Dateiname mit Datum
+            const filename = `Mitglieder_Alle_Mitglieder_${new Date().toISOString().split('T')[0]}.xlsx`;
+            
+            // Exportiere
+            XLSX.writeFile(wb, filename);
         }
     </script>
 </body>
