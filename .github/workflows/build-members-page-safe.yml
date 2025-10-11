@@ -1,0 +1,96 @@
+name: Build Members Page (Sichere Version)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mitglieder/**'
+      - '.github/workflows/build-members-page-safe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+      
+      - name: Build members page with password from secret (SAFE METHOD)
+        env:
+          MEMBERS_PASSWORD: ${{ secrets.MEMBERS_PASSWORD }}
+        run: |
+          echo "🔐 Baue Mitgliederseite mit Secret-Passwort (sichere Methode)..."
+          
+          # Verwende Python für sicheres String-Replacement
+          # Dies funktioniert mit ALLEN Sonderzeichen!
+          python3 << 'EOF'
+import os
+import sys
+
+# Lese Template
+with open('mitglieder/mitglieder-template.html', 'r', encoding='utf-8') as f:
+    content = f.read()
+
+# Hole Passwort aus Environment (sicher!)
+password = os.environ.get('MEMBERS_PASSWORD', '')
+
+if not password:
+    print("❌ FEHLER: MEMBERS_PASSWORD Secret nicht gesetzt!")
+    sys.exit(1)
+
+# Ersetze Platzhalter mit echtem Passwort
+# Python escaped automatisch alle Sonderzeichen korrekt
+content = content.replace('MEMBERS_PASSWORD_PLACEHOLDER', password)
+
+# Schreibe finale HTML-Datei
+with open('mitglieder.html', 'w', encoding='utf-8') as f:
+    f.write(content)
+
+print(f"✅ Mitgliederseite erfolgreich gebaut")
+print(f"✅ Passwort-Länge: {len(password)} Zeichen")
+EOF
+      
+      - name: Copy data file
+        run: |
+          cp mitglieder/mitglieder_data.json mitglieder_data.json
+          echo "✅ Datendatei kopiert"
+      
+      - name: Verify build
+        run: |
+          echo "🔍 Verifiziere Build..."
+          
+          # Prüfe ob Platzhalter ersetzt wurde
+          if grep -q "MEMBERS_PASSWORD_PLACEHOLDER" mitglieder.html; then
+            echo "❌ FEHLER: Platzhalter wurde nicht ersetzt!"
+            exit 1
+          fi
+          
+          # Prüfe ob Datei existiert und Inhalt hat
+          if [ ! -s mitglieder.html ]; then
+            echo "❌ FEHLER: mitglieder.html ist leer oder existiert nicht!"
+            exit 1
+          fi
+          
+          echo "✅ Build erfolgreich verifiziert"
+      
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          if [[ -n $(git status --porcelain mitglieder.html mitglieder_data.json) ]]; then
+            git add mitglieder.html mitglieder_data.json
+            git commit -m "🤖 Auto-build: Mitgliederseite aktualisiert [sichere Methode]"
+            git push
+            echo "✅ Änderungen gepusht"
+          else
+            echo "ℹ️ Keine Änderungen"
+          fi
