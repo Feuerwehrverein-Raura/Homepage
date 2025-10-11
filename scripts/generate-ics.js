@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const FWV_CONFIG = require('./config.js');
 
 class ICSGenerator {
     constructor() {
@@ -214,12 +215,12 @@ class ICSGenerator {
         let ics = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//Feuerwehrverein Raura Kaiseraugst//Vereinskalender//DE',
+            `PRODID:${FWV_CONFIG.system.calendar.prodId}`,
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
-            'X-WR-CALNAME:Feuerwehrverein Raura Kaiseraugst',
-            'X-WR-CALDESC:Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst',
-            'X-WR-TIMEZONE:Europe/Zurich'
+            `X-WR-CALNAME:${FWV_CONFIG.system.calendar.calendarName}`,
+            `X-WR-CALDESC:${FWV_CONFIG.system.calendar.calendarDescription}`,
+            `X-WR-TIMEZONE:${FWV_CONFIG.system.defaultTimezone}`
         ];
 
         this.events.forEach(event => {

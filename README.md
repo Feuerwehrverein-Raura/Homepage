@@ -506,8 +506,8 @@ node scripts/test-pdf.js
 ### **Verein Kontakt**
 
 - 🌐 **Website:** https://feuerwehrverein-raura.github.io/Homepage/
-- 📧 **Präsident:** rene.kaeslin@fwv-raura.ch
-- 📧 **Aktuar:** stefan.mueller@fwv-raura.ch
+- 📧 **Präsident:** praesident@fwv-raura.ch
+- 📧 **Aktuar:** aktuar@fwv-raura.ch
 - 📍 **Adresse:** Feuerwehrverein Raura, 4303 Kaiseraugst
 
 ---

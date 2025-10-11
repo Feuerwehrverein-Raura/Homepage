@@ -82,6 +82,7 @@
         }
     }
     </script>
+    <script src="scripts/config.js"></script>
 </head>
 <body class="font-sans bg-gray-50">
     <!-- Navigation -->
@@ -307,7 +308,7 @@
                                 <div>
                                     <p class="text-white font-medium">Aktuar</p>
                                     <p class="text-fire-200 text-sm">Stefan Müller<br>Rosenweg 9<br>4303 Kaiseraugst</p>
-                                    <p class="text-fire-200 text-sm">aktuar@fwv-raura.ch</p>
+                                    <p class="text-fire-200 text-sm" id="aktuar-email">aktuar@fwv-raura.ch</p>
                                 </div>
                             </div>
                             
@@ -714,7 +715,7 @@ Formular erstellt über: www.fwv-raura.ch
 Version: ${new Date().toLocaleDateString('de-DE')}`;
 
             // E-Mail an sowohl Aktuar als auch Kassier
-            const mailtoLink = `mailto:stefan+fwv-raura@juroct.net,costagi1@bluewin.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+            const mailtoLink = `mailto:stefan+fwv-raura@juroct.ch,costagi1@bluewin.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
             
             return {
                 mailtoLink,
@@ -740,7 +741,7 @@ ${message}
 Mit freundlichen Grüssen
 ${name}`;
 
-            const mailtoLink = `mailto:stefan+fwv-raura@juroct.net@fwv-raura.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+            const mailtoLink = `mailto:stefan+fwv-raura@juroct.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
             
             return {
                 mailtoLink,
@@ -1167,6 +1168,15 @@ function renderUpcomingEvents(events) {
 
     console.log(`✅ ${events.length} Events angezeigt`);
 }
+    </script>
+    <script>
+        // Aktualisiere E-Mail-Adressen mit Konfiguration
+        document.addEventListener('DOMContentLoaded', function() {
+            const aktuarEmail = document.getElementById('aktuar-email');
+            if (aktuarEmail && typeof FWV_CONFIG !== 'undefined') {
+                aktuarEmail.textContent = FWV_CONFIG.kontakte.aktuar.email;
+            }
+        });
     </script>
 </body>
 </html>

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const FWV_CONFIG = require('./config.js');
 
 class PDFGenerator {
     constructor() {
@@ -133,7 +134,7 @@ class PDFGenerator {
         <header class="header">
             <div class="header-content">
                 <div class="logo-section">
-                    <h1>Feuerwehrverein Raura</h1>
+                    <h1>${FWV_CONFIG.verein.name}</h1>
                     <h2>📋 Arbeitsplan ${event.title}</h2>
                 </div>
                 <div class="event-info">
@@ -185,8 +186,8 @@ class PDFGenerator {
             <div class="contact-grid">
                 <div class="contact-card">
                     <h4>Hauptspringer</h4>
-                    <p><strong>Stefan Müller (Aktuar)</strong></p>
-                    <p>📧 aktuar@fwv-raura.ch</p>
+                    <p><strong>${FWV_CONFIG.system.springer.hauptspringer}</strong></p>
+                    <p>📧 ${FWV_CONFIG.system.springer.email}</p>
                     <p>⏰ Verfügbar: Samstag & Sonntag ganztags</p>
                 </div>
                 <div class="contact-card">
@@ -219,7 +220,7 @@ class PDFGenerator {
         <header class="header">
             <div class="header-content">
                 <div class="logo-section">
-                    <h1>Feuerwehrverein Raura</h1>
+                    <h1>${FWV_CONFIG.verein.name}</h1>
                     <h2>📅 Events & Schichtpläne Übersicht</h2>
                 </div>
                 <div class="event-info">
@@ -838,7 +839,7 @@ class PDFGenerator {
     getHeaderTemplate(event) {
         return `
         <div style="font-size: 10px; padding: 5px 15px; width: 100%; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd;">
-            <span style="color: #d32f2f; font-weight: bold;">Feuerwehrverein Raura - ${event.title}</span>
+            <span style="color: #d32f2f; font-weight: bold;">${FWV_CONFIG.verein.name} - ${event.title}</span>
             <span style="color: #666;">Arbeitsplan</span>
         </div>`;
     }
@@ -846,7 +847,7 @@ class PDFGenerator {
     getOverviewHeaderTemplate() {
         return `
         <div style="font-size: 10px; padding: 5px 15px; width: 100%; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd;">
-            <span style="color: #d32f2f; font-weight: bold;">Feuerwehrverein Raura</span>
+            <span style="color: #d32f2f; font-weight: bold;">${FWV_CONFIG.verein.name}</span>
             <span style="color: #666;">Events & Schichtpläne Übersicht</span>
         </div>`;
     }

@@ -280,6 +280,7 @@
         </div>
     </div>
 
+    <script src="scripts/config.js"></script>
     <script>
         class EventsManager {
             constructor() {
@@ -726,7 +727,7 @@
                         location: 'Roter Schopf, Kaiseraugst',
                         category: 'Hauptveranstaltung',
                         organizer: 'Stefan Müller',
-                        email: 'aktuar@fwv-raura.ch',
+                        email: FWV_CONFIG.kontakte.aktuar.email,
                         status: 'confirmed',
                         registrationRequired: true,
                         cost: 'Kostenlos',
@@ -1542,8 +1543,8 @@
                 </div>
                 <div class="contact-card">
                     <h4>Springer & Vertretung</h4>
-                    <p><strong>Stefan Müller (Aktuar)</strong></p>
-                    <p>📧 aktuar@fwv-raura.ch</p>
+                    <p><strong>${FWV_CONFIG.system.springer.hauptspringer}</strong></p>
+                    <p>📧 ${FWV_CONFIG.kontakte.aktuar.email}</p>
                     <p>⏰ Verfügbar bei kurzfristigen Ausfällen</p>
                 </div>
             </div>
@@ -2355,12 +2356,12 @@ ${name}`;
                 let ics = [
                     'BEGIN:VCALENDAR',
                     'VERSION:2.0',
-                    'PRODID:-//Feuerwehrverein Raura Kaiseraugst//Vereinskalender//DE',
+                    `PRODID:${FWV_CONFIG.system.calendar.prodId}`,
                     'CALSCALE:GREGORIAN',
                     'METHOD:PUBLISH',
-                    'X-WR-CALNAME:Feuerwehrverein Raura Kaiseraugst',
-                    'X-WR-CALDESC:Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst',
-                    'X-WR-TIMEZONE:Europe/Zurich'
+                    `X-WR-CALNAME:${FWV_CONFIG.system.calendar.calendarName}`,
+                    `X-WR-CALDESC:${FWV_CONFIG.system.calendar.calendarDescription}`,
+                    `X-WR-TIMEZONE:${FWV_CONFIG.system.defaultTimezone}`
                 ];
 
                 events.forEach(event => {

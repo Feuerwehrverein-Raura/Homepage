@@ -1,476 +1,222 @@
-# 📜 Scripts Documentation
+# 📂 Scripts Directory
 
-This directory contains automation scripts for the Feuerwehrverein Raura Homepage project.
+Alle JavaScript-Module und Konfigurationsdateien für die Feuerwehrverein Raura Homepage.
 
----
+## 📁 Verzeichnisstruktur
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Scripts](#scripts)
-  - [generate-ics.js](#generate-icsjs)
-  - [generate-shift-plans.js](#generate-shift-plansjs)
-  - [test-pdf.js](#test-pdfjs)
-- [Requirements](#requirements)
-- [Usage](#usage)
-- [Troubleshooting](#troubleshooting)
+```
+scripts/
+├── config.js           # 🔧 Zentrale Konfiguration
+├── generate-ics.js     # 📅 ICS-Kalender Generator  
+├── pdf-generator.js    # 📄 PDF-Generator (Puppeteer)
+└── Readme.md          # 📖 Diese Dokumentation
+```
 
 ---
 
-## 🎯 Overview
+## 📋 Script-Übersicht
 
-These scripts automate various tasks for the homepage:
+### **🔧 config.js**
+**Zweck:** Zentrale Konfiguration für alle E-Mail-Adressen und Vereinsdaten
 
-| Script | Purpose | Trigger | Output |
-|--------|---------|---------|--------|
-| `generate-ics.js` | Generate calendar ICS file | GitHub Actions / Manual | `calendar.ics` |
-| `generate-shift-plans.js` | Generate shift plan PDFs | Manual | `pdfs/*.pdf` |
-| `test-pdf.js` | Test PDF generation | Manual | Test PDFs |
+**Verwendung:**
+```javascript
+// Browser
+FWV_CONFIG.getEmail('aktuar');        // -> "aktuar@fwv-raura.ch"
+FWV_CONFIG.getName('praesident');     // -> "René Käslin"
 
----
-
-## 📜 Scripts
-
-### generate-ics.js
-
-**Purpose:** Generates an ICS (iCalendar) file from all markdown event files
+// Node.js
+const FWV_CONFIG = require('./config.js');
+const email = FWV_CONFIG.kontakte.aktuar.email;
+```
 
 **Features:**
-- ✅ Parses YAML frontmatter from event markdown files
-- ✅ Validates date formats (ISO 8601)
-- ✅ Handles multiple line endings (Windows/Unix)
-- ✅ Skips assignment files and README.md
-- ✅ Creates RFC 5545 compliant ICS format
-- ✅ Detailed error logging with filename context
+- ✅ Zentrale E-Mail-Verwaltung
+- ✅ Vorstandskontakte mit Telefonnummern
+- ✅ Hilfsfunktionen für einfachen Zugriff
+- ✅ Browser & Node.js kompatibel
+- ✅ E-Mail-Alias-System
 
-**Input:**
-```
-events/*.md  (excluding *-assignments.md and README.md)
-```
+**Eingebunden in:**
+- `index.html`, `events.html`, `calendar.html`
+- Alle anderen Scripts in diesem Ordner
 
-**Output:**
-```
-calendar.ics  (in project root)
-```
+---
 
-**Date Format Requirements:**
-```yaml
-# ✅ Correct - ISO 8601 format
-startDate: 2025-10-14T14:00:00
-endDate: 2025-10-14T18:00:00
+### **📅 generate-ics.js**
+**Zweck:** Generiert ICS-Kalenderdateien aus Markdown-Event-Dateien
 
-# ❌ Incorrect formats
-startDate: 14.10.2025 14:00
-startDate: October 14, 2025 2pm
-startDate: 2025-10-14  # Missing time component
-```
-
-**Required Frontmatter Fields:**
-- `id` - Unique event identifier
-- `title` - Event title
-- `startDate` - Event start (ISO 8601)
-- `endDate` - Event end (ISO 8601)
-
-**Optional Fields:**
-- `location` - Event location
-- `organizer` - Organizer name
-- `email` - Contact email
-- `category` - Event category
-- `registrationDeadline` - Registration deadline (ISO 8601)
-
-**Error Handling:**
-- Invalid dates: Logs warning, skips event
-- Missing fields: Logs warning, skips event
-- Parse errors: Logs error with details, continues
-- No events: Creates empty calendar
-
-**Usage:**
+**Ausführung:**
 ```bash
-# Manual run
 node scripts/generate-ics.js
-
-# Via npm script
-npm run generate-ics
-
-# Automated via GitHub Actions
-# Triggered on push to events/** or daily at 6:00 AM
 ```
-
-**Output Example:**
-```
-🚀 Starting ICS generation...
-
-📁 Found 5 files in events directory
-⏭️  Skipping: README.md
-⏭️  Skipping: chilbi-2025-assignments.md
-✅ Loaded: Chilbi 2025 (2025-10-14T12:00:00.000Z)
-✅ Loaded: Grillplausch Sommer (2025-06-17T14:00:00.000Z)
-
-📊 Total events loaded: 2
-
-✅ Generated calendar.ics with 2 events
-📍 Output: /path/to/Homepage/calendar.ics
-```
-
----
-
-### generate-shift-plans.js
-
-**Purpose:** Generates PDF work schedules for events with shift assignments
 
 **Features:**
-- ✅ Loads event data and shift assignments
-- ✅ Generates individual shift plan PDFs
-- ✅ Creates overview PDF with all events
-- ✅ Uses Puppeteer for PDF generation
-- ✅ Matches original "Arbeitsplan Chilbi" format
-- ✅ Handles multi-day events with shift grouping
+- ✅ Parst Markdown-Dateien mit Frontmatter
+- ✅ Validiert Datumsformate und Pflichtfelder
+- ✅ Generiert RFC-konforme ICS-Dateien
+- ✅ Unterstützt mehrere Events und Kategorien
+- ✅ Umfangreiches Logging mit Emojis
+- ✅ Verwendet zentrale Konfiguration
 
-**Input:**
-```
-events/*.md                    # Event definitions
-events/*-assignments.md        # Shift assignments
-```
-
-**Output:**
-```
-pdfs/
-├── arbeitsplan-[event-id].pdf
-├── arbeitsplan-[event-id].html
-└── overview-all-events.pdf
-```
-
-**PDF Structure:**
-```
-Feuerwehrverein Raura, Kaiseraugst
-Arbeitsplan [Event Title]
-
-Aufbau [Date] ab [Time] für [Event]
-- Person 1
-- Person 2
-[...]
-
-[Day], [Date]    Küche           Bar             Service/Kasse
-12:00-14:00     - Person A      - Person B      - Person C
-                -               -               -
-14:00-16:00     - Person D      - Person E      - Person F
-[...]
-
-Springer: [Names]
-
-Abbau [Date]
-- Person X
-- Person Y
-```
-
-**Usage:**
-```bash
-# Generate all shift plans
-node scripts/generate-shift-plans.js
-
-# Or via npm script
-npm run generate-shifts
-npm run generate-pdfs  # Alias
-```
-
-**Requirements:**
-- Node.js >= 14.0.0
-- Puppeteer ^21.0.0
-- Events with `shifts` array in frontmatter
-- Corresponding `-assignments.md` files
+**Automatisierung:**
+- 🤖 **GitHub Action:** Läuft automatisch bei Änderungen in `events/`
+- ⏰ **Zeitplan:** Täglich um 6:00 Uhr UTC
+- 📄 **Output:** Aktualisiert `calendar.ics`
 
 ---
 
-### test-pdf.js
+### **📄 pdf-generator.js**
+**Zweck:** Professionelle PDF-Generierung für Events und Arbeitspläne
 
-**Purpose:** Test PDF generation functionality without full event data
+**Verwendung:**
+```javascript
+const PDFGenerator = require('./pdf-generator');
+const generator = new PDFGenerator();
+await generator.initialize();
+await generator.generateShiftPlanPDF(event, assignments, markdownContent);
+```
 
 **Features:**
-- ✅ Creates sample event with mock data
-- ✅ Tests single event PDF generation
-- ✅ Tests overview PDF generation
-- ✅ Validates file creation and sizes
-- ✅ Provides detailed output logs
+- ✅ Professionelle PDF-Layouts mit CSS
+- ✅ Event-Details und Schichtplanung
+- ✅ Statistiken und Übersichts-Dashboards
+- ✅ Druckoptimierte Formatierung
+- ✅ Header/Footer-Templates
+- ✅ Verwendet zentrale Kontaktdaten
 
-**Usage:**
-```bash
-node scripts/test-pdf.js
-```
-
-**Output:**
-```
-🧪 PDF Generation Test
-📄 Generating single event PDF...
-✅ Event PDF created: pdfs/arbeitsplan-test-event.pdf
-📄 Generating overview PDF...
-✅ Overview PDF created: pdfs/overview-all-events.pdf
-✅ PDF generator closed
-
-🎉 PDF Generation Test Complete!
-
-Generated files:
-- Event PDF: pdfs/arbeitsplan-test-event.pdf
-- Overview PDF: pdfs/overview-all-events.pdf
-
-File information:
-- Event PDF: 45.2 KB
-- Overview PDF: 38.7 KB
-```
+**Abhängigkeiten:** Puppeteer (Headless Chrome)
 
 ---
 
-## 🔧 Requirements
+## 🔧 Gemeinsame Funktionalitäten
 
-### System Requirements
-```bash
-# Node.js version
-node --version  # Should be >= 14.0.0
+### **Event-Parsing**
+Standardisiertes Parsen für alle Scripts:
 
-# Check npm
-npm --version
-```
-
-### Dependencies
-
-**Production:**
-```json
-{
-  "puppeteer": "^21.0.0",
-  "html-pdf": "^3.0.1",
-  "jspdf": "^2.5.1"
+```javascript
+parseMarkdownEvent(content, filename) {
+    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+    if (!frontmatterMatch) return null;
+    
+    const [, frontmatterStr, markdownContent] = frontmatterMatch;
+    const frontmatter = this.parseFrontmatter(frontmatterStr);
+    
+    return {
+        ...frontmatter,
+        description: markdownContent.trim(),
+        startDate: new Date(frontmatter.startDate),
+        endDate: new Date(frontmatter.endDate)
+    };
 }
 ```
 
-**Installation:**
-```bash
-# Install all dependencies
-npm install
+### **Datums-Handling**
+Standardisierte Formatierung und Validierung:
 
-# Or install specific packages
-npm install puppeteer html-pdf jspdf
+```javascript
+formatDateForICS(date) {
+    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+}
+
+isValidDate(date) {
+    return date instanceof Date && !isNaN(date.getTime());
+}
+```
+
+### **Error Handling**
+Konsistentes Logging mit Emoji-Präfixen:
+
+```javascript
+console.log('✅ Erfolgreich verarbeitet');
+console.warn('⚠️  Warnung gefunden');
+console.error('❌ Fehler aufgetreten');
 ```
 
 ---
 
-## 🚀 Usage
+## 🚀 Automatisierung
 
-### Local Development
-
-```bash
-# Clone repository
-git clone https://github.com/Feuerwehrverein-Raura/Homepage.git
-cd Homepage
-
-# Install dependencies
-npm install
-
-# Run ICS generation
-npm run generate-ics
-
-# Run shift plan generation
-npm run generate-shifts
-
-# Test PDF generation
-node scripts/test-pdf.js
-```
-
-### GitHub Actions Integration
-
-The `generate-ics.js` script runs automatically via GitHub Actions:
-
-**Triggers:**
-- Push to `events/**` (any .md file changes)
-- Daily at 6:00 AM UTC (scheduled)
-
-**Workflow File:** `.github/workflows/generate-calendar.yml`
-
-**Manual Trigger:**
-```bash
-# In GitHub
-Actions → Generate Calendar ICS → Run workflow
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Issue 1: "Invalid time value" Error
-
-**Symptom:**
-```
-Error generating ICS file: RangeError: Invalid time value
-```
-
-**Causes:**
-- Invalid date format in event frontmatter
-- Missing date fields
-- Incorrect ISO 8601 format
-
-**Solution:**
+### **GitHub Actions**
 ```yaml
-# ✅ Fix date format
-startDate: 2025-10-14T14:00:00  # Must include time
-endDate: 2025-10-14T18:00:00    # ISO 8601 format
+# .github/workflows/generate-calendar.yml
+name: Generate Calendar ICS
+on:
+  push:
+    paths: ['events/**']
+  schedule:
+    - cron: '0 6 * * *'
 
-# Check for typos
-starDate: ...   # ❌ Wrong
-startDate: ...  # ✅ Correct
-```
-
-**Debug:**
-```bash
-# Run script with verbose output
-node scripts/generate-ics.js
-
-# Check each event file
-cat events/your-event.md | grep -A2 "startDate"
-```
-
----
-
-#### Issue 2: No Events Generated
-
-**Symptom:**
-```
-⚠️ No events found to generate ICS file
-✅ Generated empty calendar.ics (no events available)
-```
-
-**Causes:**
-- No `.md` files in `events/` folder
-- All events are `-assignments.md` files
-- Frontmatter parsing errors
-
-**Solution:**
-```bash
-# Check event files exist
-ls -la events/*.md
-
-# Verify frontmatter format
-head -n 20 events/your-event.md
-
-# Ensure proper YAML syntax
----
-id: test-event
-title: Test Event
-startDate: 2025-10-14T14:00:00
-endDate: 2025-10-14T18:00:00
----
+jobs:
+  generate-calendar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate ICS file
+        run: node scripts/generate-ics.js
 ```
 
 ---
 
-#### Issue 3: PDF Generation Fails
+## 🔗 Abhängigkeiten
 
-**Symptom:**
-```
-❌ Error generating PDF: ...
-```
+### **Externe Bibliotheken**
+- **Puppeteer** (pdf-generator.js) - Headless Chrome für PDF-Generierung
+- **Node.js** - Laufzeitumgebung
 
-**Causes:**
-- Puppeteer not installed
-- Missing event data
-- No assignment files
-
-**Solution:**
-```bash
-# Reinstall Puppeteer
-npm install puppeteer
-
-# Check assignment files exist
-ls events/*-assignments.md
-
-# Run test first
-node scripts/test-pdf.js
-```
+### **Interne Abhängigkeiten**
+- Event Markdown-Dateien (`events/*.md`)
+- Assignment-Dateien (`events/*-assignments.md`)
+- Zentrale Konfiguration (`config.js`)
 
 ---
 
-#### Issue 4: GitHub Actions Permission Denied
+## 💻 Entwicklung
 
-**Symptom:**
-```
-Error: Process completed with exit code 1
-Permission denied
-```
+### **Neue Scripts hinzufügen**
+1. Script-Datei in `scripts/` erstellen
+2. Naming Convention: `verb-noun.js`
+3. Error Handling und Logging einbauen
+4. In diesem README dokumentieren
+5. Bei Bedarf zu `package.json` hinzufügen
 
-**Solution:**
-```yaml
-# In .github/workflows/generate-calendar.yml
-# Ensure permissions are set:
-permissions:
-  contents: write  # Required for pushing
-```
-
----
-
-### Debug Mode
-
-Enable detailed logging:
-
-```bash
-# Set DEBUG environment variable
-DEBUG=* node scripts/generate-ics.js
-
-# Or add console.log in scripts
-# Already implemented in generate-ics.js
-```
+### **Best Practices**
+- ✅ Aussagekräftige Funktionsnamen verwenden
+- ✅ Umfangreiches Error Handling
+- ✅ Progress-Logging mit Emoji-Präfixen
+- ✅ Alle Eingaben validieren
+- ✅ CLI und Modul-Verwendung unterstützen
+- ✅ Zentrale Konfiguration verwenden (`FWV_CONFIG`)
 
 ---
 
-## 📚 Additional Resources
+## 🎯 Optimierungen (Oktober 2025)
 
-### Date Format References
-- [ISO 8601 Standard](https://en.wikipedia.org/wiki/ISO_8601)
-- [JavaScript Date](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date)
+### **Was wurde bereinigt:**
+- ❌ **Gelöscht:** `js/` Ordner (in `scripts/` integriert)
+- ❌ **Gelöscht:** `simple-pdf-generator.js` (nicht verwendet)
+- ❌ **Gelöscht:** `generate-shift-plans.js` (nicht verwendet)
+- ❌ **Gelöscht:** `test-pdf.js` (nur für Tests)
+- ❌ **Gelöscht:** Veraltete `Readme.md` mit falschen Informationen
 
-### ICS Format
-- [RFC 5545 (iCalendar)](https://tools.ietf.org/html/rfc5545)
-- [ICS File Format](https://icalendar.org/)
-
-### PDF Generation
-- [Puppeteer Docs](https://pptr.dev/)
-- [html-pdf](https://www.npmjs.com/package/html-pdf)
-
----
-
-## 🔄 Script Maintenance
-
-### Adding New Scripts
-
-1. Create script file in `scripts/` directory
-2. Add npm script to `package.json`:
-   ```json
-   "scripts": {
-     "your-script": "node scripts/your-script.js"
-   }
-   ```
-3. Document in this README
-4. Add error handling and logging
-
-### Best Practices
-
-- ✅ Use clear, descriptive console.log messages
-- ✅ Include emoji prefixes (📄, ✅, ❌, ⚠️) for readability
-- ✅ Validate all inputs before processing
-- ✅ Handle errors gracefully with try-catch
-- ✅ Log file paths and counts
-- ✅ Use `process.exit(1)` for errors
-- ✅ Test with edge cases
+### **Was wurde optimiert:**
+- ✅ **Vereinfacht:** Nur noch ein `scripts/` Ordner
+- ✅ **Zentralisiert:** Alle Konfiguration in `config.js`
+- ✅ **Aktualisiert:** Alle Pfad-Referenzen korrigiert
+- ✅ **Dokumentiert:** Realistische, aktuelle Dokumentation
 
 ---
 
 ## 📞 Support
 
-**Issues with scripts:**
-- 🐛 Report bugs: [GitHub Issues](https://github.com/Feuerwehrverein-Raura/Homepage/issues)
-- 📧 Technical contact: webmaster@feuerwehrverein-raura.ch
-- 📖 Main README: [../README.md](../README.md)
-- 📝 Event README: [../events/README.md](../events/README.md)
+**Technische Probleme:**
+- 📧 Kontakt: **aktuar@fwv-raura.ch**
+- 🐛 GitHub Issues: [Repository Issues](https://github.com/Feuerwehrverein-Raura/Homepage/issues)
+
+**Dokumentation:**
+- 📖 Haupt-README: [../README.md](../README.md)
+- 🔧 Konfiguration: [../KONFIGURATION.md](../KONFIGURATION.md)
 
 ---
 
-**Last Updated:** October 2025  
-**Maintained by:** Feuerwehrverein Raura IT Team
+**Letzte Aktualisierung:** Oktober 2025  
+**Wartung:** Feuerwehrverein Raura IT Team (Stefan Müller)

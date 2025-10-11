@@ -27,6 +27,7 @@
             }
         }
     </script>
+    <script src="scripts/config.js"></script>
 </head>
 <body class="font-sans antialiased bg-gray-50">
     <!-- Navigation -->
@@ -641,7 +642,7 @@
                         `SUMMARY:${event.title}`,
                         `DESCRIPTION:${description}`,
                         `LOCATION:${event.location}`,
-                        `ORGANIZER;CN=${event.organizer}:mailto:${event.email || 'kontakt@fwv-raura.ch'}`,
+                        `ORGANIZER;CN=${event.organizer}:mailto:${event.email || FWV_CONFIG.kontakte.info.email}`,
                         `CATEGORIES:${event.category || 'Event'}`,
                         'STATUS:CONFIRMED',
                         'END:VEVENT'
