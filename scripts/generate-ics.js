@@ -236,7 +236,7 @@ class ICSGenerator {
                     .replace(/#{1,6}\s/g, '')
                     .replace(/\n/g, '\\n')
                     .replace(/,/g, '\\,')
-                    .substring(0, 500); // Limit description length
+                    .substring(0, 1000); // Increase description length limit
 
                 ics.push(
                     'BEGIN:VEVENT',
@@ -265,7 +265,15 @@ class ICSGenerator {
         if (!this.isValidDate(date)) {
             throw new Error(`Invalid date object: ${date}`);
         }
-        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+        // For local time events (no timezone conversion)
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return `${year}${month}${day}T${hours}${minutes}${seconds}`;
     }
 
     async run() {
