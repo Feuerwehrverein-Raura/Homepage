@@ -1,4 +1,4 @@
-name: Build Members Page (Sichere Version)
+name: Build Members Page
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'mitglieder/**'
-      - '.github/workflows/build-members-page-safe.yml'
+      - '.github/workflows/build-members-page.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,23 +23,26 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
       
-      - name: Build members page with password from secret (SAFE METHOD)
+      - name: Build members page with password from secret
         env:
           MEMBERS_PASSWORD: ${{ secrets.MEMBERS_PASSWORD }}
         run: |
-          echo "🔐 Baue Mitgliederseite mit Secret-Passwort (sichere Methode)..."
+          echo "🔐 Baue Mitgliederseite mit Secret-Passwort..."
           
           # Verwende Python für sicheres String-Replacement
-          # Dies funktioniert mit ALLEN Sonderzeichen!
-          python3 << 'EOF'
+          python3 << 'PYEOF'
 import os
 import sys
 
 # Lese Template
-with open('mitglieder/mitglieder-template.html', 'r', encoding='utf-8') as f:
-    content = f.read()
+try:
+    with open('mitglieder/mitglieder-template.html', 'r', encoding='utf-8') as f:
+        content = f.read()
+except FileNotFoundError:
+    print("❌ FEHLER: Template-Datei nicht gefunden!")
+    sys.exit(1)
 
-# Hole Passwort aus Environment (sicher!)
+# Hole Passwort aus Environment
 password = os.environ.get('MEMBERS_PASSWORD', '')
 
 if not password:
@@ -47,16 +50,15 @@ if not password:
     sys.exit(1)
 
 # Ersetze Platzhalter mit echtem Passwort
-# Python escaped automatisch alle Sonderzeichen korrekt
 content = content.replace('MEMBERS_PASSWORD_PLACEHOLDER', password)
 
 # Schreibe finale HTML-Datei
 with open('mitglieder.html', 'w', encoding='utf-8') as f:
     f.write(content)
 
-print(f"✅ Mitgliederseite erfolgreich gebaut")
+print("✅ Mitgliederseite erfolgreich gebaut")
 print(f"✅ Passwort-Länge: {len(password)} Zeichen")
-EOF
+PYEOF
       
       - name: Copy data file
         run: |
@@ -67,15 +69,13 @@ EOF
         run: |
           echo "🔍 Verifiziere Build..."
           
-          # Prüfe ob Platzhalter ersetzt wurde
           if grep -q "MEMBERS_PASSWORD_PLACEHOLDER" mitglieder.html; then
             echo "❌ FEHLER: Platzhalter wurde nicht ersetzt!"
             exit 1
           fi
           
-          # Prüfe ob Datei existiert und Inhalt hat
           if [ ! -s mitglieder.html ]; then
-            echo "❌ FEHLER: mitglieder.html ist leer oder existiert nicht!"
+            echo "❌ FEHLER: mitglieder.html ist leer!"
             exit 1
           fi
           
@@ -88,7 +88,7 @@ EOF
           
           if [[ -n $(git status --porcelain mitglieder.html mitglieder_data.json) ]]; then
             git add mitglieder.html mitglieder_data.json
-            git commit -m "🤖 Auto-build: Mitgliederseite aktualisiert [sichere Methode]"
+            git commit -m "🤖 Auto-build: Mitgliederseite aktualisiert"
             git push
             echo "✅ Änderungen gepusht"
           else
