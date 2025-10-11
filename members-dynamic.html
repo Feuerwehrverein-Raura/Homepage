@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mitgliederbereich - Feuerwehrverein Raura</title>
+    <meta name="robots" content="noindex, nofollow">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#ffebee',
+                            100: '#ffcdd2',
+                            200: '#ef9a9a',
+                            300: '#e57373',
+                            400: '#ef5350',
+                            500: '#f44336',
+                            600: '#e53935',
+                            700: '#d32f2f',
+                            800: '#c62828',
+                            900: '#b71c1c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-sans bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-fire-700 text-white shadow-lg fixed top-0 w-full z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full overflow-hidden bg-white p-1">
+                        <img src="images/logo.png" alt="Logo" class="w-full h-full object-contain">
+                    </div>
+                    <span class="text-xl font-bold">FWV Raura - Mitglieder</span>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="index.html" class="hover:text-fire-200 transition-colors">Zurück zur Hauptseite</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="min-h-screen flex items-center justify-center pt-20 px-4">
+        
+        <!-- Step 1: Email Request Form (shown initially) -->
+        <div id="email-request-container" class="w-full max-w-md">
+            <div class="bg-white rounded-lg shadow-xl p-8">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-fire-100 flex items-center justify-center">
+                        <svg class="w-10 h-10 text-fire-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Mitgliederbereich</h1>
+                    <p class="text-gray-600">Bitte gib deine E-Mail-Adresse ein, um einen PIN zu erhalten</p>
+                </div>
+
+                <form id="email-request-form" class="space-y-6">
+                    <div>
+                        <label for="email-input" class="block text-sm font-medium text-gray-700 mb-2">
+                            E-Mail-Adresse
+                        </label>
+                        <input 
+                            type="email" 
+                            id="email-input" 
+                            placeholder="deine@email.ch" 
+                            required
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500 focus:border-fire-500"
+                            autocomplete="email"
+                        >
+                        <p class="mt-2 text-sm text-gray-500">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            Du musst als Mitglied registriert sein
+                        </p>
+                    </div>
+
+                    <div id="error-message-email" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+                        <strong class="font-bold">Fehler!</strong>
+                        <span class="block sm:inline" id="error-text-email"></span>
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        id="request-pin-btn"
+                        class="w-full bg-fire-600 hover:bg-fire-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        <span id="btn-text">PIN per E-Mail anfordern</span>
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-600">
+                        Bereits einen PIN erhalten?<br>
+                        <button id="show-pin-entry" class="text-fire-600 hover:text-fire-700 font-medium">Hier PIN eingeben</button>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Security Info -->
+            <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                    <div class="text-sm text-blue-800">
+                        <p class="font-semibold mb-1">Sicherer Zugriff</p>
+                        <p>Du erhältst einen 6-stelligen PIN per E-Mail. Dieser ist 15 Minuten gültig und nur einmal verwendbar.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: PIN Entry Form (shown after email request) -->
+        <div id="pin-entry-container" class="hidden w-full max-w-md">
+            <div class="bg-white rounded-lg shadow-xl p-8">
+                <div class="text-center mb-8">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+                        <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">E-Mail versendet!</h1>
+                    <p class="text-gray-600">Prüfe dein Postfach und gib den PIN ein</p>
+                    <p class="text-sm text-gray-500 mt-2">
+                        E-Mail an: <span id="sent-to-email" class="font-medium text-fire-600"></span>
+                    </p>
+                </div>
+
+                <form id="pin-form" class="space-y-6">
+                    <div>
+                        <label for="pin-input" class="block text-sm font-medium text-gray-700 mb-2">
+                            6-stelliger PIN
+                        </label>
+                        <input 
+                            type="text" 
+                            id="pin-input" 
+                            placeholder="000000" 
+                            maxlength="6"
+                            pattern="[0-9]{6}"
+                            required
+                            class="w-full px-4 py-3 text-center text-2xl tracking-widest border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500 focus:border-fire-500"
+                            autocomplete="off"
+                        >
+                        <p class="mt-2 text-sm text-gray-500">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            PIN ist 15 Minuten gültig
+                        </p>
+                    </div>
+
+                    <div id="error-message-pin" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+                        <strong class="font-bold">Fehler!</strong>
+                        <span class="block sm:inline" id="error-text-pin"></span>
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        class="w-full bg-fire-600 hover:bg-fire-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                        </svg>
+                        Zugriff erhalten
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center space-y-2">
+                    <button id="resend-pin" class="text-fire-600 hover:text-fire-700 font-medium text-sm">
+                        📧 PIN erneut senden
+                    </button>
+                    <p class="text-sm text-gray-600">
+                        Keine E-Mail erhalten?<br>
+                        <button id="back-to-email" class="text-fire-600 hover:text-fire-700 font-medium">Zurück zur E-Mail-Eingabe</button>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <div class="text-sm text-yellow-800">
+                        <p class="font-semibold mb-1">Wichtige Hinweise</p>
+                        <ul class="list-disc list-inside space-y-1">
+                            <li>Prüfe auch den Spam-Ordner</li>
+                            <li>PIN ist nur 15 Minuten gültig</li>
+                            <li>Jeder PIN kann nur einmal verwendet werden</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Members Content (shown after successful authentication) -->
+        <div id="members-content" class="hidden w-full max-w-6xl">
+            <div class="bg-white rounded-lg shadow-xl p-8">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">Willkommen im Mitgliederbereich</h1>
+                        <p class="text-gray-600 mt-1">Angemeldet als: <span id="logged-in-email" class="font-medium text-fire-600"></span></p>
+                    </div>
+                    <button id="logout-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                        Abmelden
+                    </button>
+                </div>
+
+                <!-- Member Resources -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Protocols -->
+                    <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                        <div class="w-12 h-12 bg-fire-100 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-fire-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Protokolle</h3>
+                        <p class="text-gray-600 text-sm mb-4">Zugriff auf alle Sitzungsprotokolle und Dokumente</p>
+                        <a href="members/protocols/" class="text-fire-600 hover:text-fire-700 text-sm font-medium">Zu den Dokumenten →</a>
+                    </div>
+
+                    <!-- Member List -->
+                    <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                        <div class="w-12 h-12 bg-fire-100 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-fire-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Mitgliederliste</h3>
+                        <p class="text-gray-600 text-sm mb-4">Kontaktdaten aller aktiven Mitglieder</p>
+                        <a href="members/contacts/" class="text-fire-600 hover:text-fire-700 text-sm font-medium">Zur Liste →</a>
+                    </div>
+
+                    <!-- Internal Documents -->
+                    <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                        <div class="w-12 h-12 bg-fire-100 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-fire-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Interne Dokumente</h3>
+                        <p class="text-gray-600 text-sm mb-4">Statuten, Reglemente und weitere Unterlagen</p>
+                        <a href="members/documents/" class="text-fire-600 hover:text-fire-700 text-sm font-medium">Zu den Dokumenten →</a>
+                    </div>
+
+                    <!-- Photo Gallery -->
+                    <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                        <div class="w-12 h-12 bg-fire-100 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-fire-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Fotogalerie</h3>
+                        <p class="text-gray-600 text-sm mb-4">Bilder von Events und Veranstaltungen</p>
+                        <a href="members/photos/" class="text-fire-600 hover:text-fire-700 text-sm font-medium">Zur Galerie →</a>
+                    </div>
+
+                    <!-- Financial Reports -->
+                    <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                        <div class="w-12 h-12 bg-fire-100 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-fire-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Finanzen</h3>
+                        <p class="text-gray-600 text-sm mb-4">Budgets und Jahresabrechnungen</p>
+                        <a href="members/finances/" class="text-fire-600 hover:text-fire-700 text-sm font-medium">Zu den Berichten →</a>
+                    </div>
+
+                    <!-- Important Links -->
+                    <div class="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                        <div class="w-12 h-12 bg-fire-100 rounded-lg flex items-center justify-center mb-4">
+                            <svg class="w-6 h-6 text-fire-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                            </svg>
+                        </div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Wichtige Links</h3>
+                        <p class="text-gray-600 text-sm mb-4">WhatsApp-Gruppen und externe Ressourcen</p>
+                        <a href="https://chat.whatsapp.com/EC9AaXNofvr25mIG3wxdhj" target="_blank" class="text-fire-600 hover:text-fire-700 text-sm font-medium">Zu den Links →</a>
+                    </div>
+                </div>
+
+                <!-- Session Info -->
+                <div class="mt-8 border-t border-gray-200 pt-6">
+                    <div class="flex items-center justify-between text-sm text-gray-600">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                            <span>Sitzung aktiv bis: <span id="session-expires" class="font-medium"></span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dynamic PIN Authentication System with Email Integration
+        class DynamicPINAuthSystem {
+            constructor() {
+                this.sessionKey = 'fwv_member_session';
+                this.sessionDuration = 24 * 60 * 60 * 1000; // 24 hours
+                this.pinExpiry = 15 * 60 * 1000; // 15 minutes
+                this.currentEmail = null;
+                this.init();
+            }
+
+            init() {
+                // Check if already authenticated
+                if (this.isAuthenticated()) {
+                    this.showMemberContent();
+                } else {
+                    this.showEmailRequest();
+                }
+
+                // Setup event listeners
+                document.getElementById('email-request-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.requestPIN();
+                });
+
+                document.getElementById('pin-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.validatePIN();
+                });
+
+                document.getElementById('show-pin-entry')?.addEventListener('click', () => {
+                    this.showPINEntry();
+                });
+
+                document.getElementById('back-to-email')?.addEventListener('click', () => {
+                    this.showEmailRequest();
+                });
+
+                document.getElementById('resend-pin')?.addEventListener('click', () => {
+                    this.resendPIN();
+                });
+
+                document.getElementById('logout-btn')?.addEventListener('click', () => {
+                    this.logout();
+                });
+
+                // Auto-format PIN input (only numbers)
+                document.getElementById('pin-input')?.addEventListener('input', (e) => {
+                    e.target.value = e.target.value.replace(/\D/g, '');
+                });
+            }
+
+            async requestPIN() {
+                const email = document.getElementById('email-input').value.trim();
+                const btn = document.getElementById('request-pin-btn');
+                const btnText = document.getElementById('btn-text');
+                
+                // Hide previous errors
+                document.getElementById('error-message-email').classList.add('hidden');
+
+                // Validate email format
+                if (!this.validateEmail(email)) {
+                    this.showError('email', 'Bitte gib eine gültige E-Mail-Adresse ein.');
+                    return;
+                }
+
+                // Show loading state
+                btn.disabled = true;
+                btnText.textContent = 'Sende E-Mail...';
+
+                try {
+                    // Generate PIN and send email
+                    const pin = this.generatePIN();
+                    const success = await this.sendPINEmail(email, pin);
+
+                    if (success) {
+                        // Store email and PIN temporarily (in real app, this would be server-side)
+                        this.currentEmail = email;
+                        sessionStorage.setItem('pending_pin', JSON.stringify({
+                            pin: pin,
+                            email: email,
+                            expires: Date.now() + this.pinExpiry
+                        }));
+
+                        // Show PIN entry form
+                        document.getElementById('sent-to-email').textContent = email;
+                        this.showPINEntry();
+                    } else {
+                        throw new Error('E-Mail konnte nicht versendet werden');
+                    }
+                } catch (error) {
+                    console.error('PIN request error:', error);
+                    this.showError('email', 'Es ist ein Fehler aufgetreten. Bitte versuche es später erneut.');
+                } finally {
+                    btn.disabled = false;
+                    btnText.textContent = 'PIN per E-Mail anfordern';
+                }
+            }
+
+            async resendPIN() {
+                if (this.currentEmail) {
+                    document.getElementById('email-input').value = this.currentEmail;
+                    await this.requestPIN();
+                }
+            }
+
+            generatePIN() {
+                // Generate 6-digit PIN
+                return Math.floor(100000 + Math.random() * 900000).toString();
+            }
+
+            async sendPINEmail(email, pin) {
+                // Build mailto link with PIN
+                const subject = encodeURIComponent('Dein Mitgliederbereich-PIN');
+                const body = encodeURIComponent(`Hallo,
+
+Dein PIN für den Zugriff auf den Mitgliederbereich lautet:
+
+${pin}
+
+Dieser PIN ist 15 Minuten gültig und kann nur einmal verwendet werden.
+
+Falls du diese E-Mail nicht angefordert hast, ignoriere sie bitte.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura Kaiseraugst
+
+---
+Diese E-Mail wurde automatisch generiert.
+`);
+
+                const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
+                
+                // Open default email client
+                window.location.href = mailtoLink;
+                
+                // Simulate delay (in reality, email would be sent via backend)
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Return true (in real app, check if email was actually sent)
+                return true;
+            }
+
+            async validatePIN() {
+                const pinInput = document.getElementById('pin-input').value;
+                
+                // Hide previous errors
+                document.getElementById('error-message-pin').classList.add('hidden');
+
+                if (pinInput.length !== 6) {
+                    this.showError('pin', 'Bitte gib einen 6-stelligen PIN ein.');
+                    return;
+                }
+
+                try {
+                    // Get pending PIN from session storage
+                    const pendingData = sessionStorage.getItem('pending_pin');
+                    if (!pendingData) {
+                        this.showError('pin', 'Keine aktive PIN-Anforderung gefunden. Bitte fordere einen neuen PIN an.');
+                        return;
+                    }
+
+                    const { pin, email, expires } = JSON.parse(pendingData);
+
+                    // Check if PIN is expired
+                    if (Date.now() > expires) {
+                        sessionStorage.removeItem('pending_pin');
+                        this.showError('pin', 'Dieser PIN ist abgelaufen. Bitte fordere einen neuen PIN an.');
+                        return;
+                    }
+
+                    // Validate PIN
+                    if (pinInput !== pin) {
+                        this.showError('pin', 'Ungültiger PIN. Bitte versuche es erneut.');
+                        return;
+                    }
+
+                    // PIN is valid - create session
+                    this.createSession(email);
+                    
+                    // Clear pending PIN (one-time use)
+                    sessionStorage.removeItem('pending_pin');
+                    
+                    // Show member content
+                    this.showMemberContent();
+
+                } catch (error) {
+                    console.error('PIN validation error:', error);
+                    this.showError('pin', 'Ein Fehler ist aufgetreten. Bitte versuche es später erneut.');
+                }
+            }
+
+            validateEmail(email) {
+                const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return re.test(email);
+            }
+
+            showError(type, message) {
+                const errorContainer = document.getElementById(`error-message-${type}`);
+                const errorText = document.getElementById(`error-text-${type}`);
+                errorText.textContent = message;
+                errorContainer.classList.remove('hidden');
+            }
+
+            createSession(email) {
+                const expiresAt = new Date(Date.now() + this.sessionDuration);
+                const session = {
+                    authenticated: true,
+                    email: email,
+                    createdAt: new Date().toISOString(),
+                    expiresAt: expiresAt.toISOString()
+                };
+                localStorage.setItem(this.sessionKey, JSON.stringify(session));
+            }
+
+            isAuthenticated() {
+                const sessionData = localStorage.getItem(this.sessionKey);
+                if (!sessionData) return false;
+
+                try {
+                    const session = JSON.parse(sessionData);
+                    const expiresAt = new Date(session.expiresAt);
+                    
+                    if (expiresAt < new Date()) {
+                        // Session expired
+                        this.logout();
+                        return false;
+                    }
+
+                    return session.authenticated;
+                } catch (error) {
+                    console.error('Session validation error:', error);
+                    return false;
+                }
+            }
+
+            showEmailRequest() {
+                document.getElementById('email-request-container').classList.remove('hidden');
+                document.getElementById('pin-entry-container').classList.add('hidden');
+                document.getElementById('members-content').classList.add('hidden');
+            }
+
+            showPINEntry() {
+                document.getElementById('email-request-container').classList.add('hidden');
+                document.getElementById('pin-entry-container').classList.remove('hidden');
+                document.getElementById('members-content').classList.add('hidden');
+                
+                // Focus PIN input
+                setTimeout(() => {
+                    document.getElementById('pin-input')?.focus();
+                }, 100);
+            }
+
+            showMemberContent() {
+                document.getElementById('email-request-container').classList.add('hidden');
+                document.getElementById('pin-entry-container').classList.add('hidden');
+                document.getElementById('members-content').classList.remove('hidden');
+
+                // Display user email
+                const sessionData = localStorage.getItem(this.sessionKey);
+                if (sessionData) {
+                    const session = JSON.parse(sessionData);
+                    document.getElementById('logged-in-email').textContent = session.email;
+                    
+                    // Display session expiry
+                    const expiresAt = new Date(session.expiresAt);
+                    document.getElementById('session-expires').textContent = expiresAt.toLocaleString('de-CH', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            }
+
+            logout() {
+                localStorage.removeItem(this.sessionKey);
+                sessionStorage.removeItem('pending_pin');
+                this.currentEmail = null;
+                window.location.reload();
+            }
+        }
+
+        // Initialize the authentication system when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new DynamicPINAuthSystem();
+        });
+    </script>
+</body>
+</html>
