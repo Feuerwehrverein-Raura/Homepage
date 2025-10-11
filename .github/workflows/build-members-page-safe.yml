@@ -29,36 +29,30 @@ jobs:
         run: |
           echo "🔐 Baue Mitgliederseite mit Secret-Passwort..."
           
-          # Verwende Python für sicheres String-Replacement
-          python3 << 'PYEOF'
+          python3 -c '
 import os
 import sys
 
-# Lese Template
 try:
-    with open('mitglieder/mitglieder-template.html', 'r', encoding='utf-8') as f:
+    with open("mitglieder/mitglieder-template.html", "r", encoding="utf-8") as f:
         content = f.read()
 except FileNotFoundError:
-    print("❌ FEHLER: Template-Datei nicht gefunden!")
+    print("❌ FEHLER: Template nicht gefunden!")
     sys.exit(1)
 
-# Hole Passwort aus Environment
-password = os.environ.get('MEMBERS_PASSWORD', '')
-
+password = os.environ.get("MEMBERS_PASSWORD", "")
 if not password:
-    print("❌ FEHLER: MEMBERS_PASSWORD Secret nicht gesetzt!")
+    print("❌ FEHLER: Secret nicht gesetzt!")
     sys.exit(1)
 
-# Ersetze Platzhalter mit echtem Passwort
-content = content.replace('MEMBERS_PASSWORD_PLACEHOLDER', password)
+content = content.replace("MEMBERS_PASSWORD_PLACEHOLDER", password)
 
-# Schreibe finale HTML-Datei
-with open('mitglieder.html', 'w', encoding='utf-8') as f:
+with open("mitglieder.html", "w", encoding="utf-8") as f:
     f.write(content)
 
-print("✅ Mitgliederseite erfolgreich gebaut")
+print("✅ Build erfolgreich")
 print(f"✅ Passwort-Länge: {len(password)} Zeichen")
-PYEOF
+'
       
       - name: Copy data file
         run: |
@@ -70,16 +64,16 @@ PYEOF
           echo "🔍 Verifiziere Build..."
           
           if grep -q "MEMBERS_PASSWORD_PLACEHOLDER" mitglieder.html; then
-            echo "❌ FEHLER: Platzhalter wurde nicht ersetzt!"
+            echo "❌ FEHLER: Platzhalter nicht ersetzt!"
             exit 1
           fi
           
           if [ ! -s mitglieder.html ]; then
-            echo "❌ FEHLER: mitglieder.html ist leer!"
+            echo "❌ FEHLER: Datei leer!"
             exit 1
           fi
           
-          echo "✅ Build erfolgreich verifiziert"
+          echo "✅ Verifikation erfolgreich"
       
       - name: Commit and push if changed
         run: |
