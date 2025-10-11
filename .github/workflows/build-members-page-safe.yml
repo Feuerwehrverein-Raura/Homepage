@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'mitglieder/**'
+      - 'scripts/build-members-page.py'
       - '.github/workflows/build-members-page.yml'
   workflow_dispatch:
 
@@ -23,36 +24,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
       
-      - name: Build members page with password from secret
+      - name: Build members page
         env:
           MEMBERS_PASSWORD: ${{ secrets.MEMBERS_PASSWORD }}
         run: |
-          echo "🔐 Baue Mitgliederseite mit Secret-Passwort..."
-          
-          python3 -c '
-import os
-import sys
-
-try:
-    with open("mitglieder/mitglieder-template.html", "r", encoding="utf-8") as f:
-        content = f.read()
-except FileNotFoundError:
-    print("❌ FEHLER: Template nicht gefunden!")
-    sys.exit(1)
-
-password = os.environ.get("MEMBERS_PASSWORD", "")
-if not password:
-    print("❌ FEHLER: Secret nicht gesetzt!")
-    sys.exit(1)
-
-content = content.replace("MEMBERS_PASSWORD_PLACEHOLDER", password)
-
-with open("mitglieder.html", "w", encoding="utf-8") as f:
-    f.write(content)
-
-print("✅ Build erfolgreich")
-print(f"✅ Passwort-Länge: {len(password)} Zeichen")
-'
+          echo "🔐 Baue Mitgliederseite..."
+          python3 scripts/build-members-page.py
       
       - name: Copy data file
         run: |
