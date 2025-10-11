@@ -586,8 +586,90 @@
             subscribeCalendar() {
                 const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
                 const webcalUrl = 'webcal://' + window.location.host + window.location.pathname.replace(/\/[^\/]*$/, '') + '/calendar.ics';
+                const httpsUrl = baseUrl + '/calendar.ics';
                 
-                alert(`Kalender-Abonnement:\n\nFügen Sie diese URL zu Ihrem Kalender hinzu:\n${webcalUrl}\n\nOder laden Sie die ICS-Datei herunter und importieren Sie sie manuell.`);
+                // Erstelle Modal-HTML
+                const modalHTML = `
+                    <div class="bg-white rounded-lg max-w-2xl w-full mx-4">
+                        <div class="bg-gradient-to-r from-fire-500 to-fire-600 text-white p-6 rounded-t-lg">
+                            <h3 class="text-xl font-bold flex items-center">
+                                <span class="mr-2">📅</span>
+                                Kalender abonnieren
+                            </h3>
+                        </div>
+                        <div class="p-6">
+                            <p class="mb-4 text-gray-600">
+                                Wählen Sie eine der folgenden Optionen, um den Feuerwehrverein Raura Kalender zu abonnieren:
+                            </p>
+                            
+                            <div class="space-y-4">
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h4 class="font-semibold text-blue-800 mb-2">📱 Automatisches Abonnement (empfohlen)</h4>
+                                    <p class="text-sm text-blue-700 mb-3">Klicken Sie auf den Link um den Kalender automatisch zu abonnieren:</p>
+                                    <a href="${webcalUrl}" class="inline-block bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors">
+                                        📅 Kalender automatisch abonnieren
+                                    </a>
+                                </div>
+                                
+                                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                    <h4 class="font-semibold text-gray-800 mb-2">🔗 Manuelle URL (zum Kopieren)</h4>
+                                    <p class="text-sm text-gray-600 mb-3">Falls der automatische Link nicht funktioniert, kopieren Sie diese URL und fügen Sie sie in Ihrem Kalender hinzu:</p>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="text" value="${webcalUrl}" readonly 
+                                               class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm font-mono bg-white"
+                                               id="calendar-url-input">
+                                        <button onclick="navigator.clipboard.writeText('${webcalUrl}').then(() => this.textContent = '✅ Kopiert!').catch(() => this.textContent = '📋 Kopieren')" 
+                                                class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm">
+                                            📋 Kopieren
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <h4 class="font-semibold text-green-800 mb-2">⬇️ ICS-Datei herunterladen</h4>
+                                    <p class="text-sm text-green-700 mb-3">Laden Sie die ICS-Datei herunter und importieren Sie sie manuell in Ihren Kalender:</p>
+                                    <a href="${httpsUrl}" download="fwv-raura-kalender.ics" 
+                                       class="inline-block bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">
+                                        ⬇️ ICS-Datei herunterladen
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6 text-sm text-gray-500">
+                                <p><strong>💡 Tipp:</strong> Nach dem Abonnieren werden neue Termine automatisch in Ihrem Kalender angezeigt.</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-6 py-3 rounded-b-lg flex justify-end">
+                            <button onclick="this.closest('.fixed').remove()" 
+                                    class="px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                                Schließen
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Erstelle Modal
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = modalHTML;
+                
+                // Schließen bei Klick auf Hintergrund
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+                
+                document.body.appendChild(modal);
+                
+                // URL automatisch auswählen für einfaches Kopieren
+                setTimeout(() => {
+                    const input = document.getElementById('calendar-url-input');
+                    if (input) {
+                        input.select();
+                        input.focus();
+                    }
+                }, 100);
             }
 
             downloadAllICS() {
