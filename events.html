@@ -1452,7 +1452,733 @@
             downloadArbeitsplanPDF() {
                 if (!this.selectedEvent || !this.selectedEvent.shifts) return;
                 
-                alert('PDF-Download wird vorbereitet. Diese Funktion wird in Kürze verfügbar sein.');
+                // Generate HTML content for PDF
+                const htmlContent = this.generatePrintableArbeitsplan(this.selectedEvent);
+                
+                // Create a new window with the content
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(htmlContent);
+                printWindow.document.close();
+                
+                // Wait for content to load, then trigger print dialog
+                printWindow.onload = function() {
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 250);
+                };
+            }
+
+            generatePrintableArbeitsplan(event) {
+                const arbeitsplan = this.arbeitsplanData[event.id] || { assignments: {} };
+                const stats = this.calculateArbeitsplanStats(event, arbeitsplan);
+                
+                return `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbeitsplan ${event.title}</title>
+    <style>
+        ${this.getPrintCSS()}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1>🔥 Feuerwehrverein Raura Kaiseraugst</h1>
+                    <h2>📋 Arbeitsplan ${event.title}</h2>
+                </div>
+                <div class="event-info">
+                    <div class="info-item"><strong>📅 Datum:</strong> ${this.formatDate(event.startDate)} - ${this.formatDate(event.endDate)}</div>
+                    <div class="info-item"><strong>📍 Ort:</strong> ${event.location}</div>
+                    <div class="info-item"><strong>⏰ Stand:</strong> ${new Date().toLocaleDateString('de-DE')} ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr</div>
+                    <div class="info-item"><strong>👤 Koordination:</strong> ${event.organizer} (${event.email})</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Statistics Dashboard -->
+        <section class="stats-section">
+            <h3>📊 Übersicht</h3>
+            <div class="stats-grid">
+                <div class="stat-card ${stats.fillPercentage >= 80 ? 'stat-good' : stats.fillPercentage >= 50 ? 'stat-warning' : 'stat-critical'}">
+                    <div class="stat-number">${stats.filledPositions}/${stats.totalPositions}</div>
+                    <div class="stat-label">Besetzte Positionen</div>
+                    <div class="stat-percentage">${stats.fillPercentage}%</div>
+                </div>
+                <div class="stat-card ${stats.filledShifts === stats.totalShifts ? 'stat-good' : stats.filledShifts < stats.totalShifts/2 ? 'stat-critical' : 'stat-warning'}">
+                    <div class="stat-number">${stats.filledShifts}/${stats.totalShifts}</div>
+                    <div class="stat-label">Besetzte Schichten</div>
+                </div>
+                <div class="stat-card ${stats.criticalShifts === 0 ? 'stat-good' : 'stat-critical'}">
+                    <div class="stat-number">${stats.criticalShifts}</div>
+                    <div class="stat-label">Unbesetzte Schichten</div>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: ${stats.fillPercentage}%"></div>
+                <div class="progress-text">${stats.fillPercentage}% belegt (${stats.filledPositions}/${stats.totalPositions})</div>
+            </div>
+        </section>
+
+        ${stats.criticalShifts > 0 ? this.generateCriticalSection(event, arbeitsplan) : ''}
+
+        <!-- Shift Tables -->
+        ${this.generateShiftSections(event, arbeitsplan)}
+
+        <!-- Contact Information -->
+        <section class="contact-section">
+            <h3>📞 Kontakt & Anmeldung</h3>
+            <div class="contact-grid">
+                <div class="contact-card">
+                    <h4>Schichtkoordination</h4>
+                    <p><strong>${event.organizer}</strong></p>
+                    <p>📧 ${event.email}</p>
+                    ${event.registrationDeadline ? `<p>📅 Anmeldeschluss: ${this.formatDate(event.registrationDeadline)}</p>` : ''}
+                </div>
+                <div class="contact-card">
+                    <h4>Springer & Vertretung</h4>
+                    <p><strong>Stefan Müller (Aktuar)</strong></p>
+                    <p>📧 aktuar@fwv-raura.ch</p>
+                    <p>⏰ Verfügbar bei kurzfristigen Ausfällen</p>
+                </div>
+            </div>
+            <div class="anmeldung-hinweis">
+                <h4>💡 Anmeldung</h4>
+                <p>Anmeldungen bitte per E-Mail an <strong>${event.email}</strong> mit Angabe der gewünschten Schicht(en).</p>
+                <p>Bei Fragen oder kurzfristigen Änderungen bitte direkt Kontakt aufnehmen.</p>
+            </div>
+        </section>
+    </div>
+</body>
+</html>`;
+            }
+
+            calculateArbeitsplanStats(event, arbeitsplan) {
+                if (!event.shifts) return { totalShifts: 0, filledShifts: 0, totalPositions: 0, filledPositions: 0, fillPercentage: 0, criticalShifts: 0 };
+                
+                let totalPositions = 0;
+                let filledPositions = 0;
+                let filledShifts = 0;
+                let criticalShifts = 0;
+                
+                for (const shift of event.shifts) {
+                    const assignments = arbeitsplan.assignments[shift.id] || [];
+                    const needed = shift.needed || 1;
+                    
+                    totalPositions += needed;
+                    filledPositions += assignments.length;
+                    
+                    if (assignments.length > 0) {
+                        filledShifts++;
+                    } else {
+                        criticalShifts++;
+                    }
+                }
+                
+                const fillPercentage = totalPositions > 0 ? Math.round((filledPositions / totalPositions) * 100) : 0;
+                
+                return {
+                    totalShifts: event.shifts.length,
+                    filledShifts,
+                    totalPositions,
+                    filledPositions,
+                    fillPercentage,
+                    criticalShifts
+                };
+            }
+
+            generateCriticalSection(event, arbeitsplan) {
+                const criticalShifts = event.shifts.filter(shift => {
+                    const assignments = arbeitsplan.assignments[shift.id] || [];
+                    return assignments.length === 0;
+                });
+                
+                if (criticalShifts.length === 0) return '';
+                
+                return `
+                <section class="critical-section">
+                    <h3>🚨 Dringende Hilfe gesucht</h3>
+                    <div class="critical-alert">
+                        <h4>❌ Noch unbesetzte Schichten (${criticalShifts.length})</h4>
+                        <ul class="critical-list">
+                            ${criticalShifts.map(shift => `
+                                <li><strong>${shift.name}</strong> - ${shift.date}, ${shift.time} (${shift.needed || 1} Personen benötigt)</li>
+                            `).join('')}
+                        </ul>
+                        <p class="critical-note">
+                            <strong>📞 Bitte meldet euch:</strong> Diese Schichten brauchen noch Helfer! 
+                            Kontakt: ${event.email}
+                        </p>
+                    </div>
+                </section>`;
+            }
+
+            generateShiftSections(event, arbeitsplan) {
+                // Group shifts by category
+                const categories = this.groupShiftsByCategory(event.shifts);
+                let sections = '';
+
+                const categoryOrder = ['aufbau', 'samstag', 'sonntag', 'abbau', 'sonstige'];
+                const categoryTitles = {
+                    'aufbau': '🔨 Aufbau',
+                    'samstag': '🎪 Chilbi-Betrieb Samstag',
+                    'sonntag': '🎪 Chilbi-Betrieb Sonntag', 
+                    'abbau': '🔧 Abbau',
+                    'sonstige': '📋 Weitere Schichten'
+                };
+
+                for (const category of categoryOrder) {
+                    if (!categories[category] || categories[category].length === 0) continue;
+
+                    const shifts = categories[category];
+                    sections += `
+                    <section class="shift-category">
+                        <h3>${categoryTitles[category]}</h3>
+                        ${this.generateShiftTable(shifts, arbeitsplan, category)}
+                    </section>`;
+                }
+
+                return sections;
+            }
+
+            groupShiftsByCategory(shifts) {
+                const categories = {
+                    aufbau: [],
+                    samstag: [], 
+                    sonntag: [],
+                    abbau: [],
+                    sonstige: []
+                };
+                
+                for (const shift of shifts) {
+                    if (shift.id.includes('aufbau')) {
+                        categories.aufbau.push(shift);
+                    } else if (shift.id.includes('abbau')) {
+                        categories.abbau.push(shift);
+                    } else if (shift.id.includes('samstag')) {
+                        categories.samstag.push(shift);
+                    } else if (shift.id.includes('sonntag')) {
+                        categories.sonntag.push(shift);
+                    } else {
+                        categories.sonstige.push(shift);
+                    }
+                }
+                
+                return categories;
+            }
+
+            generateShiftTable(shifts, arbeitsplan, category) {
+                if (category === 'samstag' || category === 'sonntag') {
+                    return this.generateDailyShiftTable(shifts, arbeitsplan);
+                }
+                return this.generateSimpleShiftTable(shifts, arbeitsplan);
+            }
+
+            generateDailyShiftTable(shifts, arbeitsplan) {
+                // Group by time slots
+                const timeSlots = {};
+
+                for (const shift of shifts) {
+                    const timeMatch = shift.time.match(/(\d{2}:\d{2})-(\d{2}:\d{2}|Open End)/);
+                    if (timeMatch) {
+                        const timeKey = shift.time;
+                        if (!timeSlots[timeKey]) {
+                            timeSlots[timeKey] = [];
+                        }
+                        timeSlots[timeKey].push(shift);
+                    }
+                }
+
+                let html = '';
+
+                for (const [timeKey, timeShifts] of Object.entries(timeSlots).sort()) {
+                    html += `
+                    <div class="time-slot">
+                        <h4>${timeKey}</h4>
+                        <table class="shift-table">
+                            <thead>
+                                <tr>
+                                    <th>Bereich</th>
+                                    <th>Benötigt</th>
+                                    <th>Status</th>
+                                    <th>Zugewiesene Helfer</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+
+                    // Sort shifts (Bar, Küche, Kasse)
+                    const sortedShifts = timeShifts.sort((a, b) => {
+                        const order = { 'bar': 0, 'kueche': 1, 'kasse': 2 };
+                        const aType = a.id.includes('bar') ? 'bar' : a.id.includes('kueche') ? 'kueche' : 'kasse';
+                        const bType = b.id.includes('bar') ? 'bar' : b.id.includes('kueche') ? 'kueche' : 'kasse';
+                        return order[aType] - order[bType];
+                    });
+
+                    for (const shift of sortedShifts) {
+                        const assignments = arbeitsplan.assignments[shift.id] || [];
+                        const needed = shift.needed || 1;
+                        const assigned = assignments.length;
+
+                        let statusClass, statusText;
+                        if (assigned >= needed) {
+                            statusClass = 'status-complete';
+                            statusText = `✅ Komplett besetzt (${assigned}/${needed})`;
+                        } else if (assigned === 0) {
+                            statusClass = 'status-critical';
+                            statusText = `❌ Unbesetzt (0/${needed})`;
+                        } else {
+                            statusClass = 'status-partial';
+                            statusText = `⚠️ Teilweise besetzt (${assigned}/${needed})`;
+                        }
+
+                        const helpers = assigned > 0 
+                            ? assignments.join(', ')
+                            : '--- noch niemand angemeldet ---';
+
+                        const areaName = shift.description.split(' - ')[0] || 
+                            (shift.id.includes('bar') ? 'Bar' : 
+                             shift.id.includes('kueche') ? 'Küche' : 'Service/Kasse');
+
+                        html += `
+                                <tr class="${statusClass}">
+                                    <td><strong>${areaName}</strong></td>
+                                    <td class="text-center">${needed}</td>
+                                    <td class="${statusClass}">${statusText}</td>
+                                    <td>${helpers}</td>
+                                </tr>`;
+                    }
+
+                    html += `
+                            </tbody>
+                        </table>
+                    </div>`;
+                }
+
+                return html;
+            }
+
+            generateSimpleShiftTable(shifts, arbeitsplan) {
+                let html = `
+                <table class="shift-table">
+                    <thead>
+                        <tr>
+                            <th>Schicht</th>
+                            <th>Zeit</th>
+                            <th>Benötigt</th>
+                            <th>Status</th>
+                            <th>Zugewiesene Helfer</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                for (const shift of shifts) {
+                    const assignments = arbeitsplan.assignments[shift.id] || [];
+                    const needed = shift.needed || 1;
+                    const assigned = assignments.length;
+
+                    let statusClass, statusText;
+                    if (assigned >= needed) {
+                        statusClass = 'status-complete';
+                        statusText = `✅ Komplett besetzt (${assigned}/${needed})`;
+                    } else if (assigned === 0) {
+                        statusClass = 'status-critical';
+                        statusText = `❌ Unbesetzt (0/${needed})`;
+                    } else {
+                        statusClass = 'status-partial';
+                        statusText = `⚠️ Teilweise besetzt (${assigned}/${needed})`;
+                    }
+
+                    const helpers = assigned > 0 
+                        ? assignments.join(', ')
+                        : '--- noch niemand angemeldet ---';
+
+                    html += `
+                        <tr class="${statusClass}">
+                            <td><strong>${shift.name}</strong></td>
+                            <td>${shift.time}</td>
+                            <td class="text-center">${needed}</td>
+                            <td class="${statusClass}">${statusText}</td>
+                            <td>${helpers}</td>
+                        </tr>`;
+                }
+
+                html += `
+                    </tbody>
+                </table>`;
+
+                return html;
+            }
+
+            getPrintCSS() {
+                return `
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+
+                body {
+                    font-family: 'Arial', 'Helvetica', sans-serif;
+                    line-height: 1.4;
+                    color: #333;
+                    background: white;
+                    font-size: 14px;
+                }
+
+                .container {
+                    max-width: 100%;
+                    margin: 0 auto;
+                    background: white;
+                }
+
+                .header {
+                    background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+                    color: white;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                    page-break-inside: avoid;
+                }
+
+                .header-content {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    flex-wrap: wrap;
+                }
+
+                .logo-section h1 {
+                    font-size: 22px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+
+                .logo-section h2 {
+                    font-size: 18px;
+                    font-weight: normal;
+                    opacity: 0.9;
+                }
+
+                .event-info {
+                    text-align: right;
+                }
+
+                .info-item {
+                    margin-bottom: 3px;
+                    font-size: 12px;
+                }
+
+                .stats-section {
+                    background: white;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    border: 2px solid #d32f2f;
+                    border-radius: 8px;
+                    page-break-inside: avoid;
+                }
+
+                .stats-section h3 {
+                    margin-bottom: 15px;
+                    color: #d32f2f;
+                    border-bottom: 2px solid #d32f2f;
+                    padding-bottom: 5px;
+                    font-size: 16px;
+                }
+
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 15px;
+                    margin-bottom: 15px;
+                }
+
+                .stat-card {
+                    background: white;
+                    padding: 15px;
+                    border-radius: 6px;
+                    text-align: center;
+                    border: 2px solid #e0e0e0;
+                }
+
+                .stat-card.stat-good {
+                    border-color: #4caf50;
+                    background: #f1f8e9;
+                }
+
+                .stat-card.stat-warning {
+                    border-color: #ff9800;
+                    background: #fff3e0;
+                }
+
+                .stat-card.stat-critical {
+                    border-color: #f44336;
+                    background: #ffebee;
+                }
+
+                .stat-number {
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+
+                .stat-label {
+                    font-size: 12px;
+                    color: #666;
+                    margin-bottom: 5px;
+                }
+
+                .stat-percentage {
+                    font-size: 14px;
+                    font-weight: bold;
+                    color: #d32f2f;
+                }
+
+                .progress-bar {
+                    background: #e0e0e0;
+                    height: 25px;
+                    border-radius: 12px;
+                    position: relative;
+                    overflow: hidden;
+                }
+
+                .progress-fill {
+                    background: linear-gradient(90deg, #4caf50, #8bc34a);
+                    height: 100%;
+                    border-radius: 12px;
+                }
+
+                .progress-text {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    font-weight: bold;
+                    color: #333;
+                    font-size: 12px;
+                }
+
+                .critical-section {
+                    background: #ffebee;
+                    border: 2px solid #f44336;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    page-break-inside: avoid;
+                }
+
+                .critical-section h3 {
+                    color: #d32f2f;
+                    margin-bottom: 10px;
+                    font-size: 16px;
+                }
+
+                .critical-alert {
+                    background: white;
+                    padding: 10px;
+                    border-radius: 6px;
+                    border-left: 4px solid #f44336;
+                }
+
+                .critical-list {
+                    list-style-type: none;
+                    margin: 10px 0;
+                }
+
+                .critical-list li {
+                    padding: 3px 0;
+                    border-bottom: 1px solid #eee;
+                    font-size: 13px;
+                }
+
+                .critical-note {
+                    margin-top: 10px;
+                    padding: 8px;
+                    background: #ffcdd2;
+                    border-radius: 4px;
+                    font-size: 12px;
+                }
+
+                .shift-category {
+                    background: white;
+                    margin-bottom: 20px;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    page-break-inside: avoid;
+                }
+
+                .shift-category h3 {
+                    background: #d32f2f;
+                    color: white;
+                    padding: 12px 15px;
+                    margin: 0;
+                    font-size: 16px;
+                }
+
+                .time-slot {
+                    padding: 12px 15px;
+                    border-bottom: 1px solid #eee;
+                }
+
+                .time-slot:last-child {
+                    border-bottom: none;
+                }
+
+                .time-slot h4 {
+                    color: #d32f2f;
+                    margin-bottom: 8px;
+                    font-size: 14px;
+                }
+
+                .shift-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 8px;
+                    font-size: 12px;
+                }
+
+                .shift-table th {
+                    background: #f5f5f5;
+                    padding: 8px 6px;
+                    text-align: left;
+                    border: 1px solid #ddd;
+                    font-weight: bold;
+                    font-size: 12px;
+                }
+
+                .shift-table td {
+                    padding: 6px;
+                    border: 1px solid #ddd;
+                    vertical-align: top;
+                    font-size: 11px;
+                }
+
+                .shift-table .text-center {
+                    text-align: center;
+                }
+
+                .shift-table tr.status-complete {
+                    background: #f1f8e9;
+                }
+
+                .shift-table tr.status-partial {
+                    background: #fff3e0;
+                }
+
+                .shift-table tr.status-critical {
+                    background: #ffebee;
+                }
+
+                .status-complete {
+                    color: #2e7d32;
+                    font-weight: bold;
+                }
+
+                .status-partial {
+                    color: #f57c00;
+                    font-weight: bold;
+                }
+
+                .status-critical {
+                    color: #d32f2f;
+                    font-weight: bold;
+                }
+
+                .contact-section {
+                    background: white;
+                    padding: 15px;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    margin-top: 20px;
+                    page-break-inside: avoid;
+                }
+
+                .contact-section h3 {
+                    color: #d32f2f;
+                    margin-bottom: 10px;
+                    border-bottom: 2px solid #d32f2f;
+                    padding-bottom: 5px;
+                    font-size: 16px;
+                }
+
+                .contact-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 15px;
+                    margin-bottom: 15px;
+                }
+
+                .contact-card {
+                    background: #f8f9fa;
+                    padding: 10px;
+                    border-radius: 6px;
+                    border-left: 4px solid #d32f2f;
+                }
+
+                .contact-card h4 {
+                    color: #d32f2f;
+                    margin-bottom: 8px;
+                    font-size: 14px;
+                }
+
+                .contact-card p {
+                    margin-bottom: 3px;
+                    font-size: 12px;
+                }
+
+                .anmeldung-hinweis {
+                    background: #e3f2fd;
+                    padding: 10px;
+                    border-radius: 6px;
+                    border-left: 4px solid #2196f3;
+                }
+
+                .anmeldung-hinweis h4 {
+                    color: #1976d2;
+                    margin-bottom: 8px;
+                    font-size: 14px;
+                }
+
+                .anmeldung-hinweis p {
+                    margin-bottom: 5px;
+                    font-size: 12px;
+                }
+
+                /* Print optimizations */
+                @media print {
+                    .container {
+                        margin: 0;
+                        padding: 0;
+                    }
+                    
+                    .shift-category {
+                        page-break-inside: avoid;
+                        break-inside: avoid;
+                    }
+                    
+                    .time-slot {
+                        page-break-inside: avoid;
+                        break-inside: avoid;
+                    }
+                    
+                    .stats-section {
+                        page-break-after: avoid;
+                    }
+                    
+                    .critical-section {
+                        page-break-after: avoid;
+                    }
+                }
+
+                @page {
+                    margin: 15mm;
+                    size: A4;
+                }
+                `;
             }
 
             editArbeitsplan() {
