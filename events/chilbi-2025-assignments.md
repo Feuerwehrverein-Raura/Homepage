@@ -28,10 +28,11 @@
 
 ### samstag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
 - Ramon Kahl
-- Sandra Unger + Gabo
+- Gabo
 
 ### samstag-kueche-14-16 (14:00-16:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Sandra Unger
+- **[OFFEN - 1 Platz]**
 
 ### samstag-bar-16-18 (16:00-18:00) - 2 Personen benötigt
 - Marijan Vukadin
@@ -76,7 +77,8 @@
 - **[OFFEN - 1 Platz]**
 
 ### sonntag-bar-14-16 (14:00-16:00) - 2 Personen benötigt
-- **[OFFEN - 2 Plätze]**
+- Oliver Jucker
+- Dario Roth
 
 ### sonntag-kueche-14-16 (14:00-16:00) - 2 Personen benötigt
 - Ursula Meyer ?
