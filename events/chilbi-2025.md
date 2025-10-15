@@ -107,6 +107,13 @@ shifts:
     time: 22:00-Open End
     needed: 2
     description: Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)
+
+  - id: samstag-service-18-open
+    name: Service/Kasse Samstag 18:00-Open End
+    date: 2025-10-18
+    time: 18:00-Open End
+    needed: 1
+    description: Service und Kassenbereich - Bedienung der Gäste und Kassenführung (bis Betriebsschluss)
   
   # Sonntag Schichten
   - id: sonntag-bar-12-14
