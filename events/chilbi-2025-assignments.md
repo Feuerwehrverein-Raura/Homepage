@@ -64,6 +64,10 @@
 ### samstag-kueche-22-open (22:00-Open End) - 2 Personen benötigt
 - **[OFFEN - 2 Plätze]**
 
+### samstag-service-18-open (18:00-Open End) - 1 Person benötigt
+- Josua Sutter
+
+
 ---
 
 ## Sonntag, 19.10.2025
