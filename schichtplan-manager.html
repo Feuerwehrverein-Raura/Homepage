@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schichtplan-Manager - Feuerwehrverein Raura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .shift-cell {
+            min-height: 60px;
+        }
+        .drag-over {
+            background-color: #fee2e2 !important;
+            border: 2px dashed #dc2626;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="h-12 w-auto">
+                    <span class="text-xl font-bold text-fire-700">Feuerwehrverein Raura</span>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="index.html" class="text-gray-700 hover:text-fire-600 transition-colors">Home</a>
+                    <a href="events.html" class="text-gray-700 hover:text-fire-600 transition-colors">Veranstaltungen</a>
+                    <a href="calendar.html" class="text-gray-700 hover:text-fire-600 transition-colors">Kalender</a>
+                    <a href="schichtplan-manager.html" class="text-fire-600 font-semibold">Schichtplan</a>
+                    <a href="#contact" class="text-gray-700 hover:text-fire-600 transition-colors">Kontakt</a>
+                </div>
+                <button id="mobile-menu-button" class="md:hidden text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden bg-white shadow-md">
+        <div class="px-4 pt-2 pb-3 space-y-1">
+            <a href="index.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Home</a>
+            <a href="events.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Veranstaltungen</a>
+            <a href="calendar.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Kalender</a>
+            <a href="schichtplan-manager.html" class="block px-3 py-2 text-fire-600 font-semibold bg-fire-50 rounded-md">Schichtplan</a>
+            <a href="#contact" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Kontakt</a>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-r from-fire-600 to-fire-800 text-white py-12">
+        <div class="container mx-auto px-4">
+            <h1 class="text-4xl font-bold mb-4">👷 Schichtplan-Manager</h1>
+            <p class="text-xl">Interaktive Verwaltung der Helfer-Schichten</p>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <section class="py-8">
+        <div class="container mx-auto px-4">
+            <!-- Event Selection -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div class="flex-1">
+                        <label for="event-selector" class="block text-sm font-medium text-gray-700 mb-2">
+                            Event auswählen
+                        </label>
+                        <select id="event-selector" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 focus:border-fire-500">
+                            <option value="">Lade Events...</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="load-assignments-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            📂 Schichtplan laden
+                        </button>
+                        <input type="file" id="assignments-file" accept=".md" class="hidden">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div id="statistics" class="hidden grid md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-sm text-gray-600 mb-1">Gesamt</div>
+                    <div class="text-3xl font-bold text-gray-800" id="stat-total">0</div>
+                    <div class="text-xs text-gray-500">Schichten</div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-sm text-gray-600 mb-1">Besetzt</div>
+                    <div class="text-3xl font-bold text-green-600" id="stat-filled">0</div>
+                    <div class="text-xs text-gray-500">Zugewiesen</div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-sm text-gray-600 mb-1">Offen</div>
+                    <div class="text-3xl font-bold text-red-600" id="stat-open">0</div>
+                    <div class="text-xs text-gray-500">Plätze frei</div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="text-sm text-gray-600 mb-1">Fortschritt</div>
+                    <div class="text-3xl font-bold text-fire-600" id="stat-progress">0%</div>
+                    <div class="text-xs text-gray-500">Abdeckung</div>
+                </div>
+            </div>
+
+            <!-- Schichtplan Table -->
+            <div id="schichtplan-container" class="hidden bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2" id="event-title">Schichtplan</h2>
+                    <p class="text-gray-600" id="event-details"></p>
+                </div>
+                <div id="shifts-content" class="space-y-6">
+                    <!-- Shifts will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="action-buttons" class="hidden flex flex-wrap gap-3">
+                <button id="export-markdown-btn" class="flex-1 bg-gray-800 text-white px-6 py-3 rounded-lg hover:bg-gray-900 transition-colors flex items-center justify-center space-x-2">
+                    <span>📝</span>
+                    <span>Markdown exportieren</span>
+                </button>
+                <button id="export-pdf-btn" class="flex-1 bg-fire-600 text-white px-6 py-3 rounded-lg hover:bg-fire-700 transition-colors flex items-center justify-center space-x-2">
+                    <span>📄</span>
+                    <span>PDF Arbeitsplan</span>
+                </button>
+                <button id="clear-all-btn" class="px-6 py-3 border border-red-500 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+                    🗑️ Alle löschen
+                </button>
+            </div>
+
+            <!-- Help Section -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mt-6">
+                <h3 class="text-lg font-bold text-blue-800 mb-2">💡 Anleitung</h3>
+                <ul class="space-y-2 text-blue-700 text-sm">
+                    <li><strong>1.</strong> Wählen Sie ein Event aus der Liste</li>
+                    <li><strong>2.</strong> Tragen Sie Namen direkt in die Schichtfelder ein</li>
+                    <li><strong>3.</strong> Speichern Sie den Schichtplan als Markdown oder PDF</li>
+                    <li><strong>4.</strong> Optional: Laden Sie einen bestehenden Schichtplan (.md Datei)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p>&copy; 2025 Feuerwehrverein Raura Kaiseraugst. Alle Rechte vorbehalten.</p>
+            <p class="mt-2 text-gray-400">Schichtplan-Manager Version 1.0</p>
+        </div>
+    </footer>
+
+    <script>
+        class SchichtplanManager {
+            constructor() {
+                this.events = [];
+                this.currentEvent = null;
+                this.assignments = {};
+                this.init();
+            }
+
+            async init() {
+                await this.loadEvents();
+                this.setupEventListeners();
+            }
+
+            async loadEvents() {
+                try {
+                    const response = await fetch('events/');
+                    const text = await response.text();
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, 'text/html');
+                    const links = Array.from(doc.querySelectorAll('a'))
+                        .filter(a => a.href.endsWith('.md') && !a.href.includes('README') && !a.href.includes('assignments'));
+                    
+                    for (const link of links) {
+                        const filename = link.href.split('/').pop();
+                        const eventData = await this.loadEventFile(`events/${filename}`);
+                        if (eventData && eventData.shifts && eventData.shifts.length > 0) {
+                            this.events.push({ filename, ...eventData });
+                        }
+                    }
+
+                    this.populateEventSelector();
+                } catch (error) {
+                    console.error('Fehler beim Laden der Events:', error);
+                    this.showError('Events konnten nicht geladen werden');
+                }
+            }
+
+            async loadEventFile(filepath) {
+                try {
+                    const response = await fetch(filepath);
+                    const text = await response.text();
+                    return this.parseMarkdown(text);
+                } catch (error) {
+                    console.error(`Fehler beim Laden von ${filepath}:`, error);
+                    return null;
+                }
+            }
+
+            parseMarkdown(content) {
+                const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+                if (!frontmatterMatch) return null;
+
+                try {
+                    const data = jsyaml.load(frontmatterMatch[1]);
+                    return data;
+                } catch (error) {
+                    console.error('YAML Parse Error:', error);
+                    return null;
+                }
+            }
+
+            populateEventSelector() {
+                const selector = document.getElementById('event-selector');
+                selector.innerHTML = '<option value="">Event auswählen...</option>';
+                
+                this.events.forEach((event, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${event.title} (${new Date(event.startDate).toLocaleDateString('de-DE')})`;
+                    selector.appendChild(option);
+                });
+            }
+
+            setupEventListeners() {
+                // Event selection
+                document.getElementById('event-selector').addEventListener('change', (e) => {
+                    if (e.target.value !== '') {
+                        this.loadEvent(parseInt(e.target.value));
+                    }
+                });
+
+                // Load assignments button
+                document.getElementById('load-assignments-btn').addEventListener('click', () => {
+                    document.getElementById('assignments-file').click();
+                });
+
+                document.getElementById('assignments-file').addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        this.loadAssignmentsFile(e.target.files[0]);
+                    }
+                });
+
+                // Export buttons
+                document.getElementById('export-markdown-btn').addEventListener('click', () => {
+                    this.exportMarkdown();
+                });
+
+                document.getElementById('export-pdf-btn').addEventListener('click', () => {
+                    this.exportPDF();
+                });
+
+                document.getElementById('clear-all-btn').addEventListener('click', () => {
+                    if (confirm('Möchten Sie wirklich alle Zuweisungen löschen?')) {
+                        this.clearAllAssignments();
+                    }
+                });
+
+                // Mobile menu
+                document.getElementById('mobile-menu-button').addEventListener('click', () => {
+                    document.getElementById('mobile-menu').classList.toggle('hidden');
+                });
+            }
+
+            loadEvent(index) {
+                this.currentEvent = this.events[index];
+                this.assignments = {};
+                
+                // Initialize assignments
+                this.currentEvent.shifts.forEach(shift => {
+                    this.assignments[shift.id] = [];
+                });
+
+                this.renderSchichtplan();
+                this.updateStatistics();
+                
+                document.getElementById('schichtplan-container').classList.remove('hidden');
+                document.getElementById('statistics').classList.remove('hidden');
+                document.getElementById('action-buttons').classList.remove('hidden');
+            }
+
+            renderSchichtplan() {
+                const container = document.getElementById('shifts-content');
+                document.getElementById('event-title').textContent = `Schichtplan: ${this.currentEvent.title}`;
+                document.getElementById('event-details').textContent = 
+                    `${new Date(this.currentEvent.startDate).toLocaleDateString('de-DE')} - ${this.currentEvent.location}`;
+
+                container.innerHTML = '';
+
+                // Group shifts by category (extracted from shift names or IDs)
+                const grouped = this.groupShiftsByCategory(this.currentEvent.shifts);
+
+                for (const [category, shifts] of Object.entries(grouped)) {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'border-t-2 border-fire-500 pt-4';
+                    
+                    const categoryTitle = document.createElement('h3');
+                    categoryTitle.className = 'text-xl font-bold text-gray-800 mb-4';
+                    categoryTitle.textContent = category;
+                    categoryDiv.appendChild(categoryTitle);
+
+                    const shiftsGrid = document.createElement('div');
+                    shiftsGrid.className = 'space-y-3';
+
+                    shifts.forEach(shift => {
+                        const shiftCard = this.createShiftCard(shift);
+                        shiftsGrid.appendChild(shiftCard);
+                    });
+
+                    categoryDiv.appendChild(shiftsGrid);
+                    container.appendChild(categoryDiv);
+                }
+            }
+
+            groupShiftsByCategory(shifts) {
+                const grouped = {};
+                
+                shifts.forEach(shift => {
+                    let category = 'Allgemein';
+                    
+                    // Try to extract category from shift ID or name
+                    if (shift.id.includes('aufbau')) category = '🔨 Aufbau';
+                    else if (shift.id.includes('samstag')) category = '🎪 Samstag';
+                    else if (shift.id.includes('sonntag')) category = '🎪 Sonntag';
+                    else if (shift.id.includes('abbau')) category = '📦 Abbau';
+                    else if (shift.name.toLowerCase().includes('aufbau')) category = '🔨 Aufbau';
+                    else if (shift.name.toLowerCase().includes('abbau')) category = '📦 Abbau';
+
+                    if (!grouped[category]) grouped[category] = [];
+                    grouped[category].push(shift);
+                });
+
+                return grouped;
+            }
+
+            createShiftCard(shift) {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-50 rounded-lg p-4 border border-gray-200';
+                
+                const header = document.createElement('div');
+                header.className = 'flex justify-between items-start mb-3';
+                
+                const titleDiv = document.createElement('div');
+                const title = document.createElement('h4');
+                title.className = 'font-bold text-gray-800';
+                title.textContent = shift.name;
+                
+                const details = document.createElement('p');
+                details.className = 'text-sm text-gray-600';
+                details.textContent = `${shift.time} - ${shift.description || ''}`;
+                
+                titleDiv.appendChild(title);
+                titleDiv.appendChild(details);
+                
+                const badge = document.createElement('span');
+                badge.className = 'px-3 py-1 bg-fire-100 text-fire-700 text-sm rounded-full';
+                badge.textContent = `${shift.needed} Helfer`;
+                
+                header.appendChild(titleDiv);
+                header.appendChild(badge);
+                card.appendChild(header);
+
+                // Assignment slots
+                const slotsDiv = document.createElement('div');
+                slotsDiv.className = 'space-y-2';
+                
+                for (let i = 0; i < shift.needed; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'flex items-center gap-2';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.className = 'flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 focus:border-fire-500';
+                    input.placeholder = `Person ${i + 1}`;
+                    input.dataset.shiftId = shift.id;
+                    input.dataset.slotIndex = i;
+                    
+                    // Load existing assignment if available
+                    if (this.assignments[shift.id] && this.assignments[shift.id][i]) {
+                        input.value = this.assignments[shift.id][i];
+                    }
+                    
+                    input.addEventListener('input', (e) => {
+                        this.updateAssignment(shift.id, i, e.target.value);
+                    });
+                    
+                    slot.appendChild(input);
+                    slotsDiv.appendChild(slot);
+                }
+                
+                card.appendChild(slotsDiv);
+                return card;
+            }
+
+            updateAssignment(shiftId, slotIndex, value) {
+                if (!this.assignments[shiftId]) {
+                    this.assignments[shiftId] = [];
+                }
+                this.assignments[shiftId][slotIndex] = value.trim();
+                this.updateStatistics();
+            }
+
+            updateStatistics() {
+                if (!this.currentEvent) return;
+
+                let totalSlots = 0;
+                let filledSlots = 0;
+
+                this.currentEvent.shifts.forEach(shift => {
+                    totalSlots += shift.needed;
+                    const assignments = this.assignments[shift.id] || [];
+                    filledSlots += assignments.filter(a => a && a.trim() !== '').length;
+                });
+
+                const progress = totalSlots > 0 ? Math.round((filledSlots / totalSlots) * 100) : 0;
+
+                document.getElementById('stat-total').textContent = this.currentEvent.shifts.length;
+                document.getElementById('stat-filled').textContent = filledSlots;
+                document.getElementById('stat-open').textContent = totalSlots - filledSlots;
+                document.getElementById('stat-progress').textContent = `${progress}%`;
+            }
+
+            async loadAssignmentsFile(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.parseAssignmentsMarkdown(e.target.result);
+                };
+                reader.readAsText(file);
+            }
+
+            parseAssignmentsMarkdown(content) {
+                // Parse the assignments markdown file
+                const lines = content.split('\n');
+                let currentShiftId = null;
+
+                lines.forEach(line => {
+                    // Look for shift headers like: ### aufbau-samstag (...)
+                    const shiftMatch = line.match(/^###\s+([a-z0-9-]+)\s+\(/);
+                    if (shiftMatch) {
+                        currentShiftId = shiftMatch[1];
+                        this.assignments[currentShiftId] = [];
+                        return;
+                    }
+
+                    // Look for person assignments like: - Person Name
+                    if (currentShiftId && line.trim().startsWith('- ') && !line.includes('[OFFEN')) {
+                        const name = line.replace(/^-\s+/, '').trim();
+                        this.assignments[currentShiftId].push(name);
+                    }
+                });
+
+                // Re-render with loaded assignments
+                this.renderSchichtplan();
+                this.updateStatistics();
+                this.showSuccess('Schichtplan erfolgreich geladen!');
+            }
+
+            exportMarkdown() {
+                if (!this.currentEvent) return;
+
+                let markdown = `# Schichtplan ${this.currentEvent.title}\n\n`;
+                markdown += `**Event:** ${this.currentEvent.id}\n`;
+                markdown += `**Generiert:** ${new Date().toLocaleDateString('de-DE')}\n`;
+                markdown += `**Status:** In Bearbeitung\n\n---\n\n`;
+
+                const grouped = this.groupShiftsByCategory(this.currentEvent.shifts);
+
+                for (const [category, shifts] of Object.entries(grouped)) {
+                    markdown += `## ${category}\n\n`;
+
+                    shifts.forEach(shift => {
+                        const assignments = this.assignments[shift.id] || [];
+                        const filled = assignments.filter(a => a && a.trim() !== '').length;
+                        const open = shift.needed - filled;
+
+                        markdown += `### ${shift.id} (${new Date(shift.date).toLocaleDateString('de-DE')}, ${shift.time}) - ${shift.needed} Personen benötigt\n`;
+                        
+                        // Add assigned people
+                        assignments.forEach(person => {
+                            if (person && person.trim() !== '') {
+                                markdown += `- ${person}\n`;
+                            }
+                        });
+
+                        // Add open slots
+                        if (open > 0) {
+                            markdown += `- **[OFFEN - ${open} ${open === 1 ? 'Platz' : 'Plätze'}]**\n`;
+                        }
+
+                        markdown += '\n';
+                    });
+
+                    markdown += '---\n\n';
+                }
+
+                // Add statistics
+                let totalSlots = 0;
+                let filledSlots = 0;
+                this.currentEvent.shifts.forEach(shift => {
+                    totalSlots += shift.needed;
+                    const assignments = this.assignments[shift.id] || [];
+                    filledSlots += assignments.filter(a => a && a.trim() !== '').length;
+                });
+
+                markdown += `## Statistik\n`;
+                markdown += `- **GESAMT:** ${filledSlots}/${totalSlots} Plätze zugeteilt (**${totalSlots - filledSlots} Plätze noch offen**)\n`;
+
+                // Download
+                this.downloadFile(markdown, `${this.currentEvent.id}-assignments.md`, 'text/markdown');
+                this.showSuccess('Markdown erfolgreich exportiert!');
+            }
+
+            exportPDF() {
+                if (!this.currentEvent) return;
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // Header
+                doc.setFontSize(20);
+                doc.text('Feuerwehrverein Raura, Kaiseraugst', 105, 20, { align: 'center' });
+                
+                doc.setFontSize(16);
+                doc.text(`Arbeitsplan ${this.currentEvent.title}`, 105, 30, { align: 'center' });
+
+                let yPos = 45;
+
+                const grouped = this.groupShiftsByCategory(this.currentEvent.shifts);
+
+                for (const [category, shifts] of Object.entries(grouped)) {
+                    // Category header
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(category, 20, yPos);
+                    yPos += 8;
+
+                    shifts.forEach(shift => {
+                        const assignments = this.assignments[shift.id] || [];
+                        const people = assignments.filter(a => a && a.trim() !== '').join(', ');
+                        
+                        doc.setFontSize(11);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`${shift.name} (${shift.time})`, 20, yPos);
+                        yPos += 6;
+
+                        doc.setFont(undefined, 'normal');
+                        doc.setFontSize(10);
+                        const personText = people || '[NOCH OFFEN]';
+                        const lines = doc.splitTextToSize(personText, 170);
+                        lines.forEach(line => {
+                            doc.text(line, 25, yPos);
+                            yPos += 5;
+                        });
+
+                        yPos += 3;
+
+                        // New page if needed
+                        if (yPos > 270) {
+                            doc.addPage();
+                            yPos = 20;
+                        }
+                    });
+
+                    yPos += 5;
+                }
+
+                doc.save(`arbeitsplan-${this.currentEvent.id}.pdf`);
+                this.showSuccess('PDF erfolgreich generiert!');
+            }
+
+            clearAllAssignments() {
+                this.currentEvent.shifts.forEach(shift => {
+                    this.assignments[shift.id] = [];
+                });
+                this.renderSchichtplan();
+                this.updateStatistics();
+                this.showSuccess('Alle Zuweisungen gelöscht');
+            }
+
+            downloadFile(content, filename, mimeType) {
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            showSuccess(message) {
+                // Simple alert for now - could be replaced with a toast notification
+                alert('✅ ' + message);
+            }
+
+            showError(message) {
+                alert('❌ ' + message);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            new SchichtplanManager();
+        });
+    </script>
+</body>
+</html>
