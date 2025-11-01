@@ -8,7 +8,7 @@ X-WR-CALDESC:Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst
 X-WR-TIMEZONE:Europe/Zurich
 BEGIN:VEVENT
 UID:chilbi-2024@feuerwehrverein-raura.ch
-DTSTAMP:20251031T061918
+DTSTAMP:20251101T061647
 DTSTART:20241014T140000
 DTEND:20241015T220000
 SUMMARY:Chilbi 2024
@@ -20,7 +20,7 @@ STATUS:CONFIRMED
 END:VEVENT
 BEGIN:VEVENT
 UID:chilbi-2025@feuerwehrverein-raura.ch
-DTSTAMP:20251031T061918
+DTSTAMP:20251101T061647
 DTSTART:20251018T120000
 DTEND:20251019T220000
 SUMMARY:Chilbi 2025
@@ -28,6 +28,18 @@ DESCRIPTION:Chilbi 2025\n\nUnsere traditionelle Chilbi findet auch dieses Jahr w
 LOCATION:Roter Schopf, Kaiseraugst
 ORGANIZER;CN=Stefan Müller:mailto:stefan+fwv-raura@juroct.ch
 CATEGORIES:Hauptveranstaltung
+STATUS:CONFIRMED
+END:VEVENT
+BEGIN:VEVENT
+UID:weihnachtshock2025@feuerwehrverein-raura.ch
+DTSTAMP:20251101T061647
+DTSTART:20251213T180000
+DTEND:20251213T235959
+SUMMARY:Weihnachtshock 2025
+DESCRIPTION:Event-Titel\n\nWie jedes Jahr der obligatorische Weihnachtshock wie jedes Jahr
+LOCATION:Nach Anmeldung (Kaiseraugst)
+ORGANIZER;CN=Brigitte Käslin:mailto:organisator@feuerwehrverein-raura.ch
+CATEGORIES:Gesellschaftsanlass
 STATUS:CONFIRMED
 END:VEVENT
 END:VCALENDAR
