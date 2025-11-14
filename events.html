@@ -313,7 +313,7 @@
                         participantRegistration: frontmatter.participantRegistration === true || frontmatter.participantRegistration === 'true',
                         maxParticipants: frontmatter.maxParticipants || null,
                         status: frontmatter.status || 'confirmed',
-                        tags: frontmatter.tags || [],
+                        tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : (frontmatter.tags ? [frontmatter.tags] : []),
                         description: description,
                         shifts: shifts
                     };
