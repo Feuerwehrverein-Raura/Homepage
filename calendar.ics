@@ -8,7 +8,7 @@ X-WR-CALDESC:Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst
 X-WR-TIMEZONE:Europe/Zurich
 BEGIN:VEVENT
 UID:chilbi-2024@feuerwehrverein-raura.ch
-DTSTAMP:20251114T234141
+DTSTAMP:20251114T234521
 DTSTART:20241014T140000
 DTEND:20241015T220000
 SUMMARY:Chilbi 2024
@@ -20,7 +20,7 @@ STATUS:CONFIRMED
 END:VEVENT
 BEGIN:VEVENT
 UID:chilbi-2025@feuerwehrverein-raura.ch
-DTSTAMP:20251114T234141
+DTSTAMP:20251114T234521
 DTSTART:20251018T120000
 DTEND:20251019T220000
 SUMMARY:Chilbi 2025
@@ -32,11 +32,11 @@ STATUS:CONFIRMED
 END:VEVENT
 BEGIN:VEVENT
 UID:weihnachtshock2025@feuerwehrverein-raura.ch
-DTSTAMP:20251114T234141
+DTSTAMP:20251114T234521
 DTSTART:20251213T180000
 DTEND:20251213T235959
 SUMMARY:Weihnachtshock 2025
-DESCRIPTION:Event-Titel\n\nWie jedes Jahr der obligatorische Weihnachtshock wie jedes Jahr
+DESCRIPTION:Weihnachtshock 2025\n\nAuch dieses Jahr laden wir alle Vereinsmitglieder herzlich zu unserem traditionellen Weihnachtshock ein. Bei gemütlichem Beisammensein lassen wir das Jahr gemeinsam ausklingen.\n\nWichtige Informationen\n\n- Datum: Samstag\, 13. Dezember 2025\, ab 18:00 Uhr\n- Ort: Wird nach der Anmeldung bekannt gegeben\n- Anmeldung: Erforderlich bis spätestens 6. Dezember 2025\n- Teilnehmerzahl: Begrenzt auf 50 Personen\n- Kosten: Kostenlos für Vereinsmitglieder\n\nWir freuen uns auf einen schönen Abend mit euch!
 LOCATION:Nach Anmeldung (Kaiseraugst)
 ORGANIZER;CN=Brigitte Käslin:mailto:organisator@feuerwehrverein-raura.ch
 CATEGORIES:Gesellschaftsanlass
