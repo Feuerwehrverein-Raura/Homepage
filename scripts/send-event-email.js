@@ -114,19 +114,43 @@ function markdownToHtml(markdown) {
 }
 
 /**
- * Load email recipients from Mailcow distribution list
+ * Load email recipients from member data or Mailcow distribution list
  */
 function loadRecipients() {
-    if (!process.env.EMAIL_RECIPIENTS_TO) {
-        throw new Error('EMAIL_RECIPIENTS_TO Secret ist nicht konfiguriert! Bitte in GitHub Secrets anlegen.');
+    // Option 1: Load from mitglieder_data.json
+    const memberDataPath = path.join(__dirname, '..', 'mitglieder_data.json');
+    if (fs.existsSync(memberDataPath)) {
+        console.log('📋 Lade E-Mail-Empfänger aus mitglieder_data.json...');
+        const members = JSON.parse(fs.readFileSync(memberDataPath, 'utf-8'));
+
+        // Filter: Nur Aktivmitglieder mit E-Mail, deren Zustellung E-Mail enthält
+        const emailRecipients = members.filter(m => {
+            const zustellung = (m.Zustellung || '').toLowerCase();
+            return m.Status === 'Aktivmitglied' &&
+                m['E-Mail'] &&
+                m['E-Mail'].trim() !== '' &&
+                (zustellung.includes('e-mail') || zustellung.includes('email'));
+        });
+
+        console.log(`✅ ${emailRecipients.length} Mitglieder mit E-Mail-Zustellung gefunden`);
+
+        return emailRecipients.map(m => ({
+            name: m.Mitglied,
+            email: m['E-Mail']
+        }));
     }
 
-    console.log('📋 Verwende Mailcow Verteilerliste...');
-    const emails = process.env.EMAIL_RECIPIENTS_TO.split(',').map(e => e.trim());
-    return emails.map(email => ({
-        name: email.split('@')[0],
-        email: email
-    }));
+    // Option 2: Fallback to Mailcow distribution list
+    if (process.env.EMAIL_RECIPIENTS_TO) {
+        console.log('📋 Verwende Mailcow Verteilerliste...');
+        const emails = process.env.EMAIL_RECIPIENTS_TO.split(',').map(e => e.trim());
+        return emails.map(email => ({
+            name: email.split('@')[0],
+            email: email
+        }));
+    }
+
+    throw new Error('Keine Empfänger gefunden! Entweder mitglieder_data.json oder EMAIL_RECIPIENTS_TO Secret muss vorhanden sein.');
 }
 
 /**
