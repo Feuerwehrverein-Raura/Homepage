@@ -1,0 +1,86 @@
+name: Send Event Email
+
+on:
+  workflow_dispatch:
+    inputs:
+      event_file:
+        description: 'Event-Datei (z.B. events/weihnachtshock2025.md)'
+        required: true
+        type: string
+        default: 'events/weihnachtshock2025.md'
+      mode:
+        description: 'Versand-Modus'
+        required: true
+        type: choice
+        options:
+          - 'Test (einzelne Person)'
+          - 'Alle Mitglieder'
+        default: 'Test (einzelne Person)'
+      test_email:
+        description: 'Test-E-Mail-Adresse (nur für Test-Modus)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm install nodemailer handlebars
+
+      - name: Validate inputs
+        run: |
+          if [ "${{ inputs.mode }}" = "Test (einzelne Person)" ] && [ -z "${{ inputs.test_email }}" ]; then
+            echo "❌ Test-E-Mail-Adresse ist erforderlich für Test-Modus!"
+            exit 1
+          fi
+
+      - name: Send emails (Test Mode)
+        if: inputs.mode == 'Test (einzelne Person)'
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          TEST_EMAIL: ${{ inputs.test_email }}
+        run: |
+          echo "🧪 TEST MODUS - Sende nur an: ${{ inputs.test_email }}"
+          node scripts/send-event-email.js "${{ inputs.event_file }}"
+
+      - name: Send emails (Production Mode)
+        if: inputs.mode == 'Alle Mitglieder'
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+        run: |
+          echo "🚀 PRODUKTIV MODUS - Sende an alle Mitglieder"
+          echo "⚠️  ACHTUNG: Dies sendet E-Mails an alle Mitglieder mit E-Mail-Zustellung!"
+          node scripts/send-event-email.js "${{ inputs.event_file }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Email Versand Zusammenfassung" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Modus:** ${{ inputs.mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Event:** ${{ inputs.event_file }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.mode }}" = "Test (einzelne Person)" ]; then
+            echo "**Test-Empfänger:** ${{ inputs.test_email }}" >> $GITHUB_STEP_SUMMARY
+          fi

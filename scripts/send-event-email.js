@@ -117,6 +117,37 @@ function markdownToHtml(markdown) {
  * Load email recipients from member data or Mailcow distribution list
  */
 function loadRecipients() {
+    // Check if test mode is enabled
+    if (process.env.TEST_EMAIL) {
+        console.log('🧪 TEST MODUS aktiviert!');
+        const testEmail = process.env.TEST_EMAIL.trim();
+
+        // Try to find the member in mitglieder_data.json to get their name
+        const memberDataPath = path.join(__dirname, '..', 'mitglieder_data.json');
+        if (fs.existsSync(memberDataPath)) {
+            const members = JSON.parse(fs.readFileSync(memberDataPath, 'utf-8'));
+            const testMember = members.find(m =>
+                m['E-Mail'] && m['E-Mail'].toLowerCase() === testEmail.toLowerCase()
+            );
+
+            if (testMember) {
+                console.log(`✅ Test-Mitglied gefunden: ${testMember.Mitglied}`);
+                console.log(`📧 Test-E-Mail wird gesendet an: ${testEmail}`);
+                return [{
+                    name: testMember.Mitglied,
+                    email: testMember['E-Mail']
+                }];
+            }
+        }
+
+        // If not found in member data, use email address
+        console.log(`📧 Test-E-Mail wird gesendet an: ${testEmail}`);
+        return [{
+            name: testEmail.split('@')[0],
+            email: testEmail
+        }];
+    }
+
     // Option 1: Load from mitglieder_data.json
     const memberDataPath = path.join(__dirname, '..', 'mitglieder_data.json');
     if (fs.existsSync(memberDataPath)) {

@@ -1,0 +1,83 @@
+name: Send Event Letter
+
+on:
+  workflow_dispatch:
+    inputs:
+      event_file:
+        description: 'Event-Datei (z.B. events/weihnachtshock2025.md)'
+        required: true
+        type: string
+        default: 'events/weihnachtshock2025.md'
+      mode:
+        description: 'Versand-Modus'
+        required: true
+        type: choice
+        options:
+          - 'Test (einzelne Person)'
+          - 'Alle Mitglieder'
+        default: 'Test (einzelne Person)'
+      test_email:
+        description: 'E-Mail des Test-Mitglieds (wird über E-Mail-Adresse in mitglieder_data.json gefunden)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  send-letter:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Validate inputs
+        run: |
+          if [ "${{ inputs.mode }}" = "Test (einzelne Person)" ] && [ -z "${{ inputs.test_email }}" ]; then
+            echo "❌ Test-E-Mail-Adresse ist erforderlich für Test-Modus!"
+            exit 1
+          fi
+
+      - name: Send letters (Test Mode)
+        if: inputs.mode == 'Test (einzelne Person)'
+        env:
+          PINGEN_API_KEY: ${{ secrets.PINGEN_API_KEY }}
+          PINGEN_STAGING: 'true'  # Use staging for tests
+          TEST_EMAIL: ${{ inputs.test_email }}
+        run: |
+          echo "🧪 TEST MODUS - Sende nur an Mitglied mit E-Mail: ${{ inputs.test_email }}"
+          echo "📮 Verwendet Pingen STAGING (Briefe werden NICHT wirklich versendet)"
+          node scripts/send-event-letter.js "${{ inputs.event_file }}"
+
+      - name: Send letters (Production Mode)
+        if: inputs.mode == 'Alle Mitglieder'
+        env:
+          PINGEN_API_KEY: ${{ secrets.PINGEN_API_KEY }}
+          PINGEN_STAGING: 'false'  # Use production
+        run: |
+          echo "🚀 PRODUKTIV MODUS - Sende an alle Mitglieder mit Post-Zustellung"
+          echo "⚠️  ACHTUNG: Dies versendet ECHTE Briefe via Pingen und verursacht KOSTEN!"
+          echo "⚠️  Bitte stellen Sie sicher, dass Sie wirklich fortfahren möchten."
+          sleep 5
+          node scripts/send-event-letter.js "${{ inputs.event_file }}"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Brief Versand Zusammenfassung" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Modus:** ${{ inputs.mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Event:** ${{ inputs.event_file }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.mode }}" = "Test (einzelne Person)" ]; then
+            echo "**Test-Empfänger:** Mitglied mit E-Mail ${{ inputs.test_email }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Pingen Modus:** STAGING (kein echter Versand)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Pingen Modus:** PRODUCTION (echter Versand)" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **WARNUNG:** Echte Briefe wurden versendet!" >> $GITHUB_STEP_SUMMARY
+          fi

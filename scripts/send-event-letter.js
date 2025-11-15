@@ -99,8 +99,43 @@ function loadRecipients() {
         throw new Error('mitglieder_data.json nicht gefunden!');
     }
 
-    console.log('📋 Lade Brief-Empfänger aus mitglieder_data.json...');
     const members = JSON.parse(fs.readFileSync(memberDataPath, 'utf-8'));
+
+    // Check if test mode is enabled
+    if (process.env.TEST_EMAIL) {
+        console.log('🧪 TEST MODUS aktiviert!');
+        const testEmail = process.env.TEST_EMAIL.trim();
+
+        // Find the test member
+        const testMember = members.find(m =>
+            m['E-Mail'] && m['E-Mail'].toLowerCase() === testEmail.toLowerCase()
+        );
+
+        if (!testMember) {
+            throw new Error(`Test-Mitglied mit E-Mail ${testEmail} nicht gefunden!`);
+        }
+
+        // Check if member has address
+        if (!testMember.Strasse || !testMember.PLZ || !testMember.Ort) {
+            throw new Error(`Test-Mitglied ${testMember.Mitglied} hat keine vollständige Adresse!`);
+        }
+
+        console.log(`✅ Test-Mitglied gefunden: ${testMember.Mitglied}`);
+        console.log(`📮 Test-Brief wird gesendet an: ${testMember.Strasse}, ${testMember.PLZ} ${testMember.Ort}`);
+
+        return [{
+            name: testMember.Mitglied,
+            address: {
+                street: testMember.Strasse,
+                zip: testMember.PLZ,
+                city: testMember.Ort,
+                country: 'CH'
+            }
+        }];
+    }
+
+    // Normal mode: Load all recipients
+    console.log('📋 Lade Brief-Empfänger aus mitglieder_data.json...');
 
     // Filter: Nur Aktivmitglieder und Ehrenmitglieder mit Post-Zustellung
     const letterRecipients = members.filter(m => {
