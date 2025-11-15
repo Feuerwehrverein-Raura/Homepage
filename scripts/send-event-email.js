@@ -117,9 +117,32 @@ function markdownToHtml(markdown) {
  * Load email recipients
  */
 function loadRecipients() {
+    // Option 1: Simple recipient email (Mailcow distribution list)
+    if (process.env.EMAIL_RECIPIENTS_TO) {
+        console.log('📋 Verwende Mailcow Verteilerliste...');
+        const emails = process.env.EMAIL_RECIPIENTS_TO.split(',').map(e => e.trim());
+        return emails.map(email => ({
+            name: email.split('@')[0],
+            email: email
+        }));
+    }
+
+    // Option 2: JSON with detailed recipients (GitHub Secret)
+    if (process.env.EMAIL_RECIPIENTS) {
+        console.log('📋 Lade Empfänger aus GitHub Secret (JSON)...');
+        const data = JSON.parse(process.env.EMAIL_RECIPIENTS);
+        return data.recipients.filter(r => r.active);
+    }
+
+    // Option 3: Fallback to local file
     const recipientsPath = path.join(__dirname, '..', '.email', 'recipients.json');
-    const data = JSON.parse(fs.readFileSync(recipientsPath, 'utf-8'));
-    return data.recipients.filter(r => r.active);
+    if (fs.existsSync(recipientsPath)) {
+        console.log('📋 Lade Empfänger aus lokaler Datei...');
+        const data = JSON.parse(fs.readFileSync(recipientsPath, 'utf-8'));
+        return data.recipients.filter(r => r.active);
+    }
+
+    throw new Error('Keine Empfänger konfiguriert! Bitte EMAIL_RECIPIENTS_TO, EMAIL_RECIPIENTS Secret oder .email/recipients.json konfigurieren.');
 }
 
 /**
