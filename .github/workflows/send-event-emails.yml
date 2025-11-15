@@ -67,7 +67,6 @@ jobs:
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
           FROM_NAME: 'Feuerwehrverein Raura Kaiseraugst'
           EMAIL_RECIPIENTS_TO: ${{ secrets.EMAIL_RECIPIENTS_TO }}
-          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             EVENT_FILE="${{ github.event.inputs.event_file }}"

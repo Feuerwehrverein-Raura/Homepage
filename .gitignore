@@ -6,9 +6,6 @@ package-lock.json
 .env
 .env.local
 
-# Email recipients (contains personal data)
-.email/recipients.json
-
 # Logs
 *.log
 npm-debug.log*
