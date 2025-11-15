@@ -1,0 +1,64 @@
+name: Member Data Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      jwt_token:
+        description: 'JWT Token (from OTP verification)'
+        required: true
+        type: string
+      updates:
+        description: 'JSON with field updates (e.g., {"Telefon": "123456", "E-Mail": "new@example.com"})'
+        required: true
+        type: string
+      target_email:
+        description: 'Target member email (only for Vorstand, leave empty to edit own data)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  update-member-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "Member Data Update Bot"
+          git config --global user.email "actions@github.com"
+
+      - name: Update member data
+        id: update
+        env:
+          JWT_TOKEN: ${{ inputs.jwt_token }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          UPDATES_JSON: ${{ inputs.updates }}
+          TARGET_EMAIL: ${{ inputs.target_email }}
+        run: |
+          node scripts/update-member-data.js
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          branch: ${{ steps.update.outputs.branch }}
+          title: ${{ steps.update.outputs.pr_title }}
+          body: ${{ steps.update.outputs.pr_body }}
+          labels: mitglieder-update
+          reviewers: ${{ github.repository_owner }}
+
+      - name: Display result
+        run: |
+          echo "✅ Pull Request erstellt!"
+          echo "📋 Änderungen müssen noch reviewed und gemerged werden"

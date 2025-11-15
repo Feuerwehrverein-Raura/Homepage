@@ -1,4 +1,4 @@
-name: OTP Request
+name: OTP Verify
 
 on:
   workflow_dispatch:
@@ -7,14 +7,22 @@ on:
         description: 'E-Mail-Adresse des Mitglieds'
         required: true
         type: string
+      otp:
+        description: 'OTP Code (6 Ziffern)'
+        required: true
+        type: string
 
 permissions:
   contents: write
   actions: write
 
 jobs:
-  send-otp:
+  verify-otp:
     runs-on: ubuntu-latest
+    outputs:
+      token: ${{ steps.verify.outputs.token }}
+      role: ${{ steps.verify.outputs.role }}
+      result: ${{ steps.verify.outputs.result }}
 
     steps:
       - name: Checkout repository
@@ -27,21 +35,22 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
-        run: npm install nodemailer
-
       - name: Configure Git
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
 
-      - name: Generate and send OTP
+      - name: Verify OTP and generate JWT
+        id: verify
         env:
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
           MEMBER_EMAIL: ${{ inputs.email }}
+          OTP_CODE: ${{ inputs.otp }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
-          node scripts/otp-request.js
+          node scripts/otp-verify.js
+
+      - name: Display result
+        run: |
+          echo "✅ Authentifizierung erfolgreich!"
+          echo "🎫 Token: ${{ steps.verify.outputs.token }}"
+          echo "👤 Rolle: ${{ steps.verify.outputs.role }}"

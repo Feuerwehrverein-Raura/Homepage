@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mein Profil - Feuerwehrverein Raura</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .profile-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+        }
+        .form-section h3 {
+            margin-top: 0;
+            color: #dc2626;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="tel"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .form-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .btn {
+            background: #dc2626;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #b91c1c;
+        }
+        .info-box {
+            background: #f3f4f6;
+            padding: 15px;
+            border-left: 4px solid #3b82f6;
+            margin: 15px 0;
+        }
+        .warning-box {
+            background: #fef3c7;
+            padding: 15px;
+            border-left: 4px solid #f59e0b;
+            margin: 15px 0;
+        }
+        .user-info {
+            background: #ecfdf5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>👤 Mein Profil</h1>
+            <nav>
+                <a href="mitglieder-login.html">Zurück zum Login</a>
+                <a href="index.html">Startseite</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="profile-container">
+            <div class="user-info" id="userInfo">
+                <strong>Angemeldet als:</strong> <span id="userName">Lädt...</span>
+            </div>
+
+            <div class="warning-box">
+                <strong>⚠️ Wichtig:</strong> Alle Änderungen erstellen einen Pull Request und müssen vom Vorstand genehmigt werden.
+            </div>
+
+            <form id="profileForm">
+                <!-- Contact Information -->
+                <div class="form-section">
+                    <h3>Kontaktdaten</h3>
+
+                    <div class="form-group">
+                        <label for="email">E-Mail-Adresse:</label>
+                        <input type="email" id="email" name="E-Mail">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="telefon">Telefon:</label>
+                        <input type="tel" id="telefon" name="Telefon">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mobile">Mobile:</label>
+                        <input type="tel" id="mobile" name="Mobile">
+                    </div>
+                </div>
+
+                <!-- Address Information -->
+                <div class="form-section">
+                    <h3>Adresse</h3>
+
+                    <div class="form-group">
+                        <label for="strasse">Strasse:</label>
+                        <input type="text" id="strasse" name="Strasse">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="adresszusatz">Adresszusatz:</label>
+                        <input type="text" id="adresszusatz" name="Adresszusatz">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="plz">PLZ:</label>
+                        <input type="text" id="plz" name="PLZ">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ort">Ort:</label>
+                        <input type="text" id="ort" name="Ort">
+                    </div>
+                </div>
+
+                <!-- Delivery Preferences -->
+                <div class="form-section">
+                    <h3>Zustellpräferenzen</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="zustellung-email" name="zustellung-email">
+                            E-Mail-Zustellung für Event-Einladungen
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="zustellung-post" name="zustellung-post">
+                            Post-Zustellung für Event-Einladungen
+                        </label>
+                    </div>
+                </div>
+
+                <button type="button" class="btn" onclick="submitChanges()">Änderungen speichern</button>
+            </form>
+
+            <div class="info-box" style="margin-top: 30px;">
+                <strong>📋 So funktioniert's:</strong>
+                <ol>
+                    <li>Ändern Sie die gewünschten Felder</li>
+                    <li>Klicken Sie auf "Änderungen speichern"</li>
+                    <li>Ein neuer Tab öffnet sich mit GitHub Actions</li>
+                    <li>Klicken Sie dort auf "Run workflow"</li>
+                    <li>Die Workflow-Parameter sind bereits ausgefüllt</li>
+                    <li>Klicken Sie auf den grünen "Run workflow" Button</li>
+                    <li>Ein Pull Request wird erstellt</li>
+                    <li>Der Vorstand prüft und genehmigt Ihre Änderungen</li>
+                </ol>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const REPO_OWNER = 'Feuerwehrverein-Raura';
+        const REPO_NAME = 'Homepage';
+
+        // Check authentication
+        function checkAuth() {
+            const token = localStorage.getItem('jwt_token');
+            const expires = localStorage.getItem('jwt_expires');
+            const name = localStorage.getItem('member_name');
+
+            if (!token || !expires || Date.now() >= parseInt(expires)) {
+                alert('Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.');
+                window.location.href = 'mitglieder-login.html';
+                return false;
+            }
+
+            document.getElementById('userName').textContent = name || 'Unbekannt';
+            return true;
+        }
+
+        // Track original values
+        const originalValues = {};
+
+        // Load current data from localStorage (in production, fetch from GitHub)
+        function loadProfileData() {
+            // In a real implementation, this would fetch the current member data
+            // For now, we'll leave fields empty for user to fill in
+            const email = localStorage.getItem('member_email');
+            if (email) {
+                document.getElementById('email').value = email;
+            }
+        }
+
+        function submitChanges() {
+            const token = localStorage.getItem('jwt_token');
+
+            if (!checkAuth()) {
+                return;
+            }
+
+            // Collect changed fields
+            const updates = {};
+            const form = document.getElementById('profileForm');
+            const inputs = form.querySelectorAll('input[name]');
+
+            inputs.forEach(input => {
+                const fieldName = input.name;
+                let value;
+
+                if (input.type === 'checkbox') {
+                    value = input.checked;
+                } else {
+                    value = input.value;
+                }
+
+                // Only include changed fields with values
+                if (value !== '' && value !== false) {
+                    updates[fieldName] = value;
+                }
+            });
+
+            if (Object.keys(updates).length === 0) {
+                alert('Keine Änderungen vorgenommen.');
+                return;
+            }
+
+            // Create JSON for workflow
+            const updatesJson = JSON.stringify(updates);
+
+            // Open GitHub Actions with pre-filled parameters
+            const workflowUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/workflows/member-data-update.yml`;
+
+            // Save for clipboard
+            localStorage.setItem('pending_updates', updatesJson);
+
+            window.open(workflowUrl, '_blank');
+
+            alert(`GitHub Actions wird geöffnet.\n\nWichtig:\n\n1. Klicken Sie auf "Run workflow"\n2. Fügen Sie folgende Werte ein:\n\n   JWT Token: ${token.substring(0, 20)}...\n   Updates: ${updatesJson}\n   Target Email: (leer lassen)\n\n3. Klicken Sie auf "Run workflow"\n4. Ein Pull Request wird erstellt`);
+
+            // Show instructions
+            showInstructions(updatesJson, token);
+        }
+
+        function showInstructions(updatesJson, token) {
+            const instructionsHtml = `
+                <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 9999; padding: 50px;">
+                    <div style="max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; max-height: 90vh; overflow-y: auto;">
+                        <h2>📋 Workflow-Parameter</h2>
+                        <p>Kopieren Sie die folgenden Werte in das GitHub Actions Formular:</p>
+
+                        <h3>JWT Token:</h3>
+                        <div style="background: #f3f4f6; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all; margin-bottom: 20px;">
+                            ${token}
+                        </div>
+                        <button onclick="navigator.clipboard.writeText('${token}')" style="margin-bottom: 20px;">Token kopieren</button>
+
+                        <h3>Updates (JSON):</h3>
+                        <div style="background: #f3f4f6; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all; margin-bottom: 20px;">
+                            ${updatesJson}
+                        </div>
+                        <button onclick="navigator.clipboard.writeText('${updatesJson}')">Updates kopieren</button>
+
+                        <h3>Target Email:</h3>
+                        <p style="background: #f3f4f6; padding: 10px; border-radius: 4px;">
+                            <em>(leer lassen - Sie bearbeiten Ihre eigenen Daten)</em>
+                        </p>
+
+                        <button onclick="this.parentElement.parentElement.remove()" style="margin-top: 30px; background: #dc2626; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">Schließen</button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', instructionsHtml);
+        }
+
+        // Initialize
+        window.addEventListener('load', function() {
+            if (checkAuth()) {
+                loadProfileData();
+            }
+        });
+    </script>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Feuerwehrverein Raura Kaiseraugst</p>
+        </div>
+    </footer>
+</body>
+</html>
