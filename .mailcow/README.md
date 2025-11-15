@@ -7,7 +7,7 @@ Automatische Synchronisation der Mailcow E-Mail-Verteilerliste basierend auf `mi
 Das System aktualisiert automatisch die Mailcow Verteilerliste (Alias), sodass sie immer mit den Mitgliederdaten synchron ist.
 
 **Single Source of Truth:** `mitglieder_data.json`
-**Ziel:** Mailcow Alias (z.B. `events@fwv-raura.ch`)
+**Ziel:** Mailcow Alias (z.B. `alle@fwv-raura.ch`)
 
 ## 🚀 Setup
 
@@ -31,14 +31,14 @@ Erstellen Sie folgende Secrets:
 |-------------|------|----------|
 | `MAILCOW_API_URL` | Mailcow URL | `https://mail.fwv-raura.ch` |
 | `MAILCOW_API_KEY` | API Key aus Schritt 1 | `XXXXXX-XXXXXX-XXXXXX` |
-| `MAILCOW_ALIAS_ADDRESS` | Alias-Adresse | `events@fwv-raura.ch` |
+| `MAILCOW_ALIAS_ADDRESS` | Alias-Adresse | `alle@fwv-raura.ch` |
 
 ### 3. Alias in Mailcow erstellen (einmalig)
 
 Falls noch nicht vorhanden:
 
 1. **Mailcow:** E-Mail → Konfiguration → Alias
-2. **Erstellen Sie:** `events@fwv-raura.ch`
+2. **Erstellen Sie:** `alle@fwv-raura.ch`
 3. **Ziel-Adressen:** Beliebig (wird automatisch überschrieben)
 4. **Aktivieren:** ✅
 
@@ -56,25 +56,28 @@ Die Verteilerliste wird automatisch synchronisiert wenn:
   {
     "Mitglied": "Max Mustermann",
     "Status": "Aktivmitglied",
-    "Zustellung": "E-Mail",
+    "zustellung-email": true,
+    "zustellung-post": false,
     "E-Mail": "max@example.com"
   },
   {
     "Mitglied": "Erika Musterfrau",
     "Status": "Aktivmitglied",
-    "Zustellung": "E-Mail und Post",
+    "zustellung-email": true,
+    "zustellung-post": true,
     "E-Mail": "erika@example.com"
   },
   {
     "Mitglied": "Hans Müller",
     "Status": "Aktivmitglied",
-    "Zustellung": "Post",
+    "zustellung-email": false,
+    "zustellung-post": true,
     "E-Mail": ""
   }
 ]
 ```
 
-**Mailcow Alias `events@fwv-raura.ch` enthält dann:**
+**Mailcow Alias `alle@fwv-raura.ch` enthält dann:**
 - ✅ `max@example.com`
 - ✅ `erika@example.com`
 - ❌ Hans Müller (hat keine E-Mail-Zustellung)
@@ -88,13 +91,13 @@ Die Verteilerliste wird automatisch synchronisiert wenn:
 ## 📊 Was wird synchronisiert?
 
 **Aufgenommen werden:**
-- ✅ Status = "Aktivmitglied"
+- ✅ Status = "Aktivmitglied" oder "Ehrenmitglied"
 - ✅ E-Mail vorhanden
-- ✅ Zustellung enthält "E-Mail" oder "email"
+- ✅ zustellung-email = true
 
 **Entfernt werden:**
-- ❌ Status ≠ "Aktivmitglied" (z.B. ausgetreten)
-- ❌ Zustellung = "Post" (nur)
+- ❌ Status ≠ "Aktivmitglied" und ≠ "Ehrenmitglied" (z.B. ausgetreten)
+- ❌ zustellung-email = false
 - ❌ Keine E-Mail-Adresse
 
 ## 📝 Workflow

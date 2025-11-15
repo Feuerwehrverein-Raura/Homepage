@@ -16,7 +16,7 @@ const SMTP_HOST = process.env.SMTP_HOST || 'mail.fwv-raura.ch';
 const SMTP_PORT = process.env.SMTP_PORT || 587;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'events@fwv-raura.ch';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'alle@fwv-raura.ch';
 const FROM_NAME = process.env.FROM_NAME || 'Feuerwehrverein Raura Kaiseraugst';
 
 // Parse command line arguments
@@ -123,13 +123,12 @@ function loadRecipients() {
         console.log('📋 Lade E-Mail-Empfänger aus mitglieder_data.json...');
         const members = JSON.parse(fs.readFileSync(memberDataPath, 'utf-8'));
 
-        // Filter: Nur Aktivmitglieder mit E-Mail, deren Zustellung E-Mail enthält
+        // Filter: Nur Aktivmitglieder und Ehrenmitglieder mit E-Mail-Zustellung
         const emailRecipients = members.filter(m => {
-            const zustellung = (m.Zustellung || '').toLowerCase();
-            return m.Status === 'Aktivmitglied' &&
+            return (m.Status === 'Aktivmitglied' || m.Status === 'Ehrenmitglied') &&
                 m['E-Mail'] &&
                 m['E-Mail'].trim() !== '' &&
-                (zustellung.includes('e-mail') || zustellung.includes('email'));
+                m['zustellung-email'] === true;
         });
 
         console.log(`✅ ${emailRecipients.length} Mitglieder mit E-Mail-Zustellung gefunden`);

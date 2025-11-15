@@ -13,7 +13,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Lindenweg 27",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -23,9 +23,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "François Bach",
@@ -41,7 +42,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Ziegelhofweg 32",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -51,9 +52,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": ""
+    "Geschlecht": "",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Helen Berg",
@@ -69,7 +71,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Violaweg 80",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -79,9 +81,10 @@
     "Versand-Email": "reinerberg47@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Reiner Berg",
@@ -97,7 +100,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Violaweg 80",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -107,9 +110,10 @@
     "Versand-Email": "reinerberg47@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Loris Birrer",
@@ -125,7 +129,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Heidemurweg 41",
     "PLZ": "4303 ",
     "Ort": "Kaiseraugst",
@@ -135,9 +139,10 @@
     "Versand-Email": "loris.birrer@bluemail.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Alvin T. P. Brodbeck",
@@ -153,7 +158,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Violaweg 70",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -163,9 +168,10 @@
     "Versand-Email": "a.brodbeck@intergga.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Andreas Brodbeck",
@@ -181,7 +187,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "Revisor",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Augsterstrasse 16",
     "PLZ": "4304",
     "Ort": "Giebenach",
@@ -191,9 +197,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Bruno Bürgi",
@@ -209,7 +216,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Flielti 1255A",
     "PLZ": "3855",
     "Ort": "Brienz",
@@ -219,9 +226,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Giuseppe Costanza",
@@ -237,7 +245,7 @@
     "Status": "Ehrenmitglied",
     "Funktion": "Vorstand, Kassier",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Marksteinweg 12",
     "PLZ": "4304",
     "Ort": "Giebenach",
@@ -247,9 +255,10 @@
     "Versand-Email": "costagi1@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Verena Degen",
@@ -265,7 +274,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Schulstrasse 10",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -275,9 +284,10 @@
     "Versand-Email": "vreni.degen@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Heinz Degen",
@@ -293,7 +303,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Schulstrasse 10",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -303,9 +313,10 @@
     "Versand-Email": "heinz.degen@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Rolf Dill",
@@ -321,7 +332,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Ziegelhofweg 9",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -331,9 +342,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Ray Egle",
@@ -349,7 +361,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Im Baumgarten 2",
     "PLZ": "4302 ",
     "Ort": "Augst",
@@ -359,9 +371,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": ""
+    "Geschlecht": "",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Angela Engel",
@@ -377,7 +390,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Schwarzackerstrasse 60",
     "PLZ": 4303,
     "Ort": "Kaiseraugst",
@@ -387,9 +400,10 @@
     "Versand-Email": "aengel76@gmx.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Werner Fankhauser",
@@ -405,7 +419,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Violaweg 73",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -415,9 +429,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Yves Füchter",
@@ -433,7 +448,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Fortunastrasse 14",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -443,9 +458,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Rebecca Füchter",
@@ -461,7 +477,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Fortunastrasse 14",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -471,9 +487,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Adrian Gilgen",
@@ -489,7 +506,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Rosenweg 4",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -499,9 +516,10 @@
     "Versand-Email": "ad_gilgen@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Vreni Grossenbacher",
@@ -517,7 +535,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Kurzenbettli 25",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -527,9 +545,10 @@
     "Versand-Email": "vreni.grossenbacher@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Eduard Grossenbacher",
@@ -545,7 +564,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Kurzenbettli 23",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -555,9 +574,10 @@
     "Versand-Email": "edi.grossenbacher@hotmail.com",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Helen Grossenbacher",
@@ -573,7 +593,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Kurzenbettli 23",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -583,9 +603,10 @@
     "Versand-Email": "edi.grossenbacher@hotmail.com",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Post",
     "Bemerkungen": "Achtung Geburtsdatum identisch mit Edi ?",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Roger Heid",
@@ -601,7 +622,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Liebrütistrasse 11",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -611,9 +632,10 @@
     "Versand-Email": "heid19@sunrise.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Oliver Jucker",
@@ -629,7 +651,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Weidenweg 28",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -639,9 +661,10 @@
     "Versand-Email": "oju@gmx.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Ramon Kahl",
@@ -657,7 +680,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Weidenweg 19",
     "PLZ": "4303 ",
     "Ort": "Kaiseraugst",
@@ -667,9 +690,10 @@
     "Versand-Email": "Ramon.Kahl@web.de",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Brigitte Käslin",
@@ -685,7 +709,7 @@
     "Status": "Ehrenmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Heidemurweg 10",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -695,9 +719,10 @@
     "Versand-Email": "rene.kaeslin@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "René Käslin",
@@ -713,7 +738,7 @@
     "Status": "Ehrenmitglied",
     "Funktion": "Vorstand, Präsident",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Heidemurweg 10",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -723,9 +748,10 @@
     "Versand-Email": "rene.kaeslin@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Margrit Käslin",
@@ -741,7 +767,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Clarahofweg 18",
     "PLZ": "4058",
     "Ort": "Basel",
@@ -751,9 +777,10 @@
     "Versand-Email": "franz.kaeslin@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Franz Käslin",
@@ -769,7 +796,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Clarahofweg 18",
     "PLZ": "4058",
     "Ort": "Basel",
@@ -779,9 +806,10 @@
     "Versand-Email": "franz.kaeslin@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Markus Kiefer",
@@ -797,7 +825,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Rheinparkstrasse 1",
     "PLZ": "4127 ",
     "Ort": "Birsfelden",
@@ -807,9 +835,10 @@
     "Versand-Email": "markus.kiefer1969@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": ""
+    "Geschlecht": "",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Michèle Killer",
@@ -825,7 +854,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Postfach 168",
     "PLZ": "4313",
     "Ort": "Möhlin",
@@ -835,9 +864,10 @@
     "Versand-Email": "michele.killer@yahoo.de",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Raphael Kohler",
@@ -853,7 +883,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Schwarzackerstrasse 51",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -863,9 +893,10 @@
     "Versand-Email": "raphael.kohler@gmx.de",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": ""
+    "Geschlecht": "",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Cornelia Lengweiler",
@@ -881,7 +912,7 @@
     "Status": "Ehrenmitglied",
     "Funktion": "Vorstand, Materialwart",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Auf der Wacht 14",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -891,9 +922,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Kurt Lengweiler",
@@ -909,7 +941,7 @@
     "Status": "Ehrenmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Auf der Wacht 14",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -919,9 +951,10 @@
     "Versand-Email": "kurt.lengweiler@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Markus Lüthi",
@@ -937,7 +970,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Pappelnweg 38c",
     "PLZ": "4310",
     "Ort": "Rheinfelden",
@@ -947,9 +980,10 @@
     "Versand-Email": "maluethi@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Daniel Meier",
@@ -965,7 +999,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Auf der Schanz 21",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -975,9 +1009,10 @@
     "Versand-Email": "daniel-meier@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Paola Meixueiro",
@@ -993,7 +1028,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Weidenweg 19",
     "PLZ": "4303 ",
     "Ort": "Kaiseraugst",
@@ -1003,9 +1038,10 @@
     "Versand-Email": "pao.meixueiro@gmail.com",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Ralf Merten",
@@ -1021,7 +1057,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Fliederweg 43",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1031,9 +1067,10 @@
     "Versand-Email": "ralf.merten@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Susanne Meyer",
@@ -1049,7 +1086,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Ziegelhofweg 29",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1059,9 +1096,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Patrick Meyer",
@@ -1077,7 +1115,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Ziegelhofweg 29",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1087,9 +1125,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Ursula Meyer",
@@ -1105,7 +1144,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Alemannenstrasse 10a",
     "PLZ": "DE-79618",
     "Ort": "Rheinfelden",
@@ -1115,9 +1154,10 @@
     "Versand-Email": "",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Urs Michel",
@@ -1133,7 +1173,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "Vorstand, Beisitzer",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Unterer Gallezenweg 5",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -1143,9 +1183,10 @@
     "Versand-Email": "urs.michel@erne.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Stefan Müller",
@@ -1161,7 +1202,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "Vorstand, Aktuar",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Rosenweg 9",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1171,9 +1212,10 @@
     "Versand-Email": "stefan.mueller.1694@gmail.com",
     "IBAN": "CH8208401000064526054",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Dietmar Müller",
@@ -1189,7 +1231,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Gartenstrasse 8",
     "PLZ": "DE-79618",
     "Ort": "Rheinfelden-Herten",
@@ -1199,9 +1241,10 @@
     "Versand-Email": "dietmaryvonne.mueller@t-online.de",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Nicolas Niederberger",
@@ -1217,7 +1260,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Im Spiegelgrund 2",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1227,9 +1270,10 @@
     "Versand-Email": "hathi92@gmx.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Sandra Petrack",
@@ -1245,7 +1289,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Heidemurweg 20",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1255,9 +1299,10 @@
     "Versand-Email": "s.unger@hotmail.ch ",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Urs Rychener",
@@ -1273,7 +1318,7 @@
     "Status": "Ehrenmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Friedhofstrasse 34",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1283,9 +1328,10 @@
     "Versand-Email": "urychener@gmx.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Andrea Schöllnast",
@@ -1301,7 +1347,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Weidenweg 28",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1311,9 +1357,10 @@
     "Versand-Email": "andrea@babsy.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Gisela Schötzau",
@@ -1329,7 +1376,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Hauptstrasse 46",
     "PLZ": "4302",
     "Ort": "Augst BL",
@@ -1339,9 +1386,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Post",
     "Bemerkungen": "Korrespondenz zusammen mit Martin Schötzau versenden",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Martin Schötzau",
@@ -1357,7 +1405,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Hauptstrasse 46",
     "PLZ": "4302",
     "Ort": "Augst BL",
@@ -1367,9 +1415,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "Korrespondenz zusammen mit Gisela Schötzau versenden",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Thomas Schwerzmann",
@@ -1385,7 +1434,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Auf der Schanz 11",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1395,9 +1444,10 @@
     "Versand-Email": "mfpr92og@test.juroct.net",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Ursula Stadelmann",
@@ -1413,7 +1463,7 @@
     "Status": "Ehrenmitglied",
     "Funktion": "Revisor",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Äussere Reben 48",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1423,9 +1473,10 @@
     "Versand-Email": "ursula.stadelmann@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Hansjörg Steiner",
@@ -1441,7 +1492,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Schufenholzweg 20",
     "PLZ": "4302",
     "Ort": "Augst BL",
@@ -1451,9 +1502,10 @@
     "Versand-Email": "hansjoerg.steiner@outlook.de",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Hanspeter Trächslin",
@@ -1469,7 +1521,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Ziegelhofweg 11",
     "PLZ": "4303",
     "Ort": "Kaiseraugst",
@@ -1479,9 +1531,10 @@
     "Versand-Email": "hanspeter.traechslin@teleport.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Peter Tschudin",
@@ -1497,7 +1550,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Schufenholzweg 25",
     "PLZ": "4302",
     "Ort": "Augst",
@@ -1507,9 +1560,10 @@
     "Versand-Email": "",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Post",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": false,
+    "zustellung-post": true
   },
   {
     "Mitglied": "Marianne Vizeli",
@@ -1525,7 +1579,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Osterenstrasse 44",
     "PLZ": 4628,
     "Ort": "Wolfwil",
@@ -1535,9 +1589,10 @@
     "Versand-Email": "marianne.vizeli@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "w"
+    "Geschlecht": "w",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Andreas Vizeli",
@@ -1553,7 +1608,7 @@
     "Status": "Aktivmitglied",
     "Funktion": "",
     "Austrittsdatum": "",
-    "Austrittsdatum (Jahre)": 0.0,
+    "Austrittsdatum (Jahre)": 0,
     "Strasse": "Osterenstrasse 44",
     "PLZ": 4628,
     "Ort": "Wolfwil",
@@ -1563,9 +1618,10 @@
     "Versand-Email": "andreas.vizeli@bluewin.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   },
   {
     "Mitglied": "Marijan Vukadin",
@@ -1591,8 +1647,9 @@
     "Versand-Email": "mar_vin@gmx.ch",
     "IBAN": "",
     "Zusatz bei Mann (r)": "r",
-    "Zustellung": "Mail",
     "Bemerkungen": "",
-    "Geschlecht": "m"
+    "Geschlecht": "m",
+    "zustellung-email": true,
+    "zustellung-post": false
   }
 ]

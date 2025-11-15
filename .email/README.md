@@ -12,33 +12,34 @@ Benötigte Secrets:
 |-------------|------|----------|
 | `SMTP_HOST` | Mailcow Server | `mail.fwv-raura.ch` |
 | `SMTP_PORT` | SMTP Port | `587` |
-| `SMTP_USER` | SMTP Benutzer | `events@fwv-raura.ch` |
+| `SMTP_USER` | SMTP Benutzer | `alle@fwv-raura.ch` |
 | `SMTP_PASS` | SMTP Passwort | `IhrPasswort123` |
-| `FROM_EMAIL` | Absender | `events@fwv-raura.ch` |
-| `EMAIL_RECIPIENTS_TO` | Mailcow Verteilerliste (optional) | `events@fwv-raura.ch` |
+| `FROM_EMAIL` | Absender | `alle@fwv-raura.ch` |
+| `EMAIL_RECIPIENTS_TO` | Mailcow Verteilerliste (optional) | `alle@fwv-raura.ch` |
 | `MITGLIEDER_ACCESS_TOKEN` | Zugriff auf mitglieder_data.json (optional) | Token |
 
 ### 2. Empfänger-Verwaltung
 
 **Option A: Mailcow Verteilerliste (empfohlen)**
 
-1. Erstellen Sie in Mailcow einen Alias: `events@fwv-raura.ch`
+1. Erstellen Sie in Mailcow einen Alias: `alle@fwv-raura.ch`
 2. Fügen Sie alle Mitglieder hinzu
-3. Setzen Sie Secret `EMAIL_RECIPIENTS_TO=events@fwv-raura.ch`
+3. Setzen Sie Secret `EMAIL_RECIPIENTS_TO=alle@fwv-raura.ch`
 
 **Option B: Automatisch aus mitglieder_data.json**
 
 E-Mails werden automatisch an alle Mitglieder gesendet, die:
-- ✅ Status = "Aktivmitglied"
+- ✅ Status = "Aktivmitglied" oder "Ehrenmitglied"
 - ✅ E-Mail vorhanden
-- ✅ Zustellung ≠ "Post"
+- ✅ zustellung-email = true
 
 **Beispiel in mitglieder_data.json:**
 ```json
 {
   "Mitglied": "Max Mustermann",
   "Status": "Aktivmitglied",
-  "Zustellung": "E-Mail",
+  "zustellung-email": true,
+  "zustellung-post": false,
   "E-Mail": "max@example.com"
 }
 ```

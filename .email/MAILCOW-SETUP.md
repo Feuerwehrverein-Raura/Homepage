@@ -24,7 +24,7 @@ https://mail.ihre-domain.de
 1. **Navigation:** E-Mail → Konfiguration → Alias
 2. **Klicken Sie auf:** "Alias hinzufügen"
 3. **Füllen Sie aus:**
-   - **Alias-Adresse:** `events@fwv-raura.ch` (oder `verteiler@fwv-raura.ch`)
+   - **Alias-Adresse:** `alle@fwv-raura.ch` (oder `verteiler@fwv-raura.ch`)
    - **Ziel-Adressen:**
      ```
      praesident@fwv-raura.ch
@@ -40,10 +40,10 @@ https://mail.ihre-domain.de
 
 ### 1.3 Testen
 
-Senden Sie eine Test-E-Mail an `events@fwv-raura.ch`:
+Senden Sie eine Test-E-Mail an `alle@fwv-raura.ch`:
 
 ```bash
-echo "Test" | mail -s "Verteiler-Test" events@fwv-raura.ch
+echo "Test" | mail -s "Verteiler-Test" alle@fwv-raura.ch
 ```
 
 Alle konfigurierten Empfänger sollten die E-Mail erhalten.
@@ -56,9 +56,9 @@ Alle konfigurierten Empfänger sollten die E-Mail erhalten.
 2. Klicken Sie auf: **"New repository secret"**
 3. Füllen Sie aus:
    - **Name:** `EMAIL_RECIPIENTS_TO`
-   - **Value:** `events@fwv-raura.ch`
+   - **Value:** `alle@fwv-raura.ch`
 
-   (Oder für mehrere Verteiler, komma-separiert: `events@fwv-raura.ch,vorstand@fwv-raura.ch`)
+   (Oder für mehrere Verteiler, komma-separiert: `alle@fwv-raura.ch,vorstand@fwv-raura.ch`)
 4. Klicken Sie auf: **"Add secret"**
 
 ### 2.2 Andere Secrets erstellen
@@ -69,10 +69,10 @@ Erstellen Sie auch diese Secrets (falls noch nicht vorhanden):
 |-------------|---------------|--------------|
 | `SMTP_HOST` | `mail.fwv-raura.ch` | Mailcow Server |
 | `SMTP_PORT` | `587` | SMTP Port (587 oder 465) |
-| `SMTP_USER` | `events@fwv-raura.ch` | SMTP Benutzername |
+| `SMTP_USER` | `alle@fwv-raura.ch` | SMTP Benutzername |
 | `SMTP_PASS` | `IhrPasswort123` | SMTP Passwort |
-| `FROM_EMAIL` | `events@fwv-raura.ch` | Absender-Adresse |
-| `EMAIL_RECIPIENTS_TO` | `events@fwv-raura.ch` | Verteilerliste (neu!) |
+| `FROM_EMAIL` | `alle@fwv-raura.ch` | Absender-Adresse |
+| `EMAIL_RECIPIENTS_TO` | `alle@fwv-raura.ch` | Verteilerliste (neu!) |
 
 ## Schritt 3: Testen
 
@@ -95,7 +95,7 @@ Erwartete Ausgabe:
 🎨 Erstelle E-Mail-Template...
 ✅ Template erstellt
 📧 Versende E-Mails...
-✅ E-Mail gesendet an events@fwv-raura.ch
+✅ E-Mail gesendet an alle@fwv-raura.ch
 ✅ Alle E-Mails erfolgreich versendet!
 ```
 
@@ -103,7 +103,7 @@ Erwartete Ausgabe:
 
 In Mailcow UI:
 1. Gehen Sie zu: **Logs → Postfix**
-2. Suchen Sie nach: `from=<events@fwv-raura.ch>`
+2. Suchen Sie nach: `from=<alle@fwv-raura.ch>`
 3. Sie sollten sehen:
    - Eine eingehende E-Mail von GitHub Actions
    - Mehrere ausgehende E-Mails an alle Verteiler-Mitglieder
@@ -113,7 +113,7 @@ In Mailcow UI:
 ### Empfänger hinzufügen
 
 1. **Mailcow:** E-Mail → Konfiguration → Alias
-2. Klicken Sie auf den **Bearbeiten-Button** (✏️) neben `events@fwv-raura.ch`
+2. Klicken Sie auf den **Bearbeiten-Button** (✏️) neben `alle@fwv-raura.ch`
 3. Fügen Sie die neue E-Mail-Adresse in **Ziel-Adressen** hinzu
 4. Speichern
 
@@ -122,7 +122,7 @@ In Mailcow UI:
 ### Empfänger entfernen
 
 1. **Mailcow:** E-Mail → Konfiguration → Alias
-2. Bearbeiten Sie `events@fwv-raura.ch`
+2. Bearbeiten Sie `alle@fwv-raura.ch`
 3. Entfernen Sie die E-Mail-Adresse aus **Ziel-Adressen**
 4. Speichern
 
@@ -149,7 +149,7 @@ So gehen E-Mails an mehrere Listen gleichzeitig.
 In Mailcow können Sie Auto-Responder einrichten:
 
 1. **Mailcow:** E-Mail → Konfiguration → Auto-Antworten
-2. Erstellen Sie eine Auto-Antwort für `events@fwv-raura.ch`
+2. Erstellen Sie eine Auto-Antwort für `alle@fwv-raura.ch`
 3. Text z.B.: "Diese ist eine automatische Verteiler-E-Mail. Bitte nicht antworten."
 
 ### Catch-All für Bounces
@@ -189,7 +189,7 @@ Mailcow UI → Logs → Postfix
 Suchen Sie nach der Event-E-Mail.
 
 **2. Prüfen Sie den Alias:**
-- Ist `events@fwv-raura.ch` aktiv?
+- Ist `alle@fwv-raura.ch` aktiv?
 - Sind alle Ziel-Adressen korrekt?
 
 **3. Prüfen Sie Spam-Ordner:**

@@ -102,11 +102,10 @@ function loadRecipients() {
     console.log('📋 Lade Brief-Empfänger aus mitglieder_data.json...');
     const members = JSON.parse(fs.readFileSync(memberDataPath, 'utf-8'));
 
-    // Filter: Nur Aktivmitglieder mit Post-Zustellung (auch wenn zusätzlich E-Mail)
+    // Filter: Nur Aktivmitglieder und Ehrenmitglieder mit Post-Zustellung
     const letterRecipients = members.filter(m => {
-        const zustellung = (m.Zustellung || '').toLowerCase();
-        return m.Status === 'Aktivmitglied' &&
-            zustellung.includes('post') &&
+        return (m.Status === 'Aktivmitglied' || m.Status === 'Ehrenmitglied') &&
+            m['zustellung-post'] === true &&
             m.Strasse && m.PLZ && m.Ort;
     });
 
