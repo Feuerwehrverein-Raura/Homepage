@@ -6,7 +6,7 @@ startDate: 2025-12-13T18:00:00
 endDate: 2025-12-13T23:59:59
 location: Nach Anmeldung (Kaiseraugst)
 organizer: Brigitte Käslin
-email: organisator@feuerwehrverein-raura.ch
+email: brigitte.kaeslin2@gmail.com
 
 # === OPTIONALE FELDER ===
 subtitle: Weihnachtsessen 2025
