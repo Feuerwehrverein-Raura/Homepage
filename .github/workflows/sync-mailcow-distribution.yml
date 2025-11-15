@@ -1,0 +1,36 @@
+name: Sync Mailcow Distribution List
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mitglieder_data.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-mailcow:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MITGLIEDER_ACCESS_TOKEN || github.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Sync distribution list to Mailcow
+        env:
+          MAILCOW_API_URL: ${{ secrets.MAILCOW_API_URL }}
+          MAILCOW_API_KEY: ${{ secrets.MAILCOW_API_KEY }}
+          MAILCOW_ALIAS_ADDRESS: ${{ secrets.MAILCOW_ALIAS_ADDRESS }}
+        run: |
+          echo "🔄 Synchronisiere Mailcow Verteilerliste..."
+          node scripts/sync-mailcow-distribution-list.js

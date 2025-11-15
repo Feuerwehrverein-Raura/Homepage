@@ -1,0 +1,36 @@
+name: Send Event Letter Invitations
+
+on:
+  workflow_dispatch:
+    inputs:
+      event_file:
+        description: 'Event file to send letters for (e.g., events/weihnachtshock2025.md)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  send-letters:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MITGLIEDER_ACCESS_TOKEN }}  # For private repo access
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Send event invitation letters via Pingen
+        env:
+          PINGEN_API_KEY: ${{ secrets.PINGEN_API_KEY }}
+          PINGEN_STAGING: ${{ secrets.PINGEN_STAGING }}
+        run: |
+          EVENT_FILE="${{ github.event.inputs.event_file }}"
+          echo "📮 Versende Brief-Einladungen für: $EVENT_FILE"
+          node scripts/send-event-letter.js "$EVENT_FILE"

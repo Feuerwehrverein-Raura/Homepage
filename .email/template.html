@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}}</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .event-title {
+            font-size: 24px;
+            color: #dc2626;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .event-subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 25px;
+        }
+        .event-details {
+            background: #f9f9f9;
+            border-left: 4px solid #dc2626;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 5px;
+        }
+        .detail-item {
+            margin: 12px 0;
+            display: flex;
+            align-items: start;
+        }
+        .detail-icon {
+            font-size: 20px;
+            margin-right: 10px;
+            min-width: 25px;
+        }
+        .detail-text {
+            flex: 1;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #333;
+            display: block;
+            margin-bottom: 3px;
+        }
+        .description {
+            margin: 25px 0;
+            line-height: 1.8;
+        }
+        .cta-button {
+            display: inline-block;
+            background: #dc2626;
+            color: white;
+            padding: 15px 35px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .cta-button:hover {
+            background: #b91c1c;
+        }
+        .footer {
+            background: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #dc2626;
+            text-decoration: none;
+        }
+        .badge {
+            display: inline-block;
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔥 Feuerwehrverein Raura Kaiseraugst</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="content">
+            <div class="event-title">{{title}}</div>
+            {{#if subtitle}}
+            <div class="event-subtitle">{{subtitle}}</div>
+            {{/if}}
+
+            <!-- Event Details Box -->
+            <div class="event-details">
+                <div class="detail-item">
+                    <span class="detail-icon">📅</span>
+                    <div class="detail-text">
+                        <span class="detail-label">Datum</span>
+                        {{startDate}} {{#if endDate}}bis {{endDate}}{{/if}}
+                    </div>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-icon">⏰</span>
+                    <div class="detail-text">
+                        <span class="detail-label">Uhrzeit</span>
+                        {{startTime}} {{#if endTime}}- {{endTime}}{{/if}} Uhr
+                    </div>
+                </div>
+
+                <div class="detail-item">
+                    <span class="detail-icon">📍</span>
+                    <div class="detail-text">
+                        <span class="detail-label">Ort</span>
+                        {{location}}
+                    </div>
+                </div>
+
+                {{#if organizer}}
+                <div class="detail-item">
+                    <span class="detail-icon">👤</span>
+                    <div class="detail-text">
+                        <span class="detail-label">Organisator</span>
+                        {{organizer}}
+                        {{#if organizerEmail}}<br><a href="mailto:{{organizerEmail}}">{{organizerEmail}}</a>{{/if}}
+                    </div>
+                </div>
+                {{/if}}
+
+                {{#if cost}}
+                <div class="detail-item">
+                    <span class="detail-icon">💰</span>
+                    <div class="detail-text">
+                        <span class="detail-label">Kosten</span>
+                        {{cost}}
+                    </div>
+                </div>
+                {{/if}}
+            </div>
+
+            <!-- Description -->
+            <div class="description">
+                {{{description}}}
+            </div>
+
+            {{#if registrationRequired}}
+            <div class="badge">
+                ✉️ Anmeldung erforderlich{{#if registrationDeadline}} bis {{registrationDeadline}}{{/if}}
+            </div>
+            {{#if maxParticipants}}
+            <div class="badge">
+                👥 Begrenzt auf {{maxParticipants}} Teilnehmer
+            </div>
+            {{/if}}
+            {{/if}}
+
+            <!-- Call to Action -->
+            {{#if registrationUrl}}
+            <center>
+                <a href="{{registrationUrl}}" class="cta-button">Jetzt anmelden</a>
+            </center>
+            {{else}}
+            <center>
+                <a href="{{eventUrl}}" class="cta-button">Details ansehen</a>
+            </center>
+            {{/if}}
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Feuerwehrverein Raura Kaiseraugst</strong></p>
+            <p>
+                <a href="https://www.fwv-raura.ch">www.fwv-raura.ch</a><br>
+                <a href="mailto:kontakt@fwv-raura.ch">kontakt@fwv-raura.ch</a>
+            </p>
+            <p style="font-size: 12px; color: #999; margin-top: 15px;">
+                Sie erhalten diese E-Mail als Mitglied des Feuerwehrvereins Raura Kaiseraugst.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
