@@ -42,4 +42,5 @@ jobs:
           git config --local user.name "GitHub Action"
           git add calendar.ics
           git commit -m "🤖 Update calendar.ics [automated]"
+          git pull --rebase origin ${{ github.ref_name }}
           git push
