@@ -102,12 +102,13 @@ function loadRecipients() {
     console.log('📋 Lade Brief-Empfänger aus mitglieder_data.json...');
     const members = JSON.parse(fs.readFileSync(memberDataPath, 'utf-8'));
 
-    // Filter: Nur Aktivmitglieder mit Post-Zustellung
-    const letterRecipients = members.filter(m =>
-        m.Status === 'Aktivmitglied' &&
-        m.Zustellung === 'Post' &&
-        m.Strasse && m.PLZ && m.Ort
-    );
+    // Filter: Nur Aktivmitglieder mit Post-Zustellung (auch wenn zusätzlich E-Mail)
+    const letterRecipients = members.filter(m => {
+        const zustellung = (m.Zustellung || '').toLowerCase();
+        return m.Status === 'Aktivmitglied' &&
+            zustellung.includes('post') &&
+            m.Strasse && m.PLZ && m.Ort;
+    });
 
     console.log(`✅ ${letterRecipients.length} Mitglieder mit Post-Zustellung gefunden`);
 
