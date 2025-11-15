@@ -5,6 +5,7 @@ on:
     paths: ['events/**']
   schedule:
     - cron: '0 6 * * *' # Täglich um 6:00 Uhr
+  workflow_dispatch: # Erlaubt manuelles Auslösen
 
 permissions:
   contents: write  # This is crucial for pushing back to the repo
