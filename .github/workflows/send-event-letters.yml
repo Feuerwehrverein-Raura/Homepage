@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MITGLIEDER_ACCESS_TOKEN }}  # For private repo access
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -28,7 +30,6 @@ jobs:
         env:
           PINGEN_API_KEY: ${{ secrets.PINGEN_API_KEY }}
           PINGEN_STAGING: ${{ secrets.PINGEN_STAGING }}
-          LETTER_RECIPIENTS: ${{ secrets.LETTER_RECIPIENTS }}
         run: |
           EVENT_FILE="${{ github.event.inputs.event_file }}"
           echo "📮 Versende Brief-Einladungen für: $EVENT_FILE"

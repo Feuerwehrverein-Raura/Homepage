@@ -89,16 +89,37 @@ function formatTime(dateStr) {
 }
 
 /**
- * Load letter recipients (postal addresses)
+ * Load letter recipients from member data
  */
 function loadRecipients() {
-    if (!process.env.LETTER_RECIPIENTS) {
-        throw new Error('LETTER_RECIPIENTS Secret ist nicht konfiguriert! Bitte in GitHub Secrets anlegen.');
+    // Load from mitglieder_data.json
+    const memberDataPath = path.join(__dirname, '..', 'mitglieder_data.json');
+
+    if (!fs.existsSync(memberDataPath)) {
+        throw new Error('mitglieder_data.json nicht gefunden!');
     }
 
-    console.log('📋 Lade Brief-Empfänger...');
-    const data = JSON.parse(process.env.LETTER_RECIPIENTS);
-    return data.recipients.filter(r => r.active);
+    console.log('📋 Lade Brief-Empfänger aus mitglieder_data.json...');
+    const members = JSON.parse(fs.readFileSync(memberDataPath, 'utf-8'));
+
+    // Filter: Nur Aktivmitglieder mit Post-Zustellung
+    const letterRecipients = members.filter(m =>
+        m.Status === 'Aktivmitglied' &&
+        m.Zustellung === 'Post' &&
+        m.Strasse && m.PLZ && m.Ort
+    );
+
+    console.log(`✅ ${letterRecipients.length} Mitglieder mit Post-Zustellung gefunden`);
+
+    return letterRecipients.map(m => ({
+        name: m.Mitglied,
+        address: {
+            street: m.Strasse,
+            zip: m.PLZ,
+            city: m.Ort,
+            country: 'CH'
+        }
+    }));
 }
 
 /**
