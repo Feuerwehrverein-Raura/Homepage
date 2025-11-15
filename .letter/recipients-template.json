@@ -1,0 +1,35 @@
+{
+  "comment": "Beispiel für LETTER_RECIPIENTS Secret. Komprimieren Sie diesen JSON für GitHub Secret!",
+  "recipients": [
+    {
+      "name": "Max Mustermann",
+      "address": {
+        "street": "Musterstrasse 123",
+        "zip": "4303",
+        "city": "Kaiseraugst",
+        "country": "CH"
+      },
+      "active": true
+    },
+    {
+      "name": "Erika Musterfrau",
+      "address": {
+        "street": "Hauptstrasse 45",
+        "zip": "4303",
+        "city": "Kaiseraugst",
+        "country": "CH"
+      },
+      "active": true
+    },
+    {
+      "name": "Deaktiviertes Mitglied",
+      "address": {
+        "street": "Alte Adresse 99",
+        "zip": "4000",
+        "city": "Basel",
+        "country": "CH"
+      },
+      "active": false
+    }
+  ]
+}

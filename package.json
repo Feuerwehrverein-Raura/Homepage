@@ -8,6 +8,7 @@
     "generate-ics": "node scripts/generate-ics.js",
     "generate-pdfs": "node scripts/generate-shift-plans.js",
     "send-event-email": "node scripts/send-event-email.js",
+    "send-event-letter": "node scripts/send-event-letter.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
