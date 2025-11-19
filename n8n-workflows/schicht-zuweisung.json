@@ -1,0 +1,72 @@
+{
+  "name": "Schicht-Zuweisung",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shift-assignment",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/contents/events/{{ $json.body.eventId }}-assignments.md",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "github-get",
+      "name": "Assignments laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhookData = $(\"Webhook\").first().json.body;\nconst githubResponse = $input.first().json;\n\n// Decode Markdown\nlet markdown = Buffer.from(githubResponse.content, \"base64\").toString(\"utf8\");\n\nconst personName = webhookData.personName;\nconst shiftIds = webhookData.shiftIds || [];\n\n// Für jede Schicht-ID den Namen hinzufügen\nfor (const shiftId of shiftIds) {\n  // Suche die Schicht-Sektion\n  const lines = markdown.split('\\n');\n  let inSection = false;\n  let sectionStart = -1;\n  let sectionEnd = -1;\n  \n  for (let i = 0; i < lines.length; i++) {\n    if (lines[i].toLowerCase().includes('### ' + shiftId.toLowerCase())) {\n      inSection = true;\n      sectionStart = i;\n    } else if (inSection && (lines[i].startsWith('### ') || lines[i].startsWith('---'))) {\n      sectionEnd = i;\n      break;\n    }\n  }\n  \n  if (sectionStart >= 0) {\n    if (sectionEnd < 0) sectionEnd = lines.length;\n    \n    // Prüfe ob Person bereits eingetragen\n    let personExists = false;\n    for (let i = sectionStart; i < sectionEnd; i++) {\n      if (lines[i].includes(personName)) {\n        personExists = true;\n        break;\n      }\n    }\n    \n    if (!personExists) {\n      // Suche OFFEN-Platz und ersetze\n      for (let i = sectionStart; i < sectionEnd; i++) {\n        if (lines[i].includes('[OFFEN')) {\n          const match = lines[i].match(/\\[OFFEN - (\\d+)/);\n          if (match) {\n            const count = parseInt(match[1]) - 1;\n            if (count > 0) {\n              lines.splice(i, 0, '- ' + personName);\n              lines[i + 1] = lines[i + 1].replace(/\\d+/, count.toString());\n            } else {\n              lines[i] = '- ' + personName;\n            }\n            break;\n          }\n        }\n      }\n    }\n  }\n  \n  markdown = lines.join('\\n');\n}\n\n// Aktualisiere Timestamp\nmarkdown = markdown.replace(/\\*Zuletzt aktualisiert:.*\\*/, '*Zuletzt aktualisiert: ' + new Date().toLocaleDateString('de-CH') + '*');\n\nconst newContent = Buffer.from(markdown).toString(\"base64\");\n\nreturn {\n  json: {\n    content: newContent,\n    sha: githubResponse.sha,\n    eventId: webhookData.eventId,\n    personName: personName\n  }\n};"
+      },
+      "id": "code-1",
+      "name": "Person eintragen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/contents/events/{{ $json.eventId }}-assignments.md",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"message\": \"Schicht-Zuweisung: {{ $json.personName }}\", \"content\": \"{{ $json.content }}\", \"sha\": \"{{ $json.sha }}\"}",
+        "options": {}
+      },
+      "id": "github-put",
+      "name": "Assignments speichern",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Assignments laden", "type": "main", "index": 0}]]
+    },
+    "Assignments laden": {
+      "main": [[{"node": "Person eintragen", "type": "main", "index": 0}]]
+    },
+    "Person eintragen": {
+      "main": [[{"node": "Assignments speichern", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
