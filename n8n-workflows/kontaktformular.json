@@ -1,0 +1,158 @@
+{
+  "id": "Ry5NMF33gWhs4Y7O",
+  "name": "Kontaktformular",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contact-form",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// E-Mails aus Vorstand-Markdown-Dateien laden\nconst aktuarRes = await this.helpers.httpRequest({\n  method: \"GET\",\n  url: \"https://fwv-raura.ch/vorstand/aktuar.md\"\n});\n\nconst kassierRes = await this.helpers.httpRequest({\n  method: \"GET\",\n  url: \"https://fwv-raura.ch/vorstand/kassier.md\"\n});\n\nfunction extractEmail(markdown) {\n  const match = markdown.match(/email:\\s*(.+)/i);\n  return match ? match[1].trim() : null;\n}\n\nconst aktuarEmail = extractEmail(aktuarRes);\nconst kassierEmail = extractEmail(kassierRes);\n\nconst body = $input.first().json.body;\n\n// Empfänger basierend auf Betreff\nlet to;\nif (body.subject === \"Mitgliedschaft\") {\n  to = `${aktuarEmail}, ${kassierEmail}`;\n} else {\n  // Veranstaltung, Zusammenarbeit, Allgemein\n  to = \"vorstand@fwv-raura.ch\";\n}\n\nreturn {\n  json: {\n    senderName: body.name,\n    senderEmail: body.email,\n    subject: body.subject,\n    message: body.message || \"\",\n    type: body.type,\n    membership: body.membership ? JSON.stringify(body.membership, null, 2) : \"\",\n    to: to\n  }\n};"
+      },
+      "id": "code-1",
+      "name": "Daten verarbeiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "website@fwv-raura.ch",
+        "toEmail": "={{ $json.to }}",
+        "subject": "=Kontaktformular: {{ $json.subject }}",
+        "emailType": "html",
+        "message": "=<h2>Neue Kontaktanfrage</h2><p><strong>Von:</strong> {{ $json.senderName }} ({{ $json.senderEmail }})</p><p><strong>Betreff:</strong> {{ $json.subject }}</p><hr>{{ $json.type === \"membership\" ? \"<h3>Mitgliedschaftsantrag</h3><pre>\" + $json.membership + \"</pre>\" : \"<p>\" + $json.message + \"</p>\" }}",
+        "options": {
+          "replyTo": "={{ $json.senderEmail }}"
+        }
+      },
+      "id": "email-1",
+      "name": "E-Mail an Vorstand",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        750,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "website@fwv-raura.ch",
+        "toEmail": "={{ $json.senderEmail }}",
+        "subject": "Ihre Anfrage beim Feuerwehrverein Raurachemme",
+        "emailType": "html",
+        "message": "=<h2>Vielen Dank für Ihre Nachricht</h2><p>Guten Tag {{ $json.senderName }}</p><p>Wir haben Ihre Anfrage erhalten und werden uns in Kürze bei Ihnen melden.</p><hr><p>Mit freundlichen Grüssen<br>Feuerwehrverein Raurachemme</p>",
+        "options": {}
+      },
+      "id": "email-2",
+      "name": "Bestätigung an Absender",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        750,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: \"Vielen Dank für Ihre Nachricht.\" }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-1",
+      "name": "Erfolg Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Daten verarbeiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daten verarbeiten": {
+      "main": [
+        [
+          {
+            "node": "E-Mail an Vorstand",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bestätigung an Absender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "E-Mail an Vorstand": {
+      "main": [
+        [
+          {
+            "node": "Erfolg Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bestätigung an Absender": {
+      "main": [
+        [
+          {
+            "node": "Erfolg Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}

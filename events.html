@@ -871,9 +871,10 @@
                             <div class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-4">
                                 ${event.shifts.map((shift, index) => `
                                     <label class="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                        <input type="checkbox" name="shifts" value="${index}" 
+                                        <input type="checkbox" name="shifts" value="${shift.id || index}"
+                                               data-name="${shift.name || `Schicht ${index + 1}`}"
                                                class="w-4 h-4 text-fire-500 border-gray-300 rounded focus:ring-fire-500">
-                                        <span class="text-sm">Schicht ${index + 1} (${shift.needed || 0} Personen benötigt)</span>
+                                        <span class="text-sm">${shift.name || `Schicht ${index + 1}`} (${shift.needed || 0} Personen benötigt)</span>
                                     </label>
                                 `).join('')}
                             </div>
@@ -975,53 +976,104 @@
                 modal.classList.remove('hidden');
             }
 
-            submitShiftRegistration(formData) {
-                const selectedShifts = formData.getAll('shifts');
-                
-                if (selectedShifts.length === 0) {
+            async submitShiftRegistration(formData) {
+                const selectedShiftInputs = document.querySelectorAll('#shift-registration-form input[name="shifts"]:checked');
+
+                if (selectedShiftInputs.length === 0) {
                     alert('Bitte wählen Sie mindestens eine Schicht aus.');
                     return;
                 }
 
-                const emailBody = `
-Anmeldung für: ${this.selectedEvent.title}
+                // Button deaktivieren
+                const submitBtn = document.querySelector('#shift-registration-form button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Wird gesendet...';
 
-Name: ${formData.get('name')}
-E-Mail: ${formData.get('email')}
-Telefon: ${formData.get('phone') || 'Nicht angegeben'}
+                // Sammle Schicht-Infos mit ID und Name
+                const shiftsData = Array.from(selectedShiftInputs).map(input => ({
+                    id: input.value,
+                    name: input.dataset.name
+                }));
 
-Gewählte Schichten:
-${selectedShifts.map(index => `- Schicht ${parseInt(index) + 1}`).join('\n')}
+                const payload = {
+                    type: 'shift',
+                    eventId: this.selectedEvent.id,
+                    eventTitle: this.selectedEvent.title,
+                    organizerEmail: this.selectedEvent.email,
+                    name: formData.get('name'),
+                    email: formData.get('email'),
+                    phone: formData.get('phone') || '',
+                    shifts: shiftsData.map(s => s.name),
+                    shiftIds: shiftsData.map(s => s.id),
+                    notes: formData.get('notes') || ''
+                };
 
-Bemerkungen:
-${formData.get('notes') || 'Keine'}
-                `.trim();
+                try {
+                    const response = await fetch('https://n8n.fwv-raura.ch/webhook/event-registration', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
 
-                const mailto = `mailto:${this.selectedEvent.email}?subject=${encodeURIComponent('Helfer-Anmeldung: ' + this.selectedEvent.title)}&body=${encodeURIComponent(emailBody)}`;
-                window.location.href = mailto;
+                    const result = await response.json();
 
-                document.getElementById('registration-modal').classList.add('hidden');
-                alert('Ihre Anmeldung wird jetzt in Ihrem E-Mail-Programm geöffnet. Bitte senden Sie die E-Mail ab, um die Anmeldung zu bestätigen.');
+                    if (response.ok && result.success) {
+                        document.getElementById('registration-modal').classList.add('hidden');
+                        alert('Vielen Dank für Ihre Anmeldung!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.');
+                    } else {
+                        throw new Error(result.message || 'Unbekannter Fehler');
+                    }
+                } catch (error) {
+                    console.error('Fehler bei Anmeldung:', error);
+                    alert('Beim Senden ist ein Fehler aufgetreten.\n\nBitte versuchen Sie es später erneut.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
             }
 
-            submitParticipantRegistration(formData) {
-                const emailBody = `
-Anmeldung für: ${this.selectedEvent.title}
+            async submitParticipantRegistration(formData) {
+                // Button deaktivieren
+                const submitBtn = document.querySelector('#participant-registration-form button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Wird gesendet...';
 
-Name: ${formData.get('name')}
-E-Mail: ${formData.get('email')}
-Telefon: ${formData.get('phone') || 'Nicht angegeben'}
-Anzahl Personen: ${formData.get('participants')}
+                const payload = {
+                    type: 'participant',
+                    eventId: this.selectedEvent.id,
+                    eventTitle: this.selectedEvent.title,
+                    organizerEmail: this.selectedEvent.email,
+                    name: formData.get('name'),
+                    email: formData.get('email'),
+                    phone: formData.get('phone') || '',
+                    participants: parseInt(formData.get('participants')) || 1,
+                    notes: formData.get('notes') || ''
+                };
 
-Bemerkungen:
-${formData.get('notes') || 'Keine'}
-                `.trim();
+                try {
+                    const response = await fetch('https://n8n.fwv-raura.ch/webhook/event-registration', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
 
-                const mailto = `mailto:${this.selectedEvent.email}?subject=${encodeURIComponent('Teilnehmer-Anmeldung: ' + this.selectedEvent.title)}&body=${encodeURIComponent(emailBody)}`;
-                window.location.href = mailto;
+                    const result = await response.json();
 
-                document.getElementById('registration-modal').classList.add('hidden');
-                alert('Ihre Anmeldung wird jetzt in Ihrem E-Mail-Programm geöffnet. Bitte senden Sie die E-Mail ab, um die Anmeldung zu bestätigen.');
+                    if (response.ok && result.success) {
+                        document.getElementById('registration-modal').classList.add('hidden');
+                        alert('Vielen Dank für Ihre Anmeldung!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.');
+                    } else {
+                        throw new Error(result.message || 'Unbekannter Fehler');
+                    }
+                } catch (error) {
+                    console.error('Fehler bei Anmeldung:', error);
+                    alert('Beim Senden ist ein Fehler aufgetreten.\n\nBitte versuchen Sie es später erneut.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
             }
 
             showArbeitsplan() {

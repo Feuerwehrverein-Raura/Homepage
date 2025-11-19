@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('other-address').value = '';
         }
 
-        function sendContactEmail() {
+        async function sendContactEmail() {
             const name = document.getElementById('contact-name').value.trim();
             const email = document.getElementById('contact-email').value.trim();
             const subject = document.getElementById('contact-subject').value;
@@ -611,34 +611,68 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
-            let mailtoLink, successMessage;
+            // Button deaktivieren während des Sendens
+            const submitButton = document.querySelector('#contact-form button[type="submit"]');
+            const originalText = submitButton.innerHTML;
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<span>Wird gesendet...</span>';
+
+            let payload;
 
             if (subject === 'Mitgliedschaft') {
-                const result = generateMembershipEmail(name, email);
-                if (!result) return;
-                mailtoLink = result.mailtoLink;
-                successMessage = result.successMessage;
+                payload = generateMembershipPayload(name, email);
+                if (!payload) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
+                    return;
+                }
             } else {
                 const message = document.getElementById('contact-message').value.trim();
                 if (!message) {
                     alert('Bitte geben Sie eine Nachricht ein.');
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalText;
                     return;
                 }
-                
-                const result = generateGeneralEmail(name, email, subject, message);
-                mailtoLink = result.mailtoLink;
-                successMessage = result.successMessage;
+
+                payload = {
+                    name: name,
+                    email: email,
+                    subject: subject,
+                    message: message,
+                    type: 'contact'
+                };
             }
 
-            window.location.href = mailtoLink;
+            try {
+                const response = await fetch('https://n8n.fwv-raura.ch/webhook/contact-form', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
 
-            setTimeout(() => {
-                alert(successMessage);
-                resetContactForm();
-            }, 500);
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert(subject === 'Mitgliedschaft'
+                        ? 'Vielen Dank für Ihren Beitrittsantrag!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.\n\nAktive Feuerwehr-Mitglieder werden sofort aufgenommen,\nandere Interessierte werden an der nächsten GV bestätigt.'
+                        : 'Vielen Dank für Ihre Nachricht!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.');
+                    resetContactForm();
+                } else {
+                    throw new Error(result.message || 'Unbekannter Fehler');
+                }
+            } catch (error) {
+                console.error('Fehler beim Senden:', error);
+                alert('Beim Senden ist ein Fehler aufgetreten.\n\nBitte versuchen Sie es später erneut oder kontaktieren Sie uns direkt per E-Mail an info@fwv-raura.ch');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalText;
+            }
         }
 
-        function generateMembershipEmail(name, email) {
+        function generateMembershipPayload(name, email) {
             // Alle erforderlichen Felder prüfen
             const lastname = document.getElementById('member-lastname').value.trim();
             const firstname = document.getElementById('member-firstname').value.trim();
@@ -653,7 +687,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const otherAddress = document.getElementById('other-address').value.trim();
 
             // Validierung
-            if (!lastname || !firstname || !street || !city || !phone || !memberEmail || 
+            if (!lastname || !firstname || !street || !city || !phone || !memberEmail ||
                 !firefighterStatus || !correspondenceMethod || !correspondenceAddress) {
                 alert('Bitte füllen Sie alle Pflichtfelder (*) aus.');
                 return null;
@@ -664,8 +698,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return null;
             }
 
-            const subjectLine = 'Beitrittsantrag - Feuerwehrverein Raura';
-            
             const firefighterStatusText = {
                 'active': 'Ja (aktiv)',
                 'former': 'Ehemalige/r',
@@ -673,79 +705,33 @@ document.addEventListener('DOMContentLoaded', function() {
             };
 
             const correspondenceMethodText = correspondenceMethod.value === 'post' ? 'Post' : 'E-Mail';
-            
+
             let correspondenceDetails = '';
             if (correspondenceAddress.value === 'main') {
-                correspondenceDetails = correspondenceMethod.value === 'post' 
+                correspondenceDetails = correspondenceMethod.value === 'post'
                     ? 'Hauptadresse (wie oben angegeben)'
                     : 'Haupt-E-Mail (wie oben angegeben)';
             } else if (correspondenceAddress.value === 'other') {
                 correspondenceDetails = `Andere: ${otherAddress}`;
             }
 
-            const body = `Sehr geehrte Damen und Herren,
-
-hiermit beantrage ich die Aufnahme in den Feuerwehrverein Raura Kaiseraugst.
-
-PERSÖNLICHE DATEN:
-Name: ${lastname}
-Vorname: ${firstname}
-Strasse: ${street}
-PLZ und Ort: ${city}
-Telefonnummer: ${phone}
-${mobile ? `Mobilnummer: ${mobile}` : 'Mobilnummer: -'}
-E-Mail-Adresse: ${memberEmail}
-
-FEUERWEHR-ZUGEHÖRIGKEIT:
-Angehörige/r der Feuerwehr Raurica: ${firefighterStatusText[firefighterStatus.value]}
-
-KORRESPONDENZ:
-Zustellung der Korrespondenz: ${correspondenceMethodText}
-${correspondenceDetails ? `Zustelladresse: ${correspondenceDetails}` : ''}
-
-KONTAKT FÜR RÜCKFRAGEN:
-Name: ${name}
-E-Mail: ${email}
-
-Mit freundlichen Grüssen
-${name}
-
----
-Formular erstellt über: www.fwv-raura.ch
-Version: ${new Date().toLocaleDateString('de-DE')}`;
-
-            // E-Mail an sowohl Aktuar als auch Kassier
-            const mailtoLink = `mailto:stefan+fwv-raura@juroct.ch,costagi1@bluewin.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
-            
             return {
-                mailtoLink,
-                successMessage: 'Beitrittsantrag wurde an Ihren E-Mail-Client weitergeleitet.\n\nBitte senden Sie die E-Mail an den Aktuar und Kassier ab.\n\nAktive Feuerwehr-Mitglieder werden sofort aufgenommen,\nandere Interessierte werden an der nächsten GV bestätigt.'
-            };
-        }
-
-        function generateGeneralEmail(name, email, subject, message) {
-            const subjectLine = `Kontaktanfrage: ${subject}`;
-            const body = `Hallo,
-
-ich möchte gerne Kontakt mit dem Feuerwehrverein Raura aufnehmen.
-
-BETREFF: ${subject}
-
-MEINE KONTAKTDATEN:
-Name: ${name}
-E-Mail: ${email}
-
-NACHRICHT:
-${message}
-
-Mit freundlichen Grüssen
-${name}`;
-
-            const mailtoLink = `mailto:stefan+fwv-raura@juroct.ch?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
-            
-            return {
-                mailtoLink,
-                successMessage: 'E-Mail-Client wurde geöffnet. Bitte senden Sie die E-Mail ab.'
+                name: name,
+                email: email,
+                subject: 'Mitgliedschaft',
+                type: 'membership',
+                membership: {
+                    lastname: lastname,
+                    firstname: firstname,
+                    street: street,
+                    city: city,
+                    phone: phone,
+                    mobile: mobile || '',
+                    email: memberEmail,
+                    firefighterStatus: firefighterStatusText[firefighterStatus.value],
+                    correspondenceMethod: correspondenceMethodText,
+                    correspondenceAddress: correspondenceDetails
+                }
             };
         }
 
