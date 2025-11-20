@@ -1,0 +1,108 @@
+{
+  "name": "Event-Änderung PDF Versand",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "event-changed",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "event-changed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prüfe ob es eine relevante Änderung ist\nconst body = $input.first().json.body;\n\n// Nur bei bestimmten Commits triggern\nconst commits = body.commits || [];\nconst hasEventChanges = commits.some(commit => {\n  const message = commit.message.toLowerCase();\n  const files = [...(commit.added || []), ...(commit.modified || [])];\n  \n  // Prüfe ob Event-Dateien geändert wurden\n  const hasEventFiles = files.some(f => f.startsWith('events/') && f.endsWith('.md'));\n  \n  // Ignoriere automatische Commits\n  const isAutomated = message.includes('[automated]') || message.includes('🤖');\n  \n  return hasEventFiles && !isAutomated;\n});\n\nreturn [{\n  json: {\n    shouldTrigger: hasEventChanges,\n    commits: commits.length,\n    repository: body.repository?.full_name\n  }\n}];"
+      },
+      "id": "code-1",
+      "name": "Änderung prüfen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.shouldTrigger }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-1",
+      "name": "Soll triggern?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/actions/workflows/generate-calendar-pdf.yml/dispatches",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"ref\": \"main\", \"inputs\": {\"send_post\": \"true\"}}",
+        "options": {}
+      },
+      "id": "github-dispatch",
+      "name": "PDF Generierung triggern",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "github-token",
+          "name": "GitHub Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "website@fwv-raura.ch",
+        "toEmail": "aktuar@fwv-raura.ch",
+        "subject": "Event-Änderung: Kalender-PDF wird versendet",
+        "emailType": "html",
+        "html": "<h2>Event-Änderung erkannt</h2><p>Es wurden Änderungen an Events vorgenommen.</p><p>Der Kalender-PDF wird automatisch an alle Post-Mitglieder versendet.</p><p><strong>Repository:</strong> {{ $json.repository }}</p><p><strong>Commits:</strong> {{ $json.commits }}</p>"
+      },
+      "id": "email-1",
+      "name": "Benachrichtigung",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1050, 200],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-mailcow",
+          "name": "Mailcow SMTP"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Änderung prüfen", "type": "main", "index": 0}]]
+    },
+    "Änderung prüfen": {
+      "main": [[{"node": "Soll triggern?", "type": "main", "index": 0}]]
+    },
+    "Soll triggern?": {
+      "main": [
+        [{"node": "PDF Generierung triggern", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "PDF Generierung triggern": {
+      "main": [[{"node": "Benachrichtigung", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
