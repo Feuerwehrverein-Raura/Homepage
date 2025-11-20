@@ -5,6 +5,8 @@ on:
     paths: ['events/**']
   schedule:
     - cron: '0 6 1 * *' # Monatlich am 1. um 6:00 Uhr
+  repository_dispatch:
+    types: [calendar-pdf-send]
   workflow_dispatch:
     inputs:
       send_post:
@@ -58,7 +60,7 @@ jobs:
           git push
 
       - name: Send via Pingen to Post-Mitglieder
-        if: github.event.inputs.send_post == 'true' || (github.event_name == 'push' && steps.verify-changed-files.outputs.changed == 'true')
+        if: github.event.inputs.send_post == 'true' || github.event_name == 'repository_dispatch' || (github.event_name == 'push' && steps.verify-changed-files.outputs.changed == 'true')
         env:
           PINGEN_CLIENT_ID: ${{ secrets.PINGEN_CLIENT_ID }}
           PINGEN_CLIENT_SECRET: ${{ secrets.PINGEN_CLIENT_SECRET }}
