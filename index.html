@@ -464,7 +464,7 @@
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-8">
         <div class="container mx-auto px-4">
-            <div class="grid md:grid-cols-3 gap-8">
+            <div class="grid md:grid-cols-4 gap-8">
                 <div>
                     <div class="flex items-center space-x-3 mb-4">
                         <div class="w-8 h-8 rounded-full overflow-hidden bg-white p-1">
@@ -490,12 +490,26 @@
                     <div class="space-y-2 text-sm">
                         <p class="text-gray-300">kontakt@fwv-raura.ch</p>
                         <p class="text-gray-300">4303 Kaiseraugst</p>
-                        <a href="https://chat.whatsapp.com/EC9AaXNofvr25mIG3wxdhj" target="_blank" rel="noopener noreferrer" 
+                        <a href="https://chat.whatsapp.com/EC9AaXNofvr25mIG3wxdhj" target="_blank" rel="noopener noreferrer"
                            class="text-fire-400 hover:text-fire-300 transition-colors inline-flex items-center space-x-1">
                             <span>WhatsApp Gruppe</span>
                             <span class="text-xs">↗</span>
                         </a>
                     </div>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Newsletter</h4>
+                    <p class="text-gray-300 text-sm mb-3">Bleiben Sie über Events informiert</p>
+                    <form id="newsletter-form" class="space-y-2">
+                        <input type="email" id="newsletter-email" required
+                               placeholder="Ihre E-Mail"
+                               class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-400 focus:outline-none focus:border-fire-500">
+                        <button type="submit" id="newsletter-btn"
+                                class="w-full bg-fire-600 hover:bg-fire-700 text-white px-3 py-2 rounded text-sm font-semibold transition-colors">
+                            Anmelden
+                        </button>
+                    </form>
+                    <p id="newsletter-message" class="text-xs mt-2 hidden"></p>
                 </div>
             </div>
             <div class="border-t border-gray-700 mt-8 pt-8 text-center">
@@ -512,8 +526,52 @@ document.addEventListener('DOMContentLoaded', function() {
     setupMobileMenu();
     setupSmoothScrolling();
     loadVorstandMembers();
-    loadUpcomingEvents();  // ← NEU
+    loadUpcomingEvents();
+    initializeNewsletter();
 });
+
+        function initializeNewsletter() {
+            const form = document.getElementById('newsletter-form');
+            if (!form) return;
+
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const email = document.getElementById('newsletter-email').value.trim();
+                const btn = document.getElementById('newsletter-btn');
+                const msg = document.getElementById('newsletter-message');
+
+                if (!email) return;
+
+                btn.disabled = true;
+                btn.textContent = '...';
+
+                try {
+                    const response = await fetch('https://n8n.fwv-raura.ch/webhook/newsletter-subscribe', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email })
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        msg.textContent = 'Vielen Dank! Bitte bestätigen Sie Ihre E-Mail.';
+                        msg.className = 'text-xs mt-2 text-green-400';
+                        form.reset();
+                    } else {
+                        throw new Error(result.message || 'Fehler');
+                    }
+                } catch (error) {
+                    msg.textContent = 'Fehler beim Anmelden. Bitte versuchen Sie es später.';
+                    msg.className = 'text-xs mt-2 text-red-400';
+                } finally {
+                    msg.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.textContent = 'Anmelden';
+                }
+            });
+        }
 
         function initializeContactForm() {
             const contactForm = document.getElementById('contact-form');

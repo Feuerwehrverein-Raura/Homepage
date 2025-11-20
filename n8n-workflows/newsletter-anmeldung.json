@@ -1,0 +1,181 @@
+{
+  "id": "Z2oF3qnWr5bS29Yf",
+  "name": "Newsletter-Anmeldung",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "newsletter-subscribe",
+        "options": {
+          "responseMode": "responseNode"
+        }
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/contents/newsletter_subscribers.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "github-get",
+      "name": "Abonnenten laden",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const email = $(\"Webhook\").first().json.body.email;\nconst githubResponse = $input.first().json;\nconst existingContent = Buffer.from(githubResponse.content, \"base64\").toString(\"utf8\");\nconst data = JSON.parse(existingContent);\nconst alreadyExists = data.subscribers.some(s => s.email === email);\nif (!alreadyExists) {\n  const token = Buffer.from(email + Date.now()).toString(\"base64\").replace(/[^a-zA-Z0-9]/g, \"\").substring(0, 32);\n  data.subscribers.push({ email: email, subscribedAt: new Date().toISOString(), confirmed: false, token: token });\n  data.lastUpdated = new Date().toISOString();\n}\nconst newContent = Buffer.from(JSON.stringify(data, null, 2)).toString(\"base64\");\nreturn { json: { content: newContent, sha: githubResponse.sha, email: email, alreadyExists: alreadyExists, token: alreadyExists ? null : data.subscribers[data.subscribers.length - 1].token } };"
+      },
+      "id": "code-1",
+      "name": "Abonnent hinzufügen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/contents/newsletter_subscribers.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"message\": \"Newsletter-Anmeldung\", \"content\": \"{{ $json.content }}\", \"sha\": \"{{ $json.sha }}\"}",
+        "options": {}
+      },
+      "id": "github-put",
+      "name": "Abonnenten speichern",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "website@fwv-raura.ch",
+        "toEmail": "={{ $(\"Abonnent hinzufügen\").first().json.email }}",
+        "subject": "Newsletter-Anmeldung bestätigen - FWV Raura",
+        "emailType": "html",
+        "message": "=<h2>Bitte bestätigen Sie Ihre Anmeldung</h2><p>Vielen Dank für Ihr Interesse am Newsletter des Feuerwehrvereins Raurachemme.</p><p><a href=\"https://n8n.fwv-raura.ch/webhook/newsletter-confirm?token={{ $(\"Abonnent hinzufügen\").first().json.token }}\">Newsletter-Anmeldung bestätigen</a></p><p>Mit freundlichen Grüssen<br>Feuerwehrverein Raurachemme</p>",
+        "options": {}
+      },
+      "id": "email-1",
+      "name": "Bestätigungs-E-Mail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1050,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-1",
+      "name": "Erfolg Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Abonnenten laden",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abonnenten laden": {
+      "main": [
+        [
+          {
+            "node": "Abonnent hinzufügen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abonnent hinzufügen": {
+      "main": [
+        [
+          {
+            "node": "Abonnenten speichern",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abonnenten speichern": {
+      "main": [
+        [
+          {
+            "node": "Bestätigungs-E-Mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bestätigungs-E-Mail": {
+      "main": [
+        [
+          {
+            "node": "Erfolg Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "tags": []
+}
