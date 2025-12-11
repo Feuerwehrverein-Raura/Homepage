@@ -29,6 +29,7 @@ services:
     volumes:
       - ./events:/app/events:ro
       - ./vorstand:/app/vorstand:ro
+      - ./data:/data
     networks:
       - fwv-network
     healthcheck:
