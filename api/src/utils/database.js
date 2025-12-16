@@ -12,8 +12,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.log('✅ SQLite database connected:', dbPath);
 });
 
-// Enable foreign keys
+// Enable foreign keys and WAL mode for better concurrent access
 db.run('PRAGMA foreign_keys = ON');
+db.run('PRAGMA journal_mode = WAL');
 
 // Initialize tables
 db.serialize(() => {

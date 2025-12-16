@@ -1,9 +1,10 @@
 # 🔥 Feuerwehrverein Raura Kaiseraugst - Homepage
 
-> **Moderne Website mit Event-Management, Kalender-Integration, Schichtplanung und PDF-Export**
+> **Moderne Website mit Event-Management, Kalender-Integration, Schichtplanung und Docker-API**
 
-[![GitHub Pages](https://img.shields.io/badge/Deployed-GitHub%20Pages-success)](https://feuerwehrverein-raura.github.io/Homepage/)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D14.0.0-green)](https://nodejs.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue)](https://www.docker.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green)](https://nodejs.org/)
+[![SQLite](https://img.shields.io/badge/SQLite-3-003B57)](https://www.sqlite.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -15,6 +16,7 @@
 - **ICS-Feed** für Kalender-Apps (Google Calendar, Apple Calendar, Outlook)
 - **Automatische Event-Synchronisation** via GitHub Actions
 - **Status-Tracking:** Vergangene, laufende und zukünftige Events
+- **Online-Anmeldungen** mit REST API und Datenbank-Speicherung
 
 ### 👷 **Schichtplanung**
 - **Helfer-Management** für Großveranstaltungen (z.B. Chilbi)
@@ -22,11 +24,12 @@
 - **PDF-Export** im Original-Arbeitsplan-Format
 - **Automatische Statistiken:** Offene vs. besetzte Plätze
 
-### 📧 **Anmeldungen**
+### 📧 **Anmeldungen & Newsletter**
 - **Helfer-Anmeldung** mit Schichtauswahl (z.B. Chilbi)
 - **Teilnehmer-Anmeldungen** für gesellige Events (z.B. Grillplausch)
-- **Automatische E-Mail-Generierung** mit allen relevanten Details
-- **Anmeldeschluss-Management** mit visuellen Hinweisen
+- **Newsletter-System** mit Double-Opt-In
+- **Kontaktformular** mit automatischem E-Mail-Versand
+- **SQLite-Datenbank** für persistente Datenspeicherung
 
 ### 🎪 **Event-Management**
 - **Markdown-basierte Events** - einfach zu erstellen und bearbeiten
@@ -34,11 +37,24 @@
 - **Responsive Design** - funktioniert auf allen Geräten
 - **Bilderunterstützung** mit Lazy Loading
 
+### 🐳 **Docker Container System**
+- **Express.js REST API** für alle dynamischen Funktionen
+- **SQLite Datenbank** mit WAL-Modus
+- **Automatische Backups** via Syncthing
+- **Nginx Webserver** für statische Inhalte
+- **Multi-Container Setup** mit docker-compose
+
+### 🔐 **Authentifizierung**
+- **OIDC/OAuth2 Login** mit Authentik
+- **Geschützter Bereich** für Vorstand und Mitglieder
+- **Passwort-Fallback** für Legacy-Zugriff
+- **Session Management** mit sessionStorage
+
 ### 🤖 **Automation**
-- **GitHub Actions** für automatische ICS-Generierung
+- **GitHub Actions** für automatische ICS-Generierung und PDF-Kalender
 - **Versionskontrolle** für alle Änderungen
-- **Automatisches Deployment** auf GitHub Pages
-- **Tägliche Kalender-Updates** um 6:00 Uhr
+- **CI/CD Pipeline** für Docker Container Builds
+- **Pingen Integration** für physischen Kalender-Versand per Post
 
 ---
 
@@ -49,7 +65,11 @@ Homepage/
 ├── 🏠 index.html                    # Hauptseite
 ├── 📅 calendar.html                 # Interaktive Kalenderseite
 ├── 🎫 events.html                   # Veranstaltungsübersicht mit Anmeldung
-├── 👷 schichtplan-manager.html      # Schichtplan-Verwaltungstool
+├── 👷 schichtplan-manager.html      # Schichtplan-Verwaltungstool (geschützt)
+├── 📋 anmeldungen.html              # Anmeldungen-Dashboard (geschützt)
+├── 👤 members-dynamic.html          # Mitgliederverwaltung (geschützt)
+├── 🔐 login.html                    # Login-Seite (OIDC + Passwort)
+├── 🔄 auth-callback.html            # OIDC Callback Handler
 ├── 📄 calendar.ics                  # Automatisch generierter ICS-Feed
 │
 ├── 📂 events/                       # Event-Markdown-Dateien
@@ -58,6 +78,12 @@ Homepage/
 │   ├── 📋 chilbi-2024-assignments.md  # Schichtplan-Zuweisungen
 │   ├── 🎪 chilbi-2025.md           # Zukünftige Chilbi
 │   └── 🍖 grillplausch-2024.md     # Beispiel: Teilnehmer-Event
+│
+├── 📂 vorstand/                     # Vorstandsinformationen
+│   └── *.md                         # Vorstandsmitglieder-Dateien
+│
+├── 📂 mitglieder/                   # Mitgliederinformationen
+│   └── *.md                         # Mitglieder-Dateien
 │
 ├── 🖼️ images/                       # Bilder und Assets
 │   ├── 🔥 logo.png                  # Vereinslogo
@@ -75,16 +101,44 @@ Homepage/
 ├── 📦 pdfs/                         # Generierte PDF-Dateien
 │   ├── 📄 arbeitsplan-chilbi-2024.pdf
 │   ├── 📄 arbeitsplan-chilbi-2025.pdf
-│   └── 📊 overview-all-events.pdf
+│   └── 📊 calendar-*.pdf            # Monatliche Kalender-PDFs
 │
 ├── ⚙️ scripts/                      # Automatisierungs-Scripts
 │   ├── 📝 README.md                 # Scripts-Dokumentation
-│   ├── 📊 generate-ics.js           # ICS-Generator (FIXED)
+│   ├── 📊 generate-ics.js           # ICS-Generator
 │   ├── 📋 generate-shift-plans.js   # PDF-Generator
 │   └── 🧪 test-pdf.js               # PDF-Test-Script
 │
+├── 🐳 api/                          # Docker API Container
+│   ├── 📝 README.md                 # API-Dokumentation
+│   ├── 🐳 Dockerfile                # API Container Image
+│   ├── 📦 package.json              # Node.js Dependencies
+│   └── src/
+│       ├── 🚀 server.js             # Express.js Server
+│       ├── routes/                  # API Endpoints
+│       │   ├── contact.js           # Kontaktformular
+│       │   ├── events.js            # Event-Anmeldungen
+│       │   ├── newsletter.js        # Newsletter-System
+│       │   ├── members.js           # Mitgliederverwaltung
+│       │   └── calendar.js          # Kalender-PDF-Generierung
+│       └── utils/
+│           ├── database.js          # SQLite Helper
+│           ├── backup.js            # Automatische Backups
+│           ├── email.js             # E-Mail-Versand
+│           ├── github.js            # GitHub API (deprecated)
+│           └── hybrid-storage.js    # Hybrid SQLite/GitHub
+│
+├── 🐳 docker-compose.yml            # Multi-Container Orchestrierung
+├── 🐳 Dockerfile.website            # Website Container Image
+├── ⚙️ nginx.conf                    # Nginx Konfiguration
+│
+├── 📂 data/                         # SQLite Datenbank (persistent)
+│   └── 🗄️ fwv-raura.db             # SQLite Datenbank-Datei
+│
 ├── 🔄 .github/workflows/
-│   └── ⚡ generate-calendar.yml     # GitHub Actions Workflow
+│   ├── ⚡ generate-calendar.yml     # ICS-Generierung
+│   ├── 📄 generate-calendar-pdf.yml # PDF-Kalender + Pingen
+│   └── 🐳 build-containers.yml      # Docker Builds
 │
 ├── 📋 README.md                     # Diese Dokumentation
 ├── 📦 package.json                  # Node.js Konfiguration
@@ -95,25 +149,88 @@ Homepage/
 
 ## 🚀 Quick Start
 
-### **Voraussetzungen**
-- Git installiert
-- Node.js >= 14.0.0 (für Scripts)
-- Python 3 oder Node.js für lokalen Server
-- Texteditor (VS Code empfohlen)
+### **Option 1: Docker (Empfohlen)**
 
-### **1. Repository klonen**
+#### **Voraussetzungen**
+- Docker & Docker Compose installiert
+- Git installiert
+
+#### **1. Repository klonen**
 ```bash
 git clone https://github.com/Feuerwehrverein-Raura/Homepage.git
 cd Homepage
 ```
 
-### **2. Dependencies installieren**
+#### **2. Umgebungsvariablen konfigurieren**
 ```bash
+# .env Datei erstellen
+cp api/.env.example api/.env
+
+# Variablen anpassen:
+# - SMTP_HOST, SMTP_USER, SMTP_PASS
+# - GITHUB_TOKEN (optional, für GitHub Backup)
+# - PINGEN_TOKEN (für Kalender-Postversand)
+```
+
+#### **3. Container starten**
+```bash
+docker-compose up -d
+```
+
+#### **4. Website öffnen**
+```
+http://localhost:8080          # Website
+http://localhost:3000          # API
+http://localhost:3000/health   # API Health Check
+```
+
+#### **5. Logs anzeigen**
+```bash
+docker-compose logs -f          # Alle Container
+docker-compose logs -f api      # Nur API
+docker-compose logs -f website  # Nur Website
+```
+
+#### **6. Container stoppen**
+```bash
+docker-compose down             # Stoppen
+docker-compose down -v          # Stoppen + Volumes löschen
+```
+
+---
+
+### **Option 2: Lokale Entwicklung**
+
+#### **Voraussetzungen**
+- Node.js >= 18.0.0
+- Python 3 oder Node.js für lokalen Webserver
+- SQLite3
+
+#### **1. Repository klonen**
+```bash
+git clone https://github.com/Feuerwehrverein-Raura/Homepage.git
+cd Homepage
+```
+
+#### **2. API Dependencies installieren**
+```bash
+cd api
 npm install
 ```
 
-### **3. Lokalen Server starten**
+#### **3. API starten**
 ```bash
+cd api
+npm start              # Produktion
+# oder
+npm run dev            # Entwicklung mit nodemon
+```
+
+#### **4. Website lokal servieren**
+```bash
+# In neuem Terminal
+cd Homepage
+
 # Option 1: Python
 python -m http.server 8000
 
@@ -124,9 +241,10 @@ npx http-server
 # Rechtsklick auf index.html → "Open with Live Server"
 ```
 
-### **4. Website öffnen**
+#### **5. Website öffnen**
 ```
-http://localhost:8000
+http://localhost:8000          # Website
+http://localhost:3000          # API
 ```
 
 ---
@@ -298,6 +416,102 @@ events/chilbi-2025-assignments.md
 
 ---
 
+## 🐳 Docker API System
+
+### **Architektur**
+
+Das System besteht aus zwei Docker-Containern:
+
+1. **Website Container** (Nginx)
+   - Serviert statische HTML/CSS/JS Dateien
+   - Port 8080 (extern) → 80 (intern)
+   - Leichtgewichtig, basiert auf Alpine Linux
+
+2. **API Container** (Node.js + Express)
+   - REST API für alle dynamischen Funktionen
+   - SQLite Datenbank mit WAL-Modus
+   - Automatische Backups alle 60 Minuten
+   - Port 3000 (extern & intern)
+
+### **API Endpoints**
+
+```
+POST /api/contact           # Kontaktformular
+POST /api/events/register   # Event-Anmeldungen
+POST /api/newsletter/subscribe        # Newsletter-Anmeldung
+POST /api/newsletter/confirm/:token   # Newsletter-Bestätigung
+POST /api/members/register  # Mitglieder-Registrierung (mit OTP)
+POST /api/members/mutations # Mitglieder-Mutationen
+GET  /api/calendar/generate # PDF-Kalender-Generierung
+GET  /health                # Health Check
+```
+
+Ausführliche API-Dokumentation: [api/README.md](api/README.md)
+
+### **SQLite Datenbank**
+
+**Speicherort:** `./data/fwv-raura.db` (persistent)
+
+**Tabellen:**
+- `event_registrations` - Event-Anmeldungen (Helfer & Teilnehmer)
+- `newsletter_subscribers` - Newsletter-Abonnenten
+- `pending_members` - Ausstehende Mitglieder-Registrierungen
+- `member_mutations` - Mitglieder-Änderungen
+- `otp_codes` - One-Time-Passwords (5 Min. Gültigkeit)
+- `contact_submissions` - Kontaktformular-Anfragen
+
+**Features:**
+- WAL-Modus für bessere Concurrent-Access
+- Automatische Backups alle 60 Minuten nach `/sync/backups`
+- Cleanup von alten Backups (> 24h)
+- Symlink `fwv-raura-latest.db` für Syncthing
+
+### **Syncthing Integration**
+
+```yaml
+volumes:
+  - ./sync:/sync  # Syncthing-Verzeichnis
+```
+
+**Backup-Verzeichnis:** `/sync/backups`
+- Stündliche SQLite-Backups
+- Format: `fwv-raura-YYYY-MM-DDTHH-MM-SS.db`
+- Automatisches Cleanup (> 24h)
+- Latest-Symlink für einfachen Zugriff
+
+### **Umgebungsvariablen**
+
+Siehe [api/.env.example](api/.env.example):
+
+```env
+# Server
+PORT=3000
+NODE_ENV=production
+
+# Database
+DB_PATH=/data/fwv-raura.db
+BACKUP_DIR=/sync/backups
+BACKUP_INTERVAL=3600000  # 1 Stunde
+
+# Email (SMTP)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-email@example.com
+SMTP_PASS=your-password
+SMTP_FROM=noreply@fwv-raura.ch
+
+# GitHub (optional, für Backup)
+GITHUB_TOKEN=ghp_xxxxxxxxxxxxx
+GITHUB_OWNER=Feuerwehrverein-Raura
+GITHUB_REPO=Homepage
+
+# Pingen (für Kalender-Postversand)
+PINGEN_TOKEN=your-pingen-token
+```
+
+---
+
 ## 🤖 Automation & Scripts
 
 ### **ICS-Generierung (Automatisch)**
@@ -315,7 +529,21 @@ npm run generate-ics
 node scripts/generate-ics.js
 ```
 
-### **PDF-Generierung (Manuell)**
+### **PDF-Kalender-Generierung (Automatisch)**
+
+**GitHub Actions** generiert monatliche PDF-Kalender:
+
+**Trigger:**
+- Push zu `events/*.md`
+- Monatlich am 1. um 6:00 Uhr UTC
+- Manual Trigger via `repository_dispatch`
+
+**Features:**
+- Generiert PDF-Kalender für aktuellen Monat
+- Versendet per Pingen an Mitglieder mit `zustellung-post: true`
+- Speichert PDF in `pdfs/calendar-YYYY-MM.pdf`
+
+### **Schichtplan-PDF-Generierung (Manuell)**
 
 ```bash
 npm run generate-pdfs
@@ -328,6 +556,17 @@ node scripts/generate-shift-plans.js
 - `pdfs/arbeitsplan-[event-id].html`
 - `pdfs/overview-all-events.pdf`
 
+### **Docker Container Builds (Automatisch)**
+
+**GitHub Actions** baut automatisch Docker Images:
+
+**Trigger:**
+- Push zu `main` Branch
+
+**Output:**
+- `ghcr.io/feuerwehrverein-raura/homepage-website:latest`
+- `ghcr.io/feuerwehrverein-raura/homepage-api:latest`
+
 ### **Verfügbare npm Scripts**
 
 ```json
@@ -338,6 +577,83 @@ node scripts/generate-shift-plans.js
   "test": "node scripts/test-pdf.js"
 }
 ```
+
+---
+
+## 🔐 Authentifizierung & Geschützter Bereich
+
+### **Login-Methoden**
+
+Das System unterstützt zwei Authentifizierungs-Methoden:
+
+1. **OIDC/OAuth2 mit Authentik (Empfohlen)**
+   - OAuth2 Authorization Code Flow
+   - State & Nonce für Sicherheit
+   - Zentrale Benutzerverwaltung
+   - Single Sign-On
+
+2. **OTP (One-Time Password) per E-Mail**
+   - 6-stelliger Code per E-Mail
+   - Gültig für 5 Minuten
+   - Nur für autorisierte E-Mail-Adressen (Vorstand & Mitglieder)
+   - Keine Passwörter nötig
+
+### **Geschützte Seiten**
+
+Folgende Seiten erfordern Authentifizierung:
+
+- [anmeldungen.html](anmeldungen.html) - Event-Anmeldungen Dashboard
+- [schichtplan-manager.html](schichtplan-manager.html) - Schichtplan-Verwaltung
+- [members-dynamic.html](members-dynamic.html) - Mitgliederverwaltung
+
+### **Authentik Konfiguration**
+
+**Provider-Settings:**
+```yaml
+Authority: https://auth.fwv-raura.ch/application/o/fwv-raura/
+Client ID: fwv-raura-website
+Redirect URI: https://fwv-raura.ch/auth-callback.html
+Response Type: code
+Scope: openid profile email
+```
+
+**Application-Setup in Authentik:**
+1. Provider erstellen: OAuth2/OpenID Provider
+2. Application erstellen: fwv-raura-website
+3. Redirect URIs konfigurieren
+4. Client ID notieren
+5. Scopes: openid, profile, email
+
+### **Implementierung**
+
+**OIDC Login-Flow:**
+1. User klickt "Mit Authentik anmelden"
+2. Redirect zu Authentik Authorization Endpoint
+3. User authentifiziert sich bei Authentik
+4. Redirect zurück zu `/auth-callback.html`
+5. Token-Austausch & Session-Setup
+6. Redirect zur ursprünglich angeforderten Seite
+
+**OTP Login-Flow:**
+1. User klickt "OTP per E-Mail senden"
+2. User gibt E-Mail-Adresse ein
+3. API prüft ob E-Mail in vorstand/*.md oder mitglieder/*.md existiert
+4. 6-stelliger Code wird per E-Mail versendet
+5. User gibt Code ein
+6. API verifiziert Code und gibt Berechtigung
+7. Session wird erstellt und User zur Zielseite weitergeleitet
+
+**Session-Management:**
+```javascript
+// Check Authentication
+if (sessionStorage.getItem('authenticated') !== 'true') {
+    window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+}
+```
+
+**Autorisierte Benutzer:**
+- E-Mail-Adressen in `vorstand/*.md` Dateien (Frontmatter: `email`)
+- E-Mail-Adressen in `mitglieder/*.md` Dateien (Frontmatter: `email`)
 
 ---
 

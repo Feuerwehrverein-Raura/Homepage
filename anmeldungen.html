@@ -250,13 +250,27 @@
     <script>
         let registrationsData = [];
 
-        // Login handling
+        // Check authentication on page load
+        if (sessionStorage.getItem('authenticated') === 'true') {
+            // User is already authenticated, show content directly
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('protected-content').style.display = 'block';
+            document.getElementById('protected-content').classList.remove('protected-content');
+            window.addEventListener('DOMContentLoaded', loadRegistrations);
+        } else {
+            // Not authenticated, redirect to login page
+            window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+        }
+
+        // Login handling (legacy fallback, should use login.html instead)
         document.getElementById('login-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const password = document.getElementById('password').value;
 
             // Same password as member list
             if (password === 'FWVRaura2024!') {
+                sessionStorage.setItem('authenticated', 'true');
+                sessionStorage.setItem('auth_method', 'password');
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('protected-content').style.display = 'block';
                 document.getElementById('protected-content').classList.remove('protected-content');

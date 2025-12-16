@@ -627,6 +627,12 @@
             }
         }
 
+        // Check authentication before initializing
+        if (sessionStorage.getItem('authenticated') !== 'true') {
+            // Not authenticated, redirect to login page
+            window.location.href = '/login.html?redirect=' + encodeURIComponent(window.location.pathname);
+        }
+
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             new SchichtplanManager();

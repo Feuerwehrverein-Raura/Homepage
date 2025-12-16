@@ -9,6 +9,8 @@ const eventRoutes = require('./routes/events');
 const newsletterRoutes = require('./routes/newsletter');
 const calendarRoutes = require('./routes/calendar');
 const memberRoutes = require('./routes/members');
+const authRoutes = require('./routes/auth');
+const { startBackupSchedule } = require('./utils/backup');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -42,6 +44,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/members', memberRoutes);
+app.use('/api/auth', authRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {
