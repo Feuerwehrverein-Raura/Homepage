@@ -229,13 +229,15 @@ Für jeden Tag benötigen wir Helfer in 2 Bereichen:
 - **Bar:** Getränke ausgeben und zubereiten
 - **Küche:** Essen zubereiten und ausgeben
 
-**Schichtzeiten:**
+**Schichtzeiten (2-Stunden-Blöcke):**
 - 12:00-14:00 Uhr (je 2 Personen pro Bereich)
 - 14:00-16:00 Uhr (je 2 Personen pro Bereich)
 - 16:00-18:00 Uhr (je 2 Personen pro Bereich)
 - 18:00-20:00 Uhr (je 2 Personen pro Bereich)
 - 20:00-22:00 Uhr (je 2 Personen pro Bereich)
 - 22:00-Open End (je 2 Personen pro Bereich)
+
+**Bitte meldet euch für mindestens 2 aufeinanderfolgende Schichten an (= 4 Stunden), damit wir nicht zu viele Wechsel haben!**
 
 ### Abbau
 - **Abbau:** 23.02.2026, 18:00-21:00 Uhr (5 Personen)

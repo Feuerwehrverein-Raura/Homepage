@@ -1,0 +1,84 @@
+name: Send Letter via Pingen
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'briefe/*.html'
+  workflow_dispatch:
+    inputs:
+      letter_file:
+        description: 'Brief-Datei (z.B. briefe/fasnacht-2026-helferaufruf.html)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Nur testen, nicht wirklich versenden'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  send-letters:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MITGLIEDER_ACCESS_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install puppeteer
+
+      - name: Determine letter file
+        id: letter
+        run: |
+          if [ -n "${{ github.event.inputs.letter_file }}" ]; then
+            echo "file=${{ github.event.inputs.letter_file }}" >> $GITHUB_OUTPUT
+          else
+            # Bei Push: Finde geänderte Brief-Dateien mit SEND-VIA-PINGEN Marker
+            changed_files=$(git diff --name-only HEAD~1 HEAD -- 'briefe/*.html' || echo "")
+            for file in $changed_files; do
+              if grep -q "SEND-VIA-PINGEN" "$file" 2>/dev/null; then
+                echo "file=$file" >> $GITHUB_OUTPUT
+                break
+              fi
+            done
+          fi
+
+      - name: Check if letter should be sent
+        id: check
+        run: |
+          file="${{ steps.letter.outputs.file }}"
+          if [ -z "$file" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Keine Brief-Datei gefunden oder kein SEND-VIA-PINGEN Marker"
+          elif [ ! -f "$file" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Datei existiert nicht: $file"
+          elif ! grep -q "SEND-VIA-PINGEN" "$file"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Kein SEND-VIA-PINGEN Marker in $file"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "Brief wird versendet: $file"
+          fi
+
+      - name: Send letter via Pingen
+        if: steps.check.outputs.skip != 'true'
+        env:
+          PINGEN_API_KEY: ${{ secrets.PINGEN_API_KEY }}
+          PINGEN_STAGING: ${{ secrets.PINGEN_STAGING }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          echo "📮 Versende Brief: ${{ steps.letter.outputs.file }}"
+          node scripts/send-letter-via-pingen.js "${{ steps.letter.outputs.file }}"
