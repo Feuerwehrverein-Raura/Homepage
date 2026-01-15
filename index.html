@@ -559,7 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.textContent = '...';
 
                 try {
-                    const response = await fetch('https://n8n.fwv-raura.ch/webhook/newsletter-subscribe', {
+                    const response = await fetch('/api/newsletter/subscribe', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: email })
@@ -715,7 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                const response = await fetch('https://n8n.fwv-raura.ch/webhook/contact-form', {
+                const response = await fetch('/api/contact', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

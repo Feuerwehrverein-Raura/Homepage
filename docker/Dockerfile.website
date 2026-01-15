@@ -1,0 +1,45 @@
+# Frontend Website - Übernimmt bestehendes Design
+FROM nginx:alpine
+
+WORKDIR /usr/share/nginx/html
+
+# Kopiere alle HTML-Seiten
+COPY index.html ./
+COPY events.html ./
+COPY calendar.html ./
+COPY login.html ./
+COPY anmeldungen.html ./
+COPY schichtplan-manager.html ./
+COPY mitglieder.html ./
+COPY auth-callback.html ./
+COPY qr-rechnung.html ./
+
+# Kalender-Dateien
+COPY calendar.ics ./
+
+# JavaScript-Dateien im Root
+COPY events.js ./
+
+# Scripts-Verzeichnis (config.js etc.)
+COPY scripts/config.js ./scripts/
+
+# Assets
+COPY images/ ./images/
+
+# Event-Dateien (Markdown für Frontend-Parsing)
+COPY events/ ./events/
+COPY events-list.json ./
+
+# Vorstand-Dateien (Markdown für Frontend-Parsing)
+COPY vorstand/ ./vorstand/
+
+# PDFs (generierte Arbeitspläne etc.)
+COPY pdfs/ ./pdfs/
+
+# Briefe (für Pingen-Integration)
+COPY briefe/ ./briefe/
+
+# Nginx Config mit API-Proxy (kopiert von parent)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80

@@ -178,12 +178,23 @@
 
             async loadEvents() {
                 try {
-                    // Lade alle Event-Dateien aus dem events/ Ordner
-                    const eventFiles = [
-                        'events/chilbi-2024.md',
-                        'events/grillplausch-sommer-2024.md',
-                        'events/chilbi-2025.md'
-                    ];
+                    // Lade Event-Liste dynamisch aus events-list.json
+                    let eventFiles = [];
+                    try {
+                        const listResponse = await fetch('events-list.json');
+                        if (listResponse.ok) {
+                            const listData = await listResponse.json();
+                            eventFiles = listData.files || [];
+                            console.log('📋 Events aus events-list.json geladen:', eventFiles.length);
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ events-list.json nicht gefunden, verwende Fallback');
+                        eventFiles = [
+                            'events/chilbi-2024.md',
+                            'events/chilbi-2025.md',
+                            'events/fasnacht-2026.md'
+                        ];
+                    }
 
                     console.log('📂 Lade Event-Dateien:', eventFiles);
 

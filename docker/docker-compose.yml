@@ -1,0 +1,216 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # REVERSE PROXY
+  # ============================================
+  traefik:
+    image: traefik:v3.0
+    container_name: fwv-traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.fwv-raura.ch`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH}"
+
+  # ============================================
+  # DATABASE
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: fwv-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fwv}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-fwv_raura}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - fwv-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fwv}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # BACKENDS (APIs)
+  # ============================================
+
+  # Mitgliederverwaltung API
+  api-members:
+    build: ./backend-members
+    container_name: fwv-api-members
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
+      JWT_SECRET: ${JWT_SECRET}
+      API_KEY: ${API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/members`, `/auth`, `/roles`)"
+      - "traefik.http.routers.api-members.entrypoints=websecure"
+      - "traefik.http.services.api-members.loadbalancer.server.port=3000"
+
+  # Events API
+  api-events:
+    build: ./backend-events
+    container_name: fwv-api-events
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
+      JWT_SECRET: ${JWT_SECRET}
+      MEMBERS_API_URL: http://api-members:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-events.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/events`, `/shifts`, `/registrations`, `/calendar`)"
+      - "traefik.http.routers.api-events.entrypoints=websecure"
+      - "traefik.http.services.api-events.loadbalancer.server.port=3000"
+
+  # Buchhaltung API
+  api-accounting:
+    build: ./backend-accounting
+    container_name: fwv-api-accounting
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
+      JWT_SECRET: ${JWT_SECRET}
+      MEMBERS_API_URL: http://api-members:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-accounting.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/invoices`, `/payments`, `/reports`, `/accounts`)"
+      - "traefik.http.routers.api-accounting.entrypoints=websecure"
+      - "traefik.http.services.api-accounting.loadbalancer.server.port=3000"
+
+  # Versand API (Email, Pingen, SMS)
+  api-dispatch:
+    build: ./backend-dispatch
+    container_name: fwv-api-dispatch
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
+      JWT_SECRET: ${JWT_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      PINGEN_CLIENT_ID: ${PINGEN_CLIENT_ID}
+      PINGEN_CLIENT_SECRET: ${PINGEN_CLIENT_SECRET}
+      PINGEN_ORGANISATION_ID: ${PINGEN_ORGANISATION_ID}
+      PINGEN_STAGING: ${PINGEN_STAGING:-false}
+      MEMBERS_API_URL: http://api-members:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-dispatch.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/email`, `/pingen`, `/sms`, `/templates`)"
+      - "traefik.http.routers.api-dispatch.entrypoints=websecure"
+      - "traefik.http.services.api-dispatch.loadbalancer.server.port=3000"
+
+  # ============================================
+  # FRONTENDS
+  # ============================================
+
+  # Öffentliche Website
+  frontend-website:
+    build: ./frontend-website
+    container_name: fwv-frontend-website
+    restart: unless-stopped
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.website.rule=Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)"
+      - "traefik.http.routers.website.entrypoints=websecure"
+      - "traefik.http.services.website.loadbalancer.server.port=80"
+
+  # Vorstand Portal
+  frontend-vorstand:
+    build: ./frontend-vorstand
+    container_name: fwv-frontend-vorstand
+    restart: unless-stopped
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vorstand.rule=Host(`vorstand.fwv-raura.ch`)"
+      - "traefik.http.routers.vorstand.entrypoints=websecure"
+      - "traefik.http.services.vorstand.loadbalancer.server.port=80"
+
+  # Mitglieder Self-Service Portal
+  frontend-mitglieder:
+    build: ./frontend-mitglieder
+    container_name: fwv-frontend-mitglieder
+    restart: unless-stopped
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mitglieder.rule=Host(`my.fwv-raura.ch`)"
+      - "traefik.http.routers.mitglieder.entrypoints=websecure"
+      - "traefik.http.services.mitglieder.loadbalancer.server.port=80"
+
+  # Events Portal
+  frontend-events:
+    build: ./frontend-events
+    container_name: fwv-frontend-events
+    restart: unless-stopped
+    networks:
+      - fwv-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.events.rule=Host(`events.fwv-raura.ch`)"
+      - "traefik.http.routers.events.entrypoints=websecure"
+      - "traefik.http.services.events.loadbalancer.server.port=80"
+
+networks:
+  fwv-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
