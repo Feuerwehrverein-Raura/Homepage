@@ -9,6 +9,8 @@
     "cors": "^2.8.5",
     "helmet": "^7.1.0",
     "ical-generator": "^7.0.0",
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
   }
 }
