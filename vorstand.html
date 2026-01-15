@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vorstand - Mitgliederverwaltung | FWV Raura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-sans bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-fire-700 text-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full overflow-hidden bg-white p-1">
+                        <img src="images/logo.png" alt="Logo" class="w-full h-full object-contain">
+                    </div>
+                    <div>
+                        <span class="text-xl font-bold">FWV Raura</span>
+                        <p class="text-fire-200 text-sm">Vorstand-Portal</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <a href="index.html" class="hover:text-fire-200 transition-colors">Website</a>
+                    <a href="events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                    <button id="logout-btn" class="hover:text-fire-200 transition-colors">Abmelden</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Tabs -->
+    <section class="bg-white border-b">
+        <div class="container mx-auto px-4">
+            <div class="flex space-x-8 border-b">
+                <button id="tab-members" class="tab-btn py-4 px-2 font-semibold border-b-2 border-fire-500 text-fire-600">
+                    Mitglieder
+                </button>
+                <button id="tab-events" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                    Veranstaltungen
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Members Section -->
+    <div id="members-section">
+        <!-- Header -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">Mitgliederverwaltung</h1>
+                        <p class="text-gray-600 mt-1">Mitglieder verwalten und Statistiken einsehen</p>
+                    </div>
+                    <button id="add-member-btn" class="bg-fire-500 text-white px-6 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-2">
+                        <span>+</span>
+                        <span>Neues Mitglied</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    <!-- Statistics -->
+    <section class="bg-white border-b">
+        <div class="container mx-auto px-4 py-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-fire-50 p-4 rounded-lg">
+                    <div class="text-fire-600 text-sm font-medium">Gesamt</div>
+                    <div id="stat-total" class="text-3xl font-bold text-gray-800">-</div>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <div class="text-green-600 text-sm font-medium">Aktivmitglieder</div>
+                    <div id="stat-aktiv" class="text-3xl font-bold text-gray-800">-</div>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <div class="text-blue-600 text-sm font-medium">Passivmitglieder</div>
+                    <div id="stat-passiv" class="text-3xl font-bold text-gray-800">-</div>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-lg">
+                    <div class="text-yellow-600 text-sm font-medium">Ehrenmitglieder</div>
+                    <div id="stat-ehren" class="text-3xl font-bold text-gray-800">-</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Filters and Search -->
+    <section class="bg-white border-b">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <div class="flex items-center space-x-4">
+                    <input type="text" id="search-input" placeholder="Suche nach Name oder E-Mail..."
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500 w-full md:w-80">
+                    <select id="status-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <option value="">Alle Status</option>
+                        <option value="Aktivmitglied">Aktivmitglied</option>
+                        <option value="Passivmitglied">Passivmitglied</option>
+                        <option value="Ehrenmitglied">Ehrenmitglied</option>
+                    </select>
+                </div>
+                <button id="export-btn" class="border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    Export CSV
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Members Table -->
+    <section class="py-8">
+        <div class="container mx-auto px-4">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="min-w-full">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">E-Mail</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Telefon</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Funktion</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="members-tbody" class="bg-white divide-y divide-gray-200">
+                        <!-- Members will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loading-state" class="text-center py-12">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                <p class="mt-4 text-gray-600">Lade Mitglieder...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="text-center py-12 hidden">
+                <p class="text-gray-600">Keine Mitglieder gefunden.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Member Modal -->
+    <div id="member-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="modal-title" class="text-2xl font-bold text-gray-800">Mitglied bearbeiten</h3>
+                    <button id="close-modal" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                </div>
+
+                <form id="member-form" class="space-y-6">
+                    <input type="hidden" id="member-id">
+
+                    <!-- Persönliche Daten -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Persönliche Daten</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Anrede</label>
+                                <select id="anrede" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    <option value="">-</option>
+                                    <option value="Herr">Herr</option>
+                                    <option value="Frau">Frau</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Geschlecht</label>
+                                <select id="geschlecht" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    <option value="">-</option>
+                                    <option value="M">Männlich</option>
+                                    <option value="W">Weiblich</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Vorname *</label>
+                                <input type="text" id="vorname" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nachname *</label>
+                                <input type="text" id="nachname" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Geburtstag</label>
+                                <input type="date" id="geburtstag" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Adresse -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Adresse</h4>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Strasse</label>
+                                <input type="text" id="strasse" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Adresszusatz</label>
+                                <input type="text" id="adresszusatz" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">PLZ</label>
+                                    <input type="text" id="plz" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Ort</label>
+                                    <input type="text" id="ort" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kontakt -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Kontakt</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                                <input type="tel" id="telefon" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                                <input type="tel" id="mobile" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                                <input type="email" id="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mitgliedschaft -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Mitgliedschaft</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select id="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    <option value="Aktivmitglied">Aktivmitglied</option>
+                                    <option value="Passivmitglied">Passivmitglied</option>
+                                    <option value="Ehrenmitglied">Ehrenmitglied</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Funktion</label>
+                                <input type="text" id="funktion" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Eintrittsdatum</label>
+                                <input type="date" id="eintrittsdatum" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Zustellung -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Zustellung</h4>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="zustellung-email" class="mr-2 rounded">
+                                <span class="text-sm text-gray-700">E-Mail-Zustellung</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="zustellung-post" class="mr-2 rounded">
+                                <span class="text-sm text-gray-700">Post-Zustellung</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Bemerkungen -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bemerkungen</label>
+                        <textarea id="bemerkungen" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"></textarea>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex justify-between pt-4 border-t">
+                        <button type="button" id="delete-member-btn" class="text-red-600 hover:text-red-700 font-medium hidden">
+                            Löschen
+                        </button>
+                        <div class="flex space-x-3">
+                            <button type="button" id="cancel-btn" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                                Abbrechen
+                            </button>
+                            <button type="submit" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
+                                Speichern
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    </div> <!-- End Members Section -->
+
+    <!-- Events Section -->
+    <div id="events-section" class="hidden">
+        <!-- Header -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">Veranstaltungsverwaltung</h1>
+                        <p class="text-gray-600 mt-1">Events und Schichten verwalten</p>
+                    </div>
+                    <button id="add-event-btn" class="bg-fire-500 text-white px-6 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-2">
+                        <span>+</span>
+                        <span>Neues Event</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Events List -->
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Titel</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Datum</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Kategorie</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Schichten</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="events-tbody" class="bg-white divide-y divide-gray-200">
+                            <!-- Events will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Loading State -->
+                <div id="events-loading-state" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                    <p class="mt-4 text-gray-600">Lade Events...</p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="events-empty-state" class="text-center py-12 hidden">
+                    <p class="text-gray-600">Keine Events gefunden.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Event Modal -->
+    <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="event-modal-title" class="text-2xl font-bold text-gray-800">Event bearbeiten</h3>
+                    <button id="close-event-modal" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                </div>
+
+                <form id="event-form" class="space-y-6">
+                    <input type="hidden" id="event-id">
+
+                    <!-- Basis-Informationen -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Basis-Informationen</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Titel *</label>
+                                <input type="text" id="event-title" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Untertitel</label>
+                                <input type="text" id="event-subtitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Beschreibung</label>
+                                <textarea id="event-description" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"></textarea>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
+                                <input type="text" id="event-slug" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                <p class="text-xs text-gray-500 mt-1">URL-freundlicher Name (z.B. fasnacht-2026)</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Kategorie</label>
+                                <select id="event-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    <option value="Jahresanlass">Jahresanlass</option>
+                                    <option value="Einsatz">Einsatz</option>
+                                    <option value="Übung">Übung</option>
+                                    <option value="Sonstiges">Sonstiges</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datum und Ort -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Datum und Ort</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Start-Datum *</label>
+                                <input type="datetime-local" id="event-start-date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">End-Datum</label>
+                                <input type="datetime-local" id="event-end-date" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Ort</label>
+                                <input type="text" id="event-location" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Anmeldung -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Anmeldung</h4>
+                        <div class="space-y-4">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="event-registration-required" class="mr-2 rounded">
+                                <span class="text-sm text-gray-700">Anmeldung erforderlich</span>
+                            </label>
+                            <div id="registration-settings" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Anmeldeschluss</label>
+                                    <input type="datetime-local" id="event-registration-deadline" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Max. Teilnehmer</label>
+                                    <input type="number" id="event-max-participants" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Schichten -->
+                    <div>
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-semibold text-gray-700">Schichten</h4>
+                            <button type="button" id="add-shift-btn" class="text-fire-600 hover:text-fire-700 text-sm font-medium">
+                                + Schicht hinzufügen
+                            </button>
+                        </div>
+                        <div id="shifts-container" class="space-y-3">
+                            <!-- Shifts will be added dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Sonstiges -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Sonstiges</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                <select id="event-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    <option value="planned">Geplant</option>
+                                    <option value="confirmed">Bestätigt</option>
+                                    <option value="cancelled">Abgesagt</option>
+                                    <option value="completed">Abgeschlossen</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Kosten</label>
+                                <input type="text" id="event-cost" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Bild URL</label>
+                                <input type="url" id="event-image-url" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="flex justify-between pt-4 border-t">
+                        <button type="button" id="delete-event-btn" class="text-red-600 hover:text-red-700 font-medium hidden">
+                            Löschen
+                        </button>
+                        <div class="flex space-x-3">
+                            <button type="button" id="cancel-event-btn" class="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                                Abbrechen
+                            </button>
+                            <button type="submit" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
+                                Speichern
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.fwv-raura.ch';
+        const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
+        const CLIENT_ID = '2wdsIoITphFOrIt8P8jZCXJpmODjtELw4RdBvAhI';
+        const REDIRECT_URI = window.location.origin + '/auth-callback.html';
+
+        let members = [];
+        let events = [];
+        let currentShifts = [];
+        let authToken = null;
+        let currentTab = 'members';
+
+        // Check authentication
+        async function checkAuth() {
+            // Check for token in URL (from callback)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('token')) {
+                authToken = urlParams.get('token');
+                localStorage.setItem('auth_token', authToken);
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return true;
+            }
+
+            // Check localStorage
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                // Redirect to Authentik for login
+                const state = encodeURIComponent(window.location.pathname);
+                const authUrl = `${AUTHENTIK_URL}/application/o/authorize/?` +
+                    `client_id=${CLIENT_ID}&` +
+                    `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+                    `response_type=code&` +
+                    `scope=openid%20profile%20email&` +
+                    `state=${state}`;
+                window.location.href = authUrl;
+                return false;
+            }
+
+            authToken = token;
+
+            // Verify token is still valid
+            try {
+                const response = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) {
+                    localStorage.removeItem('auth_token');
+                    return checkAuth(); // Retry auth
+                }
+                const user = await response.json();
+                // Check if user has vorstand or admin role
+                if (!user.groups?.includes('vorstand') && !user.groups?.includes('admin')) {
+                    alert('Sie haben keine Berechtigung für diesen Bereich.');
+                    window.location.href = '/';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Auth verification failed:', error);
+                localStorage.removeItem('auth_token');
+                return checkAuth();
+            }
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/members/stats/overview`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load stats');
+
+                const stats = await response.json();
+                document.getElementById('stat-total').textContent = stats.total || 0;
+                document.getElementById('stat-aktiv').textContent = stats.aktiv || 0;
+                document.getElementById('stat-passiv').textContent = stats.passiv || 0;
+                document.getElementById('stat-ehren').textContent = stats.ehren || 0;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load members
+        async function loadMembers(filters = {}) {
+            try {
+                document.getElementById('loading-state').classList.remove('hidden');
+                document.getElementById('empty-state').classList.add('hidden');
+
+                const params = new URLSearchParams(filters);
+                const response = await fetch(`${API_BASE}/members?${params}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.removeItem('auth_token');
+                        window.location.href = '/login.html?return=/vorstand.html';
+                        return;
+                    }
+                    throw new Error('Failed to load members');
+                }
+
+                members = await response.json();
+                renderMembers();
+            } catch (error) {
+                console.error('Error loading members:', error);
+                alert('Fehler beim Laden der Mitglieder');
+            } finally {
+                document.getElementById('loading-state').classList.add('hidden');
+            }
+        }
+
+        // Render members table
+        function renderMembers() {
+            const tbody = document.getElementById('members-tbody');
+
+            if (members.length === 0) {
+                tbody.innerHTML = '';
+                document.getElementById('empty-state').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('empty-state').classList.add('hidden');
+
+            tbody.innerHTML = members.map(member => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${member.vorname} ${member.nachname}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-600">${member.email || '-'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-600">${member.mobile || member.telefon || '-'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(member.status)}">
+                            ${member.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-600">${member.funktion || '-'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editMember('${member.id}')" class="text-fire-600 hover:text-fire-800">
+                            Bearbeiten
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getStatusClass(status) {
+            const classes = {
+                'Aktivmitglied': 'bg-green-100 text-green-800',
+                'Passivmitglied': 'bg-blue-100 text-blue-800',
+                'Ehrenmitglied': 'bg-yellow-100 text-yellow-800'
+            };
+            return classes[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        // Open modal for new member
+        function openNewMemberModal() {
+            document.getElementById('modal-title').textContent = 'Neues Mitglied';
+            document.getElementById('member-form').reset();
+            document.getElementById('member-id').value = '';
+            document.getElementById('delete-member-btn').classList.add('hidden');
+            document.getElementById('member-modal').classList.remove('hidden');
+        }
+
+        // Edit member
+        async function editMember(id) {
+            try {
+                const response = await fetch(`${API_BASE}/members/${id}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load member');
+
+                const member = await response.json();
+
+                document.getElementById('modal-title').textContent = 'Mitglied bearbeiten';
+                document.getElementById('member-id').value = member.id;
+                document.getElementById('anrede').value = member.anrede || '';
+                document.getElementById('vorname').value = member.vorname;
+                document.getElementById('nachname').value = member.nachname;
+                document.getElementById('geschlecht').value = member.geschlecht || '';
+                document.getElementById('geburtstag').value = member.geburtstag || '';
+                document.getElementById('strasse').value = member.strasse || '';
+                document.getElementById('adresszusatz').value = member.adresszusatz || '';
+                document.getElementById('plz').value = member.plz || '';
+                document.getElementById('ort').value = member.ort || '';
+                document.getElementById('telefon').value = member.telefon || '';
+                document.getElementById('mobile').value = member.mobile || '';
+                document.getElementById('email').value = member.email || '';
+                document.getElementById('status').value = member.status || 'Aktivmitglied';
+                document.getElementById('funktion').value = member.funktion || '';
+                document.getElementById('eintrittsdatum').value = member.eintrittsdatum || '';
+                document.getElementById('zustellung-email').checked = member.zustellung_email !== false;
+                document.getElementById('zustellung-post').checked = member.zustellung_post === true;
+                document.getElementById('bemerkungen').value = member.bemerkungen || '';
+
+                document.getElementById('delete-member-btn').classList.remove('hidden');
+                document.getElementById('member-modal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading member:', error);
+                alert('Fehler beim Laden des Mitglieds');
+            }
+        }
+
+        // Save member
+        async function saveMember(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('member-id').value;
+            const data = {
+                anrede: document.getElementById('anrede').value,
+                vorname: document.getElementById('vorname').value,
+                nachname: document.getElementById('nachname').value,
+                geschlecht: document.getElementById('geschlecht').value,
+                geburtstag: document.getElementById('geburtstag').value || null,
+                strasse: document.getElementById('strasse').value,
+                adresszusatz: document.getElementById('adresszusatz').value,
+                plz: document.getElementById('plz').value,
+                ort: document.getElementById('ort').value,
+                telefon: document.getElementById('telefon').value,
+                mobile: document.getElementById('mobile').value,
+                email: document.getElementById('email').value,
+                status: document.getElementById('status').value,
+                funktion: document.getElementById('funktion').value,
+                eintrittsdatum: document.getElementById('eintrittsdatum').value || null,
+                zustellung_email: document.getElementById('zustellung-email').checked,
+                zustellung_post: document.getElementById('zustellung-post').checked,
+                bemerkungen: document.getElementById('bemerkungen').value
+            };
+
+            try {
+                const url = id ? `${API_BASE}/members/${id}` : `${API_BASE}/members`;
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Failed to save member');
+
+                document.getElementById('member-modal').classList.add('hidden');
+                await loadMembers();
+                await loadStats();
+
+            } catch (error) {
+                console.error('Error saving member:', error);
+                alert('Fehler beim Speichern');
+            }
+        }
+
+        // Delete member
+        async function deleteMember() {
+            const id = document.getElementById('member-id').value;
+            if (!id) return;
+
+            if (!confirm('Mitglied wirklich löschen?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/members/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to delete member');
+
+                document.getElementById('member-modal').classList.add('hidden');
+                await loadMembers();
+                await loadStats();
+
+            } catch (error) {
+                console.error('Error deleting member:', error);
+                alert('Fehler beim Löschen');
+            }
+        }
+
+        // Export CSV
+        function exportCSV() {
+            const csv = [
+                ['Vorname', 'Nachname', 'E-Mail', 'Telefon', 'Status', 'Funktion'].join(','),
+                ...members.map(m => [
+                    m.vorname, m.nachname, m.email || '', m.mobile || m.telefon || '', m.status, m.funktion || ''
+                ].join(','))
+            ].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `mitglieder-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
+
+        // Event listeners
+        document.getElementById('add-member-btn').addEventListener('click', openNewMemberModal);
+        document.getElementById('member-form').addEventListener('submit', saveMember);
+        document.getElementById('delete-member-btn').addEventListener('click', deleteMember);
+        document.getElementById('close-modal').addEventListener('click', () => {
+            document.getElementById('member-modal').classList.add('hidden');
+        });
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            document.getElementById('member-modal').classList.add('hidden');
+        });
+
+        // Search and filters
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            loadMembers({ search: e.target.value, status: document.getElementById('status-filter').value });
+        });
+
+        document.getElementById('status-filter').addEventListener('change', (e) => {
+            loadMembers({ search: document.getElementById('search-input').value, status: e.target.value });
+        });
+
+        document.getElementById('export-btn').addEventListener('click', exportCSV);
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('auth_token');
+            window.location.href = '/';
+        });
+
+        // ============================================
+        // TAB SWITCHING
+        // ============================================
+
+        function switchTab(tab) {
+            currentTab = tab;
+
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-fire-500', 'text-fire-600');
+                btn.classList.add('border-transparent', 'text-gray-600');
+            });
+
+            if (tab === 'members') {
+                document.getElementById('tab-members').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('tab-members').classList.remove('border-transparent', 'text-gray-600');
+                document.getElementById('members-section').classList.remove('hidden');
+                document.getElementById('events-section').classList.add('hidden');
+            } else if (tab === 'events') {
+                document.getElementById('tab-events').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('tab-events').classList.remove('border-transparent', 'text-gray-600');
+                document.getElementById('members-section').classList.add('hidden');
+                document.getElementById('events-section').classList.remove('hidden');
+                loadEvents();
+            }
+        }
+
+        document.getElementById('tab-members').addEventListener('click', () => switchTab('members'));
+        document.getElementById('tab-events').addEventListener('click', () => switchTab('events'));
+
+        // ============================================
+        // EVENTS MANAGEMENT
+        // ============================================
+
+        // Load events
+        async function loadEvents() {
+            try {
+                document.getElementById('events-loading-state').classList.remove('hidden');
+                document.getElementById('events-empty-state').classList.add('hidden');
+
+                const response = await fetch(`${API_BASE}/events`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load events');
+
+                events = await response.json();
+                renderEvents();
+            } catch (error) {
+                console.error('Error loading events:', error);
+                alert('Fehler beim Laden der Events');
+            } finally {
+                document.getElementById('events-loading-state').classList.add('hidden');
+            }
+        }
+
+        // Render events table
+        function renderEvents() {
+            const tbody = document.getElementById('events-tbody');
+
+            if (events.length === 0) {
+                tbody.innerHTML = '';
+                document.getElementById('events-empty-state').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('events-empty-state').classList.add('hidden');
+
+            tbody.innerHTML = events.map(event => {
+                const startDate = new Date(event.start_date);
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">${event.title}</div>
+                            <div class="text-xs text-gray-500">${event.subtitle || ''}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-600">${startDate.toLocaleDateString('de-CH')}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-600">${event.category || '-'}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full ${getEventStatusClass(event.status)}">
+                                ${getEventStatusLabel(event.status)}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <button onclick="viewShifts('${event.id}')" class="text-sm text-blue-600 hover:text-blue-800">
+                                Schichten anzeigen
+                            </button>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="editEvent('${event.id}')" class="text-fire-600 hover:text-fire-800">
+                                Bearbeiten
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getEventStatusClass(status) {
+            const classes = {
+                'planned': 'bg-blue-100 text-blue-800',
+                'confirmed': 'bg-green-100 text-green-800',
+                'cancelled': 'bg-red-100 text-red-800',
+                'completed': 'bg-gray-100 text-gray-800'
+            };
+            return classes[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        function getEventStatusLabel(status) {
+            const labels = {
+                'planned': 'Geplant',
+                'confirmed': 'Bestätigt',
+                'cancelled': 'Abgesagt',
+                'completed': 'Abgeschlossen'
+            };
+            return labels[status] || status;
+        }
+
+        // Open modal for new event
+        function openNewEventModal() {
+            document.getElementById('event-modal-title').textContent = 'Neues Event';
+            document.getElementById('event-form').reset();
+            document.getElementById('event-id').value = '';
+            document.getElementById('delete-event-btn').classList.add('hidden');
+            document.getElementById('shifts-container').innerHTML = '';
+            currentShifts = [];
+            document.getElementById('event-modal').classList.remove('hidden');
+        }
+
+        // Edit event
+        async function editEvent(id) {
+            try {
+                const response = await fetch(`${API_BASE}/events/${id}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load event');
+
+                const event = await response.json();
+
+                document.getElementById('event-modal-title').textContent = 'Event bearbeiten';
+                document.getElementById('event-id').value = event.id;
+                document.getElementById('event-title').value = event.title;
+                document.getElementById('event-subtitle').value = event.subtitle || '';
+                document.getElementById('event-description').value = event.description || '';
+                document.getElementById('event-slug').value = event.slug;
+                document.getElementById('event-category').value = event.category || 'Jahresanlass';
+                document.getElementById('event-start-date').value = formatDateTimeLocal(event.start_date);
+                document.getElementById('event-end-date').value = event.end_date ? formatDateTimeLocal(event.end_date) : '';
+                document.getElementById('event-location').value = event.location || '';
+                document.getElementById('event-registration-required').checked = event.registration_required;
+                document.getElementById('event-registration-deadline').value = event.registration_deadline ? formatDateTimeLocal(event.registration_deadline) : '';
+                document.getElementById('event-max-participants').value = event.max_participants || '';
+                document.getElementById('event-status').value = event.status || 'planned';
+                document.getElementById('event-cost').value = event.cost || '';
+                document.getElementById('event-image-url').value = event.image_url || '';
+
+                // Toggle registration settings
+                toggleRegistrationSettings();
+
+                // Load shifts
+                currentShifts = event.shifts || [];
+                renderShifts();
+
+                document.getElementById('delete-event-btn').classList.remove('hidden');
+                document.getElementById('event-modal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading event:', error);
+                alert('Fehler beim Laden des Events');
+            }
+        }
+
+        // View shifts
+        async function viewShifts(eventId) {
+            try {
+                const response = await fetch(`${API_BASE}/events/${eventId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load event');
+
+                const event = await response.json();
+                const shifts = event.shifts || [];
+
+                if (shifts.length === 0) {
+                    alert('Keine Schichten für dieses Event');
+                    return;
+                }
+
+                // Load registrations for each shift
+                const registrationsResponse = await fetch(`${API_BASE}/registrations?event_id=${eventId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                const registrations = registrationsResponse.ok ? await registrationsResponse.json() : [];
+
+                let shiftInfo = shifts.map(shift => {
+                    const shiftRegs = registrations.filter(r => r.shift_ids && r.shift_ids.includes(shift.id));
+                    return `${shift.name} (${new Date(shift.date).toLocaleDateString('de-CH')} ${shift.start_time || ''}-${shift.end_time || ''})\\n  Angemeldet: ${shiftRegs.length}/${shift.needed}`;
+                }).join('\\n\\n');
+
+                alert(`Schichten für "${event.title}":\\n\\n${shiftInfo}`);
+            } catch (error) {
+                console.error('Error loading shifts:', error);
+                alert('Fehler beim Laden der Schichten');
+            }
+        }
+
+        // Helper function to format datetime for input
+        function formatDateTimeLocal(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            const offset = date.getTimezoneOffset();
+            const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+            return localDate.toISOString().slice(0, 16);
+        }
+
+        // Toggle registration settings visibility
+        function toggleRegistrationSettings() {
+            const required = document.getElementById('event-registration-required').checked;
+            const settings = document.getElementById('registration-settings');
+            if (required) {
+                settings.classList.remove('hidden');
+            } else {
+                settings.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('event-registration-required').addEventListener('change', toggleRegistrationSettings);
+
+        // Shifts management
+        let shiftCounter = 0;
+
+        function addShift(shiftData = null) {
+            const shiftId = shiftData?.id || `new-${shiftCounter++}`;
+            const shiftHtml = `
+                <div class="shift-item border border-gray-300 rounded-lg p-4" data-shift-id="${shiftId}">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Schicht-Name</label>
+                            <input type="text" class="shift-name w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-fire-500"
+                                value="${shiftData?.name || ''}" placeholder="z.B. Freitag Abend" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Datum</label>
+                            <input type="date" class="shift-date w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-fire-500"
+                                value="${shiftData?.date || ''}" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Benötigt</label>
+                            <input type="number" class="shift-needed w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-fire-500"
+                                value="${shiftData?.needed || 2}" min="1" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Start-Zeit</label>
+                            <input type="time" class="shift-start-time w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-fire-500"
+                                value="${shiftData?.start_time || ''}">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">End-Zeit</label>
+                            <input type="time" class="shift-end-time w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-fire-500"
+                                value="${shiftData?.end_time || ''}">
+                        </div>
+                        <div class="md:col-span-2 flex items-end">
+                            <button type="button" onclick="removeShift('${shiftId}')" class="text-red-600 hover:text-red-700 text-sm">
+                                Entfernen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('shifts-container').insertAdjacentHTML('beforeend', shiftHtml);
+        }
+
+        function removeShift(shiftId) {
+            const shiftElement = document.querySelector(`[data-shift-id="${shiftId}"]`);
+            if (shiftElement) {
+                shiftElement.remove();
+            }
+        }
+
+        function renderShifts() {
+            document.getElementById('shifts-container').innerHTML = '';
+            currentShifts.forEach(shift => addShift(shift));
+        }
+
+        function getShiftsFromForm() {
+            const shifts = [];
+            document.querySelectorAll('.shift-item').forEach(item => {
+                const shiftId = item.dataset.shiftId;
+                shifts.push({
+                    id: shiftId.startsWith('new-') ? null : shiftId,
+                    name: item.querySelector('.shift-name').value,
+                    date: item.querySelector('.shift-date').value,
+                    start_time: item.querySelector('.shift-start-time').value || null,
+                    end_time: item.querySelector('.shift-end-time').value || null,
+                    needed: parseInt(item.querySelector('.shift-needed').value)
+                });
+            });
+            return shifts;
+        }
+
+        document.getElementById('add-shift-btn').addEventListener('click', () => addShift());
+
+        // Save event
+        async function saveEvent(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('event-id').value;
+            const data = {
+                slug: document.getElementById('event-slug').value,
+                title: document.getElementById('event-title').value,
+                subtitle: document.getElementById('event-subtitle').value || null,
+                description: document.getElementById('event-description').value || null,
+                start_date: document.getElementById('event-start-date').value,
+                end_date: document.getElementById('event-end-date').value || null,
+                location: document.getElementById('event-location').value || null,
+                category: document.getElementById('event-category').value,
+                registration_required: document.getElementById('event-registration-required').checked,
+                registration_deadline: document.getElementById('event-registration-deadline').value || null,
+                max_participants: parseInt(document.getElementById('event-max-participants').value) || null,
+                status: document.getElementById('event-status').value,
+                cost: document.getElementById('event-cost').value || null,
+                image_url: document.getElementById('event-image-url').value || null
+            };
+
+            try {
+                const url = id ? `${API_BASE}/events/${id}` : `${API_BASE}/events`;
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Failed to save event');
+
+                const savedEvent = await response.json();
+
+                // Save shifts
+                const shifts = getShiftsFromForm();
+
+                // Delete old shifts if editing
+                if (id && currentShifts.length > 0) {
+                    const oldShiftIds = currentShifts.map(s => s.id);
+                    const newShiftIds = shifts.filter(s => s.id).map(s => s.id);
+                    const toDelete = oldShiftIds.filter(id => !newShiftIds.includes(id));
+
+                    for (const shiftId of toDelete) {
+                        try {
+                            await fetch(`${API_BASE}/shifts/${shiftId}`, {
+                                method: 'DELETE',
+                                headers: { 'Authorization': `Bearer ${authToken}` }
+                            });
+                        } catch (e) {
+                            console.error('Failed to delete shift:', e);
+                        }
+                    }
+                }
+
+                // Create/update shifts
+                for (const shift of shifts) {
+                    const shiftData = {
+                        event_id: savedEvent.id,
+                        name: shift.name,
+                        date: shift.date,
+                        start_time: shift.start_time,
+                        end_time: shift.end_time,
+                        needed: shift.needed
+                    };
+
+                    try {
+                        await fetch(`${API_BASE}/shifts`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${authToken}`
+                            },
+                            body: JSON.stringify(shiftData)
+                        });
+                    } catch (e) {
+                        console.error('Failed to save shift:', e);
+                    }
+                }
+
+                document.getElementById('event-modal').classList.add('hidden');
+                await loadEvents();
+
+            } catch (error) {
+                console.error('Error saving event:', error);
+                alert('Fehler beim Speichern');
+            }
+        }
+
+        // Delete event
+        async function deleteEvent() {
+            const id = document.getElementById('event-id').value;
+            if (!id) return;
+
+            if (!confirm('Event wirklich löschen? Dies löscht auch alle Schichten und Anmeldungen.')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/events/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to delete event');
+
+                document.getElementById('event-modal').classList.add('hidden');
+                await loadEvents();
+
+            } catch (error) {
+                console.error('Error deleting event:', error);
+                alert('Fehler beim Löschen');
+            }
+        }
+
+        // Event listeners for events
+        document.getElementById('add-event-btn').addEventListener('click', openNewEventModal);
+        document.getElementById('event-form').addEventListener('submit', saveEvent);
+        document.getElementById('delete-event-btn').addEventListener('click', deleteEvent);
+        document.getElementById('close-event-modal').addEventListener('click', () => {
+            document.getElementById('event-modal').classList.add('hidden');
+        });
+        document.getElementById('cancel-event-btn').addEventListener('click', () => {
+            document.getElementById('event-modal').classList.add('hidden');
+        });
+
+        // Initialize
+        (async () => {
+            if (await checkAuth()) {
+                await loadStats();
+                await loadMembers();
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -29,12 +29,7 @@
     </div>
 
     <script>
-        // OIDC Configuration
-        const OIDC_CONFIG = {
-            authority: 'https://auth.fwv-raura.ch/application/o/fwv-raura/',
-            client_id: 'fwv-raura-website',
-            token_endpoint: 'https://auth.fwv-raura.ch/application/o/token/'
-        };
+        const API_BASE = 'https://api.fwv-raura.ch';
 
         async function handleCallback() {
             try {
@@ -50,35 +45,52 @@
                     throw new Error(errorDescription || error);
                 }
 
-                // Validate state
-                const savedState = sessionStorage.getItem('oidc_state');
-                if (!savedState || savedState !== state) {
-                    throw new Error('State mismatch - möglicher CSRF-Angriff');
-                }
-
-                // Exchange code for token
-                if (code) {
-                    const redirectUri = window.location.origin + '/auth-callback.html';
-
-                    // In production, this should go through a backend
-                    // For now, we'll just set authenticated state
-                    // IMPORTANT: This is not secure for production!
-                    sessionStorage.setItem('authenticated', 'true');
-                    sessionStorage.setItem('auth_method', 'oidc');
-                    sessionStorage.setItem('auth_code', code);
-
-                    // Get intended page
-                    const intendedPage = sessionStorage.getItem('intended_page') || 'anmeldungen.html';
-
-                    // Clean up
-                    sessionStorage.removeItem('oidc_state');
-                    sessionStorage.removeItem('intended_page');
-
-                    // Redirect to intended page
-                    window.location.href = intendedPage;
-                } else {
+                if (!code) {
                     throw new Error('Kein Authorization Code erhalten');
                 }
+
+                // Determine client type from state or URL
+                let clientType = 'members'; // default
+                if (state && state.includes('/vorstand')) {
+                    clientType = 'vorstand';
+                }
+
+                // Exchange code for token via our backend
+                // The backend will validate the code with Authentik
+                const response = await fetch(`${API_BASE}/auth/callback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: code,
+                        redirect_uri: window.location.origin + '/auth-callback.html',
+                        client_type: clientType
+                    })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Token exchange failed');
+                }
+
+                const data = await response.json();
+                const accessToken = data.access_token;
+
+                // Store token
+                localStorage.setItem('auth_token', accessToken);
+
+                // Determine redirect target
+                let redirectTo = '/';
+                if (state) {
+                    try {
+                        redirectTo = decodeURIComponent(state);
+                    } catch (e) {
+                        console.warn('Failed to decode state:', e);
+                    }
+                }
+
+                // Redirect to intended page
+                window.location.href = redirectTo;
+
             } catch (error) {
                 console.error('Authentication error:', error);
 
@@ -90,8 +102,8 @@
                         </svg>
                         <h1 class="text-2xl font-bold text-gray-800 mb-2">Authentifizierung fehlgeschlagen</h1>
                         <p class="text-gray-600 mb-4">${error.message}</p>
-                        <a href="login.html" class="inline-block bg-fire-700 text-white px-6 py-2 rounded-lg hover:bg-fire-800 transition-colors">
-                            Zurück zum Login
+                        <a href="/" class="inline-block bg-fire-700 text-white px-6 py-2 rounded-lg hover:bg-fire-800 transition-colors">
+                            Zurück zur Startseite
                         </a>
                     </div>
                 `;

@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const { Pool } = require('pg');
 const ical = require('ical-generator').default;
 const axios = require('axios');
+const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -69,7 +70,7 @@ app.get('/events/:id', async (req, res) => {
     }
 });
 
-app.post('/events', async (req, res) => {
+app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const {
             slug, title, subtitle, description, start_date, end_date,
@@ -96,7 +97,7 @@ app.post('/events', async (req, res) => {
     }
 });
 
-app.put('/events/:id', async (req, res) => {
+app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
@@ -113,6 +114,21 @@ app.put('/events/:id', async (req, res) => {
         `, values);
 
         res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM events WHERE id = $1 RETURNING id', [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        res.json({ message: 'Event deleted', id });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -140,7 +156,7 @@ app.get('/shifts', async (req, res) => {
     }
 });
 
-app.post('/shifts', async (req, res) => {
+app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { event_id, name, description, date, start_time, end_time, needed } = req.body;
 
@@ -156,11 +172,26 @@ app.post('/shifts', async (req, res) => {
     }
 });
 
+app.delete('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM shifts WHERE id = $1 RETURNING id', [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Shift not found' });
+        }
+
+        res.json({ message: 'Shift deleted', id });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ============================================
 // REGISTRATIONS
 // ============================================
 
-app.get('/registrations', async (req, res) => {
+app.get('/registrations', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id } = req.query;
         let query = `
@@ -188,7 +219,7 @@ app.get('/registrations', async (req, res) => {
     }
 });
 
-app.post('/registrations', async (req, res) => {
+app.post('/registrations', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id, guest_name, guest_email, shift_ids, notes } = req.body;
 
@@ -331,6 +362,216 @@ app.get('/calendar/ics', async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// ============================================
+// SHIFT REMINDERS (automated notifications)
+// ============================================
+
+// Send reminders for upcoming shifts
+app.post('/shifts/send-reminders', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { days_ahead = 1 } = req.body;
+
+        // Get shifts in the next X days
+        const fromDate = new Date();
+        const toDate = new Date();
+        toDate.setDate(toDate.getDate() + days_ahead);
+
+        const shiftsResult = await pool.query(`
+            SELECT s.*, e.title as event_title, e.location, e.slug
+            FROM shifts s
+            JOIN events e ON s.event_id = e.id
+            WHERE s.date BETWEEN $1 AND $2
+            AND e.status NOT IN ('cancelled')
+            ORDER BY s.date, s.start_time
+        `, [fromDate.toISOString().split('T')[0], toDate.toISOString().split('T')[0]]);
+
+        const shifts = shiftsResult.rows;
+        let sentCount = 0;
+        let errors = [];
+
+        for (const shift of shifts) {
+            // Get registrations for this shift
+            const regsResult = await pool.query(`
+                SELECT r.*, m.vorname, m.nachname, m.email
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE r.event_id = $1
+                AND r.shift_ids && ARRAY[$2::uuid]
+                AND r.status = 'confirmed'
+            `, [shift.event_id, shift.id]);
+
+            const registrations = regsResult.rows;
+
+            for (const reg of registrations) {
+                const email = reg.email || reg.guest_email;
+                const name = reg.vorname && reg.nachname ? `${reg.vorname} ${reg.nachname}` : reg.guest_name;
+
+                if (!email) continue;
+
+                const shiftDate = new Date(shift.date);
+                const dateStr = shiftDate.toLocaleDateString('de-CH', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                const timeStr = shift.start_time && shift.end_time
+                    ? `${shift.start_time} - ${shift.end_time}`
+                    : shift.start_time || 'ganztägig';
+
+                const subject = `Erinnerung: Ihre Schicht am ${dateStr}`;
+                const body = `
+Guten Tag ${name},
+
+Dies ist eine Erinnerung an Ihre Schicht:
+
+Event: ${shift.event_title}
+Schicht: ${shift.name}
+Datum: ${dateStr}
+Zeit: ${timeStr}
+${shift.location ? `Ort: ${shift.location}` : ''}
+
+Bitte seien Sie pünktlich vor Ort.
+
+Bei Fragen oder wenn Sie verhindert sind, melden Sie sich bitte umgehend bei uns.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+                `.trim();
+
+                try {
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: email,
+                        subject: subject,
+                        body: body,
+                        event_id: shift.event_id
+                    });
+                    sentCount++;
+                } catch (error) {
+                    console.error(`Failed to send reminder to ${email}:`, error.message);
+                    errors.push({ email, error: error.message });
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            shifts_checked: shifts.length,
+            reminders_sent: sentCount,
+            errors: errors
+        });
+
+    } catch (error) {
+        console.error('Error sending shift reminders:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Cron-compatible endpoint (can be called without auth via API key)
+app.post('/shifts/cron-reminders', requireApiKey, async (req, res) => {
+    try {
+        // Send reminders for shifts happening tomorrow
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() + 1);
+        const toDate = new Date(fromDate);
+
+        const shiftsResult = await pool.query(`
+            SELECT s.*, e.title as event_title, e.location, e.slug
+            FROM shifts s
+            JOIN events e ON s.event_id = e.id
+            WHERE s.date = $1
+            AND e.status NOT IN ('cancelled')
+            ORDER BY s.start_time
+        `, [fromDate.toISOString().split('T')[0]]);
+
+        const shifts = shiftsResult.rows;
+        let sentCount = 0;
+
+        for (const shift of shifts) {
+            const regsResult = await pool.query(`
+                SELECT r.*, m.vorname, m.nachname, m.email
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE r.event_id = $1
+                AND r.shift_ids && ARRAY[$2::uuid]
+                AND r.status = 'confirmed'
+            `, [shift.event_id, shift.id]);
+
+            for (const reg of regsResult.rows) {
+                const email = reg.email || reg.guest_email;
+                const name = reg.vorname && reg.nachname ? `${reg.vorname} ${reg.nachname}` : reg.guest_name;
+
+                if (!email) continue;
+
+                const shiftDate = new Date(shift.date);
+                const dateStr = shiftDate.toLocaleDateString('de-CH', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                const timeStr = shift.start_time && shift.end_time
+                    ? `${shift.start_time} - ${shift.end_time}`
+                    : shift.start_time || 'ganztägig';
+
+                const subject = `Erinnerung: Ihre Schicht morgen am ${dateStr}`;
+                const body = `
+Guten Tag ${name},
+
+Dies ist eine Erinnerung an Ihre Schicht MORGEN:
+
+Event: ${shift.event_title}
+Schicht: ${shift.name}
+Datum: ${dateStr}
+Zeit: ${timeStr}
+${shift.location ? `Ort: ${shift.location}` : ''}
+
+Bitte seien Sie pünktlich vor Ort.
+
+Bei Fragen oder wenn Sie verhindert sind, melden Sie sich bitte umgehend bei uns.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+                `.trim();
+
+                try {
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: email,
+                        subject: subject,
+                        body: body,
+                        event_id: shift.event_id
+                    }, {
+                        headers: { 'x-api-key': process.env.API_KEY }
+                    });
+                    sentCount++;
+                } catch (error) {
+                    console.error(`Failed to send reminder to ${email}:`, error.message);
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            date: fromDate.toISOString().split('T')[0],
+            shifts_found: shifts.length,
+            reminders_sent: sentCount
+        });
+
+    } catch (error) {
+        console.error('Error in cron reminders:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Helper endpoint to get missing API key for auth middleware
+function requireApiKey(req, res, next) {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.API_KEY) {
+        return res.status(401).json({ error: 'Invalid API key' });
+    }
+    next();
+}
 
 app.listen(PORT, () => {
     console.log(`API-Events running on port ${PORT}`);
