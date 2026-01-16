@@ -897,15 +897,39 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Schichten auswählen *</label>
-                            <div class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                                ${event.shifts.map((shift, index) => `
-                                    <label class="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                                        <input type="checkbox" name="shifts" value="${shift.id || index}"
-                                               data-name="${shift.name || `Schicht ${index + 1}`}"
-                                               class="w-4 h-4 text-fire-500 border-gray-300 rounded focus:ring-fire-500">
-                                        <span class="text-sm">${shift.name || `Schicht ${index + 1}`} (${shift.needed || 0} Personen benötigt)</span>
-                                    </label>
-                                `).join('')}
+                            <p class="text-sm text-gray-500 mb-2">💡 Tipp: Bitte buche 2 Schichten am Stück für optimalen Ablauf</p>
+                            <div class="space-y-2 max-h-80 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                                ${event.shifts.map((shift, index) => {
+                                    const regs = shift.registrations || { approved: [], pending: [], spotsLeft: shift.needed };
+                                    const isFull = regs.spotsLeft <= 0;
+                                    return `
+                                    <div class="p-3 border rounded-lg ${isFull ? 'bg-gray-100 opacity-60' : 'hover:bg-gray-50'}">
+                                        <label class="flex items-start space-x-3 cursor-pointer ${isFull ? 'cursor-not-allowed' : ''}">
+                                            <input type="checkbox" name="shifts" value="${shift.id || index}"
+                                                   data-name="${shift.name || `Schicht ${index + 1}`}"
+                                                   ${isFull ? 'disabled' : ''}
+                                                   class="mt-1 w-4 h-4 text-fire-500 border-gray-300 rounded focus:ring-fire-500">
+                                            <div class="flex-1">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="font-medium text-sm">${shift.name || `Schicht ${index + 1}`}</span>
+                                                    <span class="text-xs ${regs.spotsLeft > 1 ? 'text-green-600' : regs.spotsLeft === 1 ? 'text-orange-600' : 'text-red-600'}">
+                                                        ${isFull ? '❌ Voll' : `✓ ${regs.spotsLeft}/${shift.needed} frei`}
+                                                    </span>
+                                                </div>
+                                                ${regs.approved.length > 0 ? `
+                                                    <div class="mt-1 text-xs text-green-700">
+                                                        <span class="font-medium">Vergeben:</span> ${regs.approved.map(r => r.name).join(', ')}
+                                                    </div>
+                                                ` : ''}
+                                                ${regs.pending.length > 0 ? `
+                                                    <div class="mt-1 text-xs text-yellow-700">
+                                                        <span class="font-medium">Reserviert:</span> ${regs.pending.map(r => r.name).join(', ')}
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                        </label>
+                                    </div>
+                                `}).join('')}
                             </div>
                         </div>
                         

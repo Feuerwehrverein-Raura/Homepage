@@ -44,13 +44,44 @@ app.get('/events', async (req, res) => {
         query += ' ORDER BY start_date';
         const eventsResult = await pool.query(query, params);
 
-        // Fetch shifts for all events
+        // Fetch shifts for all events with registration info
         const events = await Promise.all(eventsResult.rows.map(async (event) => {
             const shifts = await pool.query(
                 'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
                 [event.id]
             );
-            return { ...event, shifts: shifts.rows };
+
+            // Get registrations for each shift
+            const shiftsWithRegistrations = await Promise.all(shifts.rows.map(async (shift) => {
+                const registrations = await pool.query(`
+                    SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                    FROM registrations r
+                    LEFT JOIN members m ON r.member_id = m.id
+                    WHERE $1 = ANY(r.shift_ids)
+                `, [shift.id]);
+
+                const approved = registrations.rows.filter(r => r.status === 'approved');
+                const pending = registrations.rows.filter(r => r.status === 'pending');
+
+                return {
+                    ...shift,
+                    registrations: {
+                        approved: approved.map(r => ({
+                            id: r.id,
+                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                        })),
+                        pending: pending.map(r => ({
+                            id: r.id,
+                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                        })),
+                        approvedCount: approved.length,
+                        pendingCount: pending.length,
+                        spotsLeft: shift.needed - approved.length
+                    }
+                };
+            }));
+
+            return { ...event, shifts: shiftsWithRegistrations };
         }));
 
         res.json(events);
@@ -77,13 +108,43 @@ app.get('/events/:id', async (req, res) => {
             return res.status(404).json({ error: 'Event not found' });
         }
 
-        // Get shifts
+        // Get shifts with registration info
         const shifts = await pool.query(
             'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
             [event.rows[0].id]
         );
 
-        res.json({ ...event.rows[0], shifts: shifts.rows });
+        // Get registrations for each shift
+        const shiftsWithRegistrations = await Promise.all(shifts.rows.map(async (shift) => {
+            const registrations = await pool.query(`
+                SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE $1 = ANY(r.shift_ids)
+            `, [shift.id]);
+
+            const approved = registrations.rows.filter(r => r.status === 'approved');
+            const pending = registrations.rows.filter(r => r.status === 'pending');
+
+            return {
+                ...shift,
+                registrations: {
+                    approved: approved.map(r => ({
+                        id: r.id,
+                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                    })),
+                    pending: pending.map(r => ({
+                        id: r.id,
+                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                    })),
+                    approvedCount: approved.length,
+                    pendingCount: pending.length,
+                    spotsLeft: shift.needed - approved.length
+                }
+            };
+        }));
+
+        res.json({ ...event.rows[0], shifts: shiftsWithRegistrations });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
