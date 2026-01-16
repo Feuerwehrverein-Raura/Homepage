@@ -52,7 +52,16 @@ app.get('/events', async (req, res) => {
 app.get('/events/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const event = await pool.query('SELECT * FROM events WHERE id = $1 OR slug = $1', [id]);
+
+        // Try UUID first, then slug
+        let event;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+        if (uuidRegex.test(id)) {
+            event = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
+        } else {
+            event = await pool.query('SELECT * FROM events WHERE slug = $1', [id]);
+        }
 
         if (event.rows.length === 0) {
             return res.status(404).json({ error: 'Event not found' });
@@ -243,8 +252,27 @@ app.post('/registrations/public', async (req, res) => {
             name, email, phone,
             shifts, shiftIds, // für Schicht-Anmeldung
             participants, // für Teilnehmer-Anmeldung
-            notes
+            notes,
+            skipMemberCheck // Falls der User trotzdem als Gast anmelden möchte
         } = req.body;
+
+        // Prüfen ob die E-Mail zu einem Mitglied gehört
+        if (!skipMemberCheck && email) {
+            const memberCheck = await pool.query(
+                'SELECT id, vorname, nachname, email FROM members WHERE LOWER(email) = LOWER($1)',
+                [email]
+            );
+
+            if (memberCheck.rows.length > 0) {
+                const member = memberCheck.rows[0];
+                return res.status(409).json({
+                    success: false,
+                    isMember: true,
+                    message: `Diese E-Mail-Adresse gehört zu einem Mitglied (${member.vorname} ${member.nachname}). Bitte melden Sie sich zuerst an, um sich als Mitglied zu registrieren.`,
+                    memberName: `${member.vorname} ${member.nachname}`
+                });
+            }
+        }
 
         // Event laden
         const event = await pool.query('SELECT * FROM events WHERE id = $1 OR slug = $1', [eventId]);
@@ -331,6 +359,183 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+// REGISTRATION MANAGEMENT (Vorstand)
+// ============================================
+
+// Get all registrations with filters (Vorstand only)
+app.get('/registrations/manage', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { event_id, status } = req.query;
+        let query = `
+            SELECT r.*, e.title as event_title, e.slug as event_slug,
+                   m.vorname, m.nachname
+            FROM registrations r
+            JOIN events e ON r.event_id = e.id
+            LEFT JOIN members m ON r.member_id = m.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (event_id) {
+            params.push(event_id);
+            query += ` AND r.event_id = $${params.length}`;
+        }
+        if (status) {
+            params.push(status);
+            query += ` AND r.status = $${params.length}`;
+        }
+
+        query += ' ORDER BY r.created_at DESC';
+
+        const result = await pool.query(query, params);
+
+        // Parse notes JSON and add shift names
+        for (const reg of result.rows) {
+            if (reg.notes) {
+                try {
+                    reg.notes_data = JSON.parse(reg.notes);
+                } catch (e) {
+                    reg.notes_data = { notes: reg.notes };
+                }
+            }
+            // Get shift names
+            if (reg.shift_ids && reg.shift_ids.length > 0) {
+                const shifts = await pool.query(
+                    'SELECT id, name, date, start_time, end_time FROM shifts WHERE id = ANY($1)',
+                    [reg.shift_ids]
+                );
+                reg.shifts = shifts.rows;
+            }
+        }
+
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Approve registration
+app.post('/registrations/:id/approve', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(`
+            UPDATE registrations
+            SET status = 'approved', approved_by = $2, approved_at = NOW(), confirmed_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [id, req.user.email || req.user.name]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+
+        const reg = result.rows[0];
+
+        // Send approval email
+        if (reg.guest_email) {
+            const event = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: reg.guest_email,
+                    subject: `Ihre Anmeldung wurde bestätigt - ${event.rows[0]?.title}`,
+                    body: `Guten Tag ${reg.guest_name},\n\nIhre Anmeldung für "${event.rows[0]?.title}" wurde bestätigt.\n\nWir freuen uns auf Sie!\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
+                });
+            } catch (emailErr) {
+                console.error('Approval email failed:', emailErr.message);
+            }
+        }
+
+        res.json({ success: true, registration: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Reject registration
+app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+
+        const result = await pool.query(`
+            UPDATE registrations
+            SET status = 'rejected', approved_by = $2, approved_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [id, req.user.email || req.user.name]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+
+        const reg = result.rows[0];
+
+        // Send rejection email
+        if (reg.guest_email) {
+            const event = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: reg.guest_email,
+                    subject: `Ihre Anmeldung - ${event.rows[0]?.title}`,
+                    body: `Guten Tag ${reg.guest_name},\n\nLeider können wir Ihre Anmeldung für "${event.rows[0]?.title}" nicht berücksichtigen.\n\n${reason ? `Grund: ${reason}\n\n` : ''}Bei Fragen kontaktieren Sie uns bitte.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
+                });
+            } catch (emailErr) {
+                console.error('Rejection email failed:', emailErr.message);
+            }
+        }
+
+        res.json({ success: true, registration: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update registration (Vorstand)
+app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { guest_name, guest_email, phone, shift_ids, notes, status } = req.body;
+
+        const result = await pool.query(`
+            UPDATE registrations
+            SET guest_name = COALESCE($2, guest_name),
+                guest_email = COALESCE($3, guest_email),
+                phone = COALESCE($4, phone),
+                shift_ids = COALESCE($5, shift_ids),
+                notes = COALESCE($6, notes),
+                status = COALESCE($7, status)
+            WHERE id = $1
+            RETURNING *
+        `, [id, guest_name, guest_email, phone, shift_ids, notes, status]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete registration (Vorstand)
+app.delete('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM registrations WHERE id = $1 RETURNING id', [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+
+        res.json({ success: true, message: 'Registration deleted' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
