@@ -64,9 +64,15 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
+      DATABASE_URL: ${DATABASE_URL_ENCODED}
       JWT_SECRET: ${JWT_SECRET}
       API_KEY: ${API_KEY}
+      AUTHENTIK_URL: https://auth.fwv-raura.ch
+      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID}
+      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET}
+      AUTHENTIK_CLIENT_ID_VORSTAND: ${AUTHENTIK_CLIENT_ID_VORSTAND}
+      AUTHENTIK_CLIENT_SECRET_VORSTAND: ${AUTHENTIK_CLIENT_SECRET_VORSTAND}
+      AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy

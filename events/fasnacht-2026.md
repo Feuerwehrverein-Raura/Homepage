@@ -2,14 +2,14 @@
 id: fasnacht-2026
 title: Fasnacht 2026
 subtitle: Festbetrieb im Roten Schopf
-startDate: 2026-02-21T12:00:00
-endDate: 2026-02-22T23:59:59
+startDate: 2026-02-14T12:00:00
+endDate: 2026-02-15T23:59:59
 location: Roter Schopf, Kaiseraugst
 category: Hauptveranstaltung
 organizer: Stefan Müller
 email: stefan+fwv-raura@juroct.ch
 registrationRequired: true
-registrationDeadline: 2026-02-15T23:59:59
+registrationDeadline: 2026-02-08T23:59:59
 cost: Kostenlos
 status: confirmed
 tags: [Fasnacht, Festbetrieb, Essen, Getränke, Helfer]
@@ -18,7 +18,7 @@ shifts:
   # Aufbau
   - id: aufbau
     name: Aufbau
-    date: 2026-02-20
+    date: 2026-02-13
     time: 17:00-20:00
     needed: 5
     description: Aufbau und Vorbereitung des Roten Schopfs für die Fasnacht
@@ -26,84 +26,84 @@ shifts:
   # Samstag Schichten
   - id: samstag-bar-12-14
     name: Bar Samstag 12:00-14:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 12:00-14:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: samstag-kueche-12-14
     name: Küche Samstag 12:00-14:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 12:00-14:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: samstag-bar-14-16
     name: Bar Samstag 14:00-16:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 14:00-16:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: samstag-kueche-14-16
     name: Küche Samstag 14:00-16:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 14:00-16:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: samstag-bar-16-18
     name: Bar Samstag 16:00-18:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 16:00-18:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: samstag-kueche-16-18
     name: Küche Samstag 16:00-18:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 16:00-18:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: samstag-bar-18-20
     name: Bar Samstag 18:00-20:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 18:00-20:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: samstag-kueche-18-20
     name: Küche Samstag 18:00-20:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 18:00-20:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: samstag-bar-20-22
     name: Bar Samstag 20:00-22:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 20:00-22:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: samstag-kueche-20-22
     name: Küche Samstag 20:00-22:00
-    date: 2026-02-21
+    date: 2026-02-14
     time: 20:00-22:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: samstag-bar-22-open
     name: Bar Samstag 22:00-Open End
-    date: 2026-02-21
+    date: 2026-02-14
     time: 22:00-Open End
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten (bis Betriebsschluss)
 
   - id: samstag-kueche-22-open
     name: Küche Samstag 22:00-Open End
-    date: 2026-02-21
+    date: 2026-02-14
     time: 22:00-Open End
     needed: 2
     description: Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)
@@ -111,84 +111,84 @@ shifts:
   # Sonntag Schichten
   - id: sonntag-bar-12-14
     name: Bar Sonntag 12:00-14:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 12:00-14:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: sonntag-kueche-12-14
     name: Küche Sonntag 12:00-14:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 12:00-14:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: sonntag-bar-14-16
     name: Bar Sonntag 14:00-16:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 14:00-16:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: sonntag-kueche-14-16
     name: Küche Sonntag 14:00-16:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 14:00-16:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: sonntag-bar-16-18
     name: Bar Sonntag 16:00-18:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 16:00-18:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: sonntag-kueche-16-18
     name: Küche Sonntag 16:00-18:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 16:00-18:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: sonntag-bar-18-20
     name: Bar Sonntag 18:00-20:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 18:00-20:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: sonntag-kueche-18-20
     name: Küche Sonntag 18:00-20:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 18:00-20:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: sonntag-bar-20-22
     name: Bar Sonntag 20:00-22:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 20:00-22:00
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten
 
   - id: sonntag-kueche-20-22
     name: Küche Sonntag 20:00-22:00
-    date: 2026-02-22
+    date: 2026-02-15
     time: 20:00-22:00
     needed: 2
     description: Küche - Essen zubereiten und ausgeben
 
   - id: sonntag-bar-22-open
     name: Bar Sonntag 22:00-Open End
-    date: 2026-02-22
+    date: 2026-02-15
     time: 22:00-Open End
     needed: 2
     description: Bar - Getränke ausgeben und zubereiten (bis Betriebsschluss)
 
   - id: sonntag-kueche-22-open
     name: Küche Sonntag 22:00-Open End
-    date: 2026-02-22
+    date: 2026-02-15
     time: 22:00-Open End
     needed: 2
     description: Küche - Essen zubereiten und ausgeben (bis Betriebsschluss)
@@ -196,7 +196,7 @@ shifts:
   # Abbau
   - id: abbau
     name: Abbau
-    date: 2026-02-23
+    date: 2026-02-16
     time: 18:00-21:00
     needed: 5
     description: Abbau und Aufräumarbeiten nach der Fasnacht
@@ -240,12 +240,12 @@ Für jeden Tag benötigen wir Helfer in 2 Bereichen:
 **Bitte meldet euch für mindestens 2 aufeinanderfolgende Schichten an (= 4 Stunden), damit wir nicht zu viele Wechsel haben!**
 
 ### Abbau
-- **Abbau:** 23.02.2026, 18:00-21:00 Uhr (5 Personen)
+- **Abbau:** 16.02.2026, 18:00-21:00 Uhr (5 Personen)
   - Abbau und Aufräumarbeiten nach der Fasnacht
 
 ## Anmeldung
 
-**Anmeldeschluss für Helfer:** 15. Februar 2026
+**Anmeldeschluss für Helfer:** 8. Februar 2026
 
 Die Anmeldung erfolgt über die Website mit Schichtauswahl.
 
