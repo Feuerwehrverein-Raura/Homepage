@@ -42,8 +42,18 @@ app.get('/events', async (req, res) => {
         }
 
         query += ' ORDER BY start_date';
-        const result = await pool.query(query, params);
-        res.json(result.rows);
+        const eventsResult = await pool.query(query, params);
+
+        // Fetch shifts for all events
+        const events = await Promise.all(eventsResult.rows.map(async (event) => {
+            const shifts = await pool.query(
+                'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
+                [event.id]
+            );
+            return { ...event, shifts: shifts.rows };
+        }));
+
+        res.json(events);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
