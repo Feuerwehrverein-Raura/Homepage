@@ -252,6 +252,33 @@ app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (re
     }
 });
 
+app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, date, start_time, end_time, needed } = req.body;
+
+        const result = await pool.query(`
+            UPDATE shifts SET
+                name = COALESCE($1, name),
+                description = COALESCE($2, description),
+                date = COALESCE($3, date),
+                start_time = COALESCE($4, start_time),
+                end_time = COALESCE($5, end_time),
+                needed = COALESCE($6, needed)
+            WHERE id = $7
+            RETURNING *
+        `, [name, description, date, start_time, end_time, needed, id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Shift not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.delete('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
