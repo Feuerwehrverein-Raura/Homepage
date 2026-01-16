@@ -345,8 +345,14 @@ app.post('/registrations/public', async (req, res) => {
             }
         }
 
-        // Event laden
-        const event = await pool.query('SELECT * FROM events WHERE id = $1 OR slug = $1', [eventId]);
+        // Event laden (UUID oder Slug)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let event;
+        if (uuidRegex.test(eventId)) {
+            event = await pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
+        } else {
+            event = await pool.query('SELECT * FROM events WHERE slug = $1', [eventId]);
+        }
         if (event.rows.length === 0) {
             return res.status(404).json({ success: false, message: 'Event nicht gefunden' });
         }
