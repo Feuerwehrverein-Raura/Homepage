@@ -106,17 +106,70 @@ function authenticateAny(req, res, next) {
         return next();
     }
 
-    // Then try JWT
+    // Then try Vorstand JWT
     if (authHeader) {
+        const token = authHeader.split(' ')[1];
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fwv-raura-secret-key');
+                if (decoded.type === 'vorstand') {
+                    req.user = {
+                        id: decoded.email,
+                        email: decoded.email,
+                        name: decoded.role,
+                        role: decoded.role,
+                        groups: decoded.groups || ['vorstand']
+                    };
+                    return next();
+                }
+            } catch (e) {
+                // Not a valid Vorstand token, try Authentik
+            }
+        }
+
+        // Try Authentik JWT
         return authenticateToken(req, res, next);
     }
 
     return res.status(401).json({ error: 'Authentication required' });
 }
 
+/**
+ * Middleware specifically for Vorstand IMAP tokens
+ */
+function authenticateVorstand(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fwv-raura-secret-key');
+
+        if (decoded.type !== 'vorstand') {
+            return res.status(403).json({ error: 'Vorstand access required' });
+        }
+
+        req.user = {
+            id: decoded.email,
+            email: decoded.email,
+            role: decoded.role,
+            groups: decoded.groups || ['vorstand']
+        };
+
+        next();
+    } catch (err) {
+        console.error('Vorstand token verification failed:', err.message);
+        return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+}
+
 module.exports = {
     authenticateToken,
     requireRole,
     requireApiKey,
-    authenticateAny
+    authenticateAny,
+    authenticateVorstand
 };

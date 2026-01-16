@@ -3,7 +3,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { Pool } = require('pg');
 const axios = require('axios');
-const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
+const jwt = require('jsonwebtoken');
+const { ImapFlow } = require('imapflow');
+const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,6 +39,128 @@ app.get('/auth/login', (req, res) => {
     const returnUrl = req.query.return || '/';
     res.redirect(`${process.env.AUTHENTIK_URL}/application/o/authorize/?client_id=${process.env.AUTHENTIK_CLIENT_ID}&redirect_uri=${encodeURIComponent(returnUrl)}&response_type=code&scope=openid%20profile%20email`);
 });
+
+// ============================================
+// VORSTAND IMAP LOGIN
+// ============================================
+
+// IMAP-based authentication for Vorstand members
+app.post('/auth/vorstand/login', async (req, res) => {
+    const { email, password } = req.body;
+    const clientIp = req.ip || req.connection.remoteAddress;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password required' });
+    }
+
+    // Validate email domain and allowed addresses
+    const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,vizepraesident@fwv-raura.ch,beisitzer@fwv-raura.ch').split(',').map(e => e.trim().toLowerCase());
+    const emailLower = email.toLowerCase();
+
+    if (!allowedEmails.includes(emailLower)) {
+        // Log failed attempt
+        await logAudit(pool, 'LOGIN_FAILED', null, email, clientIp, { reason: 'Email not in allowed list' });
+        return res.status(403).json({ error: 'Unauthorized email address' });
+    }
+
+    try {
+        // Try to authenticate via IMAP
+        const imapConfig = {
+            host: process.env.IMAP_HOST || 'mail.test.juroct.net',
+            port: parseInt(process.env.IMAP_PORT || '993'),
+            secure: true,
+            auth: {
+                user: email,
+                pass: password
+            },
+            logger: false
+        };
+
+        const client = new ImapFlow(imapConfig);
+
+        try {
+            // Connect and authenticate
+            await client.connect();
+
+            // If we get here, authentication succeeded
+            await client.logout();
+
+            // Determine role from email prefix
+            const emailPrefix = emailLower.split('@')[0];
+            const role = emailPrefix; // praesident, aktuar, kassier, etc.
+
+            // Generate JWT token
+            const token = jwt.sign(
+                {
+                    email: emailLower,
+                    role: role,
+                    groups: ['vorstand'],
+                    type: 'vorstand'
+                },
+                process.env.JWT_SECRET || 'fwv-raura-secret-key',
+                { expiresIn: '8h' }
+            );
+
+            // Log successful login
+            await logAudit(pool, 'LOGIN_SUCCESS', null, emailLower, clientIp, { role });
+
+            res.json({
+                success: true,
+                token: token,
+                user: {
+                    email: emailLower,
+                    role: role,
+                    name: getRoleName(role)
+                }
+            });
+
+        } catch (imapError) {
+            // Authentication failed
+            console.error('IMAP auth failed:', imapError.message);
+            await logAudit(pool, 'LOGIN_FAILED', null, email, clientIp, { reason: 'Invalid credentials' });
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+    } catch (error) {
+        console.error('Vorstand login error:', error);
+        await logAudit(pool, 'LOGIN_ERROR', null, email, clientIp, { error: error.message });
+        res.status(500).json({ error: 'Authentication service error' });
+    }
+});
+
+// Get Vorstand user info
+app.get('/auth/vorstand/me', authenticateVorstand, async (req, res) => {
+    res.json({
+        email: req.user.email,
+        role: req.user.role,
+        name: getRoleName(req.user.role),
+        groups: req.user.groups
+    });
+});
+
+// Helper function to get role display name
+function getRoleName(role) {
+    const names = {
+        'praesident': 'Präsident',
+        'vizepraesident': 'Vize-Präsident',
+        'aktuar': 'Aktuar',
+        'kassier': 'Kassier',
+        'beisitzer': 'Beisitzer'
+    };
+    return names[role] || role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+// Audit logging helper
+async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
+    try {
+        await pool.query(`
+            INSERT INTO audit_log (action, user_id, email, ip_address, details, created_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+        `, [action, userId, email, ipAddress, JSON.stringify(details)]);
+    } catch (error) {
+        console.error('Failed to write audit log:', error.message);
+    }
+}
 
 // OAuth2 callback - exchange code for token
 app.post('/auth/callback', async (req, res) => {
@@ -173,6 +297,12 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
             iban, zustellung_email ?? true, zustellung_post ?? false, bemerkungen
         ]);
 
+        // Audit log
+        await logAudit(pool, 'MEMBER_CREATE', null, req.user.email, req.ip, {
+            member_id: result.rows[0].id,
+            member_name: `${vorname} ${nachname}`
+        });
+
         res.status(201).json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -193,6 +323,9 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
             return res.status(400).json({ error: 'No fields to update' });
         }
 
+        // Get old values for audit log
+        const oldResult = await pool.query('SELECT vorname, nachname FROM members WHERE id = $1', [id]);
+
         const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
         values.push(id);
 
@@ -206,6 +339,16 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
             return res.status(404).json({ error: 'Member not found' });
         }
 
+        // Audit log
+        const memberName = oldResult.rows.length > 0
+            ? `${oldResult.rows[0].vorname} ${oldResult.rows[0].nachname}`
+            : 'Unknown';
+        await logAudit(pool, 'MEMBER_UPDATE', null, req.user.email, req.ip, {
+            member_id: id,
+            member_name: memberName,
+            updated_fields: fields
+        });
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -216,11 +359,25 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
 app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
+
+        // Get member info for audit log before deleting
+        const memberResult = await pool.query('SELECT vorname, nachname, email FROM members WHERE id = $1', [id]);
+
         const result = await pool.query('DELETE FROM members WHERE id = $1 RETURNING id', [id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Member not found' });
         }
+
+        // Audit log
+        const memberName = memberResult.rows.length > 0
+            ? `${memberResult.rows[0].vorname} ${memberResult.rows[0].nachname}`
+            : 'Unknown';
+        await logAudit(pool, 'MEMBER_DELETE', null, req.user.email, req.ip, {
+            member_id: id,
+            member_name: memberName,
+            member_email: memberResult.rows[0]?.email
+        });
 
         res.json({ message: 'Member deleted', id });
     } catch (error) {
@@ -249,6 +406,47 @@ app.get('/members/:id/roles', authenticateAny, async (req, res) => {
             JOIN member_roles mr ON r.id = mr.role_id
             WHERE mr.member_id = $1
         `, [id]);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+// Get audit log (Vorstand only)
+app.get('/audit', authenticateVorstand, async (req, res) => {
+    try {
+        const { limit = 100, offset = 0, action, email } = req.query;
+
+        let query = 'SELECT * FROM audit_log WHERE 1=1';
+        const params = [];
+
+        if (action) {
+            params.push(action);
+            query += ` AND action = $${params.length}`;
+        }
+
+        if (email) {
+            params.push(`%${email}%`);
+            query += ` AND email ILIKE $${params.length}`;
+        }
+
+        query += ' ORDER BY created_at DESC';
+
+        params.push(parseInt(limit));
+        query += ` LIMIT $${params.length}`;
+
+        params.push(parseInt(offset));
+        query += ` OFFSET $${params.length}`;
+
+        const result = await pool.query(query, params);
+
+        // Log that someone viewed the audit log
+        await logAudit(pool, 'AUDIT_VIEW', null, req.user.email, req.ip, { filters: { action, email } });
+
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
