@@ -101,6 +101,9 @@
                 <button id="tab-audit" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                     Audit-Log
                 </button>
+                <button id="tab-email" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                    E-Mail
+                </button>
             </div>
         </div>
     </section>
@@ -474,6 +477,192 @@
                 </div>
             </div>
         </section>
+    </div>
+
+    <!-- Email Management Section -->
+    <div id="email-section" class="hidden">
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">E-Mail Verwaltung</h1>
+                        <p class="text-gray-600 mt-1">Mailboxen und Aliase fuer fwv-raura.ch verwalten</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button id="add-mailbox-btn" class="bg-fire-500 text-white px-4 py-2 rounded-lg hover:bg-fire-600">
+                            + Mailbox
+                        </button>
+                        <button id="add-alias-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                            + Alias
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Email Tabs -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4">
+                <div class="flex space-x-6">
+                    <button id="email-tab-mailboxes" class="email-tab-btn py-3 px-2 font-medium border-b-2 border-fire-500 text-fire-600">
+                        Mailboxen
+                    </button>
+                    <button id="email-tab-aliases" class="email-tab-btn py-3 px-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                        Aliase
+                    </button>
+                    <button id="email-tab-quota" class="email-tab-btn py-3 px-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                        Speicherplatz
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Mailboxes List -->
+        <section id="mailboxes-panel" class="py-6">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">E-Mail</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Quota</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mailboxes-tbody" class="divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+                <div id="mailboxes-loading" class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Aliases List -->
+        <section id="aliases-panel" class="py-6 hidden">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Alias</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Weiterleitung an</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="aliases-tbody" class="divide-y divide-gray-200"></tbody>
+                    </table>
+                </div>
+                <div id="aliases-loading" class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quota Overview -->
+        <section id="quota-panel" class="py-6 hidden">
+            <div class="container mx-auto px-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="quota-cards"></div>
+                <div id="quota-loading" class="text-center py-8">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Mailbox Modal -->
+    <div id="mailbox-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="mailbox-modal-title" class="text-xl font-bold text-gray-800">Neue Mailbox</h3>
+                    <button class="close-mailbox-modal text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <form id="mailbox-form" class="space-y-4">
+                    <input type="hidden" id="mailbox-edit-email">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail Adresse</label>
+                        <div class="flex">
+                            <input type="text" id="mailbox-local" required placeholder="name"
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-fire-500">
+                            <span class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600">@fwv-raura.ch</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" id="mailbox-name" required placeholder="Max Muster"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Passwort</label>
+                        <input type="password" id="mailbox-password" placeholder="Mindestens 8 Zeichen"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                        <p class="text-xs text-gray-500 mt-1" id="mailbox-password-hint">Erforderlich fuer neue Mailbox</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Speicherplatz (MB)</label>
+                        <input type="number" id="mailbox-quota" value="1024" min="100"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="mailbox-active" checked class="w-4 h-4 text-fire-600 rounded">
+                        <label for="mailbox-active" class="ml-2 text-sm text-gray-700">Aktiv</label>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" class="close-mailbox-modal px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            Abbrechen
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
+                            Speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alias Modal -->
+    <div id="alias-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="alias-modal-title" class="text-xl font-bold text-gray-800">Neuer Alias</h3>
+                    <button class="close-alias-modal text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <form id="alias-form" class="space-y-4">
+                    <input type="hidden" id="alias-edit-id">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Alias Adresse</label>
+                        <div class="flex">
+                            <input type="text" id="alias-address" required placeholder="info"
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:ring-2 focus:ring-fire-500">
+                            <span class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600">@fwv-raura.ch</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Weiterleitung an</label>
+                        <input type="text" id="alias-goto" required placeholder="mail@example.com, andere@mail.ch"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                        <p class="text-xs text-gray-500 mt-1">Mehrere E-Mails mit Komma trennen</p>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="alias-active" checked class="w-4 h-4 text-fire-600 rounded">
+                        <label for="alias-active" class="ml-2 text-sm text-gray-700">Aktiv</label>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" class="close-alias-modal px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            Abbrechen
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                            Speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Event Modal (simplified) -->
@@ -1385,6 +1574,7 @@
             document.getElementById('members-section').classList.add('hidden');
             document.getElementById('events-section').classList.add('hidden');
             document.getElementById('audit-section').classList.add('hidden');
+            document.getElementById('email-section').classList.add('hidden');
 
             if (tab === 'members') {
                 document.getElementById('tab-members').classList.add('border-fire-500', 'text-fire-600');
@@ -1397,6 +1587,10 @@
                 document.getElementById('tab-audit').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('audit-section').classList.remove('hidden');
                 loadAuditLog();
+            } else if (tab === 'email') {
+                document.getElementById('tab-email').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('email-section').classList.remove('hidden');
+                loadMailboxes();
             }
         }
 
@@ -1408,6 +1602,7 @@
         document.getElementById('tab-members').addEventListener('click', () => switchTab('members'));
         document.getElementById('tab-events').addEventListener('click', () => switchTab('events'));
         document.getElementById('tab-audit').addEventListener('click', () => switchTab('audit'));
+        document.getElementById('tab-email').addEventListener('click', () => switchTab('email'));
 
         // Members
         document.getElementById('add-member-btn').addEventListener('click', openNewMemberModal);
@@ -1440,6 +1635,274 @@
         // Audit
         document.getElementById('audit-action-filter').addEventListener('change', (e) => loadAuditLog({ action: e.target.value }));
         document.getElementById('refresh-audit-btn').addEventListener('click', () => loadAuditLog({ action: document.getElementById('audit-action-filter').value }));
+
+        // Email Management
+        document.getElementById('add-mailbox-btn').addEventListener('click', openNewMailboxModal);
+        document.getElementById('add-alias-btn').addEventListener('click', openNewAliasModal);
+        document.getElementById('mailbox-form').addEventListener('submit', saveMailbox);
+        document.getElementById('alias-form').addEventListener('submit', saveAlias);
+        document.querySelectorAll('.close-mailbox-modal').forEach(btn => btn.addEventListener('click', () => document.getElementById('mailbox-modal').classList.add('hidden')));
+        document.querySelectorAll('.close-alias-modal').forEach(btn => btn.addEventListener('click', () => document.getElementById('alias-modal').classList.add('hidden')));
+
+        // Email Sub-Tabs
+        document.getElementById('email-tab-mailboxes').addEventListener('click', () => switchEmailTab('mailboxes'));
+        document.getElementById('email-tab-aliases').addEventListener('click', () => switchEmailTab('aliases'));
+        document.getElementById('email-tab-quota').addEventListener('click', () => switchEmailTab('quota'));
+
+        function switchEmailTab(tab) {
+            document.querySelectorAll('.email-tab-btn').forEach(btn => {
+                btn.classList.remove('border-fire-500', 'text-fire-600');
+                btn.classList.add('border-transparent', 'text-gray-600');
+            });
+            document.getElementById('mailboxes-panel').classList.add('hidden');
+            document.getElementById('aliases-panel').classList.add('hidden');
+            document.getElementById('quota-panel').classList.add('hidden');
+
+            if (tab === 'mailboxes') {
+                document.getElementById('email-tab-mailboxes').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('mailboxes-panel').classList.remove('hidden');
+                loadMailboxes();
+            } else if (tab === 'aliases') {
+                document.getElementById('email-tab-aliases').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('aliases-panel').classList.remove('hidden');
+                loadAliases();
+            } else if (tab === 'quota') {
+                document.getElementById('email-tab-quota').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('quota-panel').classList.remove('hidden');
+                loadQuota();
+            }
+        }
+
+        async function loadMailboxes() {
+            document.getElementById('mailboxes-loading').classList.remove('hidden');
+            try {
+                const response = await fetch(`${API_BASE}/mailcow/mailboxes`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const mailboxes = await response.json();
+                const tbody = document.getElementById('mailboxes-tbody');
+                tbody.innerHTML = mailboxes.map(mb => `
+                    <tr>
+                        <td class="px-6 py-4 font-medium">${mb.username}</td>
+                        <td class="px-6 py-4">${mb.name || '-'}</td>
+                        <td class="px-6 py-4">${Math.round(mb.quota_used / 1024 / 1024)} / ${mb.quota} MB</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${mb.active == 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${mb.active == 1 ? 'Aktiv' : 'Inaktiv'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="editMailbox('${mb.username}')" class="text-blue-600 hover:text-blue-800 mr-3">Bearbeiten</button>
+                            <button onclick="deleteMailbox('${mb.username}')" class="text-red-600 hover:text-red-800">Loeschen</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading mailboxes:', error);
+            }
+            document.getElementById('mailboxes-loading').classList.add('hidden');
+        }
+
+        async function loadAliases() {
+            document.getElementById('aliases-loading').classList.remove('hidden');
+            try {
+                const response = await fetch(`${API_BASE}/mailcow/aliases`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const aliases = await response.json();
+                const tbody = document.getElementById('aliases-tbody');
+                tbody.innerHTML = aliases.map(a => `
+                    <tr>
+                        <td class="px-6 py-4 font-medium">${a.address}</td>
+                        <td class="px-6 py-4">${a.goto}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full ${a.active == 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${a.active == 1 ? 'Aktiv' : 'Inaktiv'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="editAlias(${a.id}, '${a.address}', '${a.goto}', ${a.active})" class="text-blue-600 hover:text-blue-800 mr-3">Bearbeiten</button>
+                            <button onclick="deleteAlias(${a.id})" class="text-red-600 hover:text-red-800">Loeschen</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading aliases:', error);
+            }
+            document.getElementById('aliases-loading').classList.add('hidden');
+        }
+
+        async function loadQuota() {
+            document.getElementById('quota-loading').classList.remove('hidden');
+            try {
+                const response = await fetch(`${API_BASE}/mailcow/quota`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const quotaData = await response.json();
+                const container = document.getElementById('quota-cards');
+                container.innerHTML = quotaData.map(q => `
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="font-medium text-gray-800">${q.email}</div>
+                        <div class="text-sm text-gray-600 mb-2">${q.name || ''}</div>
+                        <div class="w-full bg-gray-200 rounded-full h-3 mb-1">
+                            <div class="h-3 rounded-full ${q.percent_used > 90 ? 'bg-red-500' : q.percent_used > 70 ? 'bg-yellow-500' : 'bg-green-500'}"
+                                 style="width: ${Math.min(q.percent_used, 100)}%"></div>
+                        </div>
+                        <div class="text-xs text-gray-500">${Math.round(q.quota_used / 1024 / 1024)} / ${q.quota} MB (${q.percent_used}%)</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading quota:', error);
+            }
+            document.getElementById('quota-loading').classList.add('hidden');
+        }
+
+        function openNewMailboxModal() {
+            document.getElementById('mailbox-modal-title').textContent = 'Neue Mailbox';
+            document.getElementById('mailbox-edit-email').value = '';
+            document.getElementById('mailbox-local').value = '';
+            document.getElementById('mailbox-local').disabled = false;
+            document.getElementById('mailbox-name').value = '';
+            document.getElementById('mailbox-password').value = '';
+            document.getElementById('mailbox-password').required = true;
+            document.getElementById('mailbox-password-hint').textContent = 'Erforderlich fuer neue Mailbox';
+            document.getElementById('mailbox-quota').value = '1024';
+            document.getElementById('mailbox-active').checked = true;
+            document.getElementById('mailbox-modal').classList.remove('hidden');
+        }
+
+        async function editMailbox(email) {
+            const response = await fetch(`${API_BASE}/mailcow/mailboxes/${email}`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const mb = await response.json();
+
+            document.getElementById('mailbox-modal-title').textContent = 'Mailbox bearbeiten';
+            document.getElementById('mailbox-edit-email').value = email;
+            document.getElementById('mailbox-local').value = email.split('@')[0];
+            document.getElementById('mailbox-local').disabled = true;
+            document.getElementById('mailbox-name').value = mb.name || '';
+            document.getElementById('mailbox-password').value = '';
+            document.getElementById('mailbox-password').required = false;
+            document.getElementById('mailbox-password-hint').textContent = 'Leer lassen um Passwort nicht zu aendern';
+            document.getElementById('mailbox-quota').value = mb.quota || 1024;
+            document.getElementById('mailbox-active').checked = mb.active == 1;
+            document.getElementById('mailbox-modal').classList.remove('hidden');
+        }
+
+        async function saveMailbox(e) {
+            e.preventDefault();
+            const editEmail = document.getElementById('mailbox-edit-email').value;
+            const isEdit = !!editEmail;
+
+            const data = {
+                name: document.getElementById('mailbox-name').value,
+                quota: parseInt(document.getElementById('mailbox-quota').value),
+                active: document.getElementById('mailbox-active').checked ? 1 : 0
+            };
+
+            if (!isEdit) {
+                data.local_part = document.getElementById('mailbox-local').value;
+                data.password = document.getElementById('mailbox-password').value;
+            } else if (document.getElementById('mailbox-password').value) {
+                data.password = document.getElementById('mailbox-password').value;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/mailcow/mailboxes${isEdit ? '/' + editEmail : ''}`, {
+                    method: isEdit ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Fehler beim Speichern');
+                document.getElementById('mailbox-modal').classList.add('hidden');
+                loadMailboxes();
+            } catch (error) {
+                alert('Fehler: ' + error.message);
+            }
+        }
+
+        async function deleteMailbox(email) {
+            if (!confirm(`Mailbox ${email} wirklich loeschen? Alle E-Mails gehen verloren!`)) return;
+            try {
+                await fetch(`${API_BASE}/mailcow/mailboxes/${email}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                loadMailboxes();
+            } catch (error) {
+                alert('Fehler beim Loeschen');
+            }
+        }
+
+        function openNewAliasModal() {
+            document.getElementById('alias-modal-title').textContent = 'Neuer Alias';
+            document.getElementById('alias-edit-id').value = '';
+            document.getElementById('alias-address').value = '';
+            document.getElementById('alias-address').disabled = false;
+            document.getElementById('alias-goto').value = '';
+            document.getElementById('alias-active').checked = true;
+            document.getElementById('alias-modal').classList.remove('hidden');
+        }
+
+        function editAlias(id, address, goto, active) {
+            document.getElementById('alias-modal-title').textContent = 'Alias bearbeiten';
+            document.getElementById('alias-edit-id').value = id;
+            document.getElementById('alias-address').value = address.split('@')[0];
+            document.getElementById('alias-address').disabled = true;
+            document.getElementById('alias-goto').value = goto;
+            document.getElementById('alias-active').checked = active == 1;
+            document.getElementById('alias-modal').classList.remove('hidden');
+        }
+
+        async function saveAlias(e) {
+            e.preventDefault();
+            const editId = document.getElementById('alias-edit-id').value;
+            const isEdit = !!editId;
+
+            const data = {
+                goto: document.getElementById('alias-goto').value,
+                active: document.getElementById('alias-active').checked ? 1 : 0
+            };
+
+            if (!isEdit) {
+                data.address = document.getElementById('alias-address').value;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/mailcow/aliases${isEdit ? '/' + editId : ''}`, {
+                    method: isEdit ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Fehler beim Speichern');
+                document.getElementById('alias-modal').classList.add('hidden');
+                loadAliases();
+            } catch (error) {
+                alert('Fehler: ' + error.message);
+            }
+        }
+
+        async function deleteAlias(id) {
+            if (!confirm('Alias wirklich loeschen?')) return;
+            try {
+                await fetch(`${API_BASE}/mailcow/aliases/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                loadAliases();
+            } catch (error) {
+                alert('Fehler beim Loeschen');
+            }
+        }
 
         // Logout
         document.getElementById('logout-btn').addEventListener('click', () => {

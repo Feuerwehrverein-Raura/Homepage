@@ -53,7 +53,7 @@ app.get('/auth/login', (req, res) => {
 // VORSTAND IMAP LOGIN
 // ============================================
 
-// IMAP-based authentication for Vorstand members
+// IMAP-based authentication for Vorstand members (with admin fallback)
 app.post('/auth/vorstand/login', async (req, res) => {
     const { email, password } = req.body;
     const clientIp = req.ip || req.connection.remoteAddress;
@@ -62,9 +62,40 @@ app.post('/auth/vorstand/login', async (req, res) => {
         return res.status(400).json({ error: 'Email and password required' });
     }
 
-    // Validate email domain and allowed addresses
-    const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,vizepraesident@fwv-raura.ch,beisitzer@fwv-raura.ch').split(',').map(e => e.trim().toLowerCase());
     const emailLower = email.toLowerCase();
+
+    // Check for admin user (doesn't depend on IMAP)
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@fwv-raura.ch').toLowerCase();
+    const adminPassword = process.env.ADMIN_PASSWORD;
+
+    if (adminPassword && emailLower === adminEmail && password === adminPassword) {
+        // Admin login successful
+        const token = jwt.sign(
+            {
+                email: emailLower,
+                role: 'admin',
+                groups: ['vorstand', 'admin'],
+                type: 'vorstand'
+            },
+            process.env.JWT_SECRET || 'fwv-raura-secret-key',
+            { expiresIn: '8h' }
+        );
+
+        await logAudit(pool, 'LOGIN_SUCCESS', null, emailLower, clientIp, { role: 'admin', method: 'password' });
+
+        return res.json({
+            success: true,
+            token: token,
+            user: {
+                email: emailLower,
+                role: 'admin',
+                name: 'Administrator'
+            }
+        });
+    }
+
+    // Validate email domain and allowed addresses for IMAP login
+    const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,vizepraesident@fwv-raura.ch,beisitzer@fwv-raura.ch').split(',').map(e => e.trim().toLowerCase());
 
     if (!allowedEmails.includes(emailLower)) {
         // Log failed attempt

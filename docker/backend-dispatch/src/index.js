@@ -484,6 +484,196 @@ app.post('/newsletter/unsubscribe', async (req, res) => {
 });
 
 // ============================================
+// MAILCOW MANAGEMENT
+// ============================================
+
+const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'https://mail.test.juroct.net';
+const MAILCOW_API_KEY = process.env.MAILCOW_API_KEY;
+const MAILCOW_DOMAIN = 'fwv-raura.ch';
+
+// Helper für Mailcow API Aufrufe
+async function mailcowApi(method, endpoint, data = null) {
+    const config = {
+        method,
+        url: `${MAILCOW_API_URL}/api/v1${endpoint}`,
+        headers: {
+            'X-API-Key': MAILCOW_API_KEY,
+            'Content-Type': 'application/json'
+        }
+    };
+    if (data) config.data = data;
+    return axios(config);
+}
+
+// Alle Mailboxen abrufen
+app.get('/mailcow/mailboxes', async (req, res) => {
+    try {
+        const response = await mailcowApi('GET', `/get/mailbox/${MAILCOW_DOMAIN}`);
+        res.json(response.data);
+    } catch (error) {
+        console.error('Mailcow error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Einzelne Mailbox abrufen
+app.get('/mailcow/mailboxes/:email', async (req, res) => {
+    try {
+        const response = await mailcowApi('GET', `/get/mailbox/${req.params.email}`);
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Mailbox erstellen
+app.post('/mailcow/mailboxes', async (req, res) => {
+    try {
+        const { local_part, name, password, quota = 1024, active = 1 } = req.body;
+
+        const response = await mailcowApi('POST', '/add/mailbox', {
+            local_part,
+            domain: MAILCOW_DOMAIN,
+            name,
+            password,
+            password2: password,
+            quota,
+            active,
+            force_pw_update: 0,
+            tls_enforce_in: 0,
+            tls_enforce_out: 0
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Mailcow create error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Mailbox aktualisieren
+app.put('/mailcow/mailboxes/:email', async (req, res) => {
+    try {
+        const { name, quota, active, password } = req.body;
+        const updateData = {
+            attr: {}
+        };
+
+        if (name !== undefined) updateData.attr.name = name;
+        if (quota !== undefined) updateData.attr.quota = quota;
+        if (active !== undefined) updateData.attr.active = active;
+        if (password) {
+            updateData.attr.password = password;
+            updateData.attr.password2 = password;
+        }
+
+        updateData.items = [req.params.email];
+
+        const response = await mailcowApi('POST', '/edit/mailbox', updateData);
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Mailbox löschen
+app.delete('/mailcow/mailboxes/:email', async (req, res) => {
+    try {
+        const response = await mailcowApi('POST', '/delete/mailbox', [req.params.email]);
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Alle Aliase abrufen
+app.get('/mailcow/aliases', async (req, res) => {
+    try {
+        const response = await mailcowApi('GET', `/get/alias/${MAILCOW_DOMAIN}`);
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Alias erstellen
+app.post('/mailcow/aliases', async (req, res) => {
+    try {
+        const { address, goto, active = 1 } = req.body;
+
+        // address kann mit oder ohne Domain sein
+        const fullAddress = address.includes('@') ? address : `${address}@${MAILCOW_DOMAIN}`;
+
+        const response = await mailcowApi('POST', '/add/alias', {
+            address: fullAddress,
+            goto: goto, // Kann mehrere E-Mails mit Komma getrennt sein
+            active
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Mailcow alias error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Alias aktualisieren
+app.put('/mailcow/aliases/:id', async (req, res) => {
+    try {
+        const { goto, active } = req.body;
+        const updateData = {
+            attr: {},
+            items: [req.params.id]
+        };
+
+        if (goto !== undefined) updateData.attr.goto = goto;
+        if (active !== undefined) updateData.attr.active = active;
+
+        const response = await mailcowApi('POST', '/edit/alias', updateData);
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Alias löschen
+app.delete('/mailcow/aliases/:id', async (req, res) => {
+    try {
+        const response = await mailcowApi('POST', '/delete/alias', [req.params.id]);
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Domain-Informationen
+app.get('/mailcow/domain', async (req, res) => {
+    try {
+        const response = await mailcowApi('GET', `/get/domain/${MAILCOW_DOMAIN}`);
+        res.json(response.data);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Quota-Nutzung aller Mailboxen
+app.get('/mailcow/quota', async (req, res) => {
+    try {
+        const response = await mailcowApi('GET', `/get/mailbox/${MAILCOW_DOMAIN}`);
+        const quotaInfo = response.data.map(mb => ({
+            email: mb.username,
+            name: mb.name,
+            quota: mb.quota,
+            quota_used: mb.quota_used,
+            percent_used: mb.quota > 0 ? Math.round((mb.quota_used / mb.quota) * 100) : 0
+        }));
+        res.json(quotaInfo);
+    } catch (error) {
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// ============================================
 // DISPATCH LOG
 // ============================================
 

@@ -53,6 +53,8 @@ services:
       IMAP_HOST: ${IMAP_HOST:-mail.test.juroct.net}
       IMAP_PORT: ${IMAP_PORT:-993}
       VORSTAND_EMAILS: ${VORSTAND_EMAILS:-praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,vizepraesident@fwv-raura.ch,beisitzer@fwv-raura.ch}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fwv-raura.ch}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
