@@ -151,7 +151,9 @@ services:
 
   # Öffentliche Website
   frontend-website:
-    build: ./frontend-website
+    build:
+      context: ..
+      dockerfile: docker/frontend-website/Dockerfile
     container_name: fwv-frontend-website
     restart: unless-stopped
     networks:
