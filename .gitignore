@@ -24,3 +24,6 @@ Thumbs.db
 # Build artifacts
 dist/
 build/
+
+# Private member letters
+briefe/
