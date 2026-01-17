@@ -43,6 +43,11 @@ CREATE TABLE members (
     zustellung_email BOOLEAN DEFAULT true,
     zustellung_post BOOLEAN DEFAULT false,
 
+    -- Zusätzliche Infos
+    foto VARCHAR(500),                    -- URL oder Pfad zum Profilfoto
+    tshirt_groesse VARCHAR(10),           -- XS, S, M, L, XL, XXL, XXXL
+    feuerwehr_zugehoerigkeit VARCHAR(200), -- z.B. "Feuerwehr Raura", "Feuerwehr Hinterdorf"
+
     -- Authentik Sync (für Self-Service Portal)
     authentik_user_id VARCHAR(100),
     authentik_synced_at TIMESTAMP,

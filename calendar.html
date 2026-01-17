@@ -178,61 +178,36 @@
 
             async loadEvents() {
                 try {
-                    // Lade Event-Liste dynamisch aus events-list.json
-                    let eventFiles = [];
-                    try {
-                        const listResponse = await fetch('events-list.json');
-                        if (listResponse.ok) {
-                            const listData = await listResponse.json();
-                            eventFiles = listData.files || [];
-                            console.log('📋 Events aus events-list.json geladen:', eventFiles.length);
-                        }
-                    } catch (e) {
-                        console.warn('⚠️ events-list.json nicht gefunden, verwende Fallback');
-                        eventFiles = [
-                            'events/chilbi-2024.md',
-                            'events/chilbi-2025.md',
-                            'events/fasnacht-2026.md'
-                        ];
+                    // Lade Events von der API
+                    console.log('📂 Lade Events von API...');
+                    const response = await fetch('https://api.fwv-raura.ch/events');
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.status}`);
                     }
 
-                    console.log('📂 Lade Event-Dateien:', eventFiles);
+                    const apiEvents = await response.json();
 
-                    const promises = eventFiles.map(async (file) => {
-                        try {
-                            console.log(`📄 Lade: ${file}`);
-                            const response = await fetch(file);
-                            
-                            if (!response.ok) {
-                                console.warn(`⚠️ ${file}: HTTP ${response.status}`);
-                                return null;
-                            }
-                            
-                            const content = await response.text();
-                            if (!content.trim()) {
-                                console.warn(`⚠️ ${file}: Datei ist leer`);
-                                return null;
-                            }
-                            
-                            const event = this.parseMarkdownEvent(content, file);
-                            if (event) {
-                                console.log(`✅ Event geladen: ${event.title}`);
-                                return event;
-                            }
-                            
-                            return null;
-                        } catch (error) {
-                            console.error(`❌ Fehler beim Laden von ${file}:`, error);
-                            return null;
-                        }
-                    });
+                    // Map API format to internal format
+                    this.events = apiEvents.map(e => ({
+                        id: e.slug || e.id,
+                        title: e.title || 'Unbenanntes Event',
+                        subtitle: e.subtitle || '',
+                        category: e.category || 'Sonstiges',
+                        startDate: new Date(e.start_date),
+                        endDate: new Date(e.end_date || e.start_date),
+                        location: e.location || '',
+                        organizer: e.organizer || '',
+                        email: e.organizer_email || 'info@fwv-raura.ch',
+                        cost: e.cost || 'Kostenlos',
+                        registrationRequired: e.registration_required || false,
+                        registrationDeadline: e.registration_deadline ? new Date(e.registration_deadline) : null,
+                        status: e.status || 'confirmed',
+                        description: e.description || '',
+                        shifts: e.shifts || []
+                    }));
 
-                    const results = await Promise.allSettled(promises);
-                    this.events = results
-                        .filter(result => result.status === 'fulfilled' && result.value !== null)
-                        .map(result => result.value);
-
-                    console.log(`🎯 ${this.events.length} Events erfolgreich geladen:`, 
+                    console.log(`🎯 ${this.events.length} Events von API geladen:`,
                         this.events.map(e => `${e.title} (${e.startDate.toDateString()})`));
 
                 } catch (error) {
@@ -595,9 +570,9 @@
             }
 
             subscribeCalendar() {
-                const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
-                const webcalUrl = 'webcal://' + window.location.host + window.location.pathname.replace(/\/[^\/]*$/, '') + '/calendar.ics';
-                const httpsUrl = baseUrl + '/calendar.ics';
+                // API-basierte URLs für dynamischen Kalender
+                const webcalUrl = 'webcal://api.fwv-raura.ch/calendar/ics';
+                const httpsUrl = 'https://api.fwv-raura.ch/calendar/ics';
                 
                 // Erstelle Modal-HTML
                 const modalHTML = `
@@ -684,8 +659,8 @@
             }
 
             downloadAllICS() {
-                const icsData = this.generateICS(this.events);
-                this.downloadICS(icsData, 'feuerwehrverein-raura-kalender.ics');
+                // Download direkt von der API für aktuelle Daten
+                window.location.href = 'https://api.fwv-raura.ch/calendar/ics';
             }
 
             downloadEventICS() {

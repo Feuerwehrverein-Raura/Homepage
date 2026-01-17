@@ -322,6 +322,23 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Eintrittsdatum</label>
                                 <input type="date" id="eintrittsdatum" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
                             </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">T-Shirt Groesse</label>
+                                <select id="tshirt-groesse" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    <option value="">-- Nicht angegeben --</option>
+                                    <option value="XS">XS</option>
+                                    <option value="S">S</option>
+                                    <option value="M">M</option>
+                                    <option value="L">L</option>
+                                    <option value="XL">XL</option>
+                                    <option value="XXL">XXL</option>
+                                    <option value="XXXL">XXXL</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Foto URL</label>
+                                <input type="url" id="foto" placeholder="https://..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
                         </div>
                     </div>
 
@@ -503,9 +520,11 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Kategorie</label>
                             <select id="event-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
-                                <option value="Jahresanlass">Jahresanlass</option>
-                                <option value="Einsatz">Einsatz</option>
-                                <option value="Uebung">Uebung</option>
+                                <option value="Dorffest">Dorffest</option>
+                                <option value="Aufbau">Aufbau</option>
+                                <option value="Abbau">Abbau</option>
+                                <option value="Ausflug">Ausflug</option>
+                                <option value="Ausflug mit Anmeldung">Ausflug mit Anmeldung</option>
                                 <option value="Sonstiges">Sonstiges</option>
                             </select>
                         </div>
@@ -812,6 +831,8 @@
                 document.getElementById('bemerkungen').value = member.bemerkungen || '';
 
                 document.getElementById('feuerwehr-zugehoerigkeit').value = member.feuerwehr_zugehoerigkeit || 'keine';
+                document.getElementById('tshirt-groesse').value = member.tshirt_groesse || '';
+                document.getElementById('foto').value = member.foto || '';
 
                 document.getElementById('delete-member-btn').classList.remove('hidden');
                 document.getElementById('member-modal').classList.remove('hidden');
@@ -844,8 +865,12 @@
                 zustellung_email: document.getElementById('zustellung-email').checked,
                 zustellung_post: document.getElementById('zustellung-post').checked,
                 bemerkungen: document.getElementById('bemerkungen').value,
-                feuerwehr_zugehoerigkeit: document.getElementById('feuerwehr-zugehoerigkeit').value
+                feuerwehr_zugehoerigkeit: document.getElementById('feuerwehr-zugehoerigkeit').value,
+                tshirt_groesse: document.getElementById('tshirt-groesse').value || null,
+                foto: document.getElementById('foto').value || null
             };
+
+            console.log('Saving member data:', data);
 
             try {
                 const url = id ? `${API_BASE}/members/${id}` : `${API_BASE}/members`;
@@ -860,7 +885,11 @@
                     body: JSON.stringify(data)
                 });
 
-                if (!response.ok) throw new Error('Failed to save member');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Save member failed:', response.status, errorData);
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
 
                 document.getElementById('member-modal').classList.add('hidden');
                 await loadMembers();
@@ -868,7 +897,7 @@
 
             } catch (error) {
                 console.error('Error saving member:', error);
-                alert('Fehler beim Speichern');
+                alert('Fehler beim Speichern: ' + error.message);
             }
         }
 
@@ -894,14 +923,48 @@
         }
 
         function exportCSV() {
-            const csv = [
-                ['Vorname', 'Nachname', 'E-Mail', 'Telefon', 'Status', 'Funktion'].join(','),
-                ...members.map(m => [
-                    m.vorname, m.nachname, m.email || '', m.mobile || m.telefon || '', m.status, m.funktion || ''
-                ].join(','))
-            ].join('\n');
+            // CSV-Escape-Funktion fuer Felder mit Kommas oder Anfuehrungszeichen
+            const escapeCSV = (value) => {
+                if (!value) return '';
+                const str = String(value);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            };
 
-            const blob = new Blob([csv], { type: 'text/csv' });
+            // Alle Felder fuer Serienbriefe
+            const headers = [
+                'Anrede', 'Vorname', 'Nachname',
+                'Strasse', 'Adresszusatz', 'PLZ', 'Ort',
+                'E-Mail', 'Telefon', 'Mobile',
+                'Status', 'Funktion', 'Feuerwehr-Zugehoerigkeit',
+                'Geburtstag', 'Eintrittsdatum'
+            ];
+
+            const rows = members.map(m => [
+                escapeCSV(m.anrede),
+                escapeCSV(m.vorname),
+                escapeCSV(m.nachname),
+                escapeCSV(m.strasse),
+                escapeCSV(m.adresszusatz),
+                escapeCSV(m.plz),
+                escapeCSV(m.ort),
+                escapeCSV(m.email),
+                escapeCSV(m.telefon),
+                escapeCSV(m.mobile),
+                escapeCSV(m.status),
+                escapeCSV(m.funktion),
+                escapeCSV(m.feuerwehr_zugehoerigkeit),
+                escapeCSV(m.geburtstag),
+                escapeCSV(m.eintrittsdatum)
+            ].join(';'));  // Semikolon fuer bessere Excel-Kompatibilitaet
+
+            // BOM fuer UTF-8 (damit Excel Umlaute richtig anzeigt)
+            const BOM = '\uFEFF';
+            const csv = BOM + headers.join(';') + '\n' + rows.join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -1044,9 +1107,20 @@
             const row = document.createElement('div');
             row.className = 'shift-row border rounded-lg p-3 bg-gray-50';
             row.dataset.shiftId = shiftId;
+
+            const bereichValue = shift?.bereich || 'Allgemein';
             row.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-6 gap-2">
-                    <div class="md:col-span-2">
+                <div class="grid grid-cols-1 md:grid-cols-7 gap-2">
+                    <div>
+                        <select class="shift-bereich w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
+                            <option value="Allgemein" ${bereichValue === 'Allgemein' ? 'selected' : ''}>Allgemein</option>
+                            <option value="Kueche" ${bereichValue === 'Kueche' ? 'selected' : ''}>Küche</option>
+                            <option value="Bar" ${bereichValue === 'Bar' ? 'selected' : ''}>Bar</option>
+                            <option value="Service" ${bereichValue === 'Service' ? 'selected' : ''}>Service</option>
+                            <option value="Kasse" ${bereichValue === 'Kasse' ? 'selected' : ''}>Kasse</option>
+                        </select>
+                    </div>
+                    <div>
                         <input type="text" placeholder="Name (z.B. Schicht 1)" value="${shift?.name || ''}"
                             class="shift-name w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
                     </div>
@@ -1087,6 +1161,7 @@
                 const shiftId = row.dataset.shiftId;
                 shifts.push({
                     id: shiftId.startsWith('new-') ? null : shiftId,
+                    bereich: row.querySelector('.shift-bereich').value,
                     name: row.querySelector('.shift-name').value,
                     date: row.querySelector('.shift-date').value,
                     start_time: row.querySelector('.shift-start').value,
@@ -1126,6 +1201,8 @@
                 cost: document.getElementById('event-cost').value || null
             };
 
+            console.log('Saving event data:', data);
+
             try {
                 const url = id ? `${API_BASE}/events/${id}` : `${API_BASE}/events`;
                 const method = id ? 'PUT' : 'POST';
@@ -1139,7 +1216,11 @@
                     body: JSON.stringify(data)
                 });
 
-                if (!response.ok) throw new Error('Failed to save event');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Save event failed:', response.status, errorData);
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
 
                 const savedEvent = await response.json();
                 const eventId = savedEvent.id;
@@ -1152,7 +1233,7 @@
                 await loadEvents();
             } catch (error) {
                 console.error('Error saving event:', error);
-                alert('Fehler beim Speichern');
+                alert('Fehler beim Speichern: ' + error.message);
             }
         }
 

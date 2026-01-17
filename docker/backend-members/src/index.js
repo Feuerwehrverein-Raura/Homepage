@@ -15,9 +15,18 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL
 });
 
-// Middleware
-app.use(helmet());
-app.use(cors());
+// Middleware - CORS must be before helmet
+const corsOptions = {
+    origin: ['https://fwv-raura.ch', 'https://www.fwv-raura.ch', 'http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    credentials: true
+};
+app.use(cors(corsOptions));
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
+}));
 app.use(express.json());
 
 // Health Check
@@ -150,6 +159,108 @@ function getRoleName(role) {
     return names[role] || role.charAt(0).toUpperCase() + role.slice(1);
 }
 
+// ============================================
+// AUTHENTIK AUTO-SYNC HELPERS
+// ============================================
+
+async function createAuthentikUser(member) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+    const MITGLIEDER_GROUP_PK = process.env.AUTHENTIK_MITGLIEDER_GROUP || '248db02d-6592-4571-9050-2ccc0fdf0b7e';
+
+    if (!AUTHENTIK_API_TOKEN) {
+        console.warn('AUTHENTIK_API_TOKEN not configured - skipping user creation');
+        return null;
+    }
+
+    if (!member.email) {
+        console.warn('Member has no email - skipping Authentik sync');
+        return null;
+    }
+
+    try {
+        // Generate a username from email (use part before @)
+        const username = member.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+
+        const userData = {
+            username: username,
+            name: `${member.vorname} ${member.nachname}`,
+            email: member.email,
+            is_active: true,
+            path: 'users',
+            type: 'internal',
+            groups: [MITGLIEDER_GROUP_PK]  // Add to Mitglieder group
+        };
+
+        const response = await axios.post(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/`,
+            userData,
+            {
+                headers: {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        const authentikUser = response.data;
+        console.log(`Created Authentik user: ${username} (pk=${authentikUser.pk})`);
+
+        // Set a random initial password (user will need to reset)
+        const tempPassword = `FWV${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+        await axios.post(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUser.pk}/set_password/`,
+            { password: tempPassword },
+            {
+                headers: {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        return {
+            pk: authentikUser.pk,
+            username: username,
+            tempPassword: tempPassword
+        };
+
+    } catch (error) {
+        // Check if user already exists
+        if (error.response?.status === 400 && error.response?.data?.username) {
+            console.warn(`Authentik user might already exist for ${member.email}`);
+            return null;
+        }
+        console.error(`Failed to create Authentik user for ${member.email}:`, error.response?.data || error.message);
+        return null;
+    }
+}
+
+async function deleteAuthentikUser(authentikUserId) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId) {
+        return false;
+    }
+
+    try {
+        await axios.delete(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`
+                }
+            }
+        );
+        console.log(`Deleted Authentik user: pk=${authentikUserId}`);
+        return true;
+    } catch (error) {
+        console.error(`Failed to delete Authentik user ${authentikUserId}:`, error.response?.data || error.message);
+        return false;
+    }
+}
+
 // Audit logging helper
 async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
     try {
@@ -166,6 +277,8 @@ async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
 app.post('/auth/callback', async (req, res) => {
     try {
         const { code, redirect_uri, client_type } = req.body;
+
+        console.log('Auth callback request:', { redirect_uri, client_type, code_length: code?.length });
 
         if (!code) {
             return res.status(400).json({ error: 'No code provided' });
@@ -224,6 +337,54 @@ app.post('/auth/callback', async (req, res) => {
 });
 
 // ============================================
+// PUBLIC ROUTES
+// ============================================
+
+// Get Vorstand members (public, for website display)
+app.get('/vorstand', async (req, res) => {
+    try {
+        // Get members with Vorstand functions
+        const vorstandFunctions = [
+            'Präsident', 'Praesident', 'Vizepräsident', 'Vizepraesident',
+            'Aktuar', 'Kassier', 'Beisitzer', 'Materialwart'
+        ];
+
+        const result = await pool.query(`
+            SELECT
+                id, vorname, nachname, funktion, foto, email
+            FROM members
+            WHERE funktion IS NOT NULL
+              AND funktion != ''
+              AND funktion != '-'
+              AND status = 'Aktivmitglied'
+            ORDER BY
+                CASE funktion
+                    WHEN 'Präsident' THEN 1
+                    WHEN 'Praesident' THEN 1
+                    WHEN 'Vizepräsident' THEN 2
+                    WHEN 'Vizepraesident' THEN 2
+                    WHEN 'Aktuar' THEN 3
+                    WHEN 'Kassier' THEN 4
+                    WHEN 'Materialwart' THEN 5
+                    WHEN 'Beisitzer' THEN 6
+                    ELSE 10
+                END,
+                nachname
+        `);
+
+        // Filter to only show typical Vorstand functions
+        const vorstandMembers = result.rows.filter(m =>
+            vorstandFunctions.some(f => m.funktion.toLowerCase().includes(f.toLowerCase()))
+        );
+
+        res.json(vorstandMembers);
+    } catch (error) {
+        console.error('GET /vorstand error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // MEMBERS ROUTES (protected)
 // ============================================
 
@@ -253,7 +414,31 @@ app.get('/members', authenticateAny, async (req, res) => {
     }
 });
 
-// Get single member
+// IMPORTANT: These specific routes MUST come before /members/:id to avoid matching 'me' or 'stats' as an ID
+
+// Get own member data (self-service)
+app.get('/members/me', authenticateToken, async (req, res) => {
+    try {
+        console.log('/members/me called for user:', req.user?.email);
+        const result = await pool.query(
+            'SELECT * FROM members WHERE email = $1',
+            [req.user.email]
+        );
+
+        if (result.rows.length === 0) {
+            console.log('Member not found for email:', req.user.email);
+            return res.status(404).json({ error: 'Member profile not found' });
+        }
+
+        console.log('Member found:', result.rows[0].vorname, result.rows[0].nachname);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('/members/me error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get single member (MUST come after /members/me)
 app.get('/members/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -277,7 +462,8 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
             strasse, adresszusatz, plz, ort,
             telefon, mobile, email, versand_email,
             status, funktion, eintrittsdatum,
-            iban, zustellung_email, zustellung_post, bemerkungen
+            iban, zustellung_email, zustellung_post, bemerkungen,
+            feuerwehr_zugehoerigkeit, foto, tshirt_groesse
         } = req.body;
 
         const result = await pool.query(`
@@ -286,30 +472,116 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
                 strasse, adresszusatz, plz, ort,
                 telefon, mobile, email, versand_email,
                 status, funktion, eintrittsdatum,
-                iban, zustellung_email, zustellung_post, bemerkungen
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+                iban, zustellung_email, zustellung_post, bemerkungen,
+                feuerwehr_zugehoerigkeit, foto, tshirt_groesse
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
             RETURNING *
         `, [
             anrede, vorname, nachname, geschlecht, geburtstag,
             strasse, adresszusatz, plz, ort,
             telefon, mobile, email, versand_email,
             status || 'Aktivmitglied', funktion, eintrittsdatum || new Date(),
-            iban, zustellung_email ?? true, zustellung_post ?? false, bemerkungen
+            iban, zustellung_email ?? true, zustellung_post ?? false, bemerkungen,
+            feuerwehr_zugehoerigkeit, foto, tshirt_groesse
         ]);
+
+        const newMember = result.rows[0];
+
+        // Auto-create Authentik user if email is provided
+        if (email) {
+            const authentikResult = await createAuthentikUser({
+                vorname,
+                nachname,
+                email
+            });
+
+            if (authentikResult) {
+                // Update member with Authentik user ID
+                await pool.query(`
+                    UPDATE members
+                    SET authentik_user_id = $1, authentik_synced_at = NOW()
+                    WHERE id = $2
+                `, [authentikResult.pk.toString(), newMember.id]);
+
+                newMember.authentik_user_id = authentikResult.pk.toString();
+                newMember.authentik_username = authentikResult.username;
+
+                // Create default notification preferences
+                const notificationTypes = ['shift_reminder', 'event_update', 'newsletter', 'general'];
+                for (const type of notificationTypes) {
+                    await pool.query(`
+                        INSERT INTO notification_preferences (member_id, notification_type, enabled)
+                        VALUES ($1, $2, true)
+                        ON CONFLICT (member_id, notification_type) DO NOTHING
+                    `, [newMember.id, type]);
+                }
+            }
+        }
 
         // Audit log
         await logAudit(pool, 'MEMBER_CREATE', null, req.user.email, req.ip, {
-            member_id: result.rows[0].id,
-            member_name: `${vorname} ${nachname}`
+            member_id: newMember.id,
+            member_name: `${vorname} ${nachname}`,
+            authentik_synced: !!newMember.authentik_user_id
         });
 
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(newMember);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-// Update member (requires Vorstand role)
+// IMPORTANT: PUT /members/me MUST come before /members/:id to avoid matching 'me' as an ID
+// Update own member data (limited fields) - Self-service
+app.put('/members/me', authenticateToken, async (req, res) => {
+    try {
+        const {
+            telefon, mobile, email, versand_email,
+            strasse, adresszusatz, plz, ort,
+            iban, bemerkungen
+        } = req.body;
+
+        console.log('PUT /members/me called for user:', req.user?.email);
+
+        // Get current member
+        const currentResult = await pool.query(
+            'SELECT id FROM members WHERE email = $1',
+            [req.user.email]
+        );
+
+        if (currentResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Member profile not found' });
+        }
+
+        const memberId = currentResult.rows[0].id;
+
+        // Update allowed fields only
+        const result = await pool.query(`
+            UPDATE members SET
+                telefon = COALESCE($1, telefon),
+                mobile = COALESCE($2, mobile),
+                email = COALESCE($3, email),
+                versand_email = COALESCE($4, versand_email),
+                strasse = COALESCE($5, strasse),
+                adresszusatz = COALESCE($6, adresszusatz),
+                plz = COALESCE($7, plz),
+                ort = COALESCE($8, ort),
+                iban = COALESCE($9, iban),
+                bemerkungen = COALESCE($10, bemerkungen),
+                updated_at = NOW()
+            WHERE id = $11
+            RETURNING *
+        `, [telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen, memberId]);
+
+        console.log('Profile updated successfully for:', req.user.email);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('PUT /members/me error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update member by ID (requires Vorstand role) - MUST come after /members/me
 app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -579,72 +851,10 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
 });
 
 // ============================================
-// SELF-SERVICE ROUTES (Member can access their own data)
+// NOTIFICATION PREFERENCES (Self-service)
 // ============================================
 
-// Get own member data
-app.get('/members/me', authenticateToken, async (req, res) => {
-    try {
-        // req.user.email comes from JWT token
-        const result = await pool.query(
-            'SELECT * FROM members WHERE email = $1',
-            [req.user.email]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Member profile not found' });
-        }
-
-        res.json(result.rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Update own member data (limited fields)
-app.put('/members/me', authenticateToken, async (req, res) => {
-    try {
-        const {
-            telefon, mobile, email, versand_email,
-            strasse, adresszusatz, plz, ort,
-            iban, bemerkungen
-        } = req.body;
-
-        // Get current member
-        const currentResult = await pool.query(
-            'SELECT id FROM members WHERE email = $1',
-            [req.user.email]
-        );
-
-        if (currentResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Member profile not found' });
-        }
-
-        const memberId = currentResult.rows[0].id;
-
-        // Update allowed fields only
-        const result = await pool.query(`
-            UPDATE members SET
-                telefon = COALESCE($1, telefon),
-                mobile = COALESCE($2, mobile),
-                email = COALESCE($3, email),
-                versand_email = COALESCE($4, versand_email),
-                strasse = COALESCE($5, strasse),
-                adresszusatz = COALESCE($6, adresszusatz),
-                plz = COALESCE($7, plz),
-                ort = COALESCE($8, ort),
-                iban = COALESCE($9, iban),
-                bemerkungen = COALESCE($10, bemerkungen),
-                updated_at = NOW()
-            WHERE id = $11
-            RETURNING *
-        `, [telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen, memberId]);
-
-        res.json(result.rows[0]);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// Note: GET /members/me and PUT /members/me are defined earlier (before /members/:id) to avoid route conflicts
 
 // Get own notification preferences
 app.get('/members/me/notifications', authenticateToken, async (req, res) => {

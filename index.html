@@ -935,20 +935,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function displayVorstandMembers(members, container) {
             const membersHtml = members.map(member => {
-                const imageHtml = member.image 
+                const name = `${member.vorname} ${member.nachname}`;
+                const initials = `${member.vorname?.[0] || ''}${member.nachname?.[0] || ''}`;
+
+                const imageHtml = member.foto
                     ? `<div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                         <img src="${member.image}" alt="${member.name}" class="w-full h-full object-cover">
+                         <img src="${member.foto}" alt="${name}" class="w-full h-full object-cover">
                        </div>`
                     : `<div class="w-12 h-12 rounded-full bg-fire-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                         ${member.name.split(' ').map(n => n[0]).join('')}
+                         ${initials}
                        </div>`;
 
                 const contactInfo = [];
                 if (member.email) {
                     contactInfo.push(`<a href="mailto:${member.email}" class="text-fire-600 hover:text-fire-700 text-xs">📧 ${member.email}</a>`);
-                }
-                if (member.phone) {
-                    contactInfo.push(`<a href="tel:${member.phone}" class="text-fire-600 hover:text-fire-700 text-xs">📞 ${member.phone}</a>`);
                 }
 
                 return `
@@ -956,8 +956,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="flex items-center space-x-3">
                             ${imageHtml}
                             <div class="flex-1 min-w-0">
-                                <h5 class="font-semibold text-gray-800 text-sm">${member.position}</h5>
-                                <p class="text-gray-600 text-xs mb-1">${member.name}</p>
+                                <h5 class="font-semibold text-gray-800 text-sm">${member.funktion}</h5>
+                                <p class="text-gray-600 text-xs mb-1">${name}</p>
                                 <div class="space-y-0.5">
                                     ${contactInfo.join('<br>')}
                                 </div>
@@ -972,76 +972,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         async function loadVorstandMembers() {
-    const vorstandContainer = document.getElementById('vorstand-container');
-    const vorstandLoading = document.getElementById('vorstand-loading');
-    const vorstandError = document.getElementById('vorstand-error');
+            const vorstandContainer = document.getElementById('vorstand-container');
+            const vorstandLoading = document.getElementById('vorstand-loading');
+            const vorstandError = document.getElementById('vorstand-error');
 
-    try {
-        console.log('🔄 Lade Vorstand...');
-        
-        // Lade die automatisch generierte Vorstand-Liste
-        let memberFiles = [];
-        try {
-            const listResponse = await fetch('vorstand-list.json');
-            if (listResponse.ok) {
-                const listData = await listResponse.json();
-                memberFiles = listData.files;
-                console.log(`📋 Vorstand-Liste geladen: ${memberFiles.length} Dateien`);
-            } else {
-                console.warn('⚠️ vorstand-list.json nicht gefunden, verwende Fallback');
-                memberFiles = [
-                    'vorstand/praesident.md',
-                    'vorstand/vizepraesident.md',
-                    'vorstand/aktuar.md',
-                    'vorstand/kassier.md',
-                    'vorstand/beisitzer.md'
-                ];
-            }
-        } catch (error) {
-            console.warn('⚠️ Fehler beim Laden der Vorstand-Liste:', error);
-            memberFiles = [
-                'vorstand/praesident.md',
-                'vorstand/vizepraesident.md',
-                'vorstand/aktuar.md',
-                'vorstand/kassier.md',
-                'vorstand/beisitzer.md'
-            ];
-        }
-
-        const members = [];
-        
-        for (const file of memberFiles) {
             try {
-                const member = await loadMemberFromFile(file);
-                if (member) {
-                    members.push(member);
+                console.log('🔄 Lade Vorstand von API...');
+
+                const response = await fetch('https://api.fwv-raura.ch/vorstand');
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
                 }
+
+                const members = await response.json();
+
+                if (members.length === 0) {
+                    throw new Error('Keine Vorstandsmitglieder gefunden');
+                }
+
+                displayVorstandMembers(members, vorstandContainer);
+
+                vorstandLoading.classList.add('hidden');
+                vorstandContainer.classList.remove('hidden');
+
             } catch (error) {
-                console.warn(`Konnte ${file} nicht laden:`, error.message);
+                console.error('Fehler beim Laden der Vorstandsmitglieder:', error);
+                vorstandLoading.classList.add('hidden');
+                vorstandError.classList.remove('hidden');
             }
         }
-
-        if (members.length === 0) {
-            throw new Error('Keine Vorstandsmitglieder gefunden');
-        }
-
-        members.sort((a, b) => {
-            const orderA = a.order || 999;
-            const orderB = b.order || 999;
-            return orderA - orderB;
-        });
-
-        displayVorstandMembers(members, vorstandContainer);
-        
-        vorstandLoading.classList.add('hidden');
-        vorstandContainer.classList.remove('hidden');
-
-    } catch (error) {
-        console.error('Fehler beim Laden der Vorstandsmitglieder:', error);
-        vorstandLoading.classList.add('hidden');
-        vorstandError.classList.remove('hidden');
-    }
-}
         // EVENT LOADING FUNCTIONS
 async function loadUpcomingEvents() {
     try {
@@ -1214,7 +1174,7 @@ function renderUpcomingEvents(events) {
         }
 
         return `
-            <div class="bg-gradient-to-br from-${color.from} to-${color.to} text-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform">
+            <a href="events.html?event=${event.id}" class="block bg-gradient-to-br from-${color.from} to-${color.to} text-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform cursor-pointer">
                 <div class="p-6">
                     <div class="flex items-center mb-4">
                         <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
@@ -1230,7 +1190,7 @@ function renderUpcomingEvents(events) {
                         ${additionalInfo}
                     </div>
                 </div>
-            </div>
+            </a>
         `;
     }).join('');
 

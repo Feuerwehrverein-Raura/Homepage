@@ -238,13 +238,13 @@ app.get('/shifts', async (req, res) => {
 
 app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
-        const { event_id, name, description, date, start_time, end_time, needed } = req.body;
+        const { event_id, name, description, date, start_time, end_time, needed, bereich } = req.body;
 
         const result = await pool.query(`
-            INSERT INTO shifts (event_id, name, description, date, start_time, end_time, needed)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO shifts (event_id, name, description, date, start_time, end_time, needed, bereich)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
-        `, [event_id, name, description, date, start_time, end_time, needed]);
+        `, [event_id, name, description, date, start_time, end_time, needed, bereich || 'Allgemein']);
 
         res.status(201).json(result.rows[0]);
     } catch (error) {
@@ -255,7 +255,7 @@ app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (re
 app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, date, start_time, end_time, needed } = req.body;
+        const { name, description, date, start_time, end_time, needed, bereich } = req.body;
 
         const result = await pool.query(`
             UPDATE shifts SET
@@ -264,10 +264,11 @@ app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
                 date = COALESCE($3, date),
                 start_time = COALESCE($4, start_time),
                 end_time = COALESCE($5, end_time),
-                needed = COALESCE($6, needed)
-            WHERE id = $7
+                needed = COALESCE($6, needed),
+                bereich = COALESCE($7, bereich)
+            WHERE id = $8
             RETURNING *
-        `, [name, description, date, start_time, end_time, needed, id]);
+        `, [name, description, date, start_time, end_time, needed, bereich, id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Shift not found' });

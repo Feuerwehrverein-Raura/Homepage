@@ -215,6 +215,13 @@
         let memberData = null;
         let notifications = [];
 
+        // Redirect to Authentik login
+        function redirectToLogin() {
+            localStorage.removeItem('auth_token');
+            const state = encodeURIComponent(window.location.pathname);
+            window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
+        }
+
         // Check authentication
         async function checkAuth() {
             // Check for token in URL (from callback)
@@ -229,9 +236,31 @@
             }
 
             if (!authToken) {
-                // Redirect to Authentik login
-                const state = encodeURIComponent(window.location.pathname);
-                window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
+                redirectToLogin();
+                return false;
+            }
+
+            // Validate token by making a test API call
+            try {
+                const response = await fetch(`${API_BASE}/members/me`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (response.status === 401 || response.status === 403) {
+                    console.log('Token invalid or expired, redirecting to login');
+                    redirectToLogin();
+                    return false;
+                }
+
+                if (response.ok) {
+                    // Token is valid, store the member data
+                    memberData = await response.json();
+                    document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
+                    return true;
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                redirectToLogin();
                 return false;
             }
 
@@ -241,16 +270,22 @@
         // Load member profile
         async function loadProfile() {
             try {
-                const response = await fetch(`${API_BASE}/members/me`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                // If memberData wasn't loaded in checkAuth, load it now
+                if (!memberData) {
+                    const response = await fetch(`${API_BASE}/members/me`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
 
-                if (!response.ok) throw new Error('Failed to load profile');
+                    if (response.status === 401 || response.status === 403) {
+                        redirectToLogin();
+                        return;
+                    }
 
-                memberData = await response.json();
+                    if (!response.ok) throw new Error('Failed to load profile');
 
-                // Update UI
-                document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
+                    memberData = await response.json();
+                    document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
+                }
 
                 // Populate form
                 document.getElementById('profile-vorname').value = memberData.vorname || '';
@@ -286,6 +321,8 @@
                     iban: document.getElementById('profile-iban').value
                 };
 
+                console.log('Saving profile data:', data);
+
                 const response = await fetch(`${API_BASE}/members/me`, {
                     method: 'PUT',
                     headers: {
@@ -295,14 +332,22 @@
                     body: JSON.stringify(data)
                 });
 
-                if (!response.ok) throw new Error('Failed to save profile');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Save profile failed:', response.status, errorData);
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                // Update memberData with the response from the server
+                memberData = await response.json();
+                document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
 
                 alert('Profil erfolgreich gespeichert!');
                 await loadProfile();
 
             } catch (error) {
                 console.error('Error saving profile:', error);
-                alert('Fehler beim Speichern des Profils');
+                alert('Fehler beim Speichern des Profils: ' + error.message);
             }
         }
 
@@ -313,14 +358,20 @@
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
-                if (!response.ok) throw new Error('Failed to load notifications');
+                if (!response.ok) {
+                    console.log('No notifications found, using defaults');
+                    notifications = [];
+                } else {
+                    notifications = await response.json();
+                }
 
-                notifications = await response.json();
                 renderNotifications();
 
             } catch (error) {
                 console.error('Error loading notifications:', error);
-                alert('Fehler beim Laden der Benachrichtigungen');
+                // Show defaults even if API fails
+                notifications = [];
+                renderNotifications();
             }
         }
 
@@ -341,7 +392,20 @@
                 'general': 'Allgemeine Vereinsmitteilungen'
             };
 
-            container.innerHTML = notifications.map(notif => `
+            // Default notification types if none exist
+            const defaultTypes = ['shift_reminder', 'event_update', 'newsletter', 'general'];
+
+            // Use existing notifications or create defaults
+            let displayNotifications = notifications;
+            if (!notifications || notifications.length === 0) {
+                displayNotifications = defaultTypes.map(type => ({
+                    notification_type: type,
+                    enabled: true,
+                    alternative_email: null
+                }));
+            }
+
+            container.innerHTML = displayNotifications.map(notif => `
                 <div class="border border-gray-200 rounded-lg p-4" data-notification-type="${notif.notification_type}">
                     <div class="flex items-center justify-between mb-3">
                         <div>
@@ -375,6 +439,8 @@
                     };
                 });
 
+                console.log('Saving notification preferences:', preferences);
+
                 const response = await fetch(`${API_BASE}/members/me/notifications`, {
                     method: 'PUT',
                     headers: {
@@ -384,14 +450,18 @@
                     body: JSON.stringify({ preferences })
                 });
 
-                if (!response.ok) throw new Error('Failed to save notifications');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Save notifications failed:', response.status, errorData);
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
 
                 alert('Benachrichtigungseinstellungen gespeichert!');
                 await loadNotifications();
 
             } catch (error) {
                 console.error('Error saving notifications:', error);
-                alert('Fehler beim Speichern der Einstellungen');
+                alert('Fehler beim Speichern der Einstellungen: ' + error.message);
             }
         }
 
@@ -400,19 +470,34 @@
             try {
                 document.getElementById('events-loading').classList.remove('hidden');
                 document.getElementById('events-empty').classList.add('hidden');
+                document.getElementById('my-events-list').innerHTML = '';
+
+                // Check if memberData is loaded
+                if (!memberData || !memberData.id) {
+                    console.log('memberData not yet loaded, showing empty state');
+                    document.getElementById('events-loading').classList.add('hidden');
+                    document.getElementById('events-empty').classList.remove('hidden');
+                    return;
+                }
 
                 const response = await fetch(`${API_BASE}/registrations?member_id=${memberData.id}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
-                if (!response.ok) throw new Error('Failed to load events');
+                if (!response.ok) {
+                    // If 404 or other error, show empty state instead of error
+                    console.log('No registrations found or API error');
+                    document.getElementById('events-empty').classList.remove('hidden');
+                    return;
+                }
 
                 const registrations = await response.json();
                 renderMyEvents(registrations);
 
             } catch (error) {
                 console.error('Error loading events:', error);
-                document.getElementById('my-events-list').innerHTML = '<p class="text-red-600">Fehler beim Laden der Events</p>';
+                // Show empty state instead of error message
+                document.getElementById('events-empty').classList.remove('hidden');
             } finally {
                 document.getElementById('events-loading').classList.add('hidden');
             }
