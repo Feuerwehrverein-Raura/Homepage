@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const { Pool } = require('pg');
 const ical = require('ical-generator').default;
 const axios = require('axios');
+const puppeteer = require('puppeteer');
 const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
 
 const app = express();
@@ -882,6 +883,208 @@ function requireApiKey(req, res, next) {
     }
     next();
 }
+
+// ============================================
+// CALENDAR PDF EXPORT
+// ============================================
+
+// Generate calendar PDF
+app.get('/calendar/pdf', async (req, res) => {
+    try {
+        const { year, upcoming } = req.query;
+
+        // Load events
+        let query = 'SELECT * FROM events WHERE status != $1';
+        const params = ['cancelled'];
+
+        if (upcoming === 'true') {
+            query += ' AND start_date >= NOW()';
+        } else if (year) {
+            query += ' AND EXTRACT(YEAR FROM start_date) = $2';
+            params.push(year);
+        }
+
+        query += ' ORDER BY start_date';
+        const eventsResult = await pool.query(query, params);
+        const events = eventsResult.rows;
+
+        // Format date helper
+        const formatDate = (date) => {
+            return new Date(date).toLocaleDateString('de-CH', {
+                weekday: 'long',
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            });
+        };
+
+        const formatTime = (date) => {
+            return new Date(date).toLocaleTimeString('de-CH', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        };
+
+        // Generate events HTML rows
+        const eventsHTML = events.map(event => {
+            const dateStr = formatDate(event.start_date);
+            const timeStr = event.start_date ? formatTime(event.start_date) : '';
+            const endTimeStr = event.end_date ? ` - ${formatTime(event.end_date)}` : '';
+
+            return `
+                <tr>
+                    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
+                        <strong>${dateStr}</strong><br>
+                        <span style="color: #6b7280;">${timeStr}${endTimeStr}</span>
+                    </td>
+                    <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
+                        <strong>${event.title}</strong><br>
+                        <span style="color: #6b7280;">${event.location || ''}</span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        const html = `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Veranstaltungskalender - Feuerwehrverein Raura</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.4;
+            color: #1f2937;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #dc2626;
+        }
+        .header img {
+            height: 60px;
+            margin-bottom: 10px;
+        }
+        .header h1 {
+            color: #dc2626;
+            margin: 0 0 10px 0;
+            font-size: 24pt;
+        }
+        .header p {
+            margin: 0;
+            color: #6b7280;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th {
+            background: #dc2626;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 9pt;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="https://fwv-raura.ch/images/logo.png" alt="FWV Raura">
+        <h1>Veranstaltungskalender</h1>
+        <p>Feuerwehrverein Raura Kaiseraugst</p>
+        <p>Stand: ${new Date().toLocaleDateString('de-CH')}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40%;">Datum & Zeit</th>
+                <th style="width: 60%;">Veranstaltung</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${eventsHTML || '<tr><td colspan="2" style="padding: 20px; text-align: center;">Keine kommenden Veranstaltungen</td></tr>'}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Feuerwehrverein Raura | www.fwv-raura.ch | kontakt@fwv-raura.ch</p>
+        <p>Änderungen vorbehalten. Aktuelle Informationen auf unserer Website.</p>
+    </div>
+</body>
+</html>
+        `;
+
+        // Generate PDF
+        const browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '2cm', right: '2cm', bottom: '2cm', left: '2cm' }
+        });
+        await browser.close();
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="Kalender_FWV_Raura_${new Date().getFullYear()}.pdf"`);
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error('Calendar PDF error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Send calendar PDF via dispatch (email/post based on preferences)
+app.post('/calendar/send', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { member_ids, send_method, year } = req.body;
+        // send_method: 'preference', 'email', 'post', 'both'
+
+        // Generate calendar PDF first
+        const calendarPdfUrl = `http://localhost:${PORT}/calendar/pdf?upcoming=true`;
+        const pdfResponse = await axios.get(calendarPdfUrl, { responseType: 'arraybuffer' });
+        const pdfBase64 = Buffer.from(pdfResponse.data).toString('base64');
+
+        // Call dispatch API to send
+        const dispatchUrl = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+
+        const response = await axios.post(`${dispatchUrl}/letters/generic`, {
+            member_ids,
+            subject: `Veranstaltungskalender ${year || new Date().getFullYear()}`,
+            content: `Anbei finden Sie unseren aktuellen Veranstaltungskalender.`,
+            note: 'Wir freuen uns auf Ihre Teilnahme an unseren Anlässen!',
+            send_method,
+            attachments: [{
+                filename: `Kalender_FWV_Raura_${year || new Date().getFullYear()}.pdf`,
+                content: pdfBase64
+            }]
+        });
+
+        res.json(response.data);
+    } catch (error) {
+        console.error('Calendar send error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`API-Events running on port ${PORT}`);
