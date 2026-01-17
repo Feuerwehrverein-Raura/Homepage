@@ -1,11 +1,8 @@
 version: '3.8'
 
-# Production docker-compose für Server mit existierendem Traefik + Authentik
-# Traefik läuft bereits auf dem Server mit:
-# - Entrypoints: http, https
-# - TLS: letsencrypt certresolver
-# - Netzwerk: proxy
-# Authentik läuft unter auth.fwv-raura.ch für OAuth2/OIDC
+# Production docker-compose mit Images aus GitHub Container Registry
+# Watchtower aktualisiert Container automatisch bei neuen Images
+# Traefik + Authentik laufen bereits auf dem Server
 
 services:
   # ============================================
@@ -23,128 +20,132 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - fwv-internal
+      - proxy
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fwv}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
   # ============================================
-  # BACKENDS (APIs)
+  # BACKENDS (APIs) - Images from ghcr.io
   # ============================================
 
   # Mitgliederverwaltung API
   api-members:
-    build: ./backend-members
+    image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-members:latest
     container_name: fwv-api-members
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
-      # Authentik OIDC
-      AUTHENTIK_URL: https://auth.fwv-raura.ch
-      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID_MEMBERS}
-      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET_MEMBERS}
+      DATABASE_URL: ${DATABASE_URL_ENCODED}
+      JWT_SECRET: ${JWT_SECRET}
       API_KEY: ${API_KEY}
+      AUTHENTIK_URL: https://auth.fwv-raura.ch
+      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID}
+      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET}
+      AUTHENTIK_CLIENT_ID_VORSTAND: ${AUTHENTIK_CLIENT_ID_VORSTAND}
+      AUTHENTIK_CLIENT_SECRET_VORSTAND: ${AUTHENTIK_CLIENT_SECRET_VORSTAND}
+      AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN}
+      IMAP_HOST: ${IMAP_HOST:-mail.test.juroct.net}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      VORSTAND_EMAILS: ${VORSTAND_EMAILS:-praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,vizepraesident@fwv-raura.ch,beisitzer@fwv-raura.ch}
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - fwv-internal
       - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      # HTTP -> HTTPS Redirect
-      - "traefik.http.routers.api-members.entrypoints=http"
-      - "traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/members`, `/auth`, `/roles`)"
-      - "traefik.http.routers.api-members.middlewares=traefik-https-redirect"
-      # HTTPS Router
-      - "traefik.http.routers.api-members-secure.entrypoints=https"
-      - "traefik.http.routers.api-members-secure.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/members`, `/auth`, `/roles`)"
-      - "traefik.http.routers.api-members-secure.tls=true"
-      - "traefik.http.routers.api-members-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.api-members-secure.service=api-members"
+      - "traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`))"
+      - "traefik.http.routers.api-members.entrypoints=https"
+      - "traefik.http.routers.api-members.tls=true"
+      - "traefik.http.routers.api-members.tls.certresolver=letsencrypt"
       - "traefik.http.services.api-members.loadbalancer.server.port=3000"
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # Events API
   api-events:
-    build: ./backend-events
+    image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-events:latest
     container_name: fwv-api-events
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
-      AUTHENTIK_URL: https://auth.fwv-raura.ch
-      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID_EVENTS}
-      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET_EVENTS}
+      DATABASE_URL: ${DATABASE_URL_ENCODED}
+      JWT_SECRET: ${JWT_SECRET}
       MEMBERS_API_URL: http://api-members:3000
+      DISPATCH_API_URL: http://api-dispatch:3000
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - fwv-internal
       - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.api-events.entrypoints=http"
-      - "traefik.http.routers.api-events.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/events`, `/shifts`, `/registrations`, `/calendar`)"
-      - "traefik.http.routers.api-events.middlewares=traefik-https-redirect"
-      - "traefik.http.routers.api-events-secure.entrypoints=https"
-      - "traefik.http.routers.api-events-secure.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/events`, `/shifts`, `/registrations`, `/calendar`)"
-      - "traefik.http.routers.api-events-secure.tls=true"
-      - "traefik.http.routers.api-events-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.api-events-secure.service=api-events"
+      - "traefik.http.routers.api-events.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/events`) || PathPrefix(`/shifts`) || PathPrefix(`/registrations`) || PathPrefix(`/calendar`))"
+      - "traefik.http.routers.api-events.entrypoints=https"
+      - "traefik.http.routers.api-events.tls=true"
+      - "traefik.http.routers.api-events.tls.certresolver=letsencrypt"
       - "traefik.http.services.api-events.loadbalancer.server.port=3000"
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # Buchhaltung API
   api-accounting:
-    build: ./backend-accounting
+    image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-accounting:latest
     container_name: fwv-api-accounting
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
-      AUTHENTIK_URL: https://auth.fwv-raura.ch
-      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID_ACCOUNTING}
-      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET_ACCOUNTING}
+      DATABASE_URL: ${DATABASE_URL_ENCODED}
+      JWT_SECRET: ${JWT_SECRET}
       MEMBERS_API_URL: http://api-members:3000
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - fwv-internal
       - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.api-accounting.entrypoints=http"
-      - "traefik.http.routers.api-accounting.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/invoices`, `/payments`, `/reports`, `/accounts`)"
-      - "traefik.http.routers.api-accounting.middlewares=traefik-https-redirect"
-      - "traefik.http.routers.api-accounting-secure.entrypoints=https"
-      - "traefik.http.routers.api-accounting-secure.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/invoices`, `/payments`, `/reports`, `/accounts`)"
-      - "traefik.http.routers.api-accounting-secure.tls=true"
-      - "traefik.http.routers.api-accounting-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.api-accounting-secure.service=api-accounting"
+      - "traefik.http.routers.api-accounting.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/invoices`) || PathPrefix(`/payments`) || PathPrefix(`/reports`) || PathPrefix(`/accounts`))"
+      - "traefik.http.routers.api-accounting.entrypoints=https"
+      - "traefik.http.routers.api-accounting.tls=true"
+      - "traefik.http.routers.api-accounting.tls.certresolver=letsencrypt"
       - "traefik.http.services.api-accounting.loadbalancer.server.port=3000"
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # Versand API (Email, Pingen, SMS)
   api-dispatch:
-    build: ./backend-dispatch
+    image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-dispatch:latest
     container_name: fwv-api-dispatch
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgres://${POSTGRES_USER:-fwv}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fwv_raura}
-      AUTHENTIK_URL: https://auth.fwv-raura.ch
-      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID_DISPATCH}
-      AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET_DISPATCH}
+      DATABASE_URL: ${DATABASE_URL_ENCODED}
+      JWT_SECRET: ${JWT_SECRET}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
@@ -154,119 +155,51 @@ services:
       PINGEN_ORGANISATION_ID: ${PINGEN_ORGANISATION_ID}
       PINGEN_STAGING: ${PINGEN_STAGING:-false}
       MEMBERS_API_URL: http://api-members:3000
-      CONTACT_EMAIL: ${CONTACT_EMAIL:-kontakt@fwv-raura.ch}
-      WEBSITE_URL: ${WEBSITE_URL:-https://fwv-raura.ch}
-      # Nextcloud Integration
-      NEXTCLOUD_URL: ${NEXTCLOUD_URL:-https://nextcloud.fwv-raura.ch}
-      NEXTCLOUD_USER: ${NEXTCLOUD_USER}
-      NEXTCLOUD_PASSWORD: ${NEXTCLOUD_PASSWORD}
-      NEXTCLOUD_FOLDER: ${NEXTCLOUD_FOLDER:-/FWV-Dokumente}
+      EVENTS_API_URL: http://api-events:3000
+      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.fwv-raura.ch}
+      MAILCOW_API_KEY: ${MAILCOW_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - fwv-internal
       - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.api-dispatch.entrypoints=http"
-      - "traefik.http.routers.api-dispatch.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/email`, `/pingen`, `/sms`, `/templates`, `/contact`, `/newsletter`)"
-      - "traefik.http.routers.api-dispatch.middlewares=traefik-https-redirect"
-      - "traefik.http.routers.api-dispatch-secure.entrypoints=https"
-      - "traefik.http.routers.api-dispatch-secure.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/email`, `/pingen`, `/sms`, `/templates`, `/contact`, `/newsletter`)"
-      - "traefik.http.routers.api-dispatch-secure.tls=true"
-      - "traefik.http.routers.api-dispatch-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.api-dispatch-secure.service=api-dispatch"
+      - "traefik.http.routers.api-dispatch.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/email`) || PathPrefix(`/pingen`) || PathPrefix(`/sms`) || PathPrefix(`/templates`) || PathPrefix(`/letters`) || PathPrefix(`/contact`) || PathPrefix(`/newsletter`) || PathPrefix(`/dispatch-log`) || PathPrefix(`/mailcow`))"
+      - "traefik.http.routers.api-dispatch.entrypoints=https"
+      - "traefik.http.routers.api-dispatch.tls=true"
+      - "traefik.http.routers.api-dispatch.tls.certresolver=letsencrypt"
       - "traefik.http.services.api-dispatch.loadbalancer.server.port=3000"
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # ============================================
   # FRONTENDS
   # ============================================
 
-  # Öffentliche Website
+  # Oeffentliche Website
   frontend-website:
-    build:
-      context: ./website
-      dockerfile: ../Dockerfile.website
+    image: ghcr.io/feuerwehrverein-raura/fwv-raura-frontend:latest
     container_name: fwv-frontend-website
     restart: unless-stopped
     networks:
-      - fwv-internal
       - proxy
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.fwv-website.entrypoints=http"
-      - "traefik.http.routers.fwv-website.rule=Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)"
-      - "traefik.http.routers.fwv-website.middlewares=traefik-https-redirect"
-      - "traefik.http.routers.fwv-website-secure.entrypoints=https"
-      - "traefik.http.routers.fwv-website-secure.rule=Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)"
-      - "traefik.http.routers.fwv-website-secure.tls=true"
-      - "traefik.http.routers.fwv-website-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.fwv-website-secure.service=fwv-website"
-      - "traefik.http.services.fwv-website.loadbalancer.server.port=80"
-
-  # Vorstand Portal (Placeholder - wird später implementiert)
-  # frontend-vorstand:
-  #   build: ./frontend-vorstand
-  #   container_name: fwv-frontend-vorstand
-  #   restart: unless-stopped
-  #   networks:
-  #     - fwv-internal
-  #     - proxy
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.fwv-vorstand.entrypoints=http"
-  #     - "traefik.http.routers.fwv-vorstand.rule=Host(`vorstand.fwv-raura.ch`)"
-  #     - "traefik.http.routers.fwv-vorstand.middlewares=traefik-https-redirect@docker"
-  #     - "traefik.http.routers.fwv-vorstand-secure.entrypoints=https"
-  #     - "traefik.http.routers.fwv-vorstand-secure.rule=Host(`vorstand.fwv-raura.ch`)"
-  #     - "traefik.http.routers.fwv-vorstand-secure.tls=true"
-  #     - "traefik.http.routers.fwv-vorstand-secure.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.fwv-vorstand.loadbalancer.server.port=80"
-
-  # Mitglieder Self-Service Portal (Placeholder - wird später implementiert)
-  # frontend-mitglieder:
-  #   build: ./frontend-mitglieder
-  #   container_name: fwv-frontend-mitglieder
-  #   restart: unless-stopped
-  #   networks:
-  #     - fwv-internal
-  #     - proxy
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.fwv-mitglieder.entrypoints=http"
-  #     - "traefik.http.routers.fwv-mitglieder.rule=Host(`my.fwv-raura.ch`)"
-  #     - "traefik.http.routers.fwv-mitglieder.middlewares=traefik-https-redirect@docker"
-  #     - "traefik.http.routers.fwv-mitglieder-secure.entrypoints=https"
-  #     - "traefik.http.routers.fwv-mitglieder-secure.rule=Host(`my.fwv-raura.ch`)"
-  #     - "traefik.http.routers.fwv-mitglieder-secure.tls=true"
-  #     - "traefik.http.routers.fwv-mitglieder-secure.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.fwv-mitglieder.loadbalancer.server.port=80"
-
-  # Events Portal (Placeholder - wird später implementiert)
-  # frontend-events:
-  #   build: ./frontend-events
-  #   container_name: fwv-frontend-events
-  #   restart: unless-stopped
-  #   networks:
-  #     - fwv-internal
-  #     - proxy
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.fwv-events.entrypoints=http"
-  #     - "traefik.http.routers.fwv-events.rule=Host(`events.fwv-raura.ch`)"
-  #     - "traefik.http.routers.fwv-events.middlewares=traefik-https-redirect@docker"
-  #     - "traefik.http.routers.fwv-events-secure.entrypoints=https"
-  #     - "traefik.http.routers.fwv-events-secure.rule=Host(`events.fwv-raura.ch`)"
-  #     - "traefik.http.routers.fwv-events-secure.tls=true"
-  #     - "traefik.http.routers.fwv-events-secure.tls.certresolver=letsencrypt"
-  #     - "traefik.http.services.fwv-events.loadbalancer.server.port=80"
+      - "traefik.http.routers.website.rule=Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)"
+      - "traefik.http.routers.website.entrypoints=https"
+      - "traefik.http.routers.website.tls=true"
+      - "traefik.http.routers.website.tls.certresolver=letsencrypt"
+      - "traefik.http.services.website.loadbalancer.server.port=80"
+      - "com.centurylinklabs.watchtower.enable=true"
 
 networks:
-  fwv-internal:
-    driver: bridge
   proxy:
     external: true
 
