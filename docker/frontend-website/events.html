@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veranstaltungen - Feuerwehrverein Raura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation (gleich wie auf der Hauptseite) -->
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="h-12 w-auto">
+                    <span class="text-xl font-bold text-fire-700">Feuerwehrverein Raura</span>
+                </div>
+                <div class="hidden md:flex space-x-6">
+                    <a href="index.html" class="text-gray-700 hover:text-fire-600 transition-colors">Home</a>
+                    <a href="events.html" class="text-fire-600 font-semibold">Veranstaltungen</a>
+                    <a href="calendar.html" class="text-gray-700 hover:text-fire-600 transition-colors">Kalender</a>
+                    <a href="mein.html" class="text-gray-700 hover:text-fire-600 transition-colors">Mein Bereich</a>
+                    <a href="vorstand.html" class="text-gray-700 hover:text-fire-600 transition-colors">Vorstand</a>
+                </div>
+                <button id="mobile-menu-button" class="md:hidden text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="hidden md:hidden bg-white shadow-md">
+        <div class="px-4 pt-2 pb-3 space-y-1">
+            <a href="index.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Home</a>
+            <a href="events.html" class="block px-3 py-2 text-fire-600 font-semibold bg-fire-50 rounded-md">Veranstaltungen</a>
+            <a href="calendar.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Kalender</a>
+            <a href="mein.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Mein Bereich</a>
+            <a href="vorstand.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Vorstand</a>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-r from-fire-600 to-fire-800 text-white py-12">
+        <div class="container mx-auto px-4">
+            <h1 class="text-4xl font-bold mb-4">Veranstaltungen</h1>
+            <p class="text-xl">Entdecken Sie unsere kommenden und vergangenen Events</p>
+        </div>
+    </section>
+
+    <!-- Filters and Controls -->
+    <section class="py-6 bg-white shadow-sm">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <div class="flex flex-wrap gap-2">
+                    <button id="all-filter" class="filter-btn px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
+                        Alle
+                    </button>
+                    <button id="upcoming-filter" class="filter-btn px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        Kommende
+                    </button>
+                    <button id="past-filter" class="filter-btn px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        Vergangene
+                    </button>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-2 flex-1 md:flex-initial md:max-w-md">
+                    <div class="relative flex-1">
+                        <input type="text" id="search-input" placeholder="Suchen..." 
+                               class="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-400">🔍</span>
+                        </div>
+                    </div>
+                    <select id="category-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <option value="">Alle Kategorien</option>
+                        <option value="Dorffest">Dorffest</option>
+                        <option value="Aufbau">Aufbau</option>
+                        <option value="Abbau">Abbau</option>
+                        <option value="Ausflug">Ausflug</option>
+                        <option value="Ausflug mit Anmeldung">Ausflug mit Anmeldung</option>
+                        <option value="Sonstiges">Sonstiges</option>
+                    </select>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="list-view-btn" class="p-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
+                        <span class="text-xl">📋</span>
+                    </button>
+                    <button id="grid-view-btn" class="p-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">
+                        <span class="text-xl">⊞</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Events List -->
+    <section class="py-8">
+        <div class="container mx-auto px-4">
+            <div id="events-container" class="space-y-6">
+                <!-- Events will be loaded here -->
+            </div>
+            
+            <!-- No events message -->
+            <div id="no-events" class="hidden text-center py-12">
+                <div class="text-gray-400 text-6xl mb-4">📅</div>
+                <h3 class="text-xl font-semibold text-gray-600 mb-2">Keine Veranstaltungen gefunden</h3>
+                <p class="text-gray-500">Versuchen Sie andere Suchkriterien oder Filter.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Event Detail Modal -->
+    <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div id="modal-content">
+                <!-- Modal content will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Modal -->
+    <div id="registration-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-bold text-gray-800">Anmeldung</h3>
+                <button id="close-registration-modal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+            <div id="registration-content">
+                <!-- Registration form will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Arbeitsplan Modal -->
+    <div id="arbeitsplan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Arbeitsplan</h3>
+                    <button id="close-arbeitsplan-modal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                </div>
+                <div id="arbeitsplan-content">
+                    <!-- Arbeitsplan content will be loaded here -->
+                </div>
+                <div class="mt-6 flex gap-3">
+                    <button id="download-arbeitsplan" class="flex-1 bg-fire-500 text-white px-4 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
+                        <span>📄</span>
+                        <span>PDF herunterladen</span>
+                    </button>
+                    <button id="edit-arbeitsplan" class="flex-1 border border-blue-500 text-blue-500 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
+                        <span>✏️</span>
+                        <span>Bearbeiten</span>
+                    </button>
+                    <button id="close-arbeitsplan-modal-btn" class="flex-1 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                        Schließen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-40">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-fire-500 mx-auto mb-4"></div>
+            <p class="text-gray-600">Lade Veranstaltungen...</p>
+        </div>
+    </div>
+
+    <script>
+        class EventsManager {
+            constructor() {
+                this.events = [];
+                this.filteredEvents = [];
+                this.currentFilter = 'all';
+                this.currentCategory = '';
+                this.searchQuery = '';
+                this.viewMode = 'list';
+                this.selectedEvent = null;
+                this.selectedShifts = [];
+                this.arbeitsplanData = {};
+                
+                this.init();
+            }
+
+            async init() {
+                console.log('🔄 Initialisiere Event-System...');
+                await this.loadEvents();
+                await this.loadArbeitsplanData();
+                this.setupEventListeners();
+                this.filterEvents();
+                this.renderEvents();
+                document.getElementById('loading').classList.add('hidden');
+            }
+
+            async loadEvents() {
+                try {
+                    console.log('📂 Lade Events von API...');
+                    this.events = await this.loadEventsFromAPI();
+                    console.log(`✅ ${this.events.length} Events erfolgreich geladen:`,
+                        this.events.map(e => `${e.title} (${e.id})`));
+                } catch (error) {
+                    console.error('❌ Fehler beim Laden der Events:', error);
+                    this.events = [];
+                }
+            }
+
+            async loadEventsFromAPI() {
+                try {
+                    const response = await fetch('https://api.fwv-raura.ch/events');
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.status}`);
+                    }
+                    const apiEvents = await response.json();
+
+                    // Map API format to internal format
+                    return apiEvents.map(e => ({
+                        id: e.slug || e.id,
+                        title: e.title || 'Unbenanntes Event',
+                        subtitle: e.subtitle || '',
+                        category: e.category || 'Allgemein',
+                        startDate: new Date(e.start_date),
+                        endDate: new Date(e.end_date || e.start_date),
+                        location: e.location || '',
+                        organizer: e.organizer || '',
+                        email: e.organizer_email || '',
+                        cost: e.cost || 'Kostenlos',
+                        registrationRequired: e.registration_required || false,
+                        registrationDeadline: e.registration_deadline ? new Date(e.registration_deadline) : null,
+                        participantRegistration: e.participant_registration || false,
+                        maxParticipants: e.max_participants || null,
+                        status: e.status || 'confirmed',
+                        tags: e.tags || [],
+                        description: e.description || '',
+                        shifts: e.shifts || []
+                    })).sort((a, b) => a.startDate - b.startDate);
+                } catch (error) {
+                    console.error('❌ API-Fehler, versuche Markdown-Fallback...', error);
+                    return this.loadEventsFromMarkdown();
+                }
+            }
+
+            async loadEventsFromMarkdown() {
+                // Fallback: Lade die automatisch generierte events-list.json
+                let eventFiles = [];
+                try {
+                    const response = await fetch('events-list.json');
+                    if (response.ok) {
+                        const data = await response.json();
+                        eventFiles = data.files || [];
+                        console.log(`📁 Gefundene Event-Dateien (via events-list.json): ${eventFiles.length}`);
+                    } else {
+                        console.warn('⚠️  events-list.json nicht gefunden');
+                    }
+                } catch (error) {
+                    console.warn('⚠️  Fehler beim Laden von events-list.json:', error);
+                }
+
+                if (eventFiles.length === 0) {
+                    return [];
+                }
+
+                const events = [];
+                for (const file of eventFiles) {
+                    try {
+                        const response = await fetch(file);
+                        if (!response.ok) continue;
+                        const content = await response.text();
+                        const event = this.parseEventMarkdown(content, file);
+                        if (event) events.push(event);
+                    } catch (error) {
+                        console.error(`❌ Fehler beim Laden von ${file}:`, error);
+                    }
+                }
+
+                return events.sort((a, b) => a.startDate - b.startDate);
+            }
+
+            parseEventMarkdown(content, filename) {
+                try {
+                    // Extract frontmatter
+                    const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+                    if (!frontmatterMatch) {
+                        console.warn(`⚠️  Kein Frontmatter gefunden in ${filename}`);
+                        return null;
+                    }
+
+                    const [, frontmatterStr, markdownContent] = frontmatterMatch;
+                    const frontmatter = this.parseFrontmatter(frontmatterStr);
+                    
+                    // Parse description from markdown
+                    const description = this.parseMarkdown(markdownContent.trim());
+
+                    // Parse shifts if present
+                    const shifts = [];
+                    const shiftsMatch = content.match(/shifts:\r?\n((?:[ ]{2,}-.*\r?\n)+)/);
+                    if (shiftsMatch) {
+                        const shiftLines = shiftsMatch[1].split(/\r?\n/).filter(l => l.trim().startsWith('-'));
+                        for (const line of shiftLines) {
+                            const neededMatch = line.match(/needed:\s*(\d+)/);
+                            if (neededMatch) {
+                                shifts.push({ needed: parseInt(neededMatch[1]) });
+                            }
+                        }
+                    }
+
+                    return {
+                        id: frontmatter.id || filename.replace('events/', '').replace('.md', ''),
+                        title: frontmatter.title || 'Unbenanntes Event',
+                        subtitle: frontmatter.subtitle || '',
+                        category: frontmatter.category || 'Allgemein',
+                        startDate: new Date(frontmatter.startDate),
+                        endDate: new Date(frontmatter.endDate),
+                        location: frontmatter.location || '',
+                        organizer: frontmatter.organizer || '',
+                        email: frontmatter.email || '',
+                        cost: frontmatter.cost || 'Kostenlos',
+                        registrationRequired: frontmatter.registrationRequired === true || frontmatter.registrationRequired === 'true',
+                        registrationDeadline: frontmatter.registrationDeadline ? new Date(frontmatter.registrationDeadline) : null,
+                        participantRegistration: frontmatter.participantRegistration === true || frontmatter.participantRegistration === 'true',
+                        maxParticipants: frontmatter.maxParticipants || null,
+                        status: frontmatter.status || 'confirmed',
+                        tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : (frontmatter.tags ? [frontmatter.tags] : []),
+                        description: description,
+                        shifts: shifts
+                    };
+                } catch (error) {
+                    console.error(`❌ Fehler beim Parsen von ${filename}:`, error);
+                    return null;
+                }
+            }
+
+            parseFrontmatter(frontmatterStr) {
+                const frontmatter = {};
+                const lines = frontmatterStr.split(/\r?\n/);
+                
+                let currentKey = null;
+                let currentValue = [];
+                
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed.startsWith('#')) continue;
+                    
+                    if (line.match(/^[a-zA-Z]/)) {
+                        // New key-value pair
+                        if (currentKey) {
+                            frontmatter[currentKey] = this.parseValue(currentValue.join('\n'));
+                        }
+                        
+                        const colonIndex = trimmed.indexOf(':');
+                        if (colonIndex > -1) {
+                            currentKey = trimmed.substring(0, colonIndex).trim();
+                            const value = trimmed.substring(colonIndex + 1).trim();
+                            currentValue = [value];
+                        }
+                    } else if (currentKey && trimmed.startsWith('-')) {
+                        // Array item
+                        currentValue.push(trimmed);
+                    }
+                }
+                
+                if (currentKey) {
+                    frontmatter[currentKey] = this.parseValue(currentValue.join('\n'));
+                }
+                
+                return frontmatter;
+            }
+
+            parseValue(value) {
+                const trimmed = value.trim();
+                
+                // Boolean
+                if (trimmed === 'true') return true;
+                if (trimmed === 'false') return false;
+                
+                // Number
+                if (/^\d+$/.test(trimmed)) return parseInt(trimmed);
+                if (/^\d+\.\d+$/.test(trimmed)) return parseFloat(trimmed);
+                
+                // Array
+                if (trimmed.includes('\n-')) {
+                    return trimmed.split(/\r?\n/)
+                        .filter(l => l.trim().startsWith('-'))
+                        .map(l => l.trim().substring(1).trim().replace(/^\[|\]$/g, ''));
+                }
+                
+                // String (remove quotes if present)
+                return trimmed.replace(/^["']|["']$/g, '');
+            }
+
+            parseMarkdown(markdown) {
+                // Simple markdown to HTML conversion
+                return markdown
+                    .replace(/^### (.*$)/gim, '<h3 class="text-xl font-bold mt-4 mb-2">$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold mt-6 mb-3">$1</h2>')
+                    .replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold mt-8 mb-4">$1</h1>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/\n\n/g, '</p><p class="mb-3">')
+                    .replace(/^(?!<[h|p])/gim, '<p class="mb-3">')
+                    .replace(/(<\/h[1-6]>)<p class="mb-3">/g, '$1')
+                    .replace(/^- (.*$)/gim, '<li>$1</li>')
+                    .replace(/(<li>.*<\/li>)/gs, '<ul class="mb-3 list-none">$1</ul>')
+                    .replace(/<p class="mb-3"><\/p>/g, '');
+            }
+
+            async loadArbeitsplanData() {
+                // Load arbeitsplan assignments if available
+                this.arbeitsplanData = {};
+                for (const event of this.events) {
+                    if (event.shifts && event.shifts.length > 0) {
+                        try {
+                            const assignmentFile = `events/${event.id}-assignments.md`;
+                            const response = await fetch(assignmentFile);
+                            if (response.ok) {
+                                const content = await response.text();
+                                this.arbeitsplanData[event.id] = content;
+                            }
+                        } catch (error) {
+                            console.log(`ℹ️  Keine Assignments für ${event.id}`);
+                        }
+                    }
+                }
+            }
+
+            setupEventListeners() {
+                // Filter buttons
+                document.getElementById('all-filter').addEventListener('click', () => this.setFilter('all'));
+                document.getElementById('upcoming-filter').addEventListener('click', () => this.setFilter('upcoming'));
+                document.getElementById('past-filter').addEventListener('click', () => this.setFilter('past'));
+                
+                // Category filter
+                document.getElementById('category-filter').addEventListener('change', (e) => {
+                    this.currentCategory = e.target.value;
+                    this.filterEvents();
+                    this.renderEvents();
+                });
+                
+                // Search
+                document.getElementById('search-input').addEventListener('input', (e) => {
+                    this.searchQuery = e.target.value.toLowerCase();
+                    this.filterEvents();
+                    this.renderEvents();
+                });
+                
+                // View mode
+                document.getElementById('list-view-btn').addEventListener('click', () => this.setViewMode('list'));
+                document.getElementById('grid-view-btn').addEventListener('click', () => this.setViewMode('grid'));
+                
+                // Modal close buttons
+                document.getElementById('event-modal').addEventListener('click', (e) => {
+                    if (e.target.id === 'event-modal') {
+                        this.closeModal();
+                    }
+                });
+                
+                document.getElementById('close-registration-modal').addEventListener('click', () => {
+                    document.getElementById('registration-modal').classList.add('hidden');
+                });
+                
+                document.getElementById('close-arbeitsplan-modal').addEventListener('click', () => {
+                    document.getElementById('arbeitsplan-modal').classList.add('hidden');
+                });
+                
+                document.getElementById('close-arbeitsplan-modal-btn').addEventListener('click', () => {
+                    document.getElementById('arbeitsplan-modal').classList.add('hidden');
+                });
+                
+                // Mobile menu
+                document.getElementById('mobile-menu-button').addEventListener('click', () => {
+                    document.getElementById('mobile-menu').classList.toggle('hidden');
+                });
+
+                // Arbeitsplan actions
+                document.getElementById('edit-arbeitsplan').addEventListener('click', () => {
+                    if (this.selectedEvent) {
+                        window.location.href = `schichtplan-manager.html?event=${this.selectedEvent.id}`;
+                    }
+                });
+
+                document.getElementById('download-arbeitsplan').addEventListener('click', () => {
+                    if (this.selectedEvent) {
+                        const pdfPath = `pdfs/arbeitsplan-${this.selectedEvent.id}.pdf`;
+                        window.open(pdfPath, '_blank');
+                    }
+                });
+            }
+
+            setFilter(filter) {
+                this.currentFilter = filter;
+                
+                // Update button styles
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.classList.remove('bg-fire-500', 'text-white');
+                    btn.classList.add('border', 'border-gray-300', 'text-gray-700');
+                });
+                
+                const activeBtn = document.getElementById(`${filter}-filter`);
+                activeBtn.classList.remove('border', 'border-gray-300', 'text-gray-700');
+                activeBtn.classList.add('bg-fire-500', 'text-white');
+                
+                this.filterEvents();
+                this.renderEvents();
+            }
+
+            setViewMode(mode) {
+                this.viewMode = mode;
+                
+                // Update button styles
+                const listBtn = document.getElementById('list-view-btn');
+                const gridBtn = document.getElementById('grid-view-btn');
+                
+                if (mode === 'list') {
+                    listBtn.classList.remove('border', 'border-gray-300', 'text-gray-600');
+                    listBtn.classList.add('bg-fire-500', 'text-white');
+                    gridBtn.classList.remove('bg-fire-500', 'text-white');
+                    gridBtn.classList.add('border', 'border-gray-300', 'text-gray-600');
+                } else {
+                    gridBtn.classList.remove('border', 'border-gray-300', 'text-gray-600');
+                    gridBtn.classList.add('bg-fire-500', 'text-white');
+                    listBtn.classList.remove('bg-fire-500', 'text-white');
+                    listBtn.classList.add('border', 'border-gray-300', 'text-gray-600');
+                }
+                
+                this.renderEvents();
+            }
+
+            filterEvents() {
+                const now = new Date();
+                let filtered = [...this.events];
+
+                // Time filter
+                if (this.currentFilter === 'upcoming') {
+                    filtered = filtered.filter(event => event.startDate >= now);
+                } else if (this.currentFilter === 'past') {
+                    filtered = filtered.filter(event => event.endDate < now);
+                }
+
+                // Category filter
+                if (this.currentCategory) {
+                    filtered = filtered.filter(event => event.category === this.currentCategory);
+                }
+
+                // Search filter
+                if (this.searchQuery) {
+                    filtered = filtered.filter(event => 
+                        event.title.toLowerCase().includes(this.searchQuery) ||
+                        event.description.toLowerCase().includes(this.searchQuery) ||
+                        event.location.toLowerCase().includes(this.searchQuery) ||
+                        event.organizer.toLowerCase().includes(this.searchQuery) ||
+                        (event.tags && event.tags.some(tag => tag.toLowerCase().includes(this.searchQuery)))
+                    );
+                }
+
+                // Sort by date
+                filtered.sort((a, b) => {
+                    if (this.currentFilter === 'past') {
+                        return b.startDate - a.startDate;
+                    }
+                    return a.startDate - b.startDate;
+                });
+
+                this.filteredEvents = filtered;
+            }
+
+            renderEvents() {
+                const container = document.getElementById('events-container');
+                const noEventsMsg = document.getElementById('no-events');
+
+                if (this.filteredEvents.length === 0) {
+                    container.innerHTML = '';
+                    noEventsMsg.classList.remove('hidden');
+                    return;
+                }
+
+                noEventsMsg.classList.add('hidden');
+
+                if (this.viewMode === 'list') {
+                    container.className = 'space-y-6';
+                    container.innerHTML = this.filteredEvents.map(event => this.createEventListItem(event)).join('');
+                } else {
+                    container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6';
+                    container.innerHTML = this.filteredEvents.map(event => this.createEventGridItem(event)).join('');
+                }
+
+                // Add click listeners
+                container.querySelectorAll('[data-event-id]').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        const eventId = e.currentTarget.dataset.eventId;
+                        this.showEventModal(eventId);
+                    });
+                });
+            }
+
+            createEventListItem(event) {
+                const isPast = event.endDate < new Date();
+                const statusBadge = this.getStatusBadge(event);
+                const registrationBadge = this.getRegistrationBadge(event);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
+                         data-event-id="${event.id}">
+                        <div class="p-6">
+                            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-start justify-between mb-3">
+                                        <div>
+                                            <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
+                                            <p class="text-fire-600 font-medium">${event.subtitle || ''}</p>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            ${statusBadge}
+                                            ${registrationBadge}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="prose prose-sm max-w-none mb-4 text-gray-600">
+                                        ${this.truncateText(event.description, 200)}
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-500 mb-4">
+                                        <div class="space-y-2">
+                                            <div class="flex items-center">
+                                                <span class="mr-2">📅</span>
+                                                <span>${this.formatDate(event.startDate)}</span>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="mr-2">⏰</span>
+                                                <span>${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
+                                            </div>
+                                        </div>
+                                        <div class="space-y-2">
+                                            <div class="flex items-center">
+                                                <span class="mr-2">📍</span>
+                                                <span>${event.location}</span>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <span class="mr-2">👤</span>
+                                                <span>${event.organizer}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex flex-wrap gap-2">
+                                        ${(event.tags || []).map(tag => `
+                                            <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                                                ${tag}
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4 lg:mt-0 lg:ml-6 flex-shrink-0">
+                                    <span class="inline-block px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
+                                        ${event.category || 'Event'}
+                                    </span>
+                                    ${event.cost && event.cost !== 'Kostenlos' ? `
+                                        <div class="mt-2 text-lg font-bold text-fire-600">
+                                            ${event.cost}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            createEventGridItem(event) {
+                const isPast = event.endDate < new Date();
+                const statusBadge = this.getStatusBadge(event);
+                const registrationBadge = this.getRegistrationBadge(event);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}" 
+                         data-event-id="${event.id}">
+                        <div class="p-5">
+                            <div class="flex items-start justify-between mb-3">
+                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded-full text-xs font-medium">
+                                    ${event.category || 'Event'}
+                                </span>
+                                <div class="flex space-x-1">
+                                    ${statusBadge}
+                                    ${registrationBadge}
+                                </div>
+                            </div>
+                            
+                            <h3 class="text-lg font-bold text-gray-800 mb-1">${event.title}</h3>
+                            <p class="text-fire-600 text-sm mb-3">${event.subtitle || ''}</p>
+                            
+                            <div class="text-sm text-gray-600 mb-4 line-clamp-2">
+                                ${this.truncateText(event.description, 100)}
+                            </div>
+                            
+                            <div class="space-y-2 text-sm text-gray-500 mb-4">
+                                <div class="flex items-center">
+                                    <span class="mr-2">📅</span>
+                                    <span>${this.formatDate(event.startDate)}</span>
+                                </div>
+                                <div class="flex items-center">
+                                    <span class="mr-2">📍</span>
+                                    <span class="truncate">${event.location}</span>
+                                </div>
+                            </div>
+                            
+                            ${event.cost && event.cost !== 'Kostenlos' ? `
+                                <div class="text-fire-600 font-bold text-lg mb-2">
+                                    ${event.cost}
+                                </div>
+                            ` : ''}
+                            
+                            <div class="flex flex-wrap gap-1">
+                                ${(event.tags || []).slice(0, 3).map(tag => `
+                                    <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                                        ${tag}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            getStatusBadge(event) {
+                if (event.status === 'cancelled') {
+                    return '<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">❌ Abgesagt</span>';
+                } else if (event.status === 'confirmed') {
+                    return '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">✅ Bestätigt</span>';
+                }
+                return '';
+            }
+
+            getRegistrationBadge(event) {
+                const category = event.category || '';
+
+                // Category-based registration logic
+                if (category === 'Dorffest') {
+                    // Dorffest: Helfer-Schichten
+                    if (event.shifts && event.shifts.length > 0) {
+                        return '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">👷 Helfer gesucht</span>';
+                    }
+                } else if (category === 'Ausflug') {
+                    // Ausflug: Keine Anmeldung nötig
+                    return '';
+                } else if (category === 'Ausflug mit Anmeldung' || category === 'Aufbau' || category === 'Abbau') {
+                    // Ausflug mit Anmeldung / Aufbau / Abbau: Teilnehmer-Anmeldung
+                    return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">📧 Anmeldung erforderlich</span>';
+                } else {
+                    // Sonstiges: Fallback auf bisherige Logik
+                    if (event.registrationRequired) {
+                        if (event.shifts && event.shifts.length > 0) {
+                            return '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">👷 Helfer gesucht</span>';
+                        } else if (event.participantRegistration) {
+                            return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">📧 Anmeldung möglich</span>';
+                        }
+                    }
+                }
+                return '';
+            }
+
+            getRegistrationButtons(event) {
+                const category = event.category || '';
+                let buttons = '';
+
+                // Category-based button logic
+                if (category === 'Dorffest') {
+                    // Dorffest: Schichten-Anmeldung für Helfer
+                    if (event.shifts && event.shifts.length > 0) {
+                        buttons += `
+                            <button onclick="eventsManager.showShiftRegistration()"
+                                    class="flex-1 min-w-[200px] bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                                👷 Für Schicht anmelden
+                            </button>
+                        `;
+                        if (this.arbeitsplanData[event.id]) {
+                            buttons += `
+                                <button onclick="eventsManager.showArbeitsplan()"
+                                        class="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
+                                    📋 Arbeitsplan ansehen
+                                </button>
+                            `;
+                        }
+                    }
+                } else if (category === 'Ausflug') {
+                    // Ausflug: Keine Anmeldung nötig - keine Buttons
+                } else if (category === 'Ausflug mit Anmeldung' || category === 'Aufbau' || category === 'Abbau') {
+                    // Ausflug mit Anmeldung / Aufbau / Abbau: Teilnehmer-Anmeldung
+                    buttons += `
+                        <button onclick="eventsManager.showParticipantRegistration()"
+                                class="flex-1 min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
+                            📧 Jetzt anmelden
+                        </button>
+                    `;
+                } else {
+                    // Sonstiges: Fallback auf bisherige Logik
+                    if (event.registrationRequired && event.shifts && event.shifts.length > 0) {
+                        buttons += `
+                            <button onclick="eventsManager.showShiftRegistration()"
+                                    class="flex-1 min-w-[200px] bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                                👷 Für Schicht anmelden
+                            </button>
+                        `;
+                        if (this.arbeitsplanData[event.id]) {
+                            buttons += `
+                                <button onclick="eventsManager.showArbeitsplan()"
+                                        class="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
+                                    📋 Arbeitsplan ansehen
+                                </button>
+                            `;
+                        }
+                    } else if (event.registrationRequired && event.participantRegistration) {
+                        buttons += `
+                            <button onclick="eventsManager.showParticipantRegistration()"
+                                    class="flex-1 min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
+                                📧 Jetzt anmelden
+                            </button>
+                        `;
+                    }
+                }
+
+                return buttons;
+            }
+
+            showEventModal(eventId) {
+                const event = this.events.find(e => e.id === eventId);
+                if (!event) return;
+
+                this.selectedEvent = event;
+                const modal = document.getElementById('event-modal');
+                const content = document.getElementById('modal-content');
+
+                content.innerHTML = `
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 class="text-3xl font-bold text-gray-800">${event.title}</h2>
+                                ${event.subtitle ? `<p class="text-lg text-fire-600 font-medium mt-1">${event.subtitle}</p>` : ''}
+                            </div>
+                            <button onclick="document.getElementById('event-modal').classList.add('hidden')" 
+                                    class="text-gray-500 hover:text-gray-700 text-3xl leading-none">
+                                ×
+                            </button>
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-2 mb-6">
+                            ${this.getStatusBadge(event)}
+                            ${this.getRegistrationBadge(event)}
+                            <span class="px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
+                                ${event.category || 'Event'}
+                            </span>
+                        </div>
+                        
+                        <div class="prose max-w-none mb-6">
+                            ${event.description}
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-lg mb-6">
+                            <div class="space-y-3">
+                                <h4 class="font-semibold text-gray-800 text-lg">📅 Termin</h4>
+                                <div class="space-y-2 text-sm">
+                                    <div><strong>Datum:</strong> ${this.formatDate(event.startDate)}</div>
+                                    <div><strong>Zeit:</strong> ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</div>
+                                    <div><strong>Ort:</strong> ${event.location}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <h4 class="font-semibold text-gray-800 text-lg">📞 Kontakt & Details</h4>
+                                <div class="space-y-2 text-sm">
+                                    <div><strong>Organisator:</strong> ${event.organizer}</div>
+                                    <div><strong>E-Mail:</strong> <a href="mailto:${event.email}" class="text-fire-600 hover:text-fire-700">${event.email}</a></div>
+                                    <div><strong>Kosten:</strong> <span class="font-medium">${event.cost}</span></div>
+                                    ${event.registrationDeadline ? `
+                                        <div><strong>Anmeldeschluss:</strong> ${this.formatDate(event.registrationDeadline)}</div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${event.tags && event.tags.length > 0 ? `
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-gray-800 mb-2">Tags:</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    ${event.tags.map(tag => `
+                                        <span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
+                                            ${tag}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="flex flex-wrap gap-3 mt-6">
+                            ${this.getRegistrationButtons(event)}
+                            
+                            <button onclick="eventsManager.downloadICS()" 
+                                    class="flex-1 min-w-[200px] border border-fire-500 text-fire-500 px-6 py-3 rounded-lg hover:bg-fire-50 transition-colors">
+                                📅 Zu Kalender hinzufügen
+                            </button>
+                            
+                            <button onclick="document.getElementById('event-modal').classList.add('hidden')" 
+                                    class="flex-1 min-w-[200px] border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                Schließen
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            showShiftRegistration() {
+                const event = this.selectedEvent;
+                if (!event || !event.shifts) return;
+
+                const modal = document.getElementById('registration-modal');
+                const content = document.getElementById('registration-content');
+
+                content.innerHTML = `
+                    <form id="shift-registration-form" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                            <input type="text" name="name" required 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail *</label>
+                            <input type="email" name="email" required 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
+                            <input type="tel" name="phone" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Schichten auswählen *</label>
+                            <p class="text-sm text-gray-500 mb-2">💡 Tipp: Bitte buche 2 Schichten am Stück für optimalen Ablauf</p>
+                            <div class="space-y-2 max-h-80 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                                ${event.shifts.map((shift, index) => {
+                                    const regs = shift.registrations || { approved: [], pending: [], spotsLeft: shift.needed };
+                                    const isFull = regs.spotsLeft <= 0;
+                                    return `
+                                    <div class="p-3 border rounded-lg ${isFull ? 'bg-gray-100 opacity-60' : 'hover:bg-gray-50'}">
+                                        <label class="flex items-start space-x-3 cursor-pointer ${isFull ? 'cursor-not-allowed' : ''}">
+                                            <input type="checkbox" name="shifts" value="${shift.id || index}"
+                                                   data-name="${shift.name || `Schicht ${index + 1}`}"
+                                                   ${isFull ? 'disabled' : ''}
+                                                   class="mt-1 w-4 h-4 text-fire-500 border-gray-300 rounded focus:ring-fire-500">
+                                            <div class="flex-1">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="font-medium text-sm">${shift.name || `Schicht ${index + 1}`}</span>
+                                                    <span class="text-xs ${regs.spotsLeft > 1 ? 'text-green-600' : regs.spotsLeft === 1 ? 'text-orange-600' : 'text-red-600'}">
+                                                        ${isFull ? '❌ Voll' : `✓ ${regs.spotsLeft}/${shift.needed} frei`}
+                                                    </span>
+                                                </div>
+                                                ${regs.approved.length > 0 ? `
+                                                    <div class="mt-1 text-xs text-green-700">
+                                                        <span class="font-medium">Vergeben:</span> ${regs.approved.map(r => r.name).join(', ')}
+                                                    </div>
+                                                ` : ''}
+                                                ${regs.pending.length > 0 ? `
+                                                    <div class="mt-1 text-xs text-yellow-700">
+                                                        <span class="font-medium">Reserviert:</span> ${regs.pending.map(r => r.name).join(', ')}
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                        </label>
+                                    </div>
+                                `}).join('')}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Bemerkungen</label>
+                            <textarea name="notes" rows="3" 
+                                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500"></textarea>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <button type="submit" 
+                                    class="flex-1 bg-fire-500 text-white px-6 py-3 rounded-lg hover:bg-fire-600 transition-colors">
+                                Anmeldung absenden
+                            </button>
+                            <button type="button" onclick="document.getElementById('registration-modal').classList.add('hidden')" 
+                                    class="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                Abbrechen
+                            </button>
+                        </div>
+                    </form>
+                `;
+
+                // Add form submit handler
+                document.getElementById('shift-registration-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.submitShiftRegistration(new FormData(e.target));
+                });
+
+                modal.classList.remove('hidden');
+            }
+
+            showParticipantRegistration() {
+                const event = this.selectedEvent;
+                if (!event) return;
+
+                const modal = document.getElementById('registration-modal');
+                const content = document.getElementById('registration-content');
+
+                content.innerHTML = `
+                    <form id="participant-registration-form" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                            <input type="text" name="name" required 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail *</label>
+                            <input type="email" name="email" required 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
+                            <input type="tel" name="phone" 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Anzahl Personen *</label>
+                            <input type="number" name="participants" min="1" max="${event.maxParticipants || 10}" value="1" required 
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            ${event.maxParticipants ? `<p class="text-sm text-gray-500 mt-1">Maximal ${event.maxParticipants} Teilnehmer</p>` : ''}
+                        </div>
+                        
+                        ${event.cost && event.cost !== 'Kostenlos' ? `
+                            <div class="bg-fire-50 p-4 rounded-lg">
+                                <p class="text-fire-800 font-medium">Kosten: ${event.cost}</p>
+                            </div>
+                        ` : ''}
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Bemerkungen</label>
+                            <textarea name="notes" rows="3" 
+                                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500"></textarea>
+                        </div>
+                        
+                        <div class="flex gap-3">
+                            <button type="submit" 
+                                    class="flex-1 bg-fire-500 text-white px-6 py-3 rounded-lg hover:bg-fire-600 transition-colors">
+                                Anmeldung absenden
+                            </button>
+                            <button type="button" onclick="document.getElementById('registration-modal').classList.add('hidden')" 
+                                    class="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                Abbrechen
+                            </button>
+                        </div>
+                    </form>
+                `;
+
+                // Add form submit handler
+                document.getElementById('participant-registration-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.submitParticipantRegistration(new FormData(e.target));
+                });
+
+                modal.classList.remove('hidden');
+            }
+
+            async submitShiftRegistration(formData) {
+                const selectedShiftInputs = document.querySelectorAll('#shift-registration-form input[name="shifts"]:checked');
+
+                if (selectedShiftInputs.length === 0) {
+                    alert('Bitte wählen Sie mindestens eine Schicht aus.');
+                    return;
+                }
+
+                // Button deaktivieren
+                const submitBtn = document.querySelector('#shift-registration-form button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Wird gesendet...';
+
+                // Sammle Schicht-Infos mit ID und Name
+                const shiftsData = Array.from(selectedShiftInputs).map(input => ({
+                    id: input.value,
+                    name: input.dataset.name
+                }));
+
+                const payload = {
+                    type: 'shift',
+                    eventId: this.selectedEvent.id,
+                    eventTitle: this.selectedEvent.title,
+                    organizerEmail: this.selectedEvent.email,
+                    name: formData.get('name'),
+                    email: formData.get('email'),
+                    phone: formData.get('phone') || '',
+                    shifts: shiftsData.map(s => s.name),
+                    shiftIds: shiftsData.map(s => s.id),
+                    notes: formData.get('notes') || ''
+                };
+
+                try {
+                    const response = await fetch('https://api.fwv-raura.ch/registrations/public', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        document.getElementById('registration-modal').classList.add('hidden');
+                        this.showSuccessMessage('Vielen Dank für Ihre Anmeldung!\n\nIhre Anmeldung wird vom Vorstand geprüft. Sie erhalten eine Bestätigung per E-Mail.');
+                    } else if (response.status === 409 && result.isMember) {
+                        // User ist Mitglied - zum Login auffordern
+                        this.showMemberLoginPrompt(result.memberName, payload);
+                    } else {
+                        throw new Error(result.message || 'Unbekannter Fehler');
+                    }
+                } catch (error) {
+                    console.error('Fehler bei Anmeldung:', error);
+                    alert('Beim Senden ist ein Fehler aufgetreten.\n\nBitte versuchen Sie es später erneut.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            }
+
+            async submitParticipantRegistration(formData) {
+                // Button deaktivieren
+                const submitBtn = document.querySelector('#participant-registration-form button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Wird gesendet...';
+
+                const payload = {
+                    type: 'participant',
+                    eventId: this.selectedEvent.id,
+                    eventTitle: this.selectedEvent.title,
+                    organizerEmail: this.selectedEvent.email,
+                    name: formData.get('name'),
+                    email: formData.get('email'),
+                    phone: formData.get('phone') || '',
+                    participants: parseInt(formData.get('participants')) || 1,
+                    notes: formData.get('notes') || ''
+                };
+
+                try {
+                    const response = await fetch('https://api.fwv-raura.ch/registrations/public', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        document.getElementById('registration-modal').classList.add('hidden');
+                        this.showSuccessMessage('Vielen Dank für Ihre Anmeldung!\n\nIhre Anmeldung wird vom Vorstand geprüft. Sie erhalten eine Bestätigung per E-Mail.');
+                    } else if (response.status === 409 && result.isMember) {
+                        // User ist Mitglied - zum Login auffordern
+                        this.showMemberLoginPrompt(result.memberName, payload);
+                    } else {
+                        throw new Error(result.message || 'Unbekannter Fehler');
+                    }
+                } catch (error) {
+                    console.error('Fehler bei Anmeldung:', error);
+                    alert('Beim Senden ist ein Fehler aufgetreten.\n\nBitte versuchen Sie es später erneut.');
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            }
+
+            showMemberLoginPrompt(memberName, originalPayload) {
+                const content = document.getElementById('registration-content');
+                content.innerHTML = `
+                    <div class="text-center py-6">
+                        <div class="text-6xl mb-4">👤</div>
+                        <h4 class="text-xl font-bold text-gray-800 mb-3">Mitglied erkannt!</h4>
+                        <p class="text-gray-600 mb-6">
+                            Diese E-Mail-Adresse gehört zu <strong>${memberName}</strong>.<br>
+                            Als Mitglied können Sie sich direkt über den Mitglieder-Bereich anmelden.
+                        </p>
+                        <div class="space-y-3">
+                            <a href="mein.html?redirect=events&event=${this.selectedEvent?.id || ''}"
+                               class="block w-full bg-fire-500 text-white px-6 py-3 rounded-lg hover:bg-fire-600 transition-colors">
+                                Zum Mitglieder-Login
+                            </a>
+                            <button onclick="eventsManager.continueAsGuest()"
+                                    class="block w-full border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                Trotzdem als Gast anmelden
+                            </button>
+                            <button onclick="document.getElementById('registration-modal').classList.add('hidden')"
+                                    class="block w-full text-gray-500 hover:text-gray-700 py-2">
+                                Abbrechen
+                            </button>
+                        </div>
+                    </div>
+                `;
+                this.pendingGuestPayload = originalPayload;
+            }
+
+            async continueAsGuest() {
+                if (!this.pendingGuestPayload) return;
+
+                const payload = { ...this.pendingGuestPayload, skipMemberCheck: true };
+
+                try {
+                    const response = await fetch('https://api.fwv-raura.ch/registrations/public', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok && result.success) {
+                        document.getElementById('registration-modal').classList.add('hidden');
+                        this.showSuccessMessage('Vielen Dank für Ihre Anmeldung!\n\nIhre Anmeldung wird vom Vorstand geprüft. Sie erhalten eine Bestätigung per E-Mail.');
+                    } else {
+                        throw new Error(result.message || 'Unbekannter Fehler');
+                    }
+                } catch (error) {
+                    console.error('Fehler bei Gast-Anmeldung:', error);
+                    alert('Beim Senden ist ein Fehler aufgetreten.');
+                }
+
+                this.pendingGuestPayload = null;
+            }
+
+            showSuccessMessage(message) {
+                alert(message);
+            }
+
+            showArbeitsplan() {
+                const event = this.selectedEvent;
+                if (!event || !this.arbeitsplanData[event.id]) return;
+
+                const modal = document.getElementById('arbeitsplan-modal');
+                const content = document.getElementById('arbeitsplan-content');
+
+                // Parse the arbeitsplan markdown
+                const arbeitsplanHTML = this.parseMarkdown(this.arbeitsplanData[event.id]);
+
+                content.innerHTML = `
+                    <div class="prose max-w-none">
+                        ${arbeitsplanHTML}
+                    </div>
+                `;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            downloadICS() {
+                const event = this.selectedEvent;
+                if (!event) return;
+
+                const icsContent = [
+                    'BEGIN:VCALENDAR',
+                    'VERSION:2.0',
+                    'PRODID:-//Feuerwehrverein Raura//Events//DE',
+                    'BEGIN:VEVENT',
+                    `UID:${event.id}@feuerwehrverein-raura.ch`,
+                    `DTSTAMP:${this.formatDateForICS(new Date())}`,
+                    `DTSTART:${this.formatDateForICS(event.startDate)}`,
+                    `DTEND:${this.formatDateForICS(event.endDate)}`,
+                    `SUMMARY:${event.title}`,
+                    `DESCRIPTION:${event.description.replace(/<[^>]*>/g, '').substring(0, 200)}`,
+                    `LOCATION:${event.location}`,
+                    `ORGANIZER;CN=${event.organizer}:mailto:${event.email}`,
+                    'END:VEVENT',
+                    'END:VCALENDAR'
+                ].join('\r\n');
+
+                const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `${event.id}.ics`;
+                link.click();
+            }
+
+            closeModal() {
+                document.getElementById('event-modal').classList.add('hidden');
+                document.getElementById('event-modal').classList.remove('flex');
+                this.selectedEvent = null;
+            }
+
+            truncateText(text, maxLength) {
+                const plainText = text.replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim();
+                if (plainText.length <= maxLength) return plainText;
+                return plainText.substring(0, maxLength) + '...';
+            }
+
+            formatDate(date) {
+                return new Intl.DateTimeFormat('de-DE', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    weekday: 'long'
+                }).format(date);
+            }
+
+            formatTime(date) {
+                return new Intl.DateTimeFormat('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            }
+
+            formatDateForICS(date) {
+                return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            }
+        }
+
+        // Initialize events manager when page loads
+        let eventsManager;
+        document.addEventListener('DOMContentLoaded', () => {
+            eventsManager = new EventsManager();
+        });
+    </script>
+</body>
+</html>

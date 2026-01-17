@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mein Portal - Feuerwehrverein Raura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#dc2626',
+                            600: '#b91c1c',
+                            700: '#991b1b',
+                            800: '#7f1d1d'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-fire-700 text-white shadow-lg">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <h1 class="text-xl font-bold">Mein Portal</h1>
+                <div class="flex space-x-4 items-center">
+                    <span id="user-name" class="text-sm">Laden...</span>
+                    <a href="index.html" class="hover:text-fire-200 transition-colors">Website</a>
+                    <a href="events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                    <button id="logout-btn" class="hover:text-fire-200 transition-colors">Abmelden</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Tabs -->
+    <section class="bg-white border-b">
+        <div class="container mx-auto px-4">
+            <div class="flex space-x-8 border-b">
+                <button id="tab-profile" class="tab-btn py-4 px-2 font-semibold border-b-2 border-fire-500 text-fire-600">
+                    Mein Profil
+                </button>
+                <button id="tab-notifications" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                    Benachrichtigungen
+                </button>
+                <button id="tab-events" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                    Meine Events
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Profile Section -->
+    <div id="profile-section">
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="max-w-3xl mx-auto">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Persönliche Daten</h2>
+
+                        <form id="profile-form" class="space-y-6">
+                            <!-- Persönliche Daten (read-only) -->
+                            <div>
+                                <h3 class="font-semibold text-gray-700 mb-3">Stammdaten</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Vorname</label>
+                                        <input type="text" id="profile-vorname" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Nachname</label>
+                                        <input type="text" id="profile-nachname" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Funktion</label>
+                                        <input type="text" id="profile-funktion" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                                        <input type="text" id="profile-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kontaktdaten (editable) -->
+                            <div>
+                                <h3 class="font-semibold text-gray-700 mb-3">Kontaktdaten</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                                        <input type="tel" id="profile-telefon" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label>
+                                        <input type="tel" id="profile-mobile" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                                        <input type="email" id="profile-email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Adresse (editable) -->
+                            <div>
+                                <h3 class="font-semibold text-gray-700 mb-3">Adresse</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Strasse</label>
+                                        <input type="text" id="profile-strasse" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">PLZ</label>
+                                        <input type="text" id="profile-plz" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Ort</label>
+                                        <input type="text" id="profile-ort" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bankdaten (editable) -->
+                            <div>
+                                <h3 class="font-semibold text-gray-700 mb-3">Bankverbindung</h3>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">IBAN</label>
+                                    <input type="text" id="profile-iban" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                </div>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div class="flex justify-end pt-4 border-t">
+                                <button type="submit" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
+                                    Speichern
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Notifications Section -->
+    <div id="notifications-section" class="hidden">
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="max-w-3xl mx-auto">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Benachrichtigungseinstellungen</h2>
+                        <p class="text-gray-600 mb-6">Verwalten Sie Ihre E-Mail-Benachrichtigungen. Sie können für jeden Typ eine alternative E-Mail-Adresse angeben.</p>
+
+                        <div id="notifications-list" class="space-y-6">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+
+                        <div class="flex justify-end pt-6 border-t mt-6">
+                            <button id="save-notifications-btn" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
+                                Einstellungen speichern
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Events Section -->
+    <div id="events-section" class="hidden">
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="max-w-4xl mx-auto">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Meine Veranstaltungen</h2>
+
+                        <div id="my-events-list" class="space-y-4">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+
+                        <!-- Loading State -->
+                        <div id="events-loading" class="text-center py-8">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                            <p class="mt-4 text-gray-600">Lade Events...</p>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="events-empty" class="text-center py-8 hidden">
+                            <p class="text-gray-600">Sie sind für keine Veranstaltungen angemeldet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.fwv-raura.ch';
+        const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
+        const CLIENT_ID = 'fwv-members';
+        const REDIRECT_URI = window.location.origin + '/auth-callback.html';
+
+        let authToken = null;
+        let currentTab = 'profile';
+        let memberData = null;
+        let notifications = [];
+
+        // Redirect to Authentik login
+        function redirectToLogin() {
+            localStorage.removeItem('auth_token');
+            const state = encodeURIComponent(window.location.pathname);
+            window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
+        }
+
+        // Check authentication
+        async function checkAuth() {
+            // Check for token in URL (from callback)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('token')) {
+                authToken = urlParams.get('token');
+                localStorage.setItem('auth_token', authToken);
+                // Remove token from URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                authToken = localStorage.getItem('auth_token');
+            }
+
+            if (!authToken) {
+                redirectToLogin();
+                return false;
+            }
+
+            // Validate token by making a test API call
+            try {
+                const response = await fetch(`${API_BASE}/members/me`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (response.status === 401 || response.status === 403) {
+                    console.log('Token invalid or expired, redirecting to login');
+                    redirectToLogin();
+                    return false;
+                }
+
+                if (response.ok) {
+                    // Token is valid, store the member data
+                    memberData = await response.json();
+                    document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
+                    return true;
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                redirectToLogin();
+                return false;
+            }
+
+            return true;
+        }
+
+        // Load member profile
+        async function loadProfile() {
+            try {
+                // If memberData wasn't loaded in checkAuth, load it now
+                if (!memberData) {
+                    const response = await fetch(`${API_BASE}/members/me`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+
+                    if (response.status === 401 || response.status === 403) {
+                        redirectToLogin();
+                        return;
+                    }
+
+                    if (!response.ok) throw new Error('Failed to load profile');
+
+                    memberData = await response.json();
+                    document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
+                }
+
+                // Populate form
+                document.getElementById('profile-vorname').value = memberData.vorname || '';
+                document.getElementById('profile-nachname').value = memberData.nachname || '';
+                document.getElementById('profile-funktion').value = memberData.funktion || '-';
+                document.getElementById('profile-status').value = memberData.status || 'Aktivmitglied';
+                document.getElementById('profile-telefon').value = memberData.telefon || '';
+                document.getElementById('profile-mobile').value = memberData.mobile || '';
+                document.getElementById('profile-email').value = memberData.email || '';
+                document.getElementById('profile-strasse').value = memberData.strasse || '';
+                document.getElementById('profile-plz').value = memberData.plz || '';
+                document.getElementById('profile-ort').value = memberData.ort || '';
+                document.getElementById('profile-iban').value = memberData.iban || '';
+
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                alert('Fehler beim Laden des Profils');
+            }
+        }
+
+        // Save profile
+        async function saveProfile(e) {
+            e.preventDefault();
+
+            try {
+                const data = {
+                    telefon: document.getElementById('profile-telefon').value,
+                    mobile: document.getElementById('profile-mobile').value,
+                    email: document.getElementById('profile-email').value,
+                    strasse: document.getElementById('profile-strasse').value,
+                    plz: document.getElementById('profile-plz').value,
+                    ort: document.getElementById('profile-ort').value,
+                    iban: document.getElementById('profile-iban').value
+                };
+
+                console.log('Saving profile data:', data);
+
+                const response = await fetch(`${API_BASE}/members/me`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Save profile failed:', response.status, errorData);
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                alert('Profil erfolgreich gespeichert!');
+                await loadProfile();
+
+            } catch (error) {
+                console.error('Error saving profile:', error);
+                alert('Fehler beim Speichern des Profils: ' + error.message);
+            }
+        }
+
+        // Load notification preferences
+        async function loadNotifications() {
+            try {
+                const response = await fetch(`${API_BASE}/members/me/notifications`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    console.log('No notifications found, using defaults');
+                    notifications = [];
+                } else {
+                    notifications = await response.json();
+                }
+
+                renderNotifications();
+
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+                // Show defaults even if API fails
+                notifications = [];
+                renderNotifications();
+            }
+        }
+
+        // Render notification preferences
+        function renderNotifications() {
+            const container = document.getElementById('notifications-list');
+            const notificationLabels = {
+                'shift_reminder': 'Schicht-Erinnerungen',
+                'event_update': 'Event-Updates',
+                'newsletter': 'Newsletter',
+                'general': 'Allgemeine Benachrichtigungen'
+            };
+
+            const notificationDescriptions = {
+                'shift_reminder': 'Erinnerungen für anstehende Schichten',
+                'event_update': 'Benachrichtigungen über Event-Änderungen',
+                'newsletter': 'Monatlicher Newsletter',
+                'general': 'Allgemeine Vereinsmitteilungen'
+            };
+
+            // Default notification types if none exist
+            const defaultTypes = ['shift_reminder', 'event_update', 'newsletter', 'general'];
+
+            // Use existing notifications or create defaults
+            let displayNotifications = notifications;
+            if (!notifications || notifications.length === 0) {
+                displayNotifications = defaultTypes.map(type => ({
+                    notification_type: type,
+                    enabled: true,
+                    alternative_email: null
+                }));
+            }
+
+            container.innerHTML = displayNotifications.map(notif => `
+                <div class="border border-gray-200 rounded-lg p-4" data-notification-type="${notif.notification_type}">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h4 class="font-semibold text-gray-800">${notificationLabels[notif.notification_type] || notif.notification_type}</h4>
+                            <p class="text-sm text-gray-600">${notificationDescriptions[notif.notification_type] || ''}</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer notif-enabled" ${notif.enabled ? 'checked' : ''}>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-fire-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-fire-600"></div>
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Alternative E-Mail (optional)</label>
+                        <input type="email" class="notif-alt-email w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"
+                               value="${notif.alternative_email || ''}"
+                               placeholder="Leer = Standard E-Mail verwenden">
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Save notification preferences
+        async function saveNotifications() {
+            try {
+                const notifElements = document.querySelectorAll('#notifications-list > div');
+                const preferences = Array.from(notifElements).map(el => {
+                    return {
+                        notification_type: el.dataset.notificationType,
+                        enabled: el.querySelector('.notif-enabled').checked,
+                        alternative_email: el.querySelector('.notif-alt-email').value || null
+                    };
+                });
+
+                console.log('Saving notification preferences:', preferences);
+
+                const response = await fetch(`${API_BASE}/members/me/notifications`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ preferences })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('Save notifications failed:', response.status, errorData);
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                alert('Benachrichtigungseinstellungen gespeichert!');
+                await loadNotifications();
+
+            } catch (error) {
+                console.error('Error saving notifications:', error);
+                alert('Fehler beim Speichern der Einstellungen: ' + error.message);
+            }
+        }
+
+        // Load my events
+        async function loadMyEvents() {
+            try {
+                document.getElementById('events-loading').classList.remove('hidden');
+                document.getElementById('events-empty').classList.add('hidden');
+                document.getElementById('my-events-list').innerHTML = '';
+
+                // Check if memberData is loaded
+                if (!memberData || !memberData.id) {
+                    console.log('memberData not yet loaded, showing empty state');
+                    document.getElementById('events-loading').classList.add('hidden');
+                    document.getElementById('events-empty').classList.remove('hidden');
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE}/registrations?member_id=${memberData.id}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    // If 404 or other error, show empty state instead of error
+                    console.log('No registrations found or API error');
+                    document.getElementById('events-empty').classList.remove('hidden');
+                    return;
+                }
+
+                const registrations = await response.json();
+                renderMyEvents(registrations);
+
+            } catch (error) {
+                console.error('Error loading events:', error);
+                // Show empty state instead of error message
+                document.getElementById('events-empty').classList.remove('hidden');
+            } finally {
+                document.getElementById('events-loading').classList.add('hidden');
+            }
+        }
+
+        // Render my events
+        function renderMyEvents(registrations) {
+            const container = document.getElementById('my-events-list');
+
+            if (registrations.length === 0) {
+                container.innerHTML = '';
+                document.getElementById('events-empty').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('events-empty').classList.add('hidden');
+
+            container.innerHTML = registrations.map(reg => `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-semibold text-gray-800">${reg.event_title}</h4>
+                            <p class="text-sm text-gray-600 mt-1">Status: <span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(reg.status)}">${getStatusLabel(reg.status)}</span></p>
+                            ${reg.notes ? `<p class="text-sm text-gray-600 mt-2">Notiz: ${reg.notes}</p>` : ''}
+                        </div>
+                        <span class="text-xs text-gray-500">${new Date(reg.created_at).toLocaleDateString('de-CH')}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getStatusClass(status) {
+            const classes = {
+                'pending': 'bg-yellow-100 text-yellow-800',
+                'confirmed': 'bg-green-100 text-green-800',
+                'cancelled': 'bg-red-100 text-red-800'
+            };
+            return classes[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        function getStatusLabel(status) {
+            const labels = {
+                'pending': 'Ausstehend',
+                'confirmed': 'Bestätigt',
+                'cancelled': 'Abgesagt'
+            };
+            return labels[status] || status;
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            currentTab = tab;
+
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-fire-500', 'text-fire-600');
+                btn.classList.add('border-transparent', 'text-gray-600');
+            });
+
+            // Hide all sections
+            document.getElementById('profile-section').classList.add('hidden');
+            document.getElementById('notifications-section').classList.add('hidden');
+            document.getElementById('events-section').classList.add('hidden');
+
+            // Show selected section
+            if (tab === 'profile') {
+                document.getElementById('tab-profile').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('tab-profile').classList.remove('border-transparent', 'text-gray-600');
+                document.getElementById('profile-section').classList.remove('hidden');
+            } else if (tab === 'notifications') {
+                document.getElementById('tab-notifications').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('tab-notifications').classList.remove('border-transparent', 'text-gray-600');
+                document.getElementById('notifications-section').classList.remove('hidden');
+                if (notifications.length === 0) loadNotifications();
+            } else if (tab === 'events') {
+                document.getElementById('tab-events').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('tab-events').classList.remove('border-transparent', 'text-gray-600');
+                document.getElementById('events-section').classList.remove('hidden');
+                loadMyEvents();
+            }
+        }
+
+        // Event listeners
+        document.getElementById('profile-form').addEventListener('submit', saveProfile);
+        document.getElementById('save-notifications-btn').addEventListener('click', saveNotifications);
+
+        document.getElementById('tab-profile').addEventListener('click', () => switchTab('profile'));
+        document.getElementById('tab-notifications').addEventListener('click', () => switchTab('notifications'));
+        document.getElementById('tab-events').addEventListener('click', () => switchTab('events'));
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('auth_token');
+            window.location.href = '/';
+        });
+
+        // Initialize
+        (async () => {
+            if (await checkAuth()) {
+                await loadProfile();
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,15 +1,12 @@
-# Baut die bestehende Website aus dem Hauptverzeichnis
 FROM nginx:alpine
 
-# Kopiere die bestehende Website (Build-Context ist das Root-Verzeichnis)
-COPY *.html /usr/share/nginx/html/
-COPY *.css /usr/share/nginx/html/
-COPY *.js /usr/share/nginx/html/
-COPY images/ /usr/share/nginx/html/images/
-COPY fonts/ /usr/share/nginx/html/fonts/
-COPY scripts/config.js /usr/share/nginx/html/scripts/config.js
+# Kopiere die Website-Dateien
+COPY . /usr/share/nginx/html/
 
-# Nginx Config
-COPY docker/frontend-website/nginx.conf /etc/nginx/conf.d/default.conf
+# Nginx Config  
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Fix file permissions - nginx worker runs as non-root user
+RUN chmod -R 644 /usr/share/nginx/html/*.html /usr/share/nginx/html/*.css /usr/share/nginx/html/*.js 2>/dev/null || true &&     chmod -R 644 /usr/share/nginx/html/*.json 2>/dev/null || true &&     find /usr/share/nginx/html -type d -exec chmod 755 {} \;
 
 EXPOSE 80

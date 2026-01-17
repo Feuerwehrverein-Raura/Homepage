@@ -43,15 +43,6 @@ CREATE TABLE members (
     zustellung_email BOOLEAN DEFAULT true,
     zustellung_post BOOLEAN DEFAULT false,
 
-    -- Zusätzliche Infos
-    foto VARCHAR(500),                    -- URL oder Pfad zum Profilfoto
-    tshirt_groesse VARCHAR(10),           -- XS, S, M, L, XL, XXL, XXXL
-    feuerwehr_zugehoerigkeit VARCHAR(200), -- z.B. "Feuerwehr Raura", "Feuerwehr Hinterdorf"
-
-    -- Authentik Sync (für Self-Service Portal)
-    authentik_user_id VARCHAR(100),
-    authentik_synced_at TIMESTAMP,
-
     -- Meta
     bemerkungen TEXT,
     created_at TIMESTAMP DEFAULT NOW(),
@@ -77,27 +68,6 @@ INSERT INTO roles (name, description, permissions) VALUES
 ('vorstand', 'Vorstandsmitglied', '["members:read", "members:write", "events:*", "dispatch:*"]'),
 ('kassier', 'Kassier', '["members:read", "accounting:*"]'),
 ('mitglied', 'Normales Mitglied', '["members:read:self", "events:read", "events:register"]');
-
--- Notification Preferences (granulare Benachrichtigungseinstellungen)
-CREATE TABLE notification_preferences (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    member_id UUID REFERENCES members(id) ON DELETE CASCADE,
-
-    -- Benachrichtigungstyp
-    notification_type VARCHAR(50) NOT NULL, -- 'shift_reminder', 'event_update', 'newsletter', 'general'
-
-    -- Einstellungen
-    enabled BOOLEAN DEFAULT true,
-    alternative_email VARCHAR(200), -- Optional: Alternative Email für diesen Benachrichtigungstyp
-
-    -- Meta
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-
-    UNIQUE(member_id, notification_type)
-);
-
-CREATE INDEX idx_notification_prefs_member ON notification_preferences(member_id);
 
 -- ============================================
 -- EVENTS SCHEMA

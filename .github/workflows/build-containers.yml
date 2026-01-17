@@ -10,7 +10,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/fwv-raura
+  # Must be lowercase for Docker - hardcoded since github.repository_owner has uppercase
+  IMAGE_PREFIX: feuerwehrverein-raura/fwv-raura
 
 jobs:
   detect-changes:
@@ -139,19 +140,4 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ github.sha }}
 
-  deploy:
-    needs: [build-backend-events, build-backend-members, build-backend-dispatch, build-frontend-website]
-    if: always() && (needs.build-backend-events.result == 'success' || needs.build-backend-members.result == 'success' || needs.build-backend-dispatch.result == 'success' || needs.build-frontend-website.result == 'success' || needs.build-backend-events.result == 'skipped' || needs.build-backend-members.result == 'skipped' || needs.build-backend-dispatch.result == 'skipped' || needs.build-frontend-website.result == 'skipped')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
-          script: |
-            cd /opt/fwv-raura
-            docker compose pull
-            docker compose up -d
-            docker image prune -f
+  # Deploy step removed - Watchtower on server auto-updates containers when new images are pushed
