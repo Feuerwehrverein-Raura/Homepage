@@ -1,0 +1,157 @@
+name: Build and Push Docker Containers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/**'
+      - '.github/workflows/build-containers.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/fwv-raura
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend-events: ${{ steps.filter.outputs.backend-events }}
+      backend-members: ${{ steps.filter.outputs.backend-members }}
+      backend-dispatch: ${{ steps.filter.outputs.backend-dispatch }}
+      frontend-website: ${{ steps.filter.outputs.frontend-website }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend-events:
+              - 'docker/backend-events/**'
+            backend-members:
+              - 'docker/backend-members/**'
+            backend-dispatch:
+              - 'docker/backend-dispatch/**'
+            frontend-website:
+              - 'docker/frontend-website/**'
+
+  build-backend-events:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-events == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/backend-events
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-events:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-events:${{ github.sha }}
+
+  build-backend-members:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-members == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/backend-members
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-members:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-members:${{ github.sha }}
+
+  build-backend-dispatch:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-dispatch == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/backend-dispatch
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-dispatch:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-dispatch:${{ github.sha }}
+
+  build-frontend-website:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend-website == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/frontend-website
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ github.sha }}
+
+  deploy:
+    needs: [build-backend-events, build-backend-members, build-backend-dispatch, build-frontend-website]
+    if: always() && (needs.build-backend-events.result == 'success' || needs.build-backend-members.result == 'success' || needs.build-backend-dispatch.result == 'success' || needs.build-frontend-website.result == 'success' || needs.build-backend-events.result == 'skipped' || needs.build-backend-members.result == 'skipped' || needs.build-backend-dispatch.result == 'skipped' || needs.build-frontend-website.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            cd /opt/fwv-raura
+            docker compose pull
+            docker compose up -d
+            docker image prune -f

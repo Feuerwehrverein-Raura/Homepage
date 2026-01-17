@@ -430,8 +430,17 @@ app.get('/members/me', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Member profile not found' });
         }
 
-        console.log('Member found:', result.rows[0].vorname, result.rows[0].nachname);
-        res.json(result.rows[0]);
+        const member = result.rows[0];
+
+        // Audit log for profile view (self-service)
+        await logAudit(pool, 'MEMBER_SELFSERVICE_VIEW', member.id, req.user.email, req.ip, {
+            member_id: member.id,
+            member_name: `${member.vorname} ${member.nachname}`,
+            self_service: true
+        });
+
+        console.log('Member found:', member.vorname, member.nachname);
+        res.json(member);
     } catch (error) {
         console.error('/members/me error:', error.message);
         res.status(500).json({ error: error.message });
@@ -448,7 +457,16 @@ app.get('/members/:id', authenticateAny, async (req, res) => {
             return res.status(404).json({ error: 'Member not found' });
         }
 
-        res.json(result.rows[0]);
+        const member = result.rows[0];
+
+        // Audit log for member view by Vorstand
+        await logAudit(pool, 'MEMBER_VIEW', member.id, req.user.email, req.ip, {
+            member_id: member.id,
+            member_name: `${member.vorname} ${member.nachname}`,
+            viewed_by: req.user.email
+        });
+
+        res.json(member);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -545,7 +563,7 @@ app.put('/members/me', authenticateToken, async (req, res) => {
 
         // Get current member
         const currentResult = await pool.query(
-            'SELECT id FROM members WHERE email = $1',
+            'SELECT id, vorname, nachname FROM members WHERE email = $1',
             [req.user.email]
         );
 
@@ -554,6 +572,20 @@ app.put('/members/me', authenticateToken, async (req, res) => {
         }
 
         const memberId = currentResult.rows[0].id;
+        const memberName = `${currentResult.rows[0].vorname} ${currentResult.rows[0].nachname}`;
+
+        // Track which fields were updated
+        const updatedFields = [];
+        if (telefon !== undefined) updatedFields.push('telefon');
+        if (mobile !== undefined) updatedFields.push('mobile');
+        if (email !== undefined) updatedFields.push('email');
+        if (versand_email !== undefined) updatedFields.push('versand_email');
+        if (strasse !== undefined) updatedFields.push('strasse');
+        if (adresszusatz !== undefined) updatedFields.push('adresszusatz');
+        if (plz !== undefined) updatedFields.push('plz');
+        if (ort !== undefined) updatedFields.push('ort');
+        if (iban !== undefined) updatedFields.push('iban');
+        if (bemerkungen !== undefined) updatedFields.push('bemerkungen');
 
         // Update allowed fields only
         const result = await pool.query(`
@@ -572,6 +604,14 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             WHERE id = $11
             RETURNING *
         `, [telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen, memberId]);
+
+        // Audit log for self-service update
+        await logAudit(pool, 'MEMBER_SELFSERVICE_UPDATE', memberId, req.user.email, req.ip, {
+            member_id: memberId,
+            member_name: memberName,
+            updated_fields: updatedFields,
+            self_service: true
+        });
 
         console.log('Profile updated successfully for:', req.user.email);
         res.json(result.rows[0]);
@@ -835,6 +875,14 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
             }
         }
 
+        // Audit log for Authentik sync
+        await logAudit(pool, 'AUTHENTIK_SYNC', null, req.user.email, req.ip, {
+            total_members: members.length,
+            synced_count: synced.length,
+            error_count: errors.length,
+            synced_emails: synced.map(s => s.email)
+        });
+
         res.json({
             success: true,
             total: members.length,
@@ -894,7 +942,7 @@ app.put('/members/me/notifications', authenticateToken, async (req, res) => {
 
         // Get member ID from email
         const memberResult = await pool.query(
-            'SELECT id FROM members WHERE email = $1',
+            'SELECT id, vorname, nachname FROM members WHERE email = $1',
             [req.user.email]
         );
 
@@ -903,8 +951,10 @@ app.put('/members/me/notifications', authenticateToken, async (req, res) => {
         }
 
         const memberId = memberResult.rows[0].id;
+        const memberName = `${memberResult.rows[0].vorname} ${memberResult.rows[0].nachname}`;
 
         // Update each preference
+        const changedPrefs = [];
         for (const pref of preferences) {
             await pool.query(`
                 INSERT INTO notification_preferences (member_id, notification_type, enabled, alternative_email)
@@ -915,7 +965,16 @@ app.put('/members/me/notifications', authenticateToken, async (req, res) => {
                     alternative_email = $4,
                     updated_at = NOW()
             `, [memberId, pref.notification_type, pref.enabled, pref.alternative_email || null]);
+            changedPrefs.push({ type: pref.notification_type, enabled: pref.enabled });
         }
+
+        // Audit log for notification preference changes
+        await logAudit(pool, 'NOTIFICATION_PREFS_UPDATE', memberId, req.user.email, req.ip, {
+            member_id: memberId,
+            member_name: memberName,
+            preferences: changedPrefs,
+            self_service: true
+        });
 
         // Return updated preferences
         const result = await pool.query(
