@@ -20,6 +20,7 @@ jobs:
       backend-events: ${{ steps.filter.outputs.backend-events }}
       backend-members: ${{ steps.filter.outputs.backend-members }}
       backend-dispatch: ${{ steps.filter.outputs.backend-dispatch }}
+      backend-accounting: ${{ steps.filter.outputs.backend-accounting }}
       frontend-website: ${{ steps.filter.outputs.frontend-website }}
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +34,8 @@ jobs:
               - 'docker/backend-members/**'
             backend-dispatch:
               - 'docker/backend-dispatch/**'
+            backend-accounting:
+              - 'docker/backend-accounting/**'
             frontend-website:
               - 'docker/frontend-website/**'
 
@@ -113,6 +116,32 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-dispatch:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-dispatch:${{ github.sha }}
+
+  build-backend-accounting:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-accounting == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/backend-accounting
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-accounting:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-accounting:${{ github.sha }}
 
   build-frontend-website:
     needs: detect-changes
