@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.2.0...v1.2.1) (2026-01-18)
+
+
+### Bug Fixes
+
+* add missing auth-callback.html to docker frontend ([1cc632e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1cc632e1282df09b0639c55ebc00b552f220584f))
+
 # [1.2.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.1.0...v1.2.0) (2026-01-18)
 
 
