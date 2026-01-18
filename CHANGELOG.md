@@ -1,3 +1,10 @@
+## [1.3.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.2...v1.3.3) (2026-01-18)
+
+
+### Bug Fixes
+
+* shift data not persisted correctly ([726e191](https://github.com/Feuerwehrverein-Raura/Homepage/commit/726e191db396c677a1daa97b9ed9eea984f4e3ff))
+
 ## [1.3.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.1...v1.3.2) (2026-01-18)
 
 
