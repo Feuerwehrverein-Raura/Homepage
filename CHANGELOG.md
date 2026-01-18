@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.4.0...v1.5.0) (2026-01-18)
+
+
+### Features
+
+* add automatic delivery method based on member preferences ([57d80fc](https://github.com/Feuerwehrverein-Raura/Homepage/commit/57d80fce25a52788e27794cc64ece5ab5acf6727))
+
 # [1.4.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.4...v1.4.0) (2026-01-18)
 
 
