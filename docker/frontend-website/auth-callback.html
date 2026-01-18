@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentifizierung - Feuerwehrverein Raura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'fire': {
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-fire-700 mx-auto mb-4"></div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Authentifizierung läuft...</h1>
+        <p class="text-gray-600">Bitte warten Sie einen Moment.</p>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.fwv-raura.ch';
+
+        async function handleCallback() {
+            try {
+                // Parse URL parameters
+                const params = new URLSearchParams(window.location.search);
+                const code = params.get('code');
+                const state = params.get('state');
+                const error = params.get('error');
+                const errorDescription = params.get('error_description');
+
+                // Check for errors
+                if (error) {
+                    throw new Error(errorDescription || error);
+                }
+
+                if (!code) {
+                    throw new Error('Kein Authorization Code erhalten');
+                }
+
+                // Determine client type from state or URL
+                let clientType = 'members'; // default
+                if (state && state.includes('/vorstand')) {
+                    clientType = 'vorstand';
+                }
+
+                // Exchange code for token via our backend
+                // The backend will validate the code with Authentik
+                const response = await fetch(`${API_BASE}/auth/callback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: code,
+                        redirect_uri: window.location.origin + '/auth-callback.html',
+                        client_type: clientType
+                    })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Token exchange failed');
+                }
+
+                const data = await response.json();
+                const accessToken = data.access_token;
+
+                // Store token
+                localStorage.setItem('auth_token', accessToken);
+
+                // Determine redirect target
+                let redirectTo = '/';
+                if (state) {
+                    try {
+                        redirectTo = decodeURIComponent(state);
+                    } catch (e) {
+                        console.warn('Failed to decode state:', e);
+                    }
+                }
+
+                // Redirect to intended page
+                window.location.href = redirectTo;
+
+            } catch (error) {
+                console.error('Authentication error:', error);
+
+                // Show error
+                document.body.innerHTML = `
+                    <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+                        <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <h1 class="text-2xl font-bold text-gray-800 mb-2">Authentifizierung fehlgeschlagen</h1>
+                        <p class="text-gray-600 mb-4">${error.message}</p>
+                        <a href="/" class="inline-block bg-fire-700 text-white px-6 py-2 rounded-lg hover:bg-fire-800 transition-colors">
+                            Zurück zur Startseite
+                        </a>
+                    </div>
+                `;
+            }
+        }
+
+        // Run on page load
+        handleCallback();
+    </script>
+</body>
+</html>
