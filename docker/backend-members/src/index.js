@@ -150,14 +150,35 @@ app.post('/auth/vorstand/login', async (req, res) => {
 
             // Determine role from email prefix
             const emailPrefix = emailLower.split('@')[0];
-            const role = emailPrefix; // praesident, aktuar, kassier, etc.
+            let role = emailPrefix; // praesident, aktuar, kassier, etc.
+            let groups = ['vorstand'];
+            let memberName = getRoleName(role);
+
+            // Check if member has Admin function in database
+            try {
+                const memberResult = await pool.query(
+                    "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1 OR funktion ILIKE '%Admin%'",
+                    [emailLower]
+                );
+                if (memberResult.rows.length > 0) {
+                    const member = memberResult.rows[0];
+                    memberName = `${member.vorname} ${member.nachname}`;
+                    // Check if member has Admin function
+                    if (member.funktion && member.funktion.toLowerCase().includes('admin')) {
+                        role = 'admin';
+                        groups = ['vorstand', 'admin'];
+                    }
+                }
+            } catch (dbError) {
+                console.error('Error checking member function:', dbError.message);
+            }
 
             // Generate JWT token
             const token = jwt.sign(
                 {
                     email: emailLower,
                     role: role,
-                    groups: ['vorstand'],
+                    groups: groups,
                     type: 'vorstand'
                 },
                 process.env.JWT_SECRET || 'fwv-raura-secret-key',
@@ -173,7 +194,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
                 user: {
                     email: emailLower,
                     role: role,
-                    name: getRoleName(role)
+                    name: memberName
                 }
             });
 
