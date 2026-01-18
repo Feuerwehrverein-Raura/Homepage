@@ -34,10 +34,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/fwv-raura-homepage.git"
+    "url": "https://github.com/Feuerwehrverein-Raura/Homepage.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/fwv-raura-homepage/issues"
+    "url": "https://github.com/Feuerwehrverein-Raura/Homepage/issues"
   },
-  "homepage": "https://your-org.github.io/fwv-raura-homepage/"
+  "homepage": "https://fwv-raura.ch"
 }
