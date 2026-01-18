@@ -508,8 +508,12 @@ async function mailcowApi(method, endpoint, data = null) {
 // Alle Mailboxen abrufen
 app.get('/mailcow/mailboxes', async (req, res) => {
     try {
-        const response = await mailcowApi('GET', `/get/mailbox/${MAILCOW_DOMAIN}`);
-        res.json(response.data);
+        const response = await mailcowApi('GET', '/get/mailbox/all');
+        // Filter by domain since domain-specific endpoint returns empty
+        const mailboxes = Array.isArray(response.data)
+            ? response.data.filter(mb => mb.domain === MAILCOW_DOMAIN)
+            : [];
+        res.json(mailboxes);
     } catch (error) {
         console.error('Mailcow error:', error.response?.data || error.message);
         res.status(500).json({ error: error.response?.data || error.message });
@@ -589,8 +593,12 @@ app.delete('/mailcow/mailboxes/:email', async (req, res) => {
 // Alle Aliase abrufen
 app.get('/mailcow/aliases', async (req, res) => {
     try {
-        const response = await mailcowApi('GET', `/get/alias/${MAILCOW_DOMAIN}`);
-        res.json(response.data);
+        const response = await mailcowApi('GET', '/get/alias/all');
+        // Filter by domain since domain-specific endpoint returns empty
+        const aliases = Array.isArray(response.data)
+            ? response.data.filter(a => a.domain === MAILCOW_DOMAIN || a.address?.endsWith(`@${MAILCOW_DOMAIN}`))
+            : [];
+        res.json(aliases);
     } catch (error) {
         res.status(500).json({ error: error.response?.data || error.message });
     }
@@ -659,8 +667,11 @@ app.get('/mailcow/domain', async (req, res) => {
 // Quota-Nutzung aller Mailboxen
 app.get('/mailcow/quota', async (req, res) => {
     try {
-        const response = await mailcowApi('GET', `/get/mailbox/${MAILCOW_DOMAIN}`);
-        const quotaInfo = response.data.map(mb => ({
+        const response = await mailcowApi('GET', '/get/mailbox/all');
+        const mailboxes = Array.isArray(response.data)
+            ? response.data.filter(mb => mb.domain === MAILCOW_DOMAIN)
+            : [];
+        const quotaInfo = mailboxes.map(mb => ({
             email: mb.username,
             name: mb.name,
             quota: mb.quota,
