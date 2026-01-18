@@ -10,6 +10,25 @@ const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for correct client IP behind Traefik
+app.set('trust proxy', true);
+
+// Helper to get real client IP from proxy headers
+function getClientIp(req) {
+    // X-Forwarded-For can contain multiple IPs, take the first (original client)
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (forwardedFor) {
+        const ips = forwardedFor.split(',').map(ip => ip.trim());
+        return ips[0];
+    }
+    // X-Real-IP is set by some proxies
+    if (req.headers['x-real-ip']) {
+        return req.headers['x-real-ip'];
+    }
+    // Fallback to req.ip (which should now work with trust proxy)
+    return req.ip;
+}
+
 // Database
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL
@@ -56,7 +75,7 @@ app.get('/auth/login', (req, res) => {
 // IMAP-based authentication for Vorstand members (with admin fallback)
 app.post('/auth/vorstand/login', async (req, res) => {
     const { email, password } = req.body;
-    const clientIp = req.ip || req.connection.remoteAddress;
+    const clientIp = getClientIp(req);
 
     if (!email || !password) {
         return res.status(400).json({ error: 'Email and password required' });
@@ -579,7 +598,7 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
         }
 
         // Audit log
-        await logAudit(pool, 'MEMBER_CREATE', null, req.user.email, req.ip, {
+        await logAudit(pool, 'MEMBER_CREATE', null, req.user.email, getClientIp(req), {
             member_id: newMember.id,
             member_name: `${vorname} ${nachname}`,
             authentik_synced: !!newMember.authentik_user_id
@@ -675,7 +694,7 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
         const memberName = oldResult.rows.length > 0
             ? `${oldResult.rows[0].vorname} ${oldResult.rows[0].nachname}`
             : 'Unknown';
-        await logAudit(pool, 'MEMBER_UPDATE', null, req.user.email, req.ip, {
+        await logAudit(pool, 'MEMBER_UPDATE', null, req.user.email, getClientIp(req), {
             member_id: id,
             member_name: memberName,
             updated_fields: fields
@@ -705,7 +724,7 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
         const memberName = memberResult.rows.length > 0
             ? `${memberResult.rows[0].vorname} ${memberResult.rows[0].nachname}`
             : 'Unknown';
-        await logAudit(pool, 'MEMBER_DELETE', null, req.user.email, req.ip, {
+        await logAudit(pool, 'MEMBER_DELETE', null, req.user.email, getClientIp(req), {
             member_id: id,
             member_name: memberName,
             member_email: memberResult.rows[0]?.email
@@ -777,7 +796,7 @@ app.get('/audit', authenticateVorstand, async (req, res) => {
         const result = await pool.query(query, params);
 
         // Log that someone viewed the audit log
-        await logAudit(pool, 'AUDIT_VIEW', null, req.user.email, req.ip, { filters: { action, email } });
+        await logAudit(pool, 'AUDIT_VIEW', null, req.user.email, getClientIp(req), { filters: { action, email } });
 
         res.json(result.rows);
     } catch (error) {
