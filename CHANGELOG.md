@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.2.1...v1.3.0) (2026-01-18)
+
+
+### Features
+
+* add photo upload feature for members and cleanup old files ([0629612](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0629612f29dde2ba5fe9ce5d971a94e2b47b651e))
+
 ## [1.2.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.2.0...v1.2.1) (2026-01-18)
 
 
