@@ -26,7 +26,7 @@ const FWV_CONFIG = {
         },
         aktuar: {
             name: "Stefan Müller", 
-            email: "stefan+fwv-raura@juroct.ch", // Aktualisiert zur persönlichen E-Mail
+            email: "aktuar@fwv-raura.ch",
             phone: "+41 76 519 99 70",
             position: "Aktuar"
         },
@@ -56,7 +56,7 @@ const FWV_CONFIG = {
         },
         webmaster: {
             name: "Stefan Müller",
-            email: "stefan+fwv-raura@juroct.ch", // Persönliche E-Mail für IT-Themen
+            email: "aktuar@fwv-raura.ch",
             description: "Website & IT"
         }
     },
@@ -65,7 +65,7 @@ const FWV_CONFIG = {
     defaultOrganizers: {
         chilbi: {
             name: "Stefan Müller",
-            email: "stefan+fwv-raura@juroct.ch" // Persönliche E-Mail für Chilbi-Organisation
+            email: "aktuar@fwv-raura.ch"
         },
         generalEvent: {
             name: "René Käslin", 
@@ -88,7 +88,7 @@ const FWV_CONFIG = {
         // Springer-System für Arbeitsplanung
         springer: {
             hauptspringer: "Stefan Müller (Aktuar)",
-            email: "stefan+fwv-raura@juroct.ch",
+            email: "aktuar@fwv-raura.ch",
             verfuegbarkeit: "Verfügbar bei kurzfristigen Ausfällen"
         }
     },

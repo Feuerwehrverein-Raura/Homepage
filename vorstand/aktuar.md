@@ -1,7 +1,7 @@
 ---
 position: Aktuar
 name: Stefan Müller
-email: stefan+fwv-raura@juroct.ch
+email: aktuar@fwv-raura.ch
 phone: +41 76 519 99 70
 image: images/aktuar.png
 order: 2
