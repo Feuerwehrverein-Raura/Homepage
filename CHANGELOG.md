@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.0...v1.3.1) (2026-01-18)
+
+
+### Bug Fixes
+
+* add persistent volume for member photo uploads ([de7abfd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/de7abfd4ef2791e71e4065dc86900a2e407f4742))
+
 # [1.3.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.2.1...v1.3.0) (2026-01-18)
 
 
