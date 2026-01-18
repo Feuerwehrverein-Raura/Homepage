@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.1...v1.3.2) (2026-01-18)
+
+
+### Bug Fixes
+
+* add API base URL to Vorstand photo paths ([d84952a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d84952a0625fd01dffdee9c842520e418d3f1820))
+
 ## [1.3.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.0...v1.3.1) (2026-01-18)
 
 
