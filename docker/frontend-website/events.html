@@ -231,11 +231,14 @@
 
             async loadEventsFromAPI() {
                 try {
+                    console.log('🌐 Fetching events from API...');
                     const response = await fetch('https://api.fwv-raura.ch/events');
+                    console.log('📥 API Response status:', response.status);
                     if (!response.ok) {
                         throw new Error(`API Error: ${response.status}`);
                     }
                     const apiEvents = await response.json();
+                    console.log('📊 Raw API events:', apiEvents.length, apiEvents);
 
                     // Map API format to internal format
                     return apiEvents.map(e => ({
