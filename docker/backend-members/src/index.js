@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const { ImapFlow } = require('imapflow');
@@ -9,6 +9,13 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
+
+// Configure pg to return dates/timestamps as strings (not JS Date objects)
+// This prevents timezone conversion issues
+types.setTypeParser(1082, val => val); // DATE
+types.setTypeParser(1083, val => val); // TIME
+types.setTypeParser(1114, val => val); // TIMESTAMP
+types.setTypeParser(1184, val => val); // TIMESTAMPTZ
 
 // Configure multer for photo uploads
 const storage = multer.diskStorage({

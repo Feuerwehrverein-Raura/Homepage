@@ -1519,6 +1519,10 @@
             if (date.includes('T')) {
                 return date.split('T')[0];
             }
+            // Handle PostgreSQL timestamp "2026-01-18 19:00:00"
+            if (date.includes(' ')) {
+                return date.split(' ')[0];
+            }
             return date;
         }
 

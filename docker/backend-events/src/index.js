@@ -1,10 +1,17 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const ical = require('ical-generator').default;
 const axios = require('axios');
 const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
+
+// Configure pg to return dates/timestamps as strings (not JS Date objects)
+// This prevents timezone conversion issues
+types.setTypeParser(1082, val => val); // DATE
+types.setTypeParser(1083, val => val); // TIME
+types.setTypeParser(1114, val => val); // TIMESTAMP
+types.setTypeParser(1184, val => val); // TIMESTAMPTZ
 
 const app = express();
 const PORT = process.env.PORT || 3000;
