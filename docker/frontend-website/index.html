@@ -977,62 +977,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const vorstandError = document.getElementById('vorstand-error');
 
     try {
-        console.log('🔄 Lade Vorstand...');
-        
-        // Lade die automatisch generierte Vorstand-Liste
-        let memberFiles = [];
-        try {
-            const listResponse = await fetch('vorstand-list.json');
-            if (listResponse.ok) {
-                const listData = await listResponse.json();
-                memberFiles = listData.files;
-                console.log(`📋 Vorstand-Liste geladen: ${memberFiles.length} Dateien`);
-            } else {
-                console.warn('⚠️ vorstand-list.json nicht gefunden, verwende Fallback');
-                memberFiles = [
-                    'vorstand/praesident.md',
-                    'vorstand/vizepraesident.md',
-                    'vorstand/aktuar.md',
-                    'vorstand/kassier.md',
-                    'vorstand/beisitzer.md'
-                ];
-            }
-        } catch (error) {
-            console.warn('⚠️ Fehler beim Laden der Vorstand-Liste:', error);
-            memberFiles = [
-                'vorstand/praesident.md',
-                'vorstand/vizepraesident.md',
-                'vorstand/aktuar.md',
-                'vorstand/kassier.md',
-                'vorstand/beisitzer.md'
-            ];
+        console.log('🔄 Lade Vorstand von API...');
+
+        const response = await fetch('https://api.fwv-raura.ch/vorstand');
+        if (!response.ok) {
+            throw new Error('API Fehler: ' + response.status);
         }
 
-        const members = [];
-        
-        for (const file of memberFiles) {
-            try {
-                const member = await loadMemberFromFile(file);
-                if (member) {
-                    members.push(member);
-                }
-            } catch (error) {
-                console.warn(`Konnte ${file} nicht laden:`, error.message);
-            }
-        }
+        const apiMembers = await response.json();
+        console.log(`📋 ${apiMembers.length} Vorstandsmitglieder von API geladen`);
 
-        if (members.length === 0) {
+        if (apiMembers.length === 0) {
             throw new Error('Keine Vorstandsmitglieder gefunden');
         }
 
-        members.sort((a, b) => {
-            const orderA = a.order || 999;
-            const orderB = b.order || 999;
-            return orderA - orderB;
+        // Transform API response to expected format
+        const members = apiMembers.map(m => {
+            // Extract clean position from funktion (remove "Vorstand, " prefix)
+            let position = m.funktion || '';
+            position = position.replace(/^Vorstand,?\s*/i, '').trim() || m.funktion;
+
+            return {
+                name: `${m.vorname} ${m.nachname}`,
+                position: position,
+                image: m.foto || null,
+                email: m.email || null,
+                phone: null
+            };
         });
 
         displayVorstandMembers(members, vorstandContainer);
-        
+
         vorstandLoading.classList.add('hidden');
         vorstandContainer.classList.remove('hidden');
 
