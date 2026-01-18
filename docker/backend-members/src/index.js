@@ -390,6 +390,65 @@ async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
     }
 }
 
+// Send notification email helper - sends to member AND aktuar
+async function sendNotificationEmail(memberId, templateName, variables = {}) {
+    try {
+        const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+        const AKTUAR_EMAIL = process.env.AKTUAR_EMAIL || 'aktuar@fwv-raura.ch';
+
+        // Get member data
+        const member = await pool.query('SELECT * FROM members WHERE id = $1', [memberId]);
+        if (member.rows.length === 0) {
+            console.log(`Member ${memberId} not found`);
+            return;
+        }
+
+        const memberData = member.rows[0];
+
+        // Get template by name
+        const templateResult = await pool.query('SELECT * FROM dispatch_templates WHERE name = $1', [templateName]);
+        if (templateResult.rows.length === 0) {
+            console.warn(`Template '${templateName}' not found`);
+            return;
+        }
+
+        const template = templateResult.rows[0];
+
+        // Merge member data with custom variables
+        const mergedVars = {
+            anrede: memberData.anrede || '',
+            vorname: memberData.vorname || '',
+            nachname: memberData.nachname || '',
+            ...variables
+        };
+
+        // Send to member (if email enabled)
+        if (memberData.email && memberData.zustellung_email) {
+            await axios.post(`${DISPATCH_API}/email/send`, {
+                to: memberData.versand_email || memberData.email,
+                template_id: template.id,
+                variables: mergedVars,
+                member_id: memberId
+            });
+            console.log(`Notification email '${templateName}' sent to member ${memberData.email}`);
+        } else {
+            console.log(`Skipping notification to member ${memberId} - no email or zustellung_email disabled`);
+        }
+
+        // Always send to Aktuar for record-keeping
+        await axios.post(`${DISPATCH_API}/email/send`, {
+            to: AKTUAR_EMAIL,
+            template_id: template.id,
+            variables: mergedVars,
+            member_id: memberId
+        });
+        console.log(`Notification email '${templateName}' sent to Aktuar ${AKTUAR_EMAIL}`);
+
+    } catch (error) {
+        console.error(`Failed to send notification email:`, error.message);
+    }
+}
+
 // OAuth2 callback - exchange code for token
 app.post('/auth/callback', async (req, res) => {
     try {
@@ -853,6 +912,12 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
             updated_fields: fields
         });
 
+        // Send notification email to member and aktuar
+        const changedFieldsList = fields.map(f => `- ${f}`).join('\n');
+        sendNotificationEmail(id, 'Datenänderung bestätigt', {
+            changed_fields: changedFieldsList
+        }).catch(err => console.error('Email notification failed:', err));
+
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1155,7 +1220,14 @@ app.post('/registrations/:id/approve', authenticateVorstand, async (req, res) =>
             member_name: `${registration.vorname} ${registration.nachname}`
         });
 
-        // TODO: Send welcome email to new member (via dispatch API)
+        // Send welcome email to new member
+        const today = new Date().toLocaleDateString('de-CH');
+        sendNotificationEmail(memberId, 'Willkommen neues Mitglied', {
+            mitgliedsnummer: memberId.substring(0, 8),
+            status: memberStatus,
+            eintrittsdatum: today,
+            praesident_name: 'René Käslin'
+        }).catch(err => console.error('Welcome email failed:', err));
 
         res.json({
             success: true,
@@ -1200,7 +1272,43 @@ app.post('/registrations/:id/reject', authenticateVorstand, async (req, res) => 
             reason: reason
         });
 
-        // TODO: Send rejection email to applicant (via dispatch API)
+        // Send rejection email to applicant and aktuar
+        if (registration.email) {
+            const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+            const AKTUAR_EMAIL = process.env.AKTUAR_EMAIL || 'aktuar@fwv-raura.ch';
+
+            try {
+                // Get template
+                const templateResult = await pool.query('SELECT * FROM dispatch_templates WHERE name = $1', ['Registrierung abgelehnt']);
+                if (templateResult.rows.length > 0) {
+                    const template = templateResult.rows[0];
+                    const variables = {
+                        vorname: registration.vorname,
+                        nachname: registration.nachname,
+                        ablehnungsgrund: reason || 'Keine Begründung angegeben',
+                        praesident_name: 'René Käslin'
+                    };
+
+                    // Send to applicant
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: registration.email,
+                        template_id: template.id,
+                        variables
+                    });
+
+                    // Send to aktuar
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: AKTUAR_EMAIL,
+                        template_id: template.id,
+                        variables
+                    });
+
+                    console.log(`Rejection email sent to ${registration.email} and ${AKTUAR_EMAIL}`);
+                }
+            } catch (err) {
+                console.error('Rejection email failed:', err.message);
+            }
+        }
 
         res.json({
             success: true,
