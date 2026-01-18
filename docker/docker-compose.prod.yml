@@ -55,6 +55,8 @@ services:
       VORSTAND_EMAILS: ${VORSTAND_EMAILS:-praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,vizepraesident@fwv-raura.ch,beisitzer@fwv-raura.ch}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fwv-raura.ch}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    volumes:
+      - member_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,7 +70,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=proxy"
-      - "traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`))"
+      - "traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/uploads`) || PathPrefix(`/registrations`))"
       - "traefik.http.routers.api-members.entrypoints=https"
       - "traefik.http.routers.api-members.tls=true"
       - "traefik.http.routers.api-members.tls.certresolver=letsencrypt"
@@ -224,3 +226,4 @@ networks:
 
 volumes:
   postgres_data:
+  member_uploads:
