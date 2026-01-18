@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.4...v1.4.0) (2026-01-18)
+
+
+### Features
+
+* add email/post dispatch system with automatic notifications ([e33f6d1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e33f6d166040c85f3720ad46c7b7bd4bd91089ca))
+
 ## [1.3.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.3...v1.3.4) (2026-01-18)
 
 
