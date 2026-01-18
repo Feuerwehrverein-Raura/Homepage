@@ -374,12 +374,19 @@ app.post('/auth/callback', async (req, res) => {
 // Get Vorstand members (public, for website display)
 app.get('/vorstand', async (req, res) => {
     try {
-        // Get members with Vorstand functions
-        const vorstandFunctions = [
-            'Präsident', 'Praesident', 'Vizepräsident', 'Vizepraesident',
-            'Aktuar', 'Kassier', 'Beisitzer', 'Materialwart'
-        ];
+        // Mapping from function to official email
+        const funktionToEmail = {
+            'präsident': 'praesident@fwv-raura.ch',
+            'praesident': 'praesident@fwv-raura.ch',
+            'vizepräsident': 'vizepraesident@fwv-raura.ch',
+            'vizepraesident': 'vizepraesident@fwv-raura.ch',
+            'aktuar': 'aktuar@fwv-raura.ch',
+            'kassier': 'kassier@fwv-raura.ch',
+            'materialwart': 'materialwart@fwv-raura.ch',
+            'beisitzer': 'beisitzer@fwv-raura.ch'
+        };
 
+        // Query Vorstand members - don't filter by status since Vorstand can be Ehrenmitglied
         const result = await pool.query(`
             SELECT
                 id, vorname, nachname, funktion, foto, email
@@ -387,26 +394,48 @@ app.get('/vorstand', async (req, res) => {
             WHERE funktion IS NOT NULL
               AND funktion != ''
               AND funktion != '-'
-              AND status = 'Aktivmitglied'
+              AND (
+                  funktion ILIKE '%Präsident%' OR
+                  funktion ILIKE '%Praesident%' OR
+                  funktion ILIKE '%Vizepräsident%' OR
+                  funktion ILIKE '%Vizepraesident%' OR
+                  funktion ILIKE '%Aktuar%' OR
+                  funktion ILIKE '%Kassier%' OR
+                  funktion ILIKE '%Materialwart%' OR
+                  funktion ILIKE '%Beisitzer%'
+              )
             ORDER BY
-                CASE funktion
-                    WHEN 'Präsident' THEN 1
-                    WHEN 'Praesident' THEN 1
-                    WHEN 'Vizepräsident' THEN 2
-                    WHEN 'Vizepraesident' THEN 2
-                    WHEN 'Aktuar' THEN 3
-                    WHEN 'Kassier' THEN 4
-                    WHEN 'Materialwart' THEN 5
-                    WHEN 'Beisitzer' THEN 6
+                CASE
+                    WHEN funktion ILIKE '%Präsident%' AND funktion NOT ILIKE '%Vize%' THEN 1
+                    WHEN funktion ILIKE '%Praesident%' AND funktion NOT ILIKE '%Vize%' THEN 1
+                    WHEN funktion ILIKE '%Vizepräsident%' THEN 2
+                    WHEN funktion ILIKE '%Vizepraesident%' THEN 2
+                    WHEN funktion ILIKE '%Aktuar%' THEN 3
+                    WHEN funktion ILIKE '%Kassier%' THEN 4
+                    WHEN funktion ILIKE '%Materialwart%' THEN 5
+                    WHEN funktion ILIKE '%Beisitzer%' THEN 6
                     ELSE 10
                 END,
                 nachname
         `);
 
-        // Filter to only show typical Vorstand functions
-        const vorstandMembers = result.rows.filter(m =>
-            vorstandFunctions.some(f => m.funktion.toLowerCase().includes(f.toLowerCase()))
-        );
+        // Map personal emails to official fwv-raura.ch emails
+        const vorstandMembers = result.rows.map(m => {
+            const funktionLower = m.funktion.toLowerCase();
+            let officialEmail = m.email; // fallback to personal email
+
+            for (const [key, email] of Object.entries(funktionToEmail)) {
+                if (funktionLower.includes(key)) {
+                    officialEmail = email;
+                    break;
+                }
+            }
+
+            return {
+                ...m,
+                email: officialEmail
+            };
+        });
 
         res.json(vorstandMembers);
     } catch (error) {
