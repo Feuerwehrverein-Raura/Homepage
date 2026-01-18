@@ -20,7 +20,7 @@ app.use(express.json());
 
 // Health Check
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', service: 'api-events' });
+    res.json({ status: 'ok', service: 'api-events', version: process.env.APP_VERSION || '0.0.0' });
 });
 
 // ============================================

@@ -3,17 +3,61 @@ name: Build and Push Docker Containers
 on:
   push:
     branches: [main]
-    paths:
-      - 'docker/**'
-      - '.github/workflows/build-containers.yml'
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  # Must be lowercase for Docker - hardcoded since github.repository_owner has uppercase
   IMAGE_PREFIX: feuerwehrverein-raura/fwv-raura
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install semantic-release
+        run: npm install -g semantic-release @semantic-release/changelog @semantic-release/git
+
+      - name: Run semantic-release
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx semantic-release --dry-run > release-output.txt 2>&1 || true
+          cat release-output.txt
+          if grep -q "Published release" release-output.txt; then
+            VERSION=$(grep -oP 'Published release \K[0-9]+\.[0-9]+\.[0-9]+' release-output.txt)
+            echo "new_release_published=true" >> $GITHUB_OUTPUT
+            echo "new_release_version=$VERSION" >> $GITHUB_OUTPUT
+          fi
+          # Actually run semantic-release (not dry-run)
+          npx semantic-release || true
+
+      - name: Determine version
+        id: version
+        run: |
+          # Get latest tag or use 0.0.0
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          VERSION=${LATEST_TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
@@ -40,7 +84,7 @@ jobs:
               - 'docker/frontend-website/**'
 
   build-backend-events:
-    needs: detect-changes
+    needs: [release, detect-changes]
     if: needs.detect-changes.outputs.backend-events == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -61,12 +105,15 @@ jobs:
         with:
           context: ./docker/backend-events
           push: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-events:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-events:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-events:${{ github.sha }}
 
   build-backend-members:
-    needs: detect-changes
+    needs: [release, detect-changes]
     if: needs.detect-changes.outputs.backend-members == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -87,12 +134,15 @@ jobs:
         with:
           context: ./docker/backend-members
           push: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-members:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-members:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-members:${{ github.sha }}
 
   build-backend-dispatch:
-    needs: detect-changes
+    needs: [release, detect-changes]
     if: needs.detect-changes.outputs.backend-dispatch == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -113,12 +163,15 @@ jobs:
         with:
           context: ./docker/backend-dispatch
           push: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-dispatch:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-dispatch:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-dispatch:${{ github.sha }}
 
   build-backend-accounting:
-    needs: detect-changes
+    needs: [release, detect-changes]
     if: needs.detect-changes.outputs.backend-accounting == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -139,12 +192,15 @@ jobs:
         with:
           context: ./docker/backend-accounting
           push: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-accounting:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-accounting:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api-accounting:${{ github.sha }}
 
   build-frontend-website:
-    needs: detect-changes
+    needs: [release, detect-changes]
     if: needs.detect-changes.outputs.frontend-website == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
@@ -165,8 +221,9 @@ jobs:
         with:
           context: ./docker/frontend-website
           push: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ github.sha }}
-
-  # Deploy step removed - Watchtower on server auto-updates containers when new images are pushed
