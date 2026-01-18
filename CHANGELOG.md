@@ -1,3 +1,10 @@
+## [1.3.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.3...v1.3.4) (2026-01-18)
+
+
+### Bug Fixes
+
+* prevent timezone conversion for dates in API responses ([8b85702](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8b85702cdbed56fdacec4e063f34fd54fb964ef8))
+
 ## [1.3.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.3.2...v1.3.3) (2026-01-18)
 
 
