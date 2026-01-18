@@ -106,8 +106,28 @@ function authenticateAny(req, res, next) {
         return next();
     }
 
-    // Then try JWT
+    // Then try Vorstand JWT (HS256 with JWT_SECRET)
     if (authHeader) {
+        const token = authHeader.split(' ')[1];
+        if (token) {
+            try {
+                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fwv-raura-secret-key');
+                if (decoded.type === 'vorstand') {
+                    req.user = {
+                        id: decoded.email,
+                        email: decoded.email,
+                        name: decoded.role,
+                        role: decoded.role,
+                        groups: decoded.groups || ['vorstand']
+                    };
+                    return next();
+                }
+            } catch (e) {
+                // Not a valid Vorstand token, try Authentik
+            }
+        }
+
+        // Try Authentik JWT (RS256)
         return authenticateToken(req, res, next);
     }
 
