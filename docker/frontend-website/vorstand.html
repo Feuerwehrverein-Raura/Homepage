@@ -221,6 +221,26 @@
                 <form id="member-form" class="space-y-6">
                     <input type="hidden" id="member-id">
 
+                    <!-- Foto -->
+                    <div>
+                        <h4 class="font-semibold text-gray-700 mb-3">Profilfoto</h4>
+                        <div class="flex items-center space-x-4">
+                            <div id="photo-preview" class="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                                <span class="text-gray-400 text-3xl">?</span>
+                            </div>
+                            <div class="flex-1">
+                                <input type="file" id="photo-upload" accept="image/*" class="hidden">
+                                <button type="button" id="photo-upload-btn" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                                    Foto hochladen
+                                </button>
+                                <button type="button" id="photo-delete-btn" class="ml-2 px-4 py-2 text-red-600 hover:text-red-800 hidden">
+                                    Foto entfernen
+                                </button>
+                                <p class="text-sm text-gray-500 mt-1">Max. 5MB, JPG/PNG/GIF</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Persoenliche Daten -->
                     <div>
                         <h4 class="font-semibold text-gray-700 mb-3">Persoenliche Daten</h4>
@@ -1122,6 +1142,9 @@
             document.getElementById('member-form').reset();
             document.getElementById('member-id').value = '';
             document.getElementById('delete-member-btn').classList.add('hidden');
+            // Reset photo preview
+            document.getElementById('photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
+            document.getElementById('photo-delete-btn').classList.add('hidden');
             document.getElementById('member-modal').classList.remove('hidden');
         }
 
@@ -1155,6 +1178,15 @@
                 document.getElementById('bemerkungen').value = member.bemerkungen || '';
 
                 document.getElementById('feuerwehr-zugehoerigkeit').value = member.feuerwehr_zugehoerigkeit || 'keine';
+
+                // Load photo
+                if (member.foto) {
+                    document.getElementById('photo-preview').innerHTML = `<img src="${API_BASE}${member.foto}" class="w-full h-full object-cover">`;
+                    document.getElementById('photo-delete-btn').classList.remove('hidden');
+                } else {
+                    document.getElementById('photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
+                    document.getElementById('photo-delete-btn').classList.add('hidden');
+                }
 
                 document.getElementById('delete-member-btn').classList.remove('hidden');
                 document.getElementById('member-modal').classList.remove('hidden');
@@ -1239,6 +1271,58 @@
             } catch (error) {
                 console.error('Error deleting member:', error);
                 alert('Fehler beim Loeschen');
+            }
+        }
+
+        // Photo upload handling
+        async function uploadMemberPhoto(file) {
+            const memberId = document.getElementById('member-id').value;
+            if (!memberId) {
+                alert('Bitte speichern Sie zuerst das Mitglied');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('photo', file);
+
+            try {
+                const response = await fetch(`${API_BASE}/members/${memberId}/photo`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Failed to upload photo');
+
+                const data = await response.json();
+                document.getElementById('photo-preview').innerHTML = `<img src="${API_BASE}${data.photo_url}" class="w-full h-full object-cover">`;
+                document.getElementById('photo-delete-btn').classList.remove('hidden');
+                await loadMembers();
+            } catch (error) {
+                console.error('Error uploading photo:', error);
+                alert('Fehler beim Hochladen des Fotos');
+            }
+        }
+
+        async function deleteMemberPhoto() {
+            const memberId = document.getElementById('member-id').value;
+            if (!memberId) return;
+            if (!confirm('Foto wirklich entfernen?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/members/${memberId}/photo`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to delete photo');
+
+                document.getElementById('photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
+                document.getElementById('photo-delete-btn').classList.add('hidden');
+                await loadMembers();
+            } catch (error) {
+                console.error('Error deleting photo:', error);
+                alert('Fehler beim Entfernen des Fotos');
             }
         }
 
@@ -1991,6 +2075,18 @@
         document.getElementById('search-input').addEventListener('input', (e) => loadMembers({ search: e.target.value, status: document.getElementById('status-filter').value }));
         document.getElementById('status-filter').addEventListener('change', (e) => loadMembers({ search: document.getElementById('search-input').value, status: e.target.value }));
         document.getElementById('export-btn').addEventListener('click', exportCSV);
+
+        // Photo upload
+        document.getElementById('photo-upload-btn').addEventListener('click', () => {
+            document.getElementById('photo-upload').click();
+        });
+        document.getElementById('photo-upload').addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                uploadMemberPhoto(e.target.files[0]);
+                e.target.value = ''; // Reset for next upload
+            }
+        });
+        document.getElementById('photo-delete-btn').addEventListener('click', deleteMemberPhoto);
 
         // Auto-set Eintrittsdatum when Feuerwehr Raurica is selected
         document.getElementById('feuerwehr-zugehoerigkeit').addEventListener('change', (e) => {

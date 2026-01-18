@@ -69,6 +69,26 @@
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">Persönliche Daten</h2>
 
                         <form id="profile-form" class="space-y-6">
+                            <!-- Profilfoto -->
+                            <div>
+                                <h3 class="font-semibold text-gray-700 mb-3">Profilfoto</h3>
+                                <div class="flex items-center space-x-4">
+                                    <div id="my-photo-preview" class="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                                        <span class="text-gray-400 text-3xl">?</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <input type="file" id="my-photo-upload" accept="image/*" class="hidden">
+                                        <button type="button" id="my-photo-upload-btn" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
+                                            Foto hochladen
+                                        </button>
+                                        <button type="button" id="my-photo-delete-btn" class="ml-2 px-4 py-2 text-red-600 hover:text-red-800 hidden">
+                                            Foto entfernen
+                                        </button>
+                                        <p class="text-sm text-gray-500 mt-1">Max. 5MB, JPG/PNG/GIF</p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Persönliche Daten (read-only) -->
                             <div>
                                 <h3 class="font-semibold text-gray-700 mb-3">Stammdaten</h3>
@@ -299,6 +319,15 @@
                 document.getElementById('profile-plz').value = memberData.plz || '';
                 document.getElementById('profile-ort').value = memberData.ort || '';
                 document.getElementById('profile-iban').value = memberData.iban || '';
+
+                // Load photo
+                if (memberData.foto) {
+                    document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${memberData.foto}" class="w-full h-full object-cover">`;
+                    document.getElementById('my-photo-delete-btn').classList.remove('hidden');
+                } else {
+                    document.getElementById('my-photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
+                    document.getElementById('my-photo-delete-btn').classList.add('hidden');
+                }
 
             } catch (error) {
                 console.error('Error loading profile:', error);
@@ -576,6 +605,71 @@
             }
         }
 
+        // Upload my photo
+        async function uploadMyPhoto(file) {
+            try {
+                const formData = new FormData();
+                formData.append('photo', file);
+
+                const response = await fetch(`${API_BASE}/members/me/photo`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Upload fehlgeschlagen');
+                }
+
+                const data = await response.json();
+                memberData.foto = data.foto;
+
+                // Update preview
+                document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${data.foto}" class="w-full h-full object-cover">`;
+                document.getElementById('my-photo-delete-btn').classList.remove('hidden');
+
+                alert('Foto erfolgreich hochgeladen!');
+            } catch (error) {
+                console.error('Error uploading photo:', error);
+                alert('Fehler beim Hochladen: ' + error.message);
+            }
+        }
+
+        // Delete my photo
+        async function deleteMyPhoto() {
+            if (!confirm('Möchten Sie Ihr Profilfoto wirklich entfernen?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/members/me/photo`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Löschen fehlgeschlagen');
+                }
+
+                memberData.foto = null;
+
+                // Update preview
+                document.getElementById('my-photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
+                document.getElementById('my-photo-delete-btn').classList.add('hidden');
+
+                alert('Foto erfolgreich entfernt!');
+            } catch (error) {
+                console.error('Error deleting photo:', error);
+                alert('Fehler beim Löschen: ' + error.message);
+            }
+        }
+
         // Event listeners
         document.getElementById('profile-form').addEventListener('submit', saveProfile);
         document.getElementById('save-notifications-btn').addEventListener('click', saveNotifications);
@@ -588,6 +682,24 @@
             localStorage.removeItem('auth_token');
             window.location.href = '/';
         });
+
+        // Photo upload event listeners
+        document.getElementById('my-photo-upload-btn').addEventListener('click', () => {
+            document.getElementById('my-photo-upload').click();
+        });
+
+        document.getElementById('my-photo-upload').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Die Datei ist zu gross. Maximal 5MB erlaubt.');
+                    return;
+                }
+                uploadMyPhoto(file);
+            }
+        });
+
+        document.getElementById('my-photo-delete-btn').addEventListener('click', deleteMyPhoto);
 
         // Initialize
         (async () => {

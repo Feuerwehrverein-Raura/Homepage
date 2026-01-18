@@ -5,7 +5,39 @@ const { Pool } = require('pg');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const { ImapFlow } = require('imapflow');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
+
+// Configure multer for photo uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = '/app/uploads';
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'photo-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = /jpeg|jpg|png|gif|webp/;
+        const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimetype = allowedTypes.test(file.mimetype);
+        if (extname && mimetype) {
+            return cb(null, true);
+        }
+        cb(new Error('Only image files are allowed'));
+    }
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +79,9 @@ app.use(helmet({
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
 }));
 app.use(express.json());
+
+// Serve uploaded photos statically
+app.use('/uploads', express.static('/app/uploads'));
 
 // Health Check
 app.get('/health', (req, res) => {
@@ -685,6 +720,92 @@ app.put('/members/me', authenticateToken, async (req, res) => {
     }
 });
 
+// Upload own photo (self-service)
+app.post('/members/me/photo', authenticateToken, upload.single('photo'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No photo uploaded' });
+        }
+
+        // Get member ID from email
+        const memberResult = await pool.query(
+            'SELECT id, foto FROM members WHERE email = $1',
+            [req.user.email]
+        );
+
+        if (memberResult.rows.length === 0) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Member profile not found' });
+        }
+
+        const memberId = memberResult.rows[0].id;
+        const oldPhoto = memberResult.rows[0].foto;
+
+        // Build the photo URL
+        const photoUrl = `/uploads/${req.file.filename}`;
+
+        // Update member with new photo URL
+        await pool.query(`
+            UPDATE members SET foto = $1, updated_at = NOW()
+            WHERE id = $2
+        `, [photoUrl, memberId]);
+
+        // Delete old photo file if it exists
+        if (oldPhoto && oldPhoto.startsWith('/uploads/')) {
+            const oldPath = '/app' + oldPhoto;
+            if (fs.existsSync(oldPath)) {
+                fs.unlinkSync(oldPath);
+            }
+        }
+
+        res.json({
+            success: true,
+            photo_url: photoUrl
+        });
+    } catch (error) {
+        if (req.file) {
+            try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+        }
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete own photo (self-service)
+app.delete('/members/me/photo', authenticateToken, async (req, res) => {
+    try {
+        // Get member
+        const memberResult = await pool.query(
+            'SELECT id, foto FROM members WHERE email = $1',
+            [req.user.email]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Member profile not found' });
+        }
+
+        const memberId = memberResult.rows[0].id;
+        const currentPhoto = memberResult.rows[0].foto;
+
+        // Update member to remove photo
+        await pool.query(`
+            UPDATE members SET foto = NULL, updated_at = NOW()
+            WHERE id = $1
+        `, [memberId]);
+
+        // Delete photo file if it exists
+        if (currentPhoto && currentPhoto.startsWith('/uploads/')) {
+            const photoPath = '/app' + currentPhoto;
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        res.json({ success: true, message: 'Photo deleted' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Update member by ID (requires Vorstand role) - MUST come after /members/me
 app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
@@ -756,6 +877,106 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
         });
 
         res.json({ message: 'Member deleted', id });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// PHOTO UPLOAD
+// ============================================
+
+// Upload member photo
+app.post('/members/:id/photo', authenticateVorstand, upload.single('photo'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'No photo uploaded' });
+        }
+
+        // Build the photo URL
+        const photoUrl = `/uploads/${req.file.filename}`;
+
+        // Get old photo to delete
+        const oldResult = await pool.query('SELECT foto FROM members WHERE id = $1', [id]);
+        const oldPhoto = oldResult.rows[0]?.foto;
+
+        // Update member with new photo URL
+        const result = await pool.query(`
+            UPDATE members SET foto = $1, updated_at = NOW()
+            WHERE id = $2
+            RETURNING *
+        `, [photoUrl, id]);
+
+        if (result.rows.length === 0) {
+            // Delete uploaded file if member not found
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Member not found' });
+        }
+
+        // Delete old photo file if it exists
+        if (oldPhoto && oldPhoto.startsWith('/uploads/')) {
+            const oldPath = '/app' + oldPhoto;
+            if (fs.existsSync(oldPath)) {
+                fs.unlinkSync(oldPath);
+            }
+        }
+
+        // Audit log
+        await logAudit(pool, 'MEMBER_PHOTO_UPDATE', null, req.user.email, getClientIp(req), {
+            member_id: id,
+            photo_url: photoUrl
+        });
+
+        res.json({
+            success: true,
+            photo_url: photoUrl,
+            member: result.rows[0]
+        });
+    } catch (error) {
+        // Clean up uploaded file on error
+        if (req.file) {
+            try { fs.unlinkSync(req.file.path); } catch (e) { /* ignore */ }
+        }
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete member photo
+app.delete('/members/:id/photo', authenticateVorstand, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get current photo
+        const currentResult = await pool.query('SELECT foto FROM members WHERE id = $1', [id]);
+
+        if (currentResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Member not found' });
+        }
+
+        const currentPhoto = currentResult.rows[0].foto;
+
+        // Update member to remove photo
+        await pool.query(`
+            UPDATE members SET foto = NULL, updated_at = NOW()
+            WHERE id = $1
+        `, [id]);
+
+        // Delete photo file if it exists
+        if (currentPhoto && currentPhoto.startsWith('/uploads/')) {
+            const photoPath = '/app' + currentPhoto;
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        // Audit log
+        await logAudit(pool, 'MEMBER_PHOTO_DELETE', null, req.user.email, getClientIp(req), {
+            member_id: id
+        });
+
+        res.json({ success: true, message: 'Photo deleted' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
