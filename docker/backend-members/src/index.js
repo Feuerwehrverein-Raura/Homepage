@@ -830,6 +830,172 @@ app.get('/audit', authenticateVorstand, async (req, res) => {
 });
 
 // ============================================
+// MEMBER REGISTRATIONS (Pending Applications)
+// ============================================
+
+// Get all pending registrations (Vorstand only)
+app.get('/registrations', authenticateVorstand, async (req, res) => {
+    try {
+        const { status = 'pending' } = req.query;
+
+        let query = 'SELECT * FROM member_registrations';
+        const params = [];
+
+        if (status && status !== 'all') {
+            params.push(status);
+            query += ` WHERE status = $${params.length}`;
+        }
+
+        query += ' ORDER BY created_at DESC';
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get single registration
+app.get('/registrations/:id', authenticateVorstand, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('SELECT * FROM member_registrations WHERE id = $1', [id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Approve registration (creates member)
+app.post('/registrations/:id/approve', authenticateVorstand, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { memberStatus = 'Passivmitglied' } = req.body;
+
+        // Get registration
+        const regResult = await pool.query('SELECT * FROM member_registrations WHERE id = $1', [id]);
+
+        if (regResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+
+        const registration = regResult.rows[0];
+
+        if (registration.status !== 'pending') {
+            return res.status(400).json({ error: 'Registration already processed' });
+        }
+
+        // Create member from registration
+        const memberResult = await pool.query(`
+            INSERT INTO members
+            (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
+             status, zustellung_email, zustellung_post, eintrittsdatum)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+            RETURNING id
+        `, [
+            registration.vorname,
+            registration.nachname,
+            registration.strasse,
+            registration.plz,
+            registration.ort,
+            registration.telefon,
+            registration.mobile,
+            registration.email,
+            memberStatus,
+            registration.korrespondenz_methode === 'email',
+            registration.korrespondenz_methode === 'post'
+        ]);
+
+        const memberId = memberResult.rows[0].id;
+
+        // Update registration status
+        await pool.query(`
+            UPDATE member_registrations
+            SET status = 'approved', member_id = $1, processed_by = $2, processed_at = NOW()
+            WHERE id = $3
+        `, [memberId, req.user.email, id]);
+
+        // Audit log
+        await logAudit(pool, 'REGISTRATION_APPROVED', null, req.user.email, getClientIp(req), {
+            registration_id: id,
+            member_id: memberId,
+            member_name: `${registration.vorname} ${registration.nachname}`
+        });
+
+        // TODO: Send welcome email to new member (via dispatch API)
+
+        res.json({
+            success: true,
+            message: 'Registration approved',
+            member_id: memberId
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Reject registration
+app.post('/registrations/:id/reject', authenticateVorstand, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+
+        // Get registration
+        const regResult = await pool.query('SELECT * FROM member_registrations WHERE id = $1', [id]);
+
+        if (regResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+
+        const registration = regResult.rows[0];
+
+        if (registration.status !== 'pending') {
+            return res.status(400).json({ error: 'Registration already processed' });
+        }
+
+        // Update registration status
+        await pool.query(`
+            UPDATE member_registrations
+            SET status = 'rejected', rejection_reason = $1, processed_by = $2, processed_at = NOW()
+            WHERE id = $3
+        `, [reason || null, req.user.email, id]);
+
+        // Audit log
+        await logAudit(pool, 'REGISTRATION_REJECTED', null, req.user.email, getClientIp(req), {
+            registration_id: id,
+            member_name: `${registration.vorname} ${registration.nachname}`,
+            reason: reason
+        });
+
+        // TODO: Send rejection email to applicant (via dispatch API)
+
+        res.json({
+            success: true,
+            message: 'Registration rejected'
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get registration count (for badge in UI)
+app.get('/registrations/count/pending', authenticateVorstand, async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT COUNT(*) as count FROM member_registrations WHERE status = 'pending'"
+        );
+        res.json({ count: parseInt(result.rows[0].count) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // STATISTICS
 // ============================================
 

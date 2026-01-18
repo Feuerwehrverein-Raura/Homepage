@@ -287,11 +287,71 @@ app.post('/contact', async (req, res) => {
         let emailSubject = '';
 
         if (type === 'membership' && membership) {
-            // Mitgliedschaftsantrag
-            emailSubject = `Neuer Mitgliedschaftsantrag von ${membership.firstname} ${membership.lastname}`;
-            emailBody = `
-NEUER MITGLIEDSCHAFTSANTRAG
-===========================
+            // Mitgliedschaftsantrag - In Datenbank speichern
+            const isFirefighterRaurica = membership.firefighterStatus === 'active';
+            const registrationStatus = isFirefighterRaurica ? 'approved' : 'pending';
+
+            // Registrierung in Datenbank speichern
+            const registrationResult = await pool.query(`
+                INSERT INTO member_registrations
+                (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
+                 feuerwehr_status, korrespondenz_methode, korrespondenz_adresse, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                RETURNING id
+            `, [
+                membership.firstname,
+                membership.lastname,
+                membership.street,
+                membership.city?.split(' ')[1] || '', // PLZ from "1234 Ort"
+                membership.city?.split(' ').slice(1).join(' ') || membership.city, // Ort
+                membership.phone,
+                membership.mobile || null,
+                membership.email,
+                membership.firefighterStatus,
+                membership.correspondenceMethod,
+                membership.correspondenceAddress,
+                registrationStatus
+            ]);
+
+            const registrationId = registrationResult.rows[0].id;
+            let memberId = null;
+
+            // Wenn Feuerwehr Raurica Mitglied -> automatisch genehmigen und Mitglied erstellen
+            if (isFirefighterRaurica) {
+                const memberResult = await pool.query(`
+                    INSERT INTO members
+                    (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
+                     status, feuerwehr_zugehoerigkeit, zustellung_email, zustellung_post, eintrittsdatum)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aktivmitglied', 'feuerwehr_raurica', $9, $10, NOW())
+                    RETURNING id
+                `, [
+                    membership.firstname,
+                    membership.lastname,
+                    membership.street,
+                    membership.city?.split(' ')[0] || '',
+                    membership.city?.split(' ').slice(1).join(' ') || membership.city,
+                    membership.phone,
+                    membership.mobile || null,
+                    membership.email,
+                    membership.correspondenceMethod === 'email',
+                    membership.correspondenceMethod === 'post'
+                ]);
+                memberId = memberResult.rows[0].id;
+
+                // Registrierung mit Mitglied-ID aktualisieren
+                await pool.query(`
+                    UPDATE member_registrations
+                    SET member_id = $1, processed_at = NOW(), processed_by = 'system'
+                    WHERE id = $2
+                `, [memberId, registrationId]);
+
+                emailSubject = `Neues Mitglied: ${membership.firstname} ${membership.lastname} (automatisch aufgenommen)`;
+                emailBody = `
+NEUES MITGLIED (AUTOMATISCH AUFGENOMMEN)
+========================================
+
+${membership.firstname} ${membership.lastname} ist Mitglied der Feuerwehr Raurica
+und wurde automatisch als Aktivmitglied aufgenommen.
 
 Persönliche Daten:
 - Name: ${membership.firstname} ${membership.lastname}
@@ -301,32 +361,82 @@ Persönliche Daten:
 - Mobile: ${membership.mobile || '-'}
 - E-Mail: ${membership.email}
 
-Feuerwehr-Status: ${membership.firefighterStatus}
+Feuerwehr-Status: Aktives Feuerwehr-Mitglied
 Korrespondenz: ${membership.correspondenceMethod}
-Zustelladresse: ${membership.correspondenceAddress}
 
-Absender-Kontakt: ${name} <${email}>
-            `.trim();
+Das Mitglied wurde der Datenbank hinzugefügt.
+                `.trim();
 
-            // Bestätigung an Antragsteller
-            await transporter.sendMail({
-                from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
-                to: membership.email,
-                subject: 'Bestätigung Ihres Mitgliedschaftsantrags - FWV Raura',
-                text: `
+                // Bestätigung an neues Mitglied
+                await transporter.sendMail({
+                    from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+                    to: membership.email,
+                    subject: 'Willkommen beim Feuerwehrverein Raura!',
+                    text: `
+Liebe/r ${membership.firstname} ${membership.lastname},
+
+Herzlich willkommen beim Feuerwehrverein Raura!
+
+Als aktives Mitglied der Feuerwehr Raurica wurden Sie automatisch als Aktivmitglied aufgenommen.
+
+Wir freuen uns auf Ihre Teilnahme an unseren Vereinsaktivitäten!
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+                    `.trim()
+                });
+            } else {
+                // Normale Registrierung - muss vom Aktuar bestätigt werden
+                emailSubject = `Neuer Mitgliedschaftsantrag: ${membership.firstname} ${membership.lastname} (zu prüfen)`;
+                emailBody = `
+NEUER MITGLIEDSCHAFTSANTRAG (ZU PRÜFEN)
+=======================================
+
+${membership.firstname} ${membership.lastname} möchte Mitglied werden.
+
+Persönliche Daten:
+- Name: ${membership.firstname} ${membership.lastname}
+- Strasse: ${membership.street}
+- Ort: ${membership.city}
+- Telefon: ${membership.phone}
+- Mobile: ${membership.mobile || '-'}
+- E-Mail: ${membership.email}
+
+Feuerwehr-Status: ${membership.firefighterStatus === 'former' ? 'Ehemaliges Feuerwehr-Mitglied' : 'Kein Feuerwehr-Mitglied'}
+Korrespondenz: ${membership.correspondenceMethod}
+
+Der Antrag muss im Vorstand-Bereich geprüft und genehmigt werden:
+https://fwv-raura.ch/vorstand.html
+                `.trim();
+
+                // Bestätigung an Antragsteller
+                await transporter.sendMail({
+                    from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+                    to: membership.email,
+                    subject: 'Bestätigung Ihres Mitgliedschaftsantrags - FWV Raura',
+                    text: `
 Guten Tag ${membership.firstname} ${membership.lastname},
 
 Vielen Dank für Ihren Mitgliedschaftsantrag beim Feuerwehrverein Raura!
 
-Wir haben Ihren Antrag erhalten und werden ihn schnellstmöglich bearbeiten.
-
-Aktive Feuerwehr-Mitglieder werden sofort aufgenommen.
-Andere Interessierte werden an der nächsten ordentlichen GV bestätigt.
+Wir haben Ihren Antrag erhalten. Da Sie kein aktives Mitglied der Feuerwehr Raurica sind,
+wird Ihr Antrag vom Vorstand geprüft und Sie werden über das Ergebnis informiert.
 
 Mit freundlichen Grüssen
 Feuerwehrverein Raura
-                `.trim()
+                    `.trim()
+                });
+            }
+
+            // E-Mail an Vorstand
+            await transporter.sendMail({
+                from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+                to: process.env.VORSTAND_EMAIL || 'vorstand@fwv-raura.ch',
+                replyTo: membership.email,
+                subject: emailSubject,
+                text: emailBody
             });
+
         } else {
             // Allgemeines Kontaktformular
             emailSubject = `Kontaktanfrage: ${subject}`;
@@ -357,16 +467,16 @@ Mit freundlichen Grüssen
 Feuerwehrverein Raura
                 `.trim()
             });
-        }
 
-        // E-Mail an Vorstand
-        await transporter.sendMail({
-            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
-            to: process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch',
-            replyTo: email,
-            subject: emailSubject,
-            text: emailBody
-        });
+            // E-Mail an Vorstand
+            await transporter.sendMail({
+                from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+                to: process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch',
+                replyTo: email,
+                subject: emailSubject,
+                text: emailBody
+            });
+        }
 
         // Log
         await pool.query(`

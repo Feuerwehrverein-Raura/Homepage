@@ -104,6 +104,10 @@
                 <button id="tab-email" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                     E-Mail
                 </button>
+                <button id="tab-registrations" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 relative">
+                    Anträge
+                    <span id="registrations-badge" class="hidden absolute -top-1 -right-2 bg-fire-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
+                </button>
             </div>
         </div>
     </section>
@@ -671,6 +675,144 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registrations Section -->
+    <div id="registrations-section" class="hidden">
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">Mitgliedschaftsanträge</h1>
+                        <p class="text-gray-600 mt-1">Neue Anträge prüfen und genehmigen</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <select id="registrations-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <option value="pending">Ausstehend</option>
+                            <option value="approved">Genehmigt</option>
+                            <option value="rejected">Abgelehnt</option>
+                            <option value="all">Alle</option>
+                        </select>
+                        <button id="refresh-registrations-btn" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                            Aktualisieren
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">E-Mail</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Feuerwehr</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Datum</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="registrations-tbody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="registrations-loading" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                    <p class="mt-4 text-gray-600">Lade Anträge...</p>
+                </div>
+
+                <div id="registrations-empty" class="text-center py-12 hidden">
+                    <p class="text-gray-600">Keine Anträge vorhanden.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Registration Detail Modal -->
+    <div id="registration-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Mitgliedschaftsantrag</h3>
+                    <button id="close-registration-modal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+
+                <div id="registration-details" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-sm text-gray-500">Vorname</label>
+                            <p id="reg-vorname" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <label class="text-sm text-gray-500">Nachname</label>
+                            <p id="reg-nachname" class="font-medium"></p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-500">Adresse</label>
+                        <p id="reg-adresse" class="font-medium"></p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-sm text-gray-500">Telefon</label>
+                            <p id="reg-telefon" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <label class="text-sm text-gray-500">Mobile</label>
+                            <p id="reg-mobile" class="font-medium"></p>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-500">E-Mail</label>
+                        <p id="reg-email" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-500">Feuerwehr-Status</label>
+                        <p id="reg-feuerwehr" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-500">Korrespondenz</label>
+                        <p id="reg-korrespondenz" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <label class="text-sm text-gray-500">Eingegangen am</label>
+                        <p id="reg-datum" class="font-medium"></p>
+                    </div>
+                </div>
+
+                <input type="hidden" id="registration-id">
+
+                <div id="registration-actions" class="mt-6 space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Als Status aufnehmen:</label>
+                        <select id="reg-member-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="Passivmitglied">Passivmitglied</option>
+                            <option value="Aktivmitglied">Aktivmitglied</option>
+                        </select>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button id="approve-registration-btn" class="flex-1 bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+                            Genehmigen
+                        </button>
+                        <button id="reject-registration-btn" class="flex-1 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600">
+                            Ablehnen
+                        </button>
+                    </div>
+                </div>
+
+                <div id="registration-processed" class="mt-6 hidden">
+                    <div class="bg-gray-100 rounded-lg p-4">
+                        <p class="text-sm text-gray-600">Bearbeitet von: <span id="reg-processed-by"></span></p>
+                        <p class="text-sm text-gray-600">Am: <span id="reg-processed-at"></span></p>
+                        <p id="reg-rejection-reason" class="text-sm text-red-600 mt-2 hidden"></p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1570,6 +1712,226 @@
         }
 
         // ============================================
+        // REGISTRATIONS
+        // ============================================
+
+        let registrations = [];
+
+        async function loadRegistrationCount() {
+            try {
+                const response = await fetch(`${API_BASE}/registrations/count/pending`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    const badge = document.getElementById('registrations-badge');
+                    if (data.count > 0) {
+                        badge.textContent = data.count;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading registration count:', error);
+            }
+        }
+
+        async function loadRegistrations() {
+            try {
+                document.getElementById('registrations-loading').classList.remove('hidden');
+                document.getElementById('registrations-empty').classList.add('hidden');
+
+                const status = document.getElementById('registrations-filter').value;
+                const response = await fetch(`${API_BASE}/registrations?status=${status}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load registrations');
+
+                registrations = await response.json();
+                renderRegistrations();
+                loadRegistrationCount();
+            } catch (error) {
+                console.error('Error loading registrations:', error);
+            } finally {
+                document.getElementById('registrations-loading').classList.add('hidden');
+            }
+        }
+
+        function renderRegistrations() {
+            const tbody = document.getElementById('registrations-tbody');
+
+            if (registrations.length === 0) {
+                tbody.innerHTML = '';
+                document.getElementById('registrations-empty').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('registrations-empty').classList.add('hidden');
+
+            tbody.innerHTML = registrations.map(reg => {
+                const date = new Date(reg.created_at).toLocaleDateString('de-CH');
+                const feuerwehrStatus = {
+                    'active': 'Aktiv',
+                    'former': 'Ehemalig',
+                    'no': 'Nein'
+                }[reg.feuerwehr_status] || reg.feuerwehr_status || '-';
+
+                const statusClass = {
+                    'pending': 'bg-yellow-100 text-yellow-800',
+                    'approved': 'bg-green-100 text-green-800',
+                    'rejected': 'bg-red-100 text-red-800'
+                }[reg.status] || 'bg-gray-100 text-gray-800';
+
+                const statusText = {
+                    'pending': 'Ausstehend',
+                    'approved': 'Genehmigt',
+                    'rejected': 'Abgelehnt'
+                }[reg.status] || reg.status;
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">${reg.vorname} ${reg.nachname}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-600">${reg.email}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-600">${feuerwehrStatus}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-600">${date}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full ${statusClass}">${statusText}</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="viewRegistration('${reg.id}')" class="text-fire-600 hover:text-fire-800">
+                                Anzeigen
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function viewRegistration(id) {
+            try {
+                const response = await fetch(`${API_BASE}/registrations/${id}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load registration');
+
+                const reg = await response.json();
+
+                document.getElementById('registration-id').value = reg.id;
+                document.getElementById('reg-vorname').textContent = reg.vorname;
+                document.getElementById('reg-nachname').textContent = reg.nachname;
+                document.getElementById('reg-adresse').textContent = `${reg.strasse || ''}, ${reg.plz || ''} ${reg.ort || ''}`;
+                document.getElementById('reg-telefon').textContent = reg.telefon || '-';
+                document.getElementById('reg-mobile').textContent = reg.mobile || '-';
+                document.getElementById('reg-email').textContent = reg.email;
+
+                const feuerwehrStatus = {
+                    'active': 'Aktives Feuerwehr-Mitglied',
+                    'former': 'Ehemaliges Feuerwehr-Mitglied',
+                    'no': 'Kein Feuerwehr-Mitglied'
+                }[reg.feuerwehr_status] || reg.feuerwehr_status || '-';
+                document.getElementById('reg-feuerwehr').textContent = feuerwehrStatus;
+
+                const korrespondenz = {
+                    'email': 'E-Mail',
+                    'post': 'Post'
+                }[reg.korrespondenz_methode] || reg.korrespondenz_methode || '-';
+                document.getElementById('reg-korrespondenz').textContent = korrespondenz;
+
+                document.getElementById('reg-datum').textContent = new Date(reg.created_at).toLocaleString('de-CH');
+
+                // Show/hide actions based on status
+                if (reg.status === 'pending') {
+                    document.getElementById('registration-actions').classList.remove('hidden');
+                    document.getElementById('registration-processed').classList.add('hidden');
+                } else {
+                    document.getElementById('registration-actions').classList.add('hidden');
+                    document.getElementById('registration-processed').classList.remove('hidden');
+                    document.getElementById('reg-processed-by').textContent = reg.processed_by || '-';
+                    document.getElementById('reg-processed-at').textContent = reg.processed_at
+                        ? new Date(reg.processed_at).toLocaleString('de-CH')
+                        : '-';
+
+                    if (reg.rejection_reason) {
+                        document.getElementById('reg-rejection-reason').textContent = `Grund: ${reg.rejection_reason}`;
+                        document.getElementById('reg-rejection-reason').classList.remove('hidden');
+                    } else {
+                        document.getElementById('reg-rejection-reason').classList.add('hidden');
+                    }
+                }
+
+                document.getElementById('registration-modal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Error loading registration:', error);
+                alert('Fehler beim Laden des Antrags');
+            }
+        }
+
+        async function approveRegistration() {
+            const id = document.getElementById('registration-id').value;
+            const memberStatus = document.getElementById('reg-member-status').value;
+
+            if (!confirm('Möchten Sie diesen Antrag genehmigen?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/registrations/${id}/approve`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ memberStatus })
+                });
+
+                if (!response.ok) throw new Error('Failed to approve registration');
+
+                alert('Antrag wurde genehmigt und Mitglied erstellt.');
+                document.getElementById('registration-modal').classList.add('hidden');
+                loadRegistrations();
+            } catch (error) {
+                console.error('Error approving registration:', error);
+                alert('Fehler beim Genehmigen des Antrags');
+            }
+        }
+
+        async function rejectRegistration() {
+            const id = document.getElementById('registration-id').value;
+            const reason = prompt('Grund für die Ablehnung (optional):');
+
+            if (!confirm('Möchten Sie diesen Antrag wirklich ablehnen?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/registrations/${id}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ reason })
+                });
+
+                if (!response.ok) throw new Error('Failed to reject registration');
+
+                alert('Antrag wurde abgelehnt.');
+                document.getElementById('registration-modal').classList.add('hidden');
+                loadRegistrations();
+            } catch (error) {
+                console.error('Error rejecting registration:', error);
+                alert('Fehler beim Ablehnen des Antrags');
+            }
+        }
+
+        // ============================================
         // TAB SWITCHING
         // ============================================
 
@@ -1585,6 +1947,7 @@
             document.getElementById('events-section').classList.add('hidden');
             document.getElementById('audit-section').classList.add('hidden');
             document.getElementById('email-section').classList.add('hidden');
+            document.getElementById('registrations-section').classList.add('hidden');
 
             if (tab === 'members') {
                 document.getElementById('tab-members').classList.add('border-fire-500', 'text-fire-600');
@@ -1601,6 +1964,10 @@
                 document.getElementById('tab-email').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('email-section').classList.remove('hidden');
                 loadMailboxes();
+            } else if (tab === 'registrations') {
+                document.getElementById('tab-registrations').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('registrations-section').classList.remove('hidden');
+                loadRegistrations();
             }
         }
 
@@ -1613,6 +1980,7 @@
         document.getElementById('tab-events').addEventListener('click', () => switchTab('events'));
         document.getElementById('tab-audit').addEventListener('click', () => switchTab('audit'));
         document.getElementById('tab-email').addEventListener('click', () => switchTab('email'));
+        document.getElementById('tab-registrations').addEventListener('click', () => switchTab('registrations'));
 
         // Members
         document.getElementById('add-member-btn').addEventListener('click', openNewMemberModal);
@@ -1658,6 +2026,13 @@
         document.getElementById('email-tab-mailboxes').addEventListener('click', () => switchEmailTab('mailboxes'));
         document.getElementById('email-tab-aliases').addEventListener('click', () => switchEmailTab('aliases'));
         document.getElementById('email-tab-quota').addEventListener('click', () => switchEmailTab('quota'));
+
+        // Registrations
+        document.getElementById('registrations-filter').addEventListener('change', () => loadRegistrations());
+        document.getElementById('refresh-registrations-btn').addEventListener('click', () => loadRegistrations());
+        document.getElementById('close-registration-modal').addEventListener('click', () => document.getElementById('registration-modal').classList.add('hidden'));
+        document.getElementById('approve-registration-btn').addEventListener('click', approveRegistration);
+        document.getElementById('reject-registration-btn').addEventListener('click', rejectRegistration);
 
         function switchEmailTab(tab) {
             document.querySelectorAll('.email-tab-btn').forEach(btn => {
@@ -1928,6 +2303,7 @@
             if (await checkAuth()) {
                 await loadStats();
                 await loadMembers();
+                loadRegistrationCount(); // Load badge count for pending registrations
             }
         })();
     </script>
