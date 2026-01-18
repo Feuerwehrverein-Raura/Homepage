@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.0.0...v1.1.0) (2026-01-18)
+
+
+### Features
+
+* add Admin as Funktion option with full privileges ([ef00c53](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ef00c5308fb2f2666f1d10562e9ef78b91e1ea21))
+
 # 1.0.0 (2026-01-18)
 
 
