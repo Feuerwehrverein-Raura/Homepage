@@ -1000,7 +1000,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return {
                 name: `${m.vorname} ${m.nachname}`,
                 position: position,
-                image: m.foto || null,
+                image: m.foto ? `https://api.fwv-raura.ch${m.foto}` : null,
                 email: m.email || null,
                 phone: null
             };
