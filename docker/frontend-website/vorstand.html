@@ -1505,6 +1505,23 @@
             });
         }
 
+        // Format time for HTML input (HH:MM format, no seconds)
+        function formatTimeForInput(time) {
+            if (!time) return '';
+            // Handle "HH:MM:SS" or "HH:MM" format
+            return time.substring(0, 5);
+        }
+
+        // Format date for HTML input (YYYY-MM-DD)
+        function formatDateForInput(date) {
+            if (!date) return '';
+            // Handle ISO date strings like "2026-01-18T00:00:00.000Z"
+            if (date.includes('T')) {
+                return date.split('T')[0];
+            }
+            return date;
+        }
+
         function addShiftRow(shift = null) {
             const container = document.getElementById('event-shifts-container');
             const shiftId = shift?.id || 'new-' + Date.now();
@@ -1513,6 +1530,10 @@
             row.dataset.shiftId = shiftId;
 
             const bereichValue = shift?.bereich || 'Allgemein';
+            const dateValue = formatDateForInput(shift?.date);
+            const startTimeValue = formatTimeForInput(shift?.start_time);
+            const endTimeValue = formatTimeForInput(shift?.end_time);
+
             row.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-7 gap-2">
                     <div>
@@ -1529,15 +1550,15 @@
                             class="shift-name w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
                     </div>
                     <div>
-                        <input type="date" value="${shift?.date || ''}"
+                        <input type="date" value="${dateValue}"
                             class="shift-date w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
                     </div>
                     <div>
-                        <input type="time" value="${shift?.start_time || ''}" placeholder="Start"
+                        <input type="time" value="${startTimeValue}" placeholder="Start"
                             class="shift-start w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
                     </div>
                     <div>
-                        <input type="time" value="${shift?.end_time || ''}" placeholder="Ende"
+                        <input type="time" value="${endTimeValue}" placeholder="Ende"
                             class="shift-end w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
                     </div>
                     <div class="flex items-center gap-2">
@@ -1678,7 +1699,8 @@
                             date: shift.date,
                             start_time: shift.start_time,
                             end_time: shift.end_time,
-                            needed: shift.needed
+                            needed: shift.needed,
+                            bereich: shift.bereich
                         })
                     });
                 } else {
@@ -1696,7 +1718,8 @@
                             date: shift.date,
                             start_time: shift.start_time,
                             end_time: shift.end_time,
-                            needed: shift.needed
+                            needed: shift.needed,
+                            bereich: shift.bereich
                         })
                     });
                 }

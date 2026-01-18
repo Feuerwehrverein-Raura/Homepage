@@ -119,6 +119,7 @@ CREATE TABLE shifts (
     start_time TIME,
     end_time TIME,
     needed INTEGER DEFAULT 2,
+    bereich VARCHAR(50) DEFAULT 'Allgemein',
 
     created_at TIMESTAMP DEFAULT NOW()
 );
