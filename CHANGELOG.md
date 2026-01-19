@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.8.0...v1.9.0) (2026-01-19)
+
+
+### Features
+
+* add function email credentials display and password change ([f6d4e70](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f6d4e7067c162368f2733b7b2ae88c6016478fee))
+
 # [1.8.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.7.2...v1.8.0) (2026-01-19)
 
 
