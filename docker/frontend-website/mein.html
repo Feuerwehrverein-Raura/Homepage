@@ -170,16 +170,11 @@
 
                     <!-- Funktions-E-Mail Sektion (nur sichtbar wenn Funktion vorhanden) -->
                     <div id="function-email-section" class="bg-white rounded-lg shadow p-6 mt-6 hidden">
-                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Funktions-E-Mail</h2>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Funktions-E-Mails</h2>
 
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                            <div class="flex items-start space-x-3">
-                                <div class="text-blue-500 text-2xl">@</div>
-                                <div class="flex-1">
-                                    <p class="text-sm text-blue-800 mb-1">Als <strong id="function-role-name"></strong> hast du Zugang zu folgender E-Mail-Adresse:</p>
-                                    <p class="text-lg font-mono font-semibold text-blue-900" id="function-email-address"></p>
-                                </div>
-                            </div>
+                        <!-- Container für mehrere Funktions-Emails -->
+                        <div id="function-emails-container" class="space-y-4 mb-6">
+                            <!-- Wird dynamisch gefüllt -->
                         </div>
 
                         <div class="space-y-4">
@@ -437,21 +432,53 @@
             }
         }
 
-        // Show function email section if member has a function with email
+        // Show function email section if member has function(s) with email
         function showFunctionEmailSection(funktion) {
             const section = document.getElementById('function-email-section');
+            const container = document.getElementById('function-emails-container');
 
-            if (!funktion || !FUNCTION_EMAIL_MAP[funktion]) {
+            if (!funktion) {
                 section.classList.add('hidden');
                 return;
             }
 
-            const email = FUNCTION_EMAIL_MAP[funktion];
-            section.classList.remove('hidden');
+            // Parse multiple functions (comma-separated)
+            const funktionen = funktion.split(',').map(f => f.trim()).filter(f => f);
+            const emailEntries = [];
 
-            document.getElementById('function-role-name').textContent = funktion;
-            document.getElementById('function-email-address').textContent = email;
-            document.getElementById('function-email-username').value = email;
+            funktionen.forEach(f => {
+                if (FUNCTION_EMAIL_MAP[f]) {
+                    emailEntries.push({ funktion: f, email: FUNCTION_EMAIL_MAP[f] });
+                }
+            });
+
+            if (emailEntries.length === 0) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            // Build HTML for each function email
+            container.innerHTML = emailEntries.map((entry, index) => `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-start space-x-3">
+                        <div class="text-blue-500 text-2xl">@</div>
+                        <div class="flex-1">
+                            <p class="text-sm text-blue-800 mb-1">Als <strong>${entry.funktion}</strong> hast du Zugang zu:</p>
+                            <div class="flex items-center gap-2">
+                                <p class="text-lg font-mono font-semibold text-blue-900">${entry.email}</p>
+                                <button onclick="copyToClipboard('${entry.email}')" class="p-1 hover:bg-blue-100 rounded" title="Kopieren">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Update the username field with first email (for password change)
+            document.getElementById('function-email-username').value = emailEntries[0].email;
+
+            section.classList.remove('hidden');
         }
 
         // Copy text to clipboard
