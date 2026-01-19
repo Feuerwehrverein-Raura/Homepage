@@ -1046,56 +1046,29 @@ document.addEventListener('DOMContentLoaded', function() {
         // EVENT LOADING FUNCTIONS
 async function loadUpcomingEvents() {
     try {
-        console.log('🔄 Lade kommende Events...');
-        
-        let eventFiles = [];
-        try {
-            const listResponse = await fetch('events-list.json');
-            if (listResponse.ok) {
-                const listData = await listResponse.json();
-                eventFiles = listData.files;
-                console.log(`📋 Event-Liste geladen: ${eventFiles.length} Dateien`);
-            } else {
-                console.warn('⚠️ events-list.json nicht gefunden, verwende Fallback');
-                eventFiles = [
-                    'events/chilbi-2024.md',
-                    'events/chilbi-2025.md',
-                    'events/grillplausch-sommer-2024.md'
-                ];
-            }
-        } catch (error) {
-            console.warn('⚠️ Fehler beim Laden der Event-Liste:', error);
-            eventFiles = [
-                'events/chilbi-2024.md',
-                'events/chilbi-2025.md',
-                'events/grillplausch-sommer-2024.md'
-            ];
+        console.log('🔄 Lade kommende Events von API...');
+
+        const response = await fetch('https://api.fwv-raura.ch/events?upcoming=true&limit=3');
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
         }
 
-        const events = [];
-        
-        for (const file of eventFiles) {
-            try {
-                const response = await fetch(file);
-                if (!response.ok) continue;
-                
-                const content = await response.text();
-                const event = parseEventMarkdown(content, file);
-                if (event) {
-                    events.push(event);
-                }
-            } catch (error) {
-                console.error(`Fehler beim Laden von ${file}:`, error);
-            }
-        }
+        const apiEvents = await response.json();
+        console.log(`📋 ${apiEvents.length} Events von API geladen`);
 
-        const now = new Date();
-        const upcomingEvents = events
-            .filter(event => event.startDate > now)
-            .sort((a, b) => a.startDate - b.startDate)
-            .slice(0, 3);
+        // Convert API events to the format expected by renderUpcomingEvents
+        const events = apiEvents.map(event => ({
+            title: event.title,
+            subtitle: event.subtitle || '',
+            description: event.description || '',
+            category: event.category || 'Vereinsintern',
+            startDate: new Date(event.start_date),
+            endDate: event.end_date ? new Date(event.end_date) : null,
+            location: event.location || '',
+            slug: event.slug
+        }));
 
-        renderUpcomingEvents(upcomingEvents);
+        renderUpcomingEvents(events);
 
     } catch (error) {
         console.error('Fehler beim Laden der Events:', error);
