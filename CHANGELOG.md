@@ -1,3 +1,10 @@
+## [1.9.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.0...v1.9.1) (2026-01-19)
+
+
+### Bug Fixes
+
+* use correct mail server mail.test.juroct.net everywhere ([777367f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/777367fe98b4cfe35be4c77933b29fcfb67c0f36))
+
 # [1.9.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.8.0...v1.9.0) (2026-01-19)
 
 
