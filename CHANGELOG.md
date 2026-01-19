@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.6.0...v1.7.0) (2026-01-19)
+
+
+### Features
+
+* auto-show preview after generating event invitation ([fe35988](https://github.com/Feuerwehrverein-Raura/Homepage/commit/fe359882ced4f8ed04c28b967688f6c9b247aaf8))
+
 # [1.6.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.5.1...v1.6.0) (2026-01-19)
 
 
