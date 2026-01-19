@@ -1992,11 +1992,11 @@
 
         let dispatchTemplates = [];
         let selectedMembersForDispatch = [];
-        const DISPATCH_API = 'https://api.fwv-raura.ch/dispatch';
+        let currentTemplate = null;
 
         async function loadDispatchTemplates() {
             try {
-                const response = await fetch(`${DISPATCH_API}/templates`, {
+                const response = await fetch(`${API_BASE}/templates`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 if (response.ok) {
@@ -2009,10 +2009,111 @@
                         option.textContent = `${t.name} (${t.type === 'email' ? 'E-Mail' : 'Post'})`;
                         select.appendChild(option);
                     });
+                } else {
+                    console.error('Failed to load templates:', response.status);
                 }
             } catch (error) {
                 console.error('Error loading dispatch templates:', error);
             }
+        }
+
+        function onTemplateSelected() {
+            const templateId = document.getElementById('dispatch-template').value;
+            const variablesContainer = document.getElementById('dispatch-variables');
+            const variablesInputs = document.getElementById('dispatch-variables-inputs');
+            const subjectInput = document.getElementById('dispatch-subject');
+            const bodyInput = document.getElementById('dispatch-body');
+
+            if (!templateId) {
+                currentTemplate = null;
+                variablesContainer.classList.add('hidden');
+                subjectInput.value = '';
+                bodyInput.value = '';
+                return;
+            }
+
+            currentTemplate = dispatchTemplates.find(t => t.id === templateId);
+            if (!currentTemplate) return;
+
+            // Fill subject and body from template
+            subjectInput.value = currentTemplate.subject || '';
+            bodyInput.value = currentTemplate.body || '';
+
+            // Show template variables if any
+            const variables = currentTemplate.variables || [];
+            // Filter out member variables that are auto-filled
+            const memberVars = ['anrede', 'vorname', 'nachname', 'strasse', 'plz', 'ort', 'email'];
+            const customVars = variables.filter(v => !memberVars.includes(v));
+
+            if (customVars.length > 0) {
+                variablesInputs.innerHTML = customVars.map(v => `
+                    <div class="flex items-center gap-2">
+                        <label class="w-40 text-sm text-gray-600">{{${v}}}</label>
+                        <input type="text" data-var="${v}" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="${v}">
+                    </div>
+                `).join('');
+                variablesContainer.classList.remove('hidden');
+            } else {
+                variablesContainer.classList.add('hidden');
+            }
+        }
+
+        function showDispatchPreview() {
+            const subject = document.getElementById('dispatch-subject').value;
+            let body = document.getElementById('dispatch-body').value;
+
+            // Replace template variables with sample data
+            const sampleMember = members[0] || {
+                anrede: 'Herr',
+                vorname: 'Max',
+                nachname: 'Mustermann',
+                strasse: 'Musterstrasse 1',
+                plz: '4303',
+                ort: 'Kaiseraugst',
+                email: 'max@example.com'
+            };
+
+            // Replace member variables
+            body = body.replace(/\{\{anrede\}\}/g, sampleMember.anrede || '');
+            body = body.replace(/\{\{vorname\}\}/g, sampleMember.vorname || '');
+            body = body.replace(/\{\{nachname\}\}/g, sampleMember.nachname || '');
+            body = body.replace(/\{\{strasse\}\}/g, sampleMember.strasse || '');
+            body = body.replace(/\{\{plz\}\}/g, sampleMember.plz || '');
+            body = body.replace(/\{\{ort\}\}/g, sampleMember.ort || '');
+            body = body.replace(/\{\{email\}\}/g, sampleMember.email || '');
+
+            // Replace custom variables from inputs
+            document.querySelectorAll('#dispatch-variables-inputs input[data-var]').forEach(input => {
+                const varName = input.dataset.var;
+                const value = input.value || `[${varName}]`;
+                body = body.replace(new RegExp(`\\{\\{${varName}\\}\\}`, 'g'), value);
+            });
+
+            // Show preview in modal
+            const previewHtml = `
+                <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+                        <div class="p-4 border-b flex justify-between items-center">
+                            <h3 class="text-lg font-bold">Vorschau</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">&times;</button>
+                        </div>
+                        <div class="p-6 overflow-y-auto max-h-[60vh]">
+                            <div class="mb-4">
+                                <label class="text-sm font-medium text-gray-500">Betreff:</label>
+                                <p class="font-semibold">${subject || '(kein Betreff)'}</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium text-gray-500">Nachricht:</label>
+                                <div class="mt-2 p-4 bg-gray-50 rounded-lg whitespace-pre-wrap font-mono text-sm">${body}</div>
+                            </div>
+                        </div>
+                        <div class="p-4 border-t text-right">
+                            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Schliessen</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', previewHtml);
         }
 
         function updateRecipientCount() {
@@ -2105,7 +2206,7 @@
 
                 // Send emails
                 if (emailRecipients.length > 0) {
-                    const response = await fetch(`${DISPATCH_API}/email/bulk`, {
+                    const response = await fetch(`${API_BASE}/email/bulk`, {
                         method: 'POST',
                         headers: {
                             'Authorization': `Bearer ${authToken}`,
@@ -2139,7 +2240,7 @@
                             city: member.ort
                         };
 
-                        const response = await fetch(`${DISPATCH_API}/pingen/send`, {
+                        const response = await fetch(`${API_BASE}/pingen/send`, {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${authToken}`,
@@ -2171,7 +2272,7 @@
 
         async function loadDispatchHistory() {
             try {
-                const response = await fetch(`${DISPATCH_API}/log?limit=50`, {
+                const response = await fetch(`${API_BASE}/dispatch-log?limit=50`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 if (response.ok) {
@@ -2456,6 +2557,7 @@
                 document.getElementById('tab-dispatch').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('dispatch-section').classList.remove('hidden');
                 loadDispatchTemplates();
+                loadDispatchHistory();
                 updateRecipientCount();
             } else if (tab === 'email') {
                 document.getElementById('tab-email').classList.add('border-fire-500', 'text-fire-600');
@@ -2559,6 +2661,8 @@
         document.getElementById('dispatch-filter-status').addEventListener('change', updateRecipientCount);
         document.getElementById('dispatch-filter-email').addEventListener('change', updateRecipientCount);
         document.getElementById('dispatch-filter-post').addEventListener('change', updateRecipientCount);
+        document.getElementById('dispatch-template').addEventListener('change', onTemplateSelected);
+        document.getElementById('dispatch-preview-btn').addEventListener('click', showDispatchPreview);
         document.getElementById('dispatch-send-btn').addEventListener('click', sendDispatch);
 
         // Registrations
