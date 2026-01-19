@@ -288,10 +288,16 @@ app.post('/contact', async (req, res) => {
 
         if (type === 'membership' && membership) {
             // Mitgliedschaftsantrag - In Datenbank speichern
-            const isFirefighterRaurica = membership.firefighterStatus === 'active';
+            // Frontend sendet "Ja (aktiv)", "Ehemalige/r", oder "Nein"
+            const isFirefighterRaurica = membership.firefighterStatus === 'Ja (aktiv)';
             const registrationStatus = isFirefighterRaurica ? 'approved' : 'pending';
 
             // Registrierung in Datenbank speichern
+            // PLZ/Ort aus "4303 Kaiseraugst" aufteilen
+            const cityParts = (membership.city || '').trim().split(' ');
+            const plz = cityParts[0] || '';
+            const ort = cityParts.slice(1).join(' ') || membership.city || '';
+
             const registrationResult = await pool.query(`
                 INSERT INTO member_registrations
                 (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
@@ -302,8 +308,8 @@ app.post('/contact', async (req, res) => {
                 membership.firstname,
                 membership.lastname,
                 membership.street,
-                membership.city?.split(' ')[1] || '', // PLZ from "1234 Ort"
-                membership.city?.split(' ').slice(1).join(' ') || membership.city, // Ort
+                plz,
+                ort,
                 membership.phone,
                 membership.mobile || null,
                 membership.email,
@@ -328,8 +334,8 @@ app.post('/contact', async (req, res) => {
                     membership.firstname,
                     membership.lastname,
                     membership.street,
-                    membership.city?.split(' ')[0] || '',
-                    membership.city?.split(' ').slice(1).join(' ') || membership.city,
+                    plz,
+                    ort,
                     membership.phone,
                     membership.mobile || null,
                     membership.email,
