@@ -1,3 +1,10 @@
+## [1.9.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.4...v1.9.5) (2026-01-19)
+
+
+### Bug Fixes
+
+* resolve CORS, API URLs, routing conflicts, and audit log issues ([39e1887](https://github.com/Feuerwehrverein-Raura/Homepage/commit/39e18873361363a47006df7f8c269b715849fe8a))
+
 ## [1.9.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.3...v1.9.4) (2026-01-19)
 
 
