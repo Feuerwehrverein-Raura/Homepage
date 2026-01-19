@@ -795,6 +795,339 @@ app.get('/mailcow/quota', async (req, res) => {
 });
 
 // ============================================
+// ARBEITSPLAN PDF GENERATION
+// ============================================
+
+app.post('/arbeitsplan/pdf', async (req, res) => {
+    try {
+        const { event, logoBase64 } = req.body;
+
+        if (!event || !event.shifts || event.shifts.length === 0) {
+            return res.status(400).json({ error: 'Event mit Schichten erforderlich' });
+        }
+
+        // Generate HTML matching the PDF template exactly
+        const html = generateArbeitsplanHTML(event, logoBase64);
+
+        // Convert HTML to PDF using Puppeteer
+        const browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '20mm', bottom: '15mm', left: '15mm', right: '15mm' }
+        });
+        await browser.close();
+
+        // Optional: Upload to Nextcloud
+        const filename = `Arbeitsplan ${event.title} ${new Date().getFullYear()}.pdf`;
+        await uploadToNextcloud(filename, pdfBuffer, '/Arbeitspläne').catch(() => {});
+
+        res.set({
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${filename}"`,
+            'Content-Length': pdfBuffer.length
+        });
+        res.send(pdfBuffer);
+    } catch (error) {
+        console.error('Arbeitsplan PDF error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+function generateArbeitsplanHTML(event, logoBase64) {
+    const shifts = event.shifts || [];
+
+    // Group shifts by date
+    const shiftsByDate = {};
+    shifts.forEach(shift => {
+        const date = shift.date;
+        if (!shiftsByDate[date]) {
+            shiftsByDate[date] = [];
+        }
+        shiftsByDate[date].push(shift);
+    });
+
+    // Sort dates
+    const sortedDates = Object.keys(shiftsByDate).sort();
+
+    // Get unique Bereiche (columns)
+    const allBereiche = [...new Set(shifts.map(s => s.bereich || 'Allgemein'))].sort();
+
+    // Format date like "Samstag, 01.03.2025"
+    function formatDate(dateStr) {
+        const date = new Date(dateStr + 'T12:00:00');
+        const weekdays = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${weekdays[date.getDay()]}, ${day}.${month}.${year}`;
+    }
+
+    // Format time like "18:00"
+    function formatTime(timeStr) {
+        if (!timeStr) return '';
+        return timeStr.substring(0, 5);
+    }
+
+    // Check if shift is a special type (Aufbau, Abbauen, etc.)
+    function isSpecialShift(shift) {
+        const name = (shift.bereich || shift.name || '').toLowerCase();
+        return name.includes('aufbau') || name.includes('abbau') || name.includes('kochen') || name.includes('schenkeli');
+    }
+
+    let html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+    @page { margin: 0; }
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 11pt;
+        line-height: 1.4;
+        color: #000;
+    }
+    .header {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 30px;
+    }
+    .logo {
+        width: 80px;
+        margin-right: 20px;
+    }
+    .logo img {
+        width: 80px;
+        height: auto;
+    }
+    .title-section {
+        flex: 1;
+    }
+    .org-name {
+        font-size: 14pt;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .arbeitsplan-title {
+        font-size: 16pt;
+        font-weight: bold;
+        text-decoration: underline;
+    }
+    .date-section {
+        margin-top: 25px;
+        margin-bottom: 10px;
+    }
+    .date-header {
+        font-weight: bold;
+        text-decoration: underline;
+        font-size: 11pt;
+        margin-bottom: 5px;
+    }
+    .date-header-with-task {
+        font-weight: bold;
+        text-decoration: underline;
+        font-size: 11pt;
+        margin-bottom: 5px;
+    }
+    .special-names {
+        margin-left: 0;
+        font-size: 11pt;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 5px;
+        font-size: 10pt;
+    }
+    th {
+        border: 1px solid #000;
+        padding: 5px 8px;
+        text-align: left;
+        font-weight: bold;
+        background: #fff;
+    }
+    td {
+        border: 1px solid #000;
+        padding: 5px 8px;
+        vertical-align: top;
+    }
+    .time-cell {
+        white-space: nowrap;
+        width: 90px;
+    }
+    .name-entry {
+        margin: 0;
+    }
+    .springer {
+        font-weight: bold;
+        margin-top: 15px;
+    }
+    .note {
+        margin-top: 10px;
+        font-style: normal;
+        font-size: 10pt;
+    }
+</style>
+</head>
+<body>
+
+<div class="header">`;
+
+    // Add logo if provided
+    if (logoBase64) {
+        html += `<div class="logo"><img src="data:image/png;base64,${logoBase64}" alt="Logo"></div>`;
+    }
+
+    html += `
+    <div class="title-section">
+        <div class="org-name">Feuerwehrverein Raura, Kaiseraugst</div>
+        <div class="arbeitsplan-title">Arbeitsplan ${event.title}</div>
+    </div>
+</div>`;
+
+    // Process each date
+    sortedDates.forEach(date => {
+        const dayShifts = shiftsByDate[date];
+        const formattedDate = formatDate(date);
+
+        // Separate special shifts from regular shifts
+        const specialShifts = dayShifts.filter(s => isSpecialShift(s));
+        const regularShifts = dayShifts.filter(s => !isSpecialShift(s));
+
+        // Group regular shifts by time slot
+        const timeSlots = {};
+        regularShifts.forEach(shift => {
+            const timeKey = `${shift.start_time}-${shift.end_time}`;
+            if (!timeSlots[timeKey]) {
+                timeSlots[timeKey] = {
+                    start_time: shift.start_time,
+                    end_time: shift.end_time,
+                    bereiche: {}
+                };
+            }
+            const bereich = shift.bereich || 'Allgemein';
+            timeSlots[timeKey].bereiche[bereich] = {
+                needed: shift.needed || 1,
+                assignments: shift.assignments || []
+            };
+        });
+
+        // Render special shifts (Aufbau, Abbauen, Kochen) without table
+        specialShifts.forEach(shift => {
+            const taskName = shift.bereich || shift.name || '';
+            const startTime = formatTime(shift.start_time);
+            const timeInfo = startTime ? ` ab ${startTime} Uhr` : '';
+
+            html += `
+<div class="date-section">
+    <div class="date-header-with-task">${formattedDate} ${taskName}${timeInfo}</div>
+    <div class="special-names">`;
+
+            const names = (shift.assignments || []).map(a => a.member_name || 'Unbekannt');
+            if (names.length > 0) {
+                html += `- ${names.join(', ')}`;
+            }
+
+            html += `</div>
+</div>`;
+        });
+
+        // Render regular shifts in table format
+        if (Object.keys(timeSlots).length > 0) {
+            // Get Bereiche for this day
+            const dayBereiche = [...new Set(regularShifts.map(s => s.bereich || 'Allgemein'))].sort();
+
+            // Check if it's a simple 2-column layout (Bar/Küche combined) or full table
+            const sortedTimeSlots = Object.entries(timeSlots).sort(([a], [b]) => a.localeCompare(b));
+
+            html += `
+<div class="date-section">
+    <table>
+        <thead>
+            <tr>
+                <th class="time-cell">${formattedDate.split(',')[0]},${formattedDate.split(',')[1]}</th>`;
+
+            dayBereiche.forEach(bereich => {
+                html += `<th>${bereich}</th>`;
+            });
+
+            html += `
+            </tr>
+        </thead>
+        <tbody>`;
+
+            sortedTimeSlots.forEach(([timeKey, slot]) => {
+                const startTime = formatTime(slot.start_time);
+                const endTime = formatTime(slot.end_time);
+                const endDisplay = endTime === '00:00' ? 'Open End' : endTime;
+
+                html += `
+            <tr>
+                <td class="time-cell">${startTime}-${endDisplay}</td>`;
+
+                dayBereiche.forEach(bereich => {
+                    const data = slot.bereiche[bereich];
+                    html += '<td>';
+
+                    if (data) {
+                        const assignments = data.assignments || [];
+                        const needed = data.needed || 1;
+
+                        if (assignments.length > 0) {
+                            assignments.forEach(a => {
+                                html += `<div class="name-entry">-${a.member_name || 'Unbekannt'}</div>`;
+                            });
+                            // Fill remaining slots with dashes
+                            for (let i = assignments.length; i < needed; i++) {
+                                html += '<div class="name-entry">-</div>';
+                            }
+                        } else {
+                            for (let i = 0; i < needed; i++) {
+                                html += '<div class="name-entry">-</div>';
+                            }
+                        }
+                    } else {
+                        html += '-';
+                    }
+
+                    html += '</td>';
+                });
+
+                html += '</tr>';
+            });
+
+            html += `
+        </tbody>
+    </table>
+</div>`;
+        }
+    });
+
+    // Add Springer if available in event data
+    if (event.springer) {
+        html += `
+<div class="springer">Springer: ${event.springer}</div>`;
+    }
+
+    // Add notes if available
+    if (event.notes) {
+        html += `
+<div class="note">${event.notes}</div>`;
+    }
+
+    html += `
+</body>
+</html>`;
+
+    return html;
+}
+
+// ============================================
 // DISPATCH LOG
 // ============================================
 

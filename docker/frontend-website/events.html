@@ -612,10 +612,9 @@
                     }
                 });
 
-                document.getElementById('download-arbeitsplan').addEventListener('click', () => {
+                document.getElementById('download-arbeitsplan').addEventListener('click', async () => {
                     if (this.selectedEvent) {
-                        const pdfPath = `pdfs/arbeitsplan-${this.selectedEvent.id}.pdf`;
-                        window.open(pdfPath, '_blank');
+                        await this.downloadArbeitsplanPDF();
                     }
                 });
             }
@@ -1401,6 +1400,69 @@
 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
+            }
+
+            async downloadArbeitsplanPDF() {
+                const event = this.selectedEvent;
+                if (!event || !event.shifts || event.shifts.length === 0) {
+                    alert('Keine Schichten für dieses Event vorhanden.');
+                    return;
+                }
+
+                const downloadBtn = document.getElementById('download-arbeitsplan');
+                const originalHTML = downloadBtn.innerHTML;
+                downloadBtn.innerHTML = '<span>⏳</span><span>Wird generiert...</span>';
+                downloadBtn.disabled = true;
+
+                try {
+                    // Load logo as base64
+                    let logoBase64 = null;
+                    try {
+                        const logoResponse = await fetch('images/logo.png');
+                        const logoBlob = await logoResponse.blob();
+                        logoBase64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                            reader.readAsDataURL(logoBlob);
+                        });
+                    } catch (e) {
+                        console.warn('Logo konnte nicht geladen werden:', e);
+                    }
+
+                    // Call PDF generation API
+                    const response = await fetch('https://api.fwv-raura.ch/arbeitsplan/pdf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            event: {
+                                title: event.title,
+                                shifts: event.shifts,
+                                springer: event.springer || null,
+                                notes: event.notes || null
+                            },
+                            logoBase64
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`PDF-Generierung fehlgeschlagen: ${response.status}`);
+                    }
+
+                    // Download PDF
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `Arbeitsplan ${event.title}.pdf`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error('PDF Download Fehler:', error);
+                    alert('PDF konnte nicht generiert werden. Bitte versuchen Sie es später erneut.');
+                } finally {
+                    downloadBtn.innerHTML = originalHTML;
+                    downloadBtn.disabled = false;
+                }
             }
 
             downloadICS() {
