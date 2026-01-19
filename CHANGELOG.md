@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.7.2...v1.8.0) (2026-01-19)
+
+
+### Features
+
+* add Arbeitsplan PDF generation endpoint with exact template matching ([a842194](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a842194a1bb222f10ba8de203be51b695793ea36))
+
 ## [1.7.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.7.1...v1.7.2) (2026-01-19)
 
 
