@@ -1,3 +1,10 @@
+## [1.9.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.2...v1.9.3) (2026-01-19)
+
+
+### Bug Fixes
+
+* use correct audit logging with real client IP ([faaef36](https://github.com/Feuerwehrverein-Raura/Homepage/commit/faaef36b24110d7e908588d02710edb78bbb1529))
+
 ## [1.9.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.1...v1.9.2) (2026-01-19)
 
 
