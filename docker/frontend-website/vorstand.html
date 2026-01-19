@@ -1595,7 +1595,10 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="text-sm text-gray-600">${event.shifts?.length || 0}</span>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
+                            <button onclick="generateEventInvitation('${event.id}')" class="text-green-600 hover:text-green-800" title="Einladung generieren">
+                                Einladung
+                            </button>
                             <button onclick="editEvent('${event.id}')" class="text-fire-600 hover:text-fire-800">
                                 Bearbeiten
                             </button>
@@ -1613,6 +1616,87 @@
                 'completed': 'bg-gray-100 text-gray-800'
             };
             return classes[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        async function generateEventInvitation(eventId) {
+            try {
+                // Load event data
+                const response = await fetch(`${API_BASE}/events/${eventId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error('Event nicht gefunden');
+                const event = await response.json();
+
+                // Format date and time
+                const startDate = new Date(event.start_date);
+                const endDate = event.end_date ? new Date(event.end_date) : null;
+                const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                const timeOptions = { hour: '2-digit', minute: '2-digit' };
+
+                const formattedDate = startDate.toLocaleDateString('de-CH', dateOptions);
+                const formattedTime = startDate.toLocaleTimeString('de-CH', timeOptions) + ' Uhr';
+
+                let dateRange = formattedDate;
+                if (endDate && endDate.toDateString() !== startDate.toDateString()) {
+                    dateRange += ` bis ${endDate.toLocaleDateString('de-CH', dateOptions)}`;
+                }
+
+                // Build invitation text
+                const anmeldungInfo = event.registration_required
+                    ? `\nAnmeldung: Erforderlich${event.registration_deadline ? ` bis ${new Date(event.registration_deadline).toLocaleDateString('de-CH')}` : ''}`
+                    : '\nAnmeldung: Nicht erforderlich';
+
+                const kostenInfo = event.cost ? `\nKosten: ${event.cost}` : '';
+
+                const invitationSubject = `Einladung: ${event.title}`;
+                const invitationBody = `Liebe Mitglieder
+
+Der Vorstand möchte euch herzlich einladen:
+
+═══════════════════════════════════════════
+${event.title}${event.subtitle ? '\n' + event.subtitle : ''}
+═══════════════════════════════════════════
+
+Was:      ${event.title}
+Wann:     ${formattedDate}, ${formattedTime}
+Wo:       ${event.location || 'Wird noch bekannt gegeben'}${anmeldungInfo}${kostenInfo}
+
+${event.description || ''}
+
+Wir freuen uns über zahlreiches Erscheinen!
+
+Mit freundlichen Grüssen
+Im Namen des Vorstandes
+
+René Käslin
+Präsident`;
+
+                // Switch to dispatch tab and fill in the data
+                switchTab('dispatch');
+
+                // Wait a moment for the tab to load
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Fill in the dispatch form
+                document.getElementById('dispatch-subject').value = invitationSubject;
+                document.getElementById('dispatch-body').value = invitationBody;
+
+                // Reset template selection (using free text)
+                document.getElementById('dispatch-template').value = '';
+                document.getElementById('dispatch-variables').classList.add('hidden');
+
+                // Set delivery method to auto
+                document.querySelector('input[name="delivery-method"][value="auto"]').checked = true;
+
+                // Update recipient count
+                updateRecipientCount();
+
+                alert(`Einladung für "${event.title}" wurde generiert.\n\nBitte prüfen und bei Bedarf anpassen, dann auf "Senden" klicken.`);
+
+            } catch (error) {
+                console.error('Error generating invitation:', error);
+                alert('Fehler beim Generieren der Einladung: ' + error.message);
+            }
         }
 
         function openNewEventModal() {
