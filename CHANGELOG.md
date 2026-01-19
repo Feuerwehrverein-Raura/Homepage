@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.5.1...v1.6.0) (2026-01-19)
+
+
+### Features
+
+* add automatic event invitation generation ([56c309f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/56c309fb8be8b14d963480ef088c11df9e9f271d))
+
 ## [1.5.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.5.0...v1.5.1) (2026-01-19)
 
 
