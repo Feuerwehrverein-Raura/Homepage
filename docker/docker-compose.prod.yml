@@ -160,7 +160,7 @@ services:
       PINGEN_STAGING: ${PINGEN_STAGING:-false}
       MEMBERS_API_URL: http://api-members:3000
       EVENTS_API_URL: http://api-events:3000
-      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.fwv-raura.ch}
+      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}
       MAILCOW_API_KEY: ${MAILCOW_API_KEY}
     depends_on:
       postgres:
