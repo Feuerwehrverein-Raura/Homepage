@@ -810,8 +810,9 @@ app.put('/members/me', authenticateToken, async (req, res) => {
                 changed_fields: changedFieldsList
             }).catch(err => console.error('Email notification failed:', err));
 
-            // Write audit log
-            writeAuditLog('member_self_update', 'member', memberId, req.user.email, {
+            // Write audit log with real client IP
+            const clientIp = getClientIp(req);
+            logAudit(pool, 'member_self_update', memberId, req.user.email, clientIp, {
                 updated_fields: changedFields
             });
         }
@@ -1631,11 +1632,11 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
             throw new Error(errorData.error || 'Passwortänderung fehlgeschlagen');
         }
 
-        // Log the change
-        await pool.query(`
-            INSERT INTO audit_log (action, entity_type, entity_id, user_email, details)
-            VALUES ('function_email_password_changed', 'mailbox', $1, $2, $3)
-        `, [functionEmail, req.user.email, JSON.stringify({ funktion })]);
+        // Log the change with real client IP
+        await logAudit(pool, 'FUNCTION_EMAIL_PASSWORD_CHANGED', member.id, req.user.email, getClientIp(req), {
+            function_email: functionEmail,
+            funktion
+        });
 
         res.json({ success: true, message: 'Passwort erfolgreich geändert' });
 
