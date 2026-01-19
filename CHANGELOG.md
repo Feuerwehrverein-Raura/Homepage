@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.11.0...v1.12.0) (2026-01-19)
+
+
+### Features
+
+* support multiple functions per member ([0c49837](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0c498379909b4896fbf2311b29ed388aeba211c8))
+
 # [1.11.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.10.0...v1.11.0) (2026-01-19)
 
 
