@@ -54,6 +54,19 @@ app.set('trust proxy', true);
 
 // Helper to get real client IP from proxy headers
 function getClientIp(req) {
+    // Debug logging for IP detection
+    console.log('IP Detection Headers:', {
+        'x-forwarded-for': req.headers['x-forwarded-for'],
+        'x-real-ip': req.headers['x-real-ip'],
+        'cf-connecting-ip': req.headers['cf-connecting-ip'],
+        'req.ip': req.ip,
+        'req.connection.remoteAddress': req.connection?.remoteAddress
+    });
+
+    // Cloudflare sets CF-Connecting-IP
+    if (req.headers['cf-connecting-ip']) {
+        return req.headers['cf-connecting-ip'];
+    }
     // X-Forwarded-For can contain multiple IPs, take the first (original client)
     const forwardedFor = req.headers['x-forwarded-for'];
     if (forwardedFor) {
@@ -75,12 +88,16 @@ const pool = new Pool({
 
 // Middleware - CORS must be before helmet
 const corsOptions = {
-    origin: ['https://fwv-raura.ch', 'https://www.fwv-raura.ch', 'http://localhost:3000'],
+    origin: ['https://fwv-raura.ch', 'https://www.fwv-raura.ch', 'http://localhost:3000', 'http://localhost:8080'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
+
+// Explicit preflight handling for all routes
+app.options('*', cors(corsOptions));
 app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
@@ -381,10 +398,19 @@ async function deleteAuthentikUser(authentikUserId) {
 // Audit logging helper
 async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
     try {
+        // Map action to entity_type
+        let entityType = 'auth';
+        if (action.startsWith('MEMBER_')) entityType = 'member';
+        else if (action.startsWith('LOGIN_')) entityType = 'auth';
+        else if (action.startsWith('EVENT_')) entityType = 'event';
+
+        // Store email and details in new_values JSON
+        const newValues = { email, ...details };
+
         await pool.query(`
-            INSERT INTO audit_log (action, user_id, email, ip_address, details, created_at)
+            INSERT INTO audit_log (action, entity_type, user_id, ip_address, new_values, created_at)
             VALUES ($1, $2, $3, $4, $5, NOW())
-        `, [action, userId, email, ipAddress, JSON.stringify(details)]);
+        `, [action, entityType, userId, ipAddress, JSON.stringify(newValues)]);
     } catch (error) {
         console.error('Failed to write audit log:', error.message);
     }

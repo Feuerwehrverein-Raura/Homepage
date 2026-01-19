@@ -571,7 +571,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.textContent = '...';
 
                 try {
-                    const response = await fetch('/api/newsletter/subscribe', {
+                    const response = await fetch('https://api.fwv-raura.ch/newsletter/subscribe', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: email })
@@ -727,7 +727,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             try {
-                const response = await fetch('/api/contact', {
+                const response = await fetch('https://api.fwv-raura.ch/contact', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
