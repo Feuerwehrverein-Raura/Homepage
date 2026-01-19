@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.5...v1.10.0) (2026-01-19)
+
+
+### Features
+
+* add Statuten section to main page ([2698f9e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2698f9e8279521e451e5055da5793c78d4d7da32))
+
 ## [1.9.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.4...v1.9.5) (2026-01-19)
 
 
