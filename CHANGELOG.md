@@ -1,3 +1,10 @@
+## [1.7.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.7.0...v1.7.1) (2026-01-19)
+
+
+### Bug Fixes
+
+* generate Arbeitsplan from shifts data instead of loading markdown files ([52b0fe8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/52b0fe868b280630eb21af5650efa7916e00dc88))
+
 # [1.7.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.6.0...v1.7.0) (2026-01-19)
 
 
