@@ -38,6 +38,7 @@ Nach dem Speichern wird automatisch ein Authentik-Account erstellt.
 | Materialwart | Vorstand |
 | Beisitzer | Vorstand |
 | Revisor | Kein Vorstand |
+| Social Media | Kein Vorstand (geteiltes Postfach) |
 
 ## Mitglied löschen
 

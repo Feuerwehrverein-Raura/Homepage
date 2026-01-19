@@ -19,6 +19,7 @@ Im Vorstand-Bereich kannst du E-Mail-Postfächer und Aliases verwalten.
 | materialwart@ | Materialwart |
 | beisitzer@ | Beisitzer |
 | info@ | Allgemeine Anfragen |
+| social-media@ | Social Media (geteiltes Postfach) |
 
 ## Speicherplatz
 
