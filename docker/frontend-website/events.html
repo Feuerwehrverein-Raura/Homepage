@@ -445,59 +445,111 @@
                 const shifts = event.shifts || [];
                 if (shifts.length === 0) return null;
 
-                // Group shifts by bereich (area)
-                const shiftsByBereich = {};
+                // Get all unique Bereiche
+                const bereiche = [...new Set(shifts.map(s => s.bereich || 'Allgemein'))].sort();
+
+                // Group shifts by date and time slot
+                const shiftsByDate = {};
                 shifts.forEach(shift => {
-                    const bereich = shift.bereich || 'Allgemein';
-                    if (!shiftsByBereich[bereich]) {
-                        shiftsByBereich[bereich] = [];
+                    const date = shift.date;
+                    if (!shiftsByDate[date]) {
+                        shiftsByDate[date] = {};
                     }
-                    shiftsByBereich[bereich].push(shift);
+                    const timeKey = `${shift.start_time}-${shift.end_time}`;
+                    if (!shiftsByDate[date][timeKey]) {
+                        shiftsByDate[date][timeKey] = {
+                            start_time: shift.start_time,
+                            end_time: shift.end_time,
+                            bereiche: {}
+                        };
+                    }
+                    const bereich = shift.bereich || 'Allgemein';
+                    shiftsByDate[date][timeKey].bereiche[bereich] = {
+                        needed: shift.needed || 1,
+                        assignments: shift.assignments || []
+                    };
                 });
 
-                // Generate HTML
-                let html = `<h2 class="text-xl font-bold mb-4">${event.title} - Arbeitsplan</h2>`;
+                // Sort dates
+                const sortedDates = Object.keys(shiftsByDate).sort();
 
-                Object.keys(shiftsByBereich).sort().forEach(bereich => {
-                    html += `<h3 class="text-lg font-semibold mt-4 mb-2 text-fire-700">${bereich}</h3>`;
-                    html += '<div class="overflow-x-auto"><table class="min-w-full text-sm">';
-                    html += '<thead class="bg-gray-100"><tr>';
-                    html += '<th class="px-3 py-2 text-left">Schicht</th>';
-                    html += '<th class="px-3 py-2 text-left">Datum</th>';
-                    html += '<th class="px-3 py-2 text-left">Zeit</th>';
-                    html += '<th class="px-3 py-2 text-left">Benötigt</th>';
-                    html += '<th class="px-3 py-2 text-left">Angemeldet</th>';
+                // Generate HTML matching the PDF template style
+                let html = `
+                    <div class="arbeitsplan-header text-center mb-6">
+                        <div class="text-lg font-semibold">Feuerwehrverein Raura, Kaiseraugst</div>
+                        <div class="text-2xl font-bold underline mt-2">Arbeitsplan ${event.title}</div>
+                    </div>
+                `;
+
+                sortedDates.forEach(date => {
+                    const dateObj = new Date(date + 'T12:00:00');
+                    const formattedDate = dateObj.toLocaleDateString('de-CH', {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+
+                    html += `<div class="mt-6 mb-4">
+                        <h3 class="text-lg font-bold underline">${formattedDate}</h3>
+                    </div>`;
+
+                    // Create table for this date
+                    html += '<div class="overflow-x-auto"><table class="w-full border-collapse text-sm">';
+
+                    // Header row with Bereiche
+                    html += '<thead><tr class="border-b-2 border-black">';
+                    html += '<th class="px-3 py-2 text-left font-bold border border-gray-400 bg-gray-50 w-32">Zeit</th>';
+                    bereiche.forEach(bereich => {
+                        html += `<th class="px-3 py-2 text-left font-bold border border-gray-400 bg-gray-50">${bereich}</th>`;
+                    });
                     html += '</tr></thead><tbody>';
 
-                    shiftsByBereich[bereich]
-                        .sort((a, b) => {
-                            const dateA = new Date(a.date + 'T' + a.start_time);
-                            const dateB = new Date(b.date + 'T' + b.start_time);
-                            return dateA - dateB;
-                        })
-                        .forEach(shift => {
-                            const date = new Date(shift.date).toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' });
-                            const startTime = shift.start_time ? shift.start_time.substring(0, 5) : '';
-                            const endTime = shift.end_time ? shift.end_time.substring(0, 5) : '';
-                            const assignedCount = shift.assignments ? shift.assignments.length : 0;
-                            const needed = shift.needed || 1;
-                            const statusClass = assignedCount >= needed ? 'text-green-600' : 'text-orange-600';
+                    // Sort time slots
+                    const timeSlots = Object.keys(shiftsByDate[date]).sort((a, b) => {
+                        return a.localeCompare(b);
+                    });
 
-                            html += '<tr class="border-b">';
-                            html += `<td class="px-3 py-2 font-medium">${shift.name || 'Schicht'}</td>`;
-                            html += `<td class="px-3 py-2">${date}</td>`;
-                            html += `<td class="px-3 py-2">${startTime} - ${endTime}</td>`;
-                            html += `<td class="px-3 py-2">${needed}</td>`;
-                            html += `<td class="px-3 py-2 ${statusClass}">${assignedCount}/${needed}</td>`;
-                            html += '</tr>';
+                    timeSlots.forEach(timeKey => {
+                        const slot = shiftsByDate[date][timeKey];
+                        const startTime = slot.start_time ? slot.start_time.substring(0, 5) : '';
+                        const endTime = slot.end_time ? slot.end_time.substring(0, 5) : '';
+                        const endDisplay = endTime === '00:00' ? 'Open End' : endTime;
 
-                            // Show assigned members if any
-                            if (shift.assignments && shift.assignments.length > 0) {
-                                html += '<tr class="bg-gray-50"><td colspan="5" class="px-3 py-1 text-xs text-gray-600">';
-                                html += shift.assignments.map(a => `${a.member_name || 'Unbekannt'}`).join(', ');
-                                html += '</td></tr>';
+                        html += '<tr class="border-b border-gray-300">';
+                        html += `<td class="px-3 py-2 border border-gray-400 font-medium align-top">${startTime}-${endDisplay}</td>`;
+
+                        bereiche.forEach(bereich => {
+                            const data = slot.bereiche[bereich];
+                            html += '<td class="px-3 py-2 border border-gray-400 align-top">';
+
+                            if (data) {
+                                const assignments = data.assignments || [];
+                                const needed = data.needed || 1;
+
+                                if (assignments.length > 0) {
+                                    assignments.forEach(a => {
+                                        html += `<div>-${a.member_name || 'Unbekannt'}</div>`;
+                                    });
+                                    // Fill remaining slots with dashes
+                                    for (let i = assignments.length; i < needed; i++) {
+                                        html += '<div class="text-gray-400">-</div>';
+                                    }
+                                } else {
+                                    // No assignments, show empty slots
+                                    for (let i = 0; i < needed; i++) {
+                                        html += '<div class="text-gray-400">-</div>';
+                                    }
+                                }
+                            } else {
+                                html += '<div class="text-gray-300">-</div>';
                             }
+
+                            html += '</td>';
                         });
+
+                        html += '</tr>';
+                    });
 
                     html += '</tbody></table></div>';
                 });
