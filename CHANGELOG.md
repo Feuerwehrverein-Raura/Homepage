@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.10.0...v1.11.0) (2026-01-19)
+
+
+### Features
+
+* add Social Media function with shared mailbox ([ee4eb82](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ee4eb82fdfaaf22f799c352312e6ff1fc991879d))
+
 # [1.10.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.5...v1.10.0) (2026-01-19)
 
 
