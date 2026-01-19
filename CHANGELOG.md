@@ -1,3 +1,10 @@
+## [1.7.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.7.1...v1.7.2) (2026-01-19)
+
+
+### Bug Fixes
+
+* match Arbeitsplan format to PDF template ([2570f92](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2570f92cbabf62d7ebd6d960fa20da8c3e30c683))
+
 ## [1.7.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.7.0...v1.7.1) (2026-01-19)
 
 
