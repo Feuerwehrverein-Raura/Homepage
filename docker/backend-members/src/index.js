@@ -748,9 +748,9 @@ app.put('/members/me', authenticateToken, async (req, res) => {
 
         console.log('PUT /members/me called for user:', req.user?.email);
 
-        // Get current member
+        // Get current member data to track changes
         const currentResult = await pool.query(
-            'SELECT id FROM members WHERE email = $1',
+            'SELECT * FROM members WHERE email = $1',
             [req.user.email]
         );
 
@@ -758,7 +758,30 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Member profile not found' });
         }
 
-        const memberId = currentResult.rows[0].id;
+        const currentMember = currentResult.rows[0];
+        const memberId = currentMember.id;
+
+        // Track which fields changed
+        const changedFields = [];
+        const fieldLabels = {
+            telefon: 'Telefon',
+            mobile: 'Mobile',
+            email: 'E-Mail',
+            versand_email: 'Versand E-Mail',
+            strasse: 'Strasse',
+            adresszusatz: 'Adresszusatz',
+            plz: 'PLZ',
+            ort: 'Ort',
+            iban: 'IBAN',
+            bemerkungen: 'Bemerkungen'
+        };
+
+        const updates = { telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen };
+        for (const [field, value] of Object.entries(updates)) {
+            if (value !== undefined && value !== currentMember[field]) {
+                changedFields.push(fieldLabels[field] || field);
+            }
+        }
 
         // Update allowed fields only
         const result = await pool.query(`
@@ -779,6 +802,20 @@ app.put('/members/me', authenticateToken, async (req, res) => {
         `, [telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen, memberId]);
 
         console.log('Profile updated successfully for:', req.user.email);
+
+        // Send notification email if fields changed
+        if (changedFields.length > 0) {
+            const changedFieldsList = changedFields.map(f => `- ${f}`).join('\n');
+            sendNotificationEmail(memberId, 'Datenänderung bestätigt', {
+                changed_fields: changedFieldsList
+            }).catch(err => console.error('Email notification failed:', err));
+
+            // Write audit log
+            writeAuditLog('member_self_update', 'member', memberId, req.user.email, {
+                updated_fields: changedFields
+            });
+        }
+
         res.json(result.rows[0]);
     } catch (error) {
         console.error('PUT /members/me error:', error.message);
