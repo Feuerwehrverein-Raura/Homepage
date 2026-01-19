@@ -432,22 +432,77 @@
             }
 
             async loadArbeitsplanData() {
-                // Load arbeitsplan assignments if available
+                // Generate arbeitsplan from shifts data
                 this.arbeitsplanData = {};
                 for (const event of this.events) {
                     if (event.shifts && event.shifts.length > 0) {
-                        try {
-                            const assignmentFile = `events/${event.id}-assignments.md`;
-                            const response = await fetch(assignmentFile);
-                            if (response.ok) {
-                                const content = await response.text();
-                                this.arbeitsplanData[event.id] = content;
-                            }
-                        } catch (error) {
-                            console.log(`ℹ️  Keine Assignments für ${event.id}`);
-                        }
+                        this.arbeitsplanData[event.id] = this.generateArbeitsplanFromShifts(event);
                     }
                 }
+            }
+
+            generateArbeitsplanFromShifts(event) {
+                const shifts = event.shifts || [];
+                if (shifts.length === 0) return null;
+
+                // Group shifts by bereich (area)
+                const shiftsByBereich = {};
+                shifts.forEach(shift => {
+                    const bereich = shift.bereich || 'Allgemein';
+                    if (!shiftsByBereich[bereich]) {
+                        shiftsByBereich[bereich] = [];
+                    }
+                    shiftsByBereich[bereich].push(shift);
+                });
+
+                // Generate HTML
+                let html = `<h2 class="text-xl font-bold mb-4">${event.title} - Arbeitsplan</h2>`;
+
+                Object.keys(shiftsByBereich).sort().forEach(bereich => {
+                    html += `<h3 class="text-lg font-semibold mt-4 mb-2 text-fire-700">${bereich}</h3>`;
+                    html += '<div class="overflow-x-auto"><table class="min-w-full text-sm">';
+                    html += '<thead class="bg-gray-100"><tr>';
+                    html += '<th class="px-3 py-2 text-left">Schicht</th>';
+                    html += '<th class="px-3 py-2 text-left">Datum</th>';
+                    html += '<th class="px-3 py-2 text-left">Zeit</th>';
+                    html += '<th class="px-3 py-2 text-left">Benötigt</th>';
+                    html += '<th class="px-3 py-2 text-left">Angemeldet</th>';
+                    html += '</tr></thead><tbody>';
+
+                    shiftsByBereich[bereich]
+                        .sort((a, b) => {
+                            const dateA = new Date(a.date + 'T' + a.start_time);
+                            const dateB = new Date(b.date + 'T' + b.start_time);
+                            return dateA - dateB;
+                        })
+                        .forEach(shift => {
+                            const date = new Date(shift.date).toLocaleDateString('de-CH', { weekday: 'short', day: '2-digit', month: '2-digit' });
+                            const startTime = shift.start_time ? shift.start_time.substring(0, 5) : '';
+                            const endTime = shift.end_time ? shift.end_time.substring(0, 5) : '';
+                            const assignedCount = shift.assignments ? shift.assignments.length : 0;
+                            const needed = shift.needed || 1;
+                            const statusClass = assignedCount >= needed ? 'text-green-600' : 'text-orange-600';
+
+                            html += '<tr class="border-b">';
+                            html += `<td class="px-3 py-2 font-medium">${shift.name || 'Schicht'}</td>`;
+                            html += `<td class="px-3 py-2">${date}</td>`;
+                            html += `<td class="px-3 py-2">${startTime} - ${endTime}</td>`;
+                            html += `<td class="px-3 py-2">${needed}</td>`;
+                            html += `<td class="px-3 py-2 ${statusClass}">${assignedCount}/${needed}</td>`;
+                            html += '</tr>';
+
+                            // Show assigned members if any
+                            if (shift.assignments && shift.assignments.length > 0) {
+                                html += '<tr class="bg-gray-50"><td colspan="5" class="px-3 py-1 text-xs text-gray-600">';
+                                html += shift.assignments.map(a => `${a.member_name || 'Unbekannt'}`).join(', ');
+                                html += '</td></tr>';
+                            }
+                        });
+
+                    html += '</tbody></table></div>';
+                });
+
+                return html;
             }
 
             setupEventListeners() {
@@ -1267,19 +1322,30 @@
 
             showArbeitsplan() {
                 const event = this.selectedEvent;
-                if (!event || !this.arbeitsplanData[event.id]) return;
+                if (!event) return;
 
                 const modal = document.getElementById('arbeitsplan-modal');
                 const content = document.getElementById('arbeitsplan-content');
 
-                // Parse the arbeitsplan markdown
-                const arbeitsplanHTML = this.parseMarkdown(this.arbeitsplanData[event.id]);
+                // Get the pre-generated HTML or generate it now
+                let arbeitsplanHTML = this.arbeitsplanData[event.id];
+                if (!arbeitsplanHTML && event.shifts && event.shifts.length > 0) {
+                    arbeitsplanHTML = this.generateArbeitsplanFromShifts(event);
+                }
 
-                content.innerHTML = `
-                    <div class="prose max-w-none">
-                        ${arbeitsplanHTML}
-                    </div>
-                `;
+                if (!arbeitsplanHTML) {
+                    content.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <p>Keine Schichten für dieses Event vorhanden.</p>
+                        </div>
+                    `;
+                } else {
+                    content.innerHTML = `
+                        <div class="max-w-none">
+                            ${arbeitsplanHTML}
+                        </div>
+                    `;
+                }
 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
