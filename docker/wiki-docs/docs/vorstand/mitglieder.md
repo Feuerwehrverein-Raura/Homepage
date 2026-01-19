@@ -33,7 +33,6 @@ Nach dem Speichern wird automatisch ein Authentik-Account erstellt.
 |----------|--------------|
 | Admin | Volle Rechte im System |
 | Präsident | Vorstand |
-| Vizepräsident | Vorstand |
 | Aktuar | Vorstand |
 | Kassier | Vorstand |
 | Materialwart | Vorstand |

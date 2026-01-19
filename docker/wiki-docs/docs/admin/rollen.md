@@ -10,7 +10,6 @@ sidebar_position: 1
 Admin
   └── Vorstand
         ├── Präsident
-        ├── Vizepräsident
         ├── Aktuar
         ├── Kassier
         ├── Materialwart

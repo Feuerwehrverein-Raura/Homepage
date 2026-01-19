@@ -14,7 +14,6 @@ Im Vorstand-Bereich kannst du E-Mail-Postfächer und Aliases verwalten.
 | Postfach | Zweck |
 |----------|-------|
 | praesident@ | Präsident |
-| vizepraesident@ | Vizepräsident |
 | aktuar@ | Aktuar |
 | kassier@ | Kassier |
 | materialwart@ | Materialwart |

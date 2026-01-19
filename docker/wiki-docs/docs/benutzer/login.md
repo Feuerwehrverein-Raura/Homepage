@@ -23,7 +23,6 @@ Vorstandsmitglieder haben zusätzlich Zugang zum Verwaltungsbereich:
 
 ### Erlaubte E-Mail-Adressen
 - praesident@fwv-raura.ch
-- vizepraesident@fwv-raura.ch
 - aktuar@fwv-raura.ch
 - kassier@fwv-raura.ch
 - materialwart@fwv-raura.ch

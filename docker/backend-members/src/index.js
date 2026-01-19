@@ -160,7 +160,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
     }
 
     // Validate email domain and allowed addresses for IMAP login
-    const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,vizepraesident@fwv-raura.ch,beisitzer@fwv-raura.ch').split(',').map(e => e.trim().toLowerCase());
+    const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,materialwart@fwv-raura.ch,beisitzer@fwv-raura.ch').split(',').map(e => e.trim().toLowerCase());
 
     if (!allowedEmails.includes(emailLower)) {
         // Log failed attempt
@@ -268,9 +268,9 @@ app.get('/auth/vorstand/me', authenticateVorstand, async (req, res) => {
 function getRoleName(role) {
     const names = {
         'praesident': 'Präsident',
-        'vizepraesident': 'Vize-Präsident',
         'aktuar': 'Aktuar',
         'kassier': 'Kassier',
+        'materialwart': 'Materialwart',
         'beisitzer': 'Beisitzer'
     };
     return names[role] || role.charAt(0).toUpperCase() + role.slice(1);
@@ -523,8 +523,6 @@ app.get('/vorstand', async (req, res) => {
         const funktionToEmail = {
             'präsident': 'praesident@fwv-raura.ch',
             'praesident': 'praesident@fwv-raura.ch',
-            'vizepräsident': 'vizepraesident@fwv-raura.ch',
-            'vizepraesident': 'vizepraesident@fwv-raura.ch',
             'aktuar': 'aktuar@fwv-raura.ch',
             'kassier': 'kassier@fwv-raura.ch',
             'materialwart': 'materialwart@fwv-raura.ch',
@@ -542,8 +540,6 @@ app.get('/vorstand', async (req, res) => {
               AND (
                   funktion ILIKE '%Präsident%' OR
                   funktion ILIKE '%Praesident%' OR
-                  funktion ILIKE '%Vizepräsident%' OR
-                  funktion ILIKE '%Vizepraesident%' OR
                   funktion ILIKE '%Aktuar%' OR
                   funktion ILIKE '%Kassier%' OR
                   funktion ILIKE '%Materialwart%' OR
@@ -551,14 +547,12 @@ app.get('/vorstand', async (req, res) => {
               )
             ORDER BY
                 CASE
-                    WHEN funktion ILIKE '%Präsident%' AND funktion NOT ILIKE '%Vize%' THEN 1
-                    WHEN funktion ILIKE '%Praesident%' AND funktion NOT ILIKE '%Vize%' THEN 1
-                    WHEN funktion ILIKE '%Vizepräsident%' THEN 2
-                    WHEN funktion ILIKE '%Vizepraesident%' THEN 2
-                    WHEN funktion ILIKE '%Aktuar%' THEN 3
-                    WHEN funktion ILIKE '%Kassier%' THEN 4
-                    WHEN funktion ILIKE '%Materialwart%' THEN 5
-                    WHEN funktion ILIKE '%Beisitzer%' THEN 6
+                    WHEN funktion ILIKE '%Präsident%' THEN 1
+                    WHEN funktion ILIKE '%Praesident%' THEN 1
+                    WHEN funktion ILIKE '%Aktuar%' THEN 2
+                    WHEN funktion ILIKE '%Kassier%' THEN 3
+                    WHEN funktion ILIKE '%Materialwart%' THEN 4
+                    WHEN funktion ILIKE '%Beisitzer%' THEN 5
                     ELSE 10
                 END,
                 nachname
