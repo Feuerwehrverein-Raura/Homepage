@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.12.0...v1.12.1) (2026-01-19)
+
+
+### Bug Fixes
+
+* load events from API instead of markdown files ([3ece088](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3ece0881ba1067c70e96d6ccf68587ec4115d617))
+
 # [1.12.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.11.0...v1.12.0) (2026-01-19)
 
 
