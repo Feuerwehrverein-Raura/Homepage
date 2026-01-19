@@ -1535,6 +1535,79 @@ app.put('/members/me/notifications', authenticateToken, async (req, res) => {
     }
 });
 
+// ============================================
+// FUNCTION EMAIL PASSWORD CHANGE
+// ============================================
+
+// Map functions to email addresses
+const FUNCTION_EMAIL_MAP = {
+    'Präsident': 'praesident@fwv-raura.ch',
+    'Praesident': 'praesident@fwv-raura.ch',
+    'Aktuar': 'aktuar@fwv-raura.ch',
+    'Kassier': 'kassier@fwv-raura.ch',
+    'Beisitzer': 'beisitzer@fwv-raura.ch',
+    'Beisitzerin': 'beisitzer@fwv-raura.ch',
+    'Materialwart': 'materialwart@fwv-raura.ch',
+    'Admin': 'admin@fwv-raura.ch'
+};
+
+// Change function email password (self-service)
+app.put('/members/me/function-email-password', authenticateToken, async (req, res) => {
+    try {
+        const { password } = req.body;
+
+        if (!password || password.length < 8) {
+            return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein' });
+        }
+
+        // Get member with function
+        const memberResult = await pool.query(
+            'SELECT id, funktion FROM members WHERE email = $1',
+            [req.user.email]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        const funktion = member.funktion;
+
+        if (!funktion || !FUNCTION_EMAIL_MAP[funktion]) {
+            return res.status(403).json({ error: 'Sie haben keine Funktion mit E-Mail-Adresse' });
+        }
+
+        const functionEmail = FUNCTION_EMAIL_MAP[funktion];
+
+        // Call Mailcow API via dispatch service
+        const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+
+        const mailcowResponse = await fetch(`${DISPATCH_API}/mailcow/mailboxes/${encodeURIComponent(functionEmail)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+
+        if (!mailcowResponse.ok) {
+            const errorData = await mailcowResponse.json().catch(() => ({}));
+            console.error('Mailcow password change failed:', mailcowResponse.status, errorData);
+            throw new Error(errorData.error || 'Passwortänderung fehlgeschlagen');
+        }
+
+        // Log the change
+        await pool.query(`
+            INSERT INTO audit_log (action, entity_type, entity_id, user_email, details)
+            VALUES ('function_email_password_changed', 'mailbox', $1, $2, $3)
+        `, [functionEmail, req.user.email, JSON.stringify({ funktion })]);
+
+        res.json({ success: true, message: 'Passwort erfolgreich geändert' });
+
+    } catch (error) {
+        console.error('Function email password change error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Start server
 app.listen(PORT, () => {
     console.log(`API-Members running on port ${PORT}`);

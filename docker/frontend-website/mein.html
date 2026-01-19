@@ -167,6 +167,92 @@
                             </div>
                         </form>
                     </div>
+
+                    <!-- Funktions-E-Mail Sektion (nur sichtbar wenn Funktion vorhanden) -->
+                    <div id="function-email-section" class="bg-white rounded-lg shadow p-6 mt-6 hidden">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6">Funktions-E-Mail</h2>
+
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <div class="flex items-start space-x-3">
+                                <div class="text-blue-500 text-2xl">@</div>
+                                <div class="flex-1">
+                                    <p class="text-sm text-blue-800 mb-1">Als <strong id="function-role-name"></strong> hast du Zugang zu folgender E-Mail-Adresse:</p>
+                                    <p class="text-lg font-mono font-semibold text-blue-900" id="function-email-address"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h3 class="font-semibold text-gray-700">Zugangsdaten</h3>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">IMAP/SMTP Server</label>
+                                    <div class="flex">
+                                        <input type="text" value="mail.fwv-raura.ch" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg bg-gray-50" readonly>
+                                        <button onclick="copyToClipboard('mail.fwv-raura.ch')" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg hover:bg-gray-200" title="Kopieren">
+                                            <span class="text-gray-600">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Benutzername</label>
+                                    <div class="flex">
+                                        <input type="text" id="function-email-username" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg bg-gray-50" readonly>
+                                        <button id="copy-email-btn" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg hover:bg-gray-200" title="Kopieren">
+                                            <span class="text-gray-600">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">IMAP Port</label>
+                                    <input type="text" value="993 (SSL/TLS)" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Port</label>
+                                    <input type="text" value="587 (STARTTLS)" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
+                                </div>
+                            </div>
+
+                            <!-- Webmail Link -->
+                            <div class="pt-4 border-t">
+                                <a href="https://mail.fwv-raura.ch" target="_blank"
+                                   class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Webmail öffnen
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Passwort ändern -->
+                        <div class="mt-6 pt-6 border-t">
+                            <h3 class="font-semibold text-gray-700 mb-4">Passwort ändern</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Neues Passwort</label>
+                                    <input type="password" id="function-email-password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Mindestens 8 Zeichen">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Passwort bestätigen</label>
+                                    <input type="password" id="function-email-password-confirm" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Passwort wiederholen">
+                                </div>
+                                <div class="flex justify-end">
+                                    <button id="change-email-password-btn" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
+                                        Passwort ändern
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -234,6 +320,18 @@
         let currentTab = 'profile';
         let memberData = null;
         let notifications = [];
+
+        // Mapping von Funktionen zu E-Mail-Adressen
+        const FUNCTION_EMAIL_MAP = {
+            'Präsident': 'praesident@fwv-raura.ch',
+            'Praesident': 'praesident@fwv-raura.ch',
+            'Aktuar': 'aktuar@fwv-raura.ch',
+            'Kassier': 'kassier@fwv-raura.ch',
+            'Beisitzer': 'beisitzer@fwv-raura.ch',
+            'Beisitzerin': 'beisitzer@fwv-raura.ch',
+            'Materialwart': 'materialwart@fwv-raura.ch',
+            'Admin': 'admin@fwv-raura.ch'
+        };
 
         // Redirect to Authentik login
         function redirectToLogin() {
@@ -329,9 +427,93 @@
                     document.getElementById('my-photo-delete-btn').classList.add('hidden');
                 }
 
+                // Show function email section if member has a function
+                showFunctionEmailSection(memberData.funktion);
+
             } catch (error) {
                 console.error('Error loading profile:', error);
                 alert('Fehler beim Laden des Profils');
+            }
+        }
+
+        // Show function email section if member has a function with email
+        function showFunctionEmailSection(funktion) {
+            const section = document.getElementById('function-email-section');
+
+            if (!funktion || !FUNCTION_EMAIL_MAP[funktion]) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            const email = FUNCTION_EMAIL_MAP[funktion];
+            section.classList.remove('hidden');
+
+            document.getElementById('function-role-name').textContent = funktion;
+            document.getElementById('function-email-address').textContent = email;
+            document.getElementById('function-email-username').value = email;
+        }
+
+        // Copy text to clipboard
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show brief feedback
+                const originalText = event.currentTarget.innerHTML;
+                event.currentTarget.innerHTML = '<span class="text-green-600">✓</span>';
+                setTimeout(() => {
+                    event.currentTarget.innerHTML = originalText;
+                }, 1000);
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                alert('Kopieren fehlgeschlagen');
+            });
+        }
+
+        // Change function email password
+        async function changeFunctionEmailPassword() {
+            const password = document.getElementById('function-email-password').value;
+            const confirmPassword = document.getElementById('function-email-password-confirm').value;
+
+            if (!password || password.length < 8) {
+                alert('Das Passwort muss mindestens 8 Zeichen lang sein.');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                alert('Die Passwörter stimmen nicht überein.');
+                return;
+            }
+
+            const btn = document.getElementById('change-email-password-btn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Wird geändert...';
+
+            try {
+                // Use secure members API endpoint that validates function ownership
+                const response = await fetch(`${API_BASE}/members/me/function-email-password`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ password })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                alert('Passwort erfolgreich geändert!');
+                document.getElementById('function-email-password').value = '';
+                document.getElementById('function-email-password-confirm').value = '';
+
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('Fehler beim Ändern des Passworts: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         }
 
@@ -700,6 +882,14 @@
         });
 
         document.getElementById('my-photo-delete-btn').addEventListener('click', deleteMyPhoto);
+
+        // Function email event listeners
+        document.getElementById('copy-email-btn').addEventListener('click', (e) => {
+            const email = document.getElementById('function-email-username').value;
+            copyToClipboard(email);
+        });
+
+        document.getElementById('change-email-password-btn').addEventListener('click', changeFunctionEmailPassword);
 
         // Initialize
         (async () => {
