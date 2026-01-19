@@ -1691,7 +1691,9 @@ Präsident`;
                 // Update recipient count
                 updateRecipientCount();
 
-                alert(`Einladung für "${event.title}" wurde generiert.\n\nBitte prüfen und bei Bedarf anpassen, dann auf "Senden" klicken.`);
+                // Show preview automatically
+                await new Promise(resolve => setTimeout(resolve, 150));
+                showDispatchPreview();
 
             } catch (error) {
                 console.error('Error generating invitation:', error);
