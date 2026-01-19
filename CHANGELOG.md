@@ -1,3 +1,10 @@
+## [1.9.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.3...v1.9.4) (2026-01-19)
+
+
+### Bug Fixes
+
+* correct PLZ/Ort splitting and firefighter status check in member registration ([9ea8f87](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9ea8f8731a08827ef2f34ee46051f70f5510f97b))
+
 ## [1.9.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.2...v1.9.3) (2026-01-19)
 
 
