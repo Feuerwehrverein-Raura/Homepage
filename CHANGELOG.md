@@ -1,3 +1,10 @@
+## [1.9.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.1...v1.9.2) (2026-01-19)
+
+
+### Bug Fixes
+
+* send notification email when member updates own data via mein.html ([aff596b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/aff596bc84a0c8ffcaef81a010069435c7146df8))
+
 ## [1.9.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.9.0...v1.9.1) (2026-01-19)
 
 
