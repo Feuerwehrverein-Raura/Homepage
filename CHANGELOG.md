@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.5.0...v1.5.1) (2026-01-19)
+
+
+### Bug Fixes
+
+* dispatch templates and preview functionality ([5404c48](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5404c48ae6b2ae4be1c1cd4b01abd21f26668ee6))
+
 # [1.5.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.4.0...v1.5.0) (2026-01-18)
 
 
