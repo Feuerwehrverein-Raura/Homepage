@@ -657,9 +657,30 @@ Feuerwehrverein Raura
 app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
-        const fields = Object.keys(updates);
-        const values = Object.values(updates);
+        const { create_access, ...updates } = req.body;
+
+        // Filter out non-database fields
+        const allowedFields = [
+            'slug', 'title', 'subtitle', 'description', 'start_date', 'end_date',
+            'location', 'category', 'registration_required', 'registration_deadline',
+            'max_participants', 'cost', 'status', 'image_url', 'tags',
+            'organizer_id', 'organizer_name', 'organizer_email',
+            'event_email', 'event_password_hash', 'event_access_expires'
+        ];
+
+        const filteredUpdates = {};
+        for (const [key, value] of Object.entries(updates)) {
+            if (allowedFields.includes(key)) {
+                filteredUpdates[key] = value;
+            }
+        }
+
+        const fields = Object.keys(filteredUpdates);
+        const values = Object.values(filteredUpdates);
+
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'Keine gueltigen Felder zum Aktualisieren' });
+        }
 
         const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
         values.push(id);
