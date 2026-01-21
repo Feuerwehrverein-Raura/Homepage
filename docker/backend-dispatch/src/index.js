@@ -59,15 +59,30 @@ function parseStreetAndNumber(fullStreet) {
 }
 
 // Absender-Adresse für Pingen
+// Hinweis: pobox und number müssen mindestens 1 Zeichen haben (minLength: 1 laut API)
+// Leere Felder werden beim Senden weggelassen
 const SENDER_ADDRESS = {
     name: 'Feuerwehrverein Raura',
     street: 'Rosenweg',
     number: '9',
-    pobox: '',
     zip: '4303',
     city: 'Kaiseraugst',
     country: 'CH'
 };
+
+// Helper: Pingen meta_data Adresse erstellen (entfernt leere Felder)
+function buildPingenAddress(address) {
+    const result = {};
+    // Nur nicht-leere Felder hinzufügen (API erwartet minLength: 1 für alle Felder)
+    if (address.name) result.name = address.name;
+    if (address.street) result.street = address.street;
+    if (address.number) result.number = address.number;
+    if (address.pobox) result.pobox = address.pobox;
+    if (address.zip) result.zip = address.zip;
+    if (address.city) result.city = address.city;
+    if (address.country) result.country = address.country;
+    return result;
+}
 
 // Nextcloud WebDAV für Datei-Speicherung
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
@@ -317,16 +332,15 @@ app.post('/pingen/send', async (req, res) => {
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
                         meta_data: {
-                            recipient: {
+                            recipient: buildPingenAddress({
                                 name: recipient.name,
                                 street: parsedAddress.street,
-                                number: parsedAddress.number || recipient.number || '',
-                                pobox: '',
+                                number: parsedAddress.number || recipient.number,
                                 zip: recipient.zip,
                                 city: recipient.city,
                                 country: recipient.country || 'CH'
-                            },
-                            sender: SENDER_ADDRESS
+                            }),
+                            sender: buildPingenAddress(SENDER_ADDRESS)
                         }
                     }
                 }
@@ -1530,16 +1544,15 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                                 print_mode: 'simplex',
                                 print_spectrum: 'grayscale',
                                 meta_data: {
-                                    recipient: {
+                                    recipient: buildPingenAddress({
                                         name: `${member.vorname} ${member.nachname}`,
                                         street: parsedAddress.street,
                                         number: parsedAddress.number,
-                                        pobox: '',
                                         zip: member.plz,
                                         city: member.ort,
                                         country: 'CH'
-                                    },
-                                    sender: SENDER_ADDRESS
+                                    }),
+                                    sender: buildPingenAddress(SENDER_ADDRESS)
                                 }
                             }
                         }
@@ -1759,16 +1772,15 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
                         meta_data: {
-                            recipient: {
+                            recipient: buildPingenAddress({
                                 name: `${member.vorname} ${member.nachname}`,
                                 street: parsedAddress.street,
                                 number: parsedAddress.number,
-                                pobox: '',
                                 zip: member.plz,
                                 city: member.ort,
                                 country: 'CH'
-                            },
-                            sender: SENDER_ADDRESS
+                            }),
+                            sender: buildPingenAddress(SENDER_ADDRESS)
                         }
                     }
                 }
@@ -2050,16 +2062,15 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
                     print_mode: 'simplex',
                     print_spectrum: 'grayscale',
                     meta_data: {
-                        recipient: {
+                        recipient: buildPingenAddress({
                             name: `${member.vorname} ${member.nachname}`,
                             street: parsedAddress.street,
                             number: parsedAddress.number,
-                            pobox: '',
                             zip: member.plz,
                             city: member.ort,
                             country: 'CH'
-                        },
-                        sender: SENDER_ADDRESS
+                        }),
+                        sender: buildPingenAddress(SENDER_ADDRESS)
                     }
                 }
             }
