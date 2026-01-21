@@ -1,3 +1,10 @@
+## [1.16.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.16.1...v1.16.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* use correct Pingen billing_balance attribute ([c233655](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c233655d13567bdad161f980fbbfa32ae10b0fc8))
+
 ## [1.16.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.16.0...v1.16.1) (2026-01-21)
 
 
