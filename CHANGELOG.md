@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.23.0...v1.23.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* show actual shift details in registration notification emails ([d629942](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d629942f267d8783cc24eaa990399c8ffacc25fc))
+
 # [1.23.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.22.2...v1.23.0) (2026-01-21)
 
 
