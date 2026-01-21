@@ -363,7 +363,9 @@ app.post('/registrations/public', async (req, res) => {
             skipMemberCheck // Falls der User trotzdem als Gast anmelden möchte
         } = req.body;
 
-        // Prüfen ob die E-Mail zu einem Mitglied gehört - wenn ja, muss sich das Mitglied einloggen
+        // Prüfen ob die E-Mail zu einem Mitglied gehört - wenn ja, automatisch verknüpfen
+        let memberId = null;
+        let isMember = false;
         if (email) {
             const memberCheck = await pool.query(
                 'SELECT id, vorname, nachname, email FROM members WHERE LOWER(email) = LOWER($1)',
@@ -371,13 +373,9 @@ app.post('/registrations/public', async (req, res) => {
             );
 
             if (memberCheck.rows.length > 0) {
-                const member = memberCheck.rows[0];
-                return res.status(409).json({
-                    success: false,
-                    isMember: true,
-                    message: `Diese E-Mail-Adresse gehört zu einem Mitglied (${member.vorname} ${member.nachname}). Bitte melden Sie sich zuerst an, um sich als Mitglied zu registrieren.`,
-                    memberName: `${member.vorname} ${member.nachname}`
-                });
+                memberId = memberCheck.rows[0].id;
+                isMember = true;
+                console.log(`Registrierung automatisch verknüpft mit Mitglied: ${memberCheck.rows[0].vorname} ${memberCheck.rows[0].nachname}`);
             }
         }
 
@@ -393,13 +391,14 @@ app.post('/registrations/public', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Event nicht gefunden' });
         }
 
-        // Registrierung speichern
+        // Registrierung speichern (mit member_id falls Mitglied erkannt)
         const registration = await pool.query(`
-            INSERT INTO registrations (event_id, guest_name, guest_email, shift_ids, notes, status)
-            VALUES ($1, $2, $3, $4, $5, 'pending')
+            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
+            VALUES ($1, $2, $3, $4, $5, $6, 'pending')
             RETURNING *
         `, [
             event.rows[0].id,
+            memberId,
             name,
             email,
             type === 'shift' ? shiftIds : null,
@@ -466,8 +465,9 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
 
         res.json({
             success: true,
-            message: 'Anmeldung erfolgreich',
-            registrationId: registration.rows[0].id
+            message: isMember ? 'Anmeldung erfolgreich (als Mitglied verknüpft)' : 'Anmeldung erfolgreich',
+            registrationId: registration.rows[0].id,
+            isMember: isMember
         });
     } catch (error) {
         console.error('Registration error:', error);
