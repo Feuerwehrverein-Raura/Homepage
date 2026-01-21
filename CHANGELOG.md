@@ -1,3 +1,10 @@
+## [1.18.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.18.0...v1.18.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* correct DISPATCH_API URL to use api.fwv-raura.ch ([8269753](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8269753b123d28436aed521eba95895a5be9902e))
+
 # [1.18.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.5...v1.18.0) (2026-01-21)
 
 
