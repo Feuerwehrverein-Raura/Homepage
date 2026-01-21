@@ -1,3 +1,10 @@
+## [1.17.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.0...v1.17.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* improve shift registration display with bereich and time info ([a26f131](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a26f1319a893830b04c3261b614fd50a61edb919))
+
 # [1.17.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.16.2...v1.17.0) (2026-01-21)
 
 
