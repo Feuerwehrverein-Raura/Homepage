@@ -715,7 +715,7 @@
                     return;
                 }
 
-                const response = await fetch(`${API_BASE}/registrations?member_id=${memberData.id}`, {
+                const response = await fetch(`${API_BASE}/registrations?member_id=${memberData.id}&include_guest_email=true`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
@@ -750,24 +750,59 @@
 
             document.getElementById('events-empty').classList.add('hidden');
 
-            container.innerHTML = registrations.map(reg => `
-                <div class="border border-gray-200 rounded-lg p-4">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h4 class="font-semibold text-gray-800">${reg.event_title}</h4>
-                            <p class="text-sm text-gray-600 mt-1">Status: <span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(reg.status)}">${getStatusLabel(reg.status)}</span></p>
-                            ${reg.notes ? `<p class="text-sm text-gray-600 mt-2">Notiz: ${reg.notes}</p>` : ''}
+            container.innerHTML = registrations.map(reg => {
+                // Schichten formatieren
+                let shiftsHtml = '';
+                if (reg.shifts && reg.shifts.length > 0) {
+                    shiftsHtml = `
+                        <div class="mt-3 pt-3 border-t border-gray-100">
+                            <p class="text-xs font-medium text-gray-500 mb-2">Deine Schichten:</p>
+                            <div class="space-y-1">
+                                ${reg.shifts.map(shift => {
+                                    const date = shift.date ? new Date(shift.date).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+                                    const time = shift.start_time && shift.end_time ? `${shift.start_time.substring(0,5)} - ${shift.end_time.substring(0,5)}` : '';
+                                    return `
+                                        <div class="text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded">
+                                            <span class="font-medium">${shift.name}</span>
+                                            ${date ? `<span class="text-gray-500 ml-2">${date}</span>` : ''}
+                                            ${time ? `<span class="text-gray-500 ml-1">(${time})</span>` : ''}
+                                            ${shift.bereich ? `<span class="text-xs text-gray-400 ml-2">${shift.bereich}</span>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
                         </div>
-                        <span class="text-xs text-gray-500">${new Date(reg.created_at).toLocaleDateString('de-CH')}</span>
+                    `;
+                } else if (!reg.shift_ids || reg.shift_ids.length === 0) {
+                    // Teilnehmer-Registrierung (ohne Schichten)
+                    shiftsHtml = `
+                        <p class="text-sm text-gray-500 mt-2">Teilnehmer-Anmeldung</p>
+                    `;
+                }
+
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-gray-800">${reg.event_title}</h4>
+                                <p class="text-sm text-gray-600 mt-1">
+                                    Status: <span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(reg.status)}">${getStatusLabel(reg.status)}</span>
+                                </p>
+                                ${shiftsHtml}
+                            </div>
+                            <span class="text-xs text-gray-500 whitespace-nowrap ml-4">${new Date(reg.created_at).toLocaleDateString('de-CH')}</span>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         function getStatusClass(status) {
             const classes = {
                 'pending': 'bg-yellow-100 text-yellow-800',
+                'approved': 'bg-green-100 text-green-800',
                 'confirmed': 'bg-green-100 text-green-800',
+                'rejected': 'bg-red-100 text-red-800',
                 'cancelled': 'bg-red-100 text-red-800'
             };
             return classes[status] || 'bg-gray-100 text-gray-800';
@@ -776,7 +811,9 @@
         function getStatusLabel(status) {
             const labels = {
                 'pending': 'Ausstehend',
+                'approved': 'Bestätigt',
                 'confirmed': 'Bestätigt',
+                'rejected': 'Abgelehnt',
                 'cancelled': 'Abgesagt'
             };
             return labels[status] || status;

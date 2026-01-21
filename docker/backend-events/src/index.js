@@ -1153,7 +1153,7 @@ app.delete('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), asy
 
 app.get('/registrations', authenticateAny, async (req, res) => {
     try {
-        const { event_id, member_id } = req.query;
+        const { event_id, member_id, include_guest_email } = req.query;
         let query = `
             SELECT r.*, m.vorname, m.nachname, e.title as event_title
             FROM registrations r
@@ -1168,12 +1168,45 @@ app.get('/registrations', authenticateAny, async (req, res) => {
             query += ` AND r.event_id = $${params.length}`;
         }
         if (member_id) {
-            params.push(member_id);
-            query += ` AND r.member_id = $${params.length}`;
+            // Wenn include_guest_email gesetzt ist, auch nach E-Mail des Mitglieds suchen
+            if (include_guest_email) {
+                // Mitglied-E-Mail laden
+                const memberResult = await pool.query('SELECT email FROM members WHERE id = $1', [member_id]);
+                const memberEmail = memberResult.rows[0]?.email;
+
+                if (memberEmail) {
+                    params.push(member_id);
+                    params.push(memberEmail.toLowerCase());
+                    query += ` AND (r.member_id = $${params.length - 1} OR LOWER(r.guest_email) = $${params.length})`;
+                } else {
+                    params.push(member_id);
+                    query += ` AND r.member_id = $${params.length}`;
+                }
+            } else {
+                params.push(member_id);
+                query += ` AND r.member_id = $${params.length}`;
+            }
         }
 
+        query += ' ORDER BY r.created_at DESC';
+
         const result = await pool.query(query, params);
-        res.json(result.rows);
+
+        // Schicht-Details für jede Registrierung laden
+        const registrationsWithShifts = await Promise.all(result.rows.map(async (reg) => {
+            if (reg.shift_ids && reg.shift_ids.length > 0) {
+                const shiftsResult = await pool.query(
+                    'SELECT id, name, date, start_time, end_time, bereich FROM shifts WHERE id = ANY($1)',
+                    [reg.shift_ids]
+                );
+                reg.shifts = shiftsResult.rows;
+            } else {
+                reg.shifts = [];
+            }
+            return reg;
+        }));
+
+        res.json(registrationsWithShifts);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
