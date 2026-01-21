@@ -23,9 +23,13 @@ const transporter = nodemailer.createTransport({
 
 // Pingen Config
 const PINGEN_IDENTITY = 'https://identity.pingen.com';
-const PINGEN_API = process.env.PINGEN_STAGING === 'true'
-    ? 'https://api-staging.pingen.com'
-    : 'https://api.pingen.com';
+const PINGEN_API_PRODUCTION = 'https://api.pingen.com';
+const PINGEN_API_STAGING = 'https://api-staging.pingen.com';
+
+// Helper: Pingen API URL basierend auf staging Parameter
+function getPingenApi(staging = false) {
+    return staging ? PINGEN_API_STAGING : PINGEN_API_PRODUCTION;
+}
 
 // Nextcloud WebDAV für Datei-Speicherung
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
@@ -206,7 +210,8 @@ app.post('/email/bulk', async (req, res) => {
 
 app.post('/pingen/send', async (req, res) => {
     try {
-        const { html, recipient, member_id, event_id } = req.body;
+        const { html, recipient, member_id, event_id, staging = false } = req.body;
+        const PINGEN_API = getPingenApi(staging);
 
         // Convert HTML to PDF
         const browser = await puppeteer.launch({
@@ -1210,6 +1215,8 @@ app.get('/pingen/letters', async (req, res) => {
 app.get('/pingen/letters/:letterId/status', async (req, res) => {
     try {
         const { letterId } = req.params;
+        const staging = req.query.staging === 'true';
+        const PINGEN_API = getPingenApi(staging);
 
         // Token holen
         const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
@@ -1268,6 +1275,9 @@ app.get('/pingen/letters/:letterId/status', async (req, res) => {
 // Pingen Guthaben/Info abrufen
 app.get('/pingen/account', async (req, res) => {
     try {
+        const staging = req.query.staging === 'true';
+        const PINGEN_API = getPingenApi(staging);
+
         // Token holen
         const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
@@ -1294,7 +1304,7 @@ app.get('/pingen/account', async (req, res) => {
             name: org.attributes?.name,
             balance: org.attributes?.billing_balance,
             currency: org.attributes?.billing_currency || 'CHF',
-            isStaging: process.env.PINGEN_STAGING === 'true'
+            isStaging: staging
         });
     } catch (error) {
         console.error('Pingen account error:', error.response?.data || error.message);
@@ -1326,7 +1336,7 @@ app.get('/pingen/stats', async (req, res) => {
 // Brief manuell senden
 app.post('/pingen/send-manual', async (req, res) => {
     try {
-        const { member_id, event_id, subject, body } = req.body;
+        const { member_id, event_id, subject, body, staging = false } = req.body;
 
         // Mitglied-Adresse laden
         const memberResult = await pool.query(
@@ -1391,12 +1401,13 @@ app.post('/pingen/send-manual', async (req, res) => {
 </html>`;
 
         // An Pingen senden
-        const pingenResult = await sendToPingen(html, member, member_id, event_id);
+        const pingenResult = await sendToPingen(html, member, member_id, event_id, staging);
 
         res.json({
             success: true,
             letterId: pingenResult.letterId,
-            recipient: `${member.vorname} ${member.nachname}`
+            recipient: `${member.vorname} ${member.nachname}`,
+            staging
         });
     } catch (error) {
         console.error('Manual Pingen send error:', error);
@@ -1407,7 +1418,8 @@ app.post('/pingen/send-manual', async (req, res) => {
 // Arbeitsplan per Post senden
 app.post('/pingen/send-arbeitsplan', async (req, res) => {
     try {
-        const { event_id, member_id, pdf_base64 } = req.body;
+        const { event_id, member_id, pdf_base64, staging = false } = req.body;
+        const PINGEN_API = getPingenApi(staging);
 
         // Mitglied-Adresse laden
         const memberResult = await pool.query(
@@ -1570,8 +1582,9 @@ app.post('/pingen/webhook', async (req, res) => {
 // Webhook registrieren/verwalten
 app.post('/pingen/webhooks/register', async (req, res) => {
     try {
-        const { webhook_url } = req.body;
-        const callbackUrl = webhook_url || `${process.env.DISPATCH_PUBLIC_URL || 'https://dispatch.fwv-raura.ch'}/pingen/webhook`;
+        const { webhook_url, staging = false } = req.body;
+        const PINGEN_API = getPingenApi(staging);
+        const callbackUrl = webhook_url || `${process.env.DISPATCH_PUBLIC_URL || 'https://api.fwv-raura.ch'}/pingen/webhook`;
 
         // Token holen
         const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
@@ -1617,6 +1630,9 @@ app.post('/pingen/webhooks/register', async (req, res) => {
 // Registrierte Webhooks abrufen
 app.get('/pingen/webhooks', async (req, res) => {
     try {
+        const staging = req.query.staging === 'true';
+        const PINGEN_API = getPingenApi(staging);
+
         // Token holen
         const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
@@ -1648,6 +1664,8 @@ app.get('/pingen/webhooks', async (req, res) => {
 app.delete('/pingen/webhooks/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        const staging = req.query.staging === 'true';
+        const PINGEN_API = getPingenApi(staging);
 
         // Token holen
         const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
@@ -1677,7 +1695,9 @@ app.delete('/pingen/webhooks/:id', async (req, res) => {
 });
 
 // Helper: An Pingen senden
-async function sendToPingen(html, member, memberId, eventId) {
+async function sendToPingen(html, member, memberId, eventId, staging = false) {
+    const PINGEN_API = getPingenApi(staging);
+
     // Convert HTML to PDF
     const browser = await puppeteer.launch({
         headless: 'new',
