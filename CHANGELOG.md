@@ -1,3 +1,11 @@
+# [1.17.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.16.2...v1.17.0) (2026-01-21)
+
+
+### Features
+
+* add staging parameter to Pingen API calls ([5846c38](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5846c387086e8f76de4f5f4ef8554f6a2dfc9a8e))
+* add staging toggle to Pingen UI in vorstand.html ([b95c1d2](https://github.com/Feuerwehrverein-Raura/Homepage/commit/b95c1d27a9a8c54ff4270c2097a13696a97e3d4b))
+
 ## [1.16.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.16.1...v1.16.2) (2026-01-21)
 
 
