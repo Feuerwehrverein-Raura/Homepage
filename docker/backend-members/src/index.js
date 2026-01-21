@@ -408,9 +408,9 @@ async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
         const newValues = { email, ...details };
 
         await pool.query(`
-            INSERT INTO audit_log (action, entity_type, user_id, ip_address, new_values, created_at)
-            VALUES ($1, $2, $3, $4, $5, NOW())
-        `, [action, entityType, userId, ipAddress, JSON.stringify(newValues)]);
+            INSERT INTO audit_log (action, entity_type, user_id, email, ip_address, new_values, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `, [action, entityType, userId, email, ipAddress, JSON.stringify(newValues)]);
     } catch (error) {
         console.error('Failed to write audit log:', error.message);
     }
