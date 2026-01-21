@@ -1076,7 +1076,7 @@ function generateArbeitsplanHTML(event, logoBase64) {
             sortedTimeSlots.forEach(([timeKey, slot]) => {
                 const startTime = formatTime(slot.start_time);
                 const endTime = formatTime(slot.end_time);
-                const endDisplay = endTime === '00:00' ? 'Open End' : endTime;
+                const endDisplay = endTime || '';
 
                 html += `
             <tr>

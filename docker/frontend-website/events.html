@@ -522,7 +522,7 @@
                         const slot = shiftsByDate[date][timeKey];
                         const startTime = slot.start_time ? slot.start_time.substring(0, 5) : '';
                         const endTime = slot.end_time ? slot.end_time.substring(0, 5) : '';
-                        const endDisplay = endTime === '00:00' ? 'Open End' : endTime;
+                        const endDisplay = endTime || '';
 
                         html += '<tr class="border-b border-gray-300">';
                         html += `<td class="px-3 py-2 border border-gray-400 font-medium align-top">${startTime}-${endDisplay}</td>`;
