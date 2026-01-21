@@ -1,3 +1,10 @@
+## [1.26.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.0...v1.26.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* **pingen:** default to cover page due to font embedding issue ([3de9751](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3de9751b2372e6072cf47337501f3ee6164b9311))
+
 # [1.26.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.6...v1.26.0) (2026-01-21)
 
 
