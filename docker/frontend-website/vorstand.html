@@ -1274,39 +1274,44 @@
                             <textarea id="event-description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"></textarea>
                         </div>
 
-                        <!-- Anmeldung -->
-                        <div class="md:col-span-2 border-t pt-4 mt-2">
-                            <h4 class="font-medium text-gray-800 mb-3">Anmeldung</h4>
-                        </div>
-                        <div>
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" id="event-registration-required" class="rounded border-gray-300 text-fire-500 focus:ring-fire-500">
-                                <span class="text-sm font-medium text-gray-700">Anmeldung erforderlich</span>
-                            </label>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Anmeldeschluss</label>
-                            <input type="datetime-local" id="event-registration-deadline" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Max. Teilnehmer</label>
-                            <input type="number" id="event-max-participants" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Kosten</label>
-                            <input type="text" id="event-cost" placeholder="z.B. CHF 20.- oder Kostenlos" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                        <!-- Anmeldung (fuer Teilnehmer-Events wie Ausfluege) -->
+                        <div id="registration-section" class="md:col-span-2 border-t pt-4 mt-2 contents">
+                            <div class="md:col-span-2">
+                                <h4 class="font-medium text-gray-800 mb-3">Teilnehmer-Anmeldung</h4>
+                                <p class="text-xs text-gray-500 mb-3">Fuer Ausfluege, Aufbau/Abbau und andere Events mit Teilnehmer-Anmeldung</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Anmeldeschluss</label>
+                                <input type="datetime-local" id="event-registration-deadline" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Max. Teilnehmer</label>
+                                <input type="number" id="event-max-participants" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Kosten</label>
+                                <input type="text" id="event-cost" placeholder="z.B. CHF 20.- oder Kostenlos" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            </div>
+                            <div>
+                                <!-- Platzhalter -->
+                            </div>
                         </div>
 
-                        <!-- Schichten -->
-                        <div class="md:col-span-2 border-t pt-4 mt-2">
+                        <!-- Schichten (fuer Dorffest/Helfer-Events) -->
+                        <div id="shifts-section" class="md:col-span-2 border-t pt-4 mt-2">
                             <div class="flex justify-between items-center mb-3">
-                                <h4 class="font-medium text-gray-800">Schichten</h4>
+                                <h4 class="font-medium text-gray-800">Helfer-Schichten</h4>
                                 <button type="button" onclick="addShiftRow()" class="text-sm text-fire-600 hover:text-fire-800">+ Schicht hinzufuegen</button>
                             </div>
+                            <p class="text-xs text-gray-500 mb-3">Fuer Dorffeste und andere Events mit Helfer-Einsaetzen</p>
                             <div id="event-shifts-container" class="space-y-3">
                                 <!-- Shifts will be added here dynamically -->
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">Schichten werden bei Helfer-Events verwendet (z.B. Fasnacht)</p>
+                        </div>
+
+                        <!-- Hinweis wenn keine Anmeldung -->
+                        <div id="no-registration-hint" class="md:col-span-2 border-t pt-4 mt-2 hidden">
+                            <p class="text-sm text-gray-500 italic">Bei "Ausflug" ist keine Anmeldung erforderlich. Waehle "Ausflug mit Anmeldung" wenn eine Anmeldung benoetigt wird.</p>
                         </div>
                     </div>
                     <div class="flex justify-between pt-4 border-t">
@@ -2015,16 +2020,47 @@ ${grussformel}`;
             }
         }
 
+        // Felder je nach Event-Kategorie ein-/ausblenden
+        function updateEventFormByCategory() {
+            const category = document.getElementById('event-category').value;
+            const registrationSection = document.getElementById('registration-section');
+            const shiftsSection = document.getElementById('shifts-section');
+            const noRegHint = document.getElementById('no-registration-hint');
+
+            // Alle verstecken
+            registrationSection.classList.add('hidden');
+            registrationSection.classList.remove('contents');
+            shiftsSection.classList.add('hidden');
+            noRegHint.classList.add('hidden');
+
+            if (category === 'Dorffest') {
+                // Dorffest: Nur Schichten
+                shiftsSection.classList.remove('hidden');
+            } else if (category === 'Aufbau' || category === 'Abbau' || category === 'Ausflug mit Anmeldung') {
+                // Teilnehmer-Anmeldung ohne Schichten
+                registrationSection.classList.remove('hidden');
+                registrationSection.classList.add('contents');
+            } else if (category === 'Ausflug') {
+                // Keine Anmeldung
+                noRegHint.classList.remove('hidden');
+            } else if (category === 'Sonstiges') {
+                // Beides zeigen - User entscheidet
+                registrationSection.classList.remove('hidden');
+                registrationSection.classList.add('contents');
+                shiftsSection.classList.remove('hidden');
+            }
+        }
+
         function openNewEventModal() {
             document.getElementById('event-modal-title').textContent = 'Neues Event';
             document.getElementById('event-form').reset();
             document.getElementById('event-id').value = '';
             document.getElementById('event-shifts-container').innerHTML = '';
-            document.getElementById('event-registration-required').checked = false;
             document.getElementById('event-organizer-name').value = '';
             document.getElementById('event-organizer-email').value = '';
             document.getElementById('event-create-access').checked = false;
             document.getElementById('delete-event-btn').classList.add('hidden');
+            updateEventFormByCategory();
             document.getElementById('event-modal').classList.remove('hidden');
         }
 
@@ -2042,13 +2078,12 @@ ${grussformel}`;
                 document.getElementById('event-title').value = event.title || '';
                 document.getElementById('event-subtitle').value = event.subtitle || '';
                 document.getElementById('event-slug').value = event.slug || '';
-                document.getElementById('event-category').value = event.category || 'Jahresanlass';
+                document.getElementById('event-category').value = event.category || 'Sonstiges';
                 document.getElementById('event-status').value = event.status || 'planned';
                 document.getElementById('event-start-date').value = formatDateTimeLocal(event.start_date);
                 document.getElementById('event-end-date').value = event.end_date ? formatDateTimeLocal(event.end_date) : '';
                 document.getElementById('event-location').value = event.location || '';
                 document.getElementById('event-description').value = event.description || '';
-                document.getElementById('event-registration-required').checked = event.registration_required || false;
                 document.getElementById('event-registration-deadline').value = event.registration_deadline ? formatDateTimeLocal(event.registration_deadline) : '';
                 document.getElementById('event-max-participants').value = event.max_participants || '';
                 document.getElementById('event-cost').value = event.cost || '';
@@ -2060,6 +2095,9 @@ ${grussformel}`;
 
                 // Load shifts
                 loadEventShifts(event.shifts || []);
+
+                // Felder je nach Kategorie aktualisieren
+                updateEventFormByCategory();
 
                 document.getElementById('delete-event-btn').classList.remove('hidden');
                 document.getElementById('event-modal').classList.remove('hidden');
@@ -2196,7 +2234,8 @@ ${grussformel}`;
                 end_date: document.getElementById('event-end-date').value || null,
                 location: document.getElementById('event-location').value || null,
                 description: document.getElementById('event-description').value || null,
-                registration_required: document.getElementById('event-registration-required').checked,
+                // registration_required basierend auf Kategorie
+                registration_required: ['Dorffest', 'Aufbau', 'Abbau', 'Ausflug mit Anmeldung'].includes(document.getElementById('event-category').value),
                 registration_deadline: document.getElementById('event-registration-deadline').value || null,
                 max_participants: document.getElementById('event-max-participants').value ? parseInt(document.getElementById('event-max-participants').value) : null,
                 cost: document.getElementById('event-cost').value || null,
@@ -3167,6 +3206,7 @@ ${grussformel}`;
         document.getElementById('delete-event-btn').addEventListener('click', deleteEvent);
         document.getElementById('close-event-modal').addEventListener('click', () => document.getElementById('event-modal').classList.add('hidden'));
         document.getElementById('cancel-event-btn').addEventListener('click', () => document.getElementById('event-modal').classList.add('hidden'));
+        document.getElementById('event-category').addEventListener('change', updateEventFormByCategory);
 
         // Audit
         document.getElementById('audit-action-filter').addEventListener('change', (e) => loadAuditLog({ action: e.target.value }));
