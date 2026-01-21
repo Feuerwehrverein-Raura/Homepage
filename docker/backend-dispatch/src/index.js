@@ -481,7 +481,7 @@ app.post('/email/bulk', async (req, res) => {
 
 app.post('/pingen/send', async (req, res) => {
     try {
-        const { html, recipient, member_id, event_id, staging = false, use_cover_page = false } = req.body;
+        const { html, recipient, member_id, event_id, staging = false, use_cover_page = true } = req.body;
         const PINGEN_API = getPingenApi(staging);
 
         // Convert HTML to PDF
@@ -1970,7 +1970,7 @@ app.get('/pingen/post-members', async (req, res) => {
 // Massen-PDF an alle Post-Empfänger senden
 app.post('/pingen/send-bulk-pdf', async (req, res) => {
     try {
-        const { pdf_base64, subject, member_ids, staging = false, use_cover_page = false } = req.body;
+        const { pdf_base64, subject, member_ids, staging = false, use_cover_page = true } = req.body;
         const PINGEN_API = getPingenApi(staging);
 
         if (!pdf_base64) {
@@ -2255,7 +2255,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 // Brief manuell senden
 app.post('/pingen/send-manual', async (req, res) => {
     try {
-        const { member_id, event_id, subject, body, staging = false, use_cover_page = false } = req.body;
+        const { member_id, event_id, subject, body, staging = false, use_cover_page = true } = req.body;
 
         // Mitglied-Adresse laden
         const memberResult = await pool.query(
@@ -2337,7 +2337,7 @@ app.post('/pingen/send-manual', async (req, res) => {
 // Arbeitsplan per Post senden
 app.post('/pingen/send-arbeitsplan', async (req, res) => {
     try {
-        const { event_id, member_id, pdf_base64, staging = false, use_cover_page = false } = req.body;
+        const { event_id, member_id, pdf_base64, staging = false, use_cover_page = true } = req.body;
         const PINGEN_API = getPingenApi(staging);
 
         // Mitglied-Adresse laden
@@ -2789,7 +2789,7 @@ app.delete('/pingen/webhooks/:id', async (req, res) => {
 });
 
 // Helper: An Pingen senden
-async function sendToPingen(html, member, memberId, eventId, staging = false, useCoverPage = false) {
+async function sendToPingen(html, member, memberId, eventId, staging = false, useCoverPage = true) {
     const PINGEN_API = getPingenApi(staging);
 
     // Convert HTML to PDF
