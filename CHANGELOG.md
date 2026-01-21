@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.21.1...v1.22.0) (2026-01-21)
+
+
+### Features
+
+* improve "Meine Events" to show all registrations with shifts ([fa3dfff](https://github.com/Feuerwehrverein-Raura/Homepage/commit/fa3dfffc80eb12c2378827d69e3da47363fa9e4d))
+
 ## [1.21.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.21.0...v1.21.1) (2026-01-21)
 
 
