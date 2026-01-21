@@ -1185,7 +1185,7 @@ app.get('/audit', authenticateVorstand, async (req, res) => {
 // ============================================
 
 // Get all pending registrations (Vorstand only)
-app.get('/registrations', authenticateVorstand, async (req, res) => {
+app.get('/member-registrations', authenticateVorstand, async (req, res) => {
     try {
         const { status = 'pending' } = req.query;
 
@@ -1223,7 +1223,7 @@ app.get('/registrations/:id', authenticateVorstand, async (req, res) => {
 });
 
 // Approve registration (creates member)
-app.post('/registrations/:id/approve', authenticateVorstand, async (req, res) => {
+app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, res) => {
     try {
         const { id } = req.params;
         const { memberStatus = 'Passivmitglied' } = req.body;
@@ -1298,7 +1298,7 @@ app.post('/registrations/:id/approve', authenticateVorstand, async (req, res) =>
 });
 
 // Reject registration
-app.post('/registrations/:id/reject', authenticateVorstand, async (req, res) => {
+app.post('/member-registrations/:id/reject', authenticateVorstand, async (req, res) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;

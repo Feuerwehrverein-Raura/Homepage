@@ -363,8 +363,8 @@ app.post('/registrations/public', async (req, res) => {
             skipMemberCheck // Falls der User trotzdem als Gast anmelden möchte
         } = req.body;
 
-        // Prüfen ob die E-Mail zu einem Mitglied gehört
-        if (!skipMemberCheck && email) {
+        // Prüfen ob die E-Mail zu einem Mitglied gehört - wenn ja, muss sich das Mitglied einloggen
+        if (email) {
             const memberCheck = await pool.query(
                 'SELECT id, vorname, nachname, email FROM members WHERE LOWER(email) = LOWER($1)',
                 [email]

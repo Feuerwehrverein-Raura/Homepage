@@ -2474,7 +2474,7 @@ Präsident`;
 
         async function loadRegistrationCount() {
             try {
-                const response = await fetch(`${API_BASE}/registrations/count/pending`, {
+                const response = await fetch(`${API_BASE}/member-registrations/count/pending`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 if (response.ok) {
@@ -2498,7 +2498,7 @@ Präsident`;
                 document.getElementById('registrations-empty').classList.add('hidden');
 
                 const status = document.getElementById('registrations-filter').value;
-                const response = await fetch(`${API_BASE}/registrations?status=${status}`, {
+                const response = await fetch(`${API_BASE}/member-registrations?status=${status}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
@@ -2574,7 +2574,7 @@ Präsident`;
 
         async function viewRegistration(id) {
             try {
-                const response = await fetch(`${API_BASE}/registrations/${id}`, {
+                const response = await fetch(`${API_BASE}/member-registrations/${id}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
@@ -2639,7 +2639,7 @@ Präsident`;
             if (!confirm('Möchten Sie diesen Antrag genehmigen?')) return;
 
             try {
-                const response = await fetch(`${API_BASE}/registrations/${id}/approve`, {
+                const response = await fetch(`${API_BASE}/member-registrations/${id}/approve`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -2666,7 +2666,7 @@ Präsident`;
             if (!confirm('Möchten Sie diesen Antrag wirklich ablehnen?')) return;
 
             try {
-                const response = await fetch(`${API_BASE}/registrations/${id}/reject`, {
+                const response = await fetch(`${API_BASE}/member-registrations/${id}/reject`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
