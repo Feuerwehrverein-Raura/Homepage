@@ -631,6 +631,203 @@ Feuerwehrverein Raura
 });
 
 // ============================================
+// MEMBER REGISTRATIONS (Mitglieder-Anträge)
+// ============================================
+
+// Anzahl der ausstehenden Registrierungen
+app.get('/member-registrations/count/pending', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT COUNT(*) as count FROM member_registrations WHERE status = 'pending'`
+        );
+        res.json({ count: parseInt(result.rows[0].count) });
+    } catch (error) {
+        console.error('Error counting pending registrations:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Alle Registrierungen abrufen
+app.get('/member-registrations', async (req, res) => {
+    try {
+        const { status } = req.query;
+        let query = `
+            SELECT id, vorname, nachname, strasse, plz, ort, telefon, mobile, email,
+                   feuerwehr_status, korrespondenz_methode, korrespondenz_adresse,
+                   status, member_id, processed_at, processed_by, created_at
+            FROM member_registrations
+        `;
+        const params = [];
+
+        if (status) {
+            query += ` WHERE status = $1`;
+            params.push(status);
+        }
+
+        query += ` ORDER BY created_at DESC`;
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching registrations:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Einzelne Registrierung abrufen
+app.get('/member-registrations/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            `SELECT id, vorname, nachname, strasse, plz, ort, telefon, mobile, email,
+                    feuerwehr_status, korrespondenz_methode, korrespondenz_adresse,
+                    status, member_id, processed_at, processed_by, created_at
+             FROM member_registrations WHERE id = $1`,
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Registrierung nicht gefunden' });
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Error fetching registration:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Registrierung genehmigen
+app.post('/member-registrations/:id/approve', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { processed_by = 'vorstand' } = req.body;
+
+        // Registrierung abrufen
+        const regResult = await pool.query(
+            `SELECT * FROM member_registrations WHERE id = $1 AND status = 'pending'`,
+            [id]
+        );
+
+        if (regResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Registrierung nicht gefunden oder bereits bearbeitet' });
+        }
+
+        const reg = regResult.rows[0];
+
+        // Mitglied erstellen
+        const memberResult = await pool.query(`
+            INSERT INTO members
+            (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
+             status, feuerwehr_zugehoerigkeit, zustellung_email, zustellung_post, eintrittsdatum)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aktivmitglied',
+                    CASE WHEN $9 = 'Ja (aktiv)' THEN 'feuerwehr_raurica' ELSE 'keine' END,
+                    $10, $11, NOW())
+            RETURNING id
+        `, [
+            reg.vorname,
+            reg.nachname,
+            reg.strasse,
+            reg.plz,
+            reg.ort,
+            reg.telefon,
+            reg.mobile,
+            reg.email,
+            reg.feuerwehr_status,
+            reg.korrespondenz_methode === 'email',
+            reg.korrespondenz_methode === 'post'
+        ]);
+
+        const memberId = memberResult.rows[0].id;
+
+        // Registrierung aktualisieren
+        await pool.query(`
+            UPDATE member_registrations
+            SET status = 'approved', member_id = $1, processed_at = NOW(), processed_by = $2
+            WHERE id = $3
+        `, [memberId, processed_by, id]);
+
+        // Bestätigungs-E-Mail senden
+        await transporter.sendMail({
+            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+            to: reg.email,
+            subject: 'Willkommen beim Feuerwehrverein Raura!',
+            text: `
+Liebe/r ${reg.vorname} ${reg.nachname},
+
+Herzlich willkommen beim Feuerwehrverein Raura!
+
+Ihr Mitgliedschaftsantrag wurde genehmigt. Wir freuen uns, Sie als neues Mitglied begrüssen zu dürfen.
+
+Für Fragen stehen wir Ihnen gerne zur Verfügung.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+            `.trim()
+        });
+
+        res.json({ success: true, memberId });
+    } catch (error) {
+        console.error('Error approving registration:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Registrierung ablehnen
+app.post('/member-registrations/:id/reject', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { processed_by = 'vorstand', reason = '' } = req.body;
+
+        // Registrierung abrufen
+        const regResult = await pool.query(
+            `SELECT * FROM member_registrations WHERE id = $1 AND status = 'pending'`,
+            [id]
+        );
+
+        if (regResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Registrierung nicht gefunden oder bereits bearbeitet' });
+        }
+
+        const reg = regResult.rows[0];
+
+        // Registrierung aktualisieren
+        await pool.query(`
+            UPDATE member_registrations
+            SET status = 'rejected', processed_at = NOW(), processed_by = $1
+            WHERE id = $2
+        `, [processed_by, id]);
+
+        // Ablehnungs-E-Mail senden (optional)
+        if (reg.email) {
+            await transporter.sendMail({
+                from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+                to: reg.email,
+                subject: 'Ihr Mitgliedschaftsantrag beim Feuerwehrverein Raura',
+                text: `
+Liebe/r ${reg.vorname} ${reg.nachname},
+
+Vielen Dank für Ihr Interesse am Feuerwehrverein Raura.
+
+Leider können wir Ihren Mitgliedschaftsantrag zum jetzigen Zeitpunkt nicht annehmen.
+${reason ? `Grund: ${reason}` : ''}
+
+Für Rückfragen stehen wir Ihnen gerne zur Verfügung.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+                `.trim()
+            });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error rejecting registration:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // NEWSLETTER (ersetzt n8n)
 // ============================================
 
