@@ -1000,6 +1000,10 @@
                     <select id="pingen-event-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         <option value="">Alle Events</option>
                     </select>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="pingen-staging-toggle" class="w-4 h-4 text-orange-500 border-gray-300 rounded focus:ring-orange-500">
+                        <span class="text-sm text-gray-700">Staging (Test-Modus)</span>
+                    </label>
                     <button id="refresh-pingen-btn" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
                         Aktualisieren
                     </button>
@@ -3045,6 +3049,7 @@ Präsident`;
         document.getElementById('send-letter-btn').addEventListener('click', openPingenModal);
         document.getElementById('refresh-pingen-btn').addEventListener('click', loadPingenData);
         document.getElementById('pingen-event-filter').addEventListener('change', loadPingenLetters);
+        document.getElementById('pingen-staging-toggle').addEventListener('change', loadPingenData);
         document.getElementById('close-pingen-modal').addEventListener('click', () => document.getElementById('pingen-modal').classList.add('hidden'));
         document.getElementById('cancel-pingen-btn').addEventListener('click', () => document.getElementById('pingen-modal').classList.add('hidden'));
         document.getElementById('pingen-form').addEventListener('submit', sendPingenLetter);
@@ -3310,6 +3315,10 @@ Präsident`;
         // PINGEN FUNCTIONS
         // ============================================
 
+        function isPingenStaging() {
+            return document.getElementById('pingen-staging-toggle')?.checked || false;
+        }
+
         async function loadPingenData() {
             await Promise.all([
                 loadPingenAccount(),
@@ -3322,16 +3331,17 @@ Präsident`;
 
         async function loadPingenAccount() {
             try {
-                const response = await fetch(`${DISPATCH_API}/pingen/account`, {
+                const staging = isPingenStaging();
+                const response = await fetch(`${DISPATCH_API}/pingen/account?staging=${staging}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 if (response.ok) {
                     const data = await response.json();
                     document.getElementById('pingen-balance').textContent =
-                        data.balance !== undefined ? `${(data.balance / 100).toFixed(2)} ${data.currency}` : '-';
+                        data.balance !== undefined ? `${data.balance.toFixed(2)} ${data.currency}` : '-';
 
                     // Staging-Warnung anzeigen
-                    if (data.isStaging) {
+                    if (staging) {
                         document.getElementById('pingen-staging-warning').classList.remove('hidden');
                     } else {
                         document.getElementById('pingen-staging-warning').classList.add('hidden');
@@ -3563,13 +3573,15 @@ Präsident`;
             const eventId = document.getElementById('pingen-event').value;
             const subject = document.getElementById('pingen-subject').value;
             const body = document.getElementById('pingen-body').value;
+            const staging = isPingenStaging();
 
             if (!memberId || !subject || !body) {
                 alert('Bitte alle Pflichtfelder ausfüllen');
                 return;
             }
 
-            if (!confirm('Brief wirklich senden? Die Kosten werden vom Pingen-Guthaben abgezogen.')) {
+            const modeText = staging ? ' (STAGING - kein echter Versand!)' : '';
+            if (!confirm(`Brief wirklich senden${modeText}?${staging ? '' : ' Die Kosten werden vom Pingen-Guthaben abgezogen.'}`)) {
                 return;
             }
 
@@ -3584,7 +3596,8 @@ Präsident`;
                         member_id: memberId,
                         event_id: eventId || null,
                         subject,
-                        body
+                        body,
+                        staging
                     })
                 });
 
@@ -3594,7 +3607,8 @@ Präsident`;
                 }
 
                 const result = await response.json();
-                alert(`Brief erfolgreich gesendet an ${result.recipient}!\nPingen-ID: ${result.letterId}`);
+                const stagingNote = result.staging ? ' (STAGING)' : '';
+                alert(`Brief erfolgreich gesendet an ${result.recipient}${stagingNote}!\nPingen-ID: ${result.letterId}`);
 
                 document.getElementById('pingen-modal').classList.add('hidden');
                 loadPingenData();
@@ -3606,8 +3620,9 @@ Präsident`;
 
         async function loadPingenWebhooks() {
             const container = document.getElementById('webhooks-list');
+            const staging = isPingenStaging();
             try {
-                const response = await fetch(`${DISPATCH_API}/pingen/webhooks`, {
+                const response = await fetch(`${DISPATCH_API}/pingen/webhooks?staging=${staging}`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
@@ -3644,7 +3659,9 @@ Präsident`;
         }
 
         async function registerPingenWebhook() {
-            if (!confirm('Webhook bei Pingen registrieren? Pingen wird dann automatisch Status-Updates senden.')) {
+            const staging = isPingenStaging();
+            const modeText = staging ? ' (STAGING)' : '';
+            if (!confirm(`Webhook bei Pingen${modeText} registrieren? Pingen wird dann automatisch Status-Updates senden.`)) {
                 return;
             }
 
@@ -3655,7 +3672,7 @@ Präsident`;
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({ staging })
                 });
 
                 if (!response.ok) {
@@ -3678,7 +3695,8 @@ Präsident`;
             }
 
             try {
-                const response = await fetch(`${DISPATCH_API}/pingen/webhooks/${webhookId}`, {
+                const staging = isPingenStaging();
+                const response = await fetch(`${DISPATCH_API}/pingen/webhooks/${webhookId}?staging=${staging}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
