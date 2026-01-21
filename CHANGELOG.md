@@ -1,3 +1,10 @@
+## [1.24.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.0...v1.24.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* configure CORS explicitly for dispatch API ([ec0c339](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ec0c339e4325e1c61e1f85a16a6b1e2fb1fa4db6))
+
 # [1.24.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.23.2...v1.24.0) (2026-01-21)
 
 
