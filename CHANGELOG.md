@@ -1,3 +1,10 @@
+## [1.13.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.1...v1.13.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* increase JSON body size limit to 10mb for PDF generation ([cd468ee](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cd468eec12952e27603f0c169bd0f889636f9826))
+
 ## [1.13.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.0...v1.13.1) (2026-01-21)
 
 
