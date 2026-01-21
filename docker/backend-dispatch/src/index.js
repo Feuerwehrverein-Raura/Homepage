@@ -1959,18 +1959,19 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                 const validationResult = await waitForLetterValidation(letterId, token, staging);
                 if (!validationResult.success) {
                     console.log(`Letter ${letterId} validation failed: ${validationResult.reason}`);
-                    // Delete the letter if it's in a bad state
-                    try {
-                        await axios.delete(
-                            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                        );
-                    } catch (delErr) {
-                        console.error(`Could not delete invalid letter ${letterId}:`, delErr.message);
-                    }
+                    // TEMPORARILY DISABLED: Don't delete letter so we can debug in Pingen UI
+                    // try {
+                    //     await axios.delete(
+                    //         `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                    //         { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                    //     );
+                    // } catch (delErr) {
+                    //     console.error(`Could not delete invalid letter ${letterId}:`, delErr.message);
+                    // }
+                    console.log(`Letter ${letterId} NOT deleted - check Pingen UI for details`);
                     results.failed.push({
                         name: `${member.vorname} ${member.nachname}`,
-                        error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
+                        error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason} (Letter ID: ${letterId})`
                     });
                     continue;
                 }
