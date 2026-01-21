@@ -1,3 +1,10 @@
+## [1.27.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.0...v1.27.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* **pingen:** stop auto-deleting letters with action_required status ([4ad70a9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4ad70a97a2080abb416882fb9b4b58c0684e7593))
+
 # [1.27.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.4...v1.27.0) (2026-01-21)
 
 
