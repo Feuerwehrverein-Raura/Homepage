@@ -464,6 +464,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Organisator</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Schichten</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Anmeldungen</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Aktionen</th>
                             </tr>
                         </thead>
@@ -1320,6 +1321,21 @@
         </div>
     </div>
 
+    <!-- Event Registrations Modal -->
+    <div id="event-registrations-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 id="event-reg-modal-title" class="text-2xl font-bold text-gray-800">Anmeldungen verwalten</h3>
+                    <button onclick="closeEventRegistrationsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div id="event-reg-content">
+                    <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = 'https://api.fwv-raura.ch';
         const DISPATCH_API = 'https://dispatch.fwv-raura.ch';
@@ -1330,6 +1346,7 @@
         let authToken = null;
         let currentUser = null;
         let currentTab = 'members';
+        let currentEventForRegistrations = null;
 
         // ============================================
         // AUTHENTICATION
@@ -1843,6 +1860,24 @@
 
             tbody.innerHTML = events.map(event => {
                 const startDate = new Date(event.start_date);
+
+                // Zähle Registrierungen aus allen Schichten
+                let pendingCount = 0;
+                let approvedCount = 0;
+                if (event.shifts && event.shifts.length > 0) {
+                    event.shifts.forEach(shift => {
+                        if (shift.registrations) {
+                            pendingCount += shift.registrations.pendingCount || 0;
+                            approvedCount += shift.registrations.approvedCount || 0;
+                        }
+                    });
+                }
+
+                const hasPending = pendingCount > 0;
+                const registrationsDisplay = hasPending
+                    ? `<span class="text-fire-600 font-semibold">${pendingCount} offen</span> / ${approvedCount} best.`
+                    : `${approvedCount} bestätigt`;
+
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
@@ -1864,6 +1899,10 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="text-sm text-gray-600">${event.shifts?.length || 0}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm">${registrationsDisplay}</span>
+                            ${(pendingCount > 0 || approvedCount > 0) ? `<button onclick="openEventRegistrations('${event.id}')" class="ml-2 text-fire-600 hover:text-fire-800 text-xs underline">verwalten</button>` : ''}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                             <button onclick="generateEventInvitation('${event.id}')" class="text-green-600 hover:text-green-800" title="Einladung generieren">
@@ -2278,6 +2317,135 @@ Präsident`;
             } catch (error) {
                 console.error('Error deleting event:', error);
                 alert('Fehler beim Loeschen');
+            }
+        }
+
+        // ============================================
+        // EVENT REGISTRATIONS MODAL
+        // ============================================
+
+        function openEventRegistrations(eventId) {
+            const event = events.find(e => e.id === eventId);
+            if (!event) return;
+
+            currentEventForRegistrations = event;
+            document.getElementById('event-reg-modal-title').textContent = `Anmeldungen: ${event.title}`;
+
+            renderEventRegistrations();
+            document.getElementById('event-registrations-modal').classList.remove('hidden');
+        }
+
+        function closeEventRegistrationsModal() {
+            document.getElementById('event-registrations-modal').classList.add('hidden');
+            currentEventForRegistrations = null;
+        }
+
+        function renderEventRegistrations() {
+            const event = currentEventForRegistrations;
+            if (!event || !event.shifts) return;
+
+            const container = document.getElementById('event-reg-content');
+
+            // Group by shift
+            let html = '<div class="space-y-6">';
+
+            for (const shift of event.shifts) {
+                const regs = shift.registrations || { pending: [], approved: [] };
+                const pending = regs.pending || [];
+                const approved = regs.approved || [];
+                const all = [...pending.map(r => ({...r, status: 'pending'})), ...approved.map(r => ({...r, status: 'approved'}))];
+
+                if (all.length === 0) continue;
+
+                html += `
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-800 mb-3">
+                            ${shift.bereich || ''} - ${shift.name}: ${shift.date} ${shift.start_time}-${shift.end_time}
+                        </h4>
+                        <table class="min-w-full">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                `;
+
+                for (const reg of all) {
+                    const statusBadge = reg.status === 'approved'
+                        ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Bestaetigt</span>'
+                        : '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Offen</span>';
+
+                    const actions = reg.status === 'pending'
+                        ? `<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
+                           <button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Ablehnen</button>`
+                        : `<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
+
+                    html += `
+                        <tr>
+                            <td class="px-4 py-2 text-sm text-gray-900">${reg.name || 'Unbekannt'}</td>
+                            <td class="px-4 py-2">${statusBadge}</td>
+                            <td class="px-4 py-2 text-right text-sm">${actions}</td>
+                        </tr>
+                    `;
+                }
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            // Check if any registrations exist
+            const hasAny = event.shifts.some(s => {
+                const regs = s.registrations || {};
+                return (regs.pending?.length || 0) + (regs.approved?.length || 0) > 0;
+            });
+
+            if (!hasAny) {
+                html = '<p class="text-center text-gray-500 py-8">Keine Anmeldungen vorhanden</p>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        async function approveEventRegistration(regId) {
+            try {
+                const response = await fetch(`${API_BASE}/registrations/${regId}/approve`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error('Fehler beim Bestaetigen');
+                await loadEvents();
+                currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
+                renderEventRegistrations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        async function rejectEventRegistration(regId) {
+            if (!confirm('Anmeldung wirklich ablehnen/entfernen?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/registrations/${regId}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({})
+                });
+                if (!response.ok) throw new Error('Fehler beim Ablehnen');
+                await loadEvents();
+                currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
+                renderEventRegistrations();
+            } catch (error) {
+                alert(error.message);
             }
         }
 
