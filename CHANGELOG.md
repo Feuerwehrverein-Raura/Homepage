@@ -1,3 +1,10 @@
+## [1.25.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.5...v1.25.6) (2026-01-21)
+
+
+### Bug Fixes
+
+* standardize registration endpoints to /registrations path ([ada3ecd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ada3ecd1fdaa7e1273a7d957924ebeadceb06091))
+
 ## [1.25.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.4...v1.25.5) (2026-01-21)
 
 
