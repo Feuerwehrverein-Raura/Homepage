@@ -340,7 +340,8 @@ async function waitForLetterValidation(letterId, token, staging = false) {
                     address_position: letterData?.address_position,
                     print_mode: letterData?.print_mode
                 }, null, 2));
-                return { success: false, status, reason: 'Letter requires action' };
+                // Brief NICHT löschen - als Erfolg behandeln, braucht nur manuelle Aktion in Pingen
+                return { success: true, status, needsManualAction: true };
             }
 
             if (status === 'invalid') {
@@ -362,8 +363,8 @@ async function waitForLetterValidation(letterId, token, staging = false) {
     return { success: false, status: 'timeout', reason: 'Validation timeout' };
 }
 
-// Helper: Brief-Status prüfen und bei "action_required" löschen
-// Gibt true zurück wenn der Brief erfolgreich gesendet wurde, false wenn gelöscht
+// Helper: Brief-Status prüfen (NICHT mehr löschen bei action_required)
+// Briefe bleiben in Pingen für manuelle Bearbeitung
 async function checkAndDeleteIfActionRequired(letterId, token, staging = false) {
     const PINGEN_API = getPingenApi(staging);
 
