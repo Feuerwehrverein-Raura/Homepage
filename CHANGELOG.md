@@ -1,3 +1,10 @@
+## [1.26.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.1...v1.26.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* **traefik:** add /teilnehmerliste route to events API ([8114dc2](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8114dc230f2bfc1a8dc462b667dae5a1cd4e6bd3))
+
 ## [1.26.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.0...v1.26.1) (2026-01-21)
 
 
