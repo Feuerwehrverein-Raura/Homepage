@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.16.0...v1.16.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* use correct Pingen identity endpoint for OAuth tokens ([e6178e2](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e6178e298cee681537c6fb11f9cad89cc1d785b9))
+
 # [1.16.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.15.0...v1.16.0) (2026-01-21)
 
 
