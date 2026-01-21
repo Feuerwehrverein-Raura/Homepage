@@ -314,7 +314,7 @@ app.post('/pingen/send', async (req, res) => {
             }
         });
 
-        // Step 3: Create letter with file reference and meta_data
+        // Step 3: Create letter with file reference and meta_data (auto_send: false)
         const parsedAddress = parseStreetAndNumber(recipient.street);
 
         const uploadResponse = await axios.post(
@@ -326,8 +326,8 @@ app.post('/pingen/send', async (req, res) => {
                         file_original_name: 'brief.pdf',
                         file_url: fileUrl,
                         file_url_signature: fileUrlSignature,
-                        address_position: 'left',
-                        auto_send: true,
+                        address_position: 'right',  // Schweiz: Adresse rechts
+                        auto_send: false,  // Erst Deckblatt erstellen, dann senden
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
@@ -354,6 +354,46 @@ app.post('/pingen/send', async (req, res) => {
         );
 
         const letterId = uploadResponse.data.data?.id;
+
+        // Step 4: Create cover page with recipient address
+        await axios.patch(
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
+            {
+                data: {
+                    type: 'letters',
+                    id: letterId,
+                    attributes: {}
+                }
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        // Step 5: Send the letter
+        await axios.patch(
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
+            {
+                data: {
+                    type: 'letters',
+                    id: letterId,
+                    attributes: {
+                        delivery_product: 'cheap',
+                        print_mode: 'simplex',
+                        print_spectrum: 'grayscale'
+                    }
+                }
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
 
         // Log
         await pool.query(`
@@ -1526,7 +1566,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                     }
                 });
 
-                // Step 3: Create letter with file reference and meta_data (recipient + sender)
+                // Step 3: Create letter with file reference and meta_data (auto_send: false)
                 const parsedAddress = parseStreetAndNumber(member.strasse);
 
                 const uploadResponse = await axios.post(
@@ -1538,8 +1578,8 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                                 file_original_name: filename,
                                 file_url: fileUrl,
                                 file_url_signature: fileUrlSignature,
-                                address_position: 'left',
-                                auto_send: true,
+                                address_position: 'right',  // Schweiz: Adresse rechts
+                                auto_send: false,  // Erst Deckblatt erstellen, dann senden
                                 delivery_product: 'cheap',
                                 print_mode: 'simplex',
                                 print_spectrum: 'grayscale',
@@ -1566,6 +1606,46 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                 );
 
                 const letterId = uploadResponse.data.data?.id;
+
+                // Step 4: Create cover page with recipient address
+                await axios.patch(
+                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
+                    {
+                        data: {
+                            type: 'letters',
+                            id: letterId,
+                            attributes: {}
+                        }
+                    },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/vnd.api+json'
+                        }
+                    }
+                );
+
+                // Step 5: Send the letter
+                await axios.patch(
+                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
+                    {
+                        data: {
+                            type: 'letters',
+                            id: letterId,
+                            attributes: {
+                                delivery_product: 'cheap',
+                                print_mode: 'simplex',
+                                print_spectrum: 'grayscale'
+                            }
+                        }
+                    },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/vnd.api+json'
+                        }
+                    }
+                );
 
                 // Log speichern
                 await pool.query(`
@@ -1754,7 +1834,7 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
             }
         });
 
-        // Step 3: Create letter with file reference and meta_data
+        // Step 3: Create letter with file reference and meta_data (auto_send: false)
         const parsedAddress = parseStreetAndNumber(member.strasse);
 
         const uploadResponse = await axios.post(
@@ -1766,8 +1846,8 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
                         file_original_name: `${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
                         file_url: fileUrl,
                         file_url_signature: fileUrlSignature,
-                        address_position: 'left',
-                        auto_send: true,
+                        address_position: 'right',  // Schweiz: Adresse rechts
+                        auto_send: false,  // Erst Deckblatt erstellen, dann senden
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
@@ -1794,6 +1874,46 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
         );
 
         const letterId = uploadResponse.data.data?.id;
+
+        // Step 4: Create cover page with recipient address
+        await axios.patch(
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
+            {
+                data: {
+                    type: 'letters',
+                    id: letterId,
+                    attributes: {}
+                }
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        // Step 5: Send the letter
+        await axios.patch(
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
+            {
+                data: {
+                    type: 'letters',
+                    id: letterId,
+                    attributes: {
+                        delivery_product: 'cheap',
+                        print_mode: 'simplex',
+                        print_spectrum: 'grayscale'
+                    }
+                }
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
 
         // Log
         await pool.query(`
@@ -2044,7 +2164,7 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
         }
     });
 
-    // Step 3: Create letter with file reference and meta_data
+    // Step 3: Create letter with file reference and meta_data (auto_send: false)
     const parsedAddress = parseStreetAndNumber(member.strasse);
 
     const uploadResponse = await axios.post(
@@ -2056,8 +2176,8 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
                     file_original_name: 'brief.pdf',
                     file_url: fileUrl,
                     file_url_signature: fileUrlSignature,
-                    address_position: 'left',
-                    auto_send: true,
+                    address_position: 'right',  // Schweiz: Adresse rechts
+                    auto_send: false,  // Erst Deckblatt erstellen, dann senden
                     delivery_product: 'cheap',
                     print_mode: 'simplex',
                     print_spectrum: 'grayscale',
@@ -2084,6 +2204,46 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
     );
 
     const letterId = uploadResponse.data.data?.id;
+
+    // Step 4: Create cover page with recipient address
+    await axios.patch(
+        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
+        {
+            data: {
+                type: 'letters',
+                id: letterId,
+                attributes: {}
+            }
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/vnd.api+json'
+            }
+        }
+    );
+
+    // Step 5: Send the letter
+    await axios.patch(
+        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
+        {
+            data: {
+                type: 'letters',
+                id: letterId,
+                attributes: {
+                    delivery_product: 'cheap',
+                    print_mode: 'simplex',
+                    print_spectrum: 'grayscale'
+                }
+            }
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/vnd.api+json'
+            }
+        }
+    );
 
     // Log
     await pool.query(`
