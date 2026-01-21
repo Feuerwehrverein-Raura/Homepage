@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.6...v1.26.0) (2026-01-21)
+
+
+### Features
+
+* **pingen:** add use_cover_page toggle and embed address in PDF ([f8d4af8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f8d4af8bdadf53fd9b769b1d74c97bd8c4638c44))
+
 ## [1.25.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.5...v1.25.6) (2026-01-21)
 
 
