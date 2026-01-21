@@ -73,9 +73,17 @@ async function uploadToNextcloud(filename, buffer, subfolder = '') {
     }
 }
 
-app.use(helmet());
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// CORS vor Helmet konfigurieren
+app.use(cors({
+    origin: ['https://fwv-raura.ch', 'https://www.fwv-raura.ch', 'http://localhost:3000', 'http://localhost:5173'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    credentials: true
+}));
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(express.json({ limit: '50mb' })); // Erhöht für PDF-Uploads
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'api-dispatch', version: process.env.APP_VERSION || '0.0.0' });
