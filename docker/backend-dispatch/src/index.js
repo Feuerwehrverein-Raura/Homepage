@@ -110,7 +110,8 @@ async function waitForLetterValidation(letterId, token, staging = false) {
                 }
             );
 
-            const status = response.data.data?.attributes?.status;
+            const letterData = response.data.data?.attributes;
+            const status = letterData?.status;
             console.log(`Letter ${letterId} validation check ${attempt}/${maxAttempts}: status=${status}`);
 
             if (status === 'valid') {
@@ -118,6 +119,15 @@ async function waitForLetterValidation(letterId, token, staging = false) {
             }
 
             if (status === 'action_required') {
+                // Log full letter data to understand why it requires action
+                console.log(`Letter ${letterId} requires action. Details:`, JSON.stringify({
+                    status: letterData?.status,
+                    paper_types: letterData?.paper_types,
+                    fonts: letterData?.fonts,
+                    file_pages: letterData?.file_pages,
+                    address_position: letterData?.address_position,
+                    print_mode: letterData?.print_mode
+                }, null, 2));
                 return { success: false, status, reason: 'Letter requires action' };
             }
 
