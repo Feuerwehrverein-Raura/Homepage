@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.18.1...v1.19.0) (2026-01-21)
+
+
+### Features
+
+* use organizer name in event invitations when available ([e0e4fcc](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e0e4fccf24e6af1e366e6177a1628cb3ddfb7a13))
+
 ## [1.18.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.18.0...v1.18.1) (2026-01-21)
 
 
