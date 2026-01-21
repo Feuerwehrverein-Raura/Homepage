@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.4...v1.27.0) (2026-01-21)
+
+
+### Features
+
+* **pingen:** auto-detect CH/DE country and position address accordingly ([3bc6996](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3bc6996a6dc5ea7046647ca22712cdc059e9b077))
+
 ## [1.26.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.3...v1.26.4) (2026-01-21)
 
 
