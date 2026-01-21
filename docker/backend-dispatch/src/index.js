@@ -1333,6 +1333,168 @@ app.get('/pingen/stats', async (req, res) => {
     }
 });
 
+// Mitglieder mit Post-Zustellung abrufen
+app.get('/pingen/post-members', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, vorname, nachname, strasse, adresszusatz, plz, ort, email
+            FROM members
+            WHERE zustellung_post = true
+              AND strasse IS NOT NULL AND strasse != ''
+              AND plz IS NOT NULL AND plz != ''
+              AND ort IS NOT NULL AND ort != ''
+            ORDER BY nachname, vorname
+        `);
+
+        res.json({
+            count: result.rows.length,
+            members: result.rows.map(m => ({
+                id: m.id,
+                name: `${m.vorname} ${m.nachname}`,
+                address: `${m.strasse}${m.adresszusatz ? ', ' + m.adresszusatz : ''}, ${m.plz} ${m.ort}`,
+                email: m.email,
+                strasse: m.strasse,
+                plz: m.plz,
+                ort: m.ort
+            }))
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Massen-PDF an alle Post-Empfänger senden
+app.post('/pingen/send-bulk-pdf', async (req, res) => {
+    try {
+        const { pdf_base64, subject, member_ids, staging = false } = req.body;
+        const PINGEN_API = getPingenApi(staging);
+
+        if (!pdf_base64) {
+            return res.status(400).json({ error: 'PDF-Datei erforderlich' });
+        }
+
+        // Mitglieder laden
+        let members;
+        if (member_ids && member_ids.length > 0) {
+            // Spezifische Mitglieder
+            const result = await pool.query(`
+                SELECT id, vorname, nachname, strasse, adresszusatz, plz, ort
+                FROM members
+                WHERE id = ANY($1)
+                  AND strasse IS NOT NULL AND strasse != ''
+                  AND plz IS NOT NULL AND plz != ''
+                  AND ort IS NOT NULL AND ort != ''
+            `, [member_ids]);
+            members = result.rows;
+        } else {
+            // Alle mit Post-Zustellung
+            const result = await pool.query(`
+                SELECT id, vorname, nachname, strasse, adresszusatz, plz, ort
+                FROM members
+                WHERE zustellung_post = true
+                  AND strasse IS NOT NULL AND strasse != ''
+                  AND plz IS NOT NULL AND plz != ''
+                  AND ort IS NOT NULL AND ort != ''
+            `);
+            members = result.rows;
+        }
+
+        if (members.length === 0) {
+            return res.status(400).json({ error: 'Keine Empfänger mit gültiger Adresse gefunden' });
+        }
+
+        // Token holen
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+        const token = tokenResponse.data.access_token;
+
+        // An jeden Empfänger senden
+        const results = { success: [], failed: [] };
+        const filename = subject ? `${subject.replace(/[^a-zA-Z0-9äöüÄÖÜ]/g, '_')}.pdf` : 'Rundschreiben.pdf';
+
+        for (const member of members) {
+            try {
+                const uploadResponse = await axios.post(
+                    `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters`,
+                    {
+                        data: {
+                            type: 'letters',
+                            attributes: {
+                                file_original_name: filename,
+                                address_position: 'left',
+                                auto_send: true,
+                                delivery_product: 'cheap',
+                                print_mode: 'simplex',
+                                print_spectrum: 'grayscale'
+                            }
+                        },
+                        meta: {
+                            file_content: pdf_base64,
+                            recipient: {
+                                name: `${member.vorname} ${member.nachname}`,
+                                street: member.strasse,
+                                zip: member.plz,
+                                city: member.ort,
+                                country: 'CH'
+                            }
+                        }
+                    },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/vnd.api+json'
+                        }
+                    }
+                );
+
+                const letterId = uploadResponse.data.data?.id;
+
+                // Log speichern
+                await pool.query(`
+                    INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, sent_at)
+                    VALUES ('pingen', $1, $2, $3, 'sent', $4, NOW())
+                `, [
+                    member.id,
+                    JSON.stringify({
+                        name: `${member.vorname} ${member.nachname}`,
+                        street: member.strasse,
+                        zip: member.plz,
+                        city: member.ort
+                    }),
+                    subject || 'Rundschreiben',
+                    letterId
+                ]);
+
+                results.success.push({
+                    name: `${member.vorname} ${member.nachname}`,
+                    letterId
+                });
+            } catch (err) {
+                console.error(`Pingen send error for ${member.vorname} ${member.nachname}:`, err.response?.data || err.message);
+                results.failed.push({
+                    name: `${member.vorname} ${member.nachname}`,
+                    error: err.response?.data?.errors?.[0]?.detail || err.message
+                });
+            }
+        }
+
+        res.json({
+            totalRecipients: members.length,
+            successCount: results.success.length,
+            failedCount: results.failed.length,
+            success: results.success,
+            failed: results.failed,
+            staging
+        });
+    } catch (error) {
+        console.error('Bulk PDF send error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Brief manuell senden
 app.post('/pingen/send-manual', async (req, res) => {
     try {
