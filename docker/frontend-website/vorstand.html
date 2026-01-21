@@ -2459,9 +2459,18 @@ ${grussformel}`;
                 if (allDirect.length > 0) {
                     html += `
                         <div class="border rounded-lg p-4 bg-purple-50">
-                            <h4 class="font-semibold text-gray-800 mb-3">
-                                📧 Teilnehmer-Anmeldungen (${allDirect.length})
-                            </h4>
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="font-semibold text-gray-800">
+                                    📧 Teilnehmer-Anmeldungen (${allDirect.length})
+                                </h4>
+                                <button onclick="downloadTeilnehmerliste()"
+                                        class="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    PDF
+                                </button>
+                            </div>
                             <table class="min-w-full">
                                 <thead class="bg-purple-100">
                                     <tr>
@@ -2558,6 +2567,57 @@ ${grussformel}`;
                 renderEventRegistrations();
             } catch (error) {
                 alert(error.message);
+            }
+        }
+
+        async function downloadTeilnehmerliste() {
+            try {
+                const event = currentEventForRegistrations;
+                if (!event || !event.directRegistrations) {
+                    alert('Keine Teilnehmerdaten vorhanden');
+                    return;
+                }
+
+                const direct = event.directRegistrations;
+                const participants = [
+                    ...(direct.pending || []).map(r => ({...r, status: 'pending'})),
+                    ...(direct.approved || []).map(r => ({...r, status: 'approved'}))
+                ];
+
+                if (participants.length === 0) {
+                    alert('Keine Teilnehmer zum Exportieren');
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE}/teilnehmerliste/pdf`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        eventId: event.id,
+                        eventTitle: event.title,
+                        participants: participants
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('PDF konnte nicht generiert werden');
+                }
+
+                // Download the PDF
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Teilnehmerliste_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('Fehler beim PDF-Download:', error);
+                alert('Fehler beim Erstellen der Teilnehmerliste: ' + error.message);
             }
         }
 

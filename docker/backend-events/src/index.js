@@ -1636,6 +1636,141 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
     }
 });
 
+// ============================================
+// TEILNEHMERLISTE PDF GENERATION
+// ============================================
+
+app.post('/teilnehmerliste/pdf', async (req, res) => {
+    try {
+        const { eventId, eventTitle, participants } = req.body;
+
+        if (!eventId || !participants || participants.length === 0) {
+            return res.status(400).json({ error: 'eventId and participants are required' });
+        }
+
+        // Create PDF document
+        const doc = new PDFDocument({
+            size: 'A4',
+            margin: 50,
+            info: {
+                Title: `Teilnehmerliste ${eventTitle}`,
+                Author: 'Feuerwehrverein Raura'
+            }
+        });
+
+        // Set response headers
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Teilnehmerliste_${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+
+        // Pipe PDF to response
+        doc.pipe(res);
+
+        // Header
+        doc.fontSize(20).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        doc.fontSize(16).font('Helvetica').text('Teilnehmerliste', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(14).font('Helvetica-Bold').text(eventTitle, { align: 'center' });
+        doc.moveDown(0.3);
+        doc.fontSize(10).font('Helvetica').fillColor('#666666')
+            .text(`${participants.length} Anmeldung${participants.length !== 1 ? 'en' : ''}`, { align: 'center' });
+        doc.fillColor('#000000');
+        doc.moveDown(1.5);
+
+        // Table header
+        const tableTop = doc.y;
+        const col1 = 50;  // Nr.
+        const col2 = 80;  // Name
+        const col3 = 280; // E-Mail
+        const col4 = 420; // Status
+
+        doc.fontSize(10).font('Helvetica-Bold');
+        doc.text('Nr.', col1, tableTop);
+        doc.text('Name', col2, tableTop);
+        doc.text('E-Mail', col3, tableTop);
+        doc.text('Status', col4, tableTop);
+
+        // Line under header
+        doc.moveTo(col1, tableTop + 15).lineTo(550, tableTop + 15).stroke();
+        doc.moveDown(1);
+
+        // Table rows
+        let rowY = tableTop + 25;
+        doc.font('Helvetica').fontSize(10);
+
+        participants.forEach((p, index) => {
+            // Check for page break
+            if (rowY > 750) {
+                doc.addPage();
+                rowY = 50;
+
+                // Repeat header on new page
+                doc.fontSize(10).font('Helvetica-Bold');
+                doc.text('Nr.', col1, rowY);
+                doc.text('Name', col2, rowY);
+                doc.text('E-Mail', col3, rowY);
+                doc.text('Status', col4, rowY);
+                doc.moveTo(col1, rowY + 15).lineTo(550, rowY + 15).stroke();
+                rowY += 25;
+                doc.font('Helvetica').fontSize(10);
+            }
+
+            doc.text(`${index + 1}.`, col1, rowY);
+            doc.text(p.name || '-', col2, rowY, { width: 190 });
+            doc.text(p.email || '-', col3, rowY, { width: 130 });
+
+            // Status with color
+            const statusText = p.status === 'approved' ? 'Bestätigt' :
+                              p.status === 'pending' ? 'Ausstehend' :
+                              p.status === 'rejected' ? 'Abgelehnt' : p.status;
+            const statusColor = p.status === 'approved' ? '#22c55e' :
+                               p.status === 'pending' ? '#f59e0b' :
+                               p.status === 'rejected' ? '#ef4444' : '#666666';
+            doc.fillColor(statusColor).text(statusText, col4, rowY);
+            doc.fillColor('#000000');
+
+            // Add notes if available
+            if (p.notes) {
+                rowY += 15;
+                doc.fontSize(8).fillColor('#666666')
+                    .text(`Bemerkungen: ${p.notes}`, col2, rowY, { width: 400 });
+                doc.fillColor('#000000').fontSize(10);
+            }
+
+            rowY += 20;
+        });
+
+        // Summary at the bottom
+        doc.moveDown(2);
+        const summaryY = Math.max(rowY + 20, doc.y);
+
+        if (summaryY < 750) {
+            doc.fontSize(10).font('Helvetica-Bold');
+            const approvedCount = participants.filter(p => p.status === 'approved').length;
+            const pendingCount = participants.filter(p => p.status === 'pending').length;
+
+            doc.text('Zusammenfassung:', col1, summaryY);
+            doc.font('Helvetica').fontSize(10);
+            doc.text(`Bestätigt: ${approvedCount}`, col1, summaryY + 15);
+            doc.text(`Ausstehend: ${pendingCount}`, col1, summaryY + 30);
+            doc.text(`Total: ${participants.length}`, col1, summaryY + 45);
+        }
+
+        // Footer
+        doc.fontSize(8).font('Helvetica').fillColor('#666666');
+        doc.text(
+            `Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`,
+            50, 780, { align: 'center', width: 500 }
+        );
+
+        // Finalize PDF
+        doc.end();
+
+    } catch (error) {
+        console.error('Teilnehmerliste PDF generation error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Arbeitsplan manuell versenden (Vorstand)
 app.post('/events/:id/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
