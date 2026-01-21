@@ -84,6 +84,13 @@ function buildPingenAddress(address) {
     return result;
 }
 
+// Helper: Adresse als formatierten String für Deckblatt erstellen
+// Format: "Name\nStrasse Nummer\nPLZ Ort"
+function formatAddressForCoverPage(name, street, number, zip, city) {
+    const streetLine = number ? `${street} ${number}` : street;
+    return `${name}\n${streetLine}\n${zip} ${city}`;
+}
+
 // Nextcloud WebDAV für Datei-Speicherung
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
 const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER;
@@ -356,13 +363,24 @@ app.post('/pingen/send', async (req, res) => {
         const letterId = uploadResponse.data.data?.id;
 
         // Step 4: Create cover page with recipient address
+        const recipientAddressStr = formatAddressForCoverPage(
+            recipient.name,
+            parsedAddress.street,
+            parsedAddress.number || recipient.number,
+            recipient.zip,
+            recipient.city
+        );
+
         await axios.patch(
             `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
             {
                 data: {
                     type: 'letters',
                     id: letterId,
-                    attributes: {}
+                    attributes: {
+                        address: recipientAddressStr,
+                        country: recipient.country || 'CH'
+                    }
                 }
             },
             {
@@ -1805,13 +1823,24 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                 const letterId = uploadResponse.data.data?.id;
 
                 // Step 4: Create cover page with recipient address
+                const memberAddressStr = formatAddressForCoverPage(
+                    `${member.vorname} ${member.nachname}`,
+                    parsedAddress.street,
+                    parsedAddress.number,
+                    member.plz,
+                    member.ort
+                );
+
                 await axios.patch(
                     `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
                     {
                         data: {
                             type: 'letters',
                             id: letterId,
-                            attributes: {}
+                            attributes: {
+                                address: memberAddressStr,
+                                country: 'CH'
+                            }
                         }
                     },
                     {
@@ -2073,13 +2102,24 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
         const letterId = uploadResponse.data.data?.id;
 
         // Step 4: Create cover page with recipient address
+        const arbeitsplanAddressStr = formatAddressForCoverPage(
+            `${member.vorname} ${member.nachname}`,
+            parsedAddress.street,
+            parsedAddress.number,
+            member.plz,
+            member.ort
+        );
+
         await axios.patch(
             `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
             {
                 data: {
                     type: 'letters',
                     id: letterId,
-                    attributes: {}
+                    attributes: {
+                        address: arbeitsplanAddressStr,
+                        country: 'CH'
+                    }
                 }
             },
             {
@@ -2403,13 +2443,24 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
     const letterId = uploadResponse.data.data?.id;
 
     // Step 4: Create cover page with recipient address
+    const helperAddressStr = formatAddressForCoverPage(
+        `${member.vorname} ${member.nachname}`,
+        parsedAddress.street,
+        parsedAddress.number,
+        member.plz,
+        member.ort
+    );
+
     await axios.patch(
         `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
         {
             data: {
                 type: 'letters',
                 id: letterId,
-                attributes: {}
+                attributes: {
+                    address: helperAddressStr,
+                    country: 'CH'
+                }
             }
         },
         {
