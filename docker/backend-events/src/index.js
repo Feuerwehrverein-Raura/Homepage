@@ -432,18 +432,26 @@ app.get('/health', (req, res) => {
 app.get('/events', async (req, res) => {
     try {
         const { upcoming, category } = req.query;
-        let query = 'SELECT * FROM events WHERE 1=1';
+        let query = `
+            SELECT e.*,
+                   m.vorname as organizer_vorname,
+                   m.nachname as organizer_nachname,
+                   m.email as organizer_member_email
+            FROM events e
+            LEFT JOIN members m ON e.organizer_id = m.id
+            WHERE 1=1
+        `;
         const params = [];
 
         if (upcoming === 'true') {
-            query += ' AND start_date >= NOW()';
+            query += ' AND e.start_date >= NOW()';
         }
         if (category) {
             params.push(category);
-            query += ` AND category = $${params.length}`;
+            query += ` AND e.category = $${params.length}`;
         }
 
-        query += ' ORDER BY start_date';
+        query += ' ORDER BY e.start_date';
         const eventsResult = await pool.query(query, params);
 
         // Fetch shifts for all events with registration info
@@ -495,8 +503,14 @@ app.get('/events', async (req, res) => {
             const directApproved = directRegistrations.rows.filter(r => r.status === 'approved');
             const directPending = directRegistrations.rows.filter(r => r.status === 'pending');
 
+            // Organisator-Name zusammensetzen
+            const organizerName = event.organizer_vorname && event.organizer_nachname
+                ? `${event.organizer_vorname} ${event.organizer_nachname}`
+                : event.organizer_name || null;
+
             return {
                 ...event,
+                organizer_name: organizerName,
                 shifts: shiftsWithRegistrations,
                 directRegistrations: {
                     approved: directApproved.map(r => ({

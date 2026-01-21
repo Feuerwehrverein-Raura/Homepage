@@ -31,6 +31,44 @@ function getPingenApi(staging = false) {
     return staging ? PINGEN_API_STAGING : PINGEN_API_PRODUCTION;
 }
 
+// Helper: Pingen Organisation-ID basierend auf staging Parameter
+function getPingenOrgId(staging = false) {
+    if (staging && process.env.PINGEN_STAGING_ORGANISATION_ID) {
+        return process.env.PINGEN_STAGING_ORGANISATION_ID;
+    }
+    return process.env.PINGEN_ORGANISATION_ID;
+}
+
+// Helper: Strasse und Hausnummer trennen
+// z.B. "Musterstrasse 12" -> { street: "Musterstrasse", number: "12" }
+// z.B. "Hauptstr. 5a" -> { street: "Hauptstr.", number: "5a" }
+function parseStreetAndNumber(fullStreet) {
+    if (!fullStreet) return { street: '', number: '' };
+
+    // Regex to match street name followed by house number at the end
+    // Supports: "Musterstrasse 12", "Hauptstr. 5a", "Am Waldrand 123b"
+    const match = fullStreet.match(/^(.+?)\s+(\d+\s*[a-zA-Z]?)$/);
+    if (match) {
+        return {
+            street: match[1].trim(),
+            number: match[2].trim()
+        };
+    }
+    // If no number found, return full street as street name
+    return { street: fullStreet.trim(), number: '' };
+}
+
+// Absender-Adresse für Pingen
+const SENDER_ADDRESS = {
+    name: 'Feuerwehrverein Raura',
+    street: 'Rosenweg',
+    number: '9',
+    pobox: '',
+    zip: '4303',
+    city: 'Kaiseraugst',
+    country: 'CH'
+};
+
 // Nextcloud WebDAV für Datei-Speicherung
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
 const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER;
@@ -240,29 +278,56 @@ app.post('/pingen/send', async (req, res) => {
 
         const token = tokenResponse.data.access_token;
 
-        // Upload to Pingen
+        // Step 1: Get file upload URL
+        const uploadUrlResponse = await axios.get(
+            `${PINGEN_API}/file-upload`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        const fileUrl = uploadUrlResponse.data.data.attributes.url;
+        const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
+
+        // Step 2: Upload PDF to the pre-signed URL
+        await axios.put(fileUrl, pdfBuffer, {
+            headers: {
+                'Content-Type': 'application/pdf'
+            }
+        });
+
+        // Step 3: Create letter with file reference and meta_data
+        const parsedAddress = parseStreetAndNumber(recipient.street);
+
         const uploadResponse = await axios.post(
-            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters`,
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
             {
                 data: {
                     type: 'letters',
                     attributes: {
                         file_original_name: 'brief.pdf',
+                        file_url: fileUrl,
+                        file_url_signature: fileUrlSignature,
                         address_position: 'left',
                         auto_send: true,
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
-                        print_spectrum: 'grayscale'
-                    }
-                },
-                meta: {
-                    file_content: pdfBuffer.toString('base64'),
-                    recipient: {
-                        name: recipient.name,
-                        street: recipient.street,
-                        zip: recipient.zip,
-                        city: recipient.city,
-                        country: recipient.country || 'CH'
+                        print_spectrum: 'grayscale',
+                        meta_data: {
+                            recipient: {
+                                name: recipient.name,
+                                street: parsedAddress.street,
+                                number: parsedAddress.number || recipient.number || '',
+                                pobox: '',
+                                zip: recipient.zip,
+                                city: recipient.city,
+                                country: recipient.country || 'CH'
+                            },
+                            sender: SENDER_ADDRESS
+                        }
                     }
                 }
             },
@@ -1425,28 +1490,57 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 
         for (const member of members) {
             try {
+                // Step 1: Get file upload URL
+                const uploadUrlResponse = await axios.get(
+                    `${PINGEN_API}/file-upload`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/vnd.api+json'
+                        }
+                    }
+                );
+
+                const fileUrl = uploadUrlResponse.data.data.attributes.url;
+                const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
+
+                // Step 2: Upload PDF to the pre-signed URL
+                const pdfBuffer = Buffer.from(pdf_base64, 'base64');
+                await axios.put(fileUrl, pdfBuffer, {
+                    headers: {
+                        'Content-Type': 'application/pdf'
+                    }
+                });
+
+                // Step 3: Create letter with file reference and meta_data (recipient + sender)
+                const parsedAddress = parseStreetAndNumber(member.strasse);
+
                 const uploadResponse = await axios.post(
-                    `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters`,
+                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
                     {
                         data: {
                             type: 'letters',
                             attributes: {
                                 file_original_name: filename,
+                                file_url: fileUrl,
+                                file_url_signature: fileUrlSignature,
                                 address_position: 'left',
                                 auto_send: true,
                                 delivery_product: 'cheap',
                                 print_mode: 'simplex',
-                                print_spectrum: 'grayscale'
-                            }
-                        },
-                        meta: {
-                            file_content: pdf_base64,
-                            recipient: {
-                                name: `${member.vorname} ${member.nachname}`,
-                                street: member.strasse,
-                                zip: member.plz,
-                                city: member.ort,
-                                country: 'CH'
+                                print_spectrum: 'grayscale',
+                                meta_data: {
+                                    recipient: {
+                                        name: `${member.vorname} ${member.nachname}`,
+                                        street: parsedAddress.street,
+                                        number: parsedAddress.number,
+                                        pobox: '',
+                                        zip: member.plz,
+                                        city: member.ort,
+                                        country: 'CH'
+                                    },
+                                    sender: SENDER_ADDRESS
+                                }
                             }
                         }
                     },
@@ -1625,29 +1719,57 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
 
         const token = tokenResponse.data.access_token;
 
-        // PDF direkt an Pingen senden
+        // Step 1: Get file upload URL
+        const uploadUrlResponse = await axios.get(
+            `${PINGEN_API}/file-upload`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        const fileUrl = uploadUrlResponse.data.data.attributes.url;
+        const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
+
+        // Step 2: Upload PDF to the pre-signed URL
+        const pdfBuffer = Buffer.from(pdf_base64, 'base64');
+        await axios.put(fileUrl, pdfBuffer, {
+            headers: {
+                'Content-Type': 'application/pdf'
+            }
+        });
+
+        // Step 3: Create letter with file reference and meta_data
+        const parsedAddress = parseStreetAndNumber(member.strasse);
+
         const uploadResponse = await axios.post(
-            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters`,
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
             {
                 data: {
                     type: 'letters',
                     attributes: {
                         file_original_name: `${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+                        file_url: fileUrl,
+                        file_url_signature: fileUrlSignature,
                         address_position: 'left',
                         auto_send: true,
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
-                        print_spectrum: 'grayscale'
-                    }
-                },
-                meta: {
-                    file_content: pdf_base64,
-                    recipient: {
-                        name: `${member.vorname} ${member.nachname}`,
-                        street: member.strasse,
-                        zip: member.plz,
-                        city: member.ort,
-                        country: 'CH'
+                        print_spectrum: 'grayscale',
+                        meta_data: {
+                            recipient: {
+                                name: `${member.vorname} ${member.nachname}`,
+                                street: parsedAddress.street,
+                                number: parsedAddress.number,
+                                pobox: '',
+                                zip: member.plz,
+                                city: member.ort,
+                                country: 'CH'
+                            },
+                            sender: SENDER_ADDRESS
+                        }
                     }
                 }
             },
@@ -1889,29 +2011,56 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
 
     const token = tokenResponse.data.access_token;
 
-    // Upload to Pingen
+    // Step 1: Get file upload URL
+    const uploadUrlResponse = await axios.get(
+        `${PINGEN_API}/file-upload`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/vnd.api+json'
+            }
+        }
+    );
+
+    const fileUrl = uploadUrlResponse.data.data.attributes.url;
+    const fileUrlSignature = uploadUrlResponse.data.data.attributes.url_signature;
+
+    // Step 2: Upload PDF to the pre-signed URL
+    await axios.put(fileUrl, pdfBuffer, {
+        headers: {
+            'Content-Type': 'application/pdf'
+        }
+    });
+
+    // Step 3: Create letter with file reference and meta_data
+    const parsedAddress = parseStreetAndNumber(member.strasse);
+
     const uploadResponse = await axios.post(
-        `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters`,
+        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
         {
             data: {
                 type: 'letters',
                 attributes: {
                     file_original_name: 'brief.pdf',
+                    file_url: fileUrl,
+                    file_url_signature: fileUrlSignature,
                     address_position: 'left',
                     auto_send: true,
                     delivery_product: 'cheap',
                     print_mode: 'simplex',
-                    print_spectrum: 'grayscale'
-                }
-            },
-            meta: {
-                file_content: pdfBuffer.toString('base64'),
-                recipient: {
-                    name: `${member.vorname} ${member.nachname}`,
-                    street: member.strasse,
-                    zip: member.plz,
-                    city: member.ort,
-                    country: 'CH'
+                    print_spectrum: 'grayscale',
+                    meta_data: {
+                        recipient: {
+                            name: `${member.vorname} ${member.nachname}`,
+                            street: parsedAddress.street,
+                            number: parsedAddress.number,
+                            pobox: '',
+                            zip: member.plz,
+                            city: member.ort,
+                            country: 'CH'
+                        },
+                        sender: SENDER_ADDRESS
+                    }
                 }
             }
         },
