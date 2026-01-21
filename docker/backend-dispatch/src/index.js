@@ -164,11 +164,11 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
     const fontSize = 10;
     const lineHeight = 14;
 
-    // Schweizer Briefformat: Adressfenster rechts
-    // Position: ca. 120mm von links, 45mm von oben
+    // Schweizer Briefformat: Adressfenster rechts (C5/6 Couvert)
+    // Fenster: 98mm von links, 42mm von oben, 90mm breit, 45mm hoch
     // A4: 595 x 842 points, 1mm = 2.835 points
-    const addressX = 340; // ~120mm von links
-    const addressY = height - 130; // ~45mm von oben
+    const addressX = 285; // ~100mm von links (Fenster beginnt bei 98mm)
+    const addressY = height - 125; // ~44mm von oben (Fenster beginnt bei 42mm)
 
     // Absender (klein, oberhalb der Empfängeradresse)
     if (senderAddress) {
