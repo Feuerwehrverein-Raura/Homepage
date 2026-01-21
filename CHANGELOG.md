@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.5...v1.18.0) (2026-01-21)
+
+
+### Features
+
+* add event registrations management to Vorstand dashboard ([482ef64](https://github.com/Feuerwehrverein-Raura/Homepage/commit/482ef64c8af212e2df8ef41ac9a74d580d7eaabc))
+
 ## [1.17.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.4...v1.17.5) (2026-01-21)
 
 
