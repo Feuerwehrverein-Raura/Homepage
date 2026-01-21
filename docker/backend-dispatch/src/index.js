@@ -91,6 +91,47 @@ function formatAddressForCoverPage(name, street, number, zip, city) {
     return `${name}\n${streetLine}\n${zip} ${city}`;
 }
 
+// Helper: Warten bis Brief die initiale Verarbeitung abgeschlossen hat
+// (Status ist nicht mehr "validating" - kann "valid", "action_required", etc. sein)
+async function waitForLetterProcessing(letterId, token, staging = false) {
+    const PINGEN_API = getPingenApi(staging);
+    const maxAttempts = 10;
+    const delayMs = 2000;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const response = await axios.get(
+                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/vnd.api+json'
+                    }
+                }
+            );
+
+            const status = response.data.data?.attributes?.status;
+            console.log(`Letter ${letterId} processing check ${attempt}/${maxAttempts}: status=${status}`);
+
+            // Sobald nicht mehr "validating", ist die initiale Verarbeitung fertig
+            if (status && status !== 'validating') {
+                return { ready: true, status };
+            }
+
+            if (attempt < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        } catch (error) {
+            console.error(`Error checking letter ${letterId} processing:`, error.response?.data || error.message);
+            if (attempt < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+    }
+
+    return { ready: false, status: 'timeout' };
+}
+
 // Helper: Warten bis Brief validiert ist (max 30 Sekunden)
 // Pingen braucht Zeit um das PDF zu verarbeiten bevor create-cover-page möglich ist
 async function waitForLetterValidation(letterId, token, staging = false) {
@@ -470,7 +511,13 @@ app.post('/pingen/send', async (req, res) => {
 
         const letterId = uploadResponse.data.data?.id;
 
-        // Step 4: Create cover page with recipient address FIRST
+        // Step 3.5: Wait for initial processing before creating cover page
+        const processingResult = await waitForLetterProcessing(letterId, token, staging);
+        if (!processingResult.ready) {
+            return res.status(400).json({ error: 'Brief-Verarbeitung Timeout' });
+        }
+
+        // Step 4: Create cover page with recipient address
         const recipientAddressStr = formatAddressForCoverPage(
             recipient.name,
             parsedAddress.street,
@@ -1954,8 +2001,18 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 
                 const letterId = uploadResponse.data.data?.id;
 
-                // Step 4: Create cover page with recipient address FIRST
-                // (Must be done before validation completes, as Pingen needs the address)
+                // Step 3.5: Wait for initial processing before creating cover page
+                const processingResult = await waitForLetterProcessing(letterId, token, staging);
+                if (!processingResult.ready) {
+                    console.log(`Letter ${letterId} processing timeout`);
+                    results.failed.push({
+                        name: `${member.vorname} ${member.nachname}`,
+                        error: 'Brief-Verarbeitung Timeout'
+                    });
+                    continue;
+                }
+
+                // Step 4: Create cover page with recipient address
                 const memberAddressStr = formatAddressForCoverPage(
                     `${member.vorname} ${member.nachname}`,
                     parsedAddress.street,
@@ -2265,7 +2322,13 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
 
         const letterId = uploadResponse.data.data?.id;
 
-        // Step 4: Create cover page with recipient address FIRST
+        // Step 3.5: Wait for initial processing before creating cover page
+        const processingResult = await waitForLetterProcessing(letterId, token, staging);
+        if (!processingResult.ready) {
+            return res.status(400).json({ error: 'Brief-Verarbeitung Timeout' });
+        }
+
+        // Step 4: Create cover page with recipient address
         const arbeitsplanAddressStr = formatAddressForCoverPage(
             `${member.vorname} ${member.nachname}`,
             parsedAddress.street,
@@ -2670,7 +2733,13 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
 
     const letterId = uploadResponse.data.data?.id;
 
-    // Step 4: Create cover page with recipient address FIRST
+    // Step 3.5: Wait for initial processing before creating cover page
+    const processingResult = await waitForLetterProcessing(letterId, token, staging);
+    if (!processingResult.ready) {
+        throw new Error('Brief-Verarbeitung Timeout');
+    }
+
+    // Step 4: Create cover page with recipient address
     const helperAddressStr = formatAddressForCoverPage(
         `${member.vorname} ${member.nachname}`,
         parsedAddress.street,
