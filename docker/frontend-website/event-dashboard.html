@@ -89,6 +89,13 @@
                     </div>
                 </div>
                 <div class="mt-4" id="event-description"></div>
+                <div class="mt-6 pt-4 border-t">
+                    <button onclick="sendArbeitsplan()"
+                        class="px-4 py-2 bg-fire-500 text-white font-medium rounded-lg hover:bg-fire-600 transition-colors">
+                        Arbeitsplan versenden
+                    </button>
+                    <span class="ml-3 text-sm text-gray-500" id="arbeitsplan-status"></span>
+                </div>
             </div>
 
             <!-- Tabs -->
@@ -203,6 +210,15 @@
             document.getElementById('event-status').textContent = getStatusLabel(eventData.status);
             document.getElementById('event-description').textContent = eventData.description || '';
 
+            // Arbeitsplan Status
+            const arbeitsplanStatus = document.getElementById('arbeitsplan-status');
+            if (eventData.arbeitsplan_sent_at) {
+                const sentDate = new Date(eventData.arbeitsplan_sent_at);
+                arbeitsplanStatus.textContent = `Versendet am ${sentDate.toLocaleDateString('de-CH')} um ${sentDate.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}`;
+            } else {
+                arbeitsplanStatus.textContent = 'Noch nicht versendet';
+            }
+
             renderShifts();
             renderRegistrations();
         }
@@ -297,7 +313,7 @@
         async function approveRegistration(id) {
             if (!confirm('Anmeldung genehmigen?')) return;
             try {
-                const response = await fetch(`${API_BASE}/registrations/${id}/approve`, {
+                const response = await fetch(`${API_BASE}/events/my-event/registrations/${id}/approve`, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
@@ -311,7 +327,7 @@
         async function rejectRegistration(id) {
             const reason = prompt('Grund fuer Ablehnung (optional):');
             try {
-                const response = await fetch(`${API_BASE}/registrations/${id}/reject`, {
+                const response = await fetch(`${API_BASE}/events/my-event/registrations/${id}/reject`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${authToken}`,
@@ -323,6 +339,49 @@
                 await loadDashboard();
             } catch (error) {
                 alert(error.message);
+            }
+        }
+
+        async function sendArbeitsplan() {
+            if (!confirm('Arbeitsplan an alle Helfer versenden?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/events/my-event/send-arbeitsplan`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.reason || 'Fehler beim Versenden');
+                }
+
+                // Detaillierte Summary anzeigen
+                let summary = `✓ Erfolgreich versendet: ${data.sentCount}\n`;
+
+                if (data.successEmails && data.successEmails.length > 0) {
+                    summary += '\nE-Mail gesendet an:\n';
+                    data.successEmails.forEach(e => {
+                        summary += `  • ${e.name} (${e.email})\n`;
+                    });
+                }
+
+                if (data.postOnlyMembers && data.postOnlyMembers.length > 0) {
+                    summary += '\n⚠ Post-Zustellung (keine E-Mail):\n';
+                    data.postOnlyMembers.forEach(m => {
+                        summary += `  • ${m.name}\n`;
+                    });
+                }
+
+                if (data.errors && data.errors.length > 0) {
+                    summary += '\n✗ Fehlgeschlagen:\n';
+                    data.errors.forEach(e => {
+                        summary += `  • ${e.name}: ${e.error}\n`;
+                    });
+                }
+
+                alert(summary);
+                await loadDashboard();
+            } catch (error) {
+                alert('Fehler: ' + error.message);
             }
         }
 

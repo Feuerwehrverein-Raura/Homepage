@@ -153,6 +153,269 @@ Feuerwehrverein Raura
     return { sent, errors };
 }
 
+// Helper: Prüfen ob alle Schichten eines Events besetzt sind und Arbeitsplan versenden
+// options.skipDeadlineCheck = true für manuellen Versand
+// options.skipFilledCheck = true um auch bei nicht voll besetzten Schichten zu senden
+async function checkAndSendArbeitsplan(eventId, options = {}) {
+    try {
+        // Event-Daten mit Deadline und Versandstatus abrufen
+        const eventResult = await pool.query(`
+            SELECT id, title, registration_deadline, arbeitsplan_sent_at, status
+            FROM events WHERE id = $1
+        `, [eventId]);
+
+        if (eventResult.rows.length === 0) return { sent: false, reason: 'Event nicht gefunden' };
+        const event = eventResult.rows[0];
+
+        // Schon versendet? (nur bei automatischem Versand prüfen)
+        if (!options.skipDeadlineCheck && event.arbeitsplan_sent_at) {
+            return { sent: false, reason: 'Arbeitsplan bereits versendet' };
+        }
+
+        // Event abgesagt?
+        if (event.status === 'cancelled') {
+            return { sent: false, reason: 'Event abgesagt' };
+        }
+
+        // Deadline-Prüfung (nur bei automatischem Versand)
+        if (!options.skipDeadlineCheck) {
+            if (!event.registration_deadline) {
+                return { sent: false, reason: 'Kein Anmeldeschluss definiert' };
+            }
+
+            const deadline = new Date(event.registration_deadline);
+            const now = new Date();
+            if (deadline > now) {
+                return { sent: false, reason: 'Anmeldeschluss noch nicht erreicht' };
+            }
+        }
+
+        // Alle Schichten mit benötigter und aktueller Besetzung abrufen
+        const shiftsResult = await pool.query(`
+            SELECT s.id, s.name, s.date, s.start_time, s.end_time, s.bereich, s.needed,
+                   COUNT(r.id) FILTER (WHERE r.status IN ('approved', 'confirmed')) as filled
+            FROM shifts s
+            LEFT JOIN registrations r ON s.id = ANY(r.shift_ids)
+            WHERE s.event_id = $1
+            GROUP BY s.id
+        `, [eventId]);
+
+        const shifts = shiftsResult.rows;
+
+        if (shifts.length === 0) {
+            return { sent: false, reason: 'Keine Schichten vorhanden' };
+        }
+
+        // Prüfen ob alle Schichten besetzt sind (nur bei automatischem Versand)
+        if (!options.skipFilledCheck) {
+            const allFilled = shifts.every(s => parseInt(s.filled) >= parseInt(s.needed));
+            if (!allFilled) {
+                return { sent: false, reason: 'Nicht alle Schichten besetzt' };
+            }
+        }
+
+        // Alle bestätigten Registrierungen mit Zustellpräferenzen abrufen
+        const regsResult = await pool.query(`
+            SELECT r.id, r.guest_name, r.guest_email, r.member_id, r.shift_ids,
+                   m.vorname, m.nachname, m.email as member_email, m.zustellung_email
+            FROM registrations r
+            LEFT JOIN members m ON r.member_id = m.id
+            WHERE r.event_id = $1
+            AND r.status IN ('approved', 'confirmed')
+        `, [eventId]);
+
+        const registrations = regsResult.rows;
+
+        // Schichten mit Helfern für PDF vorbereiten
+        const shiftsWithHelpers = await Promise.all(shifts.map(async shift => {
+            const helperRegs = registrations.filter(r =>
+                r.shift_ids && r.shift_ids.includes(shift.id)
+            );
+            return {
+                ...shift,
+                startTime: shift.start_time,
+                endTime: shift.end_time,
+                helpers: helperRegs.map(r =>
+                    r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                )
+            };
+        }));
+
+        // PDF generieren
+        const PDFDocument = require('pdfkit');
+        const pdfBuffers = [];
+        const doc = new PDFDocument({
+            size: 'A4',
+            margin: 50,
+            info: {
+                Title: `Arbeitsplan ${event.title}`,
+                Author: 'Feuerwehrverein Raura'
+            }
+        });
+
+        doc.on('data', chunk => pdfBuffers.push(chunk));
+
+        const pdfPromise = new Promise((resolve, reject) => {
+            doc.on('end', () => resolve(Buffer.concat(pdfBuffers)));
+            doc.on('error', reject);
+        });
+
+        // PDF-Inhalt generieren
+        doc.fontSize(20).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        doc.fontSize(16).font('Helvetica').text('Arbeitsplan', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(14).font('Helvetica-Bold').text(event.title, { align: 'center' });
+        doc.moveDown(1);
+
+        // Nach Datum gruppieren
+        const shiftsByDate = {};
+        shiftsWithHelpers.forEach(shift => {
+            const date = shift.date || 'Unbekannt';
+            if (!shiftsByDate[date]) shiftsByDate[date] = [];
+            shiftsByDate[date].push(shift);
+        });
+
+        Object.entries(shiftsByDate).forEach(([date, dateShifts]) => {
+            doc.fontSize(12).font('Helvetica-Bold').text(formatDateDE(date));
+            doc.moveDown(0.3);
+
+            const byBereich = {};
+            dateShifts.forEach(shift => {
+                const bereich = shift.bereich || 'Allgemein';
+                if (!byBereich[bereich]) byBereich[bereich] = [];
+                byBereich[bereich].push(shift);
+            });
+
+            Object.entries(byBereich).forEach(([bereich, bereichShifts]) => {
+                doc.fontSize(11).font('Helvetica-Bold').text(`  ${bereich}:`);
+                bereichShifts.forEach(shift => {
+                    const timeStr = shift.startTime && shift.endTime
+                        ? `${shift.startTime} - ${shift.endTime}` : '';
+                    const helpers = shift.helpers.length > 0
+                        ? shift.helpers.join(', ') : 'Keine Anmeldungen';
+                    doc.fontSize(10).font('Helvetica')
+                        .text(`    ${shift.name} (${timeStr}): ${helpers}`);
+                });
+                doc.moveDown(0.3);
+            });
+            doc.moveDown(0.5);
+        });
+
+        doc.moveDown(2);
+        doc.fontSize(8).font('Helvetica').fillColor('#666666')
+            .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
+
+        doc.end();
+        const pdfBuffer = await pdfPromise;
+        const pdfBase64 = pdfBuffer.toString('base64');
+
+        // E-Mails versenden (mit Zustellpräferenzen)
+        let sentCount = 0;
+        const errors = [];
+        const successEmails = [];
+        const postOnlyMembers = [];
+        const pingenResults = [];
+
+        for (const reg of registrations) {
+            const name = reg.member_id ? `${reg.vorname} ${reg.nachname}` : reg.guest_name;
+
+            // Bei Mitgliedern: Zustellpräferenz prüfen
+            if (reg.member_id && reg.zustellung_email === false) {
+                console.log(`Arbeitsplan nicht per E-Mail an ${name} (zustellung_email = false)`);
+                postOnlyMembers.push({
+                    name,
+                    email: reg.member_email,
+                    member_id: reg.member_id
+                });
+                continue;
+            }
+
+            const email = reg.member_email || reg.guest_email;
+
+            if (!email) {
+                errors.push({ name, error: 'Keine E-Mail-Adresse vorhanden' });
+                continue;
+            }
+
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: email,
+                    subject: `Arbeitsplan - ${event.title}`,
+                    body: `Guten Tag ${name},
+
+Der Arbeitsplan für "${event.title}" ist fertig.
+
+Anbei finden Sie den Arbeitsplan als PDF mit allen Schichten und Helfern.
+
+Bei Fragen kontaktieren Sie uns bitte.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura`,
+                    attachments: [{
+                        filename: `Arbeitsplan_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+                        content: pdfBase64,
+                        contentType: 'application/pdf'
+                    }]
+                });
+                sentCount++;
+                successEmails.push({ name, email });
+                console.log(`Arbeitsplan gesendet an ${email}`);
+            } catch (err) {
+                console.error(`Arbeitsplan an ${email} fehlgeschlagen:`, err.message);
+                errors.push({ name, email, error: err.message });
+            }
+        }
+
+        // Pingen-Versand für Mitglieder mit Post-Zustellung
+        for (const postMember of postOnlyMembers) {
+            if (!postMember.member_id) continue;
+
+            try {
+                const pingenResponse = await axios.post(`${DISPATCH_API}/pingen/send-arbeitsplan`, {
+                    event_id: eventId,
+                    member_id: postMember.member_id,
+                    pdf_base64: pdfBase64
+                });
+
+                if (pingenResponse.data.success) {
+                    pingenResults.push({
+                        name: postMember.name,
+                        letterId: pingenResponse.data.letterId,
+                        status: 'sent'
+                    });
+                    console.log(`Arbeitsplan per Post gesendet an ${postMember.name} (Pingen: ${pingenResponse.data.letterId})`);
+                }
+            } catch (pingenErr) {
+                console.error(`Pingen-Versand an ${postMember.name} fehlgeschlagen:`, pingenErr.message);
+                pingenResults.push({
+                    name: postMember.name,
+                    status: 'failed',
+                    error: pingenErr.response?.data?.error || pingenErr.message
+                });
+            }
+        }
+
+        // Versandstatus markieren
+        await pool.query(`
+            UPDATE events SET arbeitsplan_sent_at = NOW() WHERE id = $1
+        `, [eventId]);
+
+        console.log(`Arbeitsplan für Event "${event.title}" versendet: ${sentCount} E-Mails, ${pingenResults.filter(r => r.status === 'sent').length} Briefe`);
+        return {
+            sent: true,
+            sentCount,
+            successEmails,
+            errors,
+            postOnlyMembers,
+            pingenResults
+        };
+
+    } catch (error) {
+        console.error('Fehler beim Arbeitsplan-Versand:', error);
+        return { sent: false, reason: error.message };
+    }
+}
+
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -521,6 +784,143 @@ app.get('/events/my-event', authenticateEventOrganizer, async (req, res) => {
             shifts: shifts.rows,
             registrations: registrations.rows
         });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Registrierung genehmigen (Organisator)
+app.post('/events/my-event/registrations/:id/approve', authenticateEventOrganizer, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const eventId = req.eventOrganizer.event_id;
+
+        // Prüfen ob Registrierung zu diesem Event gehört
+        const regCheck = await pool.query(
+            'SELECT event_id FROM registrations WHERE id = $1',
+            [id]
+        );
+
+        if (regCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Registrierung nicht gefunden' });
+        }
+
+        if (regCheck.rows[0].event_id !== eventId) {
+            return res.status(403).json({ error: 'Zugriff verweigert' });
+        }
+
+        const result = await pool.query(`
+            UPDATE registrations
+            SET status = 'approved', approved_by = $2, approved_at = NOW(), confirmed_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [id, req.eventOrganizer.organizer_name || 'Organisator']);
+
+        const reg = result.rows[0];
+
+        // Bestätigungs-E-Mail senden
+        if (reg.guest_email) {
+            const event = await pool.query('SELECT title FROM events WHERE id = $1', [eventId]);
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: reg.guest_email,
+                    subject: `Ihre Anmeldung wurde bestätigt - ${event.rows[0]?.title}`,
+                    body: `Guten Tag ${reg.guest_name},\n\nIhre Anmeldung für "${event.rows[0]?.title}" wurde bestätigt.\n\nWir freuen uns auf Sie!\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
+                });
+            } catch (emailErr) {
+                console.error('Approval email failed:', emailErr.message);
+            }
+        }
+
+        // Prüfen ob Arbeitsplan versendet werden kann
+        checkAndSendArbeitsplan(eventId).then(result => {
+            if (result.sent) {
+                console.log(`Arbeitsplan automatisch versendet nach Genehmigung (${result.sentCount} Empfänger)`);
+            }
+        }).catch(err => console.error('Arbeitsplan-Check fehlgeschlagen:', err));
+
+        res.json({ success: true, registration: reg });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Registrierung ablehnen (Organisator)
+app.post('/events/my-event/registrations/:id/reject', authenticateEventOrganizer, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const eventId = req.eventOrganizer.event_id;
+
+        // Prüfen ob Registrierung zu diesem Event gehört
+        const regCheck = await pool.query(
+            'SELECT event_id FROM registrations WHERE id = $1',
+            [id]
+        );
+
+        if (regCheck.rows.length === 0) {
+            return res.status(404).json({ error: 'Registrierung nicht gefunden' });
+        }
+
+        if (regCheck.rows[0].event_id !== eventId) {
+            return res.status(403).json({ error: 'Zugriff verweigert' });
+        }
+
+        const result = await pool.query(`
+            UPDATE registrations
+            SET status = 'rejected', approved_by = $2, approved_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [id, req.eventOrganizer.organizer_name || 'Organisator']);
+
+        const reg = result.rows[0];
+
+        // Ablehnungs-E-Mail senden
+        if (reg.guest_email) {
+            const event = await pool.query('SELECT title FROM events WHERE id = $1', [eventId]);
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: reg.guest_email,
+                    subject: `Ihre Anmeldung - ${event.rows[0]?.title}`,
+                    body: `Guten Tag ${reg.guest_name},\n\nLeider können wir Ihre Anmeldung für "${event.rows[0]?.title}" nicht berücksichtigen.\n\n${reason ? `Grund: ${reason}\n\n` : ''}Bei Fragen kontaktieren Sie uns bitte.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
+                });
+            } catch (emailErr) {
+                console.error('Rejection email failed:', emailErr.message);
+            }
+        }
+
+        res.json({ success: true, registration: reg });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Arbeitsplan manuell versenden (Organisator)
+app.post('/events/my-event/send-arbeitsplan', authenticateEventOrganizer, async (req, res) => {
+    try {
+        const eventId = req.eventOrganizer.event_id;
+
+        // Manueller Versand: Deadline- und Filled-Check überspringen
+        const result = await checkAndSendArbeitsplan(eventId, {
+            skipDeadlineCheck: true,
+            skipFilledCheck: true
+        });
+
+        if (result.sent) {
+            res.json({
+                success: true,
+                message: `Arbeitsplan an ${result.sentCount} Empfänger versendet`,
+                sentCount: result.sentCount,
+                successEmails: result.successEmails,
+                errors: result.errors,
+                postOnlyMembers: result.postOnlyMembers
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                reason: result.reason
+            });
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -924,6 +1324,13 @@ app.post('/registrations/:id/approve', authenticateAny, requireRole('vorstand', 
             }
         }
 
+        // Prüfen ob Arbeitsplan versendet werden kann (async, nicht blockierend)
+        checkAndSendArbeitsplan(reg.event_id).then(result => {
+            if (result.sent) {
+                console.log(`Arbeitsplan automatisch versendet nach Genehmigung (${result.sentCount} Empfänger)`);
+            }
+        }).catch(err => console.error('Arbeitsplan-Check fehlgeschlagen:', err));
+
         res.json({ success: true, registration: result.rows[0] });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -1142,6 +1549,37 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
 
     } catch (error) {
         console.error('PDF generation error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Arbeitsplan manuell versenden (Vorstand)
+app.post('/events/:id/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const eventId = req.params.id;
+
+        // Manueller Versand: Deadline- und Filled-Check überspringen
+        const result = await checkAndSendArbeitsplan(eventId, {
+            skipDeadlineCheck: true,
+            skipFilledCheck: true
+        });
+
+        if (result.sent) {
+            res.json({
+                success: true,
+                message: `Arbeitsplan an ${result.sentCount} Empfänger versendet`,
+                sentCount: result.sentCount,
+                successEmails: result.successEmails,
+                errors: result.errors,
+                postOnlyMembers: result.postOnlyMembers
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                reason: result.reason
+            });
+        }
+    } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });

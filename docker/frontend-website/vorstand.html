@@ -111,6 +111,9 @@
                     Anträge
                     <span id="registrations-badge" class="hidden absolute -top-1 -right-2 bg-fire-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
                 </button>
+                <button id="tab-pingen" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                    Post (Pingen)
+                </button>
             </div>
         </div>
     </section>
@@ -942,6 +945,172 @@
         </section>
     </div>
 
+    <!-- Pingen Section -->
+    <div id="pingen-section" class="hidden">
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">Post-Versand (Pingen)</h1>
+                        <p class="text-gray-600 mt-1">Briefe per Post versenden und verwalten</p>
+                    </div>
+                    <button id="send-letter-btn" class="bg-fire-500 text-white px-6 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-2">
+                        <span>+</span>
+                        <span>Brief senden</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pingen Stats -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="text-blue-600 text-sm font-medium">Guthaben</div>
+                        <div id="pingen-balance" class="text-2xl font-bold text-gray-800">-</div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <div class="text-green-600 text-sm font-medium">Gesendet</div>
+                        <div id="pingen-sent" class="text-2xl font-bold text-gray-800">-</div>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg">
+                        <div class="text-yellow-600 text-sm font-medium">In Bearbeitung</div>
+                        <div id="pingen-pending" class="text-2xl font-bold text-gray-800">-</div>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg">
+                        <div class="text-red-600 text-sm font-medium">Fehlgeschlagen</div>
+                        <div id="pingen-failed" class="text-2xl font-bold text-gray-800">-</div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <div class="text-purple-600 text-sm font-medium">Letzte 30 Tage</div>
+                        <div id="pingen-30days" class="text-2xl font-bold text-gray-800">-</div>
+                    </div>
+                </div>
+                <div id="pingen-staging-warning" class="hidden mt-4 bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded">
+                    <strong>Staging-Modus:</strong> Briefe werden nicht tatsächlich gesendet (Testumgebung)
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex items-center space-x-4">
+                    <select id="pingen-event-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <option value="">Alle Events</option>
+                    </select>
+                    <button id="refresh-pingen-btn" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                        Aktualisieren
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Letters Table -->
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Empfänger</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Event</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Betreff</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Datum</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pingen-letters-tbody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="pingen-loading" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                    <p class="mt-4 text-gray-600">Lade Briefe...</p>
+                </div>
+
+                <div id="pingen-empty" class="text-center py-12 hidden">
+                    <p class="text-gray-600">Keine Briefe vorhanden.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Webhook Management -->
+        <section class="bg-white border-t mt-8">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Webhook-Konfiguration</h2>
+                        <p class="text-gray-600 text-sm">Automatische Status-Updates von Pingen</p>
+                    </div>
+                    <button id="register-webhook-btn" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 text-sm">
+                        Webhook registrieren
+                    </button>
+                </div>
+                <div id="webhooks-list" class="bg-gray-50 rounded-lg p-4">
+                    <p class="text-gray-500 text-sm">Lade Webhooks...</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Pingen Send Letter Modal -->
+    <div id="pingen-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Brief senden</h3>
+                    <button id="close-pingen-modal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+
+                <form id="pingen-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Empfänger (Mitglied) *</label>
+                        <select id="pingen-member" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            <option value="">Mitglied auswählen...</option>
+                        </select>
+                    </div>
+                    <div id="pingen-member-address" class="bg-gray-50 p-3 rounded-lg hidden">
+                        <p class="text-sm text-gray-600">Adresse:</p>
+                        <p id="pingen-address-preview" class="font-medium"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Event (optional)</label>
+                        <select id="pingen-event" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            <option value="">Kein Event</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Betreff *</label>
+                        <input type="text" id="pingen-subject" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Inhalt *</label>
+                        <textarea id="pingen-body" required rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"
+                            placeholder="Schreiben Sie hier Ihren Brief..."></textarea>
+                    </div>
+
+                    <div class="bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
+                        <strong>Hinweis:</strong> Der Brief wird automatisch formatiert und per Post versendet.
+                        Die Kosten werden vom Pingen-Guthaben abgezogen.
+                    </div>
+
+                    <div class="flex space-x-3 pt-4">
+                        <button type="button" id="cancel-pingen-btn" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            Abbrechen
+                        </button>
+                        <button type="submit" class="flex-1 bg-fire-500 text-white py-2 rounded-lg hover:bg-fire-600">
+                            Brief senden
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Registration Detail Modal -->
     <div id="registration-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
@@ -1149,6 +1318,7 @@
 
     <script>
         const API_BASE = 'https://api.fwv-raura.ch';
+        const DISPATCH_API = 'https://dispatch.fwv-raura.ch';
 
         let members = [];
         let events = [];
@@ -2734,6 +2904,7 @@ Präsident`;
             document.getElementById('dispatch-section').classList.add('hidden');
             document.getElementById('email-section').classList.add('hidden');
             document.getElementById('registrations-section').classList.add('hidden');
+            document.getElementById('pingen-section').classList.add('hidden');
 
             if (tab === 'members') {
                 document.getElementById('tab-members').classList.add('border-fire-500', 'text-fire-600');
@@ -2760,6 +2931,10 @@ Präsident`;
                 document.getElementById('tab-registrations').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('registrations-section').classList.remove('hidden');
                 loadRegistrations();
+            } else if (tab === 'pingen') {
+                document.getElementById('tab-pingen').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('pingen-section').classList.remove('hidden');
+                loadPingenData();
             }
         }
 
@@ -2774,6 +2949,7 @@ Präsident`;
         document.getElementById('tab-dispatch').addEventListener('click', () => switchTab('dispatch'));
         document.getElementById('tab-email').addEventListener('click', () => switchTab('email'));
         document.getElementById('tab-registrations').addEventListener('click', () => switchTab('registrations'));
+        document.getElementById('tab-pingen').addEventListener('click', () => switchTab('pingen'));
 
         // Members
         document.getElementById('add-member-btn').addEventListener('click', openNewMemberModal);
@@ -2864,6 +3040,16 @@ Präsident`;
         document.getElementById('close-registration-modal').addEventListener('click', () => document.getElementById('registration-modal').classList.add('hidden'));
         document.getElementById('approve-registration-btn').addEventListener('click', approveRegistration);
         document.getElementById('reject-registration-btn').addEventListener('click', rejectRegistration);
+
+        // Pingen
+        document.getElementById('send-letter-btn').addEventListener('click', openPingenModal);
+        document.getElementById('refresh-pingen-btn').addEventListener('click', loadPingenData);
+        document.getElementById('pingen-event-filter').addEventListener('change', loadPingenLetters);
+        document.getElementById('close-pingen-modal').addEventListener('click', () => document.getElementById('pingen-modal').classList.add('hidden'));
+        document.getElementById('cancel-pingen-btn').addEventListener('click', () => document.getElementById('pingen-modal').classList.add('hidden'));
+        document.getElementById('pingen-form').addEventListener('submit', sendPingenLetter);
+        document.getElementById('pingen-member').addEventListener('change', showPingenMemberAddress);
+        document.getElementById('register-webhook-btn').addEventListener('click', registerPingenWebhook);
 
         function switchEmailTab(tab) {
             document.querySelectorAll('.email-tab-btn').forEach(btn => {
@@ -3117,6 +3303,395 @@ Präsident`;
                 loadAliases();
             } catch (error) {
                 alert('Fehler beim Loeschen');
+            }
+        }
+
+        // ============================================
+        // PINGEN FUNCTIONS
+        // ============================================
+
+        async function loadPingenData() {
+            await Promise.all([
+                loadPingenAccount(),
+                loadPingenStats(),
+                loadPingenLetters(),
+                loadPingenEventFilter(),
+                loadPingenWebhooks()
+            ]);
+        }
+
+        async function loadPingenAccount() {
+            try {
+                const response = await fetch(`${DISPATCH_API}/pingen/account`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('pingen-balance').textContent =
+                        data.balance !== undefined ? `${(data.balance / 100).toFixed(2)} ${data.currency}` : '-';
+
+                    // Staging-Warnung anzeigen
+                    if (data.isStaging) {
+                        document.getElementById('pingen-staging-warning').classList.remove('hidden');
+                    } else {
+                        document.getElementById('pingen-staging-warning').classList.add('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading Pingen account:', error);
+            }
+        }
+
+        async function loadPingenStats() {
+            try {
+                const response = await fetch(`${DISPATCH_API}/pingen/stats`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (response.ok) {
+                    const stats = await response.json();
+                    document.getElementById('pingen-sent').textContent = stats.sent || '0';
+                    document.getElementById('pingen-pending').textContent = stats.pending || '0';
+                    document.getElementById('pingen-failed').textContent = stats.failed || '0';
+                    document.getElementById('pingen-30days').textContent = stats.last_30_days || '0';
+                }
+            } catch (error) {
+                console.error('Error loading Pingen stats:', error);
+            }
+        }
+
+        async function loadPingenLetters() {
+            document.getElementById('pingen-loading').classList.remove('hidden');
+            document.getElementById('pingen-empty').classList.add('hidden');
+
+            try {
+                const eventFilter = document.getElementById('pingen-event-filter').value;
+                const url = eventFilter
+                    ? `${DISPATCH_API}/pingen/letters?event_id=${eventFilter}`
+                    : `${DISPATCH_API}/pingen/letters`;
+
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const letters = await response.json();
+
+                document.getElementById('pingen-loading').classList.add('hidden');
+
+                const tbody = document.getElementById('pingen-letters-tbody');
+                if (letters.length === 0) {
+                    tbody.innerHTML = '';
+                    document.getElementById('pingen-empty').classList.remove('hidden');
+                    return;
+                }
+
+                tbody.innerHTML = letters.map(letter => {
+                    // Parse recipient address
+                    let recipientName = '-';
+                    try {
+                        const addr = JSON.parse(letter.recipient_address);
+                        recipientName = addr.name || '-';
+                    } catch (e) {
+                        recipientName = letter.vorname && letter.nachname ? `${letter.vorname} ${letter.nachname}` : '-';
+                    }
+
+                    // Status badge
+                    const statusColors = {
+                        'sent': 'bg-green-100 text-green-800',
+                        'processing': 'bg-yellow-100 text-yellow-800',
+                        'ready': 'bg-blue-100 text-blue-800',
+                        'sending': 'bg-blue-100 text-blue-800',
+                        'failed': 'bg-red-100 text-red-800',
+                        'cancelled': 'bg-gray-100 text-gray-800'
+                    };
+                    const statusLabels = {
+                        'sent': 'Gesendet',
+                        'processing': 'Verarbeitung',
+                        'ready': 'Bereit',
+                        'sending': 'Wird gesendet',
+                        'failed': 'Fehlgeschlagen',
+                        'cancelled': 'Abgebrochen'
+                    };
+                    const statusColor = statusColors[letter.status] || 'bg-gray-100 text-gray-800';
+                    const statusLabel = statusLabels[letter.status] || letter.status;
+
+                    // Format date
+                    const sentDate = letter.sent_at ? new Date(letter.sent_at).toLocaleDateString('de-CH', {
+                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                    }) : '-';
+
+                    return `
+                        <tr>
+                            <td class="px-6 py-4 font-medium">${recipientName}</td>
+                            <td class="px-6 py-4">${letter.event_title || '-'}</td>
+                            <td class="px-6 py-4">${letter.subject || 'Arbeitsplan'}</td>
+                            <td class="px-6 py-4 text-sm text-gray-500">${sentDate}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full ${statusColor}">${statusLabel}</span>
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                ${letter.external_id ? `
+                                    <button onclick="checkPingenStatus('${letter.external_id}')"
+                                        class="text-blue-600 hover:text-blue-800 text-sm">
+                                        Status prüfen
+                                    </button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading Pingen letters:', error);
+                document.getElementById('pingen-loading').classList.add('hidden');
+            }
+        }
+
+        async function loadPingenEventFilter() {
+            try {
+                const response = await fetch(`${API_BASE}/events`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const events = await response.json();
+
+                const select = document.getElementById('pingen-event-filter');
+                const currentValue = select.value;
+
+                // Clear existing options except first
+                select.innerHTML = '<option value="">Alle Events</option>';
+
+                events.forEach(event => {
+                    const option = document.createElement('option');
+                    option.value = event.id;
+                    option.textContent = event.title;
+                    if (event.id === currentValue) option.selected = true;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading events for filter:', error);
+            }
+        }
+
+        async function checkPingenStatus(letterId) {
+            try {
+                const response = await fetch(`${DISPATCH_API}/pingen/letters/${letterId}/status`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const status = await response.json();
+
+                alert(`Brief-Status: ${status.status}\nSeiten: ${status.pages || '-'}\nPreis: ${status.price ? (status.price / 100).toFixed(2) + ' CHF' : '-'}`);
+
+                // Refresh letters to show updated status
+                loadPingenLetters();
+            } catch (error) {
+                console.error('Error checking Pingen status:', error);
+                alert('Fehler beim Abrufen des Status');
+            }
+        }
+
+        async function openPingenModal() {
+            // Load members for dropdown
+            try {
+                const response = await fetch(`${API_BASE}/members?has_address=true`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const members = await response.json();
+
+                const select = document.getElementById('pingen-member');
+                select.innerHTML = '<option value="">Mitglied auswählen...</option>';
+
+                // Filter members with complete addresses and sort by name
+                const membersWithAddress = members.filter(m => m.strasse && m.plz && m.ort);
+                membersWithAddress.sort((a, b) => `${a.nachname} ${a.vorname}`.localeCompare(`${b.nachname} ${b.vorname}`));
+
+                membersWithAddress.forEach(member => {
+                    const option = document.createElement('option');
+                    option.value = member.id;
+                    option.textContent = `${member.nachname}, ${member.vorname}`;
+                    option.dataset.address = JSON.stringify({
+                        name: `${member.vorname} ${member.nachname}`,
+                        strasse: member.strasse,
+                        plz: member.plz,
+                        ort: member.ort
+                    });
+                    select.appendChild(option);
+                });
+
+                // Load events for dropdown
+                const eventsResponse = await fetch(`${API_BASE}/events`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const events = await eventsResponse.json();
+
+                const eventSelect = document.getElementById('pingen-event');
+                eventSelect.innerHTML = '<option value="">Kein Event</option>';
+
+                events.forEach(event => {
+                    const option = document.createElement('option');
+                    option.value = event.id;
+                    option.textContent = event.title;
+                    eventSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading data for Pingen modal:', error);
+            }
+
+            // Reset form
+            document.getElementById('pingen-form').reset();
+            document.getElementById('pingen-member-address').classList.add('hidden');
+
+            // Show modal
+            document.getElementById('pingen-modal').classList.remove('hidden');
+        }
+
+        function showPingenMemberAddress() {
+            const select = document.getElementById('pingen-member');
+            const selectedOption = select.options[select.selectedIndex];
+            const addressPreview = document.getElementById('pingen-address-preview');
+            const addressContainer = document.getElementById('pingen-member-address');
+
+            if (selectedOption && selectedOption.dataset.address) {
+                const addr = JSON.parse(selectedOption.dataset.address);
+                addressPreview.innerHTML = `${addr.name}<br>${addr.strasse}<br>${addr.plz} ${addr.ort}`;
+                addressContainer.classList.remove('hidden');
+            } else {
+                addressContainer.classList.add('hidden');
+            }
+        }
+
+        async function sendPingenLetter(e) {
+            e.preventDefault();
+
+            const memberId = document.getElementById('pingen-member').value;
+            const eventId = document.getElementById('pingen-event').value;
+            const subject = document.getElementById('pingen-subject').value;
+            const body = document.getElementById('pingen-body').value;
+
+            if (!memberId || !subject || !body) {
+                alert('Bitte alle Pflichtfelder ausfüllen');
+                return;
+            }
+
+            if (!confirm('Brief wirklich senden? Die Kosten werden vom Pingen-Guthaben abgezogen.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${DISPATCH_API}/pingen/send-manual`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        member_id: memberId,
+                        event_id: eventId || null,
+                        subject,
+                        body
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Fehler beim Senden');
+                }
+
+                const result = await response.json();
+                alert(`Brief erfolgreich gesendet an ${result.recipient}!\nPingen-ID: ${result.letterId}`);
+
+                document.getElementById('pingen-modal').classList.add('hidden');
+                loadPingenData();
+            } catch (error) {
+                console.error('Error sending Pingen letter:', error);
+                alert('Fehler beim Senden: ' + error.message);
+            }
+        }
+
+        async function loadPingenWebhooks() {
+            const container = document.getElementById('webhooks-list');
+            try {
+                const response = await fetch(`${DISPATCH_API}/pingen/webhooks`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    container.innerHTML = '<p class="text-red-500 text-sm">Fehler beim Laden der Webhooks</p>';
+                    return;
+                }
+
+                const webhooks = await response.json();
+
+                if (webhooks.length === 0) {
+                    container.innerHTML = `
+                        <p class="text-gray-500 text-sm">Kein Webhook registriert.</p>
+                        <p class="text-gray-400 text-xs mt-1">Registrieren Sie einen Webhook um automatische Status-Updates zu erhalten.</p>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = webhooks.map(wh => `
+                    <div class="flex justify-between items-center bg-white p-3 rounded border mb-2">
+                        <div>
+                            <p class="font-medium text-sm">${wh.attributes?.url || 'Unbekannte URL'}</p>
+                            <p class="text-xs text-gray-500">Event: ${wh.attributes?.event_category || 'letters'}</p>
+                        </div>
+                        <button onclick="deletePingenWebhook('${wh.id}')" class="text-red-600 hover:text-red-800 text-sm">
+                            Löschen
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading webhooks:', error);
+                container.innerHTML = '<p class="text-red-500 text-sm">Fehler beim Laden der Webhooks</p>';
+            }
+        }
+
+        async function registerPingenWebhook() {
+            if (!confirm('Webhook bei Pingen registrieren? Pingen wird dann automatisch Status-Updates senden.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${DISPATCH_API}/pingen/webhooks/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({})
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Registrierung fehlgeschlagen');
+                }
+
+                const result = await response.json();
+                alert(`Webhook erfolgreich registriert!\nURL: ${result.url}`);
+                loadPingenWebhooks();
+            } catch (error) {
+                console.error('Error registering webhook:', error);
+                alert('Fehler: ' + error.message);
+            }
+        }
+
+        async function deletePingenWebhook(webhookId) {
+            if (!confirm('Webhook wirklich löschen?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${DISPATCH_API}/pingen/webhooks/${webhookId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Löschen fehlgeschlagen');
+                }
+
+                alert('Webhook gelöscht');
+                loadPingenWebhooks();
+            } catch (error) {
+                console.error('Error deleting webhook:', error);
+                alert('Fehler: ' + error.message);
             }
         }
 

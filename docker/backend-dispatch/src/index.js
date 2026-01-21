@@ -1139,7 +1139,7 @@ function generateArbeitsplanHTML(event, logoBase64) {
 
 app.get('/dispatch-log', async (req, res) => {
     try {
-        const { type, status, member_id } = req.query;
+        const { type, status, member_id, event_id, limit = 100 } = req.query;
         let query = 'SELECT * FROM dispatch_log WHERE 1=1';
         const params = [];
 
@@ -1155,14 +1155,601 @@ app.get('/dispatch-log', async (req, res) => {
             params.push(member_id);
             query += ` AND member_id = $${params.length}`;
         }
+        if (event_id) {
+            params.push(event_id);
+            query += ` AND event_id = $${params.length}`;
+        }
 
-        query += ' ORDER BY created_at DESC LIMIT 100';
+        params.push(parseInt(limit));
+        query += ` ORDER BY created_at DESC LIMIT $${params.length}`;
         const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+
+// ============================================
+// PINGEN MANAGEMENT
+// ============================================
+
+// Alle Pingen-Briefe abrufen
+app.get('/pingen/letters', async (req, res) => {
+    try {
+        const { event_id, member_id, limit = 50 } = req.query;
+        let query = `
+            SELECT dl.*, m.vorname, m.nachname, e.title as event_title
+            FROM dispatch_log dl
+            LEFT JOIN members m ON dl.member_id = m.id
+            LEFT JOIN events e ON dl.event_id = e.id
+            WHERE dl.type = 'pingen'
+        `;
+        const params = [];
+
+        if (event_id) {
+            params.push(event_id);
+            query += ` AND dl.event_id = $${params.length}`;
+        }
+        if (member_id) {
+            params.push(member_id);
+            query += ` AND dl.member_id = $${params.length}`;
+        }
+
+        params.push(parseInt(limit));
+        query += ` ORDER BY dl.created_at DESC LIMIT $${params.length}`;
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Pingen Brief-Status von API abrufen
+app.get('/pingen/letters/:letterId/status', async (req, res) => {
+    try {
+        const { letterId } = req.params;
+
+        // Token holen
+        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+
+        const token = tokenResponse.data.access_token;
+
+        // Brief-Status abrufen
+        const letterResponse = await axios.get(
+            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters/${letterId}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        const letter = letterResponse.data.data;
+
+        // Status in DB aktualisieren
+        const statusMap = {
+            'validating': 'processing',
+            'valid': 'ready',
+            'action_required': 'action_required',
+            'in_progress': 'sending',
+            'sent': 'sent',
+            'cancelled': 'cancelled'
+        };
+
+        const newStatus = statusMap[letter.attributes?.status] || letter.attributes?.status;
+
+        await pool.query(`
+            UPDATE dispatch_log
+            SET status = $1, updated_at = NOW()
+            WHERE external_id = $2 AND type = 'pingen'
+        `, [newStatus, letterId]);
+
+        res.json({
+            letterId,
+            status: letter.attributes?.status,
+            price: letter.attributes?.price,
+            pages: letter.attributes?.page_count,
+            sentAt: letter.attributes?.submitted_at,
+            raw: letter
+        });
+    } catch (error) {
+        console.error('Pingen status error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Pingen Guthaben/Info abrufen
+app.get('/pingen/account', async (req, res) => {
+    try {
+        // Token holen
+        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+
+        const token = tokenResponse.data.access_token;
+
+        // Organisation Info abrufen
+        const orgResponse = await axios.get(
+            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        const org = orgResponse.data.data;
+
+        res.json({
+            name: org.attributes?.name,
+            balance: org.attributes?.balance,
+            currency: org.attributes?.currency || 'CHF',
+            isStaging: process.env.PINGEN_STAGING === 'true'
+        });
+    } catch (error) {
+        console.error('Pingen account error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Pingen Statistiken
+app.get('/pingen/stats', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'sent') as sent,
+                COUNT(*) FILTER (WHERE status IN ('processing', 'ready', 'sending')) as pending,
+                COUNT(*) FILTER (WHERE status = 'failed') as failed,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '30 days') as last_30_days,
+                COUNT(*) FILTER (WHERE created_at > NOW() - INTERVAL '7 days') as last_7_days
+            FROM dispatch_log
+            WHERE type = 'pingen'
+        `);
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Brief manuell senden
+app.post('/pingen/send-manual', async (req, res) => {
+    try {
+        const { member_id, event_id, subject, body } = req.body;
+
+        // Mitglied-Adresse laden
+        const memberResult = await pool.query(
+            'SELECT * FROM members WHERE id = $1',
+            [member_id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+
+        if (!member.strasse || !member.plz || !member.ort) {
+            return res.status(400).json({ error: 'Mitglied hat keine vollständige Adresse' });
+        }
+
+        // HTML für Brief generieren
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.6; }
+        .header { margin-bottom: 40px; }
+        .address { margin-bottom: 40px; }
+        .content { margin-top: 20px; }
+        .signature { margin-top: 40px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <strong>Feuerwehrverein Raura</strong><br>
+        4303 Kaiseraugst
+    </div>
+
+    <div class="address">
+        ${member.vorname} ${member.nachname}<br>
+        ${member.strasse}<br>
+        ${member.adresszusatz ? member.adresszusatz + '<br>' : ''}
+        ${member.plz} ${member.ort}
+    </div>
+
+    <div class="date">
+        Kaiseraugst, ${new Date().toLocaleDateString('de-CH')}
+    </div>
+
+    <div class="subject" style="margin-top: 30px; font-weight: bold;">
+        ${subject}
+    </div>
+
+    <div class="content">
+        <p>Guten Tag ${member.vorname} ${member.nachname}</p>
+        ${body.split('\n').map(p => `<p>${p}</p>`).join('')}
+    </div>
+
+    <div class="signature">
+        Mit freundlichen Grüssen<br><br>
+        Feuerwehrverein Raura
+    </div>
+</body>
+</html>`;
+
+        // An Pingen senden
+        const pingenResult = await sendToPingen(html, member, member_id, event_id);
+
+        res.json({
+            success: true,
+            letterId: pingenResult.letterId,
+            recipient: `${member.vorname} ${member.nachname}`
+        });
+    } catch (error) {
+        console.error('Manual Pingen send error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Arbeitsplan per Post senden
+app.post('/pingen/send-arbeitsplan', async (req, res) => {
+    try {
+        const { event_id, member_id, pdf_base64 } = req.body;
+
+        // Mitglied-Adresse laden
+        const memberResult = await pool.query(
+            'SELECT * FROM members WHERE id = $1',
+            [member_id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+
+        if (!member.strasse || !member.plz || !member.ort) {
+            return res.status(400).json({ error: 'Mitglied hat keine vollständige Adresse' });
+        }
+
+        // Event-Titel laden
+        let eventTitle = 'Arbeitsplan';
+        if (event_id) {
+            const eventResult = await pool.query('SELECT title FROM events WHERE id = $1', [event_id]);
+            if (eventResult.rows.length > 0) {
+                eventTitle = `Arbeitsplan ${eventResult.rows[0].title}`;
+            }
+        }
+
+        // Token holen
+        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+
+        const token = tokenResponse.data.access_token;
+
+        // PDF direkt an Pingen senden
+        const uploadResponse = await axios.post(
+            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters`,
+            {
+                data: {
+                    type: 'letters',
+                    attributes: {
+                        file_original_name: `${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+                        address_position: 'left',
+                        auto_send: true,
+                        delivery_product: 'cheap',
+                        print_mode: 'simplex',
+                        print_spectrum: 'grayscale'
+                    }
+                },
+                meta: {
+                    file_content: pdf_base64,
+                    recipient: {
+                        name: `${member.vorname} ${member.nachname}`,
+                        street: member.strasse,
+                        zip: member.plz,
+                        city: member.ort,
+                        country: 'CH'
+                    }
+                }
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        const letterId = uploadResponse.data.data?.id;
+
+        // Log
+        await pool.query(`
+            INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, event_id, sent_at)
+            VALUES ('pingen', $1, $2, $3, 'sent', $4, $5, NOW())
+        `, [
+            member_id,
+            JSON.stringify({
+                name: `${member.vorname} ${member.nachname}`,
+                street: member.strasse,
+                zip: member.plz,
+                city: member.ort
+            }),
+            eventTitle,
+            letterId,
+            event_id
+        ]);
+
+        res.json({
+            success: true,
+            letterId,
+            recipient: `${member.vorname} ${member.nachname}`
+        });
+    } catch (error) {
+        console.error('Arbeitsplan Pingen error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// PINGEN WEBHOOKS
+// ============================================
+
+// Webhook-Endpoint für Pingen Status-Updates
+// Pingen sendet POST-Requests an diesen Endpoint wenn sich der Brief-Status ändert
+app.post('/pingen/webhook', async (req, res) => {
+    try {
+        const { data, meta } = req.body;
+
+        console.log('Pingen Webhook empfangen:', JSON.stringify(req.body));
+
+        // Webhook-Typ prüfen
+        // Pingen sendet verschiedene Events: letter.status_changed, letter.sent, etc.
+        const event = req.body.event || meta?.event;
+        const letterId = data?.id || data?.attributes?.letter_id;
+        const newStatus = data?.attributes?.status;
+
+        if (!letterId) {
+            console.log('Webhook ohne Letter-ID empfangen');
+            return res.status(200).json({ received: true });
+        }
+
+        // Status-Mapping
+        const statusMap = {
+            'validating': 'processing',
+            'valid': 'ready',
+            'action_required': 'action_required',
+            'in_progress': 'sending',
+            'sent': 'sent',
+            'cancelled': 'cancelled',
+            'failed': 'failed'
+        };
+
+        const mappedStatus = statusMap[newStatus] || newStatus;
+
+        if (mappedStatus) {
+            // Status in Datenbank aktualisieren
+            const result = await pool.query(`
+                UPDATE dispatch_log
+                SET status = $1, updated_at = NOW()
+                WHERE external_id = $2 AND type = 'pingen'
+                RETURNING id
+            `, [mappedStatus, letterId]);
+
+            if (result.rows.length > 0) {
+                console.log(`Pingen Brief ${letterId} Status aktualisiert: ${mappedStatus}`);
+            } else {
+                console.log(`Pingen Brief ${letterId} nicht in DB gefunden`);
+            }
+        }
+
+        res.status(200).json({ received: true, processed: true });
+    } catch (error) {
+        console.error('Pingen Webhook Fehler:', error);
+        // Trotzdem 200 zurückgeben damit Pingen nicht erneut sendet
+        res.status(200).json({ received: true, error: error.message });
+    }
+});
+
+// Webhook registrieren/verwalten
+app.post('/pingen/webhooks/register', async (req, res) => {
+    try {
+        const { webhook_url } = req.body;
+        const callbackUrl = webhook_url || `${process.env.DISPATCH_PUBLIC_URL || 'https://dispatch.fwv-raura.ch'}/pingen/webhook`;
+
+        // Token holen
+        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+
+        const token = tokenResponse.data.access_token;
+
+        // Webhook registrieren
+        const webhookResponse = await axios.post(
+            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/webhooks`,
+            {
+                data: {
+                    type: 'webhooks',
+                    attributes: {
+                        url: callbackUrl,
+                        event_category: 'letters',
+                        signing_key: process.env.PINGEN_WEBHOOK_SECRET || 'fwv-raura-webhook-key'
+                    }
+                }
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        res.json({
+            success: true,
+            webhookId: webhookResponse.data.data?.id,
+            url: callbackUrl
+        });
+    } catch (error) {
+        console.error('Webhook Registrierung Fehler:', error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data || error.message });
+    }
+});
+
+// Registrierte Webhooks abrufen
+app.get('/pingen/webhooks', async (req, res) => {
+    try {
+        // Token holen
+        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+
+        const token = tokenResponse.data.access_token;
+
+        // Webhooks abrufen
+        const webhooksResponse = await axios.get(
+            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/webhooks`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        res.json(webhooksResponse.data.data || []);
+    } catch (error) {
+        console.error('Webhooks abrufen Fehler:', error.response?.data || error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Webhook löschen
+app.delete('/pingen/webhooks/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Token holen
+        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+
+        const token = tokenResponse.data.access_token;
+
+        // Webhook löschen
+        await axios.delete(
+            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/webhooks/${id}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Webhook löschen Fehler:', error.response?.data || error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Helper: An Pingen senden
+async function sendToPingen(html, member, memberId, eventId) {
+    // Convert HTML to PDF
+    const browser = await puppeteer.launch({
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true });
+    await browser.close();
+
+    // Get Pingen token
+    const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        grant_type: 'client_credentials',
+        client_id: process.env.PINGEN_CLIENT_ID,
+        client_secret: process.env.PINGEN_CLIENT_SECRET
+    });
+
+    const token = tokenResponse.data.access_token;
+
+    // Upload to Pingen
+    const uploadResponse = await axios.post(
+        `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters`,
+        {
+            data: {
+                type: 'letters',
+                attributes: {
+                    file_original_name: 'brief.pdf',
+                    address_position: 'left',
+                    auto_send: true,
+                    delivery_product: 'cheap',
+                    print_mode: 'simplex',
+                    print_spectrum: 'grayscale'
+                }
+            },
+            meta: {
+                file_content: pdfBuffer.toString('base64'),
+                recipient: {
+                    name: `${member.vorname} ${member.nachname}`,
+                    street: member.strasse,
+                    zip: member.plz,
+                    city: member.ort,
+                    country: 'CH'
+                }
+            }
+        },
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/vnd.api+json'
+            }
+        }
+    );
+
+    const letterId = uploadResponse.data.data?.id;
+
+    // Log
+    await pool.query(`
+        INSERT INTO dispatch_log (type, member_id, recipient_address, status, external_id, event_id, sent_at)
+        VALUES ('pingen', $1, $2, 'sent', $3, $4, NOW())
+    `, [
+        memberId,
+        JSON.stringify({
+            name: `${member.vorname} ${member.nachname}`,
+            street: member.strasse,
+            zip: member.plz,
+            city: member.ort
+        }),
+        letterId,
+        eventId
+    ]);
+
+    return { letterId };
+}
 
 app.listen(PORT, () => {
     console.log(`API-Dispatch running on port ${PORT}`);
