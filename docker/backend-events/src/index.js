@@ -1282,10 +1282,22 @@ app.post('/registrations/public', async (req, res) => {
             JSON.stringify({ phone, participants, shifts, notes })
         ]);
 
-        // Shift-Namen für E-Mail zusammenstellen
+        // Schicht-Details für E-Mail aus DB laden
         let shiftInfo = '';
-        if (type === 'shift' && shifts) {
-            shiftInfo = `\nGewählte Schichten:\n${shifts.map(s => `- ${s}`).join('\n')}`;
+        if (type === 'shift' && shiftIds && shiftIds.length > 0) {
+            const shiftDetails = await pool.query(
+                'SELECT name, date, start_time, end_time, bereich FROM shifts WHERE id = ANY($1) ORDER BY date, start_time',
+                [shiftIds]
+            );
+            if (shiftDetails.rows.length > 0) {
+                const shiftLines = shiftDetails.rows.map(s => {
+                    const date = s.date ? new Date(s.date).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+                    const time = s.start_time && s.end_time ? `${s.start_time.substring(0,5)}-${s.end_time.substring(0,5)}` : '';
+                    const bereich = s.bereich ? ` (${s.bereich})` : '';
+                    return `- ${s.name}: ${date} ${time}${bereich}`;
+                });
+                shiftInfo = `\nGewählte Schichten:\n${shiftLines.join('\n')}`;
+            }
         }
 
         // Bestätigung an Anmelder
