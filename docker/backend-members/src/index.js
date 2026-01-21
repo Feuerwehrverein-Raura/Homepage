@@ -1264,6 +1264,35 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
 
         const memberId = memberResult.rows[0].id;
 
+        // Auto-create Authentik user if email is provided
+        let authentikResult = null;
+        if (registration.email) {
+            authentikResult = await createAuthentikUser({
+                vorname: registration.vorname,
+                nachname: registration.nachname,
+                email: registration.email
+            });
+
+            if (authentikResult) {
+                // Update member with Authentik user ID
+                await pool.query(`
+                    UPDATE members
+                    SET authentik_user_id = $1, authentik_synced_at = NOW()
+                    WHERE id = $2
+                `, [authentikResult.pk.toString(), memberId]);
+
+                // Create default notification preferences
+                const notificationTypes = ['shift_reminder', 'event_update', 'newsletter', 'general'];
+                for (const type of notificationTypes) {
+                    await pool.query(`
+                        INSERT INTO notification_preferences (member_id, notification_type, enabled)
+                        VALUES ($1, $2, true)
+                        ON CONFLICT (member_id, notification_type) DO NOTHING
+                    `, [memberId, type]);
+                }
+            }
+        }
+
         // Update registration status
         await pool.query(`
             UPDATE member_registrations
@@ -1275,7 +1304,8 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
         await logAudit(pool, 'REGISTRATION_APPROVED', null, req.user.email, getClientIp(req), {
             registration_id: id,
             member_id: memberId,
-            member_name: `${registration.vorname} ${registration.nachname}`
+            member_name: `${registration.vorname} ${registration.nachname}`,
+            authentik_synced: !!authentikResult
         });
 
         // Send welcome email to new member

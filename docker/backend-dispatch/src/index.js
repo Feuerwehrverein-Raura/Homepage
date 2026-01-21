@@ -91,6 +91,55 @@ function formatAddressForCoverPage(name, street, number, zip, city) {
     return `${name}\n${streetLine}\n${zip} ${city}`;
 }
 
+// Helper: Brief-Status prüfen und bei "action_required" löschen
+// Gibt true zurück wenn der Brief erfolgreich gesendet wurde, false wenn gelöscht
+async function checkAndDeleteIfActionRequired(letterId, token, staging = false) {
+    const PINGEN_API = getPingenApi(staging);
+
+    // Kurz warten bis Pingen das PDF verarbeitet hat
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    try {
+        // Brief-Status abrufen
+        const statusResponse = await axios.get(
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/vnd.api+json'
+                }
+            }
+        );
+
+        const letterStatus = statusResponse.data.data?.attributes?.status;
+        console.log(`Letter ${letterId} status: ${letterStatus}`);
+
+        // Wenn "action_required", Brief löschen
+        if (letterStatus === 'action_required') {
+            console.log(`Letter ${letterId} requires action - deleting...`);
+
+            await axios.delete(
+                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/vnd.api+json'
+                    }
+                }
+            );
+
+            console.log(`Letter ${letterId} deleted successfully`);
+            return { success: false, reason: 'action_required', deleted: true };
+        }
+
+        return { success: true };
+    } catch (error) {
+        console.error(`Error checking letter status for ${letterId}:`, error.response?.data || error.message);
+        // Bei Fehler den Brief nicht löschen, Status unklar
+        return { success: true, warning: 'Could not verify letter status' };
+    }
+}
+
 // Nextcloud WebDAV für Datei-Speicherung
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
 const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER;
@@ -412,6 +461,16 @@ app.post('/pingen/send', async (req, res) => {
                 }
             }
         );
+
+        // Step 6: Check status and delete if action required
+        const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
+
+        if (statusCheck.deleted) {
+            return res.status(400).json({
+                success: false,
+                error: 'Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht'
+            });
+        }
 
         // Log
         await pool.query(`
@@ -1873,6 +1932,18 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                     }
                 );
 
+                // Step 6: Check status and delete if action required
+                const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
+
+                if (statusCheck.deleted) {
+                    console.log(`Letter ${letterId} for ${member.vorname} ${member.nachname} deleted due to action_required status`);
+                    results.failed.push({
+                        name: `${member.vorname} ${member.nachname}`,
+                        error: 'Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht'
+                    });
+                    continue;
+                }
+
                 // Log speichern
                 await pool.query(`
                     INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, sent_at)
@@ -2151,6 +2222,16 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
                 }
             }
         );
+
+        // Step 6: Check status and delete if action required
+        const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
+
+        if (statusCheck.deleted) {
+            return res.status(400).json({
+                success: false,
+                error: 'Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht'
+            });
+        }
 
         // Log
         await pool.query(`
@@ -2492,6 +2573,13 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
             }
         }
     );
+
+    // Step 6: Check status and delete if action required
+    const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
+
+    if (statusCheck.deleted) {
+        throw new Error('Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht');
+    }
 
     // Log
     await pool.query(`
