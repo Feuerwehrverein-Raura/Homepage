@@ -1,3 +1,10 @@
+## [1.19.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.19.0...v1.19.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* simplify invitation signature to just "Der Vorstand" when no organizer ([1eeee25](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1eeee25469cb3805db2708adf821ec1022853801))
+
 # [1.19.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.18.1...v1.19.0) (2026-01-21)
 
 
