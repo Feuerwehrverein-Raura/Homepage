@@ -160,6 +160,10 @@ function detectCountryFromAddress(address) {
 }
 
 async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null) {
+    console.log('[addAddressToPdf] Starting PDF address embedding...');
+    console.log(`[addAddressToPdf] Input PDF size: ${pdfBuffer.length} bytes`);
+    console.log(`[addAddressToPdf] Recipient address: ${recipientAddress}`);
+
     const pdfDoc = await PDFDocument.load(pdfBuffer);
 
     // fontkit registrieren für Custom Fonts
@@ -194,17 +198,31 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
 
     if (country === 'DE') {
         // Deutsches Briefformat: Adressfenster LINKS (DIN Standard)
-        // Fenster: 20mm von links, 45mm von oben, 80mm breit, 40mm hoch
+        // Pingen erwartet: ~20mm von links, ~55mm von oben
         addressX = 57; // ~20mm von links
-        addressY = height - 130; // ~46mm von oben
+        addressY = height - 156; // ~55mm von oben (842 - 55*2.835)
         console.log('Detected German address - using LEFT window position');
     } else {
-        // Schweizer Briefformat: Adressfenster RECHTS (C5/6 Couvert)
-        // Fenster: 98mm von links, 42mm von oben, 90mm breit, 45mm hoch
-        addressX = 285; // ~100mm von links (Fenster beginnt bei 98mm)
-        addressY = height - 125; // ~44mm von oben
+        // Schweizer Briefformat: Adressfenster RECHTS
+        // Pingen zeigt Adressbereich: 118mm von links, 60mm von oben
+        // 118mm = 335 points, 60mm von oben = 842 - 170 = 672 points
+        addressX = 335; // 118mm von links
+        addressY = height - 175; // ~62mm von oben (etwas unterhalb des oberen Fensterrands)
         console.log('Detected Swiss address - using RIGHT window position');
     }
+
+    // Weißen Hintergrund für Adressbereich zeichnen (damit bestehender Inhalt nicht durchscheint)
+    const bgPadding = 10;
+    const bgWidth = 200;
+    const bgHeight = 90;
+    firstPage.drawRectangle({
+        x: addressX - bgPadding,
+        y: addressY - bgHeight + 20,
+        width: bgWidth,
+        height: bgHeight,
+        color: rgb(1, 1, 1), // Weiß
+    });
+    console.log(`[addAddressToPdf] Drew white background at X=${addressX - bgPadding}, Y=${addressY - bgHeight + 20}, W=${bgWidth}, H=${bgHeight}`);
 
     // Absender (klein, oberhalb der Empfängeradresse)
     if (senderAddress) {
@@ -227,7 +245,9 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
 
     // Empfängeradresse (mehrzeilig)
     const addressLines = recipientAddress.split('\n');
+    console.log(`[addAddressToPdf] Drawing ${addressLines.length} address lines at X=${addressX}, Y=${addressY}`);
     addressLines.forEach((line, index) => {
+        console.log(`[addAddressToPdf] Line ${index}: "${line}"`);
         firstPage.drawText(line, {
             x: addressX,
             y: addressY - (index * lineHeight),
@@ -237,7 +257,9 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
         });
     });
 
-    return { pdfBytes: await pdfDoc.save(), country };
+    const savedPdf = await pdfDoc.save();
+    console.log(`[addAddressToPdf] PDF saved. Output size: ${savedPdf.length} bytes`);
+    return { pdfBytes: savedPdf, country };
 }
 
 // Helper: Warten bis Brief die initiale Verarbeitung abgeschlossen hat
@@ -361,30 +383,18 @@ async function checkAndDeleteIfActionRequired(letterId, token, staging = false) 
         );
 
         const letterStatus = statusResponse.data.data?.attributes?.status;
-        console.log(`Letter ${letterId} status: ${letterStatus}`);
+        console.log(`Letter ${letterId} final status: ${letterStatus}`);
 
-        // Wenn "action_required", Brief löschen
+        // Brief NICHT löschen - auch bei action_required bleibt er in Pingen
+        // für manuelle Bearbeitung
         if (letterStatus === 'action_required') {
-            console.log(`Letter ${letterId} requires action - deleting...`);
-
-            await axios.delete(
-                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/vnd.api+json'
-                    }
-                }
-            );
-
-            console.log(`Letter ${letterId} deleted successfully`);
-            return { success: false, reason: 'action_required', deleted: true };
+            console.log(`Letter ${letterId} requires manual action in Pingen - NOT deleting`);
+            return { success: true, status: letterStatus, needsManualAction: true };
         }
 
-        return { success: true };
+        return { success: true, status: letterStatus };
     } catch (error) {
         console.error(`Error checking letter status for ${letterId}:`, error.response?.data || error.message);
-        // Bei Fehler den Brief nicht löschen, Status unklar
         return { success: true, warning: 'Could not verify letter status' };
     }
 }
@@ -602,15 +612,19 @@ app.post('/pingen/send', async (req, res) => {
         // PDF buffer: embed address or use original depending on use_cover_page option
         let pdfBuffer;
         let detectedCountry = recipient.country || 'CH';
+        console.log(`[PINGEN] use_cover_page=${use_cover_page}, recipient address:\n${recipientAddressStr}`);
         if (use_cover_page) {
             // Use original PDF, cover page will be created by Pingen
+            console.log('[PINGEN] Using cover page approach - NOT embedding address');
             pdfBuffer = originalPdfBuffer;
         } else {
             // Embed address directly in PDF
+            console.log('[PINGEN] Embedding address directly in PDF');
             const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
             const result = await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine);
             pdfBuffer = Buffer.from(result.pdfBytes);
             detectedCountry = result.country;
+            console.log(`[PINGEN] Address embedded. Country=${detectedCountry}, PDF size: ${pdfBuffer.length} bytes`);
         }
 
         // Get Pingen token
