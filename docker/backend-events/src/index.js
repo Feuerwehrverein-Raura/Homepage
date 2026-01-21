@@ -24,7 +24,7 @@ const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Health Check
 app.get('/health', (req, res) => {
