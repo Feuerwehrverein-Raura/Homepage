@@ -1,3 +1,10 @@
+## [1.25.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.3...v1.25.4) (2026-01-21)
+
+
+### Bug Fixes
+
+* wait for Pingen letter validation before creating cover page ([3d6b4ef](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3d6b4efbcbd86545a8b1077df9ba61bb278a75c5))
+
 ## [1.25.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.2...v1.25.3) (2026-01-21)
 
 
