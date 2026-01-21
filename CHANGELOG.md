@@ -1,3 +1,10 @@
+## [1.17.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.1...v1.17.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* disable Docker cache for backend-events build ([d9d9228](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d9d922850be635ea2adc1d6033d6867f9685b70b))
+
 ## [1.17.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.0...v1.17.1) (2026-01-21)
 
 
