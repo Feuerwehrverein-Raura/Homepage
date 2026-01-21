@@ -1292,8 +1292,8 @@ app.get('/pingen/account', async (req, res) => {
 
         res.json({
             name: org.attributes?.name,
-            balance: org.attributes?.balance,
-            currency: org.attributes?.currency || 'CHF',
+            balance: org.attributes?.billing_balance,
+            currency: org.attributes?.billing_currency || 'CHF',
             isStaging: process.env.PINGEN_STAGING === 'true'
         });
     } catch (error) {
