@@ -1,3 +1,10 @@
+## [1.19.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.19.1...v1.19.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* use valid Pingen webhook event_category 'sent' instead of 'letters' ([8043c90](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8043c90748b2873d9b7669648863b3a928d9cc6e))
+
 ## [1.19.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.19.0...v1.19.1) (2026-01-21)
 
 
