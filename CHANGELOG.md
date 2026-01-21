@@ -1,3 +1,10 @@
+## [1.17.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.3...v1.17.4) (2026-01-21)
+
+
+### Bug Fixes
+
+* store email in audit_log email column ([d8e7806](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d8e780651e627f1a1aeeaf21770e14f7d66331ed))
+
 ## [1.17.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.2...v1.17.3) (2026-01-21)
 
 
