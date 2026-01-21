@@ -143,6 +143,7 @@ jobs:
         with:
           context: ./docker/backend-members
           push: true
+          no-cache: true
           build-args: |
             VERSION=${{ needs.release.outputs.version }}
           tags: |
@@ -172,6 +173,7 @@ jobs:
         with:
           context: ./docker/backend-dispatch
           push: true
+          no-cache: true
           build-args: |
             VERSION=${{ needs.release.outputs.version }}
           tags: |
@@ -201,6 +203,7 @@ jobs:
         with:
           context: ./docker/backend-accounting
           push: true
+          no-cache: true
           build-args: |
             VERSION=${{ needs.release.outputs.version }}
           tags: |
@@ -230,6 +233,7 @@ jobs:
         with:
           context: ./docker/frontend-website
           push: true
+          no-cache: true
           build-args: |
             VERSION=${{ needs.release.outputs.version }}
           tags: |
@@ -259,6 +263,7 @@ jobs:
         with:
           context: ./docker/wiki-docs
           push: true
+          no-cache: true
           build-args: |
             VERSION=${{ needs.release.outputs.version }}
           tags: |
