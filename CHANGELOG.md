@@ -1,3 +1,10 @@
+## [1.24.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.1...v1.24.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* update Pingen API to v2 3-step upload process ([f6a1b96](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f6a1b96b6bec78d98716ecb5c1c8de01debe262d))
+
 ## [1.24.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.0...v1.24.1) (2026-01-21)
 
 
