@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.21.0...v1.21.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* use organizer_name instead of organizer for event display ([ce35abd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ce35abdcd48aeb882e9f2071d4c837d92c895c7d))
+
 # [1.21.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.20.0...v1.21.0) (2026-01-21)
 
 
