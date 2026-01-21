@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.14.0...v1.15.0) (2026-01-21)
+
+
+### Features
+
+* add shift notifications, organizer fields, and event dashboard ([5dc0a64](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5dc0a648bad62cac6479d0163a351f1aaa048bab))
+
 # [1.14.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.3...v1.14.0) (2026-01-21)
 
 
