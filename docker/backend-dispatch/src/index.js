@@ -1595,7 +1595,7 @@ app.post('/pingen/webhooks/register', async (req, res) => {
 
         const token = tokenResponse.data.access_token;
 
-        // Webhook registrieren
+        // Webhook registrieren - event_category muss 'sent' sein für Brief-Status-Updates
         const webhookResponse = await axios.post(
             `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/webhooks`,
             {
@@ -1603,7 +1603,7 @@ app.post('/pingen/webhooks/register', async (req, res) => {
                     type: 'webhooks',
                     attributes: {
                         url: callbackUrl,
-                        event_category: 'letters',
+                        event_category: 'sent',
                         signing_key: process.env.PINGEN_WEBHOOK_SECRET || 'fwv-raura-webhook-key'
                     }
                 }
@@ -1623,7 +1623,9 @@ app.post('/pingen/webhooks/register', async (req, res) => {
         });
     } catch (error) {
         console.error('Webhook Registrierung Fehler:', error.response?.data || error.message);
-        res.status(500).json({ error: error.response?.data || error.message });
+        const errorData = error.response?.data;
+        const errorMsg = errorData?.errors?.[0]?.detail || errorData?.error || error.message;
+        res.status(500).json({ error: errorMsg });
     }
 });
 
