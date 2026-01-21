@@ -91,6 +91,55 @@ function formatAddressForCoverPage(name, street, number, zip, city) {
     return `${name}\n${streetLine}\n${zip} ${city}`;
 }
 
+// Helper: Warten bis Brief validiert ist (max 30 Sekunden)
+// Pingen braucht Zeit um das PDF zu verarbeiten bevor create-cover-page möglich ist
+async function waitForLetterValidation(letterId, token, staging = false) {
+    const PINGEN_API = getPingenApi(staging);
+    const maxAttempts = 10;
+    const delayMs = 3000;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const response = await axios.get(
+                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/vnd.api+json'
+                    }
+                }
+            );
+
+            const status = response.data.data?.attributes?.status;
+            console.log(`Letter ${letterId} validation check ${attempt}/${maxAttempts}: status=${status}`);
+
+            if (status === 'valid') {
+                return { success: true, status };
+            }
+
+            if (status === 'action_required') {
+                return { success: false, status, reason: 'Letter requires action' };
+            }
+
+            if (status === 'invalid') {
+                return { success: false, status, reason: 'Letter is invalid' };
+            }
+
+            // Status ist noch 'validating' oder ähnlich - weiter warten
+            if (attempt < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        } catch (error) {
+            console.error(`Error checking letter ${letterId} status:`, error.response?.data || error.message);
+            if (attempt < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+    }
+
+    return { success: false, status: 'timeout', reason: 'Validation timeout' };
+}
+
 // Helper: Brief-Status prüfen und bei "action_required" löschen
 // Gibt true zurück wenn der Brief erfolgreich gesendet wurde, false wenn gelöscht
 async function checkAndDeleteIfActionRequired(letterId, token, staging = false) {
@@ -410,6 +459,21 @@ app.post('/pingen/send', async (req, res) => {
         );
 
         const letterId = uploadResponse.data.data?.id;
+
+        // Step 3.5: Wait for letter validation before creating cover page
+        const validationResult = await waitForLetterValidation(letterId, token, staging);
+        if (!validationResult.success) {
+            // Delete the invalid letter
+            try {
+                await axios.delete(
+                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                );
+            } catch (delErr) { /* ignore */ }
+            return res.status(400).json({
+                error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
+            });
+        }
 
         // Step 4: Create cover page with recipient address
         const recipientAddressStr = formatAddressForCoverPage(
@@ -1881,6 +1945,26 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 
                 const letterId = uploadResponse.data.data?.id;
 
+                // Step 3.5: Wait for letter validation before creating cover page
+                const validationResult = await waitForLetterValidation(letterId, token, staging);
+                if (!validationResult.success) {
+                    console.log(`Letter ${letterId} validation failed: ${validationResult.reason}`);
+                    // Delete the letter if it's in a bad state
+                    try {
+                        await axios.delete(
+                            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                        );
+                    } catch (delErr) {
+                        console.error(`Could not delete invalid letter ${letterId}:`, delErr.message);
+                    }
+                    results.failed.push({
+                        name: `${member.vorname} ${member.nachname}`,
+                        error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
+                    });
+                    continue;
+                }
+
                 // Step 4: Create cover page with recipient address
                 const memberAddressStr = formatAddressForCoverPage(
                     `${member.vorname} ${member.nachname}`,
@@ -2172,6 +2256,20 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
 
         const letterId = uploadResponse.data.data?.id;
 
+        // Step 3.5: Wait for letter validation before creating cover page
+        const validationResult = await waitForLetterValidation(letterId, token, staging);
+        if (!validationResult.success) {
+            try {
+                await axios.delete(
+                    `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                );
+            } catch (delErr) { /* ignore */ }
+            return res.status(400).json({
+                error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
+            });
+        }
+
         // Step 4: Create cover page with recipient address
         const arbeitsplanAddressStr = formatAddressForCoverPage(
             `${member.vorname} ${member.nachname}`,
@@ -2310,6 +2408,46 @@ app.post('/pingen/webhook', async (req, res) => {
                 console.log(`Pingen Brief ${letterId} Status aktualisiert: ${mappedStatus}`);
             } else {
                 console.log(`Pingen Brief ${letterId} nicht in DB gefunden`);
+            }
+
+            // Bei "action_required" Brief automatisch löschen
+            if (newStatus === 'action_required') {
+                console.log(`Pingen Brief ${letterId} hat "action_required" - wird gelöscht...`);
+                try {
+                    // Token holen
+                    const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+                        grant_type: 'client_credentials',
+                        client_id: process.env.PINGEN_CLIENT_ID,
+                        client_secret: process.env.PINGEN_CLIENT_SECRET
+                    });
+                    const token = tokenResponse.data.access_token;
+
+                    // Brief löschen (beide APIs probieren - Staging und Production)
+                    const apis = [getPingenApi(false), getPingenApi(true)];
+                    const orgIds = [getPingenOrgId(false), getPingenOrgId(true)];
+
+                    for (let i = 0; i < apis.length; i++) {
+                        try {
+                            await axios.delete(
+                                `${apis[i]}/organisations/${orgIds[i]}/letters/${letterId}`,
+                                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                            );
+                            console.log(`Pingen Brief ${letterId} erfolgreich gelöscht`);
+
+                            // Status in DB auf 'deleted' setzen
+                            await pool.query(`
+                                UPDATE dispatch_log
+                                SET status = 'deleted', updated_at = NOW()
+                                WHERE external_id = $1 AND type = 'pingen'
+                            `, [letterId]);
+                            break;
+                        } catch (delErr) {
+                            // Ignorieren wenn Brief in dieser API nicht gefunden
+                        }
+                    }
+                } catch (tokenErr) {
+                    console.error(`Fehler beim Löschen von Brief ${letterId}:`, tokenErr.message);
+                }
             }
         }
 
@@ -2522,6 +2660,18 @@ async function sendToPingen(html, member, memberId, eventId, staging = false) {
     );
 
     const letterId = uploadResponse.data.data?.id;
+
+    // Step 3.5: Wait for letter validation before creating cover page
+    const validationResult = await waitForLetterValidation(letterId, token, staging);
+    if (!validationResult.success) {
+        try {
+            await axios.delete(
+                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+            );
+        } catch (delErr) { /* ignore */ }
+        throw new Error(`Brief-Validierung fehlgeschlagen: ${validationResult.reason}`);
+    }
 
     // Step 4: Create cover page with recipient address
     const helperAddressStr = formatAddressForCoverPage(
