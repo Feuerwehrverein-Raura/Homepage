@@ -136,6 +136,29 @@ async function getEmbeddableFont() {
 // Helper: Adresse direkt ins PDF schreiben (Schweizer Briefformat, Adresse rechts)
 // Position: Fensterbereich rechts oben auf der ersten Seite
 // Verwendet eingebettete Schriftart für Pingen-Kompatibilität
+// Erkennt das Land anhand der Adresse (CH oder DE)
+function detectCountryFromAddress(address) {
+    // Suche nach PLZ-Muster
+    // Schweiz: 4-stellige PLZ (z.B. "8000 Zürich" oder "CH-8000 Zürich")
+    // Deutschland: 5-stellige PLZ (z.B. "80331 München" oder "DE-80331 München")
+
+    // Explizite Länderkennung
+    if (/\bCH[-\s]?\d{4}\b/i.test(address)) return 'CH';
+    if (/\bDE[-\s]?\d{5}\b/i.test(address)) return 'DE';
+    if (/\bD[-\s]?\d{5}\b/i.test(address)) return 'DE';
+
+    // PLZ-Länge als Fallback
+    const plzMatch = address.match(/\b(\d{4,5})\s+\w/);
+    if (plzMatch) {
+        const plz = plzMatch[1];
+        if (plz.length === 4) return 'CH';
+        if (plz.length === 5) return 'DE';
+    }
+
+    // Default: Schweiz
+    return 'CH';
+}
+
 async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null) {
     const pdfDoc = await PDFDocument.load(pdfBuffer);
 
@@ -164,11 +187,24 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
     const fontSize = 10;
     const lineHeight = 14;
 
-    // Schweizer Briefformat: Adressfenster rechts (C5/6 Couvert)
-    // Fenster: 98mm von links, 42mm von oben, 90mm breit, 45mm hoch
+    // Land erkennen und Position bestimmen
     // A4: 595 x 842 points, 1mm = 2.835 points
-    const addressX = 285; // ~100mm von links (Fenster beginnt bei 98mm)
-    const addressY = height - 125; // ~44mm von oben (Fenster beginnt bei 42mm)
+    const country = detectCountryFromAddress(recipientAddress);
+    let addressX, addressY;
+
+    if (country === 'DE') {
+        // Deutsches Briefformat: Adressfenster LINKS (DIN Standard)
+        // Fenster: 20mm von links, 45mm von oben, 80mm breit, 40mm hoch
+        addressX = 57; // ~20mm von links
+        addressY = height - 130; // ~46mm von oben
+        console.log('Detected German address - using LEFT window position');
+    } else {
+        // Schweizer Briefformat: Adressfenster RECHTS (C5/6 Couvert)
+        // Fenster: 98mm von links, 42mm von oben, 90mm breit, 45mm hoch
+        addressX = 285; // ~100mm von links (Fenster beginnt bei 98mm)
+        addressY = height - 125; // ~44mm von oben
+        console.log('Detected Swiss address - using RIGHT window position');
+    }
 
     // Absender (klein, oberhalb der Empfängeradresse)
     if (senderAddress) {
@@ -201,7 +237,7 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
         });
     });
 
-    return await pdfDoc.save();
+    return { pdfBytes: await pdfDoc.save(), country };
 }
 
 // Helper: Warten bis Brief die initiale Verarbeitung abgeschlossen hat
@@ -565,13 +601,16 @@ app.post('/pingen/send', async (req, res) => {
 
         // PDF buffer: embed address or use original depending on use_cover_page option
         let pdfBuffer;
+        let detectedCountry = recipient.country || 'CH';
         if (use_cover_page) {
             // Use original PDF, cover page will be created by Pingen
             pdfBuffer = originalPdfBuffer;
         } else {
             // Embed address directly in PDF
             const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-            pdfBuffer = Buffer.from(await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine));
+            const result = await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine);
+            pdfBuffer = Buffer.from(result.pdfBytes);
+            detectedCountry = result.country;
         }
 
         // Get Pingen token
@@ -631,7 +670,8 @@ app.post('/pingen/send', async (req, res) => {
 
         // Only specify address_position when NOT using cover page (address already in PDF)
         if (!use_cover_page) {
-            letterAttributes.address_position = 'right';  // Schweiz: Adresse rechts
+            // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
+            letterAttributes.address_position = detectedCountry === 'DE' ? 'left' : 'right';
         }
 
         const uploadResponse = await axios.post(
@@ -2137,13 +2177,18 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 
                 const originalPdfBuffer = Buffer.from(pdf_base64, 'base64');
                 let pdfToUpload;
+                let detectedCountry = 'CH'; // Default
                 if (use_cover_page) {
                     // Use original PDF, cover page will be created by Pingen
                     pdfToUpload = originalPdfBuffer;
+                    // Try to detect country from address
+                    detectedCountry = detectCountryFromAddress(recipientAddress);
                 } else {
                     // Embed address directly in PDF
                     const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-                    pdfToUpload = Buffer.from(await addAddressToPdf(originalPdfBuffer, recipientAddress, senderAddressLine));
+                    const result = await addAddressToPdf(originalPdfBuffer, recipientAddress, senderAddressLine);
+                    pdfToUpload = Buffer.from(result.pdfBytes);
+                    detectedCountry = result.country;
                 }
 
                 // Step 3: Upload PDF to the pre-signed URL
@@ -2155,6 +2200,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 
                 // Step 4: Create letter with file reference
                 // auto_send depends on whether we use cover page or embedded address
+                // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
                 const uploadResponse = await axios.post(
                     `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
                     {
@@ -2164,7 +2210,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                                 file_original_name: filename,
                                 file_url: fileUrl,
                                 file_url_signature: fileUrlSignature,
-                                address_position: 'right',  // Schweiz: Adresse rechts
+                                address_position: detectedCountry === 'DE' ? 'left' : 'right',
                                 auto_send: !use_cover_page,  // auto_send wenn Adresse im PDF
                                 delivery_product: 'cheap',
                                 print_mode: 'simplex',
@@ -2176,7 +2222,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                                         number: parsedAddress.number,
                                         zip: member.plz,
                                         city: member.ort,
-                                        country: 'CH'
+                                        country: detectedCountry
                                     }),
                                     sender: buildPingenAddress(SENDER_ADDRESS)
                                 }
@@ -2510,11 +2556,15 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
 
         const originalPdfBuffer = Buffer.from(pdf_base64, 'base64');
         let pdfBuffer;
+        let detectedCountry = 'CH'; // Default
         if (use_cover_page) {
             pdfBuffer = originalPdfBuffer;
+            detectedCountry = detectCountryFromAddress(recipientAddressStr);
         } else {
             const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-            pdfBuffer = Buffer.from(await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine));
+            const result = await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine);
+            pdfBuffer = Buffer.from(result.pdfBytes);
+            detectedCountry = result.country;
         }
 
         // Step 3: Upload PDF to the pre-signed URL
@@ -2525,6 +2575,7 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
         });
 
         // Step 4: Create letter with file reference
+        // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
         const uploadResponse = await axios.post(
             `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
             {
@@ -2534,7 +2585,7 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
                         file_original_name: `${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
                         file_url: fileUrl,
                         file_url_signature: fileUrlSignature,
-                        address_position: 'right',  // Schweiz: Adresse rechts
+                        address_position: detectedCountry === 'DE' ? 'left' : 'right',
                         auto_send: !use_cover_page,  // auto_send wenn Adresse im PDF
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
@@ -2546,7 +2597,7 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
                                 number: parsedAddress.number,
                                 zip: member.plz,
                                 city: member.ort,
-                                country: 'CH'
+                                country: detectedCountry
                             }),
                             sender: buildPingenAddress(SENDER_ADDRESS)
                         }
@@ -2924,11 +2975,15 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
 
     // PDF buffer: embed address or use original depending on useCoverPage option
     let pdfBuffer;
+    let detectedCountry = 'CH'; // Default
     if (useCoverPage) {
         pdfBuffer = originalPdfBuffer;
+        detectedCountry = detectCountryFromAddress(recipientAddressStr);
     } else {
         const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
-        pdfBuffer = Buffer.from(await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine));
+        const result = await addAddressToPdf(originalPdfBuffer, recipientAddressStr, senderAddressLine);
+        pdfBuffer = Buffer.from(result.pdfBytes);
+        detectedCountry = result.country;
     }
 
     // Get Pingen token
@@ -2962,6 +3017,7 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
     });
 
     // Step 3: Create letter with file reference
+    // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
     const uploadResponse = await axios.post(
         `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
         {
@@ -2971,7 +3027,7 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
                     file_original_name: 'brief.pdf',
                     file_url: fileUrl,
                     file_url_signature: fileUrlSignature,
-                    address_position: 'right',  // Schweiz: Adresse rechts
+                    address_position: detectedCountry === 'DE' ? 'left' : 'right',
                     auto_send: !useCoverPage,  // auto_send wenn Adresse im PDF
                     delivery_product: 'cheap',
                     print_mode: 'simplex',
@@ -2983,7 +3039,7 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
                             number: parsedAddress.number,
                             zip: member.plz,
                             city: member.ort,
-                            country: 'CH'
+                            country: detectedCountry
                         }),
                         sender: buildPingenAddress(SENDER_ADDRESS)
                     }
