@@ -1,3 +1,10 @@
+## [1.24.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.2...v1.24.3) (2026-01-21)
+
+
+### Bug Fixes
+
+* remove empty pobox/number fields from Pingen API requests ([e6f5885](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e6f588513e01d3fe67e6d243e29093dd73e1dc04))
+
 ## [1.24.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.1...v1.24.2) (2026-01-21)
 
 
