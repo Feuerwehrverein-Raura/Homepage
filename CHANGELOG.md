@@ -1,3 +1,10 @@
+## [1.13.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.2...v1.13.3) (2026-01-21)
+
+
+### Bug Fixes
+
+* rename member-registrations, fix Traefik routing for event registrations ([92a0b88](https://github.com/Feuerwehrverein-Raura/Homepage/commit/92a0b88f00bd5ca08935272a36cf26d74221f5c8))
+
 ## [1.13.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.1...v1.13.2) (2026-01-21)
 
 
