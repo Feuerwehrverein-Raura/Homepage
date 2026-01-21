@@ -1,3 +1,10 @@
+## [1.25.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.0...v1.25.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* add address and country to create-cover-page API call ([cb3c17c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cb3c17c5963ebdf7ea78e8a6e494ab1e85f76216))
+
 # [1.25.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.4...v1.25.0) (2026-01-21)
 
 
