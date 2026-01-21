@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.0...v1.13.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* add /arbeitsplan route to Traefik for PDF generation ([3158b18](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3158b1886fdd43b76e661563590ef6b8444d4afb))
+
 # [1.13.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.12.1...v1.13.0) (2026-01-21)
 
 
