@@ -1,3 +1,10 @@
+## [1.24.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.3...v1.24.4) (2026-01-21)
+
+
+### Bug Fixes
+
+* add cover page creation for Pingen letters (Swiss address format) ([1f99fe5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1f99fe58c872b7445af21fac8b533a5dbc6abff3))
+
 ## [1.24.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.2...v1.24.3) (2026-01-21)
 
 
