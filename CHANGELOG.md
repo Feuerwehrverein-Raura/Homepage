@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.4...v1.25.0) (2026-01-21)
+
+
+### Features
+
+* add member-registrations API endpoints ([031bf80](https://github.com/Feuerwehrverein-Raura/Homepage/commit/031bf802f7911c49fea87f8c1b6cb5d0d05ceda6))
+
 ## [1.24.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.24.3...v1.24.4) (2026-01-21)
 
 
