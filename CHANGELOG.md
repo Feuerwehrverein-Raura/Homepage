@@ -1,3 +1,10 @@
+## [1.25.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.1...v1.25.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* auto-delete Pingen letters with action_required status and create Authentik users on registration approval ([0c70415](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0c70415ea727ffd2c777bd5536d62abe14e0d12d))
+
 ## [1.25.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.25.0...v1.25.1) (2026-01-21)
 
 
