@@ -5,6 +5,8 @@ const { Pool, types } = require('pg');
 const ical = require('ical-generator').default;
 const axios = require('axios');
 const PDFDocument = require('pdfkit');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
@@ -21,6 +23,135 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // Dispatch API für E-Mails
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+// Helper: Datum in deutschem Format
+function formatDateDE(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr + 'T12:00:00');
+    return date.toLocaleDateString('de-CH', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+// Helper: Alle Registrierungen für eine Schicht abrufen
+async function getShiftRegistrations(shiftId) {
+    const result = await pool.query(`
+        SELECT
+            r.id, r.guest_name, r.guest_email, r.member_id, r.status,
+            m.vorname, m.nachname, m.email as member_email
+        FROM registrations r
+        LEFT JOIN members m ON r.member_id = m.id
+        WHERE $1 = ANY(r.shift_ids)
+        AND r.status IN ('approved', 'confirmed', 'pending')
+    `, [shiftId]);
+    return result.rows;
+}
+
+// Helper: Benachrichtigungen bei Schicht-Änderungen senden
+async function notifyShiftRegistrations(shift, event, changeType, oldShiftData = null) {
+    const registrations = await getShiftRegistrations(shift.id);
+
+    if (registrations.length === 0) return { sent: 0, errors: [] };
+
+    let sent = 0;
+    const errors = [];
+
+    for (const reg of registrations) {
+        const email = reg.member_email || reg.guest_email;
+        const name = reg.member_id
+            ? `${reg.vorname} ${reg.nachname}`
+            : reg.guest_name;
+
+        if (!email) continue;
+
+        let subject, body;
+
+        if (changeType === 'deleted') {
+            subject = `Schicht abgesagt - ${event.title}`;
+            body = `
+Guten Tag ${name},
+
+Leider müssen wir Ihnen mitteilen, dass folgende Schicht abgesagt wurde:
+
+Event: ${event.title}
+Schicht: ${shift.name}
+Datum: ${formatDateDE(shift.date)}
+Zeit: ${shift.start_time || '-'} - ${shift.end_time || '-'}
+
+Bitte kontaktieren Sie uns bei Fragen.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+            `.trim();
+        } else if (changeType === 'updated') {
+            const changes = [];
+            if (oldShiftData) {
+                if (oldShiftData.date !== shift.date) {
+                    changes.push(`Datum: ${formatDateDE(oldShiftData.date)} → ${formatDateDE(shift.date)}`);
+                }
+                if (oldShiftData.start_time !== shift.start_time) {
+                    changes.push(`Startzeit: ${oldShiftData.start_time || '-'} → ${shift.start_time || '-'}`);
+                }
+                if (oldShiftData.end_time !== shift.end_time) {
+                    changes.push(`Endzeit: ${oldShiftData.end_time || '-'} → ${shift.end_time || '-'}`);
+                }
+                if (oldShiftData.name !== shift.name) {
+                    changes.push(`Name: ${oldShiftData.name} → ${shift.name}`);
+                }
+            }
+
+            // Keine relevanten Änderungen
+            if (changes.length === 0) return { sent: 0, errors: [] };
+
+            subject = `Schicht geändert - ${event.title}`;
+            body = `
+Guten Tag ${name},
+
+Eine Schicht, für die Sie angemeldet sind, wurde geändert:
+
+Event: ${event.title}
+Schicht: ${shift.name}
+
+Änderungen:
+${changes.map(c => `- ${c}`).join('\n')}
+
+Aktuelle Details:
+- Datum: ${formatDateDE(shift.date)}
+- Zeit: ${shift.start_time || '-'} - ${shift.end_time || '-'}
+- Bereich: ${shift.bereich || 'Allgemein'}
+
+Falls Sie aufgrund der Änderungen nicht mehr teilnehmen können,
+melden Sie sich bitte bei uns.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+            `.trim();
+        }
+
+        try {
+            await axios.post(`${DISPATCH_API}/email/send`, {
+                to: email,
+                subject: subject,
+                body: body,
+                event_id: event.id
+            });
+            sent++;
+            console.log(`Schicht-Benachrichtigung gesendet an ${email}`);
+        } catch (err) {
+            console.error(`Benachrichtigung an ${email} fehlgeschlagen:`, err.message);
+            errors.push({ email, error: err.message });
+        }
+    }
+
+    return { sent, errors };
+}
 
 app.use(helmet());
 app.use(cors());
@@ -103,23 +234,25 @@ app.get('/events/:id', async (req, res) => {
         const { id } = req.params;
 
         // Try UUID first, then slug
-        let event;
+        let eventResult;
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
         if (uuidRegex.test(id)) {
-            event = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
+            eventResult = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
         } else {
-            event = await pool.query('SELECT * FROM events WHERE slug = $1', [id]);
+            eventResult = await pool.query('SELECT * FROM events WHERE slug = $1', [id]);
         }
 
-        if (event.rows.length === 0) {
+        if (eventResult.rows.length === 0) {
             return res.status(404).json({ error: 'Event not found' });
         }
+
+        const event = eventResult.rows[0];
 
         // Get shifts with registration info
         const shifts = await pool.query(
             'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
-            [event.rows[0].id]
+            [event.id]
         );
 
         // Get registrations for each shift
@@ -152,7 +285,7 @@ app.get('/events/:id', async (req, res) => {
             };
         }));
 
-        res.json({ ...event.rows[0], shifts: shiftsWithRegistrations });
+        res.json({ ...event, shifts: shiftsWithRegistrations });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -162,24 +295,97 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
     try {
         const {
             slug, title, subtitle, description, start_date, end_date,
-            location, organizer_id, category, registration_required,
-            registration_deadline, max_participants, cost, status, image_url, tags
+            location, category, registration_required,
+            registration_deadline, max_participants, cost, status, image_url, tags,
+            organizer_name, organizer_email, create_access
         } = req.body;
+
+        // Event-Zugang generieren falls gewuenscht
+        let eventEmail = null;
+        let eventPassword = null;
+        let eventPasswordHash = null;
+        let eventAccessExpires = null;
+        let isVorstandMember = false;
+
+        // Vorstand-E-Mails pruefen (kein separater Zugang noetig)
+        const vorstandEmails = [
+            'praesident@fwv-raura.ch',
+            'aktuar@fwv-raura.ch',
+            'kassier@fwv-raura.ch',
+            'materialwart@fwv-raura.ch',
+            'beisitzer@fwv-raura.ch',
+            'vorstand@fwv-raura.ch'
+        ];
+
+        if (organizer_email) {
+            isVorstandMember = vorstandEmails.some(ve =>
+                organizer_email.toLowerCase() === ve.toLowerCase()
+            );
+        }
+
+        if (create_access && organizer_email && !isVorstandMember) {
+            // Event-spezifische E-Mail generieren
+            eventEmail = `${slug}@fwv-raura.ch`;
+            // Zufaelliges Passwort generieren (12 Zeichen)
+            eventPassword = crypto.randomBytes(6).toString('base64').replace(/[+/=]/g, '').substring(0, 12);
+            // Passwort hashen (einfaches SHA256 - fuer Produktionsumgebung bcrypt empfohlen)
+            eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
+            // Ablaufdatum: 3 Monate nach Event-Ende
+            const endDateObj = end_date ? new Date(end_date) : new Date(start_date);
+            eventAccessExpires = new Date(endDateObj);
+            eventAccessExpires.setMonth(eventAccessExpires.getMonth() + 3);
+        }
 
         const result = await pool.query(`
             INSERT INTO events (
                 slug, title, subtitle, description, start_date, end_date,
-                location, organizer_id, category, registration_required,
-                registration_deadline, max_participants, cost, status, image_url, tags
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+                location, category, registration_required,
+                registration_deadline, max_participants, cost, status, image_url, tags,
+                organizer_name, organizer_email, event_email, event_password_hash, event_access_expires
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
             RETURNING *
         `, [
             slug, title, subtitle, description, start_date, end_date,
-            location, organizer_id, category, registration_required,
-            registration_deadline, max_participants, cost, status || 'planned', image_url, tags
+            location, category, registration_required,
+            registration_deadline, max_participants, cost, status || 'planned', image_url, tags,
+            organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventAccessExpires
         ]);
 
-        res.status(201).json(result.rows[0]);
+        const newEvent = result.rows[0];
+
+        // E-Mail mit Zugangsdaten an Organisator senden
+        if (create_access && organizer_email && eventPassword) {
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: organizer_email,
+                    subject: `Ihre Zugangsdaten fuer ${title}`,
+                    body: `
+Guten Tag ${organizer_name || 'Organisator'},
+
+Sie wurden als Organisator fuer das Event "${title}" eingetragen.
+
+Hier sind Ihre Zugangsdaten fuer das Event-Dashboard:
+
+URL: https://fwv-raura.ch/event-dashboard.html
+E-Mail: ${eventEmail}
+Passwort: ${eventPassword}
+
+Dieser Zugang ist gueltig bis ${eventAccessExpires.toLocaleDateString('de-CH')}.
+
+Bei Fragen wenden Sie sich bitte an den Vorstand.
+
+Mit freundlichen Gruessen
+Feuerwehrverein Raura
+                    `.trim(),
+                    event_id: newEvent.id
+                });
+                console.log(`Event-Zugangsdaten gesendet an ${organizer_email}`);
+            } catch (emailErr) {
+                console.error('Fehler beim Senden der Zugangsdaten:', emailErr.message);
+            }
+        }
+
+        res.status(201).json(newEvent);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -221,6 +427,125 @@ app.delete('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), asy
         res.status(500).json({ error: error.message });
     }
 });
+
+// ============================================
+// EVENT ORGANIZER LOGIN
+// ============================================
+
+// Login fuer Event-Organisatoren
+app.post('/events/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ error: 'E-Mail und Passwort erforderlich' });
+        }
+
+        // Event mit passender event_email suchen
+        const result = await pool.query(
+            'SELECT * FROM events WHERE event_email = $1',
+            [email.toLowerCase()]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(401).json({ error: 'Ungueltige Zugangsdaten' });
+        }
+
+        const event = result.rows[0];
+
+        // Pruefen ob Zugang abgelaufen
+        if (event.event_access_expires && new Date(event.event_access_expires) < new Date()) {
+            return res.status(401).json({ error: 'Der Zugang ist abgelaufen. Bitte kontaktieren Sie den Vorstand.' });
+        }
+
+        // Passwort pruefen
+        const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+        if (passwordHash !== event.event_password_hash) {
+            return res.status(401).json({ error: 'Ungueltige Zugangsdaten' });
+        }
+
+        // JWT Token erstellen
+        const token = jwt.sign({
+            type: 'event-organizer',
+            event_id: event.id,
+            event_title: event.title,
+            event_email: email,
+            organizer_name: event.organizer_name
+        }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+        res.json({
+            success: true,
+            token,
+            event: {
+                id: event.id,
+                title: event.title,
+                slug: event.slug,
+                organizer_name: event.organizer_name
+            }
+        });
+    } catch (error) {
+        console.error('Event login error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Event-Daten fuer Organisator abrufen (nur eigenes Event)
+app.get('/events/my-event', authenticateEventOrganizer, async (req, res) => {
+    try {
+        const eventId = req.eventOrganizer.event_id;
+
+        const eventResult = await pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
+        if (eventResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+
+        const event = eventResult.rows[0];
+
+        // Shifts laden
+        const shifts = await pool.query(
+            'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
+            [eventId]
+        );
+
+        // Registrierungen laden
+        const registrations = await pool.query(`
+            SELECT r.*, m.vorname, m.nachname
+            FROM registrations r
+            LEFT JOIN members m ON r.member_id = m.id
+            WHERE r.event_id = $1
+            ORDER BY r.created_at DESC
+        `, [eventId]);
+
+        res.json({
+            ...event,
+            shifts: shifts.rows,
+            registrations: registrations.rows
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Middleware fuer Event-Organisator Authentifizierung
+function authenticateEventOrganizer(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ error: 'Token erforderlich' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.type !== 'event-organizer') {
+            return res.status(403).json({ error: 'Nur fuer Event-Organisatoren' });
+        }
+        req.eventOrganizer = decoded;
+        next();
+    } catch (err) {
+        return res.status(401).json({ error: 'Ungueltiger Token' });
+    }
+}
 
 // ============================================
 // SHIFTS
@@ -265,6 +590,13 @@ app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         const { id } = req.params;
         const { name, description, date, start_time, end_time, needed, bereich } = req.body;
 
+        // Alte Schicht-Daten für Vergleich speichern
+        const oldShiftResult = await pool.query('SELECT * FROM shifts WHERE id = $1', [id]);
+        if (oldShiftResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Shift not found' });
+        }
+        const oldShift = oldShiftResult.rows[0];
+
         const result = await pool.query(`
             UPDATE shifts SET
                 name = COALESCE($1, name),
@@ -278,11 +610,24 @@ app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             RETURNING *
         `, [name, description, date, start_time, end_time, needed, bereich, id]);
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Shift not found' });
-        }
+        const updatedShift = result.rows[0];
 
-        res.json(result.rows[0]);
+        // Event-Info für Benachrichtigung holen
+        const eventResult = await pool.query('SELECT * FROM events WHERE id = $1', [updatedShift.event_id]);
+        const event = eventResult.rows[0];
+
+        // Benachrichtigungen bei relevanten Änderungen senden
+        const notificationResult = await notifyShiftRegistrations(
+            updatedShift,
+            event,
+            'updated',
+            oldShift
+        );
+
+        res.json({
+            ...updatedShift,
+            notifications: notificationResult
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -291,13 +636,29 @@ app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
 app.delete('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await pool.query('DELETE FROM shifts WHERE id = $1 RETURNING id', [id]);
 
-        if (result.rows.length === 0) {
+        // Schicht-Daten vor Löschung abrufen
+        const shiftResult = await pool.query('SELECT * FROM shifts WHERE id = $1', [id]);
+        if (shiftResult.rows.length === 0) {
             return res.status(404).json({ error: 'Shift not found' });
         }
+        const shift = shiftResult.rows[0];
 
-        res.json({ message: 'Shift deleted', id });
+        // Event-Info für Benachrichtigung holen
+        const eventResult = await pool.query('SELECT * FROM events WHERE id = $1', [shift.event_id]);
+        const event = eventResult.rows[0];
+
+        // Benachrichtigungen VOR Löschung senden
+        const notificationResult = await notifyShiftRegistrations(shift, event, 'deleted');
+
+        // Jetzt Schicht löschen
+        await pool.query('DELETE FROM shifts WHERE id = $1', [id]);
+
+        res.json({
+            message: 'Shift deleted',
+            id,
+            notifications: notificationResult
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
