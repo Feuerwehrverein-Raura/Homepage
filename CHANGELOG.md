@@ -1,3 +1,10 @@
+## [1.26.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.3...v1.26.4) (2026-01-21)
+
+
+### Bug Fixes
+
+* **pingen:** correct address position for Swiss C5/6 envelope window ([f8342c3](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f8342c3ab4d43e2383b5def8a08545a4f8e3d671))
+
 ## [1.26.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.2...v1.26.3) (2026-01-21)
 
 
