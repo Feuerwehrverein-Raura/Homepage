@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.23.2...v1.24.0) (2026-01-21)
+
+
+### Features
+
+* add bulk PDF mailing feature for Pingen ([ba81c51](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ba81c513b96604a8fe7c5cf24df1730deaca7dd3))
+
 ## [1.23.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.23.1...v1.23.2) (2026-01-21)
 
 
