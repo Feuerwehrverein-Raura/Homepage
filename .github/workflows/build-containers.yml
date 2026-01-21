@@ -113,6 +113,7 @@ jobs:
         with:
           context: ./docker/backend-events
           push: true
+          no-cache: true
           build-args: |
             VERSION=${{ needs.release.outputs.version }}
           tags: |
