@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.3...v1.14.0) (2026-01-21)
+
+
+### Features
+
+* auto-link event registrations to members by email ([3f99b61](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3f99b614fe665f83d9bc20548bb2313c045d65e6))
+
 ## [1.13.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.13.2...v1.13.3) (2026-01-21)
 
 
