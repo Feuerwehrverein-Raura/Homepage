@@ -11,8 +11,9 @@ const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 
 // JWKS client to get public keys from Authentik
 const client = jwksClient({
-    jwksUri: `${AUTHENTIK_URL}/application/o/fwv-raura/.well-known/jwks.json`,
+    jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members/jwks/`,
     cache: true,
+    cacheMaxAge: 600000, // 10 minutes
     rateLimit: true,
     jwksRequestsPerMinute: 10
 });
@@ -40,7 +41,7 @@ function authenticateToken(req, res, next) {
 
     jwt.verify(token, getKey, {
         algorithms: ['RS256'],
-        issuer: AUTHENTIK_URL
+        issuer: `${AUTHENTIK_URL}/application/o/fwv-members/`
     }, (err, decoded) => {
         if (err) {
             console.error('Token verification failed:', err.message);
