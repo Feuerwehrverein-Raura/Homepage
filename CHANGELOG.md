@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.22.2...v1.23.0) (2026-01-21)
+
+
+### Features
+
+* highlight Fasnacht events in orange, Chilbi in purple ([90fd498](https://github.com/Feuerwehrverein-Raura/Homepage/commit/90fd498264aa901489e7f73b4ba2ff95c9edcef3))
+
 ## [1.22.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.22.1...v1.22.2) (2026-01-21)
 
 
