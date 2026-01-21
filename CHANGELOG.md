@@ -1,3 +1,10 @@
+## [1.22.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.22.0...v1.22.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* change status label from "Ausstehend" to "Offen" ([9326056](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9326056322f82ba43a1780125e21e55a4697c233))
+
 # [1.22.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.21.1...v1.22.0) (2026-01-21)
 
 
