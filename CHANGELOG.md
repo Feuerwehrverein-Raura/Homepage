@@ -1,3 +1,10 @@
+## [1.27.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.1...v1.27.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* **pingen:** treat action_required as success, don't delete letters ([42a4a32](https://github.com/Feuerwehrverein-Raura/Homepage/commit/42a4a327a1f800dc691f273e83771a05e0659968))
+
 ## [1.27.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.0...v1.27.1) (2026-01-21)
 
 
