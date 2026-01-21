@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.20.0...v1.21.0) (2026-01-21)
+
+
+### Features
+
+* add Teilnehmerliste PDF export for participant registrations ([4163b90](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4163b908624f867069d1ff3ddd96bdb8df84645a))
+
 # [1.20.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.19.2...v1.20.0) (2026-01-21)
 
 
