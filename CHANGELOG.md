@@ -1,3 +1,10 @@
+## [1.26.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.2...v1.26.3) (2026-01-21)
+
+
+### Bug Fixes
+
+* **pingen:** use embedded font for PDF address to fix action_required ([e2c38e7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e2c38e7bafd35872dc3221c73da9d6da494aeb0c))
+
 ## [1.26.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.26.1...v1.26.2) (2026-01-21)
 
 
