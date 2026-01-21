@@ -1,3 +1,10 @@
+## [1.17.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.4...v1.17.5) (2026-01-21)
+
+
+### Bug Fixes
+
+* filter out create_access from event update to prevent DB error ([94591ae](https://github.com/Feuerwehrverein-Raura/Homepage/commit/94591ae1070a32efd8e84b5424bf03e614bfbee6))
+
 ## [1.17.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.17.3...v1.17.4) (2026-01-21)
 
 
