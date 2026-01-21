@@ -1,3 +1,10 @@
+## [1.22.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.22.1...v1.22.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* show 00:00 as midnight instead of 'Open End' in Arbeitsplan ([51dff6d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/51dff6da2822906296a513225f52013e9901af55))
+
 ## [1.22.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.22.0...v1.22.1) (2026-01-21)
 
 
