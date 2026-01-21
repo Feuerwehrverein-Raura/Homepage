@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.12.1...v1.13.0) (2026-01-21)
+
+
+### Features
+
+* add Arbeitsplan PDF generation and clickable event tiles ([69d6af8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/69d6af8d3dc99aa17e568ba60c5be95183cbdece))
+
 ## [1.12.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.12.0...v1.12.1) (2026-01-19)
 
 
