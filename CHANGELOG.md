@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.15.0...v1.16.0) (2026-01-21)
+
+
+### Features
+
+* add Pingen postal mail integration and Arbeitsplan auto-send ([24506df](https://github.com/Feuerwehrverein-Raura/Homepage/commit/24506dff6d93dd0a41e908741ff74fcdf7b6af8b))
+
 # [1.15.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.14.0...v1.15.0) (2026-01-21)
 
 
