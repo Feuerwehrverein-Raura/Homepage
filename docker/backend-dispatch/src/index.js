@@ -22,6 +22,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Pingen Config
+const PINGEN_IDENTITY = 'https://identity.pingen.com';
 const PINGEN_API = process.env.PINGEN_STAGING === 'true'
     ? 'https://api-staging.pingen.com'
     : 'https://api.pingen.com';
@@ -218,7 +219,7 @@ app.post('/pingen/send', async (req, res) => {
         await browser.close();
 
         // Get Pingen token
-        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
             client_id: process.env.PINGEN_CLIENT_ID,
             client_secret: process.env.PINGEN_CLIENT_SECRET
@@ -1211,7 +1212,7 @@ app.get('/pingen/letters/:letterId/status', async (req, res) => {
         const { letterId } = req.params;
 
         // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
             client_id: process.env.PINGEN_CLIENT_ID,
             client_secret: process.env.PINGEN_CLIENT_SECRET
@@ -1268,7 +1269,7 @@ app.get('/pingen/letters/:letterId/status', async (req, res) => {
 app.get('/pingen/account', async (req, res) => {
     try {
         // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
             client_id: process.env.PINGEN_CLIENT_ID,
             client_secret: process.env.PINGEN_CLIENT_SECRET
@@ -1434,7 +1435,7 @@ app.post('/pingen/send-arbeitsplan', async (req, res) => {
         }
 
         // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
             client_id: process.env.PINGEN_CLIENT_ID,
             client_secret: process.env.PINGEN_CLIENT_SECRET
@@ -1573,7 +1574,7 @@ app.post('/pingen/webhooks/register', async (req, res) => {
         const callbackUrl = webhook_url || `${process.env.DISPATCH_PUBLIC_URL || 'https://dispatch.fwv-raura.ch'}/pingen/webhook`;
 
         // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
             client_id: process.env.PINGEN_CLIENT_ID,
             client_secret: process.env.PINGEN_CLIENT_SECRET
@@ -1617,7 +1618,7 @@ app.post('/pingen/webhooks/register', async (req, res) => {
 app.get('/pingen/webhooks', async (req, res) => {
     try {
         // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
             client_id: process.env.PINGEN_CLIENT_ID,
             client_secret: process.env.PINGEN_CLIENT_SECRET
@@ -1649,7 +1650,7 @@ app.delete('/pingen/webhooks/:id', async (req, res) => {
         const { id } = req.params;
 
         // Token holen
-        const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
             grant_type: 'client_credentials',
             client_id: process.env.PINGEN_CLIENT_ID,
             client_secret: process.env.PINGEN_CLIENT_SECRET
@@ -1688,7 +1689,7 @@ async function sendToPingen(html, member, memberId, eventId) {
     await browser.close();
 
     // Get Pingen token
-    const tokenResponse = await axios.post(`${PINGEN_API}/oauth/token`, {
+    const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
         grant_type: 'client_credentials',
         client_id: process.env.PINGEN_CLIENT_ID,
         client_secret: process.env.PINGEN_CLIENT_SECRET
