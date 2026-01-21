@@ -1085,18 +1085,26 @@
                                 ${event.shifts.map((shift, index) => {
                                     const regs = shift.registrations || { approved: [], pending: [], spotsLeft: shift.needed };
                                     const isFull = regs.spotsLeft <= 0;
+                                    const bereich = shift.bereich || 'Allgemein';
+                                    const timeStr = shift.start_time && shift.end_time
+                                        ? `${shift.start_time} - ${shift.end_time}`
+                                        : (shift.start_time || 'ganztägig');
+                                    const shiftLabel = shift.name || `Schicht ${index + 1}`;
                                     return `
                                     <div class="p-3 border rounded-lg ${isFull ? 'bg-gray-100 opacity-60' : 'hover:bg-gray-50'}">
                                         <label class="flex items-start space-x-3 cursor-pointer ${isFull ? 'cursor-not-allowed' : ''}">
                                             <input type="checkbox" name="shifts" value="${shift.id || index}"
-                                                   data-name="${shift.name || `Schicht ${index + 1}`}"
+                                                   data-name="${shiftLabel}"
                                                    ${isFull ? 'disabled' : ''}
                                                    class="mt-1 w-4 h-4 text-fire-500 border-gray-300 rounded focus:ring-fire-500">
                                             <div class="flex-1">
                                                 <div class="flex justify-between items-center">
-                                                    <span class="font-medium text-sm">${shift.name || `Schicht ${index + 1}`}</span>
+                                                    <div>
+                                                        <span class="font-medium text-sm">${bereich}</span>
+                                                        <span class="text-gray-500 text-sm ml-2">${timeStr}</span>
+                                                    </div>
                                                     <span class="text-xs ${regs.spotsLeft > 1 ? 'text-green-600' : regs.spotsLeft === 1 ? 'text-orange-600' : 'text-red-600'}">
-                                                        ${isFull ? '❌ Voll' : `✓ ${regs.spotsLeft}/${shift.needed} frei`}
+                                                        ${isFull ? 'Voll' : `${regs.spotsLeft}/${shift.needed} frei`}
                                                     </span>
                                                 </div>
                                                 ${regs.approved.length > 0 ? `
