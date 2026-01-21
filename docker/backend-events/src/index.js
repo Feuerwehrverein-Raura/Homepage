@@ -483,7 +483,38 @@ app.get('/events', async (req, res) => {
                 };
             }));
 
-            return { ...event, shifts: shiftsWithRegistrations };
+            // Auch direkte Event-Registrierungen holen (ohne Schichten, z.B. für Ausflüge)
+            const directRegistrations = await pool.query(`
+                SELECT r.id, r.guest_name, r.guest_email, r.status, r.member_id, r.notes,
+                       m.vorname, m.nachname
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE r.event_id = $1 AND (r.shift_ids IS NULL OR array_length(r.shift_ids, 1) IS NULL)
+            `, [event.id]);
+
+            const directApproved = directRegistrations.rows.filter(r => r.status === 'approved');
+            const directPending = directRegistrations.rows.filter(r => r.status === 'pending');
+
+            return {
+                ...event,
+                shifts: shiftsWithRegistrations,
+                directRegistrations: {
+                    approved: directApproved.map(r => ({
+                        id: r.id,
+                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                        email: r.guest_email,
+                        notes: r.notes
+                    })),
+                    pending: directPending.map(r => ({
+                        id: r.id,
+                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                        email: r.guest_email,
+                        notes: r.notes
+                    })),
+                    approvedCount: directApproved.length,
+                    pendingCount: directPending.length
+                }
+            };
         }));
 
         res.json(events);
@@ -548,7 +579,38 @@ app.get('/events/:id', async (req, res) => {
             };
         }));
 
-        res.json({ ...event, shifts: shiftsWithRegistrations });
+        // Auch direkte Event-Registrierungen holen (ohne Schichten)
+        const directRegistrations = await pool.query(`
+            SELECT r.id, r.guest_name, r.guest_email, r.status, r.member_id, r.notes,
+                   m.vorname, m.nachname
+            FROM registrations r
+            LEFT JOIN members m ON r.member_id = m.id
+            WHERE r.event_id = $1 AND (r.shift_ids IS NULL OR array_length(r.shift_ids, 1) IS NULL)
+        `, [event.id]);
+
+        const directApproved = directRegistrations.rows.filter(r => r.status === 'approved');
+        const directPending = directRegistrations.rows.filter(r => r.status === 'pending');
+
+        res.json({
+            ...event,
+            shifts: shiftsWithRegistrations,
+            directRegistrations: {
+                approved: directApproved.map(r => ({
+                    id: r.id,
+                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                    email: r.guest_email,
+                    notes: r.notes
+                })),
+                pending: directPending.map(r => ({
+                    id: r.id,
+                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                    email: r.guest_email,
+                    notes: r.notes
+                })),
+                approvedCount: directApproved.length,
+                pendingCount: directPending.length
+            }
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
