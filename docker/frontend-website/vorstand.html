@@ -1957,10 +1957,19 @@
 
                 const kostenInfo = event.cost ? `\nKosten: ${event.cost}` : '';
 
+                // Absender: Organisator falls vorhanden, sonst Vorstand
+                const hasOrganizer = event.organizer_name && event.organizer_name.trim();
+                const einladungVon = hasOrganizer
+                    ? `${event.organizer_name} lädt euch herzlich ein:`
+                    : 'Der Vorstand möchte euch herzlich einladen:';
+                const grussformel = hasOrganizer
+                    ? `Mit freundlichen Grüssen\n\n${event.organizer_name}`
+                    : `Mit freundlichen Grüssen\nIm Namen des Vorstandes\n\nRené Käslin\nPräsident`;
+
                 const invitationSubject = `Einladung: ${event.title}`;
                 const invitationBody = `Liebe Mitglieder
 
-Der Vorstand möchte euch herzlich einladen:
+${einladungVon}
 
 ═══════════════════════════════════════════
 ${event.title}${event.subtitle ? '\n' + event.subtitle : ''}
@@ -1974,11 +1983,7 @@ ${event.description || ''}
 
 Wir freuen uns über zahlreiches Erscheinen!
 
-Mit freundlichen Grüssen
-Im Namen des Vorstandes
-
-René Käslin
-Präsident`;
+${grussformel}`;
 
                 // Switch to dispatch tab and fill in the data
                 switchTab('dispatch');
