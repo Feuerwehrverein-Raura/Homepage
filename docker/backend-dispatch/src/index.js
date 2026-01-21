@@ -5,7 +5,10 @@ const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
 const puppeteer = require('puppeteer');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const fontkit = require('@pdf-lib/fontkit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -92,16 +95,72 @@ function formatAddressForCoverPage(name, street, number, zip, city) {
     return `${name}\n${streetLine}\n${zip} ${city}`;
 }
 
+// Cache für heruntergeladene Schriftart
+let cachedFontBytes = null;
+
+// Helper: Schriftart laden (eingebettet, nicht nur referenziert)
+// Verwendet Inter Font von Google Fonts (OFL Lizenz)
+async function getEmbeddableFont() {
+    if (cachedFontBytes) {
+        return cachedFontBytes;
+    }
+
+    const fontPath = path.join('/tmp', 'Inter-Regular.ttf');
+
+    // Prüfen ob Font bereits lokal gecached
+    if (fs.existsSync(fontPath)) {
+        cachedFontBytes = fs.readFileSync(fontPath);
+        return cachedFontBytes;
+    }
+
+    // Font von Google Fonts herunterladen (Inter Regular)
+    // Direct link to TTF file from Google Fonts
+    const fontUrl = 'https://github.com/google/fonts/raw/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf';
+
+    try {
+        console.log('Downloading Inter font for PDF embedding...');
+        const response = await axios.get(fontUrl, { responseType: 'arraybuffer' });
+        cachedFontBytes = Buffer.from(response.data);
+
+        // Lokal cachen für nächsten Neustart
+        fs.writeFileSync(fontPath, cachedFontBytes);
+        console.log('Inter font downloaded and cached');
+
+        return cachedFontBytes;
+    } catch (error) {
+        console.error('Could not download Inter font, falling back to Helvetica:', error.message);
+        return null;
+    }
+}
+
 // Helper: Adresse direkt ins PDF schreiben (Schweizer Briefformat, Adresse rechts)
 // Position: Fensterbereich rechts oben auf der ersten Seite
+// Verwendet eingebettete Schriftart für Pingen-Kompatibilität
 async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null) {
     const pdfDoc = await PDFDocument.load(pdfBuffer);
+
+    // fontkit registrieren für Custom Fonts
+    pdfDoc.registerFontkit(fontkit);
+
     const pages = pdfDoc.getPages();
     const firstPage = pages[0];
     const { width, height } = firstPage.getSize();
 
-    // Helvetica für saubere Darstellung
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    // Versuche eingebettete Schriftart zu laden, sonst Fallback auf Helvetica
+    let font;
+    const fontBytes = await getEmbeddableFont();
+    if (fontBytes) {
+        try {
+            font = await pdfDoc.embedFont(fontBytes);
+            console.log('Using embedded Inter font');
+        } catch (fontErr) {
+            console.error('Could not embed Inter font:', fontErr.message);
+            font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        }
+    } else {
+        font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    }
+
     const fontSize = 10;
     const lineHeight = 14;
 
@@ -481,7 +540,7 @@ app.post('/email/bulk', async (req, res) => {
 
 app.post('/pingen/send', async (req, res) => {
     try {
-        const { html, recipient, member_id, event_id, staging = false, use_cover_page = true } = req.body;
+        const { html, recipient, member_id, event_id, staging = false, use_cover_page = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
 
         // Convert HTML to PDF
@@ -547,32 +606,40 @@ app.post('/pingen/send', async (req, res) => {
 
         // Step 3: Create letter with file reference
         // auto_send depends on whether we use cover page or embedded address
+        // Build letter attributes - don't specify address_position when using cover page
+        // This prevents Pingen from immediately marking as action_required due to missing address
+        const letterAttributes = {
+            file_original_name: 'brief.pdf',
+            file_url: fileUrl,
+            file_url_signature: fileUrlSignature,
+            auto_send: !use_cover_page,  // auto_send wenn Adresse im PDF, sonst manuell
+            delivery_product: 'cheap',
+            print_mode: 'simplex',
+            print_spectrum: 'grayscale',
+            meta_data: {
+                recipient: buildPingenAddress({
+                    name: recipient.name,
+                    street: parsedAddress.street,
+                    number: parsedAddress.number || recipient.number,
+                    zip: recipient.zip,
+                    city: recipient.city,
+                    country: recipient.country || 'CH'
+                }),
+                sender: buildPingenAddress(SENDER_ADDRESS)
+            }
+        };
+
+        // Only specify address_position when NOT using cover page (address already in PDF)
+        if (!use_cover_page) {
+            letterAttributes.address_position = 'right';  // Schweiz: Adresse rechts
+        }
+
         const uploadResponse = await axios.post(
             `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
             {
                 data: {
                     type: 'letters',
-                    attributes: {
-                        file_original_name: 'brief.pdf',
-                        file_url: fileUrl,
-                        file_url_signature: fileUrlSignature,
-                        address_position: 'right',  // Schweiz: Adresse rechts
-                        auto_send: !use_cover_page,  // auto_send wenn Adresse im PDF, sonst manuell
-                        delivery_product: 'cheap',
-                        print_mode: 'simplex',
-                        print_spectrum: 'grayscale',
-                        meta_data: {
-                            recipient: buildPingenAddress({
-                                name: recipient.name,
-                                street: parsedAddress.street,
-                                number: parsedAddress.number || recipient.number,
-                                zip: recipient.zip,
-                                city: recipient.city,
-                                country: recipient.country || 'CH'
-                            }),
-                            sender: buildPingenAddress(SENDER_ADDRESS)
-                        }
-                    }
+                    attributes: letterAttributes
                 }
             },
             {
@@ -587,32 +654,55 @@ app.post('/pingen/send', async (req, res) => {
 
         // Step 4: Handle based on use_cover_page option
         if (use_cover_page) {
-            // Wait for initial processing before creating cover page
-            const processingResult = await waitForLetterProcessing(letterId, token, staging);
-            if (!processingResult.ready) {
-                return res.status(400).json({ error: 'Brief-Verarbeitung Timeout' });
-            }
+            // Small delay to let Pingen process the upload, then create cover page immediately
+            // Don't wait for full processing - that would result in action_required status
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Create cover page with recipient address
-            await axios.patch(
-                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
-                {
-                    data: {
-                        type: 'letters',
-                        id: letterId,
-                        attributes: {
-                            address: recipientAddressStr,
-                            country: recipient.country || 'CH'
+            // Create cover page with recipient address (retry up to 3 times)
+            let coverPageCreated = false;
+            for (let attempt = 1; attempt <= 3 && !coverPageCreated; attempt++) {
+                try {
+                    await axios.patch(
+                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
+                        {
+                            data: {
+                                type: 'letters',
+                                id: letterId,
+                                attributes: {
+                                    address: recipientAddressStr,
+                                    country: recipient.country || 'CH'
+                                }
+                            }
+                        },
+                        {
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                'Content-Type': 'application/vnd.api+json'
+                            }
                         }
-                    }
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/vnd.api+json'
+                    );
+                    coverPageCreated = true;
+                    console.log(`Cover page created for letter ${letterId} on attempt ${attempt}`);
+                } catch (coverErr) {
+                    console.log(`Cover page attempt ${attempt}/3 failed for letter ${letterId}:`, coverErr.response?.data?.errors?.[0]?.title || coverErr.message);
+                    if (attempt < 3) {
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                     }
                 }
-            );
+            }
+
+            if (!coverPageCreated) {
+                // If cover page creation failed, delete the letter and return error
+                try {
+                    await axios.delete(
+                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                    );
+                } catch (delErr) { /* ignore */ }
+                return res.status(400).json({
+                    error: 'Deckblatt konnte nicht erstellt werden - Brief wurde gelöscht'
+                });
+            }
 
             // Wait for letter validation AFTER cover page is created
             const validationResult = await waitForLetterValidation(letterId, token, staging);
@@ -1970,7 +2060,7 @@ app.get('/pingen/post-members', async (req, res) => {
 // Massen-PDF an alle Post-Empfänger senden
 app.post('/pingen/send-bulk-pdf', async (req, res) => {
     try {
-        const { pdf_base64, subject, member_ids, staging = false, use_cover_page = true } = req.body;
+        const { pdf_base64, subject, member_ids, staging = false, use_cover_page = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
 
         if (!pdf_base64) {
@@ -2105,36 +2195,56 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 
                 // Step 5: Handle based on use_cover_page option
                 if (use_cover_page) {
-                    // Wait for initial processing before creating cover page
-                    const processingResult = await waitForLetterProcessing(letterId, token, staging);
-                    if (!processingResult.ready) {
+                    // Small delay to let Pingen process the upload, then create cover page immediately
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // Create cover page with recipient address (retry up to 3 times)
+                    let coverPageCreated = false;
+                    for (let attempt = 1; attempt <= 3 && !coverPageCreated; attempt++) {
+                        try {
+                            await axios.patch(
+                                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
+                                {
+                                    data: {
+                                        type: 'letters',
+                                        id: letterId,
+                                        attributes: {
+                                            address: recipientAddress,
+                                            country: 'CH'
+                                        }
+                                    }
+                                },
+                                {
+                                    headers: {
+                                        Authorization: `Bearer ${token}`,
+                                        'Content-Type': 'application/vnd.api+json'
+                                    }
+                                }
+                            );
+                            coverPageCreated = true;
+                            console.log(`Cover page created for letter ${letterId} on attempt ${attempt}`);
+                        } catch (coverErr) {
+                            console.log(`Cover page attempt ${attempt}/3 failed for letter ${letterId}:`, coverErr.response?.data?.errors?.[0]?.title || coverErr.message);
+                            if (attempt < 3) {
+                                await new Promise(resolve => setTimeout(resolve, 1500));
+                            }
+                        }
+                    }
+
+                    if (!coverPageCreated) {
+                        // If cover page creation failed, delete the letter
+                        try {
+                            await axios.delete(
+                                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
+                                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                            );
+                        } catch (delErr) { /* ignore */ }
                         results.failed.push({
                             name: `${member.vorname} ${member.nachname}`,
-                            error: 'Brief-Verarbeitung Timeout'
+                            error: 'Deckblatt konnte nicht erstellt werden'
                         });
                         continue;
                     }
-
-                    // Create cover page with recipient address
-                    await axios.patch(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
-                        {
-                            data: {
-                                type: 'letters',
-                                id: letterId,
-                                attributes: {
-                                    address: recipientAddress,
-                                    country: 'CH'
-                                }
-                            }
-                        },
-                        {
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                                'Content-Type': 'application/vnd.api+json'
-                            }
-                        }
-                    );
 
                     // Wait for letter validation AFTER cover page is created
                     const validationResult = await waitForLetterValidation(letterId, token, staging);
@@ -2255,7 +2365,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 // Brief manuell senden
 app.post('/pingen/send-manual', async (req, res) => {
     try {
-        const { member_id, event_id, subject, body, staging = false, use_cover_page = true } = req.body;
+        const { member_id, event_id, subject, body, staging = false, use_cover_page = false } = req.body;
 
         // Mitglied-Adresse laden
         const memberResult = await pool.query(
@@ -2337,7 +2447,7 @@ app.post('/pingen/send-manual', async (req, res) => {
 // Arbeitsplan per Post senden
 app.post('/pingen/send-arbeitsplan', async (req, res) => {
     try {
-        const { event_id, member_id, pdf_base64, staging = false, use_cover_page = true } = req.body;
+        const { event_id, member_id, pdf_base64, staging = false, use_cover_page = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
 
         // Mitglied-Adresse laden
@@ -2789,7 +2899,7 @@ app.delete('/pingen/webhooks/:id', async (req, res) => {
 });
 
 // Helper: An Pingen senden
-async function sendToPingen(html, member, memberId, eventId, staging = false, useCoverPage = true) {
+async function sendToPingen(html, member, memberId, eventId, staging = false, useCoverPage = false) {
     const PINGEN_API = getPingenApi(staging);
 
     // Convert HTML to PDF
