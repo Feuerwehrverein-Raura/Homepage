@@ -1,3 +1,10 @@
+## [1.23.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.23.1...v1.23.2) (2026-01-21)
+
+
+### Bug Fixes
+
+* correct JWKS URL and issuer for member authentication ([89a91c1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/89a91c1343b566ce42a62f798bc68ac710bb5bd1))
+
 ## [1.23.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.23.0...v1.23.1) (2026-01-21)
 
 
