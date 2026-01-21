@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const { Pool, types } = require('pg');
 const ical = require('ical-generator').default;
 const axios = require('axios');
+const PDFDocument = require('pdfkit');
 const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
@@ -676,6 +677,110 @@ app.get('/calendar/ics', async (req, res) => {
 
         res.type('text/calendar').send(calendar.toString());
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// ARBEITSPLAN PDF GENERATION
+// ============================================
+
+app.post('/arbeitsplan/pdf', async (req, res) => {
+    try {
+        const { eventId, eventTitle, shifts } = req.body;
+
+        if (!eventId || !shifts || shifts.length === 0) {
+            return res.status(400).json({ error: 'eventId and shifts are required' });
+        }
+
+        // Create PDF document
+        const doc = new PDFDocument({
+            size: 'A4',
+            margin: 50,
+            info: {
+                Title: `Arbeitsplan ${eventTitle}`,
+                Author: 'Feuerwehrverein Raura'
+            }
+        });
+
+        // Set response headers
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Arbeitsplan_${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+
+        // Pipe PDF to response
+        doc.pipe(res);
+
+        // Header
+        doc.fontSize(20).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        doc.fontSize(16).font('Helvetica').text('Arbeitsplan', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(14).font('Helvetica-Bold').text(eventTitle, { align: 'center' });
+        doc.moveDown(1);
+
+        // Group shifts by date
+        const shiftsByDate = {};
+        shifts.forEach(shift => {
+            const date = shift.date || 'Unbekannt';
+            if (!shiftsByDate[date]) {
+                shiftsByDate[date] = [];
+            }
+            shiftsByDate[date].push(shift);
+        });
+
+        // Render shifts grouped by date
+        Object.entries(shiftsByDate).forEach(([date, dateShifts]) => {
+            // Date header
+            const dateObj = new Date(date);
+            const dateStr = dateObj.toLocaleDateString('de-CH', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            doc.fontSize(12).font('Helvetica-Bold').text(dateStr);
+            doc.moveDown(0.3);
+
+            // Group by bereich
+            const byBereich = {};
+            dateShifts.forEach(shift => {
+                const bereich = shift.bereich || 'Allgemein';
+                if (!byBereich[bereich]) {
+                    byBereich[bereich] = [];
+                }
+                byBereich[bereich].push(shift);
+            });
+
+            Object.entries(byBereich).forEach(([bereich, bereichShifts]) => {
+                doc.fontSize(11).font('Helvetica-Bold').text(`  ${bereich}:`);
+
+                bereichShifts.forEach(shift => {
+                    const timeStr = shift.startTime && shift.endTime
+                        ? `${shift.startTime} - ${shift.endTime}`
+                        : '';
+                    const helpers = shift.helpers && shift.helpers.length > 0
+                        ? shift.helpers.join(', ')
+                        : 'Noch keine Anmeldungen';
+
+                    doc.fontSize(10).font('Helvetica')
+                        .text(`    ${shift.name} (${timeStr}): ${helpers}`);
+                });
+                doc.moveDown(0.3);
+            });
+
+            doc.moveDown(0.5);
+        });
+
+        // Footer
+        doc.moveDown(2);
+        doc.fontSize(8).font('Helvetica').fillColor('#666666')
+            .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
+
+        // Finalize PDF
+        doc.end();
+
+    } catch (error) {
+        console.error('PDF generation error:', error);
         res.status(500).json({ error: error.message });
     }
 });

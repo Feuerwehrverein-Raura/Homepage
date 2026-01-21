@@ -1187,8 +1187,10 @@ function renderUpcomingEvents(events) {
             additionalInfo += `<p>💰 ${event.cost}</p>`;
         }
 
+        const eventUrl = event.slug ? `./events.html?event=${event.slug}` : './events.html';
+
         return `
-            <div class="bg-gradient-to-br from-${color.from} to-${color.to} text-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform">
+            <a href="${eventUrl}" class="block bg-gradient-to-br from-${color.from} to-${color.to} text-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform cursor-pointer">
                 <div class="p-6">
                     <div class="flex items-center mb-4">
                         <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
@@ -1204,7 +1206,7 @@ function renderUpcomingEvents(events) {
                         ${additionalInfo}
                     </div>
                 </div>
-            </div>
+            </a>
         `;
     }).join('');
 

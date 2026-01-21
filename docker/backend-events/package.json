@@ -11,6 +11,7 @@
     "ical-generator": "^7.0.0",
     "axios": "^1.6.0",
     "jsonwebtoken": "^9.0.2",
-    "jwks-rsa": "^3.1.0"
+    "jwks-rsa": "^3.1.0",
+    "pdfkit": "^0.15.0"
   }
 }

@@ -215,6 +215,14 @@
                 this.filterEvents();
                 this.renderEvents();
                 document.getElementById('loading').classList.add('hidden');
+
+                // Check for event parameter in URL and auto-open modal
+                const urlParams = new URLSearchParams(window.location.search);
+                const eventSlug = urlParams.get('event');
+                if (eventSlug) {
+                    console.log('🔗 Opening event from URL:', eventSlug);
+                    this.showEventModal(eventSlug);
+                }
             }
 
             async loadEvents() {
