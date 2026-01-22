@@ -412,6 +412,26 @@
                                     </p>
                                 </div>
                                 
+                                <!-- Anrede und Geschlecht -->
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-fire-100 text-xs mb-1">Anrede *</label>
+                                        <select id="member-anrede" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                            <option value="" class="text-gray-800">Bitte wählen...</option>
+                                            <option value="Herr" class="text-gray-800">Herr</option>
+                                            <option value="Frau" class="text-gray-800">Frau</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-fire-100 text-xs mb-1">Geschlecht *</label>
+                                        <select id="member-geschlecht" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-white text-sm">
+                                            <option value="" class="text-gray-800">Bitte wählen...</option>
+                                            <option value="M" class="text-gray-800">Männlich</option>
+                                            <option value="W" class="text-gray-800">Weiblich</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <!-- Name und Vorname -->
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
@@ -420,6 +440,12 @@
                                     <div>
                                         <input type="text" id="member-firstname" placeholder="Vorname *" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white placeholder-fire-200 focus:outline-none focus:ring-2 focus:ring-white text-sm">
                                     </div>
+                                </div>
+
+                                <!-- Geburtstag -->
+                                <div>
+                                    <label class="block text-fire-100 text-xs mb-1">Geburtstag *</label>
+                                    <input type="date" id="member-birthday" class="w-full px-4 py-2 rounded-lg bg-white bg-opacity-20 border border-white border-opacity-30 text-white focus:outline-none focus:ring-2 focus:ring-white text-sm">
                                 </div>
                                 
                                 <!-- Adresse -->
@@ -782,6 +808,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function generateMembershipPayload(name, email) {
             // Alle erforderlichen Felder prüfen
+            const anrede = document.getElementById('member-anrede').value;
+            const geschlecht = document.getElementById('member-geschlecht').value;
+            const birthday = document.getElementById('member-birthday').value;
             const lastname = document.getElementById('member-lastname').value.trim();
             const firstname = document.getElementById('member-firstname').value.trim();
             const street = document.getElementById('member-street').value.trim();
@@ -795,7 +824,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const otherAddress = document.getElementById('other-address').value.trim();
 
             // Validierung
-            if (!lastname || !firstname || !street || !city || !phone || !memberEmail ||
+            if (!anrede || !geschlecht || !birthday || !lastname || !firstname || !street || !city || !phone || !memberEmail ||
                 !firefighterStatus || !correspondenceMethod || !correspondenceAddress) {
                 alert('Bitte füllen Sie alle Pflichtfelder (*) aus.');
                 return null;
@@ -829,6 +858,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 subject: 'Mitgliedschaft',
                 type: 'membership',
                 membership: {
+                    anrede: anrede,
+                    geschlecht: geschlecht,
+                    geburtstag: birthday,
                     lastname: lastname,
                     firstname: firstname,
                     street: street,

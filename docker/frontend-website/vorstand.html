@@ -463,7 +463,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Kategorie</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Organisator</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Schichten</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Schichten/Personen</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Anmeldungen</th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Aktionen</th>
                             </tr>
@@ -1933,18 +1933,33 @@
                 // Zähle Registrierungen aus allen Schichten + direkte Registrierungen
                 let pendingCount = 0;
                 let approvedCount = 0;
+                let totalShiftCapacity = 0;
+                let totalShiftRegistered = 0;
+                let shiftsWithRegistrations = 0;
                 if (event.shifts && event.shifts.length > 0) {
                     event.shifts.forEach(shift => {
                         if (shift.registrations) {
                             pendingCount += shift.registrations.pendingCount || 0;
                             approvedCount += shift.registrations.approvedCount || 0;
+                            totalShiftRegistered += (shift.registrations.approvedCount || 0);
+                            if ((shift.registrations.approvedCount || 0) > 0) {
+                                shiftsWithRegistrations++;
+                            }
                         }
+                        totalShiftCapacity += shift.max_helpers || 0;
                     });
                 }
                 // Direkte Teilnehmer-Registrierungen (ohne Schichten)
                 if (event.directRegistrations) {
                     pendingCount += event.directRegistrations.pendingCount || 0;
                     approvedCount += event.directRegistrations.approvedCount || 0;
+                }
+
+                // Schichten/Personen Display: "4/16"
+                const shiftCount = event.shifts?.length || 0;
+                let shiftsDisplay = '-';
+                if (shiftCount > 0) {
+                    shiftsDisplay = `${totalShiftRegistered}/${totalShiftCapacity > 0 ? totalShiftCapacity : shiftCount}`;
                 }
 
                 const hasPending = pendingCount > 0;
@@ -1973,7 +1988,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="text-sm text-gray-600">${event.shifts?.length || 0}</span>
+                            <span class="text-sm text-gray-600">${shiftsDisplay}</span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="text-sm">${registrationsDisplay}</span>
