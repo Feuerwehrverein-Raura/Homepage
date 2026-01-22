@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.33.0...v1.34.0) (2026-01-22)
+
+
+### Features
+
+* **frontend:** improve event displays and member registration ([36d4b08](https://github.com/Feuerwehrverein-Raura/Homepage/commit/36d4b08c97d3b8b169860431b95efa15e5bab3ba))
+
 # [1.33.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.32.0...v1.33.0) (2026-01-22)
 
 
