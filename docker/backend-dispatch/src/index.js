@@ -198,9 +198,10 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
 
     if (country === 'DE') {
         // Deutsches Briefformat: Adressfenster LINKS (DIN Standard)
-        // Pingen erwartet: ~20mm von links, ~55mm von oben
+        // DIN 5008: Adressfenster bei ~45mm von oben, aber Textbaseline tiefer
+        // damit der weiße Hintergrund nicht den Header überdeckt
         addressX = 57; // ~20mm von links
-        addressY = height - 156; // ~55mm von oben (842 - 55*2.835)
+        addressY = height - 213; // ~75mm von oben (75 * 2.835 = 213)
         console.log('Detected German address - using LEFT window position');
     } else {
         // Schweizer Briefformat: Adressfenster RECHTS
