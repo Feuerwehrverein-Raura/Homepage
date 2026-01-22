@@ -1,3 +1,10 @@
+## [1.35.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.35.0...v1.35.1) (2026-01-22)
+
+
+### Bug Fixes
+
+* **events:** show directRegistrations for Aufbau/Abbau events ([22b2559](https://github.com/Feuerwehrverein-Raura/Homepage/commit/22b25595a9b52bafeed8b5e2a3bb3fbae2195df5))
+
 # [1.35.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.34.0...v1.35.0) (2026-01-22)
 
 
