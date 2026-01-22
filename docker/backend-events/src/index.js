@@ -1561,6 +1561,226 @@ app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', '
     }
 });
 
+// Suggest alternative shift
+app.post('/registrations/:id/suggest-alternative', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { newShiftId, shiftInfo, comment, email } = req.body;
+
+        if (!newShiftId || !email) {
+            return res.status(400).json({ error: 'newShiftId and email are required' });
+        }
+
+        // Get the registration
+        const regResult = await pool.query('SELECT * FROM registrations WHERE id = $1', [id]);
+        if (regResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Registration not found' });
+        }
+        const reg = regResult.rows[0];
+
+        // Get event info
+        const eventResult = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
+        const eventTitle = eventResult.rows[0]?.title || 'Event';
+
+        // Generate tokens for accept/decline
+        const acceptToken = crypto.randomUUID();
+        const declineToken = crypto.randomUUID();
+
+        // Store the alternative suggestion in the registration notes
+        const suggestionData = {
+            suggested_shift_id: newShiftId,
+            suggested_shift_info: shiftInfo,
+            accept_token: acceptToken,
+            decline_token: declineToken,
+            suggested_at: new Date().toISOString(),
+            suggested_by: req.user.email || req.user.name
+        };
+
+        await pool.query(`
+            UPDATE registrations
+            SET notes = COALESCE(notes, '{}')::jsonb || $2::jsonb
+            WHERE id = $1
+        `, [id, JSON.stringify({ alternative_suggestion: suggestionData })]);
+
+        // Format shift info for email
+        const shiftLabel = shiftInfo.bereich
+            ? `${shiftInfo.bereich} - ${shiftInfo.name} (${shiftInfo.date} ${shiftInfo.time})`
+            : `${shiftInfo.name} (${shiftInfo.date} ${shiftInfo.time})`;
+
+        // Build email with accept/decline links
+        const baseUrl = process.env.BASE_URL || 'https://api.fwv-raura.ch';
+        const acceptUrl = `${baseUrl}/registrations/alternative-response/${acceptToken}`;
+        const declineUrl = `${baseUrl}/registrations/alternative-response/${declineToken}`;
+
+        const emailBody = `Guten Tag ${reg.guest_name},
+
+${comment || 'Wir haben einen alternativen Vorschlag fuer deine Anmeldung.'}
+
+Vorgeschlagene Schicht:
+${shiftLabel}
+
+Event: ${eventTitle}
+
+Bitte klicke auf einen der folgenden Links:
+
+✅ JA, ich uebernehme diese Schicht:
+${acceptUrl}
+
+❌ NEIN, ich moechte absagen:
+${declineUrl}
+
+Bei Fragen kontaktiere uns bitte.
+
+Mit freundlichen Gruessen
+Feuerwehrverein Raura`;
+
+        // Send email via dispatch API
+        await axios.post(`${DISPATCH_API}/email/send`, {
+            to: email,
+            subject: `Alternative Schicht vorgeschlagen - ${eventTitle}`,
+            body: emailBody
+        });
+
+        logInfo('Alternative shift suggested', {
+            registrationId: id,
+            newShiftId,
+            email,
+            suggestedBy: req.user.email
+        });
+
+        res.json({ success: true, message: 'Vorschlag gesendet' });
+    } catch (error) {
+        logError('Error suggesting alternative', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Handle alternative response (accept/decline)
+app.get('/registrations/alternative-response/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        // Find registration with this token
+        const result = await pool.query(`
+            SELECT r.*, e.title as event_title
+            FROM registrations r
+            JOIN events e ON r.event_id = e.id
+            WHERE r.notes::text LIKE $1
+        `, [`%${token}%`]);
+
+        if (result.rows.length === 0) {
+            return res.send(`
+                <html>
+                <head><title>Fehler</title></head>
+                <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                    <h1>❌ Link ungueltig</h1>
+                    <p>Dieser Link ist ungueltig oder bereits verwendet worden.</p>
+                </body>
+                </html>
+            `);
+        }
+
+        const reg = result.rows[0];
+        let notes;
+        try {
+            notes = typeof reg.notes === 'string' ? JSON.parse(reg.notes) : reg.notes;
+        } catch(e) {
+            notes = {};
+        }
+
+        const suggestion = notes?.alternative_suggestion;
+        if (!suggestion) {
+            return res.send(`
+                <html>
+                <head><title>Fehler</title></head>
+                <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                    <h1>❌ Kein Vorschlag gefunden</h1>
+                    <p>Fuer diese Anmeldung liegt kein alternativer Vorschlag vor.</p>
+                </body>
+                </html>
+            `);
+        }
+
+        const isAccept = token === suggestion.accept_token;
+        const isDecline = token === suggestion.decline_token;
+
+        if (!isAccept && !isDecline) {
+            return res.send(`
+                <html>
+                <head><title>Fehler</title></head>
+                <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                    <h1>❌ Token ungueltig</h1>
+                    <p>Dieser Bestaetigungslink ist ungueltig.</p>
+                </body>
+                </html>
+            `);
+        }
+
+        if (isAccept) {
+            // Accept: Update registration to new shift
+            await pool.query(`
+                UPDATE registrations
+                SET shift_ids = ARRAY[$2::uuid],
+                    status = 'approved',
+                    confirmed_at = NOW(),
+                    notes = notes::jsonb - 'alternative_suggestion'
+                WHERE id = $1
+            `, [reg.id, suggestion.suggested_shift_id]);
+
+            logInfo('Alternative accepted', {
+                registrationId: reg.id,
+                newShiftId: suggestion.suggested_shift_id
+            });
+
+            return res.send(`
+                <html>
+                <head><title>Bestaetigt!</title></head>
+                <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                    <h1>✅ Vielen Dank!</h1>
+                    <p>Deine Anmeldung wurde auf die neue Schicht umgebucht:</p>
+                    <p><strong>${suggestion.suggested_shift_info?.bereich ? suggestion.suggested_shift_info.bereich + ' - ' : ''}${suggestion.suggested_shift_info?.name}</strong></p>
+                    <p>${suggestion.suggested_shift_info?.date} ${suggestion.suggested_shift_info?.time}</p>
+                    <br>
+                    <p>Wir freuen uns auf dich!</p>
+                </body>
+                </html>
+            `);
+        } else {
+            // Decline: Reject registration
+            await pool.query(`
+                UPDATE registrations
+                SET status = 'rejected',
+                    notes = notes::jsonb - 'alternative_suggestion'
+                WHERE id = $1
+            `, [reg.id]);
+
+            logInfo('Alternative declined', { registrationId: reg.id });
+
+            return res.send(`
+                <html>
+                <head><title>Abgesagt</title></head>
+                <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                    <h1>Schade!</h1>
+                    <p>Deine Anmeldung fuer "${reg.event_title}" wurde storniert.</p>
+                    <p>Vielleicht klappt es beim naechsten Mal!</p>
+                </body>
+                </html>
+            `);
+        }
+    } catch (error) {
+        logError('Error handling alternative response', { error: error.message });
+        res.status(500).send(`
+            <html>
+            <head><title>Fehler</title></head>
+            <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                <h1>❌ Fehler</h1>
+                <p>Es ist ein Fehler aufgetreten. Bitte kontaktiere uns.</p>
+            </body>
+            </html>
+        `);
+    }
+});
+
 // Update registration (Vorstand)
 app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {

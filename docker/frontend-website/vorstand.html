@@ -1405,6 +1405,45 @@
         </div>
     </div>
 
+    <!-- Alternative Schicht vorschlagen Modal -->
+    <div id="suggest-alternative-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-lg w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Alternative Schicht vorschlagen</h3>
+                    <button onclick="closeSuggestAlternativeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div class="space-y-4">
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                        <p class="text-sm text-gray-600">Anmeldung von:</p>
+                        <p id="suggest-alt-person" class="font-semibold text-gray-800"></p>
+                        <p id="suggest-alt-current-shift" class="text-sm text-gray-500"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Alternative Schicht *</label>
+                        <select id="suggest-alt-shift" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <option value="">Bitte waehlen...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nachricht an die Person</label>
+                        <textarea id="suggest-alt-comment" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500" placeholder="z.B. Leider ist diese Schicht bereits voll besetzt. Waerst du bereit, stattdessen folgende Schicht zu uebernehmen?"></textarea>
+                    </div>
+                    <div class="flex space-x-3 pt-4">
+                        <button onclick="sendAlternativeSuggestion()" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                            Vorschlag senden
+                        </button>
+                        <button onclick="closeSuggestAlternativeModal()" class="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors">
+                            Abbrechen
+                        </button>
+                    </div>
+                </div>
+                <input type="hidden" id="suggest-alt-registration-id">
+                <input type="hidden" id="suggest-alt-email">
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = 'https://api.fwv-raura.ch';
         const DISPATCH_API = 'https://api.fwv-raura.ch';
@@ -2507,8 +2546,16 @@ ${grussformel}`;
                         ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Bestaetigt</span>'
                         : '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Offen</span>';
 
+                    const shiftInfo = JSON.stringify({
+                        bereich: shift.bereich || '',
+                        name: shift.name,
+                        date: shift.date,
+                        time: `${shift.start_time}-${shift.end_time}`
+                    }).replace(/'/g, "\\'");
+
                     const actions = reg.status === 'pending'
                         ? `<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
+                           <button onclick="openSuggestAlternativeModal('${reg.id}', '${(reg.name || '').replace(/'/g, "\\'")}', '${(reg.email || '').replace(/'/g, "\\'")}', '${shiftInfo}')" class="text-blue-600 hover:text-blue-800 mr-2">Alternative</button>
                            <button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Ablehnen</button>`
                         : `<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
 
@@ -2644,6 +2691,121 @@ ${grussformel}`;
                 await loadEvents();
                 currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
                 renderEventRegistrations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // ============================================
+        // ALTERNATIVE SCHICHT VORSCHLAGEN
+        // ============================================
+
+        function openSuggestAlternativeModal(regId, personName, personEmail, currentShiftJson) {
+            const event = currentEventForRegistrations;
+            if (!event || !event.shifts) return;
+
+            let currentShift;
+            try {
+                currentShift = JSON.parse(currentShiftJson);
+            } catch(e) {
+                currentShift = { name: 'Unbekannt' };
+            }
+
+            document.getElementById('suggest-alt-registration-id').value = regId;
+            document.getElementById('suggest-alt-email').value = personEmail;
+            document.getElementById('suggest-alt-person').textContent = personName;
+            document.getElementById('suggest-alt-current-shift').textContent =
+                `Aktuelle Schicht: ${currentShift.bereich ? currentShift.bereich + ' - ' : ''}${currentShift.name} (${currentShift.date} ${currentShift.time})`;
+
+            // Populate alternative shifts dropdown
+            const select = document.getElementById('suggest-alt-shift');
+            select.innerHTML = '<option value="">Bitte waehlen...</option>';
+
+            for (const shift of event.shifts) {
+                const regs = shift.registrations || { approved: [] };
+                const approvedCount = regs.approved?.length || 0;
+                const maxHelpers = shift.max_helpers || 999;
+                const isFull = approvedCount >= maxHelpers;
+                const freeSlots = maxHelpers - approvedCount;
+
+                const label = `${shift.bereich ? shift.bereich + ' - ' : ''}${shift.name}: ${shift.date} ${shift.start_time}-${shift.end_time}` +
+                    (shift.max_helpers ? ` (${freeSlots}/${maxHelpers} frei)` : '');
+
+                const option = document.createElement('option');
+                option.value = shift.id;
+                option.textContent = label;
+                option.dataset.shiftInfo = JSON.stringify({
+                    id: shift.id,
+                    bereich: shift.bereich || '',
+                    name: shift.name,
+                    date: shift.date,
+                    time: `${shift.start_time}-${shift.end_time}`
+                });
+                if (isFull) {
+                    option.textContent += ' [VOLL]';
+                    option.style.color = '#999';
+                }
+                select.appendChild(option);
+            }
+
+            // Set default comment
+            document.getElementById('suggest-alt-comment').value =
+                'Leider ist die von dir gewaehlte Schicht bereits voll besetzt. Waerst du bereit, stattdessen die folgende Schicht zu uebernehmen?';
+
+            document.getElementById('suggest-alternative-modal').classList.remove('hidden');
+        }
+
+        function closeSuggestAlternativeModal() {
+            document.getElementById('suggest-alternative-modal').classList.add('hidden');
+        }
+
+        async function sendAlternativeSuggestion() {
+            const regId = document.getElementById('suggest-alt-registration-id').value;
+            const email = document.getElementById('suggest-alt-email').value;
+            const shiftSelect = document.getElementById('suggest-alt-shift');
+            const newShiftId = shiftSelect.value;
+            const comment = document.getElementById('suggest-alt-comment').value;
+
+            if (!newShiftId) {
+                alert('Bitte waehle eine alternative Schicht aus');
+                return;
+            }
+
+            if (!email) {
+                alert('Keine E-Mail-Adresse vorhanden');
+                return;
+            }
+
+            const selectedOption = shiftSelect.options[shiftSelect.selectedIndex];
+            let shiftInfo;
+            try {
+                shiftInfo = JSON.parse(selectedOption.dataset.shiftInfo);
+            } catch(e) {
+                shiftInfo = { name: selectedOption.textContent };
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/registrations/${regId}/suggest-alternative`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        newShiftId,
+                        shiftInfo,
+                        comment,
+                        email
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Fehler beim Senden');
+                }
+
+                alert('Vorschlag wurde per E-Mail gesendet');
+                closeSuggestAlternativeModal();
             } catch (error) {
                 alert(error.message);
             }
