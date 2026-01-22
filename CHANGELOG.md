@@ -1,3 +1,10 @@
+## [1.27.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.2...v1.27.3) (2026-01-22)
+
+
+### Bug Fixes
+
+* **pingen:** adjust Swiss address position to 78mm from top ([b8db2d6](https://github.com/Feuerwehrverein-Raura/Homepage/commit/b8db2d669e175f616cf4b616da86f07a5150943b))
+
 ## [1.27.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.1...v1.27.2) (2026-01-21)
 
 
