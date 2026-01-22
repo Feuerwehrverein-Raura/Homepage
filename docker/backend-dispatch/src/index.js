@@ -207,9 +207,9 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
         // Pingen Spezifikation:
         //   Adressbereich: X=118mm, Y=60mm, W=85.5mm, H=25.5mm (60-85.5mm von oben)
         //   Frankierbereich: X=116mm, Y=40mm, W=89.5mm, H=47.5mm (40-87.5mm von oben)
-        // Position bei ~65mm von oben = oberer Bereich des Adressfelds
+        // Position bei ~70mm von oben = Mitte des Adressfelds
         addressX = 335; // 118mm von links
-        addressY = height - 184; // ~65mm von oben (65 * 2.835 = 184)
+        addressY = height - 198; // ~70mm von oben (70 * 2.835 = 198)
         console.log('Detected Swiss address - using RIGHT window position');
     }
 
