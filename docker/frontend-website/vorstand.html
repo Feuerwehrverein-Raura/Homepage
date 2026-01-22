@@ -2724,6 +2724,96 @@ ${grussformel}`;
             }
         }
 
+        function formatAuditDetails(entry) {
+            const action = entry.action;
+            const details = entry.details || {};
+            const newValues = entry.new_values || {};
+
+            // Combine details and new_values for display
+            const data = { ...details, ...newValues };
+
+            // Format based on action type
+            if (action === 'LOGIN_SUCCESS') {
+                return `<span class="text-green-700">Erfolgreich angemeldet</span>`;
+            }
+            if (action === 'LOGIN_FAILED') {
+                return `<span class="text-red-700">Anmeldung fehlgeschlagen${data.reason ? ': ' + data.reason : ''}</span>`;
+            }
+            if (action === 'MEMBER_CREATE') {
+                const name = [data.vorname, data.nachname].filter(Boolean).join(' ');
+                return name ? `<span class="text-green-700">Neues Mitglied: <strong>${name}</strong></span>` : 'Neues Mitglied erstellt';
+            }
+            if (action === 'MEMBER_UPDATE') {
+                const changes = [];
+                if (data.vorname || data.nachname) {
+                    const name = [data.vorname, data.nachname].filter(Boolean).join(' ');
+                    changes.push(`Name: ${name}`);
+                }
+                if (data.email) changes.push(`E-Mail: ${data.email}`);
+                if (data.telefon) changes.push(`Tel: ${data.telefon}`);
+                if (data.status) changes.push(`Status: ${data.status}`);
+                if (data.funktion) changes.push(`Funktion: ${data.funktion}`);
+                if (data.strasse) changes.push(`Adresse aktualisiert`);
+                return changes.length > 0
+                    ? `<span class="text-blue-700">${changes.join(', ')}</span>`
+                    : '<span class="text-blue-700">Mitglied aktualisiert</span>';
+            }
+            if (action === 'MEMBER_DELETE') {
+                const name = [data.vorname, data.nachname].filter(Boolean).join(' ');
+                return name ? `<span class="text-orange-700">Geloescht: <strong>${name}</strong></span>` : 'Mitglied geloescht';
+            }
+            if (action === 'EVENT_CREATE') {
+                return data.title
+                    ? `<span class="text-green-700">Neues Event: <strong>${data.title}</strong></span>`
+                    : 'Neues Event erstellt';
+            }
+            if (action === 'EVENT_UPDATE') {
+                return data.title
+                    ? `<span class="text-blue-700">Event aktualisiert: <strong>${data.title}</strong></span>`
+                    : 'Event aktualisiert';
+            }
+            if (action === 'EVENT_DELETE') {
+                return data.title
+                    ? `<span class="text-orange-700">Event geloescht: <strong>${data.title}</strong></span>`
+                    : 'Event geloescht';
+            }
+            if (action === 'DISPATCH_EMAIL') {
+                const recipients = data.recipientCount || data.recipients?.length || '?';
+                return `<span class="text-purple-700">E-Mail an ${recipients} Empfaenger${data.subject ? ': ' + data.subject : ''}</span>`;
+            }
+            if (action === 'DISPATCH_LETTER' || action === 'PINGEN_SEND') {
+                return `<span class="text-purple-700">Brief versendet${data.recipient ? ' an ' + data.recipient : ''}</span>`;
+            }
+            if (action === 'AUDIT_VIEW') {
+                return '<span class="text-gray-500">Audit-Log eingesehen</span>';
+            }
+            if (action === 'REGISTRATION_APPROVE') {
+                const name = [data.vorname, data.nachname].filter(Boolean).join(' ');
+                return name
+                    ? `<span class="text-green-700">Anmeldung genehmigt: <strong>${name}</strong></span>`
+                    : 'Anmeldung genehmigt';
+            }
+            if (action === 'REGISTRATION_REJECT') {
+                const name = [data.vorname, data.nachname].filter(Boolean).join(' ');
+                return name
+                    ? `<span class="text-red-700">Anmeldung abgelehnt: <strong>${name}</strong></span>`
+                    : 'Anmeldung abgelehnt';
+            }
+
+            // Fallback: Show raw data if we have any
+            if (Object.keys(data).length > 0) {
+                const items = [];
+                for (const [key, value] of Object.entries(data)) {
+                    if (value && typeof value !== 'object') {
+                        items.push(`${key}: ${value}`);
+                    }
+                }
+                return items.length > 0 ? items.slice(0, 3).join(', ') : '-';
+            }
+
+            return '-';
+        }
+
         function renderAuditLog() {
             const tbody = document.getElementById('audit-tbody');
 
@@ -2734,7 +2824,8 @@ ${grussformel}`;
 
             tbody.innerHTML = auditLog.map(entry => {
                 const date = new Date(entry.created_at);
-                const details = entry.details ? JSON.stringify(entry.details, null, 2) : '-';
+                const formattedDetails = formatAuditDetails(entry);
+                const rawDetails = JSON.stringify({ ...entry.details, ...entry.new_values }, null, 2);
 
                 return `
                     <tr class="hover:bg-gray-50">
@@ -2744,7 +2835,7 @@ ${grussformel}`;
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="px-2 py-1 text-xs font-medium rounded-full ${getAuditActionClass(entry.action)}">
-                                ${entry.action}
+                                ${getAuditActionLabel(entry.action)}
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
@@ -2754,13 +2845,34 @@ ${grussformel}`;
                             <div class="text-sm text-gray-600">${entry.ip_address || '-'}</div>
                         </td>
                         <td class="px-6 py-4">
-                            <div class="text-xs text-gray-500 max-w-xs truncate" title="${details}">
-                                ${details}
+                            <div class="text-sm max-w-md" title="${rawDetails.replace(/"/g, '&quot;')}">
+                                ${formattedDetails}
                             </div>
                         </td>
                     </tr>
                 `;
             }).join('');
+        }
+
+        function getAuditActionLabel(action) {
+            const labels = {
+                'LOGIN_SUCCESS': 'Anmeldung',
+                'LOGIN_FAILED': 'Fehlgeschlagen',
+                'MEMBER_CREATE': 'Mitglied+',
+                'MEMBER_UPDATE': 'Mitglied~',
+                'MEMBER_DELETE': 'Mitglied-',
+                'EVENT_CREATE': 'Event+',
+                'EVENT_UPDATE': 'Event~',
+                'EVENT_DELETE': 'Event-',
+                'DISPATCH_EMAIL': 'E-Mail',
+                'DISPATCH_LETTER': 'Brief',
+                'PINGEN_SEND': 'Pingen',
+                'AUDIT_VIEW': 'Log-Ansicht',
+                'REGISTRATION_APPROVE': 'Genehmigt',
+                'REGISTRATION_REJECT': 'Abgelehnt',
+                'SYSTEM_START': 'System'
+            };
+            return labels[action] || action;
         }
 
         function getAuditActionClass(action) {
