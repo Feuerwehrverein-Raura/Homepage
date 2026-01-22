@@ -498,6 +498,7 @@ app.post('/templates', async (req, res) => {
 // ============================================
 
 app.post('/email/send', async (req, res) => {
+    console.log('[EMAIL] /email/send called with:', { to: req.body.to, template_id: req.body.template_id, member_id: req.body.member_id });
     try {
         const { to, subject, body, template_id, variables, member_id, event_id } = req.body;
 
@@ -536,20 +537,25 @@ app.post('/email/send', async (req, res) => {
             VALUES ('email', $1, $2, $3, $4, $5, 'sent', $6, $7, NOW())
         `, [template_id, member_id, to, emailSubject, emailBody, info.messageId, event_id]);
 
+        console.log('[EMAIL] Email sent successfully to:', to, 'messageId:', info.messageId);
         res.json({ success: true, messageId: info.messageId });
     } catch (error) {
+        console.error('[EMAIL] /email/send ERROR:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.post('/email/bulk', async (req, res) => {
+    console.log('[EMAIL BULK] /email/bulk called with:', { member_ids: req.body.member_ids, template_id: req.body.template_id });
     try {
         const { member_ids, template_id, variables } = req.body;
 
         // Get members
+        console.log('[EMAIL BULK] Fetching members from:', `${process.env.MEMBERS_API_URL}/members`);
         const members = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
             params: { ids: member_ids.join(',') }
         });
+        console.log('[EMAIL BULK] Fetched', members.data.length, 'members');
 
         const results = [];
         for (const member of members.data) {
@@ -577,8 +583,10 @@ app.post('/email/bulk', async (req, res) => {
             }
         }
 
+        console.log('[EMAIL BULK] Completed:', { total: results.length, success: results.filter(r => r.success).length });
         res.json({ results, total: results.length, success: results.filter(r => r.success).length });
     } catch (error) {
+        console.error('[EMAIL BULK] ERROR:', error.message, error.stack);
         res.status(500).json({ error: error.message });
     }
 });
