@@ -204,10 +204,10 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
         console.log('Detected German address - using LEFT window position');
     } else {
         // Schweizer Briefformat: Adressfenster RECHTS
-        // Pingen zeigt Adressbereich: 118mm von links, 60mm von oben
-        // 118mm = 335 points, 60mm von oben = 842 - 170 = 672 points
+        // Adressbereich: ~60-85mm von oben laut Pingen-Spezifikation
+        // Position bei ~78mm von oben = im oberen Drittel des Adressbereichs
         addressX = 335; // 118mm von links
-        addressY = height - 175; // ~62mm von oben (etwas unterhalb des oberen Fensterrands)
+        addressY = height - 221; // ~78mm von oben (78 * 2.835 = 221)
         console.log('Detected Swiss address - using RIGHT window position');
     }
 
@@ -2348,37 +2348,13 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                         }
                     );
                 } else {
-                    // Address is embedded in PDF, just wait for validation (auto_send handles sending)
-                    const validationResult = await waitForLetterValidation(letterId, token, staging);
-                    if (!validationResult.success) {
-                        console.log(`Letter ${letterId} validation failed: ${validationResult.reason}`);
-                        try {
-                            await axios.delete(
-                                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                            );
-                        } catch (delErr) {
-                            console.error(`Could not delete invalid letter ${letterId}:`, delErr.message);
-                        }
-                        results.failed.push({
-                            name: `${member.vorname} ${member.nachname}`,
-                            error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
-                        });
-                        continue;
-                    }
+                    // Address is embedded in PDF - auto_send handles sending
+                    // Don't wait for validation in bulk mode - it takes too long
+                    console.log(`Letter ${letterId} uploaded for ${member.vorname} ${member.nachname} - will be processed by Pingen`);
                 }
 
-                // Step 6: Check status and delete if action required
-                const statusCheck = await checkAndDeleteIfActionRequired(letterId, token, staging);
-
-                if (statusCheck.deleted) {
-                    console.log(`Letter ${letterId} for ${member.vorname} ${member.nachname} deleted due to action_required status`);
-                    results.failed.push({
-                        name: `${member.vorname} ${member.nachname}`,
-                        error: 'Brief wurde von Pingen als "Aktion erforderlich" markiert und automatisch gelöscht'
-                    });
-                    continue;
-                }
+                // Don't wait for validation or status check in bulk mode - too slow
+                // Letters will appear in Pingen and may need manual action
 
                 // Log speichern
                 await pool.query(`
