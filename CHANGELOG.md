@@ -1,3 +1,10 @@
+## [1.27.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.4...v1.27.5) (2026-01-22)
+
+
+### Performance Improvements
+
+* **pingen:** parallelize bulk send with batches of 5 ([37cf394](https://github.com/Feuerwehrverein-Raura/Homepage/commit/37cf3944161a09b4e470e6cde6793ba1cf75c41c))
+
 ## [1.27.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.3...v1.27.4) (2026-01-22)
 
 
