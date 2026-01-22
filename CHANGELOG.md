@@ -1,3 +1,10 @@
+# [1.36.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.35.1...v1.36.0) (2026-01-22)
+
+
+### Features
+
+* **registrations:** add 'suggest alternative shift' functionality ([14ea4aa](https://github.com/Feuerwehrverein-Raura/Homepage/commit/14ea4aa11d9df4e462cd9ce7f7f96e6783612f02))
+
 ## [1.35.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.35.0...v1.35.1) (2026-01-22)
 
 
