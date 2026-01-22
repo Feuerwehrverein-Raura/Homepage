@@ -117,6 +117,72 @@ function formatAddressForCoverPage(name, street, number, zip, city) {
     return `${name}\n${streetLine}\n${zip} ${city}`;
 }
 
+// Helper: Send Pingen cost notification to Kassier
+// Pingen Preise (Stand 2024): Economy ~CHF 1.00, Priority ~CHF 1.50 (inkl. Porto)
+async function sendPingenCostNotification(recipientName, letterId, isStaging = false) {
+    try {
+        // Get Kassier email from database
+        const kassierResult = await pool.query(
+            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Kassier%' LIMIT 1"
+        );
+
+        if (kassierResult.rows.length === 0) {
+            logWarn('Kassier not found for Pingen cost notification');
+            return;
+        }
+
+        const kassier = kassierResult.rows[0];
+        const estimatedCost = 'ca. CHF 1.00'; // Economy Versand
+        const environment = isStaging ? ' (STAGING/TEST)' : '';
+
+        await transporter.sendMail({
+            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+            to: kassier.email,
+            subject: `Pingen Briefversand${environment}: ${recipientName}`,
+            text: `Hallo ${kassier.vorname},\n\nEin Brief wurde über Pingen versendet:\n\nEmpfänger: ${recipientName}\nBrief-ID: ${letterId}\nGeschätzte Kosten: ${estimatedCost}\n\nDie genauen Kosten findest du im Pingen Dashboard.\n\nFeuerwehrverein Raura`,
+            html: `<p>Hallo ${kassier.vorname},</p><p>Ein Brief wurde über Pingen versendet:</p><ul><li><strong>Empfänger:</strong> ${recipientName}</li><li><strong>Brief-ID:</strong> ${letterId}</li><li><strong>Geschätzte Kosten:</strong> ${estimatedCost}</li></ul><p>Die genauen Kosten findest du im <a href="https://app.pingen.com">Pingen Dashboard</a>.</p><p>Feuerwehrverein Raura</p>`
+        });
+
+        logInfo('Pingen cost notification sent to Kassier', { recipient: recipientName, letterId });
+    } catch (error) {
+        logError('Failed to send Pingen cost notification', { error: error.message });
+    }
+}
+
+// Helper: Send bulk Pingen cost notification to Kassier
+async function sendPingenBulkCostNotification(count, successList, isStaging = false) {
+    try {
+        const kassierResult = await pool.query(
+            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Kassier%' LIMIT 1"
+        );
+
+        if (kassierResult.rows.length === 0) {
+            logWarn('Kassier not found for Pingen bulk cost notification');
+            return;
+        }
+
+        const kassier = kassierResult.rows[0];
+        const estimatedCostPerLetter = 1.00; // CHF
+        const totalEstimatedCost = (count * estimatedCostPerLetter).toFixed(2);
+        const environment = isStaging ? ' (STAGING/TEST)' : '';
+
+        const recipientList = successList.map(s => `- ${s.name}`).join('\n');
+        const recipientListHtml = successList.map(s => `<li>${s.name}</li>`).join('');
+
+        await transporter.sendMail({
+            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+            to: kassier.email,
+            subject: `Pingen Massenversand${environment}: ${count} Briefe`,
+            text: `Hallo ${kassier.vorname},\n\nEin Massenversand wurde über Pingen durchgeführt:\n\nAnzahl Briefe: ${count}\nGeschätzte Kosten: ca. CHF ${totalEstimatedCost}\n\nEmpfänger:\n${recipientList}\n\nDie genauen Kosten findest du im Pingen Dashboard.\n\nFeuerwehrverein Raura`,
+            html: `<p>Hallo ${kassier.vorname},</p><p>Ein Massenversand wurde über Pingen durchgeführt:</p><ul><li><strong>Anzahl Briefe:</strong> ${count}</li><li><strong>Geschätzte Kosten:</strong> ca. CHF ${totalEstimatedCost}</li></ul><p><strong>Empfänger:</strong></p><ul>${recipientListHtml}</ul><p>Die genauen Kosten findest du im <a href="https://app.pingen.com">Pingen Dashboard</a>.</p><p>Feuerwehrverein Raura</p>`
+        });
+
+        logInfo('Pingen bulk cost notification sent to Kassier', { count, totalEstimatedCost });
+    } catch (error) {
+        logError('Failed to send Pingen bulk cost notification', { error: error.message });
+    }
+}
+
 // Cache für heruntergeladene Schriftart
 let cachedFontBytes = null;
 
@@ -903,6 +969,11 @@ app.post('/pingen/send', async (req, res) => {
             INSERT INTO dispatch_log (type, member_id, recipient_address, status, external_id, event_id, sent_at)
             VALUES ('pingen', $1, $2, 'sent', $3, $4, NOW())
         `, [member_id, JSON.stringify(recipient), letterId, event_id]);
+
+        // Send cost notification to Kassier
+        sendPingenCostNotification(recipient.name, letterId, staging).catch(err => {
+            logError('Failed to send Pingen cost notification', { error: err.message });
+        });
 
         res.json({ success: true, letterId });
     } catch (error) {
@@ -2364,6 +2435,13 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                 }
             }
             console.log(`Processed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(members.length / BATCH_SIZE)}`);
+        }
+
+        // Send summary notification to Kassier for bulk send
+        if (results.success.length > 0) {
+            sendPingenBulkCostNotification(results.success.length, results.success, staging).catch(err => {
+                logError('Failed to send Pingen bulk cost notification', { error: err.message });
+            });
         }
 
         res.json({
