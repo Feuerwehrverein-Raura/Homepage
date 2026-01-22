@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.34.0...v1.35.0) (2026-01-22)
+
+
+### Features
+
+* **audit:** improve audit log details display ([96fea4f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/96fea4fbb04677df87998ce9612f8ef57719a643))
+
 # [1.34.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.33.0...v1.34.0) (2026-01-22)
 
 
