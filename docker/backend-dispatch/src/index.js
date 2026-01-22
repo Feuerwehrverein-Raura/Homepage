@@ -12,7 +12,29 @@ const fontkit = require('@pdf-lib/fontkit');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SERVICE_NAME = 'api-dispatch';
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// ===========================================
+// LOGGING UTILITIES
+// ===========================================
+function log(level, message, data = {}) {
+    const timestamp = new Date().toISOString();
+    const logEntry = { timestamp, service: SERVICE_NAME, level, message, ...data };
+    console.log(JSON.stringify(logEntry));
+}
+function logInfo(message, data = {}) { log('INFO', message, data); }
+function logWarn(message, data = {}) { log('WARN', message, data); }
+function logError(message, data = {}) { log('ERROR', message, data); }
+
+// Helper to get real client IP from proxy headers
+function getClientIp(req) {
+    if (req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip'];
+    const forwardedFor = req.headers['x-forwarded-for'];
+    if (forwardedFor) return forwardedFor.split(',')[0].trim();
+    if (req.headers['x-real-ip']) return req.headers['x-real-ip'];
+    return req.ip;
+}
 
 // SMTP Transport
 const transporter = nodemailer.createTransport({
@@ -456,6 +478,41 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 app.use(express.json({ limit: '50mb' })); // Erhöht für PDF-Uploads
+
+// Trust proxy for correct client IP
+app.set('trust proxy', true);
+
+// ===========================================
+// REQUEST LOGGING MIDDLEWARE
+// ===========================================
+app.use((req, res, next) => {
+    if (req.path === '/health') return next();
+
+    const startTime = Date.now();
+    const requestId = Math.random().toString(36).substring(7);
+    req.requestId = requestId;
+
+    logInfo('REQUEST', {
+        requestId,
+        method: req.method,
+        path: req.path,
+        ip: getClientIp(req)
+    });
+
+    res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        const logFn = res.statusCode >= 400 ? logWarn : logInfo;
+        logFn('RESPONSE', {
+            requestId,
+            method: req.method,
+            path: req.path,
+            statusCode: res.statusCode,
+            duration: `${duration}ms`
+        });
+    });
+
+    next();
+});
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'api-dispatch', version: process.env.APP_VERSION || '0.0.0' });

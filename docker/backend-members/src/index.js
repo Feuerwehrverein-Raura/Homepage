@@ -48,6 +48,29 @@ const upload = multer({
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SERVICE_NAME = 'api-members';
+
+// ===========================================
+// LOGGING UTILITIES
+// ===========================================
+function log(level, message, data = {}) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+        timestamp,
+        service: SERVICE_NAME,
+        level,
+        message,
+        ...data
+    };
+    console.log(JSON.stringify(logEntry));
+}
+
+function logInfo(message, data = {}) { log('INFO', message, data); }
+function logWarn(message, data = {}) { log('WARN', message, data); }
+function logError(message, data = {}) { log('ERROR', message, data); }
+function logDebug(message, data = {}) {
+    if (process.env.DEBUG === 'true') log('DEBUG', message, data);
+}
 
 // Trust proxy for correct client IP behind Traefik
 app.set('trust proxy', true);
@@ -103,6 +126,44 @@ app.use(helmet({
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
 }));
 app.use(express.json());
+
+// ===========================================
+// REQUEST LOGGING MIDDLEWARE
+// ===========================================
+app.use((req, res, next) => {
+    // Skip health checks for cleaner logs
+    if (req.path === '/health') return next();
+
+    const startTime = Date.now();
+    const requestId = Math.random().toString(36).substring(7);
+    req.requestId = requestId;
+
+    // Log request
+    logInfo('REQUEST', {
+        requestId,
+        method: req.method,
+        path: req.path,
+        query: Object.keys(req.query).length > 0 ? req.query : undefined,
+        ip: getClientIp(req),
+        userAgent: req.headers['user-agent']?.substring(0, 100)
+    });
+
+    // Log response when finished
+    res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        const logFn = res.statusCode >= 400 ? logWarn : logInfo;
+        logFn('RESPONSE', {
+            requestId,
+            method: req.method,
+            path: req.path,
+            statusCode: res.statusCode,
+            duration: `${duration}ms`,
+            user: req.user?.email
+        });
+    });
+
+    next();
+});
 
 // Serve uploaded photos statically
 app.use('/uploads', express.static('/app/uploads'));
