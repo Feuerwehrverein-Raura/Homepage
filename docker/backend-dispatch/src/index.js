@@ -524,12 +524,22 @@ app.post('/email/send', async (req, res) => {
             }
         }
 
-        // Send email
+        // Convert URLs to clickable links for HTML version
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const emailHtml = emailBody
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>')
+            .replace(urlRegex, '<a href="$1">$1</a>');
+
+        // Send email with both text and HTML versions
         const info = await transporter.sendMail({
             from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
             to,
             subject: emailSubject,
-            text: emailBody
+            text: emailBody,
+            html: emailHtml
         });
 
         // Log
