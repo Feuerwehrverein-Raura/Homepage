@@ -1052,36 +1052,43 @@
                             </div>
                         ` : ''}
 
-                        ${(event.category === 'Aufbau' || event.category === 'Abbau') && event.shifts && event.shifts.length > 0 ? `
-                            <div class="mb-6 bg-green-50 p-6 rounded-lg border border-green-200">
-                                <h4 class="font-semibold text-gray-800 text-lg mb-4">👥 Wer kommt?</h4>
-                                <div class="space-y-4">
-                                    ${event.shifts.map(shift => {
-                                        const regs = shift.registrations || { approved: [], pending: [] };
-                                        const bereich = shift.bereich || shift.name || 'Schicht';
-                                        const timeStr = shift.start_time && shift.end_time
-                                            ? `${shift.start_time} - ${shift.end_time}`
-                                            : (shift.start_time || '');
-                                        return `
+                        ${(event.category === 'Aufbau' || event.category === 'Abbau') ? (() => {
+                            // Check for direct registrations (Aufbau/Abbau use these)
+                            const directRegs = event.directRegistrations || { approved: [], pending: [] };
+                            const hasDirectRegs = directRegs.approved?.length > 0 || directRegs.pending?.length > 0;
+
+                            // Also check shifts if any
+                            const hasShiftRegs = event.shifts?.some(s =>
+                                s.registrations?.approved?.length > 0 || s.registrations?.pending?.length > 0
+                            );
+
+                            if (!hasDirectRegs && !hasShiftRegs) {
+                                return `
+                                    <div class="mb-6 bg-green-50 p-6 rounded-lg border border-green-200">
+                                        <h4 class="font-semibold text-gray-800 text-lg mb-4">👥 Wer kommt?</h4>
+                                        <p class="text-sm text-gray-500 italic">Noch keine Anmeldungen</p>
+                                    </div>
+                                `;
+                            }
+
+                            return `
+                                <div class="mb-6 bg-green-50 p-6 rounded-lg border border-green-200">
+                                    <h4 class="font-semibold text-gray-800 text-lg mb-4">👥 Wer kommt?</h4>
+                                    <div class="space-y-4">
+                                        ${hasDirectRegs ? `
                                             <div class="bg-white p-4 rounded-lg shadow-sm">
-                                                <div class="flex justify-between items-center mb-2">
-                                                    <span class="font-medium">${bereich}</span>
-                                                    <span class="text-sm text-gray-500">${timeStr}</span>
-                                                </div>
-                                                ${regs.approved.length > 0 ? `
+                                                ${directRegs.approved?.length > 0 ? `
                                                     <div class="flex flex-wrap gap-2">
-                                                        ${regs.approved.map(r => `
+                                                        ${directRegs.approved.map(r => `
                                                             <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
                                                                 ✓ ${r.name}
                                                             </span>
                                                         `).join('')}
                                                     </div>
-                                                ` : `
-                                                    <p class="text-sm text-gray-500 italic">Noch keine Anmeldungen</p>
-                                                `}
-                                                ${regs.pending.length > 0 ? `
-                                                    <div class="flex flex-wrap gap-2 mt-2">
-                                                        ${regs.pending.map(r => `
+                                                ` : ''}
+                                                ${directRegs.pending?.length > 0 ? `
+                                                    <div class="flex flex-wrap gap-2 ${directRegs.approved?.length > 0 ? 'mt-2' : ''}">
+                                                        ${directRegs.pending.map(r => `
                                                             <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
                                                                 ⏳ ${r.name}
                                                             </span>
@@ -1089,11 +1096,39 @@
                                                     </div>
                                                 ` : ''}
                                             </div>
-                                        `;
-                                    }).join('')}
+                                        ` : ''}
+                                        ${event.shifts?.map(shift => {
+                                            const regs = shift.registrations || { approved: [], pending: [] };
+                                            if (!regs.approved?.length && !regs.pending?.length) return '';
+                                            const bereich = shift.bereich || shift.name || 'Schicht';
+                                            const timeStr = shift.start_time && shift.end_time
+                                                ? shift.start_time + ' - ' + shift.end_time
+                                                : (shift.start_time || '');
+                                            return '<div class="bg-white p-4 rounded-lg shadow-sm">' +
+                                                '<div class="flex justify-between items-center mb-2">' +
+                                                    '<span class="font-medium">' + bereich + '</span>' +
+                                                    '<span class="text-sm text-gray-500">' + timeStr + '</span>' +
+                                                '</div>' +
+                                                (regs.approved?.length > 0 ?
+                                                    '<div class="flex flex-wrap gap-2">' +
+                                                        regs.approved.map(r =>
+                                                            '<span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ ' + r.name + '</span>'
+                                                        ).join('') +
+                                                    '</div>'
+                                                : '') +
+                                                (regs.pending?.length > 0 ?
+                                                    '<div class="flex flex-wrap gap-2 ' + (regs.approved?.length > 0 ? 'mt-2' : '') + '">' +
+                                                        regs.pending.map(r =>
+                                                            '<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">⏳ ' + r.name + '</span>'
+                                                        ).join('') +
+                                                    '</div>'
+                                                : '') +
+                                            '</div>';
+                                        }).join('') || ''}
+                                    </div>
                                 </div>
-                            </div>
-                        ` : ''}
+                            `;
+                        })() : ''}
 
                         <div class="flex flex-wrap gap-3 mt-6">
                             ${this.getRegistrationButtons(event)}
