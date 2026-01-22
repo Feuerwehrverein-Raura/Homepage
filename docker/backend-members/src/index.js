@@ -990,6 +990,25 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
         // Get member info for audit log before deleting
         const memberResult = await pool.query('SELECT vorname, nachname, email FROM members WHERE id = $1', [id]);
 
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Member not found' });
+        }
+
+        // Clean up related records before deleting member
+        // Set member_id to NULL in tables where reference is optional
+        await pool.query('UPDATE dispatch_log SET member_id = NULL WHERE member_id = $1', [id]);
+        await pool.query('UPDATE audit_log SET user_id = NULL WHERE user_id = $1', [id]);
+        await pool.query('UPDATE transactions SET member_id = NULL WHERE member_id = $1', [id]);
+        await pool.query('UPDATE transactions SET created_by = NULL WHERE created_by = $1', [id]);
+        await pool.query('UPDATE invoices SET member_id = NULL WHERE member_id = $1', [id]);
+        await pool.query('UPDATE events SET organizer_id = NULL WHERE organizer_id = $1', [id]);
+
+        // Delete records in tables where member relationship is required
+        await pool.query('DELETE FROM member_roles WHERE member_id = $1', [id]);
+        await pool.query('DELETE FROM notification_preferences WHERE member_id = $1', [id]);
+        await pool.query('DELETE FROM registrations WHERE member_id = $1', [id]);
+        await pool.query('DELETE FROM member_registrations WHERE member_id = $1', [id]);
+
         const result = await pool.query('DELETE FROM members WHERE id = $1 RETURNING id', [id]);
 
         if (result.rows.length === 0) {
