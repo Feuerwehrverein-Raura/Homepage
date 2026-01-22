@@ -982,50 +982,209 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
     }
 });
 
-// Delete member (requires Vorstand role)
+// Request member deletion (requires Vorstand role) - sends confirmation emails to Aktuar and Kassier
 app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
+        const { reason } = req.body || {};
 
-        // Get member info for audit log before deleting
+        // Get member info
         const memberResult = await pool.query('SELECT vorname, nachname, email FROM members WHERE id = $1', [id]);
-
         if (memberResult.rows.length === 0) {
             return res.status(404).json({ error: 'Member not found' });
         }
+        const member = memberResult.rows[0];
+        const memberName = `${member.vorname} ${member.nachname}`;
 
-        // Clean up related records before deleting member
-        // Set member_id to NULL in tables where reference is optional
-        await pool.query('UPDATE dispatch_log SET member_id = NULL WHERE member_id = $1', [id]);
-        await pool.query('UPDATE audit_log SET user_id = NULL WHERE user_id = $1', [id]);
-        await pool.query('UPDATE transactions SET member_id = NULL WHERE member_id = $1', [id]);
-        await pool.query('UPDATE transactions SET created_by = NULL WHERE created_by = $1', [id]);
-        await pool.query('UPDATE invoices SET member_id = NULL WHERE member_id = $1', [id]);
-        await pool.query('UPDATE events SET organizer_id = NULL WHERE organizer_id = $1', [id]);
-
-        // Delete records in tables where member relationship is required
-        await pool.query('DELETE FROM member_roles WHERE member_id = $1', [id]);
-        await pool.query('DELETE FROM notification_preferences WHERE member_id = $1', [id]);
-        await pool.query('DELETE FROM registrations WHERE member_id = $1', [id]);
-        await pool.query('DELETE FROM member_registrations WHERE member_id = $1', [id]);
-
-        const result = await pool.query('DELETE FROM members WHERE id = $1 RETURNING id', [id]);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: 'Member not found' });
+        // Check for existing pending request
+        const existingRequest = await pool.query(
+            'SELECT id FROM member_deletion_requests WHERE member_id = $1 AND status = $2',
+            [id, 'pending']
+        );
+        if (existingRequest.rows.length > 0) {
+            return res.status(400).json({ error: 'Eine Löschanfrage für dieses Mitglied ist bereits ausstehend' });
         }
 
-        // Audit log
-        const memberName = memberResult.rows.length > 0
-            ? `${memberResult.rows[0].vorname} ${memberResult.rows[0].nachname}`
-            : 'Unknown';
-        await logAudit(pool, 'MEMBER_DELETE', null, req.user.email, getClientIp(req), {
-            member_id: id,
-            member_name: memberName,
-            member_email: memberResult.rows[0]?.email
+        // Create deletion request
+        const requestResult = await pool.query(`
+            INSERT INTO member_deletion_requests (member_id, requested_by, reason)
+            VALUES ($1, $2, $3)
+            RETURNING id, aktuar_token, kassier_token
+        `, [id, req.user.email, reason || null]);
+
+        const request = requestResult.rows[0];
+        const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+        const BASE_URL = process.env.BASE_URL || 'https://fwv-raura.ch';
+
+        // Get Aktuar and Kassier emails from database
+        const aktuarResult = await pool.query(
+            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Aktuar%' LIMIT 1"
+        );
+        const kassierResult = await pool.query(
+            "SELECT vorname, email FROM members WHERE funktion ILIKE '%Kassier%' LIMIT 1"
+        );
+
+        if (aktuarResult.rows.length === 0 || kassierResult.rows.length === 0) {
+            // Rollback the request if we can't find Aktuar or Kassier
+            await pool.query('DELETE FROM member_deletion_requests WHERE id = $1', [request.id]);
+            return res.status(500).json({
+                error: 'Aktuar oder Kassier nicht gefunden. Bitte stellen Sie sicher, dass beide Funktionen in der Mitgliederliste zugewiesen sind.'
+            });
+        }
+
+        const aktuar = aktuarResult.rows[0];
+        const kassier = kassierResult.rows[0];
+
+        // Send confirmation email to Aktuar
+        const aktuarConfirmUrl = `${BASE_URL}/api/members/deletion-confirm/${request.aktuar_token}`;
+        await axios.post(`${DISPATCH_API}/email/send`, {
+            to: aktuar.email,
+            subject: `Bestätigung Mitglieder-Löschung: ${memberName}`,
+            body: `Hallo ${aktuar.vorname},\n\n${req.user.email} möchte das Mitglied "${memberName}" (${member.email}) löschen.\n\n${reason ? `Grund: ${reason}\n\n` : ''}Bitte bestätige diese Löschung durch Klick auf folgenden Link:\n${aktuarConfirmUrl}\n\nDie Löschung wird erst durchgeführt wenn sowohl Aktuar als auch Kassier bestätigt haben.\n\nDieser Link ist 7 Tage gültig.\n\nFeuerwehrverein Raura`
         });
 
-        res.json({ message: 'Member deleted', id });
+        // Send confirmation email to Kassier
+        const kassierConfirmUrl = `${BASE_URL}/api/members/deletion-confirm/${request.kassier_token}`;
+        await axios.post(`${DISPATCH_API}/email/send`, {
+            to: kassier.email,
+            subject: `Bestätigung Mitglieder-Löschung: ${memberName}`,
+            body: `Hallo ${kassier.vorname},\n\n${req.user.email} möchte das Mitglied "${memberName}" (${member.email}) löschen.\n\n${reason ? `Grund: ${reason}\n\n` : ''}Bitte bestätige diese Löschung durch Klick auf folgenden Link:\n${kassierConfirmUrl}\n\nDie Löschung wird erst durchgeführt wenn sowohl Aktuar als auch Kassier bestätigt haben.\n\nDieser Link ist 7 Tage gültig.\n\nFeuerwehrverein Raura`
+        });
+
+        // Audit log
+        await logAudit(pool, 'MEMBER_DELETE_REQUESTED', null, req.user.email, getClientIp(req), {
+            member_id: id,
+            member_name: memberName,
+            request_id: request.id
+        });
+
+        res.json({
+            message: 'Löschanfrage erstellt. Aktuar und Kassier wurden per Email benachrichtigt.',
+            request_id: request.id,
+            requires_confirmation: ['aktuar', 'kassier']
+        });
+    } catch (error) {
+        console.error('Delete request error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Confirm member deletion (via email link)
+app.get('/deletion-confirm/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        // Find the request by token
+        const requestResult = await pool.query(`
+            SELECT dr.*, m.vorname, m.nachname, m.email as member_email
+            FROM member_deletion_requests dr
+            JOIN members m ON m.id = dr.member_id
+            WHERE (dr.aktuar_token = $1 OR dr.kassier_token = $1)
+            AND dr.status = 'pending'
+            AND dr.expires_at > NOW()
+        `, [token]);
+
+        if (requestResult.rows.length === 0) {
+            return res.status(404).send('<html><body><h1>Ungültiger oder abgelaufener Link</h1><p>Der Bestätigungslink ist ungültig oder bereits abgelaufen.</p></body></html>');
+        }
+
+        const request = requestResult.rows[0];
+        const memberName = `${request.vorname} ${request.nachname}`;
+        const isAktuar = request.aktuar_token === token;
+        const role = isAktuar ? 'aktuar' : 'kassier';
+
+        // Update confirmation
+        if (isAktuar) {
+            await pool.query(
+                'UPDATE member_deletion_requests SET aktuar_confirmed_at = NOW(), aktuar_confirmed_by = $1 WHERE id = $2',
+                [role, request.id]
+            );
+        } else {
+            await pool.query(
+                'UPDATE member_deletion_requests SET kassier_confirmed_at = NOW(), kassier_confirmed_by = $1 WHERE id = $2',
+                [role, request.id]
+            );
+        }
+
+        // Check if both have confirmed
+        const updatedRequest = await pool.query(
+            'SELECT * FROM member_deletion_requests WHERE id = $1',
+            [request.id]
+        );
+        const req2 = updatedRequest.rows[0];
+
+        if (req2.aktuar_confirmed_at && req2.kassier_confirmed_at) {
+            // Both confirmed - execute deletion
+            const memberId = request.member_id;
+
+            // Clean up related records
+            await pool.query('UPDATE dispatch_log SET member_id = NULL WHERE member_id = $1', [memberId]);
+            await pool.query('UPDATE audit_log SET user_id = NULL WHERE user_id = $1', [memberId]);
+            await pool.query('UPDATE transactions SET member_id = NULL WHERE member_id = $1', [memberId]);
+            await pool.query('UPDATE transactions SET created_by = NULL WHERE created_by = $1', [memberId]);
+            await pool.query('UPDATE invoices SET member_id = NULL WHERE member_id = $1', [memberId]);
+            await pool.query('UPDATE events SET organizer_id = NULL WHERE organizer_id = $1', [memberId]);
+            await pool.query('DELETE FROM member_roles WHERE member_id = $1', [memberId]);
+            await pool.query('DELETE FROM notification_preferences WHERE member_id = $1', [memberId]);
+            await pool.query('DELETE FROM registrations WHERE member_id = $1', [memberId]);
+            await pool.query('DELETE FROM member_registrations WHERE member_id = $1', [memberId]);
+
+            // Delete member
+            await pool.query('DELETE FROM members WHERE id = $1', [memberId]);
+
+            // Update request status
+            await pool.query(
+                'UPDATE member_deletion_requests SET status = $1, executed_at = NOW() WHERE id = $2',
+                ['confirmed', request.id]
+            );
+
+            // Audit log
+            await logAudit(pool, 'MEMBER_DELETE_EXECUTED', null, 'system', '0.0.0.0', {
+                member_id: memberId,
+                member_name: memberName,
+                request_id: request.id,
+                aktuar_confirmed: req2.aktuar_confirmed_at,
+                kassier_confirmed: req2.kassier_confirmed_at
+            });
+
+            return res.send(`<html><body><h1>Mitglied gelöscht</h1><p>Das Mitglied "${memberName}" wurde erfolgreich gelöscht.</p><p>Beide Bestätigungen (Aktuar und Kassier) wurden erhalten.</p></body></html>`);
+        }
+
+        // Only one confirmed so far
+        const otherRole = isAktuar ? 'Kassier' : 'Aktuar';
+        res.send(`<html><body><h1>Bestätigung erfolgreich</h1><p>Deine Bestätigung als ${isAktuar ? 'Aktuar' : 'Kassier'} wurde registriert.</p><p>Die Löschung von "${memberName}" wird durchgeführt sobald auch der ${otherRole} bestätigt hat.</p></body></html>`);
+
+    } catch (error) {
+        console.error('Deletion confirm error:', error);
+        res.status(500).send('<html><body><h1>Fehler</h1><p>Ein Fehler ist aufgetreten.</p></body></html>');
+    }
+});
+
+// Get pending deletion requests (for Vorstand dashboard)
+app.get('/deletion-requests', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT dr.*, m.vorname, m.nachname, m.email as member_email
+            FROM member_deletion_requests dr
+            JOIN members m ON m.id = dr.member_id
+            WHERE dr.status = 'pending'
+            ORDER BY dr.requested_at DESC
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Cancel deletion request
+app.delete('/deletion-requests/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query(
+            'UPDATE member_deletion_requests SET status = $1 WHERE id = $2 AND status = $3',
+            ['cancelled', id, 'pending']
+        );
+        res.json({ message: 'Löschanfrage abgebrochen' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
