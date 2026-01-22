@@ -1,3 +1,10 @@
+## [1.28.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.28.2...v1.28.3) (2026-01-22)
+
+
+### Bug Fixes
+
+* **members:** clean up related records before deleting member ([eff86cb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/eff86cb8851af9692bb27464cc7a416e83720551))
+
 ## [1.28.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.28.1...v1.28.2) (2026-01-22)
 
 
