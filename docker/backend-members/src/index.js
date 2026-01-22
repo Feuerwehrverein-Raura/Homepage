@@ -477,6 +477,58 @@ async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
     }
 }
 
+// ===========================================
+// PHONE NUMBER FORMATTING
+// ===========================================
+// Formats phone numbers to international format with spaces
+// Swiss: +41 XX XXX XX XX
+// German: +49 XXX XXXXXXX (or +49 XXXX XXXXXXX for landlines)
+function formatPhoneNumber(phone) {
+    if (!phone) return null;
+
+    // Remove all non-digit characters except leading +
+    let cleaned = phone.replace(/[^\d+]/g, '');
+
+    // If no country code, assume Swiss
+    if (!cleaned.startsWith('+')) {
+        // Remove leading 0 if present
+        if (cleaned.startsWith('0')) {
+            cleaned = cleaned.substring(1);
+        }
+        // Default to Swiss +41
+        cleaned = '+41' + cleaned;
+    }
+
+    // Swiss numbers: +41 XX XXX XX XX
+    if (cleaned.startsWith('+41')) {
+        const digits = cleaned.substring(3);
+        if (digits.length === 9) {
+            return `+41 ${digits.substring(0, 2)} ${digits.substring(2, 5)} ${digits.substring(5, 7)} ${digits.substring(7, 9)}`;
+        }
+    }
+
+    // German numbers: +49 XXX XXXXXXX or +49 XXXX XXXXXXX
+    if (cleaned.startsWith('+49')) {
+        const digits = cleaned.substring(3);
+        // Remove leading 0 if present (common mistake)
+        const cleanDigits = digits.startsWith('0') ? digits.substring(1) : digits;
+
+        // Mobile numbers (15x, 16x, 17x) - 10 digits: +49 XXX XXXXXXX
+        if (cleanDigits.match(/^1[567]/)) {
+            if (cleanDigits.length >= 10) {
+                return `+49 ${cleanDigits.substring(0, 3)} ${cleanDigits.substring(3, 10)}`;
+            }
+        }
+        // Landline - format with area code
+        if (cleanDigits.length >= 10) {
+            return `+49 ${cleanDigits.substring(0, 4)} ${cleanDigits.substring(4)}`;
+        }
+    }
+
+    // Return original if we couldn't format it
+    return phone;
+}
+
 // Send notification email helper - sends to member AND aktuar
 async function sendNotificationEmail(memberId, templateName, variables = {}) {
     try {
@@ -752,6 +804,10 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
             feuerwehr_zugehoerigkeit, foto, tshirt_groesse
         } = req.body;
 
+        // Format phone numbers to international format
+        const formattedTelefon = formatPhoneNumber(telefon);
+        const formattedMobile = formatPhoneNumber(mobile);
+
         const result = await pool.query(`
             INSERT INTO members (
                 anrede, vorname, nachname, geschlecht, geburtstag,
@@ -765,7 +821,7 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
         `, [
             anrede, vorname, nachname, geschlecht, geburtstag,
             strasse, adresszusatz, plz, ort,
-            telefon, mobile, email, versand_email,
+            formattedTelefon, formattedMobile, email, versand_email,
             status || 'Aktivmitglied', funktion, eintrittsdatum || new Date(),
             iban, zustellung_email ?? true, zustellung_post ?? false, bemerkungen,
             feuerwehr_zugehoerigkeit, foto, tshirt_groesse
@@ -821,11 +877,10 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
 // Update own member data (limited fields) - Self-service
 app.put('/members/me', authenticateToken, async (req, res) => {
     try {
-        const {
-            telefon, mobile, email, versand_email,
-            strasse, adresszusatz, plz, ort,
-            iban, bemerkungen
-        } = req.body;
+        // Format phone numbers before processing
+        const telefon = formatPhoneNumber(req.body.telefon);
+        const mobile = formatPhoneNumber(req.body.mobile);
+        const { email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen } = req.body;
 
         console.log('PUT /members/me called for user:', req.user?.email);
 
@@ -995,7 +1050,15 @@ app.delete('/members/me/photo', authenticateToken, async (req, res) => {
 app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
+        const updates = { ...req.body };
+
+        // Format phone numbers if provided
+        if (updates.telefon !== undefined) {
+            updates.telefon = formatPhoneNumber(updates.telefon);
+        }
+        if (updates.mobile !== undefined) {
+            updates.mobile = formatPhoneNumber(updates.mobile);
+        }
 
         // Build dynamic update query
         const fields = Object.keys(updates);
