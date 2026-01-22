@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.28.3...v1.29.0) (2026-01-22)
+
+
+### Features
+
+* **members:** dual approval for member deletion (Aktuar + Kassier) ([eb59a51](https://github.com/Feuerwehrverein-Raura/Homepage/commit/eb59a51f4dbb749648ba9c1de510e2e0e127d4e5))
+
 ## [1.28.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.28.2...v1.28.3) (2026-01-22)
 
 
