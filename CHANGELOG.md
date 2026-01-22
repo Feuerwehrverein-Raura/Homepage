@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.5...v1.28.0) (2026-01-22)
+
+
+### Features
+
+* **dispatch:** add logging to email endpoints for debugging ([54df7f0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/54df7f0c095ddb3e3879e1361c5fe630589755d9))
+
 ## [1.27.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.27.4...v1.27.5) (2026-01-22)
 
 
