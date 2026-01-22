@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.32.0...v1.33.0) (2026-01-22)
+
+
+### Features
+
+* **dispatch:** send Pingen cost notification to Kassier ([f419f55](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f419f55b39f3c3b014095c17a67fb926317f234e))
+
 # [1.32.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.31.0...v1.32.0) (2026-01-22)
 
 
