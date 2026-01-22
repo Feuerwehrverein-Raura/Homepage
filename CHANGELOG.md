@@ -1,3 +1,10 @@
+## [1.28.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.28.1...v1.28.2) (2026-01-22)
+
+
+### Bug Fixes
+
+* **pingen:** move German address position to 75mm from top ([0ffd9d7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0ffd9d7b3b200b2b9d555cf261371c7eb2a9de08))
+
 ## [1.28.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.28.0...v1.28.1) (2026-01-22)
 
 
