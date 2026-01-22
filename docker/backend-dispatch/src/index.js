@@ -2162,11 +2162,13 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
         });
         const token = tokenResponse.data.access_token;
 
-        // An jeden Empfänger senden
+        // An jeden Empfänger senden (parallel in Batches von 5)
         const results = { success: [], failed: [] };
         const filename = subject ? `${subject.replace(/[^a-zA-Z0-9äöüÄÖÜ]/g, '_')}.pdf` : 'Rundschreiben.pdf';
+        const originalPdfBuffer = Buffer.from(pdf_base64, 'base64');
 
-        for (const member of members) {
+        // Helper function to process a single member
+        const processMember = async (member) => {
             try {
                 // Step 1: Get file upload URL
                 const uploadUrlResponse = await axios.get(
@@ -2192,16 +2194,12 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                     member.ort
                 );
 
-                const originalPdfBuffer = Buffer.from(pdf_base64, 'base64');
                 let pdfToUpload;
                 let detectedCountry = 'CH'; // Default
                 if (use_cover_page) {
-                    // Use original PDF, cover page will be created by Pingen
                     pdfToUpload = originalPdfBuffer;
-                    // Try to detect country from address
                     detectedCountry = detectCountryFromAddress(recipientAddress);
                 } else {
-                    // Embed address directly in PDF
                     const senderAddressLine = `${SENDER_ADDRESS.name}, ${SENDER_ADDRESS.zip} ${SENDER_ADDRESS.city}`;
                     const result = await addAddressToPdf(originalPdfBuffer, recipientAddress, senderAddressLine);
                     pdfToUpload = Buffer.from(result.pdfBytes);
@@ -2210,14 +2208,10 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 
                 // Step 3: Upload PDF to the pre-signed URL
                 await axios.put(fileUrl, pdfToUpload, {
-                    headers: {
-                        'Content-Type': 'application/pdf'
-                    }
+                    headers: { 'Content-Type': 'application/pdf' }
                 });
 
                 // Step 4: Create letter with file reference
-                // auto_send depends on whether we use cover page or embedded address
-                // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
                 const uploadResponse = await axios.post(
                     `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
                     {
@@ -2228,7 +2222,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                                 file_url: fileUrl,
                                 file_url_signature: fileUrlSignature,
                                 address_position: detectedCountry === 'DE' ? 'left' : 'right',
-                                auto_send: !use_cover_page,  // auto_send wenn Adresse im PDF
+                                auto_send: !use_cover_page,
                                 delivery_product: 'cheap',
                                 print_mode: 'simplex',
                                 print_spectrum: 'grayscale',
@@ -2255,110 +2249,9 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                 );
 
                 const letterId = uploadResponse.data.data?.id;
+                console.log(`Letter ${letterId} uploaded for ${member.vorname} ${member.nachname}`);
 
-                // Step 5: Handle based on use_cover_page option
-                if (use_cover_page) {
-                    // Small delay to let Pingen process the upload, then create cover page immediately
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-
-                    // Create cover page with recipient address (retry up to 3 times)
-                    let coverPageCreated = false;
-                    for (let attempt = 1; attempt <= 3 && !coverPageCreated; attempt++) {
-                        try {
-                            await axios.patch(
-                                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/create-cover-page`,
-                                {
-                                    data: {
-                                        type: 'letters',
-                                        id: letterId,
-                                        attributes: {
-                                            address: recipientAddress,
-                                            country: 'CH'
-                                        }
-                                    }
-                                },
-                                {
-                                    headers: {
-                                        Authorization: `Bearer ${token}`,
-                                        'Content-Type': 'application/vnd.api+json'
-                                    }
-                                }
-                            );
-                            coverPageCreated = true;
-                            console.log(`Cover page created for letter ${letterId} on attempt ${attempt}`);
-                        } catch (coverErr) {
-                            console.log(`Cover page attempt ${attempt}/3 failed for letter ${letterId}:`, coverErr.response?.data?.errors?.[0]?.title || coverErr.message);
-                            if (attempt < 3) {
-                                await new Promise(resolve => setTimeout(resolve, 1500));
-                            }
-                        }
-                    }
-
-                    if (!coverPageCreated) {
-                        // If cover page creation failed, delete the letter
-                        try {
-                            await axios.delete(
-                                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                            );
-                        } catch (delErr) { /* ignore */ }
-                        results.failed.push({
-                            name: `${member.vorname} ${member.nachname}`,
-                            error: 'Deckblatt konnte nicht erstellt werden'
-                        });
-                        continue;
-                    }
-
-                    // Wait for letter validation AFTER cover page is created
-                    const validationResult = await waitForLetterValidation(letterId, token, staging);
-                    if (!validationResult.success) {
-                        console.log(`Letter ${letterId} validation failed: ${validationResult.reason}`);
-                        try {
-                            await axios.delete(
-                                `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
-                                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                            );
-                        } catch (delErr) {
-                            console.error(`Could not delete invalid letter ${letterId}:`, delErr.message);
-                        }
-                        results.failed.push({
-                            name: `${member.vorname} ${member.nachname}`,
-                            error: `Brief-Validierung fehlgeschlagen: ${validationResult.reason}`
-                        });
-                        continue;
-                    }
-
-                    // Send the letter
-                    await axios.patch(
-                        `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}/send`,
-                        {
-                            data: {
-                                type: 'letters',
-                                id: letterId,
-                                attributes: {
-                                    delivery_product: 'cheap',
-                                    print_mode: 'simplex',
-                                    print_spectrum: 'grayscale'
-                                }
-                            }
-                        },
-                        {
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                                'Content-Type': 'application/vnd.api+json'
-                            }
-                        }
-                    );
-                } else {
-                    // Address is embedded in PDF - auto_send handles sending
-                    // Don't wait for validation in bulk mode - it takes too long
-                    console.log(`Letter ${letterId} uploaded for ${member.vorname} ${member.nachname} - will be processed by Pingen`);
-                }
-
-                // Don't wait for validation or status check in bulk mode - too slow
-                // Letters will appear in Pingen and may need manual action
-
-                // Log speichern
+                // Log speichern (don't wait for validation - too slow for bulk)
                 await pool.query(`
                     INSERT INTO dispatch_log (type, member_id, recipient_address, subject, status, external_id, sent_at)
                     VALUES ('pingen', $1, $2, $3, 'sent', $4, NOW())
@@ -2374,17 +2267,27 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
                     letterId
                 ]);
 
-                results.success.push({
-                    name: `${member.vorname} ${member.nachname}`,
-                    letterId
-                });
+                return { success: true, name: `${member.vorname} ${member.nachname}`, letterId };
             } catch (err) {
                 console.error(`Pingen send error for ${member.vorname} ${member.nachname}:`, err.response?.data || err.message);
-                results.failed.push({
-                    name: `${member.vorname} ${member.nachname}`,
-                    error: err.response?.data?.errors?.[0]?.detail || err.message
-                });
+                return { success: false, name: `${member.vorname} ${member.nachname}`, error: err.response?.data?.errors?.[0]?.detail || err.message };
             }
+        };
+
+        // Process members in parallel batches of 5
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < members.length; i += BATCH_SIZE) {
+            const batch = members.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(batch.map(processMember));
+
+            for (const result of batchResults) {
+                if (result.success) {
+                    results.success.push({ name: result.name, letterId: result.letterId });
+                } else {
+                    results.failed.push({ name: result.name, error: result.error });
+                }
+            }
+            console.log(`Processed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(members.length / BATCH_SIZE)}`);
         }
 
         res.json({
