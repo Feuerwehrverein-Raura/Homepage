@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.31.0...v1.32.0) (2026-01-22)
+
+
+### Features
+
+* **members:** auto-format phone numbers to international format ([d28438d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d28438d7059caf71ad322f73a91c0020b89f8768))
+
 # [1.31.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.30.0...v1.31.0) (2026-01-22)
 
 
