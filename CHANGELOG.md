@@ -1,3 +1,10 @@
+# [1.30.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.29.0...v1.30.0) (2026-01-22)
+
+
+### Features
+
+* **dispatch:** auto-convert URLs to clickable links in emails ([740cc5d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/740cc5d9008cd7035197592c9616a7f347c74c6c))
+
 # [1.29.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.28.3...v1.29.0) (2026-01-22)
 
 
