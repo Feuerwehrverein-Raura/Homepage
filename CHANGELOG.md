@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.30.0...v1.31.0) (2026-01-22)
+
+
+### Features
+
+* **logging:** add structured request logging to all backend services ([7251d0c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7251d0c7ee1812077b8189b99caa7ee1d9027576))
+
 # [1.30.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.29.0...v1.30.0) (2026-01-22)
 
 
