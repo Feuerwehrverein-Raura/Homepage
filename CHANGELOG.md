@@ -1,3 +1,10 @@
+# [1.37.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.36.0...v1.37.0) (2026-01-23)
+
+
+### Features
+
+* **dispatch:** enhanced message composer with rich text editor ([966224a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/966224af7de98478a4143304d61c80248b107b67))
+
 # [1.36.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.35.1...v1.36.0) (2026-01-22)
 
 
