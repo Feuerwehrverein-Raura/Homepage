@@ -1860,91 +1860,167 @@ app.get('/calendar/ics', async (req, res) => {
 
 app.post('/arbeitsplan/pdf', async (req, res) => {
     try {
-        const { eventId, eventTitle, shifts } = req.body;
+        // Support both old format (eventId, shifts) and new format (event object or events array)
+        const { eventId, eventTitle, shifts, event, events, logoBase64 } = req.body;
 
-        if (!eventId || !shifts || shifts.length === 0) {
-            return res.status(400).json({ error: 'eventId and shifts are required' });
+        // Determine which format is being used
+        let eventsToProcess = [];
+
+        if (events && Array.isArray(events) && events.length > 0) {
+            // Multiple events (grouped Arbeitsplan)
+            eventsToProcess = events;
+        } else if (event) {
+            // Single event object from frontend
+            eventsToProcess = [event];
+        } else if (shifts && shifts.length > 0) {
+            // Old format with just shifts
+            eventsToProcess = [{ title: eventTitle || 'Event', shifts }];
+        } else {
+            return res.status(400).json({ error: 'No event data provided' });
+        }
+
+        // Validate that we have shifts
+        const hasShifts = eventsToProcess.some(e => e.shifts && e.shifts.length > 0);
+        if (!hasShifts) {
+            return res.status(400).json({ error: 'No shifts found in event data' });
         }
 
         // Create PDF document
+        const isMultiEvent = eventsToProcess.length > 1;
+        const mainTitle = isMultiEvent
+            ? eventsToProcess.map(e => e.title).join(' / ')
+            : eventsToProcess[0].title;
+
         const doc = new PDFDocument({
             size: 'A4',
             margin: 50,
             info: {
-                Title: `Arbeitsplan ${eventTitle}`,
+                Title: `Arbeitsplan ${mainTitle}`,
                 Author: 'Feuerwehrverein Raura'
             }
         });
 
         // Set response headers
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="Arbeitsplan_${eventTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+        const safeTitle = mainTitle.replace(/[^a-zA-Z0-9äöüÄÖÜ ]/g, '_').substring(0, 50);
+        res.setHeader('Content-Disposition', `attachment; filename="Arbeitsplan_${safeTitle}.pdf"`);
 
         // Pipe PDF to response
         doc.pipe(res);
 
-        // Header
-        doc.fontSize(20).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
-        doc.fontSize(16).font('Helvetica').text('Arbeitsplan', { align: 'center' });
-        doc.moveDown(0.5);
-        doc.fontSize(14).font('Helvetica-Bold').text(eventTitle, { align: 'center' });
-        doc.moveDown(1);
-
-        // Group shifts by date
-        const shiftsByDate = {};
-        shifts.forEach(shift => {
-            const date = shift.date || 'Unbekannt';
-            if (!shiftsByDate[date]) {
-                shiftsByDate[date] = [];
+        // Process each event
+        eventsToProcess.forEach((eventData, eventIndex) => {
+            if (eventIndex > 0) {
+                doc.addPage();
             }
-            shiftsByDate[date].push(shift);
-        });
 
-        // Render shifts grouped by date
-        Object.entries(shiftsByDate).forEach(([date, dateShifts]) => {
-            // Date header
-            const dateObj = new Date(date);
-            const dateStr = dateObj.toLocaleDateString('de-CH', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            const shifts = eventData.shifts || [];
 
-            doc.fontSize(12).font('Helvetica-Bold').text(dateStr);
+            // Header
+            doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+            doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
             doc.moveDown(0.3);
+            doc.fontSize(16).font('Helvetica-Bold').text(eventData.title || 'Event', { align: 'center' });
+            doc.moveDown(1);
 
-            // Group by bereich
-            const byBereich = {};
-            dateShifts.forEach(shift => {
-                const bereich = shift.bereich || 'Allgemein';
-                if (!byBereich[bereich]) {
-                    byBereich[bereich] = [];
+            // Get all unique Bereiche for table headers
+            const allBereiche = [...new Set(shifts.map(s => s.bereich || 'Allgemein'))].sort();
+
+            // Group shifts by date
+            const shiftsByDate = {};
+            shifts.forEach(shift => {
+                const date = shift.date || 'Unbekannt';
+                if (!shiftsByDate[date]) {
+                    shiftsByDate[date] = [];
                 }
-                byBereich[bereich].push(shift);
+                shiftsByDate[date].push(shift);
             });
 
-            Object.entries(byBereich).forEach(([bereich, bereichShifts]) => {
-                doc.fontSize(11).font('Helvetica-Bold').text(`  ${bereich}:`);
+            // Sort dates
+            const sortedDates = Object.keys(shiftsByDate).sort();
 
-                bereichShifts.forEach(shift => {
-                    const timeStr = shift.startTime && shift.endTime
-                        ? `${shift.startTime} - ${shift.endTime}`
-                        : '';
-                    const helpers = shift.helpers && shift.helpers.length > 0
-                        ? shift.helpers.join(', ')
-                        : 'Noch keine Anmeldungen';
-
-                    doc.fontSize(10).font('Helvetica')
-                        .text(`    ${shift.name} (${timeStr}): ${helpers}`);
+            sortedDates.forEach(date => {
+                // Date header
+                const dateObj = new Date(date + 'T12:00:00');
+                const dateStr = dateObj.toLocaleDateString('de-CH', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
                 });
-                doc.moveDown(0.3);
+
+                doc.fontSize(12).font('Helvetica-Bold').text(dateStr);
+                doc.moveDown(0.5);
+
+                // Group shifts by time slot
+                const byTimeSlot = {};
+                shiftsByDate[date].forEach(shift => {
+                    const startTime = shift.start_time || shift.startTime || '';
+                    const endTime = shift.end_time || shift.endTime || '';
+                    const timeKey = `${startTime}-${endTime}`;
+
+                    if (!byTimeSlot[timeKey]) {
+                        byTimeSlot[timeKey] = { startTime, endTime, bereiche: {} };
+                    }
+
+                    const bereich = shift.bereich || 'Allgemein';
+
+                    // Get helpers from registrations
+                    let helpers = [];
+                    if (shift.registrations && shift.registrations.approved) {
+                        helpers = shift.registrations.approved.map(r => r.name);
+                    } else if (shift.helpers) {
+                        helpers = shift.helpers;
+                    }
+
+                    byTimeSlot[timeKey].bereiche[bereich] = {
+                        needed: shift.max_helpers || shift.needed || 1,
+                        helpers
+                    };
+                });
+
+                // Render as simple list (table is complex in PDFKit)
+                Object.entries(byTimeSlot).sort((a, b) => a[0].localeCompare(b[0])).forEach(([timeKey, slot]) => {
+                    const timeDisplay = slot.startTime && slot.endTime
+                        ? `${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}`
+                        : timeKey;
+
+                    doc.fontSize(10).font('Helvetica-Bold').text(`  ${timeDisplay}`);
+
+                    allBereiche.forEach(bereich => {
+                        const data = slot.bereiche[bereich];
+                        if (data) {
+                            const helperList = data.helpers.length > 0
+                                ? data.helpers.join(', ')
+                                : '(noch offen)';
+                            const countStr = `${data.helpers.length}/${data.needed}`;
+
+                            doc.fontSize(9).font('Helvetica')
+                                .text(`      ${bereich} [${countStr}]: ${helperList}`);
+                        }
+                    });
+                    doc.moveDown(0.3);
+                });
+
+                doc.moveDown(0.5);
             });
 
-            doc.moveDown(0.5);
+            // Springer section if available
+            if (eventData.springer) {
+                doc.moveDown(0.5);
+                doc.fontSize(11).font('Helvetica-Bold').text('Springer:');
+                doc.fontSize(10).font('Helvetica').text(`  ${eventData.springer}`);
+            }
+
+            // Notes if available
+            if (eventData.notes) {
+                doc.moveDown(0.5);
+                doc.fontSize(11).font('Helvetica-Bold').text('Bemerkungen:');
+                doc.fontSize(10).font('Helvetica').text(`  ${eventData.notes}`);
+            }
         });
 
-        // Footer
+        // Footer on last page
         doc.moveDown(2);
         doc.fontSize(8).font('Helvetica').fillColor('#666666')
             .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
@@ -2333,6 +2409,316 @@ function requireApiKey(req, res, next) {
     }
     next();
 }
+
+// ============================================
+// EVENT GROUPS (for combined Arbeitsplan)
+// ============================================
+
+// Get all event groups
+app.get('/event-groups', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT g.*,
+                   COALESCE(json_agg(
+                       json_build_object(
+                           'id', e.id,
+                           'title', e.title,
+                           'start_date', e.start_date,
+                           'category', e.category
+                       ) ORDER BY egm.sort_order
+                   ) FILTER (WHERE e.id IS NOT NULL), '[]') as events
+            FROM event_groups g
+            LEFT JOIN event_group_members egm ON g.id = egm.group_id
+            LEFT JOIN events e ON egm.event_id = e.id
+            GROUP BY g.id
+            ORDER BY g.created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get single event group with full event data
+app.get('/event-groups/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const groupResult = await pool.query('SELECT * FROM event_groups WHERE id = $1', [id]);
+        if (groupResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Group not found' });
+        }
+
+        const group = groupResult.rows[0];
+
+        // Get events with full shift data
+        const eventsResult = await pool.query(`
+            SELECT e.*, egm.sort_order
+            FROM events e
+            JOIN event_group_members egm ON e.id = egm.event_id
+            WHERE egm.group_id = $1
+            ORDER BY egm.sort_order, e.start_date
+        `, [id]);
+
+        // Get shifts with registrations for each event
+        const eventsWithShifts = await Promise.all(eventsResult.rows.map(async (event) => {
+            const shifts = await pool.query(
+                'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
+                [event.id]
+            );
+
+            const shiftsWithRegs = await Promise.all(shifts.rows.map(async (shift) => {
+                const regs = await pool.query(`
+                    SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                    FROM registrations r
+                    LEFT JOIN members m ON r.member_id = m.id
+                    WHERE $1 = ANY(r.shift_ids)
+                `, [shift.id]);
+
+                const approved = regs.rows.filter(r => r.status === 'approved');
+                return {
+                    ...shift,
+                    registrations: {
+                        approved: approved.map(r => ({
+                            id: r.id,
+                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                        }))
+                    }
+                };
+            }));
+
+            return { ...event, shifts: shiftsWithRegs };
+        }));
+
+        res.json({ ...group, events: eventsWithShifts });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create event group
+app.post('/event-groups', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { name, description, eventIds } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Name is required' });
+        }
+
+        const result = await pool.query(`
+            INSERT INTO event_groups (name, description, created_by)
+            VALUES ($1, $2, $3)
+            RETURNING *
+        `, [name, description, req.user.email]);
+
+        const group = result.rows[0];
+
+        // Add events to group
+        if (eventIds && eventIds.length > 0) {
+            for (let i = 0; i < eventIds.length; i++) {
+                await pool.query(`
+                    INSERT INTO event_group_members (group_id, event_id, sort_order)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT DO NOTHING
+                `, [group.id, eventIds[i], i]);
+            }
+        }
+
+        logInfo('Event group created', { groupId: group.id, name, eventCount: eventIds?.length || 0 });
+        res.status(201).json(group);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update event group
+app.put('/event-groups/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description, eventIds } = req.body;
+
+        const result = await pool.query(`
+            UPDATE event_groups
+            SET name = COALESCE($2, name),
+                description = COALESCE($3, description)
+            WHERE id = $1
+            RETURNING *
+        `, [id, name, description]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Group not found' });
+        }
+
+        // Update event memberships if provided
+        if (eventIds) {
+            await pool.query('DELETE FROM event_group_members WHERE group_id = $1', [id]);
+            for (let i = 0; i < eventIds.length; i++) {
+                await pool.query(`
+                    INSERT INTO event_group_members (group_id, event_id, sort_order)
+                    VALUES ($1, $2, $3)
+                `, [id, eventIds[i], i]);
+            }
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete event group
+app.delete('/event-groups/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query('DELETE FROM event_groups WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Generate combined Arbeitsplan PDF for a group
+app.post('/event-groups/:id/arbeitsplan-pdf', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get group with events
+        const groupResult = await pool.query('SELECT * FROM event_groups WHERE id = $1', [id]);
+        if (groupResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Group not found' });
+        }
+        const group = groupResult.rows[0];
+
+        // Get events with shifts
+        const eventsResult = await pool.query(`
+            SELECT e.*
+            FROM events e
+            JOIN event_group_members egm ON e.id = egm.event_id
+            WHERE egm.group_id = $1
+            ORDER BY egm.sort_order, e.start_date
+        `, [id]);
+
+        const eventsWithShifts = await Promise.all(eventsResult.rows.map(async (event) => {
+            const shifts = await pool.query(
+                'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
+                [event.id]
+            );
+
+            const shiftsWithRegs = await Promise.all(shifts.rows.map(async (shift) => {
+                const regs = await pool.query(`
+                    SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                    FROM registrations r
+                    LEFT JOIN members m ON r.member_id = m.id
+                    WHERE $1 = ANY(r.shift_ids)
+                `, [shift.id]);
+
+                const approved = regs.rows.filter(r => r.status === 'approved');
+                return {
+                    ...shift,
+                    registrations: {
+                        approved: approved.map(r => ({
+                            id: r.id,
+                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                        }))
+                    }
+                };
+            }));
+
+            return { title: event.title, shifts: shiftsWithRegs };
+        }));
+
+        // Forward to regular PDF endpoint
+        req.body = { events: eventsWithShifts };
+
+        // Create PDF
+        const doc = new PDFDocument({ size: 'A4', margin: 50 });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Arbeitsplan_${group.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+        doc.pipe(res);
+
+        // Title page
+        doc.fontSize(22).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(18).text(group.name, { align: 'center' });
+        doc.moveDown(0.3);
+        doc.fontSize(14).font('Helvetica').text('Kombinierter Arbeitsplan', { align: 'center' });
+        doc.moveDown(2);
+
+        // List of included events
+        doc.fontSize(12).font('Helvetica-Bold').text('Enthaltene Events:');
+        doc.moveDown(0.3);
+        doc.fontSize(11).font('Helvetica');
+        eventsWithShifts.forEach((e, i) => {
+            doc.text(`  ${i + 1}. ${e.title}`);
+        });
+
+        // Individual event pages
+        eventsWithShifts.forEach((eventData) => {
+            doc.addPage();
+
+            doc.fontSize(16).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+            doc.fontSize(12).font('Helvetica').text('Arbeitsplan', { align: 'center' });
+            doc.moveDown(0.3);
+            doc.fontSize(14).font('Helvetica-Bold').text(eventData.title, { align: 'center' });
+            doc.moveDown(1);
+
+            const shifts = eventData.shifts || [];
+            const allBereiche = [...new Set(shifts.map(s => s.bereich || 'Allgemein'))].sort();
+
+            // Group by date
+            const byDate = {};
+            shifts.forEach(s => {
+                const d = s.date || 'Unbekannt';
+                if (!byDate[d]) byDate[d] = [];
+                byDate[d].push(s);
+            });
+
+            Object.keys(byDate).sort().forEach(date => {
+                const dateObj = new Date(date + 'T12:00:00');
+                doc.fontSize(11).font('Helvetica-Bold').text(dateObj.toLocaleDateString('de-CH', {
+                    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+                }));
+                doc.moveDown(0.3);
+
+                // Group by time
+                const byTime = {};
+                byDate[date].forEach(s => {
+                    const tKey = `${s.start_time}-${s.end_time}`;
+                    if (!byTime[tKey]) byTime[tKey] = {};
+                    const b = s.bereich || 'Allgemein';
+                    byTime[tKey][b] = s;
+                });
+
+                Object.keys(byTime).sort().forEach(timeKey => {
+                    const [start, end] = timeKey.split('-');
+                    doc.fontSize(10).font('Helvetica-Bold').text(`  ${start?.substring(0,5) || ''} - ${end?.substring(0,5) || ''}`);
+
+                    allBereiche.forEach(bereich => {
+                        const shift = byTime[timeKey][bereich];
+                        if (shift) {
+                            const helpers = shift.registrations?.approved?.map(r => r.name) || [];
+                            const needed = shift.max_helpers || 1;
+                            doc.fontSize(9).font('Helvetica')
+                                .text(`      ${bereich} [${helpers.length}/${needed}]: ${helpers.length > 0 ? helpers.join(', ') : '(noch offen)'}`);
+                        }
+                    });
+                    doc.moveDown(0.2);
+                });
+                doc.moveDown(0.5);
+            });
+        });
+
+        // Footer
+        doc.fontSize(8).fillColor('#666666')
+            .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')}`, { align: 'center' });
+
+        doc.end();
+
+    } catch (error) {
+        logError('Group Arbeitsplan PDF error', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`API-Events running on port ${PORT}`);
