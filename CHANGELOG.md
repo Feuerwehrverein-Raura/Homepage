@@ -1,3 +1,10 @@
+## [1.41.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.1...v1.41.2) (2026-01-23)
+
+
+### Bug Fixes
+
+* **docker:** use npm install instead of npm ci ([f7607da](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f7607da0d544c24437645cc7b215308f9876134e))
+
 ## [1.41.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.0...v1.41.1) (2026-01-23)
 
 
