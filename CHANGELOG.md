@@ -1,3 +1,10 @@
+# [1.42.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.9...v1.42.0) (2026-01-23)
+
+
+### Features
+
+* **inventory:** add Authentik OAuth2 build args to frontend ([39d2878](https://github.com/Feuerwehrverein-Raura/Homepage/commit/39d2878a1dd70f50c769e93c076858d93b1ef5ac))
+
 ## [1.41.9](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.8...v1.41.9) (2026-01-23)
 
 
