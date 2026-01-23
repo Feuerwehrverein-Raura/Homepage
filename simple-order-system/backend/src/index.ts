@@ -110,9 +110,9 @@ app.get('/api/items', async (req, res) => {
       try {
         const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
         if (response.ok) {
-          const inventoryItems = await response.json();
+          const inventoryItems = await response.json() as any[];
           // Map inventory items to order system format
-          const items = inventoryItems.map((item: any) => ({
+          const items = inventoryItems.map((item) => ({
             id: item.id,
             name: item.name,
             price: parseFloat(item.price),

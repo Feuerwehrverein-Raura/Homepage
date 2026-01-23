@@ -407,7 +407,7 @@ function App() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex items-center gap-3">
             <img
-              src="https://fwv-raura.ch/images/logo.png"
+              src="/logo.png"
               alt="FWV Raura"
               className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1"
             />

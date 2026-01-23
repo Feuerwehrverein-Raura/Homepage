@@ -320,7 +320,7 @@ function App() {
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
           <div className="flex items-center gap-3">
             <img
-              src="https://fwv-raura.ch/images/logo.png"
+              src="/logo.png"
               alt="FWV Raura"
               className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1"
             />
@@ -739,15 +739,14 @@ function AddItemForm({ categories, locations, token, onSuccess }: {
 
 // Reports View Component
 function ReportsView({ items }: { items: Item[] }) {
-  const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchInventoryReport = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/reports/inventory-list`);
-      const data = await res.json();
-      setReportData(data);
+      await fetch(`${API_URL}/reports/inventory-list`);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching report:', error);
     }
