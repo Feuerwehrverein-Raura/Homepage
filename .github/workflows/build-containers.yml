@@ -72,6 +72,11 @@ jobs:
       backend-accounting: ${{ steps.filter.outputs.backend-accounting }}
       frontend-website: ${{ steps.filter.outputs.frontend-website }}
       wiki-docs: ${{ steps.filter.outputs.wiki-docs }}
+      order-backend: ${{ steps.filter.outputs.order-backend }}
+      order-frontend: ${{ steps.filter.outputs.order-frontend }}
+      order-kitchen: ${{ steps.filter.outputs.order-kitchen }}
+      inventory-backend: ${{ steps.filter.outputs.inventory-backend }}
+      inventory-frontend: ${{ steps.filter.outputs.inventory-frontend }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -90,6 +95,16 @@ jobs:
               - 'docker/frontend-website/**'
             wiki-docs:
               - 'docker/wiki-docs/**'
+            order-backend:
+              - 'simple-order-system/backend/**'
+            order-frontend:
+              - 'simple-order-system/frontend/**'
+            order-kitchen:
+              - 'simple-order-system/kitchen-display/**'
+            inventory-backend:
+              - 'simple-inventory-system/backend/**'
+            inventory-frontend:
+              - 'simple-inventory-system/frontend/**'
 
   build-backend-events:
     needs: [release, detect-changes]
@@ -270,3 +285,161 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-wiki:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-wiki:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-wiki:${{ github.sha }}
+
+  # Order System
+  build-order-backend:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.order-backend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./simple-order-system/backend
+          push: true
+          no-cache: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-backend:latest
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-backend:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-backend:${{ github.sha }}
+
+  build-order-frontend:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.order-frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./simple-order-system/frontend
+          push: true
+          no-cache: true
+          build-args: |
+            VITE_API_URL=https://order.fwv-raura.ch/api
+            VITE_WS_URL=wss://order.fwv-raura.ch
+            VITE_AUTHENTIK_URL=https://auth.fwv-raura.ch
+            VITE_AUTHENTIK_CLIENT_ID=order-system
+          tags: |
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-frontend:latest
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-frontend:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-frontend:${{ github.sha }}
+
+  build-order-kitchen:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.order-kitchen == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./simple-order-system/kitchen-display
+          push: true
+          no-cache: true
+          build-args: |
+            VITE_API_URL=https://order.fwv-raura.ch/api
+            VITE_WS_URL=wss://order.fwv-raura.ch
+          tags: |
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:latest
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:${{ github.sha }}
+
+  # Inventory System
+  build-inventory-backend:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.inventory-backend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./simple-inventory-system/backend
+          push: true
+          no-cache: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-backend:latest
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-backend:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-backend:${{ github.sha }}
+
+  build-inventory-frontend:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.inventory-frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./simple-inventory-system/frontend
+          push: true
+          no-cache: true
+          build-args: |
+            VITE_API_URL=https://inventar.fwv-raura.ch/api
+            VITE_AUTHENTIK_URL=https://auth.fwv-raura.ch
+            VITE_AUTHENTIK_CLIENT_ID=inventory-system
+          tags: |
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:latest
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:${{ github.sha }}
