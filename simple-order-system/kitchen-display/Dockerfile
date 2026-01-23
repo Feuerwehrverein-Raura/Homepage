@@ -6,7 +6,7 @@ ARG VITE_WS_URL=ws://localhost:3000
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 

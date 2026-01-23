@@ -6,7 +6,7 @@ ARG VITE_SYNC_URL=
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 

@@ -8,7 +8,7 @@ ARG VITE_AUTHENTIK_CLIENT_ID=order-system
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 
