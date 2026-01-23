@@ -147,7 +147,7 @@ export class SumUpPayment {
         throw new Error(`SumUp API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      return await response.json() as any[];
     } catch (error) {
       console.error('SumUp listCheckouts error:', error);
       throw error;
@@ -212,7 +212,12 @@ export class SumUpPayment {
         throw new Error(`SumUp API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      return await response.json() as {
+        reader_id: string;
+        status: 'online' | 'offline' | 'busy';
+        battery_level?: number;
+        last_seen?: string;
+      };
     } catch (error) {
       console.error('SumUp getTerminalStatus error:', error);
       throw error;
@@ -243,7 +248,7 @@ export class SumUpPayment {
         throw new Error(`SumUp API error: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { reader_id: string; name: string; status: string };
       console.log(`✅ Terminal paired successfully: ${data.reader_id}`);
       return data;
     } catch (error) {
@@ -300,7 +305,7 @@ export class RaiseNowPayment {
         throw new Error(`RaiseNow API error: ${response.statusText} - ${error}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { paylink_url: string; qr_code_url: string; reference: string };
       return {
         paylink_url: data.paylink_url,
         qr_code_url: data.qr_code_url,
@@ -338,7 +343,7 @@ export class RaiseNowPayment {
         throw new Error(`RaiseNow API error: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as { qr_code_data: string };
       return data.qr_code_data; // Base64 or URL
     } catch (error) {
       console.error('RaiseNow createTwintQR error:', error);
@@ -385,8 +390,8 @@ export class RaiseNowPayment {
  * Handles both SumUp and RaiseNow payments
  */
 export class PaymentService {
-  private sumup: SumUpPayment;
-  private raisenow: RaiseNowPayment;
+  public sumup: SumUpPayment;
+  public raisenow: RaiseNowPayment;
 
   constructor() {
     this.sumup = new SumUpPayment();

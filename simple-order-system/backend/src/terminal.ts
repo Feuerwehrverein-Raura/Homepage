@@ -40,7 +40,7 @@ export class SumUpTerminal {
         throw new Error(`SumUp API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      return await response.json() as { reader_id: string; name: string; status: string };
     } catch (error) {
       console.error('SumUp pairReader error:', error);
       throw error;
@@ -63,7 +63,7 @@ export class SumUpTerminal {
         throw new Error(`SumUp API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      return await response.json() as any[];
     } catch (error) {
       console.error('SumUp listReaders error:', error);
       throw error;
@@ -109,7 +109,7 @@ export class SumUpTerminal {
         throw new Error(`SumUp API error: ${response.statusText} - ${error}`);
       }
 
-      return await response.json();
+      return await response.json() as { checkout_id: string; status: string };
     } catch (error) {
       console.error('SumUp startCheckoutOnReader error:', error);
       throw error;
@@ -139,7 +139,14 @@ export class SumUpTerminal {
         throw new Error(`SumUp API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      return await response.json() as {
+        id: string;
+        status: string;
+        amount: number;
+        currency: string;
+        timestamp: string;
+        transaction_code?: string;
+      };
     } catch (error) {
       console.error('SumUp getCheckoutStatus error:', error);
       throw error;
@@ -188,7 +195,12 @@ export class SumUpTerminal {
         throw new Error(`SumUp API error: ${response.statusText}`);
       }
 
-      return await response.json();
+      return await response.json() as {
+        reader_id: string;
+        name: string;
+        status: 'online' | 'offline' | 'busy';
+        battery_level?: number;
+      };
     } catch (error) {
       console.error('SumUp getReaderStatus error:', error);
       throw error;
