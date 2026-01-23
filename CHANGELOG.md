@@ -1,3 +1,10 @@
+# [1.38.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.37.1...v1.38.0) (2026-01-23)
+
+
+### Features
+
+* **events:** fix Arbeitsplan PDF and add event groups ([b4a5273](https://github.com/Feuerwehrverein-Raura/Homepage/commit/b4a5273aca74f69162ea3ac7df6bd9c962ecf1e8))
+
 ## [1.37.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.37.0...v1.37.1) (2026-01-23)
 
 
