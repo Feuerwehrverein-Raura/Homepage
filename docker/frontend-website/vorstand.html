@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vorstand - Mitgliederverwaltung | FWV Raura</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Quill Rich Text Editor -->
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <style>
+        .ql-editor { min-height: 200px; font-size: 14px; }
+        .ql-toolbar { background: #f9fafb; border-radius: 8px 8px 0 0; }
+        .ql-container { border-radius: 0 0 8px 8px; }
+        .dispatch-preview-html { font-family: Arial, sans-serif; line-height: 1.6; }
+        .dispatch-preview-html h1 { font-size: 24px; font-weight: bold; margin: 16px 0 8px; }
+        .dispatch-preview-html h2 { font-size: 20px; font-weight: bold; margin: 14px 0 6px; }
+        .dispatch-preview-html h3 { font-size: 16px; font-weight: bold; margin: 12px 0 4px; }
+        .dispatch-preview-html p { margin: 8px 0; }
+        .dispatch-preview-html ul, .dispatch-preview-html ol { margin: 8px 0; padding-left: 24px; }
+        .dispatch-preview-html a { color: #dc2626; text-decoration: underline; }
+    </style>
     <script>
         tailwind.config = {
             theme: {
@@ -827,13 +842,54 @@
                         <input type="text" id="dispatch-subject" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Betreff der E-Mail">
                     </div>
 
-                    <!-- Message Body -->
+                    <!-- Message Body with Rich Text Editor -->
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Nachricht</label>
-                        <textarea id="dispatch-body" rows="12" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 font-mono text-sm" placeholder="Nachrichtentext..."></textarea>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm font-medium text-gray-700">Nachricht</label>
+                            <div class="flex gap-2">
+                                <button type="button" id="toggle-editor-mode" class="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                                    Plain Text
+                                </button>
+                                <button type="button" id="insert-placeholder-btn" class="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded">
+                                    + Platzhalter
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Rich Text Editor -->
+                        <div id="dispatch-editor-container">
+                            <div id="dispatch-editor"></div>
+                        </div>
+                        <!-- Plain Text Fallback (hidden by default) -->
+                        <textarea id="dispatch-body-plain" rows="12" class="hidden w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 font-mono text-sm" placeholder="Nachrichtentext..."></textarea>
                         <p class="text-xs text-gray-500 mt-1">
-                            Verfügbare Platzhalter: {{anrede}}, {{vorname}}, {{nachname}}, {{strasse}}, {{plz}}, {{ort}}
+                            Platzhalter: {{anrede}}, {{vorname}}, {{nachname}}, {{strasse}}, {{plz}}, {{ort}}, {{email}}
                         </p>
+                    </div>
+
+                    <!-- Placeholder Dropdown (hidden) -->
+                    <div id="placeholder-dropdown" class="hidden absolute bg-white border border-gray-300 rounded-lg shadow-lg z-50 py-1">
+                        <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{anrede}}">Anrede (Herr/Frau)</button>
+                        <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{vorname}}">Vorname</button>
+                        <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{nachname}}">Nachname</button>
+                        <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{strasse}}">Strasse</button>
+                        <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{plz}}">PLZ</button>
+                        <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{ort}}">Ort</button>
+                        <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{email}}">E-Mail</button>
+                    </div>
+
+                    <!-- File Attachments -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Anhänge (nur E-Mail)</label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                            <input type="file" id="dispatch-attachments" multiple accept=".pdf,.jpg,.jpeg,.png" class="hidden">
+                            <div class="text-center">
+                                <button type="button" onclick="document.getElementById('dispatch-attachments').click()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
+                                    📎 Dateien auswählen
+                                </button>
+                                <p class="text-xs text-gray-500 mt-2">PDF, JPG, PNG (max. 10 MB pro Datei)</p>
+                            </div>
+                            <div id="attachment-list" class="mt-3 space-y-2"></div>
+                        </div>
                     </div>
 
                     <!-- Template Variables (shown when template is selected) -->
@@ -842,32 +898,96 @@
                         <div id="dispatch-variables-inputs" class="space-y-3"></div>
                     </div>
 
-                    <!-- Preview -->
+                    <!-- Scheduled Sending -->
                     <div class="mb-6">
-                        <button id="dispatch-preview-btn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
-                            Vorschau anzeigen
-                        </button>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="dispatch-scheduled" class="mr-2">
+                            <span class="text-sm font-medium text-gray-700">Zeitgesteuert senden</span>
+                        </label>
+                        <div id="dispatch-schedule-options" class="hidden mt-2 ml-6">
+                            <input type="datetime-local" id="dispatch-schedule-date" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                            <p class="text-xs text-gray-500 mt-1">Die Nachricht wird zum angegebenen Zeitpunkt versendet</p>
+                        </div>
+                    </div>
+
+                    <!-- Preview Section -->
+                    <div class="mb-6 border rounded-lg overflow-hidden">
+                        <div class="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
+                            <span class="font-medium text-sm">Vorschau</span>
+                            <div class="flex gap-2">
+                                <button type="button" id="preview-email-btn" class="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                                    📧 E-Mail
+                                </button>
+                                <button type="button" id="preview-letter-btn" class="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200">
+                                    ✉️ Brief
+                                </button>
+                            </div>
+                        </div>
+                        <div id="dispatch-preview" class="p-4 bg-white min-h-[200px]">
+                            <p class="text-gray-400 text-sm text-center py-8">Klicke auf "E-Mail" oder "Brief" um eine Vorschau zu sehen</p>
+                        </div>
+                    </div>
+
+                    <!-- Cost Estimate (for Pingen) -->
+                    <div id="pingen-cost-estimate" class="hidden mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="font-medium text-orange-800">📮 Briefversand via Pingen</span>
+                                <p class="text-sm text-orange-600 mt-1">
+                                    <span id="pingen-letter-count">0</span> Briefe × ca. CHF 1.00 = <strong>ca. CHF <span id="pingen-total-cost">0.00</span></strong>
+                                </p>
+                            </div>
+                            <div class="text-xs text-orange-500">
+                                Kosten werden dem Kassier gemeldet
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Actions -->
                     <div class="flex justify-between items-center pt-4 border-t">
                         <div class="text-sm text-gray-600">
                             <span id="dispatch-recipient-count">0</span> Empfänger
+                            (<span id="dispatch-email-count">0</span> E-Mail, <span id="dispatch-post-count">0</span> Post)
                         </div>
                         <div class="flex gap-3">
+                            <button id="dispatch-save-draft-btn" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                💾 Entwurf speichern
+                            </button>
                             <button id="dispatch-test-btn" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                                Test senden
+                                🧪 Test senden
                             </button>
                             <button id="dispatch-send-btn" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
-                                Senden
+                                📤 Senden
                             </button>
                         </div>
                     </div>
                 </div>
 
+                <!-- Saved Drafts -->
+                <div id="drafts-section" class="bg-white rounded-lg shadow-md p-6 mt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">📝 Gespeicherte Entwürfe</h2>
+                        <button id="refresh-drafts-btn" class="text-sm text-gray-500 hover:text-gray-700">↻ Aktualisieren</button>
+                    </div>
+                    <div id="drafts-list" class="space-y-2">
+                        <p class="text-gray-500 text-sm py-4 text-center">Keine Entwürfe vorhanden</p>
+                    </div>
+                </div>
+
+                <!-- Scheduled Messages -->
+                <div id="scheduled-section" class="bg-white rounded-lg shadow-md p-6 mt-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold text-gray-800">⏰ Geplante Nachrichten</h2>
+                        <button id="refresh-scheduled-btn" class="text-sm text-gray-500 hover:text-gray-700">↻ Aktualisieren</button>
+                    </div>
+                    <div id="scheduled-list" class="space-y-2">
+                        <p class="text-gray-500 text-sm py-4 text-center">Keine geplanten Nachrichten</p>
+                    </div>
+                </div>
+
                 <!-- Send History -->
                 <div class="bg-white rounded-lg shadow-md p-6 mt-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">Versandhistorie</h2>
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">📋 Versandhistorie</h2>
                     <div class="overflow-x-auto">
                         <table class="min-w-full">
                             <thead class="bg-gray-50">
@@ -3053,6 +3173,453 @@ ${grussformel}`;
         let dispatchTemplates = [];
         let selectedMembersForDispatch = [];
         let currentTemplate = null;
+        let quillEditor = null;
+        let isPlainTextMode = false;
+        let dispatchAttachments = [];
+        let dispatchDrafts = [];
+
+        // Initialize Quill Rich Text Editor
+        function initQuillEditor() {
+            if (quillEditor) return;
+
+            quillEditor = new Quill('#dispatch-editor', {
+                theme: 'snow',
+                placeholder: 'Nachrichtentext eingeben...',
+                modules: {
+                    toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline'],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['link'],
+                        ['clean']
+                    ]
+                }
+            });
+
+            // Sync editor content changes
+            quillEditor.on('text-change', function() {
+                updatePingenCostEstimate();
+            });
+        }
+
+        // Toggle between Rich Text and Plain Text mode
+        function toggleEditorMode() {
+            isPlainTextMode = !isPlainTextMode;
+            const btn = document.getElementById('toggle-editor-mode');
+            const editorContainer = document.getElementById('dispatch-editor-container');
+            const plainTextArea = document.getElementById('dispatch-body-plain');
+
+            if (isPlainTextMode) {
+                // Switch to plain text
+                btn.textContent = 'Rich Text';
+                editorContainer.classList.add('hidden');
+                plainTextArea.classList.remove('hidden');
+                // Convert HTML to plain text
+                if (quillEditor) {
+                    plainTextArea.value = quillEditor.getText();
+                }
+            } else {
+                // Switch to rich text
+                btn.textContent = 'Plain Text';
+                editorContainer.classList.remove('hidden');
+                plainTextArea.classList.add('hidden');
+                // Set plain text content to editor
+                if (quillEditor && plainTextArea.value) {
+                    quillEditor.setText(plainTextArea.value);
+                }
+            }
+        }
+
+        // Get message content (works for both modes)
+        function getDispatchContent() {
+            if (isPlainTextMode) {
+                return {
+                    html: null,
+                    text: document.getElementById('dispatch-body-plain').value
+                };
+            } else if (quillEditor) {
+                const html = quillEditor.root.innerHTML;
+                const text = quillEditor.getText();
+                return { html, text };
+            }
+            return { html: null, text: '' };
+        }
+
+        // Set message content (works for both modes)
+        function setDispatchContent(html, text) {
+            if (isPlainTextMode) {
+                document.getElementById('dispatch-body-plain').value = text || '';
+            } else if (quillEditor) {
+                if (html && html !== '<p><br></p>') {
+                    quillEditor.root.innerHTML = html;
+                } else if (text) {
+                    quillEditor.setText(text);
+                } else {
+                    quillEditor.setText('');
+                }
+            }
+        }
+
+        // Convert HTML to plain text for letters
+        function htmlToPlainText(html) {
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+
+            // Convert headers
+            temp.querySelectorAll('h1, h2, h3').forEach(h => {
+                h.innerHTML = h.textContent.toUpperCase() + '\n';
+            });
+
+            // Convert lists
+            temp.querySelectorAll('ul li').forEach(li => {
+                li.innerHTML = '• ' + li.textContent;
+            });
+            temp.querySelectorAll('ol li').forEach((li, i) => {
+                li.innerHTML = (i + 1) + '. ' + li.textContent;
+            });
+
+            // Convert links
+            temp.querySelectorAll('a').forEach(a => {
+                a.innerHTML = a.textContent + ' (' + a.href + ')';
+            });
+
+            // Get text and clean up
+            let text = temp.textContent || temp.innerText || '';
+            text = text.replace(/\n{3,}/g, '\n\n'); // Max 2 newlines
+            return text.trim();
+        }
+
+        // Placeholder dropdown
+        function setupPlaceholderDropdown() {
+            const btn = document.getElementById('insert-placeholder-btn');
+            const dropdown = document.getElementById('placeholder-dropdown');
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const rect = btn.getBoundingClientRect();
+                dropdown.style.top = (rect.bottom + 5) + 'px';
+                dropdown.style.left = rect.left + 'px';
+                dropdown.classList.toggle('hidden');
+            });
+
+            dropdown.querySelectorAll('button[data-placeholder]').forEach(b => {
+                b.addEventListener('click', () => {
+                    const placeholder = b.dataset.placeholder;
+                    if (isPlainTextMode) {
+                        const textarea = document.getElementById('dispatch-body-plain');
+                        const pos = textarea.selectionStart;
+                        textarea.value = textarea.value.slice(0, pos) + placeholder + textarea.value.slice(pos);
+                        textarea.focus();
+                        textarea.selectionStart = textarea.selectionEnd = pos + placeholder.length;
+                    } else if (quillEditor) {
+                        const range = quillEditor.getSelection(true);
+                        quillEditor.insertText(range.index, placeholder);
+                    }
+                    dropdown.classList.add('hidden');
+                });
+            });
+
+            document.addEventListener('click', () => dropdown.classList.add('hidden'));
+        }
+
+        // File attachments handling
+        function setupAttachments() {
+            const input = document.getElementById('dispatch-attachments');
+            const list = document.getElementById('attachment-list');
+
+            input.addEventListener('change', () => {
+                Array.from(input.files).forEach(file => {
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert(`Datei "${file.name}" ist zu gross (max 10 MB)`);
+                        return;
+                    }
+                    dispatchAttachments.push(file);
+                });
+                renderAttachmentList();
+                input.value = '';
+            });
+        }
+
+        function renderAttachmentList() {
+            const list = document.getElementById('attachment-list');
+            if (dispatchAttachments.length === 0) {
+                list.innerHTML = '';
+                return;
+            }
+
+            list.innerHTML = dispatchAttachments.map((file, i) => `
+                <div class="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+                    <span class="text-sm">📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)</span>
+                    <button type="button" onclick="removeAttachment(${i})" class="text-red-500 hover:text-red-700 text-sm">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function removeAttachment(index) {
+            dispatchAttachments.splice(index, 1);
+            renderAttachmentList();
+        }
+
+        // Scheduled sending
+        function setupScheduledSending() {
+            const checkbox = document.getElementById('dispatch-scheduled');
+            const options = document.getElementById('dispatch-schedule-options');
+
+            checkbox.addEventListener('change', () => {
+                options.classList.toggle('hidden', !checkbox.checked);
+                if (checkbox.checked) {
+                    // Set default to tomorrow 9:00
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    tomorrow.setHours(9, 0, 0, 0);
+                    document.getElementById('dispatch-schedule-date').value =
+                        tomorrow.toISOString().slice(0, 16);
+                }
+            });
+        }
+
+        // Update recipient counts (email vs post)
+        function updateRecipientCounts() {
+            const recipients = getFilteredRecipients();
+            const deliveryMethod = document.querySelector('input[name="delivery-method"]:checked').value;
+
+            let emailCount = 0;
+            let postCount = 0;
+
+            recipients.forEach(m => {
+                if (deliveryMethod === 'email') {
+                    emailCount++;
+                } else if (deliveryMethod === 'post') {
+                    postCount++;
+                } else {
+                    // Auto: based on member preference
+                    if (m.zustellung_email && m.email) {
+                        emailCount++;
+                    } else if (m.zustellung_post) {
+                        postCount++;
+                    } else if (m.email) {
+                        emailCount++; // Fallback to email
+                    } else {
+                        postCount++; // Last resort: post
+                    }
+                }
+            });
+
+            document.getElementById('dispatch-recipient-count').textContent = recipients.length;
+            document.getElementById('dispatch-email-count').textContent = emailCount;
+            document.getElementById('dispatch-post-count').textContent = postCount;
+
+            // Show/hide Pingen cost estimate
+            const costEstimate = document.getElementById('pingen-cost-estimate');
+            if (postCount > 0) {
+                costEstimate.classList.remove('hidden');
+                document.getElementById('pingen-letter-count').textContent = postCount;
+                document.getElementById('pingen-total-cost').textContent = postCount.toFixed(2);
+            } else {
+                costEstimate.classList.add('hidden');
+            }
+        }
+
+        function updatePingenCostEstimate() {
+            // Trigger recipient count update which handles Pingen costs
+            updateRecipientCounts();
+        }
+
+        function getFilteredRecipients() {
+            const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
+
+            if (recipientType === 'all') {
+                return members;
+            } else if (recipientType === 'filter') {
+                const status = document.getElementById('dispatch-filter-status').value;
+                const emailOnly = document.getElementById('dispatch-filter-email').checked;
+                const postOnly = document.getElementById('dispatch-filter-post').checked;
+
+                return members.filter(m => {
+                    if (status && m.status !== status) return false;
+                    if (emailOnly && !m.zustellung_email) return false;
+                    if (postOnly && !m.zustellung_post) return false;
+                    return true;
+                });
+            } else if (recipientType === 'selected') {
+                return members.filter(m => selectedMembersForDispatch.includes(m.id));
+            }
+            return [];
+        }
+
+        // Preview functions
+        function showEmailPreview() {
+            const subject = document.getElementById('dispatch-subject').value;
+            const content = getDispatchContent();
+
+            const sampleMember = members[0] || {
+                anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
+                strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst',
+                email: 'max@example.com'
+            };
+
+            let html = content.html || content.text.replace(/\n/g, '<br>');
+            html = replacePlaceholders(html, sampleMember);
+
+            const previewDiv = document.getElementById('dispatch-preview');
+            previewDiv.innerHTML = `
+                <div class="border rounded-lg overflow-hidden">
+                    <div class="bg-blue-50 px-4 py-2 border-b">
+                        <div class="text-xs text-gray-500">An: ${sampleMember.email}</div>
+                        <div class="font-semibold">${replacePlaceholders(subject, sampleMember) || '(kein Betreff)'}</div>
+                    </div>
+                    <div class="p-4 dispatch-preview-html">
+                        ${html}
+                    </div>
+                    ${dispatchAttachments.length > 0 ? `
+                        <div class="border-t px-4 py-2 bg-gray-50">
+                            <span class="text-xs text-gray-500">Anhänge:</span>
+                            ${dispatchAttachments.map(f => `<span class="ml-2 text-xs">📎 ${f.name}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function showLetterPreview() {
+            const content = getDispatchContent();
+
+            const sampleMember = members[0] || {
+                anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
+                strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
+            };
+
+            let text = content.text || htmlToPlainText(content.html);
+            text = replacePlaceholders(text, sampleMember);
+
+            const previewDiv = document.getElementById('dispatch-preview');
+            previewDiv.innerHTML = `
+                <div class="border rounded-lg overflow-hidden bg-white" style="max-width: 600px; margin: 0 auto;">
+                    <div class="p-8 font-serif text-sm" style="min-height: 400px;">
+                        <div class="text-right text-gray-500 text-xs mb-8">
+                            Feuerwehrverein Raura<br>
+                            Datum: ${new Date().toLocaleDateString('de-CH')}
+                        </div>
+                        <div class="mb-8">
+                            <strong>${sampleMember.anrede} ${sampleMember.vorname} ${sampleMember.nachname}</strong><br>
+                            ${sampleMember.strasse}<br>
+                            ${sampleMember.plz} ${sampleMember.ort}
+                        </div>
+                        <div class="whitespace-pre-wrap">${text}</div>
+                    </div>
+                    <div class="border-t px-4 py-2 bg-orange-50 text-xs text-orange-700">
+                        📮 Wird via Pingen als Brief versendet (ca. CHF 1.00)
+                    </div>
+                </div>
+            `;
+        }
+
+        function replacePlaceholders(text, member) {
+            if (!text) return '';
+            return text
+                .replace(/\{\{anrede\}\}/g, member.anrede || '')
+                .replace(/\{\{vorname\}\}/g, member.vorname || '')
+                .replace(/\{\{nachname\}\}/g, member.nachname || '')
+                .replace(/\{\{strasse\}\}/g, member.strasse || '')
+                .replace(/\{\{plz\}\}/g, member.plz || '')
+                .replace(/\{\{ort\}\}/g, member.ort || '')
+                .replace(/\{\{email\}\}/g, member.email || '');
+        }
+
+        // Draft functions
+        async function saveDraft() {
+            const subject = document.getElementById('dispatch-subject').value;
+            const content = getDispatchContent();
+            const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
+            const deliveryMethod = document.querySelector('input[name="delivery-method"]:checked').value;
+
+            if (!subject && !content.text) {
+                alert('Bitte gib mindestens einen Betreff oder Nachrichtentext ein');
+                return;
+            }
+
+            const draft = {
+                id: 'draft_' + Date.now(),
+                subject,
+                html: content.html,
+                text: content.text,
+                recipientType,
+                deliveryMethod,
+                filterStatus: document.getElementById('dispatch-filter-status').value,
+                selectedMembers: selectedMembersForDispatch,
+                createdAt: new Date().toISOString()
+            };
+
+            // Save to localStorage
+            const drafts = JSON.parse(localStorage.getItem('dispatchDrafts') || '[]');
+            drafts.unshift(draft);
+            localStorage.setItem('dispatchDrafts', JSON.stringify(drafts.slice(0, 20))); // Max 20 drafts
+
+            alert('Entwurf gespeichert');
+            loadDrafts();
+        }
+
+        function loadDrafts() {
+            dispatchDrafts = JSON.parse(localStorage.getItem('dispatchDrafts') || '[]');
+            const container = document.getElementById('drafts-list');
+
+            if (dispatchDrafts.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">Keine Entwürfe vorhanden</p>';
+                return;
+            }
+
+            container.innerHTML = dispatchDrafts.map((d, i) => `
+                <div class="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-lg">
+                    <div class="flex-1">
+                        <div class="font-medium">${d.subject || '(kein Betreff)'}</div>
+                        <div class="text-xs text-gray-500">${new Date(d.createdAt).toLocaleString('de-CH')}</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="loadDraft(${i})" class="text-sm text-blue-600 hover:text-blue-800">Laden</button>
+                        <button onclick="deleteDraft(${i})" class="text-sm text-red-600 hover:text-red-800">Löschen</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadDraft(index) {
+            const draft = dispatchDrafts[index];
+            if (!draft) return;
+
+            document.getElementById('dispatch-subject').value = draft.subject || '';
+            setDispatchContent(draft.html, draft.text);
+
+            // Set recipient type
+            document.querySelector(`input[name="recipient-type"][value="${draft.recipientType}"]`).checked = true;
+            document.querySelectorAll('input[name="recipient-type"]').forEach(r => r.dispatchEvent(new Event('change')));
+
+            // Set delivery method
+            document.querySelector(`input[name="delivery-method"][value="${draft.deliveryMethod}"]`).checked = true;
+
+            if (draft.filterStatus) {
+                document.getElementById('dispatch-filter-status').value = draft.filterStatus;
+            }
+            if (draft.selectedMembers) {
+                selectedMembersForDispatch = draft.selectedMembers;
+            }
+
+            updateRecipientCounts();
+            alert('Entwurf geladen');
+        }
+
+        function deleteDraft(index) {
+            if (!confirm('Entwurf wirklich löschen?')) return;
+            dispatchDrafts.splice(index, 1);
+            localStorage.setItem('dispatchDrafts', JSON.stringify(dispatchDrafts));
+            loadDrafts();
+        }
+
+        // Scheduled messages
+        function loadScheduledMessages() {
+            // For now, just show placeholder - would need backend support
+            const container = document.getElementById('scheduled-list');
+            container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">Keine geplanten Nachrichten</p>';
+        }
 
         async function loadDispatchTemplates() {
             try {
@@ -3082,13 +3649,12 @@ ${grussformel}`;
             const variablesContainer = document.getElementById('dispatch-variables');
             const variablesInputs = document.getElementById('dispatch-variables-inputs');
             const subjectInput = document.getElementById('dispatch-subject');
-            const bodyInput = document.getElementById('dispatch-body');
 
             if (!templateId) {
                 currentTemplate = null;
                 variablesContainer.classList.add('hidden');
                 subjectInput.value = '';
-                bodyInput.value = '';
+                setDispatchContent('', '');
                 return;
             }
 
@@ -3097,11 +3663,10 @@ ${grussformel}`;
 
             // Fill subject and body from template
             subjectInput.value = currentTemplate.subject || '';
-            bodyInput.value = currentTemplate.body || '';
+            setDispatchContent(null, currentTemplate.body || '');
 
             // Show template variables if any
             const variables = currentTemplate.variables || [];
-            // Filter out member variables that are auto-filled
             const memberVars = ['anrede', 'vorname', 'nachname', 'strasse', 'plz', 'ort', 'email'];
             const customVars = variables.filter(v => !memberVars.includes(v));
 
@@ -3116,64 +3681,6 @@ ${grussformel}`;
             } else {
                 variablesContainer.classList.add('hidden');
             }
-        }
-
-        function showDispatchPreview() {
-            const subject = document.getElementById('dispatch-subject').value;
-            let body = document.getElementById('dispatch-body').value;
-
-            // Replace template variables with sample data
-            const sampleMember = members[0] || {
-                anrede: 'Herr',
-                vorname: 'Max',
-                nachname: 'Mustermann',
-                strasse: 'Musterstrasse 1',
-                plz: '4303',
-                ort: 'Kaiseraugst',
-                email: 'max@example.com'
-            };
-
-            // Replace member variables
-            body = body.replace(/\{\{anrede\}\}/g, sampleMember.anrede || '');
-            body = body.replace(/\{\{vorname\}\}/g, sampleMember.vorname || '');
-            body = body.replace(/\{\{nachname\}\}/g, sampleMember.nachname || '');
-            body = body.replace(/\{\{strasse\}\}/g, sampleMember.strasse || '');
-            body = body.replace(/\{\{plz\}\}/g, sampleMember.plz || '');
-            body = body.replace(/\{\{ort\}\}/g, sampleMember.ort || '');
-            body = body.replace(/\{\{email\}\}/g, sampleMember.email || '');
-
-            // Replace custom variables from inputs
-            document.querySelectorAll('#dispatch-variables-inputs input[data-var]').forEach(input => {
-                const varName = input.dataset.var;
-                const value = input.value || `[${varName}]`;
-                body = body.replace(new RegExp(`\\{\\{${varName}\\}\\}`, 'g'), value);
-            });
-
-            // Show preview in modal
-            const previewHtml = `
-                <div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
-                        <div class="p-4 border-b flex justify-between items-center">
-                            <h3 class="text-lg font-bold">Vorschau</h3>
-                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">&times;</button>
-                        </div>
-                        <div class="p-6 overflow-y-auto max-h-[60vh]">
-                            <div class="mb-4">
-                                <label class="text-sm font-medium text-gray-500">Betreff:</label>
-                                <p class="font-semibold">${subject || '(kein Betreff)'}</p>
-                            </div>
-                            <div>
-                                <label class="text-sm font-medium text-gray-500">Nachricht:</label>
-                                <div class="mt-2 p-4 bg-gray-50 rounded-lg whitespace-pre-wrap font-mono text-sm">${body}</div>
-                            </div>
-                        </div>
-                        <div class="p-4 border-t text-right">
-                            <button onclick="this.closest('.fixed').remove()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Schliessen</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', previewHtml);
         }
 
         function updateRecipientCount() {
@@ -3205,15 +3712,28 @@ ${grussformel}`;
             const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
             const templateId = document.getElementById('dispatch-template').value;
             const subject = document.getElementById('dispatch-subject').value;
-            const body = document.getElementById('dispatch-body').value;
+            const content = getDispatchContent();
+            const isScheduled = document.getElementById('dispatch-scheduled').checked;
+            const scheduleDate = document.getElementById('dispatch-schedule-date').value;
 
-            if (!subject && deliveryMethod === 'email') {
+            if (!subject && deliveryMethod !== 'post') {
                 alert('Bitte Betreff eingeben');
                 return;
             }
 
-            if (!body && !templateId) {
+            if (!content.text && !templateId) {
                 alert('Bitte Nachricht oder Vorlage auswählen');
+                return;
+            }
+
+            if (isScheduled && !scheduleDate) {
+                alert('Bitte Versanddatum auswählen');
+                return;
+            }
+
+            // For scheduled messages, save and return
+            if (isScheduled) {
+                alert('Zeitgesteuerter Versand wird noch nicht unterstützt.\nBitte Entwurf speichern und später manuell senden.');
                 return;
             }
 
@@ -3264,7 +3784,7 @@ ${grussformel}`;
                 let emailSuccess = 0;
                 let postSuccess = 0;
 
-                // Send emails
+                // Send emails (with HTML support)
                 if (emailRecipients.length > 0) {
                     const response = await fetch(`${API_BASE}/email/bulk`, {
                         method: 'POST',
@@ -3276,8 +3796,11 @@ ${grussformel}`;
                             member_ids: emailRecipients.map(m => m.id),
                             template_id: templateId || null,
                             subject,
-                            body,
-                            variables: {}
+                            body: content.text,
+                            html: content.html,
+                            variables: {},
+                            // TODO: Add attachments support
+                            attachments: []
                         })
                     });
 
@@ -3289,10 +3812,14 @@ ${grussformel}`;
                     }
                 }
 
-                // Send post
+                // Send post (convert HTML to plain text for letters)
                 if (postRecipients.length > 0) {
+                    const letterText = content.html ? htmlToPlainText(content.html) : content.text;
+
                     for (const member of postRecipients) {
-                        const html = body; // Should use template if selected
+                        // Replace placeholders for this member
+                        const personalizedText = replacePlaceholders(letterText, member);
+
                         const recipient = {
                             name: `${member.vorname} ${member.nachname}`,
                             street: member.strasse,
@@ -3307,7 +3834,7 @@ ${grussformel}`;
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                html,
+                                text: personalizedText,
                                 recipient,
                                 member_id: member.id
                             })
@@ -3617,9 +4144,13 @@ ${grussformel}`;
             } else if (tab === 'dispatch') {
                 document.getElementById('tab-dispatch').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('dispatch-section').classList.remove('hidden');
+                initQuillEditor();
                 loadDispatchTemplates();
                 loadDispatchHistory();
+                loadDrafts();
+                loadScheduledMessages();
                 updateRecipientCount();
+                updateRecipientCounts();
             } else if (tab === 'email') {
                 document.getElementById('tab-email').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('email-section').classList.remove('hidden');
@@ -3729,8 +4260,23 @@ ${grussformel}`;
         document.getElementById('dispatch-filter-email').addEventListener('change', updateRecipientCount);
         document.getElementById('dispatch-filter-post').addEventListener('change', updateRecipientCount);
         document.getElementById('dispatch-template').addEventListener('change', onTemplateSelected);
-        document.getElementById('dispatch-preview-btn').addEventListener('click', showDispatchPreview);
         document.getElementById('dispatch-send-btn').addEventListener('click', sendDispatch);
+
+        // New dispatch features
+        document.getElementById('toggle-editor-mode').addEventListener('click', toggleEditorMode);
+        document.getElementById('preview-email-btn').addEventListener('click', showEmailPreview);
+        document.getElementById('preview-letter-btn').addEventListener('click', showLetterPreview);
+        document.getElementById('dispatch-save-draft-btn').addEventListener('click', saveDraft);
+        document.getElementById('refresh-drafts-btn').addEventListener('click', loadDrafts);
+        document.getElementById('refresh-scheduled-btn').addEventListener('click', loadScheduledMessages);
+        document.querySelectorAll('input[name="delivery-method"]').forEach(r => {
+            r.addEventListener('change', updateRecipientCounts);
+        });
+
+        // Initialize Quill editor when dispatch tab is shown
+        setupPlaceholderDropdown();
+        setupAttachments();
+        setupScheduledSending();
 
         // Registrations
         document.getElementById('registrations-filter').addEventListener('change', () => loadRegistrations());
