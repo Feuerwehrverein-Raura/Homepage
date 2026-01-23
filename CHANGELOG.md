@@ -1,3 +1,10 @@
+# [1.43.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.42.0...v1.43.0) (2026-01-23)
+
+
+### Features
+
+* **ci:** add GitHub Actions builds for order and inventory systems ([226d6b6](https://github.com/Feuerwehrverein-Raura/Homepage/commit/226d6b6e45256879375fc18f52436a1120e9c40c))
+
 # [1.42.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.9...v1.42.0) (2026-01-23)
 
 
