@@ -52,16 +52,19 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
+      # API Router
       - traefik.http.routers.order-backend.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/api`)
       - traefik.http.routers.order-backend.entrypoints=https
       - traefik.http.routers.order-backend.tls=true
       - traefik.http.routers.order-backend.tls.certresolver=letsencrypt
+      - traefik.http.routers.order-backend.service=order-backend
       - traefik.http.services.order-backend.loadbalancer.server.port=3000
-      # WebSocket support
+      # WebSocket Router
       - traefik.http.routers.order-ws.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/ws`)
       - traefik.http.routers.order-ws.entrypoints=https
       - traefik.http.routers.order-ws.tls=true
       - traefik.http.routers.order-ws.tls.certresolver=letsencrypt
+      - traefik.http.routers.order-ws.service=order-ws
       - traefik.http.services.order-ws.loadbalancer.server.port=3000
       - com.centurylinklabs.watchtower.enable=true
 
