@@ -1,3 +1,10 @@
+# [1.41.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.40.0...v1.41.0) (2026-01-23)
+
+
+### Features
+
+* **inventory-system:** add inventory management with barcode support ([26496f1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/26496f11eb937558bccde02dd17b9e7b28b01c57))
+
 # [1.40.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.39.1...v1.40.0) (2026-01-23)
 
 
