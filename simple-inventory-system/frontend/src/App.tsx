@@ -35,7 +35,8 @@ function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [token, setToken] = useState<string | null>(localStorage.getItem('inventory_token'));
-  const [authMode, setAuthMode] = useState<{ local: boolean } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_authMode, setAuthMode] = useState<{ local: boolean } | null>(null);
   const [search, setSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [scanResult, setScanResult] = useState<Item | null>(null);
@@ -159,7 +160,12 @@ function App() {
 
   const stopScanner = () => {
     if (codeReaderRef.current) {
-      codeReaderRef.current.reset();
+      // Stop the video stream
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
       codeReaderRef.current = null;
     }
     setIsScanning(false);
