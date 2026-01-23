@@ -1,3 +1,10 @@
+# [1.44.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.43.0...v1.44.0) (2026-01-23)
+
+
+### Features
+
+* **order:** add Authentik OAuth2, mobile design, custom amounts ([f98ee72](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f98ee72733b2f0623ff10949826db993f60865ea))
+
 # [1.43.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.42.0...v1.43.0) (2026-01-23)
 
 
