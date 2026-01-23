@@ -1,0 +1,259 @@
+import { useState, useEffect, useRef } from 'react';
+
+interface OrderItem {
+  id: number;
+  item_name: string;
+  quantity: number;
+  notes: string;
+  printer_station: string;
+}
+
+interface Order {
+  id: number;
+  table_number: number;
+  created_at: string;
+  items: OrderItem[];
+}
+
+function App() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [station, setStation] = useState<string>('all');
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    fetchOrders();
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch('/api/orders');
+      const data = await res.json();
+      setOrders(data);
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+    }
+  };
+
+  const connectWebSocket = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.hostname;
+    const ws = new WebSocket(`${protocol}//${host}:3000`);
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'new_order') {
+        setOrders(prev => [data.order, ...prev]);
+        // Play sound or visual notification
+        playNotification();
+      } else if (data.type === 'order_completed') {
+        setOrders(prev => prev.filter(o => o.id !== data.order_id));
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected, reconnecting...');
+      setTimeout(connectWebSocket, 3000);
+    };
+
+    wsRef.current = ws;
+  };
+
+  const playNotification = () => {
+    // Simple notification - you can add audio or more visual feedback
+    document.body.style.backgroundColor = '#fef3c7';
+    setTimeout(() => {
+      document.body.style.backgroundColor = '';
+    }, 500);
+  };
+
+  const completeOrder = async (orderId: number) => {
+    try {
+      await fetch(`/api/orders/${orderId}/complete`, {
+        method: 'PATCH',
+      });
+      setOrders(orders.filter(o => o.id !== orderId));
+    } catch (error) {
+      console.error('Failed to complete order:', error);
+    }
+  };
+
+  const filterOrders = (order: Order) => {
+    if (station === 'all') return true;
+    return order.items.some(item => item.printer_station === station);
+  };
+
+  const filteredOrders = orders.filter(filterOrders);
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Header */}
+      <div className="bg-gray-800 p-4 shadow-lg">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Kitchen Display</h1>
+          
+          <div className="flex gap-2">
+            <button
+              onClick={() => setStation('all')}
+              className={`px-4 py-2 rounded font-semibold ${
+                station === 'all' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Alle
+            </button>
+            <button
+              onClick={() => setStation('bar')}
+              className={`px-4 py-2 rounded font-semibold ${
+                station === 'bar' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Bar
+            </button>
+            <button
+              onClick={() => setStation('kitchen')}
+              className={`px-4 py-2 rounded font-semibold ${
+                station === 'kitchen' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              Küche
+            </button>
+          </div>
+
+          <div className="text-xl font-bold">
+            {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* Orders Grid */}
+      <div className="max-w-7xl mx-auto p-6">
+        {filteredOrders.length === 0 ? (
+          <div className="text-center text-gray-400 text-2xl mt-20">
+            Keine offenen Bestellungen
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredOrders.map(order => (
+              <OrderCard 
+                key={order.id} 
+                order={order} 
+                station={station}
+                onComplete={() => completeOrder(order.id)} 
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrderCard({ 
+  order, 
+  station,
+  onComplete 
+}: { 
+  order: Order; 
+  station: string;
+  onComplete: () => void;
+}) {
+  const timeAgo = (dateString: string) => {
+    const now = new Date();
+    const created = new Date(dateString);
+    const diffMs = now.getTime() - created.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Jetzt';
+    if (diffMins === 1) return '1 Min';
+    return `${diffMins} Min`;
+  };
+
+  const filteredItems = station === 'all' 
+    ? order.items 
+    : order.items.filter(item => item.printer_station === station);
+
+  if (filteredItems.length === 0) return null;
+
+  const time = timeAgo(order.created_at);
+  const isUrgent = new Date().getTime() - new Date(order.created_at).getTime() > 10 * 60 * 1000;
+
+  return (
+    <div className={`bg-gray-800 rounded-lg p-6 shadow-xl border-4 ${
+      isUrgent ? 'border-red-500' : 'border-gray-700'
+    }`}>
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <div className="text-3xl font-bold text-blue-400">
+            Tisch {order.table_number}
+          </div>
+          <div className={`text-sm font-semibold ${
+            isUrgent ? 'text-red-400' : 'text-gray-400'
+          }`}>
+            vor {time}
+          </div>
+        </div>
+        <div className="text-sm text-gray-500">
+          #{order.id}
+        </div>
+      </div>
+
+      {/* Items */}
+      <div className="space-y-3 mb-6">
+        {filteredItems.map(item => (
+          <div key={item.id} className="bg-gray-700 rounded p-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <span className="text-2xl font-bold text-yellow-400 mr-2">
+                  {item.quantity}×
+                </span>
+                <span className="text-xl font-semibold">
+                  {item.item_name}
+                </span>
+              </div>
+              <div className="text-xs bg-gray-600 px-2 py-1 rounded">
+                {item.printer_station}
+              </div>
+            </div>
+            {item.notes && (
+              <div className="mt-2 text-sm text-yellow-300 bg-gray-800 p-2 rounded">
+                📝 {item.notes}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Complete Button */}
+      <button
+        onClick={onComplete}
+        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition text-lg"
+      >
+        ✓ Erledigt
+      </button>
+    </div>
+  );
+}
+
+export default App;

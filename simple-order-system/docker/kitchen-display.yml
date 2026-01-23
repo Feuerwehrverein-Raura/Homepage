@@ -1,0 +1,11 @@
+services:
+  kitchen-display:
+    build:
+      context: ../kitchen-display
+      dockerfile: Dockerfile
+    container_name: order-system-kitchen
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

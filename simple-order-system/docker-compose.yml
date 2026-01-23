@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  postgres:
+    extends:
+      file: docker/postgres.yml
+      service: postgres
+    networks:
+      - order-network
+
+  backend:
+    extends:
+      file: docker/backend.yml
+      service: backend
+    networks:
+      - order-network
+
+  frontend:
+    extends:
+      file: docker/frontend.yml
+      service: frontend
+    networks:
+      - order-network
+
+  kitchen-display:
+    extends:
+      file: docker/kitchen-display.yml
+      service: kitchen-display
+    networks:
+      - order-network
+
+networks:
+  order-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,92 @@
+version: '3.8'
+
+# Lokales Setup für Events ohne Internet
+# Einfach auf einem Laptop/Mini-PC starten
+
+services:
+  # Lokale Postgres
+  postgres:
+    image: postgres:16-alpine
+    container_name: order-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orderuser
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-localpass123}
+      POSTGRES_DB: orderdb
+    volumes:
+      - order_postgres_local:/var/lib/postgresql/data
+    networks:
+      - order-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orderuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: order-backend-local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: orderdb
+      DB_USER: orderuser
+      DB_PASSWORD: ${ORDER_DB_PASSWORD:-localpass123}
+      # Lokale Auth (einfaches Passwort)
+      LOCAL_MODE: "true"
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-fwv2026}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - order-local
+
+  # Frontend - Bestelloberfläche
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://${LOCAL_IP:-localhost}:3000/api
+        VITE_WS_URL: ws://${LOCAL_IP:-localhost}:3000
+        VITE_LOCAL_MODE: "true"
+    container_name: order-frontend-local
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - order-local
+
+  # Kitchen Display
+  kitchen-display:
+    build:
+      context: ./kitchen-display
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://${LOCAL_IP:-localhost}:3000/api
+        VITE_WS_URL: ws://${LOCAL_IP:-localhost}:3000
+    container_name: order-kitchen-local
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    networks:
+      - order-local
+
+networks:
+  order-local:
+    driver: bridge
+
+volumes:
+  order_postgres_local:

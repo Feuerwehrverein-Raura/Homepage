@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Separate Postgres for Order System
+  order-postgres:
+    image: postgres:16-alpine
+    container_name: order-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${ORDER_DB_USER:-orderuser}
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD}
+      POSTGRES_DB: ${ORDER_DB_NAME:-orderdb}
+    volumes:
+      - order_postgres_data:/var/lib/postgresql/data
+    networks:
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ORDER_DB_USER:-orderuser}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Order System Backend
+  order-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: order-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: order-postgres
+      DB_PORT: 5432
+      DB_NAME: ${ORDER_DB_NAME:-orderdb}
+      DB_USER: ${ORDER_DB_USER:-orderuser}
+      DB_PASSWORD: ${ORDER_DB_PASSWORD}
+      # Auth
+      JWT_SECRET: ${JWT_SECRET}
+      AUTHENTIK_URL: https://auth.fwv-raura.ch
+      # Payment (optional)
+      SUMUP_API_KEY: ${SUMUP_API_KEY:-}
+      SUMUP_MERCHANT_CODE: ${SUMUP_MERCHANT_CODE:-}
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.order-backend.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.order-backend.entrypoints=https"
+      - "traefik.http.routers.order-backend.tls=true"
+      - "traefik.http.routers.order-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.order-backend.loadbalancer.server.port=3000"
+      # WebSocket support
+      - "traefik.http.routers.order-ws.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.order-ws.entrypoints=https"
+      - "traefik.http.routers.order-ws.tls=true"
+      - "traefik.http.routers.order-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.services.order-ws.loadbalancer.server.port=3000"
+
+  # Order System Frontend
+  order-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://order.fwv-raura.ch/api
+        VITE_WS_URL: wss://order.fwv-raura.ch
+        VITE_AUTHENTIK_URL: https://auth.fwv-raura.ch
+        VITE_AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID_ORDER}
+    container_name: order-frontend
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.order-frontend.rule=Host(`order.fwv-raura.ch`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`) && !PathPrefix(`/kitchen`)"
+      - "traefik.http.routers.order-frontend.entrypoints=https"
+      - "traefik.http.routers.order-frontend.tls=true"
+      - "traefik.http.routers.order-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.order-frontend.loadbalancer.server.port=80"
+
+  # Kitchen Display
+  order-kitchen:
+    build:
+      context: ./kitchen-display
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://order.fwv-raura.ch/api
+        VITE_WS_URL: wss://order.fwv-raura.ch
+    container_name: order-kitchen
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.order-kitchen.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/kitchen`)"
+      - "traefik.http.routers.order-kitchen.entrypoints=https"
+      - "traefik.http.routers.order-kitchen.tls=true"
+      - "traefik.http.routers.order-kitchen.tls.certresolver=letsencrypt"
+      - "traefik.http.services.order-kitchen.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.order-kitchen-strip.stripprefix.prefixes=/kitchen"
+      - "traefik.http.routers.order-kitchen.middlewares=order-kitchen-strip"
+
+networks:
+  proxy:
+    external: true
+
+volumes:
+  order_postgres_data:
