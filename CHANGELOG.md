@@ -1,3 +1,10 @@
+## [1.37.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.37.0...v1.37.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* **events:** include directRegistrations and fix Arbeitsplan display ([741b1c8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/741b1c8f9ba5b57bd0dbaba7eb3b1c18c06d1683))
+
 # [1.37.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.36.0...v1.37.0) (2026-01-23)
 
 
