@@ -1,3 +1,10 @@
+## [1.46.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.0...v1.46.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* TypeScript errors and logo 403 ([8c82d41](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8c82d41b38dd6983f9970c3cc305c627051131cd))
+
 # [1.46.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.45.0...v1.46.0) (2026-01-23)
 
 
