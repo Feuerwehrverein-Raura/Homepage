@@ -1,3 +1,10 @@
+# [1.39.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.38.0...v1.39.0) (2026-01-23)
+
+
+### Features
+
+* **reminders:** add shift reminder system for day-before notifications ([52e1e92](https://github.com/Feuerwehrverein-Raura/Homepage/commit/52e1e920d9c27a1124ed355bccc04d5e932944e9))
+
 # [1.38.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.37.1...v1.38.0) (2026-01-23)
 
 
