@@ -1,3 +1,10 @@
+## [1.41.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.3...v1.41.4) (2026-01-23)
+
+
+### Bug Fixes
+
+* **order-backend:** use multi-stage build for TypeScript ([a33b60e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a33b60e208f7c53629d8da009ceb57f14f459fd2))
+
 ## [1.41.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.2...v1.41.3) (2026-01-23)
 
 
