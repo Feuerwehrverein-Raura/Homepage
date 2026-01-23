@@ -72,6 +72,8 @@ services:
       PORT: 3000
       DATABASE_URL: ${DATABASE_URL_ENCODED}
       JWT_SECRET: ${JWT_SECRET}
+      API_KEY: ${API_KEY}
+      AUTHENTIK_URL: https://auth.fwv-raura.ch
       MEMBERS_API_URL: http://api-members:3000
       DISPATCH_API_URL: http://api-dispatch:3000
     depends_on:
