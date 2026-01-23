@@ -1,6 +1,6 @@
 version: '3.8'
 
-# Production config for inventory.fwv-raura.ch (Server)
+# Production config for inventar.fwv-raura.ch (Server)
 
 services:
   # Separate Postgres for Inventory System
@@ -21,12 +21,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
 
   # Inventory Backend
   inventory-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: ghcr.io/feuerwehrverein-raura/inventory-backend:latest
     container_name: inventory-backend
     restart: unless-stopped
     environment:
@@ -41,20 +44,21 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       AUTHENTIK_URL: https://auth.fwv-raura.ch
       # Sync secret for Raspberry Pi sync
-      SYNC_SECRET: ${INVENTORY_SYNC_SECRET}
+      SYNC_SECRET: ${SYNC_SECRET}
     depends_on:
       inventory-postgres:
         condition: service_healthy
     networks:
       - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-      - "traefik.http.routers.inventory-backend.rule=Host(`inventory.fwv-raura.ch`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.inventory-backend.entrypoints=https"
-      - "traefik.http.routers.inventory-backend.tls=true"
-      - "traefik.http.routers.inventory-backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.inventory-backend.loadbalancer.server.port=3000"
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.inventory-backend.rule=Host(`inventar.fwv-raura.ch`) && PathPrefix(`/api`)
+      - traefik.http.routers.inventory-backend.entrypoints=https
+      - traefik.http.routers.inventory-backend.tls=true
+      - traefik.http.routers.inventory-backend.tls.certresolver=letsencrypt
+      - traefik.http.services.inventory-backend.loadbalancer.server.port=3000
+      - com.centurylinklabs.watchtower.enable=true
 
   # Inventory Frontend
   inventory-frontend:
@@ -62,19 +66,21 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://inventory.fwv-raura.ch/api
+        VITE_API_URL: https://inventar.fwv-raura.ch/api
+    image: ghcr.io/feuerwehrverein-raura/inventory-frontend:latest
     container_name: inventory-frontend
     restart: unless-stopped
     networks:
       - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-      - "traefik.http.routers.inventory-frontend.rule=Host(`inventory.fwv-raura.ch`) && !PathPrefix(`/api`)"
-      - "traefik.http.routers.inventory-frontend.entrypoints=https"
-      - "traefik.http.routers.inventory-frontend.tls=true"
-      - "traefik.http.routers.inventory-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.inventory-frontend.loadbalancer.server.port=80"
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.inventory-frontend.rule=Host(`inventar.fwv-raura.ch`) && !PathPrefix(`/api`)
+      - traefik.http.routers.inventory-frontend.entrypoints=https
+      - traefik.http.routers.inventory-frontend.tls=true
+      - traefik.http.routers.inventory-frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.inventory-frontend.loadbalancer.server.port=80
+      - com.centurylinklabs.watchtower.enable=true
 
 networks:
   proxy:

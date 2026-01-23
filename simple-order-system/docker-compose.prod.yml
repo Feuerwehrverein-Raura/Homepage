@@ -19,12 +19,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
 
   # Order System Backend
   order-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: ghcr.io/feuerwehrverein-raura/order-backend:latest
     container_name: order-backend
     restart: unless-stopped
     environment:
@@ -47,19 +50,20 @@ services:
     networks:
       - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-      - "traefik.http.routers.order-backend.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.order-backend.entrypoints=https"
-      - "traefik.http.routers.order-backend.tls=true"
-      - "traefik.http.routers.order-backend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.order-backend.loadbalancer.server.port=3000"
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.order-backend.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/api`)
+      - traefik.http.routers.order-backend.entrypoints=https
+      - traefik.http.routers.order-backend.tls=true
+      - traefik.http.routers.order-backend.tls.certresolver=letsencrypt
+      - traefik.http.services.order-backend.loadbalancer.server.port=3000
       # WebSocket support
-      - "traefik.http.routers.order-ws.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/ws`)"
-      - "traefik.http.routers.order-ws.entrypoints=https"
-      - "traefik.http.routers.order-ws.tls=true"
-      - "traefik.http.routers.order-ws.tls.certresolver=letsencrypt"
-      - "traefik.http.services.order-ws.loadbalancer.server.port=3000"
+      - traefik.http.routers.order-ws.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/ws`)
+      - traefik.http.routers.order-ws.entrypoints=https
+      - traefik.http.routers.order-ws.tls=true
+      - traefik.http.routers.order-ws.tls.certresolver=letsencrypt
+      - traefik.http.services.order-ws.loadbalancer.server.port=3000
+      - com.centurylinklabs.watchtower.enable=true
 
   # Order System Frontend
   order-frontend:
@@ -71,18 +75,20 @@ services:
         VITE_WS_URL: wss://order.fwv-raura.ch
         VITE_AUTHENTIK_URL: https://auth.fwv-raura.ch
         VITE_AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID_ORDER}
+    image: ghcr.io/feuerwehrverein-raura/order-frontend:latest
     container_name: order-frontend
     restart: unless-stopped
     networks:
       - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-      - "traefik.http.routers.order-frontend.rule=Host(`order.fwv-raura.ch`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`) && !PathPrefix(`/kitchen`)"
-      - "traefik.http.routers.order-frontend.entrypoints=https"
-      - "traefik.http.routers.order-frontend.tls=true"
-      - "traefik.http.routers.order-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.order-frontend.loadbalancer.server.port=80"
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.order-frontend.rule=Host(`order.fwv-raura.ch`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`) && !PathPrefix(`/kitchen`)
+      - traefik.http.routers.order-frontend.entrypoints=https
+      - traefik.http.routers.order-frontend.tls=true
+      - traefik.http.routers.order-frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.order-frontend.loadbalancer.server.port=80
+      - com.centurylinklabs.watchtower.enable=true
 
   # Kitchen Display
   order-kitchen:
@@ -92,20 +98,22 @@ services:
       args:
         VITE_API_URL: https://order.fwv-raura.ch/api
         VITE_WS_URL: wss://order.fwv-raura.ch
+    image: ghcr.io/feuerwehrverein-raura/order-kitchen:latest
     container_name: order-kitchen
     restart: unless-stopped
     networks:
       - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-      - "traefik.http.routers.order-kitchen.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/kitchen`)"
-      - "traefik.http.routers.order-kitchen.entrypoints=https"
-      - "traefik.http.routers.order-kitchen.tls=true"
-      - "traefik.http.routers.order-kitchen.tls.certresolver=letsencrypt"
-      - "traefik.http.services.order-kitchen.loadbalancer.server.port=80"
-      - "traefik.http.middlewares.order-kitchen-strip.stripprefix.prefixes=/kitchen"
-      - "traefik.http.routers.order-kitchen.middlewares=order-kitchen-strip"
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.order-kitchen.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/kitchen`)
+      - traefik.http.routers.order-kitchen.entrypoints=https
+      - traefik.http.routers.order-kitchen.tls=true
+      - traefik.http.routers.order-kitchen.tls.certresolver=letsencrypt
+      - traefik.http.services.order-kitchen.loadbalancer.server.port=80
+      - traefik.http.middlewares.order-kitchen-strip.stripprefix.prefixes=/kitchen
+      - traefik.http.routers.order-kitchen.middlewares=order-kitchen-strip
+      - com.centurylinklabs.watchtower.enable=true
 
 networks:
   proxy:
