@@ -98,13 +98,41 @@ function broadcast(data: any) {
   });
 }
 
-// Routes: Items (Inventory)
+// Inventory API integration
+const INVENTORY_API_URL = process.env.INVENTORY_API_URL || 'http://inventory-backend:3000';
+const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
+
+// Routes: Items (from Inventory or local)
 app.get('/api/items', async (req, res) => {
   try {
+    // Try to fetch from inventory system first
+    if (process.env.USE_INVENTORY_API === 'true') {
+      try {
+        const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
+        if (response.ok) {
+          const inventoryItems = await response.json();
+          // Map inventory items to order system format
+          const items = inventoryItems.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            price: parseFloat(item.price),
+            category: item.category,
+            printer_station: item.printer_station,
+            stock: item.stock,
+            source: 'inventory'
+          }));
+          return res.json(items);
+        }
+      } catch (inventoryError) {
+        console.error('Inventory API error, falling back to local:', inventoryError);
+      }
+    }
+
+    // Fallback to local items
     const result = await pool.query(
       'SELECT * FROM items WHERE active = true ORDER BY category, name'
     );
-    res.json(result.rows);
+    res.json(result.rows.map((item: any) => ({ ...item, source: 'local' })));
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
@@ -180,21 +208,21 @@ app.post('/api/orders', async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    
+
     const { table_number, items } = req.body;
-    
+
     // Calculate total
-    const total = items.reduce((sum: number, item: any) => 
+    const total = items.reduce((sum: number, item: any) =>
       sum + (item.price * item.quantity), 0
     );
-    
+
     // Create order
     const orderResult = await client.query(
       'INSERT INTO orders (table_number, total) VALUES ($1, $2) RETURNING *',
       [table_number, total]
     );
     const order = orderResult.rows[0];
-    
+
     // Add order items
     for (const item of items) {
       await client.query(
@@ -202,19 +230,46 @@ app.post('/api/orders', async (req, res) => {
         [order.id, item.id, item.quantity, item.price, item.notes || null]
       );
     }
-    
+
     await client.query('COMMIT');
-    
+
+    // Reduce inventory stock if using inventory API
+    if (process.env.USE_INVENTORY_API === 'true') {
+      try {
+        const inventoryItems = items
+          .filter((item: any) => item.source === 'inventory')
+          .map((item: any) => ({ id: item.id, quantity: item.quantity }));
+
+        if (inventoryItems.length > 0) {
+          await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Order-API-Key': ORDER_API_KEY
+            },
+            body: JSON.stringify({
+              items: inventoryItems,
+              order_id: order.id,
+              order_source: 'kasse'
+            })
+          });
+        }
+      } catch (inventoryError) {
+        console.error('Failed to update inventory:', inventoryError);
+        // Don't fail the order, just log the error
+      }
+    }
+
     // Print receipt
     try {
       await printReceipt(order.id, table_number, items);
     } catch (printError) {
       console.error('Print error:', printError);
     }
-    
+
     // Broadcast to kitchen display
     broadcast({ type: 'new_order', order: { ...order, items } });
-    
+
     res.json(order);
   } catch (error) {
     await client.query('ROLLBACK');
@@ -233,6 +288,98 @@ app.patch('/api/orders/:id/complete', async (req, res) => {
     );
     broadcast({ type: 'order_completed', order_id: id });
     res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Order history (for admin view)
+app.get('/api/orders/history', async (req, res) => {
+  try {
+    const { date, status, limit = 100 } = req.query;
+
+    let query = `
+      SELECT o.*,
+        json_agg(
+          json_build_object(
+            'id', oi.id,
+            'item_name', COALESCE(i.name, 'Unbekannt'),
+            'quantity', oi.quantity,
+            'price', oi.price,
+            'notes', oi.notes
+          )
+        ) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN items i ON oi.item_id = i.id
+    `;
+    const params: any[] = [];
+
+    const conditions: string[] = [];
+
+    if (date) {
+      params.push(date);
+      conditions.push(`DATE(o.created_at) = $${params.length}`);
+    }
+
+    if (status) {
+      params.push(status);
+      conditions.push(`o.status = $${params.length}`);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+
+    query += ' GROUP BY o.id ORDER BY o.created_at DESC';
+
+    params.push(limit);
+    query += ` LIMIT $${params.length}`;
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Daily statistics
+app.get('/api/stats/daily', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) as total_orders,
+        COALESCE(SUM(total), 0) as total_revenue,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_orders,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_orders,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders
+      FROM orders
+      WHERE DATE(created_at) = $1
+    `, [targetDate]);
+
+    // Best selling items today
+    const itemsResult = await pool.query(`
+      SELECT
+        COALESCE(i.name, 'Sonderposten') as name,
+        SUM(oi.quantity) as total_sold,
+        SUM(oi.quantity * oi.price) as total_revenue
+      FROM order_items oi
+      LEFT JOIN items i ON oi.item_id = i.id
+      JOIN orders o ON oi.order_id = o.id
+      WHERE DATE(o.created_at) = $1
+      GROUP BY i.name
+      ORDER BY total_sold DESC
+      LIMIT 10
+    `, [targetDate]);
+
+    res.json({
+      date: targetDate,
+      summary: result.rows[0],
+      top_items: itemsResult.rows
+    });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }

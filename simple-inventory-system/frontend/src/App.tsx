@@ -56,7 +56,7 @@ interface User {
   groups: string[];
 }
 
-type Tab = 'items' | 'scanner' | 'add' | 'low-stock';
+type Tab = 'items' | 'scanner' | 'add' | 'low-stock' | 'reports';
 
 function App() {
   const [tab, setTab] = useState<Tab>('items');
@@ -318,7 +318,14 @@ function App() {
       {/* Header */}
       <header className="bg-blue-600 text-white p-3 sm:p-4 shadow-lg">
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-          <h1 className="text-lg sm:text-xl font-bold">📦 Lagerverwaltung - FWV Raura</h1>
+          <div className="flex items-center gap-3">
+            <img
+              src="https://fwv-raura.ch/images/logo.png"
+              alt="FWV Raura"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1"
+            />
+            <h1 className="text-lg sm:text-xl font-bold">Lagerverwaltung</h1>
+          </div>
           <div className="flex items-center gap-2">
             {user && <span className="text-sm hidden sm:inline">Hallo, {user.name}</span>}
             {user ? (
@@ -344,7 +351,7 @@ function App() {
       {/* Tabs */}
       <nav className="bg-white shadow overflow-x-auto">
         <div className="container mx-auto flex min-w-max">
-          {(['items', 'scanner', 'add', 'low-stock'] as Tab[]).map((t) => (
+          {(['items', 'scanner', 'add', 'low-stock', 'reports'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); if (t !== 'scanner') stopScanner(); }}
@@ -354,8 +361,9 @@ function App() {
             >
               {t === 'items' && '📋 Artikel'}
               {t === 'scanner' && '📷 Scanner'}
-              {t === 'add' && '➕ Hinzufügen'}
-              {t === 'low-stock' && '⚠️ Nachbestellen'}
+              {t === 'add' && '➕ Neu'}
+              {t === 'low-stock' && '⚠️ Niedrig'}
+              {t === 'reports' && '📊 Berichte'}
             </button>
           ))}
         </div>
@@ -568,6 +576,11 @@ function App() {
             )}
           </div>
         )}
+
+        {/* Reports Tab */}
+        {tab === 'reports' && (
+          <ReportsView items={items} />
+        )}
       </main>
 
       {/* Item Detail Modal */}
@@ -721,6 +734,135 @@ function AddItemForm({ categories, locations, token, onSuccess }: {
         Artikel anlegen
       </button>
     </form>
+  );
+}
+
+// Reports View Component
+function ReportsView({ items }: { items: Item[] }) {
+  const [reportData, setReportData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchInventoryReport = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/reports/inventory-list`);
+      const data = await res.json();
+      setReportData(data);
+    } catch (error) {
+      console.error('Error fetching report:', error);
+    }
+    setLoading(false);
+  };
+
+  const downloadCSV = () => {
+    window.open(`${API_URL}/reports/inventory-list?format=csv`, '_blank');
+  };
+
+  useEffect(() => {
+    fetchInventoryReport();
+  }, []);
+
+  // Calculate summary from local items
+  const totalItems = items.length;
+  const totalUnits = items.reduce((sum, item) => sum + item.quantity, 0);
+  const lowStockItems = items.filter(item => item.quantity <= item.min_quantity).length;
+  const totalValue = items.reduce((sum, item) => sum + (item.quantity * (item.purchase_price || 0)), 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Quick Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-2xl sm:text-3xl font-bold text-blue-600">{totalItems}</div>
+          <div className="text-sm text-gray-500">Artikel</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-2xl sm:text-3xl font-bold text-green-600">{totalUnits}</div>
+          <div className="text-sm text-gray-500">Einheiten</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-2xl sm:text-3xl font-bold text-red-500">{lowStockItems}</div>
+          <div className="text-sm text-gray-500">Niedrig</div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow">
+          <div className="text-2xl sm:text-3xl font-bold text-purple-600">
+            CHF {totalValue.toFixed(0)}
+          </div>
+          <div className="text-sm text-gray-500">Wert (EK)</div>
+        </div>
+      </div>
+
+      {/* Export Buttons */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h3 className="font-semibold mb-3">Inventarliste exportieren</h3>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={downloadCSV}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2"
+          >
+            📥 CSV Download
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded flex items-center gap-2"
+          >
+            🖨️ Drucken
+          </button>
+          <button
+            onClick={fetchInventoryReport}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2"
+          >
+            🔄 Aktualisieren
+          </button>
+        </div>
+      </div>
+
+      {/* Full Inventory List (for print) */}
+      <div className="bg-white p-4 rounded-lg shadow print:shadow-none">
+        <h3 className="font-semibold mb-3">Vollständige Inventarliste</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Stand: {new Date().toLocaleString('de-CH')}
+        </p>
+
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-2 py-2 text-left">Name</th>
+                <th className="px-2 py-2 text-left">Kategorie</th>
+                <th className="px-2 py-2 text-left">Lagerort</th>
+                <th className="px-2 py-2 text-right">Bestand</th>
+                <th className="px-2 py-2 text-right">Min</th>
+                <th className="px-2 py-2 text-left">Barcode</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} className={`border-t ${item.quantity <= item.min_quantity ? 'bg-red-50' : ''}`}>
+                  <td className="px-2 py-2 font-medium">{item.name}</td>
+                  <td className="px-2 py-2 text-gray-600">{item.category_name || '-'}</td>
+                  <td className="px-2 py-2 text-gray-600">{item.location_name || '-'}</td>
+                  <td className={`px-2 py-2 text-right font-semibold ${
+                    item.quantity <= item.min_quantity ? 'text-red-600' : ''
+                  }`}>
+                    {item.quantity} {item.unit}
+                  </td>
+                  <td className="px-2 py-2 text-right text-gray-500">{item.min_quantity}</td>
+                  <td className="px-2 py-2 text-gray-500 font-mono text-xs">
+                    {item.custom_barcode || item.ean_code || '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {items.length === 0 && (
+          <p className="text-center text-gray-500 py-8">Keine Artikel vorhanden</p>
+        )}
+      </div>
+    </div>
   );
 }
 

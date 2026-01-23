@@ -68,10 +68,27 @@ async function initDB() {
       notes TEXT,
       image_url TEXT,
 
+      -- Verkauf (für Kasse-Integration)
+      sellable BOOLEAN DEFAULT false,
+      sale_price DECIMAL(10, 2),
+      sale_category VARCHAR(100),
+      printer_station VARCHAR(50) DEFAULT 'bar',
+
       active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+  `);
+
+  // Add sellable columns if they don't exist (migration)
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS sellable BOOLEAN DEFAULT false;
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS sale_price DECIMAL(10, 2);
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS sale_category VARCHAR(100);
+      ALTER TABLE items ADD COLUMN IF NOT EXISTS printer_station VARCHAR(50) DEFAULT 'bar';
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
   `);
 
   // Transactions (Ein-/Ausgänge)
@@ -279,7 +296,8 @@ app.post('/api/items', authenticateToken, async (req: AuthenticatedRequest, res)
     const {
       name, description, category_id, location_id,
       ean_code, quantity, min_quantity, unit,
-      purchase_price, supplier, notes, image_url
+      purchase_price, supplier, notes, image_url,
+      sellable, sale_price, sale_category, printer_station
     } = req.body;
 
     // Generate custom barcode if not provided and no EAN
@@ -296,13 +314,15 @@ app.post('/api/items', authenticateToken, async (req: AuthenticatedRequest, res)
       INSERT INTO items (
         name, description, category_id, location_id,
         ean_code, custom_barcode, quantity, min_quantity, unit,
-        purchase_price, supplier, notes, image_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        purchase_price, supplier, notes, image_url,
+        sellable, sale_price, sale_category, printer_station
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `, [
       name, description, category_id, location_id,
       ean_code, custom_barcode, quantity || 0, min_quantity || 0, unit || 'Stück',
-      purchase_price, supplier, notes, image_url
+      purchase_price, supplier, notes, image_url,
+      sellable || false, sale_price, sale_category, printer_station || 'bar'
     ]);
 
     // Log initial stock
@@ -330,7 +350,8 @@ app.put('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, r
     const {
       name, description, category_id, location_id,
       ean_code, custom_barcode, min_quantity, unit,
-      purchase_price, supplier, notes, image_url
+      purchase_price, supplier, notes, image_url,
+      sellable, sale_price, sale_category, printer_station
     } = req.body;
 
     const result = await pool.query(`
@@ -347,13 +368,18 @@ app.put('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, r
         supplier = $11,
         notes = $12,
         image_url = $13,
+        sellable = COALESCE($14, sellable),
+        sale_price = $15,
+        sale_category = $16,
+        printer_station = COALESCE($17, printer_station),
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $1
       RETURNING *
     `, [
       id, name, description, category_id, location_id,
       ean_code, custom_barcode, min_quantity, unit,
-      purchase_price, supplier, notes, image_url
+      purchase_price, supplier, notes, image_url,
+      sellable, sale_price, sale_category, printer_station
     ]);
 
     if (result.rows.length === 0) {
@@ -375,6 +401,118 @@ app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ========================================
+// SELLABLE ITEMS (für Kasse-Integration)
+// ========================================
+
+// Get all sellable items for the POS system
+app.get('/api/items/sellable', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        i.id,
+        i.name,
+        i.sale_price as price,
+        i.sale_category as category,
+        i.printer_station,
+        i.quantity as stock,
+        i.custom_barcode,
+        i.ean_code,
+        c.name as inventory_category
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      WHERE i.sellable = true AND i.active = true AND i.quantity > 0
+      ORDER BY i.sale_category, i.name
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Reduce stock when items are sold (called by order system)
+const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
+
+function authenticateOrderSystem(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const apiKey = req.headers['x-order-api-key'];
+  if (apiKey !== ORDER_API_KEY) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+  next();
+}
+
+app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { items, order_id, order_source } = req.body;
+    // items: [{ id: number, quantity: number }]
+
+    const results = [];
+
+    for (const item of items) {
+      // Get current stock
+      const stockResult = await client.query(
+        'SELECT id, name, quantity FROM items WHERE id = $1 AND active = true',
+        [item.id]
+      );
+
+      if (stockResult.rows.length === 0) {
+        throw new Error(`Item ${item.id} not found`);
+      }
+
+      const currentItem = stockResult.rows[0];
+      const newQuantity = currentItem.quantity - item.quantity;
+
+      if (newQuantity < 0) {
+        throw new Error(`Insufficient stock for ${currentItem.name}`);
+      }
+
+      // Update stock
+      await client.query(
+        'UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [newQuantity, item.id]
+      );
+
+      // Log transaction
+      await client.query(`
+        INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
+        VALUES ($1, 'out', $2, $3, $4, $5, $6)
+      `, [
+        item.id,
+        item.quantity,
+        currentItem.quantity,
+        newQuantity,
+        `Verkauf - Bestellung #${order_id} (${order_source || 'kasse'})`,
+        'kasse@fwv-raura.ch'
+      ]);
+
+      results.push({
+        id: item.id,
+        name: currentItem.name,
+        sold: item.quantity,
+        remaining: newQuantity
+      });
+    }
+
+    await client.query('COMMIT');
+
+    // Broadcast stock updates
+    for (const result of results) {
+      broadcast({ type: 'stock_updated', item_id: result.id, new_quantity: result.remaining });
+    }
+
+    res.json({ success: true, results });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Sell error:', error);
+    res.status(400).json({ error: error.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -580,6 +718,124 @@ app.get('/api/reports/inventory-value', async (req, res) => {
       WHERE active = true
     `);
     res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Full inventory list report
+app.get('/api/reports/inventory-list', async (req, res) => {
+  try {
+    const { format } = req.query;
+
+    const result = await pool.query(`
+      SELECT
+        i.id,
+        i.name,
+        i.description,
+        c.name as category,
+        l.name as location,
+        i.ean_code,
+        i.custom_barcode,
+        i.quantity,
+        i.min_quantity,
+        i.unit,
+        i.purchase_price,
+        i.sale_price,
+        i.sellable,
+        i.supplier,
+        i.notes,
+        i.created_at,
+        i.updated_at,
+        CASE WHEN i.quantity <= i.min_quantity THEN true ELSE false END as low_stock
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      LEFT JOIN locations l ON i.location_id = l.id
+      WHERE i.active = true
+      ORDER BY c.name, i.name
+    `);
+
+    if (format === 'csv') {
+      // CSV export
+      const headers = ['ID', 'Name', 'Beschreibung', 'Kategorie', 'Lagerort', 'EAN', 'Barcode', 'Bestand', 'Min.Bestand', 'Einheit', 'EK-Preis', 'VK-Preis', 'Verkaufbar', 'Lieferant', 'Notizen'];
+      const rows = result.rows.map(item => [
+        item.id,
+        item.name,
+        item.description || '',
+        item.category || '',
+        item.location || '',
+        item.ean_code || '',
+        item.custom_barcode || '',
+        item.quantity,
+        item.min_quantity,
+        item.unit,
+        item.purchase_price || '',
+        item.sale_price || '',
+        item.sellable ? 'Ja' : 'Nein',
+        item.supplier || '',
+        item.notes || ''
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
+
+      const csv = [headers.join(','), ...rows].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="inventarliste_${new Date().toISOString().split('T')[0]}.csv"`);
+      return res.send('\ufeff' + csv); // BOM for Excel UTF-8
+    }
+
+    // JSON response with summary
+    const summary = {
+      generated_at: new Date().toISOString(),
+      total_items: result.rows.length,
+      total_units: result.rows.reduce((sum, item) => sum + item.quantity, 0),
+      total_value: result.rows.reduce((sum, item) => sum + (item.quantity * (item.purchase_price || 0)), 0),
+      low_stock_items: result.rows.filter(item => item.low_stock).length,
+      categories: [...new Set(result.rows.map(item => item.category).filter(Boolean))].length
+    };
+
+    res.json({ summary, items: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Sales report (items sold from inventory)
+app.get('/api/reports/sales', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const fromDate = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const toDate = to || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(`
+      SELECT
+        i.id,
+        i.name,
+        i.sale_category as category,
+        i.sale_price,
+        SUM(CASE WHEN t.type = 'out' AND t.reason LIKE 'Verkauf%' THEN t.quantity ELSE 0 END) as total_sold,
+        SUM(CASE WHEN t.type = 'out' AND t.reason LIKE 'Verkauf%' THEN t.quantity * i.sale_price ELSE 0 END) as total_revenue
+      FROM items i
+      LEFT JOIN transactions t ON i.id = t.item_id
+        AND t.created_at >= $1
+        AND t.created_at <= $2::date + interval '1 day'
+      WHERE i.sellable = true AND i.active = true
+      GROUP BY i.id, i.name, i.sale_category, i.sale_price
+      HAVING SUM(CASE WHEN t.type = 'out' AND t.reason LIKE 'Verkauf%' THEN t.quantity ELSE 0 END) > 0
+      ORDER BY total_sold DESC
+    `, [fromDate, toDate]);
+
+    const totalRevenue = result.rows.reduce((sum, item) => sum + parseFloat(item.total_revenue || 0), 0);
+    const totalSold = result.rows.reduce((sum, item) => sum + parseInt(item.total_sold || 0), 0);
+
+    res.json({
+      period: { from: fromDate, to: toDate },
+      summary: {
+        total_items_sold: totalSold,
+        total_revenue: totalRevenue,
+        unique_products: result.rows.length
+      },
+      items: result.rows
+    });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }

@@ -50,13 +50,15 @@ function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState<string>('');
-  const [view, setView] = useState<'order' | 'inventory'>('order');
+  const [view, setView] = useState<'order' | 'inventory' | 'history'>('order');
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [showCustomItem, setShowCustomItem] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges' });
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [statsData, setStatsData] = useState<any>(null);
 
   // Check for OAuth callback on mount
   useEffect(() => {
@@ -182,6 +184,27 @@ function App() {
       console.error('Failed to fetch items:', error);
     }
   };
+
+  const fetchHistory = async () => {
+    try {
+      const [historyRes, statsRes] = await Promise.all([
+        fetch(`${API_URL}/orders/history?limit=50`),
+        fetch(`${API_URL}/stats/daily`)
+      ]);
+      const history = await historyRes.json();
+      const stats = await statsRes.json();
+      setHistoryData(history);
+      setStatsData(stats);
+    } catch (error) {
+      console.error('Failed to fetch history:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'history' && user) {
+      fetchHistory();
+    }
+  }, [view, user]);
 
   const addToCart = (item: Item) => {
     const existing = cart.find(c => c.id === item.id && !c.customPrice);
@@ -375,13 +398,21 @@ function App() {
 
   // Show inventory view only if authenticated
   const showInventoryView = view === 'inventory' && user;
+  const showHistoryView = view === 'history' && user;
 
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <div className="bg-fwv-red text-white p-3 sm:p-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-          <h1 className="text-xl sm:text-2xl font-bold">🔥 Kasse - FWV Raura</h1>
+          <div className="flex items-center gap-3">
+            <img
+              src="https://fwv-raura.ch/images/logo.png"
+              alt="FWV Raura"
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1"
+            />
+            <h1 className="text-xl sm:text-2xl font-bold">Kasse</h1>
+          </div>
           <div className="flex items-center gap-2 flex-wrap justify-center">
             {user && <span className="text-sm hidden sm:inline">Hallo, {user.name}</span>}
             <button
@@ -403,6 +434,14 @@ function App() {
                   Artikel
                 </button>
                 <button
+                  onClick={() => setView('history')}
+                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded text-sm sm:text-base ${
+                    view === 'history' ? 'bg-white text-fwv-red' : 'bg-red-700'
+                  }`}
+                >
+                  History
+                </button>
+                <button
                   onClick={logout}
                   className="px-3 py-1.5 sm:px-4 sm:py-2 rounded bg-red-800 text-sm sm:text-base"
                 >
@@ -422,7 +461,9 @@ function App() {
         </div>
       </div>
 
-      {showInventoryView ? (
+      {showHistoryView ? (
+        <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} />
+      ) : showInventoryView ? (
         <InventoryView items={items} onUpdate={fetchItems} token={token} />
       ) : (
         <div className="max-w-7xl mx-auto p-2 sm:p-4">
@@ -754,6 +795,126 @@ function InventoryView({ items, onUpdate, token }: { items: Item[]; onUpdate: ()
         {items.length === 0 && (
           <div className="text-center text-gray-500 py-8">
             Keine Artikel vorhanden. Klicken Sie auf "Neuer Artikel" um einen hinzuzufügen.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HistoryView({ data, stats, onRefresh }: { data: any[]; stats: any; onRefresh: () => void }) {
+  return (
+    <div className="max-w-7xl mx-auto p-2 sm:p-4">
+      {/* Daily Stats */}
+      {stats && (
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl sm:text-2xl font-bold">Tagesstatistik ({stats.date})</h2>
+            <button
+              onClick={onRefresh}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+            >
+              Aktualisieren
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="text-2xl sm:text-3xl font-bold text-blue-600">
+                {stats.summary?.total_orders || 0}
+              </div>
+              <div className="text-sm text-gray-600">Bestellungen</div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <div className="text-2xl sm:text-3xl font-bold text-green-600">
+                CHF {parseFloat(stats.summary?.total_revenue || 0).toFixed(2)}
+              </div>
+              <div className="text-sm text-gray-600">Umsatz</div>
+            </div>
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <div className="text-2xl sm:text-3xl font-bold text-yellow-600">
+                {stats.summary?.completed_orders || 0}
+              </div>
+              <div className="text-sm text-gray-600">Abgeschlossen</div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="text-2xl sm:text-3xl font-bold text-purple-600">
+                {stats.summary?.paid_orders || 0}
+              </div>
+              <div className="text-sm text-gray-600">Bezahlt</div>
+            </div>
+          </div>
+
+          {/* Top Items */}
+          {stats.top_items && stats.top_items.length > 0 && (
+            <div>
+              <h3 className="font-semibold mb-2">Meistverkaufte Artikel</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                {stats.top_items.slice(0, 5).map((item: any, index: number) => (
+                  <div key={index} className="bg-gray-50 p-2 rounded text-sm">
+                    <div className="font-semibold truncate">{item.name}</div>
+                    <div className="text-gray-600">{item.total_sold}x verkauft</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Order History */}
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4">Bestellhistorie</h2>
+
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full min-w-[600px]">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-sm">#</th>
+                <th className="px-3 py-2 text-left text-sm">Tisch</th>
+                <th className="px-3 py-2 text-left text-sm">Zeit</th>
+                <th className="px-3 py-2 text-left text-sm">Artikel</th>
+                <th className="px-3 py-2 text-left text-sm">Total</th>
+                <th className="px-3 py-2 text-left text-sm">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((order: any) => (
+                <tr key={order.id} className="border-t hover:bg-gray-50">
+                  <td className="px-3 py-2 text-sm font-mono">{order.id}</td>
+                  <td className="px-3 py-2 text-sm">{order.table_number}</td>
+                  <td className="px-3 py-2 text-sm">
+                    {new Date(order.created_at).toLocaleString('de-CH')}
+                  </td>
+                  <td className="px-3 py-2 text-sm">
+                    {order.items && order.items[0]?.id ? (
+                      <span className="text-xs">
+                        {order.items.map((item: any) => `${item.quantity}x ${item.item_name}`).join(', ')}
+                      </span>
+                    ) : '-'}
+                  </td>
+                  <td className="px-3 py-2 text-sm font-semibold">
+                    CHF {parseFloat(order.total).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2 text-sm">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      order.status === 'paid' ? 'bg-green-100 text-green-800' :
+                      order.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {order.status === 'paid' ? 'Bezahlt' :
+                       order.status === 'completed' ? 'Abgeschlossen' : 'Offen'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {data.length === 0 && (
+          <div className="text-center text-gray-500 py-8">
+            Keine Bestellungen vorhanden.
           </div>
         )}
       </div>
