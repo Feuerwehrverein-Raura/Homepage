@@ -1,3 +1,10 @@
+## [1.41.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.4...v1.41.5) (2026-01-23)
+
+
+### Bug Fixes
+
+* **order-backend:** add type casts for response.json() ([d950c8c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d950c8cf69ce9fd3c5643c216dcef3c4da41d44e))
+
 ## [1.41.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.3...v1.41.4) (2026-01-23)
 
 
