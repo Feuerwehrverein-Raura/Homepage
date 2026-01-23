@@ -1,3 +1,10 @@
+## [1.41.7](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.6...v1.41.7) (2026-01-23)
+
+
+### Bug Fixes
+
+* **inventory-frontend:** fix TypeScript errors ([4f41a55](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4f41a55aca5338c1991af9126d86fbaf46421e53))
+
 ## [1.41.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.5...v1.41.6) (2026-01-23)
 
 
