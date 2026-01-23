@@ -1,3 +1,10 @@
+# [1.46.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.45.0...v1.46.0) (2026-01-23)
+
+
+### Features
+
+* **kasse+lager:** Kasse-Lager Integration, History, Berichte ([eac8fb9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/eac8fb91d3e32b3aafe1e7f250985132e99bcf8d))
+
 # [1.45.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.44.0...v1.45.0) (2026-01-23)
 
 
