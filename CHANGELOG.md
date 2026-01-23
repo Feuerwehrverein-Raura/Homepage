@@ -1,3 +1,10 @@
+## [1.41.9](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.8...v1.41.9) (2026-01-23)
+
+
+### Bug Fixes
+
+* **order:** add explicit router-service mappings for Traefik ([d11a71c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d11a71cd053d8fca68d34cd5ef321fc33161f418))
+
 ## [1.41.8](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.7...v1.41.8) (2026-01-23)
 
 
