@@ -267,7 +267,8 @@
                         status: e.status || 'confirmed',
                         tags: e.tags || [],
                         description: e.description || '',
-                        shifts: e.shifts || []
+                        shifts: e.shifts || [],
+                        directRegistrations: e.directRegistrations || { approved: [], pending: [], approvedCount: 0, pendingCount: 0 }
                     })).sort((a, b) => a.startDate - b.startDate);
                 } catch (error) {
                     console.error('❌ API-Fehler, versuche Markdown-Fallback...', error);
@@ -472,9 +473,11 @@
                         };
                     }
                     const bereich = shift.bereich || 'Allgemein';
+                    // Get approved registrations as assignments
+                    const approvedRegs = shift.registrations?.approved || [];
                     shiftsByDate[date][timeKey].bereiche[bereich] = {
-                        needed: shift.needed || 1,
-                        assignments: shift.assignments || []
+                        needed: shift.max_helpers || shift.needed || 1,
+                        assignments: approvedRegs.map(r => ({ member_name: r.name }))
                     };
                 });
 
