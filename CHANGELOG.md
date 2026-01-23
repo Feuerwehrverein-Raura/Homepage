@@ -1,3 +1,10 @@
+## [1.41.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.0...v1.41.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* **docker:** add watchtower labels and fix domain for inventory system ([98e3d31](https://github.com/Feuerwehrverein-Raura/Homepage/commit/98e3d31e1504eb18e9f128bc76a45645592a87fd))
+
 # [1.41.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.40.0...v1.41.0) (2026-01-23)
 
 
