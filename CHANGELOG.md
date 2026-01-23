@@ -1,3 +1,10 @@
+# [1.40.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.39.1...v1.40.0) (2026-01-23)
+
+
+### Features
+
+* **order-system:** add simple order system for events ([831d038](https://github.com/Feuerwehrverein-Raura/Homepage/commit/831d0381b9df8e54352cd835a6374a28fee265e4))
+
 ## [1.39.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.39.0...v1.39.1) (2026-01-23)
 
 
