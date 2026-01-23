@@ -1,0 +1,103 @@
+version: '3.8'
+
+# Raspberry Pi config - lokal mit Sync zum Server
+
+services:
+  # Lokale Postgres
+  postgres:
+    image: postgres:16-alpine
+    container_name: inventory-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: inventoryuser
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-localpass123}
+      POSTGRES_DB: inventorydb
+    volumes:
+      - inventory_postgres_local:/var/lib/postgresql/data
+    networks:
+      - inventory-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventoryuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: inventory-backend-local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: inventorydb
+      DB_USER: inventoryuser
+      DB_PASSWORD: ${INVENTORY_DB_PASSWORD:-localpass123}
+      # Lokale Auth
+      LOCAL_MODE: "true"
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-fwv2026}
+      # Sync
+      SYNC_SECRET: ${INVENTORY_SYNC_SECRET}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - inventory-local
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://${LOCAL_IP:-localhost}:3000/api
+        VITE_SYNC_URL: https://inventory.fwv-raura.ch/api
+    container_name: inventory-frontend-local
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+    depends_on:
+      - backend
+    networks:
+      - inventory-local
+
+  # Sync Service (cron-basiert)
+  sync:
+    image: curlimages/curl:latest
+    container_name: inventory-sync
+    restart: unless-stopped
+    environment:
+      SYNC_SECRET: ${INVENTORY_SYNC_SECRET}
+      SERVER_URL: https://inventory.fwv-raura.ch/api
+      LOCAL_URL: http://backend:3000/api
+    entrypoint: /bin/sh
+    command: >
+      -c "while true; do
+        echo \"[$(date)] Starting sync...\";
+
+        # Export local data
+        LOCAL_DATA=$$(curl -s -H \"x-sync-key: $$SYNC_SECRET\" $$LOCAL_URL/sync/export);
+
+        # Push to server
+        curl -s -X POST -H \"Content-Type: application/json\" -H \"x-sync-key: $$SYNC_SECRET\" -d \"$$LOCAL_DATA\" $$SERVER_URL/sync/push;
+
+        echo \"[$(date)] Sync complete\";
+        sleep 300;
+      done"
+    depends_on:
+      - backend
+    networks:
+      - inventory-local
+
+networks:
+  inventory-local:
+    driver: bridge
+
+volumes:
+  inventory_postgres_local:
