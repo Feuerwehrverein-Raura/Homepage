@@ -2720,6 +2720,374 @@ app.post('/event-groups/:id/arbeitsplan-pdf', async (req, res) => {
     }
 });
 
+// ============================================
+// SHIFT REMINDERS
+// ============================================
+
+// Send reminders for shifts happening tomorrow
+// This endpoint can be called by a cron job daily
+app.post('/reminders/send-daily', async (req, res) => {
+    try {
+        // Calculate tomorrow's date
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+        logInfo('Sending shift reminders for tomorrow', { date: tomorrowStr });
+
+        // Find all shifts happening tomorrow with approved registrations
+        const shiftsResult = await pool.query(`
+            SELECT
+                s.id as shift_id,
+                s.name as shift_name,
+                s.date as shift_date,
+                s.start_time,
+                s.end_time,
+                s.bereich,
+                e.id as event_id,
+                e.title as event_title,
+                e.location as event_location
+            FROM shifts s
+            JOIN events e ON s.event_id = e.id
+            WHERE s.date = $1
+            AND e.status != 'cancelled'
+        `, [tomorrowStr]);
+
+        if (shiftsResult.rows.length === 0) {
+            return res.json({
+                success: true,
+                message: 'No shifts tomorrow',
+                reminders_sent: 0
+            });
+        }
+
+        let totalSent = 0;
+        let totalSkipped = 0;
+        const errors = [];
+
+        for (const shift of shiftsResult.rows) {
+            // Get approved registrations for this shift
+            const registrationsResult = await pool.query(`
+                SELECT
+                    r.id as registration_id,
+                    r.guest_name,
+                    r.guest_email,
+                    r.member_id,
+                    m.vorname,
+                    m.nachname,
+                    m.email as member_email
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE $1 = ANY(r.shift_ids)
+                AND r.status IN ('approved', 'confirmed')
+            `, [shift.shift_id]);
+
+            for (const reg of registrationsResult.rows) {
+                const email = reg.member_email || reg.guest_email;
+                const name = reg.member_id
+                    ? `${reg.vorname} ${reg.nachname}`
+                    : reg.guest_name;
+
+                if (!email) continue;
+
+                // Check if reminder was already sent
+                const existingReminder = await pool.query(`
+                    SELECT id FROM shift_reminders
+                    WHERE registration_id = $1
+                    AND shift_id = $2
+                    AND reminder_type = 'day_before'
+                `, [reg.registration_id, shift.shift_id]);
+
+                if (existingReminder.rows.length > 0) {
+                    totalSkipped++;
+                    continue;
+                }
+
+                // Format date and time
+                const dateObj = new Date(shift.shift_date + 'T12:00:00');
+                const dateFormatted = dateObj.toLocaleDateString('de-CH', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                });
+                const startTime = shift.start_time?.substring(0, 5) || '';
+                const endTime = shift.end_time?.substring(0, 5) || '';
+
+                const subject = `Erinnerung: Morgen ${shift.event_title}`;
+                const body = `
+Guten Tag ${name},
+
+Dies ist eine freundliche Erinnerung, dass du morgen fuer folgende Schicht eingeteilt bist:
+
+Event: ${shift.event_title}
+Datum: ${dateFormatted}
+Zeit: ${startTime} - ${endTime}
+${shift.bereich ? `Bereich: ${shift.bereich}` : ''}
+${shift.event_location ? `Ort: ${shift.event_location}` : ''}
+
+Bitte erscheine puenktlich. Bei Verhinderung melde dich bitte so schnell wie moeglich.
+
+Mit freundlichen Gruessen
+Feuerwehrverein Raura
+                `.trim();
+
+                try {
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: email,
+                        subject: subject,
+                        body: body,
+                        event_id: shift.event_id
+                    });
+
+                    // Record that reminder was sent
+                    await pool.query(`
+                        INSERT INTO shift_reminders (registration_id, shift_id, reminder_type, email)
+                        VALUES ($1, $2, 'day_before', $3)
+                    `, [reg.registration_id, shift.shift_id, email]);
+
+                    totalSent++;
+                    logInfo('Reminder sent', {
+                        email,
+                        shiftId: shift.shift_id,
+                        eventTitle: shift.event_title
+                    });
+                } catch (err) {
+                    logError('Failed to send reminder', {
+                        email,
+                        error: err.message
+                    });
+                    errors.push({ email, error: err.message });
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            date: tomorrowStr,
+            shifts_found: shiftsResult.rows.length,
+            reminders_sent: totalSent,
+            reminders_skipped: totalSkipped,
+            errors: errors.length > 0 ? errors : undefined
+        });
+
+    } catch (error) {
+        logError('Error sending daily reminders', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Manual endpoint to preview reminders that would be sent (Vorstand only)
+app.get('/reminders/preview', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { date } = req.query;
+        const targetDate = date || (() => {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow.toISOString().split('T')[0];
+        })();
+
+        // Find all shifts for the target date with registrations
+        const result = await pool.query(`
+            SELECT
+                s.id as shift_id,
+                s.name as shift_name,
+                s.date as shift_date,
+                s.start_time,
+                s.end_time,
+                s.bereich,
+                e.title as event_title,
+                r.id as registration_id,
+                r.guest_name,
+                r.guest_email,
+                r.member_id,
+                m.vorname,
+                m.nachname,
+                m.email as member_email,
+                sr.id as reminder_already_sent
+            FROM shifts s
+            JOIN events e ON s.event_id = e.id
+            JOIN registrations r ON s.id = ANY(r.shift_ids)
+            LEFT JOIN members m ON r.member_id = m.id
+            LEFT JOIN shift_reminders sr ON sr.registration_id = r.id
+                AND sr.shift_id = s.id
+                AND sr.reminder_type = 'day_before'
+            WHERE s.date = $1
+            AND e.status != 'cancelled'
+            AND r.status IN ('approved', 'confirmed')
+            ORDER BY s.start_time, s.bereich
+        `, [targetDate]);
+
+        const reminders = result.rows.map(row => ({
+            shift: {
+                id: row.shift_id,
+                name: row.shift_name,
+                date: row.shift_date,
+                time: `${row.start_time?.substring(0,5) || ''} - ${row.end_time?.substring(0,5) || ''}`,
+                bereich: row.bereich
+            },
+            event: row.event_title,
+            person: {
+                name: row.member_id ? `${row.vorname} ${row.nachname}` : row.guest_name,
+                email: row.member_email || row.guest_email
+            },
+            already_sent: !!row.reminder_already_sent
+        }));
+
+        res.json({
+            date: targetDate,
+            total: reminders.length,
+            pending: reminders.filter(r => !r.already_sent).length,
+            already_sent: reminders.filter(r => r.already_sent).length,
+            reminders
+        });
+
+    } catch (error) {
+        logError('Error previewing reminders', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Manual trigger for sending reminders (Vorstand only)
+app.post('/reminders/send', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { date } = req.body;
+
+        if (!date) {
+            return res.status(400).json({ error: 'Date is required' });
+        }
+
+        // Find all shifts for the target date with registrations
+        const shiftsResult = await pool.query(`
+            SELECT
+                s.id as shift_id,
+                s.name as shift_name,
+                s.date as shift_date,
+                s.start_time,
+                s.end_time,
+                s.bereich,
+                e.id as event_id,
+                e.title as event_title,
+                e.location as event_location
+            FROM shifts s
+            JOIN events e ON s.event_id = e.id
+            WHERE s.date = $1
+            AND e.status != 'cancelled'
+        `, [date]);
+
+        let totalSent = 0;
+        let totalSkipped = 0;
+        const errors = [];
+
+        for (const shift of shiftsResult.rows) {
+            const registrationsResult = await pool.query(`
+                SELECT
+                    r.id as registration_id,
+                    r.guest_name,
+                    r.guest_email,
+                    r.member_id,
+                    m.vorname,
+                    m.nachname,
+                    m.email as member_email
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE $1 = ANY(r.shift_ids)
+                AND r.status IN ('approved', 'confirmed')
+            `, [shift.shift_id]);
+
+            for (const reg of registrationsResult.rows) {
+                const email = reg.member_email || reg.guest_email;
+                const name = reg.member_id
+                    ? `${reg.vorname} ${reg.nachname}`
+                    : reg.guest_name;
+
+                if (!email) continue;
+
+                // Check if reminder was already sent
+                const existingReminder = await pool.query(`
+                    SELECT id FROM shift_reminders
+                    WHERE registration_id = $1
+                    AND shift_id = $2
+                    AND reminder_type = 'day_before'
+                `, [reg.registration_id, shift.shift_id]);
+
+                if (existingReminder.rows.length > 0) {
+                    totalSkipped++;
+                    continue;
+                }
+
+                const dateObj = new Date(shift.shift_date + 'T12:00:00');
+                const dateFormatted = dateObj.toLocaleDateString('de-CH', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                });
+                const startTime = shift.start_time?.substring(0, 5) || '';
+                const endTime = shift.end_time?.substring(0, 5) || '';
+
+                const subject = `Erinnerung: ${shift.event_title} am ${dateFormatted}`;
+                const body = `
+Guten Tag ${name},
+
+Dies ist eine freundliche Erinnerung an deine Schicht:
+
+Event: ${shift.event_title}
+Datum: ${dateFormatted}
+Zeit: ${startTime} - ${endTime}
+${shift.bereich ? `Bereich: ${shift.bereich}` : ''}
+${shift.event_location ? `Ort: ${shift.event_location}` : ''}
+
+Bitte erscheine puenktlich. Bei Verhinderung melde dich bitte so schnell wie moeglich.
+
+Mit freundlichen Gruessen
+Feuerwehrverein Raura
+                `.trim();
+
+                try {
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: email,
+                        subject: subject,
+                        body: body,
+                        event_id: shift.event_id
+                    });
+
+                    await pool.query(`
+                        INSERT INTO shift_reminders (registration_id, shift_id, reminder_type, email)
+                        VALUES ($1, $2, 'day_before', $3)
+                    `, [reg.registration_id, shift.shift_id, email]);
+
+                    totalSent++;
+                } catch (err) {
+                    errors.push({ email, error: err.message });
+                }
+            }
+        }
+
+        // Audit log
+        await pool.query(`
+            INSERT INTO audit_log (action, email, ip_address, details)
+            VALUES ('REMINDERS_SENT', $1, $2, $3)
+        `, [
+            req.user?.email || 'system',
+            getClientIp(req),
+            JSON.stringify({ date, sent: totalSent, skipped: totalSkipped })
+        ]);
+
+        res.json({
+            success: true,
+            date,
+            reminders_sent: totalSent,
+            reminders_skipped: totalSkipped,
+            errors: errors.length > 0 ? errors : undefined
+        });
+
+    } catch (error) {
+        logError('Error sending manual reminders', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`API-Events running on port ${PORT}`);
 });
