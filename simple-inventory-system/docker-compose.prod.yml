@@ -67,6 +67,8 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: https://inventar.fwv-raura.ch/api
+        VITE_AUTHENTIK_URL: https://auth.fwv-raura.ch
+        VITE_AUTHENTIK_CLIENT_ID: inventory-system
     image: ghcr.io/feuerwehrverein-raura/inventory-frontend:latest
     container_name: inventory-frontend
     restart: unless-stopped
