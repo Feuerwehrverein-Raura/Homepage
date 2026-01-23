@@ -1,3 +1,10 @@
+## [1.41.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.2...v1.41.3) (2026-01-23)
+
+
+### Bug Fixes
+
+* **order-backend:** add build deps for USB support ([e7cfe5a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e7cfe5a72e93d2b8199b52c9634da87f43fbf57e))
+
 ## [1.41.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.1...v1.41.2) (2026-01-23)
 
 
