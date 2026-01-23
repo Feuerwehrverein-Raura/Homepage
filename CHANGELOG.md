@@ -1,3 +1,10 @@
+## [1.41.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.5...v1.41.6) (2026-01-23)
+
+
+### Bug Fixes
+
+* **inventory-backend:** use multi-stage build for TypeScript ([f9e8cde](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f9e8cde70b9722194d5fcfe89922af805a8436e0))
+
 ## [1.41.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.4...v1.41.5) (2026-01-23)
 
 
