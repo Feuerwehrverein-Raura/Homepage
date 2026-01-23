@@ -1,3 +1,10 @@
+## [1.41.8](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.7...v1.41.8) (2026-01-23)
+
+
+### Bug Fixes
+
+* **nginx:** remove backend proxy (handled by Traefik) ([022cd6d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/022cd6d33c670a74cc411082504152a24c4f58fb))
+
 ## [1.41.7](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.41.6...v1.41.7) (2026-01-23)
 
 
