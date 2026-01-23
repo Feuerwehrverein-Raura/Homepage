@@ -1,3 +1,10 @@
+## [1.39.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.39.0...v1.39.1) (2026-01-23)
+
+
+### Bug Fixes
+
+* **api-events:** add missing AUTHENTIK_URL and API_KEY env vars ([172ccd5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/172ccd5d2f342be5255cdddd042481f3a3522550))
+
 # [1.39.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.38.0...v1.39.0) (2026-01-23)
 
 
