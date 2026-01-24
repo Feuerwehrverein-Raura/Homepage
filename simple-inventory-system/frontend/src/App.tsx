@@ -670,6 +670,8 @@ function App() {
             token={token!}
             prefillData={prefillData}
             onSuccess={() => { fetchItems(); setPrefillData(null); setTab('items'); }}
+            onCategoryAdded={fetchCategories}
+            onLocationAdded={fetchLocations}
           />
         )}
 
@@ -732,12 +734,14 @@ function App() {
 }
 
 // Add Item Form Component
-function AddItemForm({ categories, locations, token, prefillData, onSuccess }: {
+function AddItemForm({ categories, locations, token, prefillData, onSuccess, onCategoryAdded, onLocationAdded }: {
   categories: Category[];
   locations: Location[];
   token: string;
   prefillData?: { name?: string; description?: string; ean_code?: string } | null;
   onSuccess: () => void;
+  onCategoryAdded?: () => void;
+  onLocationAdded?: () => void;
 }) {
   const [form, setForm] = useState({
     name: prefillData?.name || '',
@@ -747,8 +751,58 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess }: {
     ean_code: prefillData?.ean_code || '',
     quantity: '0',
     min_quantity: '0',
-    unit: 'Stück'
+    unit: 'Stück',
+    sellable: false,
+    sale_price: '',
+    sale_category: '',
+    printer_station: 'bar'
   });
+  const [newCategory, setNewCategory] = useState('');
+  const [newLocation, setNewLocation] = useState('');
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [showNewLocation, setShowNewLocation] = useState(false);
+
+  const createCategory = async () => {
+    if (!newCategory.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: newCategory.trim() })
+      });
+      if (res.ok) {
+        const cat = await res.json();
+        setForm({ ...form, category_id: cat.id.toString() });
+        setNewCategory('');
+        setShowNewCategory(false);
+        onCategoryAdded?.();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Fehler');
+      }
+    } catch { alert('Fehler beim Erstellen'); }
+  };
+
+  const createLocation = async () => {
+    if (!newLocation.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/locations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: newLocation.trim() })
+      });
+      if (res.ok) {
+        const loc = await res.json();
+        setForm({ ...form, location_id: loc.id.toString() });
+        setNewLocation('');
+        setShowNewLocation(false);
+        onLocationAdded?.();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Fehler');
+      }
+    } catch { alert('Fehler beim Erstellen'); }
+  };
 
   // Update form when prefillData changes
   useEffect(() => {
@@ -777,7 +831,11 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess }: {
           category_id: form.category_id || null,
           location_id: form.location_id || null,
           quantity: parseInt(form.quantity),
-          min_quantity: parseInt(form.min_quantity)
+          min_quantity: parseInt(form.min_quantity),
+          sellable: form.sellable,
+          sale_price: form.sellable && form.sale_price ? parseFloat(form.sale_price) : null,
+          sale_category: form.sellable ? form.sale_category : null,
+          printer_station: form.sellable ? form.printer_station : null
         })
       });
 
@@ -814,23 +872,65 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess }: {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-        <select
-          value={form.category_id}
-          onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-          className="p-3 border rounded-lg text-base"
-        >
-          <option value="">Kategorie wählen</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <div>
+          <div className="flex gap-2">
+            <select
+              value={form.category_id}
+              onChange={(e) => setForm({ ...form, category_id: e.target.value })}
+              className="flex-1 p-3 border rounded-lg text-base"
+            >
+              <option value="">Kategorie wählen</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowNewCategory(!showNewCategory)}
+              className="px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold"
+            >+</button>
+          </div>
+          {showNewCategory && (
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="Neue Kategorie"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                className="flex-1 p-2 border rounded-lg text-sm"
+              />
+              <button type="button" onClick={createCategory} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm">Erstellen</button>
+            </div>
+          )}
+        </div>
 
-        <select
-          value={form.location_id}
-          onChange={(e) => setForm({ ...form, location_id: e.target.value })}
-          className="p-3 border rounded-lg text-base"
-        >
-          <option value="">Lagerort wählen</option>
-          {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
+        <div>
+          <div className="flex gap-2">
+            <select
+              value={form.location_id}
+              onChange={(e) => setForm({ ...form, location_id: e.target.value })}
+              className="flex-1 p-3 border rounded-lg text-base"
+            >
+              <option value="">Lagerort wählen</option>
+              {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowNewLocation(!showNewLocation)}
+              className="px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold"
+            >+</button>
+          </div>
+          {showNewLocation && (
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                placeholder="Neuer Lagerort"
+                value={newLocation}
+                onChange={(e) => setNewLocation(e.target.value)}
+                className="flex-1 p-2 border rounded-lg text-sm"
+              />
+              <button type="button" onClick={createLocation} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm">Erstellen</button>
+            </div>
+          )}
+        </div>
       </div>
 
       <input
@@ -871,6 +971,57 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess }: {
             className="w-full p-3 border rounded-lg text-base"
           />
         </div>
+      </div>
+
+      {/* Sellable Section for POS */}
+      <div className="border-t pt-4 mt-4">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.sellable}
+            onChange={(e) => setForm({ ...form, sellable: e.target.checked })}
+            className="w-5 h-5 rounded"
+          />
+          <span className="font-medium">In Kasse verkaufen</span>
+        </label>
+
+        {form.sellable && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Verkaufspreis (CHF)</label>
+              <input
+                type="number"
+                step="0.05"
+                placeholder="z.B. 5.00"
+                value={form.sale_price}
+                onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
+                className="w-full p-3 border rounded-lg text-base"
+                required={form.sellable}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Verkaufskategorie</label>
+              <input
+                type="text"
+                placeholder="z.B. Getränke"
+                value={form.sale_category}
+                onChange={(e) => setForm({ ...form, sale_category: e.target.value })}
+                className="w-full p-3 border rounded-lg text-base"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Drucker</label>
+              <select
+                value={form.printer_station}
+                onChange={(e) => setForm({ ...form, printer_station: e.target.value })}
+                className="w-full p-3 border rounded-lg text-base"
+              >
+                <option value="bar">Bar (Getränke)</option>
+                <option value="kitchen">Küche (Essen)</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       <button
