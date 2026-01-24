@@ -1744,6 +1744,71 @@ app.get('/members/stats/overview', authenticateAny, async (req, res) => {
 });
 
 // ============================================
+// EMAIL LIST FOR DISPATCH
+// ============================================
+
+// Get all email addresses with zustellung_email = true
+app.get('/members/emails/zustellung', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT
+                id,
+                vorname,
+                nachname,
+                COALESCE(versand_email, email) as email,
+                status
+            FROM members
+            WHERE zustellung_email = true
+            AND (email IS NOT NULL AND email != '')
+            AND status NOT IN ('Ausgetreten', 'Verstorben')
+            ORDER BY nachname, vorname
+        `);
+
+        // Return emails as array and formatted list
+        const emails = result.rows.map(r => r.email).filter(e => e);
+        const members = result.rows;
+
+        res.json({
+            count: emails.length,
+            emails: emails,
+            formatted: emails.join(', '),
+            members: members
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get email alias configuration (for Mailcow/Mailserver)
+app.get('/members/emails/alias-config', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT COALESCE(versand_email, email) as email
+            FROM members
+            WHERE zustellung_email = true
+            AND (email IS NOT NULL AND email != '')
+            AND status NOT IN ('Ausgetreten', 'Verstorben')
+            ORDER BY email
+        `);
+
+        const emails = result.rows.map(r => r.email).filter(e => e);
+
+        // Format for different mail systems
+        res.json({
+            count: emails.length,
+            // For Mailcow/Postfix alias format
+            alias_destinations: emails.join(','),
+            // For DNS/MX records (one per line)
+            alias_list: emails.join('\n'),
+            // JSON array for API integration
+            emails: emails
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // AUTHENTIK SYNC
 // ============================================
 
