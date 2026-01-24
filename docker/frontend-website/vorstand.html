@@ -203,9 +203,31 @@
                         <option value="Ehrenmitglied">Ehrenmitglied</option>
                     </select>
                 </div>
-                <button id="export-btn" class="border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-                    Export CSV
-                </button>
+                <!-- Export Dropdown -->
+                <div class="relative inline-block text-left">
+                    <button id="export-dropdown-btn" type="button" class="inline-flex items-center border border-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        Export CSV
+                        <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="export-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                        <div class="py-1">
+                            <button id="export-all-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                Alle Mitglieder
+                            </button>
+                            <button id="export-aktiv-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                Nur Aktivmitglieder
+                            </button>
+                            <button id="export-post-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                Post-Zustellung (zustellung_post)
+                            </button>
+                            <button id="export-email-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                E-Mail-Zustellung (zustellung_email)
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -433,6 +455,25 @@
                                 <span class="text-sm text-gray-700">Post-Zustellung</span>
                             </label>
                         </div>
+                    </div>
+
+                    <!-- Cloud-Berechtigungen -->
+                    <div id="cloud-permissions-section" class="hidden">
+                        <h4 class="font-semibold text-gray-700 mb-3">Cloud-Berechtigungen</h4>
+                        <p class="text-sm text-gray-500 mb-3">Diese Einstellungen werden sofort in Authentik/Nextcloud angewendet.</p>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="nextcloud-admin" class="mr-2 rounded text-fire-500">
+                                <span class="text-sm text-gray-700">Nextcloud Admin</span>
+                                <span class="ml-2 text-xs text-gray-400">(Volle Adminrechte in Nextcloud)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="vorstand-group" class="mr-2 rounded text-fire-500">
+                                <span class="text-sm text-gray-700">Vorstand-Gruppe</span>
+                                <span class="ml-2 text-xs text-gray-400">(Freigaben fuer Vorstand)</span>
+                            </label>
+                        </div>
+                        <div id="cloud-permissions-status" class="mt-2 text-sm text-gray-500"></div>
                     </div>
 
                     <!-- Bemerkungen -->
@@ -1905,9 +1946,139 @@
 
                 document.getElementById('delete-member-btn').classList.remove('hidden');
                 document.getElementById('member-modal').classList.remove('hidden');
+
+                // Load cloud permissions if member has Authentik account
+                loadCloudPermissions(member.id);
             } catch (error) {
                 console.error('Error loading member:', error);
                 alert('Fehler beim Laden des Mitglieds');
+            }
+        }
+
+        // Load cloud permissions for a member
+        async function loadCloudPermissions(memberId) {
+            const section = document.getElementById('cloud-permissions-section');
+            const statusEl = document.getElementById('cloud-permissions-status');
+            const nextcloudAdminCb = document.getElementById('nextcloud-admin');
+            const vorstandGroupCb = document.getElementById('vorstand-group');
+
+            // Reset and show loading
+            section.classList.add('hidden');
+            statusEl.textContent = 'Lade Berechtigungen...';
+
+            try {
+                // Check Nextcloud admin status
+                const ncResponse = await fetch(`${API_BASE}/members/${memberId}/nextcloud-admin`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!ncResponse.ok) {
+                    statusEl.textContent = 'Fehler beim Laden der Berechtigungen';
+                    return;
+                }
+
+                const ncData = await ncResponse.json();
+
+                if (!ncData.has_authentik) {
+                    statusEl.textContent = 'Kein Authentik-Account vorhanden';
+                    section.classList.remove('hidden');
+                    nextcloudAdminCb.disabled = true;
+                    vorstandGroupCb.disabled = true;
+                    return;
+                }
+
+                // Check Vorstand group status
+                const vsResponse = await fetch(`${API_BASE}/members/${memberId}/vorstand-group`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const vsData = vsResponse.ok ? await vsResponse.json() : { vorstand_group: false };
+
+                // Set checkbox values
+                nextcloudAdminCb.checked = ncData.nextcloud_admin;
+                nextcloudAdminCb.disabled = false;
+                vorstandGroupCb.checked = vsData.vorstand_group;
+                vorstandGroupCb.disabled = false;
+
+                // Show section
+                section.classList.remove('hidden');
+                statusEl.textContent = '';
+
+                // Store member ID for event handlers
+                nextcloudAdminCb.dataset.memberId = memberId;
+                vorstandGroupCb.dataset.memberId = memberId;
+            } catch (error) {
+                console.error('Error loading cloud permissions:', error);
+                statusEl.textContent = 'Fehler beim Laden';
+            }
+        }
+
+        // Toggle Nextcloud admin
+        async function toggleNextcloudAdmin(checkbox) {
+            const memberId = checkbox.dataset.memberId;
+            if (!memberId) return;
+
+            const statusEl = document.getElementById('cloud-permissions-status');
+            statusEl.textContent = 'Aktualisiere...';
+            checkbox.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/members/${memberId}/nextcloud-admin`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ enabled: checkbox.checked })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Fehler');
+                }
+
+                const data = await response.json();
+                statusEl.textContent = data.message;
+                setTimeout(() => statusEl.textContent = '', 3000);
+            } catch (error) {
+                checkbox.checked = !checkbox.checked; // Revert
+                statusEl.textContent = 'Fehler: ' + error.message;
+            } finally {
+                checkbox.disabled = false;
+            }
+        }
+
+        // Toggle Vorstand group
+        async function toggleVorstandGroup(checkbox) {
+            const memberId = checkbox.dataset.memberId;
+            if (!memberId) return;
+
+            const statusEl = document.getElementById('cloud-permissions-status');
+            statusEl.textContent = 'Aktualisiere...';
+            checkbox.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/members/${memberId}/vorstand-group`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ enabled: checkbox.checked })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Fehler');
+                }
+
+                const data = await response.json();
+                statusEl.textContent = data.message;
+                setTimeout(() => statusEl.textContent = '', 3000);
+            } catch (error) {
+                checkbox.checked = !checkbox.checked; // Revert
+                statusEl.textContent = 'Fehler: ' + error.message;
+            } finally {
+                checkbox.disabled = false;
             }
         }
 
@@ -2089,7 +2260,7 @@
             }
         }
 
-        function exportCSV() {
+        function exportCSV(filter = 'all') {
             // CSV-Escape-Funktion fuer Felder mit Kommas oder Anfuehrungszeichen
             const escapeCSV = (value) => {
                 if (!value) return '';
@@ -2100,6 +2271,27 @@
                 return str;
             };
 
+            // Filter anwenden
+            let filteredMembers = members.filter(m =>
+                m.status !== 'Ausgetreten' && m.status !== 'Verstorben'
+            );
+            let filename = 'mitglieder';
+
+            switch(filter) {
+                case 'aktiv':
+                    filteredMembers = filteredMembers.filter(m => m.status === 'Aktivmitglied');
+                    filename = 'aktivmitglieder';
+                    break;
+                case 'post':
+                    filteredMembers = filteredMembers.filter(m => m.zustellung_post === true);
+                    filename = 'post-zustellung';
+                    break;
+                case 'email':
+                    filteredMembers = filteredMembers.filter(m => m.zustellung_email === true);
+                    filename = 'email-zustellung';
+                    break;
+            }
+
             // Alle Felder fuer Serienbriefe
             const headers = [
                 'Anrede', 'Vorname', 'Nachname',
@@ -2109,7 +2301,7 @@
                 'Geburtstag', 'Eintrittsdatum'
             ];
 
-            const rows = members.map(m => [
+            const rows = filteredMembers.map(m => [
                 escapeCSV(m.anrede),
                 escapeCSV(m.vorname),
                 escapeCSV(m.nachname),
@@ -2135,7 +2327,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `mitglieder-${new Date().toISOString().split('T')[0]}.csv`;
+            a.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
         }
 
@@ -4274,7 +4466,42 @@ ${grussformel}`;
         document.getElementById('cancel-btn').addEventListener('click', () => document.getElementById('member-modal').classList.add('hidden'));
         document.getElementById('search-input').addEventListener('input', (e) => loadMembers({ search: e.target.value, status: document.getElementById('status-filter').value }));
         document.getElementById('status-filter').addEventListener('change', (e) => loadMembers({ search: document.getElementById('search-input').value, status: e.target.value }));
-        document.getElementById('export-btn').addEventListener('click', exportCSV);
+
+        // Cloud permissions checkboxes
+        document.getElementById('nextcloud-admin').addEventListener('change', function() {
+            toggleNextcloudAdmin(this);
+        });
+        document.getElementById('vorstand-group').addEventListener('change', function() {
+            toggleVorstandGroup(this);
+        });
+
+        // Export dropdown
+        const exportDropdownBtn = document.getElementById('export-dropdown-btn');
+        const exportDropdown = document.getElementById('export-dropdown');
+        exportDropdownBtn.addEventListener('click', () => {
+            exportDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+            if (!exportDropdownBtn.contains(e.target) && !exportDropdown.contains(e.target)) {
+                exportDropdown.classList.add('hidden');
+            }
+        });
+        document.getElementById('export-all-btn').addEventListener('click', () => {
+            exportCSV('all');
+            exportDropdown.classList.add('hidden');
+        });
+        document.getElementById('export-aktiv-btn').addEventListener('click', () => {
+            exportCSV('aktiv');
+            exportDropdown.classList.add('hidden');
+        });
+        document.getElementById('export-post-btn').addEventListener('click', () => {
+            exportCSV('post');
+            exportDropdown.classList.add('hidden');
+        });
+        document.getElementById('export-email-btn').addEventListener('click', () => {
+            exportCSV('email');
+            exportDropdown.classList.add('hidden');
+        });
 
         // Photo upload
         document.getElementById('photo-upload-btn').addEventListener('click', () => {

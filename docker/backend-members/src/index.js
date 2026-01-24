@@ -456,6 +456,119 @@ async function deleteAuthentikUser(authentikUserId) {
     }
 }
 
+// Authentik group membership management
+const NEXTCLOUD_ADMINS_GROUP = process.env.AUTHENTIK_NEXTCLOUD_ADMINS_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
+
+async function addUserToAuthentikGroup(authentikUserId, groupId) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId) {
+        console.warn('Missing AUTHENTIK_API_TOKEN or user ID');
+        return false;
+    }
+
+    try {
+        // First get current user groups
+        const userResponse = await axios.get(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            {
+                headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` }
+            }
+        );
+
+        const currentGroups = userResponse.data.groups || [];
+        if (currentGroups.includes(groupId)) {
+            console.log(`User ${authentikUserId} already in group ${groupId}`);
+            return true;
+        }
+
+        // Add the new group
+        const updatedGroups = [...currentGroups, groupId];
+        await axios.patch(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            { groups: updatedGroups },
+            {
+                headers: {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        console.log(`Added user ${authentikUserId} to group ${groupId}`);
+        return true;
+    } catch (error) {
+        console.error(`Failed to add user ${authentikUserId} to group ${groupId}:`, error.response?.data || error.message);
+        return false;
+    }
+}
+
+async function removeUserFromAuthentikGroup(authentikUserId, groupId) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId) {
+        console.warn('Missing AUTHENTIK_API_TOKEN or user ID');
+        return false;
+    }
+
+    try {
+        // First get current user groups
+        const userResponse = await axios.get(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            {
+                headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` }
+            }
+        );
+
+        const currentGroups = userResponse.data.groups || [];
+        if (!currentGroups.includes(groupId)) {
+            console.log(`User ${authentikUserId} not in group ${groupId}`);
+            return true;
+        }
+
+        // Remove the group
+        const updatedGroups = currentGroups.filter(g => g !== groupId);
+        await axios.patch(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            { groups: updatedGroups },
+            {
+                headers: {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+        console.log(`Removed user ${authentikUserId} from group ${groupId}`);
+        return true;
+    } catch (error) {
+        console.error(`Failed to remove user ${authentikUserId} from group ${groupId}:`, error.response?.data || error.message);
+        return false;
+    }
+}
+
+async function isUserInAuthentikGroup(authentikUserId, groupId) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId) {
+        return false;
+    }
+
+    try {
+        const userResponse = await axios.get(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            {
+                headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` }
+            }
+        );
+        return (userResponse.data.groups || []).includes(groupId);
+    } catch (error) {
+        console.error(`Failed to check user ${authentikUserId} group membership:`, error.response?.data || error.message);
+        return false;
+    }
+}
+
 // Audit logging helper
 async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
     try {
@@ -1937,6 +2050,175 @@ app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 
 // ============================================
 // AUTHENTIK SYNC
 // ============================================
+
+// Toggle Nextcloud admin status for a member
+app.post('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { enabled } = req.body;
+
+        // Get member's Authentik user ID
+        const memberResult = await pool.query(
+            'SELECT authentik_user_id, vorname, nachname FROM members WHERE id = $1',
+            [id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        if (!member.authentik_user_id) {
+            return res.status(400).json({ error: 'Mitglied hat keinen Authentik-Account' });
+        }
+
+        let success;
+        if (enabled) {
+            success = await addUserToAuthentikGroup(member.authentik_user_id, NEXTCLOUD_ADMINS_GROUP);
+        } else {
+            success = await removeUserFromAuthentikGroup(member.authentik_user_id, NEXTCLOUD_ADMINS_GROUP);
+        }
+
+        if (!success) {
+            return res.status(500).json({ error: 'Fehler bei der Authentik-Gruppenanpassung' });
+        }
+
+        // Audit log
+        await logAudit(pool, 'MEMBER_NEXTCLOUD_ADMIN', null, req.user.email, getClientIp(req), {
+            member_id: id,
+            member_name: `${member.vorname} ${member.nachname}`,
+            nextcloud_admin: enabled
+        });
+
+        res.json({
+            success: true,
+            member_id: id,
+            nextcloud_admin: enabled,
+            message: enabled ? 'Nextcloud-Admin-Rechte erteilt' : 'Nextcloud-Admin-Rechte entzogen'
+        });
+    } catch (error) {
+        console.error('Nextcloud admin toggle error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get Nextcloud admin status for a member
+app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get member's Authentik user ID
+        const memberResult = await pool.query(
+            'SELECT authentik_user_id FROM members WHERE id = $1',
+            [id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        if (!member.authentik_user_id) {
+            return res.json({ has_authentik: false, nextcloud_admin: false });
+        }
+
+        const isAdmin = await isUserInAuthentikGroup(member.authentik_user_id, NEXTCLOUD_ADMINS_GROUP);
+
+        res.json({
+            has_authentik: true,
+            nextcloud_admin: isAdmin
+        });
+    } catch (error) {
+        console.error('Nextcloud admin check error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Vorstand group management
+const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43e4-af75-e0241f06fb95';
+
+// Toggle Vorstand group status for a member
+app.post('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { enabled } = req.body;
+
+        // Get member's Authentik user ID
+        const memberResult = await pool.query(
+            'SELECT authentik_user_id, vorname, nachname FROM members WHERE id = $1',
+            [id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        if (!member.authentik_user_id) {
+            return res.status(400).json({ error: 'Mitglied hat keinen Authentik-Account' });
+        }
+
+        let success;
+        if (enabled) {
+            success = await addUserToAuthentikGroup(member.authentik_user_id, VORSTAND_GROUP);
+        } else {
+            success = await removeUserFromAuthentikGroup(member.authentik_user_id, VORSTAND_GROUP);
+        }
+
+        if (!success) {
+            return res.status(500).json({ error: 'Fehler bei der Authentik-Gruppenanpassung' });
+        }
+
+        // Audit log
+        await logAudit(pool, 'MEMBER_VORSTAND_GROUP', null, req.user.email, getClientIp(req), {
+            member_id: id,
+            member_name: `${member.vorname} ${member.nachname}`,
+            vorstand_group: enabled
+        });
+
+        res.json({
+            success: true,
+            member_id: id,
+            vorstand_group: enabled,
+            message: enabled ? 'Zur Vorstand-Gruppe hinzugefuegt' : 'Aus Vorstand-Gruppe entfernt'
+        });
+    } catch (error) {
+        console.error('Vorstand group toggle error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get Vorstand group status for a member
+app.get('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Get member's Authentik user ID
+        const memberResult = await pool.query(
+            'SELECT authentik_user_id FROM members WHERE id = $1',
+            [id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        if (!member.authentik_user_id) {
+            return res.json({ has_authentik: false, vorstand_group: false });
+        }
+
+        const inGroup = await isUserInAuthentikGroup(member.authentik_user_id, VORSTAND_GROUP);
+
+        res.json({
+            has_authentik: true,
+            vorstand_group: inGroup
+        });
+    } catch (error) {
+        console.error('Vorstand group check error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Sync all members with email to Authentik
 app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
