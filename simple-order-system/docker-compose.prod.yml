@@ -46,6 +46,9 @@ services:
       PRINTER_BAR_PORT: ${PRINTER_BAR_PORT:-9100}
       PRINTER_KITCHEN_IP: ${PRINTER_KITCHEN_IP:-}
       PRINTER_KITCHEN_PORT: ${PRINTER_KITCHEN_PORT:-9100}
+      # Inventory Integration
+      USE_INVENTORY_API: "true"
+      INVENTORY_API_URL: http://inventory-backend:3000
     depends_on:
       order-postgres:
         condition: service_healthy
