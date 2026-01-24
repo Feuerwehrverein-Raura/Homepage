@@ -1,3 +1,10 @@
+# [1.54.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.53.0...v1.54.0) (2026-01-24)
+
+
+### Features
+
+* **members:** add Authentik group management for Nextcloud and Vorstand ([31c67e4](https://github.com/Feuerwehrverein-Raura/Homepage/commit/31c67e4f7bf6c2b1a09d1ae12a70aaa4052bb388))
+
 # [1.53.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.52.0...v1.53.0) (2026-01-24)
 
 
