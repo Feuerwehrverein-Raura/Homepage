@@ -403,59 +403,68 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <div className="bg-fwv-red text-white p-3 sm:p-4 shadow-lg">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="FWV Raura"
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white p-1"
-            />
-            <h1 className="text-xl sm:text-2xl font-bold">Kasse</h1>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap justify-center">
-            {user && <span className="text-sm hidden sm:inline">Hallo, {user.name}</span>}
-            <button
-              onClick={() => setView('order')}
-              className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded text-sm sm:text-base ${
-                view === 'order' ? 'bg-white text-fwv-red' : 'bg-red-700'
-              }`}
-            >
-              Kasse
-            </button>
-            {user ? (
-              <>
-                <button
-                  onClick={() => setView('inventory')}
-                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded text-sm sm:text-base ${
-                    view === 'inventory' ? 'bg-white text-fwv-red' : 'bg-red-700'
-                  }`}
-                >
-                  Artikel
-                </button>
-                <button
-                  onClick={() => setView('history')}
-                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded text-sm sm:text-base ${
-                    view === 'history' ? 'bg-white text-fwv-red' : 'bg-red-700'
-                  }`}
-                >
-                  History
-                </button>
+      <div className="bg-fwv-red text-white p-2 sm:p-4 shadow-lg">
+        <div className="max-w-7xl mx-auto">
+          {/* Top row: Logo and user info */}
+          <div className="flex justify-between items-center mb-2 sm:mb-0">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <img
+                src="/logo.png"
+                alt="FWV Raura"
+                className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-white p-0.5 sm:p-1"
+              />
+              <h1 className="text-lg sm:text-2xl font-bold">Kasse</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              {user && <span className="text-xs sm:text-sm">Hallo, {user.name}</span>}
+              {user ? (
                 <button
                   onClick={logout}
-                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded bg-red-800 text-sm sm:text-base"
+                  className="px-2 py-1 sm:px-4 sm:py-2 rounded bg-red-800 text-xs sm:text-base min-h-[36px] sm:min-h-[40px] touch-manipulation"
                 >
                   Logout
                 </button>
+              ) : (
+                <button
+                  onClick={login}
+                  disabled={authLoading}
+                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded bg-red-700 hover:bg-red-800 text-xs sm:text-base min-h-[36px] sm:min-h-[40px] touch-manipulation"
+                >
+                  {authLoading ? '...' : 'Admin Login'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Navigation row */}
+          <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 -mx-2 px-2 sm:mx-0 sm:px-0">
+            <button
+              onClick={() => setView('order')}
+              className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                view === 'order' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+              }`}
+            >
+              🛒 Kasse
+            </button>
+            {user && (
+              <>
+                <button
+                  onClick={() => setView('inventory')}
+                  className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                    view === 'inventory' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+                  }`}
+                >
+                  📦 Artikel
+                </button>
+                <button
+                  onClick={() => setView('history')}
+                  className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                    view === 'history' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+                  }`}
+                >
+                  📊 History
+                </button>
               </>
-            ) : (
-              <button
-                onClick={login}
-                disabled={authLoading}
-                className="px-3 py-1.5 sm:px-4 sm:py-2 rounded bg-red-700 hover:bg-red-800 text-sm sm:text-base"
-              >
-                {authLoading ? '...' : 'Admin Login'}
-              </button>
             )}
           </div>
         </div>
@@ -516,17 +525,17 @@ function App() {
                     <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
                       {category}
                     </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                       {items
                         .filter(i => i.category === category)
                         .map(item => (
                           <button
                             key={item.id}
                             onClick={() => addToCart(item)}
-                            className="bg-red-50 hover:bg-red-100 active:bg-red-200 border-2 border-fwv-red p-2 sm:p-3 rounded-lg text-left transition touch-manipulation"
+                            className="bg-red-50 hover:bg-red-100 active:bg-red-200 border-2 border-fwv-red p-3 sm:p-4 rounded-lg text-left transition touch-manipulation min-h-[70px] sm:min-h-[80px]"
                           >
-                            <div className="font-semibold text-sm sm:text-base truncate">{item.name}</div>
-                            <div className="text-fwv-red font-bold text-sm sm:text-base">
+                            <div className="font-semibold text-sm sm:text-base line-clamp-2">{item.name}</div>
+                            <div className="text-fwv-red font-bold text-base sm:text-lg mt-1">
                               CHF {item.price.toFixed(2)}
                             </div>
                           </button>
@@ -549,8 +558,8 @@ function App() {
               <div className="bg-white rounded-lg shadow p-3 sm:p-4 lg:sticky lg:top-4">
                 <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Bestellung</h2>
 
-                <div className="mb-3 sm:mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Tischnummer
                   </label>
                   <input
@@ -558,37 +567,37 @@ function App() {
                     inputMode="numeric"
                     value={tableNumber}
                     onChange={(e) => setTableNumber(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-lg"
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-xl font-semibold text-center focus:border-fwv-red focus:outline-none"
                     placeholder="Tisch..."
                   />
                 </div>
 
-                <div className="space-y-2 mb-3 sm:mb-4 max-h-60 sm:max-h-96 overflow-y-auto">
+                <div className="space-y-3 mb-3 sm:mb-4 max-h-[40vh] sm:max-h-96 overflow-y-auto">
                   {cart.map((item, index) => (
-                    <div key={`${item.id}-${item.customPrice}-${index}`} className="border-b pb-2">
-                      <div className="flex justify-between items-start gap-2">
+                    <div key={`${item.id}-${item.customPrice}-${index}`} className="border-b pb-3">
+                      <div className="flex justify-between items-center gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-sm sm:text-base truncate">
+                          <div className="font-semibold text-base truncate">
                             {item.name}
                             {item.customPrice && <span className="text-blue-600 ml-1">*</span>}
                           </div>
-                          <div className="text-xs sm:text-sm text-gray-600">
+                          <div className="text-sm text-gray-600">
                             CHF {(item.customPrice || item.price).toFixed(2)}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 sm:gap-2">
+                        <div className="flex items-center gap-2">
                           <button
                             onClick={() => updateQuantity(item.id, item.customPrice, item.quantity - 1)}
-                            className="w-8 h-8 bg-gray-200 rounded hover:bg-gray-300 active:bg-gray-400 text-lg font-bold touch-manipulation"
+                            className="w-10 h-10 sm:w-11 sm:h-11 bg-gray-200 rounded-lg hover:bg-gray-300 active:bg-gray-400 text-xl font-bold touch-manipulation flex items-center justify-center"
                           >
-                            -
+                            −
                           </button>
-                          <span className="w-6 sm:w-8 text-center font-bold text-sm sm:text-base">
+                          <span className="w-8 text-center font-bold text-lg">
                             {item.quantity}
                           </span>
                           <button
                             onClick={() => updateQuantity(item.id, item.customPrice, item.quantity + 1)}
-                            className="w-8 h-8 bg-gray-200 rounded hover:bg-gray-300 active:bg-gray-400 text-lg font-bold touch-manipulation"
+                            className="w-10 h-10 sm:w-11 sm:h-11 bg-gray-200 rounded-lg hover:bg-gray-300 active:bg-gray-400 text-xl font-bold touch-manipulation flex items-center justify-center"
                           >
                             +
                           </button>
@@ -599,7 +608,7 @@ function App() {
                         value={item.notes}
                         onChange={(e) => updateNotes(item.id, item.customPrice, e.target.value)}
                         placeholder="Notiz..."
-                        className="w-full mt-1 px-2 py-1 text-sm border border-gray-300 rounded"
+                        className="w-full mt-2 px-3 py-2 text-base border border-gray-300 rounded-lg"
                       />
                     </div>
                   ))}
@@ -611,26 +620,26 @@ function App() {
                   </div>
                 )}
 
-                <div className="border-t pt-3 sm:pt-4">
-                  <div className="flex justify-between text-lg sm:text-xl font-bold mb-3 sm:mb-4">
+                <div className="border-t-2 pt-4">
+                  <div className="flex justify-between text-xl sm:text-2xl font-bold mb-4">
                     <span>Total:</span>
-                    <span>CHF {total.toFixed(2)}</span>
+                    <span className="text-green-600">CHF {total.toFixed(2)}</span>
                   </div>
 
                   <button
                     onClick={submitOrder}
                     disabled={loading || cart.length === 0 || !tableNumber}
-                    className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold py-3 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition text-base sm:text-lg touch-manipulation"
+                    className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold py-4 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition text-lg sm:text-xl touch-manipulation min-h-[56px]"
                   >
-                    {loading ? 'Sende...' : 'Bestellung senden'}
+                    {loading ? 'Sende...' : '✅ Bestellung senden'}
                   </button>
 
                   {cart.length > 0 && (
                     <button
                       onClick={() => setCart([])}
-                      className="w-full mt-2 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-700 font-semibold py-2 rounded-lg transition touch-manipulation"
+                      className="w-full mt-3 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-700 font-semibold py-3 rounded-lg transition touch-manipulation min-h-[48px]"
                     >
-                      Warenkorb leeren
+                      🗑️ Warenkorb leeren
                     </button>
                   )}
                 </div>

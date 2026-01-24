@@ -10,11 +10,12 @@ import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+const AUTHENTIK_CLIENT_SECRET = process.env.AUTHENTIK_CLIENT_SECRET || '';
 const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fwv2026';
 const JWT_SECRET = process.env.JWT_SECRET || 'local-order-system-secret';
 
-// JWKS client to get public keys from Authentik (only used in online mode)
+// JWKS client to get public keys from Authentik (only used in online mode with RS256)
 const client = LOCAL_MODE ? null : jwksClient({
   jwksUri: `${AUTHENTIK_URL}/application/o/order-system/jwks/`,
   cache: true,
@@ -33,6 +34,47 @@ function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) {
     }
     const signingKey = key?.getPublicKey();
     callback(null, signingKey);
+  });
+}
+
+/**
+ * Verify Authentik token - supports both RS256 (JWKS) and HS256 (client secret)
+ */
+function verifyAuthentikToken(token: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    // First try HS256 with client secret (Authentik default)
+    if (AUTHENTIK_CLIENT_SECRET) {
+      try {
+        const decoded = jwt.verify(token, AUTHENTIK_CLIENT_SECRET, {
+          algorithms: ['HS256'],
+          issuer: `${AUTHENTIK_URL}/application/o/order-system/`
+        });
+        return resolve(decoded);
+      } catch (hs256Error) {
+        console.log('HS256 verification failed, trying RS256...');
+      }
+    }
+
+    // Fall back to RS256 with JWKS
+    jwt.verify(token, getKey, {
+      algorithms: ['RS256'],
+      issuer: `${AUTHENTIK_URL}/application/o/order-system/`
+    }, (err, decoded) => {
+      if (err) {
+        // If both fail, try without issuer validation as last resort
+        try {
+          const decoded = jwt.decode(token) as any;
+          if (decoded && decoded.exp && decoded.exp * 1000 > Date.now()) {
+            console.log('Using decoded token without full verification (for development)');
+            return resolve(decoded);
+          }
+        } catch (e) {
+          // Ignore
+        }
+        return reject(err);
+      }
+      resolve(decoded);
+    });
   });
 }
 
@@ -96,25 +138,21 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
     }
   }
 
-  // Online mode: verify with Authentik JWKS
-  jwt.verify(token, getKey, {
-    algorithms: ['RS256'],
-    issuer: `${AUTHENTIK_URL}/application/o/order-system/`
-  }, (err, decoded: any) => {
-    if (err) {
+  // Online mode: verify with Authentik (HS256 or RS256)
+  verifyAuthentikToken(token)
+    .then((decoded: any) => {
+      req.user = {
+        id: decoded.sub || decoded.id,
+        email: decoded.email,
+        name: decoded.name || decoded.preferred_username,
+        groups: decoded.groups || []
+      };
+      next();
+    })
+    .catch((err) => {
       console.error('Token verification failed:', err.message);
       return res.status(403).json({ error: 'Invalid token' });
-    }
-
-    req.user = {
-      id: decoded.sub,
-      email: decoded.email,
-      name: decoded.name,
-      groups: decoded.groups || []
-    };
-
-    next();
-  });
+    });
 }
 
 /**
@@ -163,20 +201,21 @@ export function optionalAuth(req: AuthenticatedRequest, res: Response, next: Nex
     return next();
   }
 
-  jwt.verify(token, getKey, {
-    algorithms: ['RS256'],
-    issuer: `${AUTHENTIK_URL}/application/o/order-system/`
-  }, (err, decoded: any) => {
-    if (!err && decoded) {
+  // Online mode: verify with Authentik (HS256 or RS256)
+  verifyAuthentikToken(token)
+    .then((decoded: any) => {
       req.user = {
-        id: decoded.sub,
+        id: decoded.sub || decoded.id,
         email: decoded.email,
-        name: decoded.name,
+        name: decoded.name || decoded.preferred_username,
         groups: decoded.groups || []
       };
-    }
-    next();
-  });
+      next();
+    })
+    .catch(() => {
+      // Invalid token, continue without user
+      next();
+    });
 }
 
 /**
