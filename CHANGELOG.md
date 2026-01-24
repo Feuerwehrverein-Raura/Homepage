@@ -1,3 +1,10 @@
+## [1.47.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.47.1...v1.47.2) (2026-01-24)
+
+
+### Bug Fixes
+
+* **order:** parse price as float from API response ([76c14fc](https://github.com/Feuerwehrverein-Raura/Homepage/commit/76c14fcfa90e76c51397ee9ded909c526dc8ac01))
+
 ## [1.47.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.47.0...v1.47.1) (2026-01-24)
 
 
