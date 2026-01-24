@@ -1,3 +1,10 @@
+## [1.55.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.2...v1.55.3) (2026-01-24)
+
+
+### Bug Fixes
+
+* **arbeitsplan:** convert Date object to string for PDF generation ([5e21557](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5e21557be41e950f94885ded7e53def7fdeeba66))
+
 ## [1.55.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.1...v1.55.2) (2026-01-24)
 
 
