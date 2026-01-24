@@ -1,3 +1,11 @@
+# [1.52.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.51.1...v1.52.0) (2026-01-24)
+
+
+### Features
+
+* **vorstand:** add automatic mitglieder alias sync ([6fc4f2d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6fc4f2d8f55665d7994ac31debf6f47c0f7d0164))
+* **vorstand:** add email zustellung list feature ([eaafdea](https://github.com/Feuerwehrverein-Raura/Homepage/commit/eaafdea0c1a10489ac10a047854770a6aa9b5317))
+
 ## [1.51.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.51.0...v1.51.1) (2026-01-24)
 
 
