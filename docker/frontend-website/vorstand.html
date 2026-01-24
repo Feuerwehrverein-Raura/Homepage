@@ -460,18 +460,23 @@
                     <!-- Cloud-Berechtigungen -->
                     <div id="cloud-permissions-section" class="hidden">
                         <h4 class="font-semibold text-gray-700 mb-3">Cloud-Berechtigungen</h4>
-                        <p class="text-sm text-gray-500 mb-3">Diese Einstellungen werden sofort in Authentik/Nextcloud angewendet.</p>
+                        <p class="text-sm text-gray-500 mb-3">Werden automatisch basierend auf Funktionen vergeben.</p>
                         <div class="space-y-2">
-                            <label class="flex items-center">
-                                <input type="checkbox" id="nextcloud-admin" class="mr-2 rounded text-fire-500">
-                                <span class="text-sm text-gray-700">Nextcloud Admin</span>
-                                <span class="ml-2 text-xs text-gray-400">(Volle Adminrechte in Nextcloud)</span>
-                            </label>
-                            <label class="flex items-center">
-                                <input type="checkbox" id="vorstand-group" class="mr-2 rounded text-fire-500">
-                                <span class="text-sm text-gray-700">Vorstand-Gruppe</span>
-                                <span class="ml-2 text-xs text-gray-400">(Freigaben fuer Vorstand)</span>
-                            </label>
+                            <div class="flex items-center text-sm text-gray-600">
+                                <span id="nextcloud-admin-status" class="mr-2">⏳</span>
+                                <span>Nextcloud Admin</span>
+                                <span class="ml-2 text-xs text-gray-400">(Admin-Funktion)</span>
+                            </div>
+                            <div class="flex items-center text-sm text-gray-600">
+                                <span id="vorstand-group-status" class="mr-2">⏳</span>
+                                <span>Vorstand-Gruppe</span>
+                                <span class="ml-2 text-xs text-gray-400">(Vorstand-Funktionen)</span>
+                            </div>
+                            <div class="flex items-center text-sm text-gray-600">
+                                <span id="social-media-group-status" class="mr-2">⏳</span>
+                                <span>Social-Media-Gruppe</span>
+                                <span class="ml-2 text-xs text-gray-400">(Social Media-Funktion)</span>
+                            </div>
                         </div>
                         <div id="cloud-permissions-status" class="mt-2 text-sm text-gray-500"></div>
                     </div>
@@ -1959,12 +1964,16 @@
         async function loadCloudPermissions(memberId) {
             const section = document.getElementById('cloud-permissions-section');
             const statusEl = document.getElementById('cloud-permissions-status');
-            const nextcloudAdminCb = document.getElementById('nextcloud-admin');
-            const vorstandGroupCb = document.getElementById('vorstand-group');
+            const nextcloudAdminStatus = document.getElementById('nextcloud-admin-status');
+            const vorstandGroupStatus = document.getElementById('vorstand-group-status');
+            const socialMediaGroupStatus = document.getElementById('social-media-group-status');
 
             // Reset and show loading
             section.classList.add('hidden');
             statusEl.textContent = 'Lade Berechtigungen...';
+            nextcloudAdminStatus.textContent = '⏳';
+            vorstandGroupStatus.textContent = '⏳';
+            socialMediaGroupStatus.textContent = '⏳';
 
             try {
                 // Check Nextcloud admin status
@@ -1982,8 +1991,9 @@
                 if (!ncData.has_authentik) {
                     statusEl.textContent = 'Kein Authentik-Account vorhanden';
                     section.classList.remove('hidden');
-                    nextcloudAdminCb.disabled = true;
-                    vorstandGroupCb.disabled = true;
+                    nextcloudAdminStatus.textContent = '❌';
+                    vorstandGroupStatus.textContent = '❌';
+                    socialMediaGroupStatus.textContent = '❌';
                     return;
                 }
 
@@ -1993,92 +2003,77 @@
                 });
                 const vsData = vsResponse.ok ? await vsResponse.json() : { vorstand_group: false };
 
-                // Set checkbox values
-                nextcloudAdminCb.checked = ncData.nextcloud_admin;
-                nextcloudAdminCb.disabled = false;
-                vorstandGroupCb.checked = vsData.vorstand_group;
-                vorstandGroupCb.disabled = false;
+                // Check Social Media group status
+                const smResponse = await fetch(`${API_BASE}/members/${memberId}/social-media-group`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const smData = smResponse.ok ? await smResponse.json() : { social_media_group: false };
+
+                // Set status values
+                nextcloudAdminStatus.textContent = ncData.nextcloud_admin ? '✅' : '❌';
+                vorstandGroupStatus.textContent = vsData.vorstand_group ? '✅' : '❌';
+                socialMediaGroupStatus.textContent = smData.social_media_group ? '✅' : '❌';
 
                 // Show section
                 section.classList.remove('hidden');
                 statusEl.textContent = '';
-
-                // Store member ID for event handlers
-                nextcloudAdminCb.dataset.memberId = memberId;
-                vorstandGroupCb.dataset.memberId = memberId;
             } catch (error) {
                 console.error('Error loading cloud permissions:', error);
                 statusEl.textContent = 'Fehler beim Laden';
             }
         }
 
-        // Toggle Nextcloud admin
-        async function toggleNextcloudAdmin(checkbox) {
-            const memberId = checkbox.dataset.memberId;
-            if (!memberId) return;
+        // Sync cloud permissions based on functions
+        async function syncCloudPermissions(memberId, funktionen) {
+            const funktionenList = funktionen.split(',').map(f => f.trim());
+            const vorstandRoles = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
+
+            const isAdmin = funktionenList.includes('Admin');
+            const isVorstand = funktionenList.some(f => vorstandRoles.includes(f));
+            const isSocialMedia = funktionenList.includes('Social Media');
 
             const statusEl = document.getElementById('cloud-permissions-status');
-            statusEl.textContent = 'Aktualisiere...';
-            checkbox.disabled = true;
+            statusEl.textContent = 'Synchronisiere Cloud-Berechtigungen...';
 
             try {
-                const response = await fetch(`${API_BASE}/members/${memberId}/nextcloud-admin`, {
+                // Sync Nextcloud Admin
+                await fetch(`${API_BASE}/members/${memberId}/nextcloud-admin`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ enabled: checkbox.checked })
+                    body: JSON.stringify({ enabled: isAdmin })
                 });
 
-                if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.error || 'Fehler');
-                }
-
-                const data = await response.json();
-                statusEl.textContent = data.message;
-                setTimeout(() => statusEl.textContent = '', 3000);
-            } catch (error) {
-                checkbox.checked = !checkbox.checked; // Revert
-                statusEl.textContent = 'Fehler: ' + error.message;
-            } finally {
-                checkbox.disabled = false;
-            }
-        }
-
-        // Toggle Vorstand group
-        async function toggleVorstandGroup(checkbox) {
-            const memberId = checkbox.dataset.memberId;
-            if (!memberId) return;
-
-            const statusEl = document.getElementById('cloud-permissions-status');
-            statusEl.textContent = 'Aktualisiere...';
-            checkbox.disabled = true;
-
-            try {
-                const response = await fetch(`${API_BASE}/members/${memberId}/vorstand-group`, {
+                // Sync Vorstand group
+                await fetch(`${API_BASE}/members/${memberId}/vorstand-group`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ enabled: checkbox.checked })
+                    body: JSON.stringify({ enabled: isVorstand })
                 });
 
-                if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.error || 'Fehler');
-                }
+                // Sync Social Media group
+                await fetch(`${API_BASE}/members/${memberId}/social-media-group`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ enabled: isSocialMedia })
+                });
 
-                const data = await response.json();
-                statusEl.textContent = data.message;
+                statusEl.textContent = 'Cloud-Berechtigungen synchronisiert';
                 setTimeout(() => statusEl.textContent = '', 3000);
+
+                // Reload permissions display
+                loadCloudPermissions(memberId);
             } catch (error) {
-                checkbox.checked = !checkbox.checked; // Revert
-                statusEl.textContent = 'Fehler: ' + error.message;
-            } finally {
-                checkbox.disabled = false;
+                console.error('Error syncing cloud permissions:', error);
+                statusEl.textContent = 'Fehler beim Synchronisieren';
             }
         }
 
@@ -2175,6 +2170,15 @@
                     const errorData = await response.json().catch(() => ({}));
                     console.error('Save member failed:', response.status, errorData);
                     throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+
+                const savedMember = await response.json();
+
+                // Sync cloud permissions based on functions (in background)
+                if (savedMember.id) {
+                    syncCloudPermissions(savedMember.id, data.funktion).catch(err => {
+                        console.error('Cloud permissions sync failed:', err);
+                    });
                 }
 
                 document.getElementById('member-modal').classList.add('hidden');
@@ -4466,14 +4470,6 @@ ${grussformel}`;
         document.getElementById('cancel-btn').addEventListener('click', () => document.getElementById('member-modal').classList.add('hidden'));
         document.getElementById('search-input').addEventListener('input', (e) => loadMembers({ search: e.target.value, status: document.getElementById('status-filter').value }));
         document.getElementById('status-filter').addEventListener('change', (e) => loadMembers({ search: document.getElementById('search-input').value, status: e.target.value }));
-
-        // Cloud permissions checkboxes
-        document.getElementById('nextcloud-admin').addEventListener('change', function() {
-            toggleNextcloudAdmin(this);
-        });
-        document.getElementById('vorstand-group').addEventListener('change', function() {
-            toggleVorstandGroup(this);
-        });
 
         // Export dropdown
         const exportDropdownBtn = document.getElementById('export-dropdown-btn');

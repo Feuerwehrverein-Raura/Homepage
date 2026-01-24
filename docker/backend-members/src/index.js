@@ -2134,8 +2134,9 @@ app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand',
     }
 });
 
-// Vorstand group management
+// Group constants
 const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43e4-af75-e0241f06fb95';
+const SOCIAL_MEDIA_GROUP = process.env.AUTHENTIK_SOCIAL_MEDIA_GROUP || '494ef740-41d3-40c3-9e68-8a1e5d3b4ad9';
 
 // Toggle Vorstand group status for a member
 app.post('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
@@ -2216,6 +2217,85 @@ app.get('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 
         });
     } catch (error) {
         console.error('Vorstand group check error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Social Media group management
+app.post('/members/:id/social-media-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { enabled } = req.body;
+
+        const memberResult = await pool.query(
+            'SELECT authentik_user_id, vorname, nachname FROM members WHERE id = $1',
+            [id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        if (!member.authentik_user_id) {
+            return res.status(400).json({ error: 'Mitglied hat keinen Authentik-Account' });
+        }
+
+        let success;
+        if (enabled) {
+            success = await addUserToAuthentikGroup(member.authentik_user_id, SOCIAL_MEDIA_GROUP);
+        } else {
+            success = await removeUserFromAuthentikGroup(member.authentik_user_id, SOCIAL_MEDIA_GROUP);
+        }
+
+        if (!success) {
+            return res.status(500).json({ error: 'Fehler bei der Authentik-Gruppenanpassung' });
+        }
+
+        await logAudit(pool, 'MEMBER_SOCIAL_MEDIA_GROUP', null, req.user.email, getClientIp(req), {
+            member_id: id,
+            member_name: `${member.vorname} ${member.nachname}`,
+            social_media_group: enabled
+        });
+
+        res.json({
+            success: true,
+            member_id: id,
+            social_media_group: enabled,
+            message: enabled ? 'Zur Social-Media-Gruppe hinzugefuegt' : 'Aus Social-Media-Gruppe entfernt'
+        });
+    } catch (error) {
+        console.error('Social media group toggle error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/members/:id/social-media-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const memberResult = await pool.query(
+            'SELECT authentik_user_id FROM members WHERE id = $1',
+            [id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        if (!member.authentik_user_id) {
+            return res.json({ has_authentik: false, social_media_group: false });
+        }
+
+        const inGroup = await isUserInAuthentikGroup(member.authentik_user_id, SOCIAL_MEDIA_GROUP);
+
+        res.json({
+            has_authentik: true,
+            social_media_group: inGroup
+        });
+    } catch (error) {
+        console.error('Social media group check error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
