@@ -130,8 +130,14 @@ function App() {
         sessionStorage.removeItem('code_verifier');
 
         const payload = JSON.parse(atob(data.access_token.split('.')[1]));
+        // Build display name from available fields
+        const displayName = payload.name
+          || (payload.given_name && payload.family_name ? `${payload.given_name} ${payload.family_name}` : null)
+          || payload.given_name
+          || payload.preferred_username
+          || 'User';
         setUser({
-          name: payload.name || payload.preferred_username || 'User',
+          name: displayName,
           email: payload.email || '',
           groups: payload.groups || [],
         });
@@ -158,8 +164,14 @@ function App() {
         setToken(null);
         setUser(null);
       } else {
+        // Build display name from available fields
+        const displayName = payload.name
+          || (payload.given_name && payload.family_name ? `${payload.given_name} ${payload.family_name}` : null)
+          || payload.given_name
+          || payload.preferred_username
+          || 'User';
         setUser({
-          name: payload.name || payload.preferred_username || 'User',
+          name: displayName,
           email: payload.email || '',
           groups: payload.groups || [],
         });
@@ -740,17 +752,10 @@ function AddItemForm({ categories, locations, token, onSuccess }: {
 // Reports View Component
 function ReportsView({ items }: { items: Item[] }) {
   const [loading, setLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchInventoryReport = async () => {
+  const refreshData = () => {
     setLoading(true);
-    try {
-      await fetch(`${API_URL}/reports/inventory-list`);
-      setLastUpdated(new Date());
-    } catch (error) {
-      console.error('Error fetching report:', error);
-    }
-    setLoading(false);
+    setTimeout(() => setLoading(false), 500);
   };
 
   const downloadCSV = () => {

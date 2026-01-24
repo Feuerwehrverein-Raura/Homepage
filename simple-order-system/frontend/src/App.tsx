@@ -109,8 +109,14 @@ function App() {
 
         // Parse user info from token
         const payload = JSON.parse(atob(data.access_token.split('.')[1]));
+        // Build display name from available fields
+        const displayName = payload.name
+          || (payload.given_name && payload.family_name ? `${payload.given_name} ${payload.family_name}` : null)
+          || payload.given_name
+          || payload.preferred_username
+          || 'User';
         setUser({
-          name: payload.name || payload.preferred_username || 'User',
+          name: displayName,
           email: payload.email || '',
           groups: payload.groups || [],
         });
@@ -138,8 +144,14 @@ function App() {
         setToken(null);
         setUser(null);
       } else {
+        // Build display name from available fields
+        const displayName = payload.name
+          || (payload.given_name && payload.family_name ? `${payload.given_name} ${payload.family_name}` : null)
+          || payload.given_name
+          || payload.preferred_username
+          || 'User';
         setUser({
-          name: payload.name || payload.preferred_username || 'User',
+          name: displayName,
           email: payload.email || '',
           groups: payload.groups || [],
         });
