@@ -588,6 +588,53 @@ async function sendNotificationEmail(memberId, templateName, variables = {}) {
     }
 }
 
+// Sync mitglieder@fwv-raura.ch alias with all zustellung emails
+async function syncMitgliederAlias() {
+    try {
+        const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://fwv-api-dispatch:3000';
+        const ALIAS_ADDRESS = 'mitglieder@fwv-raura.ch';
+
+        // Get all zustellung emails
+        const result = await pool.query(`
+            SELECT COALESCE(versand_email, email) as email
+            FROM members
+            WHERE zustellung_email = true
+            AND (email IS NOT NULL AND email != '')
+            AND status NOT IN ('Ausgetreten', 'Verstorben')
+            ORDER BY email
+        `);
+        const emails = result.rows.map(r => r.email).filter(e => e);
+
+        if (emails.length === 0) {
+            console.log('No emails with zustellung_email enabled for alias sync');
+            return;
+        }
+
+        // Get existing aliases to find the mitglieder alias ID
+        const aliasesResponse = await axios.get(`${DISPATCH_API}/mailcow/aliases`);
+        const existingAlias = aliasesResponse.data.find(a => a.address === ALIAS_ADDRESS);
+
+        if (existingAlias) {
+            // Update existing alias
+            await axios.put(`${DISPATCH_API}/mailcow/aliases/${existingAlias.id}`, {
+                goto: emails.join(','),
+                active: true
+            });
+            console.log(`Updated mitglieder alias with ${emails.length} recipients`);
+        } else {
+            // Create new alias
+            await axios.post(`${DISPATCH_API}/mailcow/aliases`, {
+                address: ALIAS_ADDRESS,
+                goto: emails.join(','),
+                active: true
+            });
+            console.log(`Created mitglieder alias with ${emails.length} recipients`);
+        }
+    } catch (error) {
+        console.error('Failed to sync mitglieder alias:', error.message);
+    }
+}
+
 // OAuth2 callback - exchange code for token
 app.post('/auth/callback', async (req, res) => {
     try {
@@ -868,6 +915,11 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
         });
 
         res.status(201).json(newMember);
+
+        // Sync mitglieder alias in background (don't await to not delay response)
+        if (zustellung_email && email) {
+            syncMitgliederAlias();
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1101,6 +1153,11 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
         }).catch(err => console.error('Email notification failed:', err));
 
         res.json(result.rows[0]);
+
+        // Sync mitglieder alias if zustellung_email or email changed
+        if (fields.includes('zustellung_email') || fields.includes('email') || fields.includes('versand_email')) {
+            syncMitgliederAlias();
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1270,6 +1327,9 @@ app.get('/deletion-confirm/:token', async (req, res) => {
                 aktuar_confirmed: req2.aktuar_confirmed_at,
                 kassier_confirmed: req2.kassier_confirmed_at
             });
+
+            // Sync mitglieder alias in background (member removed)
+            syncMitgliederAlias();
 
             return res.send(`<html><body><h1>Mitglied gelöscht</h1><p>Das Mitglied "${memberName}" wurde erfolgreich gelöscht.</p><p>Beide Bestätigungen (Aktuar und Kassier) wurden erhalten.</p></body></html>`);
         }
