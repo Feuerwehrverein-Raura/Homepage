@@ -1,3 +1,10 @@
+## [1.55.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.1...v1.55.2) (2026-01-24)
+
+
+### Bug Fixes
+
+* **arbeitsplan:** load registrations fresh from database for PDF ([40aa82e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/40aa82e296ef58e1c139b1d69bbb16d0565773cc))
+
 ## [1.55.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.0...v1.55.1) (2026-01-24)
 
 
