@@ -1,3 +1,10 @@
+## [1.46.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.2...v1.46.3) (2026-01-24)
+
+
+### Bug Fixes
+
+* **auth:** show user's full name instead of 'User' ([f76d213](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f76d2137805a04ceba7a87667d7ab813ac2c479a))
+
 ## [1.46.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.1...v1.46.2) (2026-01-24)
 
 
