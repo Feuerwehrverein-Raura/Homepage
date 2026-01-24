@@ -1,3 +1,10 @@
+# [1.53.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.52.0...v1.53.0) (2026-01-24)
+
+
+### Features
+
+* **members:** auto-sync mitglieder alias on member changes ([9c4eb44](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9c4eb4450b4d08ac19b46258711c55a386bafec9))
+
 # [1.52.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.51.1...v1.52.0) (2026-01-24)
 
 
