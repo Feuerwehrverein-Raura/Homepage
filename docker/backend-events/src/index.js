@@ -1887,8 +1887,14 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
                         WHERE $1 = ANY(r.shift_ids) AND r.status IN ('approved', 'confirmed')
                     `, [shift.id]);
 
+                    // Convert Date object to string format YYYY-MM-DD
+                    const dateStr = shift.date instanceof Date
+                        ? shift.date.toISOString().split('T')[0]
+                        : shift.date;
+
                     return {
                         ...shift,
+                        date: dateStr,
                         registrations: {
                             approved: regsResult.rows.map(r => ({
                                 id: r.id,
