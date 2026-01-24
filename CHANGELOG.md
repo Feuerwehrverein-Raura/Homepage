@@ -1,3 +1,10 @@
+# [1.48.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.47.2...v1.48.0) (2026-01-24)
+
+
+### Features
+
+* **order:** add cash payment modal and daily report email ([769248a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/769248a0a8b7bff6c6a318c2b01ac8d516b512fe))
+
 ## [1.47.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.47.1...v1.47.2) (2026-01-24)
 
 
