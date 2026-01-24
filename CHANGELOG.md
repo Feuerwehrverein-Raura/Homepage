@@ -1,3 +1,10 @@
+# [1.49.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.48.0...v1.49.0) (2026-01-24)
+
+
+### Features
+
+* **order:** add printer settings page and network printing ([c5882a3](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c5882a3827475d940973cfd9ad819b446b2f105c))
+
 # [1.48.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.47.2...v1.48.0) (2026-01-24)
 
 
