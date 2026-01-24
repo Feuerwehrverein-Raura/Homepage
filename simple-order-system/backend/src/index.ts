@@ -55,8 +55,14 @@ async function initDB() {
       table_number INTEGER NOT NULL,
       status VARCHAR(50) DEFAULT 'pending',
       total DECIMAL(10, 2),
+      payment_method VARCHAR(50),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+  `);
+
+  // Add payment_method column if it doesn't exist (for existing databases)
+  await pool.query(`
+    ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)
   `);
 
   await pool.query(`
@@ -293,6 +299,25 @@ app.patch('/api/orders/:id/complete', async (req, res) => {
   }
 });
 
+// Update order status with payment method
+app.put('/api/orders/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, payment_method } = req.body;
+
+    await pool.query(
+      'UPDATE orders SET status = $1, payment_method = $2 WHERE id = $3',
+      [status || 'paid', payment_method || null, id]
+    );
+
+    broadcast({ type: 'order_updated', order_id: id, status, payment_method });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating order status:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Order history (for admin view)
 app.get('/api/orders/history', async (req, res) => {
   try {
@@ -346,8 +371,23 @@ app.get('/api/orders/history', async (req, res) => {
 // Daily statistics
 app.get('/api/stats/daily', async (req, res) => {
   try {
-    const { date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    // Business day runs from 12:00 to 12:00 next day
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    // If before 12:00, the business day started yesterday at 12:00
+    // If after 12:00, the business day started today at 12:00
+    const startDate = new Date(now);
+    if (currentHour < 12) {
+      startDate.setDate(startDate.getDate() - 1);
+    }
+    startDate.setHours(12, 0, 0, 0);
+
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 1);
+
+    // Format for display (the date when the business day started)
+    const displayDate = startDate.toISOString().split('T')[0];
 
     const result = await pool.query(`
       SELECT
@@ -357,10 +397,10 @@ app.get('/api/stats/daily', async (req, res) => {
         COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_orders,
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders
       FROM orders
-      WHERE DATE(created_at) = $1
-    `, [targetDate]);
+      WHERE created_at >= $1 AND created_at < $2
+    `, [startDate.toISOString(), endDate.toISOString()]);
 
-    // Best selling items today
+    // Best selling items for this business day
     const itemsResult = await pool.query(`
       SELECT
         COALESCE(i.name, 'Sonderposten') as name,
@@ -369,19 +409,137 @@ app.get('/api/stats/daily', async (req, res) => {
       FROM order_items oi
       LEFT JOIN items i ON oi.item_id = i.id
       JOIN orders o ON oi.order_id = o.id
-      WHERE DATE(o.created_at) = $1
+      WHERE o.created_at >= $1 AND o.created_at < $2
       GROUP BY i.name
       ORDER BY total_sold DESC
       LIMIT 10
-    `, [targetDate]);
+    `, [startDate.toISOString(), endDate.toISOString()]);
 
     res.json({
-      date: targetDate,
+      date: displayDate,
       summary: result.rows[0],
       top_items: itemsResult.rows
     });
   } catch (error) {
+    console.error('Stats error:', error);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Send daily report via email
+app.post('/api/stats/send-report', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userEmail = req.user?.email;
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Keine E-Mail-Adresse im Token gefunden' });
+    }
+
+    // Get current business day stats (12:00-12:00)
+    const now = new Date();
+    const currentHour = now.getHours();
+    const startDate = new Date(now);
+    if (currentHour < 12) {
+      startDate.setDate(startDate.getDate() - 1);
+    }
+    startDate.setHours(12, 0, 0, 0);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 1);
+    const displayDate = startDate.toISOString().split('T')[0];
+
+    // Get summary
+    const summaryResult = await pool.query(`
+      SELECT
+        COUNT(*) as total_orders,
+        COALESCE(SUM(total), 0) as total_revenue,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_orders,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_orders,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders
+      FROM orders
+      WHERE created_at >= $1 AND created_at < $2
+    `, [startDate.toISOString(), endDate.toISOString()]);
+
+    // Get payment breakdown
+    const paymentResult = await pool.query(`
+      SELECT
+        COALESCE(payment_method, 'unbekannt') as payment_method,
+        COUNT(*) as count,
+        COALESCE(SUM(total), 0) as total
+      FROM orders
+      WHERE created_at >= $1 AND created_at < $2 AND status = 'paid'
+      GROUP BY payment_method
+    `, [startDate.toISOString(), endDate.toISOString()]);
+
+    // Get top items
+    const itemsResult = await pool.query(`
+      SELECT
+        COALESCE(i.name, 'Sonderposten') as name,
+        SUM(oi.quantity) as total_sold,
+        SUM(oi.quantity * oi.price) as total_revenue
+      FROM order_items oi
+      LEFT JOIN items i ON oi.item_id = i.id
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.created_at >= $1 AND o.created_at < $2
+      GROUP BY i.name
+      ORDER BY total_sold DESC
+      LIMIT 10
+    `, [startDate.toISOString(), endDate.toISOString()]);
+
+    const summary = summaryResult.rows[0];
+    const topItems = itemsResult.rows;
+    const payments = paymentResult.rows;
+
+    // Format email content
+    const paymentLines = payments.map((p: any) =>
+      `  ${p.payment_method === 'cash' ? 'Bar' : p.payment_method === 'sumup' ? 'SumUp' : p.payment_method}: ${p.count}x = CHF ${parseFloat(p.total).toFixed(2)}`
+    ).join('\n');
+
+    const itemLines = topItems.map((item: any, i: number) =>
+      `  ${i + 1}. ${item.name} - ${item.total_sold}x = CHF ${parseFloat(item.total_revenue).toFixed(2)}`
+    ).join('\n');
+
+    const emailBody = `
+TAGESBERICHT KASSE
+==================
+Datum: ${displayDate} (12:00 - 12:00)
+
+ZUSAMMENFASSUNG
+---------------
+Bestellungen: ${summary.total_orders}
+Umsatz: CHF ${parseFloat(summary.total_revenue).toFixed(2)}
+Bezahlt: ${summary.paid_orders}
+Offen: ${summary.pending_orders}
+
+${payments.length > 0 ? `ZAHLUNGSARTEN\n-------------\n${paymentLines}\n` : ''}
+${topItems.length > 0 ? `MEISTVERKAUFTE ARTIKEL\n----------------------\n${itemLines}` : ''}
+
+--
+Feuerwehrverein Raura - Kassensystem
+    `.trim();
+
+    // Send via main API email endpoint
+    const emailApiUrl = process.env.EMAIL_API_URL || 'https://www.fwv-raura.ch/api/email/send';
+
+    const emailResponse = await fetch(emailApiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: userEmail,
+        subject: `Tagesbericht Kasse - ${displayDate}`,
+        body: emailBody
+      })
+    });
+
+    if (!emailResponse.ok) {
+      const errorText = await emailResponse.text();
+      console.error('Email API error:', errorText);
+      return res.status(500).json({ error: 'E-Mail konnte nicht gesendet werden' });
+    }
+
+    console.log(`Daily report sent to ${userEmail}`);
+    res.json({ success: true, sentTo: userEmail });
+  } catch (error) {
+    console.error('Send report error:', error);
+    res.status(500).json({ error: 'Fehler beim Senden des Berichts' });
   }
 });
 

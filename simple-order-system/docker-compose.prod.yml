@@ -39,6 +39,8 @@ services:
       # Payment (optional)
       SUMUP_API_KEY: ${SUMUP_API_KEY:-}
       SUMUP_MERCHANT_CODE: ${SUMUP_MERCHANT_CODE:-}
+      # Email
+      EMAIL_API_URL: https://www.fwv-raura.ch/api/email/send
     depends_on:
       order-postgres:
         condition: service_healthy

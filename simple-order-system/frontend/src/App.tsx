@@ -59,6 +59,8 @@ function App() {
   const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges' });
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
+  const [pendingOrder, setPendingOrder] = useState<{ id: number; total: number } | null>(null);
+  const [cashPayment, setCashPayment] = useState<{ orderId: number; total: number; received: string } | null>(null);
 
   // Check for OAuth callback on mount
   useEffect(() => {
@@ -303,6 +305,78 @@ function App() {
     }, 2000);
   };
 
+  const handlePayment = async (method: 'bar' | 'sumup') => {
+    if (!pendingOrder) return;
+
+    if (method === 'bar') {
+      // Open cash payment modal
+      setCashPayment({ orderId: pendingOrder.id, total: pendingOrder.total, received: '' });
+      setPendingOrder(null);
+      return;
+    }
+
+    // SumUp 3G Terminal
+    setLoading(true);
+    try {
+      const paymentRes = await fetch(`${API_URL}/payments/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: pendingOrder.id,
+          provider: 'sumup-terminal',
+        }),
+      });
+
+      if (!paymentRes.ok) {
+        const error = await paymentRes.json();
+        alert(`Fehler: ${error.message || 'Zahlung konnte nicht erstellt werden'}`);
+        setLoading(false);
+        return;
+      }
+
+      const payment = await paymentRes.json();
+      setPendingOrder(null);
+      alert(`💳 Zahlung an SumUp 3G gesendet!\n\nBetrag: CHF ${pendingOrder.total.toFixed(2)}`);
+      pollPaymentStatus(payment.id);
+    } catch (error) {
+      alert('Fehler bei der Zahlung');
+      setLoading(false);
+    }
+  };
+
+  const confirmCashPayment = async () => {
+    if (!cashPayment) return;
+
+    try {
+      // Mark order as paid via API
+      const res = await fetch(`${API_URL}/orders/${cashPayment.orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: 'paid', payment_method: 'cash' }),
+      });
+
+      if (res.ok) {
+        const received = parseFloat(cashPayment.received) || cashPayment.total;
+        const change = received - cashPayment.total;
+        if (change > 0) {
+          alert(`✅ Bestellung #${cashPayment.orderId} bezahlt!\n\nWechselgeld: CHF ${change.toFixed(2)}`);
+        } else {
+          alert(`✅ Bestellung #${cashPayment.orderId} bezahlt!`);
+        }
+      } else {
+        alert(`✅ Bestellung #${cashPayment.orderId} als Barzahlung erfasst.`);
+      }
+    } catch (error) {
+      console.error('Error marking order as paid:', error);
+      alert(`✅ Bestellung #${cashPayment.orderId} als Barzahlung erfasst.`);
+    }
+
+    setCashPayment(null);
+  };
+
   const submitOrder = async () => {
     if (!tableNumber || cart.length === 0) {
       alert('Bitte Tischnummer eingeben und Artikel auswählen!');
@@ -332,76 +406,10 @@ function App() {
 
       const order = await orderRes.json();
 
-      const paymentMethod = confirm(
-        `Bestellung erfolgreich erstellt!\n\n` +
-        `Gesamtsumme: CHF ${total.toFixed(2)}\n\n` +
-        `Zahlungsmethode wählen:\n` +
-        `OK = Online bezahlen (SumUp/TWINT)\n` +
-        `Abbrechen = Bar bezahlen`
-      );
-
-      if (paymentMethod) {
-        const provider = prompt(
-          'Zahlungsanbieter wählen:\n\n' +
-          '1 = SumUp Terminal (3G)\n' +
-          '2 = SumUp Online (Karte)\n' +
-          '3 = TWINT (via RaiseNow)\n\n' +
-          'Bitte Nummer eingeben:'
-        );
-
-        if (provider === '1' || provider === '2' || provider === '3') {
-          const selectedProvider =
-            provider === '1' ? 'sumup-terminal' :
-            provider === '2' ? 'sumup' :
-            'twint';
-
-          const paymentRes = await fetch(`${API_URL}/payments/create`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              orderId: order.id,
-              provider: selectedProvider,
-            }),
-          });
-
-          if (!paymentRes.ok) {
-            const error = await paymentRes.json();
-            alert(`Fehler: ${error.message || 'Zahlung konnte nicht erstellt werden'}`);
-            setLoading(false);
-            return;
-          }
-
-          const payment = await paymentRes.json();
-
-          if (selectedProvider === 'sumup-terminal') {
-            alert(
-              `💳 Zahlung an SumUp 3G Terminal gesendet!\n\n` +
-              `Betrag: CHF ${total.toFixed(2)}\n\n` +
-              `Bitte Karte ans Terminal halten.`
-            );
-            pollPaymentStatus(payment.id);
-          } else if (payment.qr_code_url && selectedProvider === 'twint') {
-            alert(
-              `TWINT QR-Code bereit!\n\n` +
-              `Bitte scannen Sie den QR-Code mit Ihrer TWINT App.\n\n` +
-              `Der QR-Code wird in einem neuen Fenster geöffnet.`
-            );
-            window.open(payment.qr_code_url, '_blank');
-          } else if (payment.payment_url) {
-            alert(
-              `Zahlung wird in neuem Fenster geöffnet.\n\n` +
-              `Bitte schließen Sie die Zahlung ab.`
-            );
-            window.open(payment.payment_url, '_blank');
-          }
-        }
-      }
-
+      // Show payment modal
+      setPendingOrder({ id: order.id, total });
       setCart([]);
       setTableNumber('');
-      alert('Bestellung erfolgreich gesendet!');
     } catch (error) {
       alert('Fehler beim Senden der Bestellung');
     } finally {
@@ -487,7 +495,7 @@ function App() {
       </div>
 
       {showHistoryView ? (
-        <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} />
+        <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token} />
       ) : showInventoryView ? (
         <InventoryView items={items} onUpdate={fetchItems} token={token} />
       ) : (
@@ -664,6 +672,205 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Payment Modal */}
+      {pendingOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <h2 className="text-2xl font-bold text-center mb-2">Bestellung #{pendingOrder.id}</h2>
+            <p className="text-3xl font-bold text-center text-green-600 mb-6">
+              CHF {pendingOrder.total.toFixed(2)}
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => handlePayment('sumup')}
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 touch-manipulation disabled:bg-gray-400"
+              >
+                💳 SumUp 3G Terminal
+              </button>
+
+              <button
+                onClick={() => handlePayment('bar')}
+                disabled={loading}
+                className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 touch-manipulation disabled:bg-gray-400"
+              >
+                💵 Barzahlung
+              </button>
+            </div>
+
+            <button
+              onClick={() => setPendingOrder(null)}
+              className="w-full mt-4 text-gray-500 hover:text-gray-700 py-2 text-sm"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cash Payment Modal */}
+      {cashPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-center mb-2">Barzahlung</h2>
+            <p className="text-sm text-gray-600 text-center mb-4">Bestellung #{cashPayment.orderId}</p>
+
+            <div className="bg-gray-100 rounded-xl p-4 mb-3">
+              <div className="flex justify-between items-center text-lg">
+                <span>Betrag:</span>
+                <span className="font-bold text-green-600">CHF {cashPayment.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Display for entered amount */}
+            <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-3 mb-3">
+              <div className="text-sm text-gray-600 mb-1">Erhalten (CHF)</div>
+              <div className="text-3xl font-bold text-center text-gray-800 min-h-[40px]">
+                {cashPayment.received || '0.00'}
+              </div>
+            </div>
+
+            {/* Change calculation - shown above keypad when applicable */}
+            {cashPayment.received && parseFloat(cashPayment.received) >= cashPayment.total && (
+              <div className="bg-green-100 border-2 border-green-500 rounded-xl p-3 mb-3">
+                <div className="flex justify-between items-center text-lg">
+                  <span className="font-semibold">Wechselgeld:</span>
+                  <span className="font-bold text-green-700 text-2xl">
+                    CHF {(parseFloat(cashPayment.received) - cashPayment.total).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {cashPayment.received && parseFloat(cashPayment.received) > 0 && parseFloat(cashPayment.received) < cashPayment.total && (
+              <div className="bg-red-100 border-2 border-red-400 rounded-xl p-3 mb-3">
+                <div className="flex justify-between items-center text-lg">
+                  <span className="font-semibold text-red-700">Fehlbetrag:</span>
+                  <span className="font-bold text-red-700">
+                    CHF {(cashPayment.total - parseFloat(cashPayment.received)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Numeric Keypad */}
+            <div className="grid grid-cols-4 gap-2 mb-3">
+              {['7', '8', '9', '10'].map(key => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    if (key === '10') {
+                      setCashPayment({ ...cashPayment, received: '10' });
+                    } else {
+                      const current = cashPayment.received === '0' ? '' : cashPayment.received;
+                      setCashPayment({ ...cashPayment, received: current + key });
+                    }
+                  }}
+                  className={`py-4 rounded-xl font-bold text-xl touch-manipulation ${
+                    key === '10' ? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800' : 'bg-gray-100 hover:bg-gray-200 active:bg-gray-300'
+                  }`}
+                >
+                  {key}
+                </button>
+              ))}
+              {['4', '5', '6', '20'].map(key => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    if (key === '20') {
+                      setCashPayment({ ...cashPayment, received: '20' });
+                    } else {
+                      const current = cashPayment.received === '0' ? '' : cashPayment.received;
+                      setCashPayment({ ...cashPayment, received: current + key });
+                    }
+                  }}
+                  className={`py-4 rounded-xl font-bold text-xl touch-manipulation ${
+                    key === '20' ? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800' : 'bg-gray-100 hover:bg-gray-200 active:bg-gray-300'
+                  }`}
+                >
+                  {key}
+                </button>
+              ))}
+              {['1', '2', '3', '50'].map(key => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    if (key === '50') {
+                      setCashPayment({ ...cashPayment, received: '50' });
+                    } else {
+                      const current = cashPayment.received === '0' ? '' : cashPayment.received;
+                      setCashPayment({ ...cashPayment, received: current + key });
+                    }
+                  }}
+                  className={`py-4 rounded-xl font-bold text-xl touch-manipulation ${
+                    key === '50' ? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800' : 'bg-gray-100 hover:bg-gray-200 active:bg-gray-300'
+                  }`}
+                >
+                  {key}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  const current = cashPayment.received === '0' ? '' : cashPayment.received;
+                  setCashPayment({ ...cashPayment, received: current + '0' });
+                }}
+                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
+              >
+                0
+              </button>
+              <button
+                onClick={() => {
+                  if (!cashPayment.received.includes('.')) {
+                    setCashPayment({ ...cashPayment, received: (cashPayment.received || '0') + '.' });
+                  }
+                }}
+                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
+              >
+                .
+              </button>
+              <button
+                onClick={() => {
+                  setCashPayment({ ...cashPayment, received: cashPayment.received.slice(0, -1) || '' });
+                }}
+                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-yellow-100 hover:bg-yellow-200 active:bg-yellow-300"
+              >
+                ←
+              </button>
+              <button
+                onClick={() => setCashPayment({ ...cashPayment, received: '100' })}
+                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800"
+              >
+                100
+              </button>
+            </div>
+
+            {/* Passend button */}
+            <button
+              onClick={() => setCashPayment({ ...cashPayment, received: cashPayment.total.toFixed(2) })}
+              className="w-full bg-gray-200 hover:bg-gray-300 active:bg-gray-400 py-3 rounded-xl font-medium mb-3 touch-manipulation"
+            >
+              Passend ({cashPayment.total.toFixed(2)})
+            </button>
+
+            <button
+              onClick={confirmCashPayment}
+              disabled={!cashPayment.received || parseFloat(cashPayment.received) < cashPayment.total}
+              className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white py-4 rounded-xl font-bold text-lg touch-manipulation disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              Bezahlung abschliessen
+            </button>
+
+            <button
+              onClick={() => setCashPayment(null)}
+              className="w-full mt-3 text-gray-500 hover:text-gray-700 py-2 text-sm"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -827,20 +1034,62 @@ function InventoryView({ items, onUpdate, token }: { items: Item[]; onUpdate: ()
   );
 }
 
-function HistoryView({ data, stats, onRefresh }: { data: any[]; stats: any; onRefresh: () => void }) {
+function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: any; onRefresh: () => void; token: string | null }) {
+  const [sendingReport, setSendingReport] = useState(false);
+
+  const sendReport = async () => {
+    if (!token) {
+      alert('Bitte einloggen um den Bericht zu senden');
+      return;
+    }
+
+    setSendingReport(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || '/api';
+      const res = await fetch(`${API_URL}/stats/send-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        alert(`Tagesbericht wurde an ${result.sentTo} gesendet!`);
+      } else {
+        alert(`Fehler: ${result.error || 'Unbekannter Fehler'}`);
+      }
+    } catch (error) {
+      console.error('Send report error:', error);
+      alert('Fehler beim Senden des Berichts');
+    } finally {
+      setSendingReport(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-2 sm:p-4">
       {/* Daily Stats */}
       {stats && (
         <div className="bg-white rounded-lg shadow p-4 sm:p-6 mb-4">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
             <h2 className="text-xl sm:text-2xl font-bold">Tagesstatistik ({stats.date})</h2>
-            <button
-              onClick={onRefresh}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-            >
-              Aktualisieren
-            </button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                onClick={sendReport}
+                disabled={sendingReport}
+                className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded disabled:bg-gray-400"
+              >
+                {sendingReport ? 'Sende...' : 'Per E-Mail senden'}
+              </button>
+              <button
+                onClick={onRefresh}
+                className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+              >
+                Aktualisieren
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -892,7 +1141,7 @@ function HistoryView({ data, stats, onRefresh }: { data: any[]; stats: any; onRe
         <h2 className="text-xl sm:text-2xl font-bold mb-4">Bestellhistorie</h2>
 
         <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <table className="w-full min-w-[600px]">
+          <table className="w-full min-w-[700px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 py-2 text-left text-sm">#</th>
@@ -900,6 +1149,7 @@ function HistoryView({ data, stats, onRefresh }: { data: any[]; stats: any; onRe
                 <th className="px-3 py-2 text-left text-sm">Zeit</th>
                 <th className="px-3 py-2 text-left text-sm">Artikel</th>
                 <th className="px-3 py-2 text-left text-sm">Total</th>
+                <th className="px-3 py-2 text-left text-sm">Zahlung</th>
                 <th className="px-3 py-2 text-left text-sm">Status</th>
               </tr>
             </thead>
@@ -920,6 +1170,20 @@ function HistoryView({ data, stats, onRefresh }: { data: any[]; stats: any; onRe
                   </td>
                   <td className="px-3 py-2 text-sm font-semibold">
                     CHF {parseFloat(order.total).toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2 text-sm">
+                    {order.payment_method ? (
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        order.payment_method === 'cash' ? 'bg-green-100 text-green-800' :
+                        order.payment_method === 'sumup' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.payment_method === 'cash' ? 'Bar' :
+                         order.payment_method === 'sumup' ? 'SumUp' : order.payment_method}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 text-sm">
                     <span className={`px-2 py-1 rounded text-xs ${
