@@ -1,3 +1,10 @@
+# [1.55.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.54.0...v1.55.0) (2026-01-24)
+
+
+### Features
+
+* **members:** auto-sync cloud permissions based on functions ([757af29](https://github.com/Feuerwehrverein-Raura/Homepage/commit/757af292e8f1fadd0bd8eaee5c97f78549de00ed))
+
 # [1.54.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.53.0...v1.54.0) (2026-01-24)
 
 
