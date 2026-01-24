@@ -1,3 +1,10 @@
+# [1.50.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.49.0...v1.50.0) (2026-01-24)
+
+
+### Features
+
+* **inventory:** add inline category/location creation and sellable options ([57ee3b4](https://github.com/Feuerwehrverein-Raura/Homepage/commit/57ee3b429d2f6e6476114819e51f706ffc65fbda))
+
 # [1.49.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.48.0...v1.49.0) (2026-01-24)
 
 
