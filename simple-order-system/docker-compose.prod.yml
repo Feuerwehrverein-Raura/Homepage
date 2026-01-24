@@ -41,6 +41,11 @@ services:
       SUMUP_MERCHANT_CODE: ${SUMUP_MERCHANT_CODE:-}
       # Email
       EMAIL_API_URL: https://www.fwv-raura.ch/api/email/send
+      # Printers (Epson TM-T20III via Ethernet)
+      PRINTER_BAR_IP: ${PRINTER_BAR_IP:-}
+      PRINTER_BAR_PORT: ${PRINTER_BAR_PORT:-9100}
+      PRINTER_KITCHEN_IP: ${PRINTER_KITCHEN_IP:-}
+      PRINTER_KITCHEN_PORT: ${PRINTER_KITCHEN_PORT:-9100}
     depends_on:
       order-postgres:
         condition: service_healthy

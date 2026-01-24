@@ -92,7 +92,30 @@ async function initDB() {
     )
   `);
 
+  // Settings table for printer configuration etc.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key VARCHAR(100) PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   console.log('Database initialized');
+}
+
+// Get setting from database
+async function getSetting(key: string): Promise<string | null> {
+  const result = await pool.query('SELECT value FROM settings WHERE key = $1', [key]);
+  return result.rows[0]?.value || null;
+}
+
+// Set setting in database
+async function setSetting(key: string, value: string): Promise<void> {
+  await pool.query(`
+    INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
+    ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()
+  `, [key, value]);
 }
 
 // WebSocket broadcast
@@ -543,9 +566,152 @@ Feuerwehrverein Raura - Kassensystem
   }
 });
 
+// Settings API endpoints
+app.get('/api/settings', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query('SELECT key, value FROM settings');
+    const settings: { [key: string]: string } = {};
+    result.rows.forEach(row => {
+      settings[row.key] = row.value;
+    });
+    res.json(settings);
+  } catch (error) {
+    console.error('Get settings error:', error);
+    res.status(500).json({ error: 'Fehler beim Laden der Einstellungen' });
+  }
+});
+
+app.put('/api/settings', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const settings = req.body;
+
+    for (const [key, value] of Object.entries(settings)) {
+      await setSetting(key, String(value));
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Save settings error:', error);
+    res.status(500).json({ error: 'Fehler beim Speichern der Einstellungen' });
+  }
+});
+
+// Test printer connection
+app.post('/api/settings/test-printer', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { station, ip, port } = req.body;
+
+    if (!ip) {
+      return res.status(400).json({ error: 'IP-Adresse erforderlich' });
+    }
+
+    const printerConfig = { ip, port: parseInt(port) || 9100 };
+
+    // Try to print a test receipt
+    await printToNetworkPrinter(printerConfig, station || 'test', 0, 0, [
+      { quantity: 1, item_name: 'DRUCKER TEST', notes: 'Verbindung erfolgreich!' }
+    ]);
+
+    res.json({ success: true, message: `Testdruck an ${ip} gesendet` });
+  } catch (error: any) {
+    console.error('Test printer error:', error);
+    res.status(500).json({ error: `Drucker nicht erreichbar: ${error.message}` });
+  }
+});
+
+// Get printer configuration (from database first, fallback to env vars)
+async function getPrinterConfig(): Promise<{ [key: string]: { ip: string; port: number } | null }> {
+  const barIp = await getSetting('printer_bar_ip') || process.env.PRINTER_BAR_IP;
+  const barPort = await getSetting('printer_bar_port') || process.env.PRINTER_BAR_PORT || '9100';
+  const kitchenIp = await getSetting('printer_kitchen_ip') || process.env.PRINTER_KITCHEN_IP;
+  const kitchenPort = await getSetting('printer_kitchen_port') || process.env.PRINTER_KITCHEN_PORT || '9100';
+
+  return {
+    bar: barIp ? { ip: barIp, port: parseInt(barPort) } : null,
+    kitchen: kitchenIp ? { ip: kitchenIp, port: parseInt(kitchenPort) } : null
+  };
+}
+
+// Import escpos for network printing
+import escpos from 'escpos';
+import Network from 'escpos-network';
+
+// Print to a specific network printer
+async function printToNetworkPrinter(
+  printerConfig: { ip: string; port: number },
+  station: string,
+  orderId: number,
+  tableNumber: number,
+  items: any[]
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const device = new Network(printerConfig.ip, printerConfig.port);
+    const printer = new escpos.Printer(device);
+
+    device.open((err: any) => {
+      if (err) {
+        console.error(`Printer ${station} (${printerConfig.ip}) connection error:`, err);
+        reject(err);
+        return;
+      }
+
+      try {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = now.toLocaleDateString('de-CH');
+
+        printer
+          .font('a')
+          .align('ct')
+          .style('b')
+          .size(2, 2)
+          .text(`TISCH ${tableNumber}`)
+          .size(1, 1)
+          .text('')
+          .align('lt')
+          .style('normal')
+          .text(`Bestellung: #${orderId}`)
+          .text(`Zeit: ${dateStr} ${timeStr}`)
+          .text(`Station: ${station.toUpperCase()}`)
+          .text('--------------------------------')
+          .style('b');
+
+        // Print each item
+        items.forEach((item: any) => {
+          printer.text(`${item.quantity}x ${item.item_name}`);
+          if (item.notes) {
+            printer.style('normal').text(`   -> ${item.notes}`).style('b');
+          }
+        });
+
+        printer
+          .text('--------------------------------')
+          .text('')
+          .align('ct')
+          .size(2, 2)
+          .text(`TISCH ${tableNumber}`)
+          .size(1, 1)
+          .text('')
+          .cut()
+          .close(() => {
+            console.log(`Printed to ${station} printer (${printerConfig.ip})`);
+            resolve();
+          });
+      } catch (printError) {
+        console.error('Print formatting error:', printError);
+        device.close(() => {});
+        reject(printError);
+      }
+    });
+  });
+}
+
 // Printer function (ESC/POS)
 async function printReceipt(orderId: number, tableNumber: number, items: any[]) {
   try {
+    // Get printer configuration from database
+    const printerConfigs = await getPrinterConfig();
+
     // Group items by printer station
     const stations = items.reduce((acc: any, item: any) => {
       const station = item.printer_station || 'bar';
@@ -555,30 +721,34 @@ async function printReceipt(orderId: number, tableNumber: number, items: any[]) 
     }, {});
 
     // For each station, print a receipt
-    // Note: This is a simplified version. You'll need to configure actual printers
     for (const [station, stationItems] of Object.entries(stations)) {
-      console.log(`\n=== PRINT TO ${station.toUpperCase()} ===`);
-      console.log(`Table: ${tableNumber}`);
-      console.log(`Order: #${orderId}`);
-      console.log(`Time: ${new Date().toLocaleTimeString()}`);
-      console.log('---');
-      
-      (stationItems as any[]).forEach((item: any) => {
-        console.log(`${item.quantity}x ${item.item_name}`);
-        if (item.notes) console.log(`   Note: ${item.notes}`);
-      });
-      
-      console.log('===========================\n');
+      const printerConfig = printerConfigs[station];
+
+      if (printerConfig) {
+        // Print to network printer
+        try {
+          await printToNetworkPrinter(printerConfig, station, orderId, tableNumber, stationItems as any[]);
+        } catch (printErr) {
+          console.error(`Failed to print to ${station}:`, printErr);
+          // Continue with other stations even if one fails
+        }
+      } else {
+        // Fallback: Log to console if no printer configured
+        console.log(`\n=== PRINT TO ${station.toUpperCase()} (No printer configured) ===`);
+        console.log(`Table: ${tableNumber}`);
+        console.log(`Order: #${orderId}`);
+        console.log(`Time: ${new Date().toLocaleTimeString()}`);
+        console.log('---');
+
+        (stationItems as any[]).forEach((item: any) => {
+          console.log(`${item.quantity}x ${item.item_name}`);
+          if (item.notes) console.log(`   Note: ${item.notes}`);
+        });
+
+        console.log('===========================\n');
+      }
     }
-    
-    // TODO: Integrate actual ESC/POS printer
-    // Example with escpos library:
-    // const device = new escpos.USB();
-    // const printer = new escpos.Printer(device);
-    // device.open(() => {
-    //   printer.text(`Table: ${tableNumber}`)...
-    // });
-    
+
   } catch (error) {
     console.error('Print error:', error);
     throw error;

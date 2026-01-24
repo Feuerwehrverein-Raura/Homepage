@@ -50,7 +50,7 @@ function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState<string>('');
-  const [view, setView] = useState<'order' | 'inventory' | 'history'>('order');
+  const [view, setView] = useState<'order' | 'inventory' | 'history' | 'settings'>('order');
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
   const [user, setUser] = useState<User | null>(null);
@@ -488,13 +488,23 @@ function App() {
                 >
                   📊 History
                 </button>
+                <button
+                  onClick={() => setView('settings')}
+                  className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                    view === 'settings' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+                  }`}
+                >
+                  ⚙️ Einstellungen
+                </button>
               </>
             )}
           </div>
         </div>
       </div>
 
-      {showHistoryView ? (
+      {view === 'settings' && user ? (
+        <SettingsView token={token} />
+      ) : showHistoryView ? (
         <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token} />
       ) : showInventoryView ? (
         <InventoryView items={items} onUpdate={fetchItems} token={token} />
@@ -1206,6 +1216,210 @@ function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: an
             Keine Bestellungen vorhanden.
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function SettingsView({ token }: { token: string | null }) {
+  const [settings, setSettings] = useState({
+    printer_bar_ip: '',
+    printer_bar_port: '9100',
+    printer_kitchen_ip: '',
+    printer_kitchen_port: '9100',
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null);
+
+  const API_URL = import.meta.env.VITE_API_URL || '/api';
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSettings(prev => ({
+          ...prev,
+          ...data
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSettings = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/settings`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(settings),
+      });
+
+      if (res.ok) {
+        alert('Einstellungen gespeichert!');
+      } else {
+        alert('Fehler beim Speichern');
+      }
+    } catch (error) {
+      alert('Fehler beim Speichern');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testPrinter = async (station: 'bar' | 'kitchen') => {
+    const ip = station === 'bar' ? settings.printer_bar_ip : settings.printer_kitchen_ip;
+    const port = station === 'bar' ? settings.printer_bar_port : settings.printer_kitchen_port;
+
+    if (!ip) {
+      alert('Bitte IP-Adresse eingeben');
+      return;
+    }
+
+    setTesting(station);
+    try {
+      const res = await fetch(`${API_URL}/settings/test-printer`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ station, ip, port }),
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        alert(`Testdruck erfolgreich an ${ip} gesendet`);
+      } else {
+        alert(`Fehler: ${result.error}`);
+      }
+    } catch (error) {
+      alert('Verbindung zum Server fehlgeschlagen');
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-center text-gray-500">Lade Einstellungen...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <h2 className="text-xl sm:text-2xl font-bold mb-6">Einstellungen</h2>
+
+        {/* Printer Settings */}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            🖨️ Bondrucker (Epson TM-T20III)
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Bar Printer */}
+            <div className="border rounded-lg p-4">
+              <h4 className="font-semibold mb-3">Bar / Getränke</h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">IP-Adresse</label>
+                  <input
+                    type="text"
+                    placeholder="z.B. 192.168.1.100"
+                    value={settings.printer_bar_ip}
+                    onChange={(e) => setSettings({ ...settings, printer_bar_ip: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Port</label>
+                  <input
+                    type="text"
+                    placeholder="9100"
+                    value={settings.printer_bar_port}
+                    onChange={(e) => setSettings({ ...settings, printer_bar_port: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={() => testPrinter('bar')}
+                  disabled={testing === 'bar' || !settings.printer_bar_ip}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg disabled:bg-gray-400"
+                >
+                  {testing === 'bar' ? 'Teste...' : 'Testdruck'}
+                </button>
+              </div>
+            </div>
+
+            {/* Kitchen Printer */}
+            <div className="border rounded-lg p-4">
+              <h4 className="font-semibold mb-3">Küche / Essen</h4>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">IP-Adresse</label>
+                  <input
+                    type="text"
+                    placeholder="z.B. 192.168.1.101"
+                    value={settings.printer_kitchen_ip}
+                    onChange={(e) => setSettings({ ...settings, printer_kitchen_ip: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Port</label>
+                  <input
+                    type="text"
+                    placeholder="9100"
+                    value={settings.printer_kitchen_port}
+                    onChange={(e) => setSettings({ ...settings, printer_kitchen_port: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={() => testPrinter('kitchen')}
+                  disabled={testing === 'kitchen' || !settings.printer_kitchen_ip}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg disabled:bg-gray-400"
+                >
+                  {testing === 'kitchen' ? 'Teste...' : 'Testdruck'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <p><strong>Hinweis:</strong> Die Epson TM-T20III Drucker müssen im selben Netzwerk sein und auf Port 9100 (Standard) erreichbar sein.</p>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="border-t pt-4">
+          <button
+            onClick={saveSettings}
+            disabled={saving}
+            className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold disabled:bg-gray-400"
+          >
+            {saving ? 'Speichere...' : 'Einstellungen speichern'}
+          </button>
+        </div>
       </div>
     </div>
   );

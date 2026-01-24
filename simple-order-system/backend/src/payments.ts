@@ -260,95 +260,62 @@ export class SumUpPayment {
 
 /**
  * RaiseNow Payment Integration
- * For TWINT payments via QR codes and PayLinks
+ * For TWINT payments via PayLinks with URL parameters (no API key needed)
  */
 export class RaiseNowPayment {
-  private apiKey: string;
-  private apiSecret: string;
-  private baseUrl: string;
+  private paylinkBase: string;
   private webhookSecret: string;
 
   constructor() {
-    this.apiKey = process.env.RAISENOW_API_KEY || '';
-    this.apiSecret = process.env.RAISENOW_API_SECRET || '';
-    this.baseUrl = process.env.RAISENOW_BASE_URL || 'https://api.raisenow.com/v1';
+    // Use PayLink base URL - no API credentials needed!
+    // Example: https://pay.raisenow.io/bddht
+    this.paylinkBase = process.env.RAISENOW_PAYLINK_BASE || '';
     this.webhookSecret = process.env.RAISENOW_WEBHOOK_SECRET || '';
   }
 
   /**
-   * Create a PayLink for TWINT payment
+   * Create a PayLink URL for TWINT payment using URL parameters
+   * No API credentials needed - just the base PayLink URL
    */
   async createPayLink(payment: PaymentRequest): Promise<RaiseNowPayLink> {
-    try {
-      const response = await fetch(`${this.baseUrl}/paylinks`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${this.apiKey}:${this.apiSecret}`).toString('base64')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: Math.round(payment.amount * 100), // Convert to cents
-          currency: payment.currency,
-          purpose: payment.description,
-          reference: payment.orderId,
-          payment_methods: ['twint'],
-          success_url: `${process.env.APP_URL}/payment/success?order=${payment.orderId}`,
-          cancel_url: `${process.env.APP_URL}/payment/cancel`,
-          stored_customer_firstname: 'Gast',
-          stored_customer_lastname: `Tisch ${payment.tableNumber}`,
-          stored_customer_email: payment.customerEmail || 'gast@fwv-raura.ch',
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`RaiseNow API error: ${response.statusText} - ${error}`);
-      }
-
-      const data = await response.json() as { paylink_url: string; qr_code_url: string; reference: string };
-      return {
-        paylink_url: data.paylink_url,
-        qr_code_url: data.qr_code_url,
-        reference: data.reference,
-      };
-    } catch (error) {
-      console.error('RaiseNow createPayLink error:', error);
-      throw error;
+    if (!this.paylinkBase) {
+      throw new Error('RAISENOW_PAYLINK_BASE not configured. Set it to your PayLink URL (e.g., https://pay.raisenow.io/xxxxx)');
     }
+
+    // Amount in Rappen (cents)
+    const amountInCents = Math.round(payment.amount * 100);
+
+    // Build PayLink URL with parameters
+    // Documentation: https://support.raisenow.com/hc/en-us/articles/4416934103953
+    const params = new URLSearchParams({
+      'rnw-amount': amountInCents.toString(),
+      'rnw-payment_method': 'twint',
+      'rnw-stored_customer_firstname': 'Gast',
+      'rnw-stored_customer_lastname': `Tisch ${payment.tableNumber}`,
+      'rnw-stored_customer_message': payment.description,
+      'rnw-stored_campaign_id': payment.orderId,
+    });
+
+    const paylinkUrl = `${this.paylinkBase}?${params.toString()}`;
+
+    // Generate QR code URL using free QR code API
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(paylinkUrl)}`;
+
+    console.log(`✅ TWINT PayLink created: ${paylinkUrl}`);
+
+    return {
+      paylink_url: paylinkUrl,
+      qr_code_url: qrCodeUrl,
+      reference: payment.orderId,
+    };
   }
 
   /**
-   * Create a TWINT QR code with fixed amount
+   * Create a TWINT QR code - uses PayLink approach
    */
   async createTwintQR(payment: PaymentRequest): Promise<string> {
-    try {
-      // RaiseNow TWINT QR format
-      const qrPayload = {
-        touchpoint_id: process.env.RAISENOW_TOUCHPOINT_ID || '',
-        amount: Math.round(payment.amount * 100),
-        purpose: payment.description,
-        reference: payment.orderId,
-      };
-
-      const response = await fetch(`${this.baseUrl}/twint/qr`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${this.apiKey}:${this.apiSecret}`).toString('base64')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(qrPayload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`RaiseNow API error: ${response.statusText}`);
-      }
-
-      const data = await response.json() as { qr_code_data: string };
-      return data.qr_code_data; // Base64 or URL
-    } catch (error) {
-      console.error('RaiseNow createTwintQR error:', error);
-      throw error;
-    }
+    const paylink = await this.createPayLink(payment);
+    return paylink.qr_code_url;
   }
 
   /**
