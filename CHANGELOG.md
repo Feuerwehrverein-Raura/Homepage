@@ -1,3 +1,10 @@
+## [1.46.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.1...v1.46.2) (2026-01-24)
+
+
+### Bug Fixes
+
+* **order:** improve mobile UI and add HS256 token verification ([4655994](https://github.com/Feuerwehrverein-Raura/Homepage/commit/46559942e0029038eb2aa53cc8d78d0318aeeaf8))
+
 ## [1.46.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.0...v1.46.1) (2026-01-23)
 
 
