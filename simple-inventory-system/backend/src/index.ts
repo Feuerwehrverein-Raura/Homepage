@@ -373,6 +373,122 @@ app.get('/api/barcode/lookup/:code', async (req, res) => {
   }
 });
 
+// ========================================
+// SELLABLE ITEMS (für Kasse-Integration)
+// ========================================
+
+// Get all sellable items for the POS system
+app.get('/api/items/sellable', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        i.id,
+        i.name,
+        i.sale_price as price,
+        i.sale_category as category,
+        i.printer_station,
+        i.quantity as stock,
+        i.custom_barcode,
+        i.ean_code,
+        c.name as inventory_category
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      WHERE i.sellable = true AND i.active = true AND i.quantity > 0
+      ORDER BY i.sale_category, i.name
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Reduce stock when items are sold (called by order system)
+const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
+
+function authenticateOrderSystem(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const apiKey = req.headers['x-order-api-key'];
+  if (apiKey !== ORDER_API_KEY) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+  next();
+}
+
+app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { items, order_id, order_source } = req.body;
+    // items: [{ id: number, quantity: number }]
+
+    const results = [];
+
+    for (const item of items) {
+      // Get current stock
+      const stockResult = await client.query(
+        'SELECT id, name, quantity FROM items WHERE id = $1 AND active = true',
+        [item.id]
+      );
+
+      if (stockResult.rows.length === 0) {
+        throw new Error(`Item ${item.id} not found`);
+      }
+
+      const currentItem = stockResult.rows[0];
+      const newQuantity = currentItem.quantity - item.quantity;
+
+      if (newQuantity < 0) {
+        throw new Error(`Insufficient stock for ${currentItem.name}`);
+      }
+
+      // Update stock
+      await client.query(
+        'UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [newQuantity, item.id]
+      );
+
+      // Log transaction
+      await client.query(`
+        INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
+        VALUES ($1, 'out', $2, $3, $4, $5, $6)
+      `, [
+        item.id,
+        item.quantity,
+        currentItem.quantity,
+        newQuantity,
+        `Verkauf - Bestellung #${order_id} (${order_source || 'kasse'})`,
+        'kasse@fwv-raura.ch'
+      ]);
+
+      results.push({
+        id: item.id,
+        name: currentItem.name,
+        sold: item.quantity,
+        remaining: newQuantity
+      });
+    }
+
+    await client.query('COMMIT');
+
+    // Broadcast stock updates
+    for (const result of results) {
+      broadcast({ type: 'stock_updated', item_id: result.id, new_quantity: result.remaining });
+    }
+
+    res.json({ success: true, results });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Sell error:', error);
+    res.status(400).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ========================================
+// INDIVIDUAL ITEMS
+// ========================================
+
 app.get('/api/items/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -504,118 +620,6 @@ app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
-  }
-});
-
-// ========================================
-// SELLABLE ITEMS (für Kasse-Integration)
-// ========================================
-
-// Get all sellable items for the POS system
-app.get('/api/items/sellable', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        i.id,
-        i.name,
-        i.sale_price as price,
-        i.sale_category as category,
-        i.printer_station,
-        i.quantity as stock,
-        i.custom_barcode,
-        i.ean_code,
-        c.name as inventory_category
-      FROM items i
-      LEFT JOIN categories c ON i.category_id = c.id
-      WHERE i.sellable = true AND i.active = true AND i.quantity > 0
-      ORDER BY i.sale_category, i.name
-    `);
-    res.json(result.rows);
-  } catch (error) {
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-// Reduce stock when items are sold (called by order system)
-const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
-
-function authenticateOrderSystem(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const apiKey = req.headers['x-order-api-key'];
-  if (apiKey !== ORDER_API_KEY) {
-    return res.status(401).json({ error: 'Invalid API key' });
-  }
-  next();
-}
-
-app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const { items, order_id, order_source } = req.body;
-    // items: [{ id: number, quantity: number }]
-
-    const results = [];
-
-    for (const item of items) {
-      // Get current stock
-      const stockResult = await client.query(
-        'SELECT id, name, quantity FROM items WHERE id = $1 AND active = true',
-        [item.id]
-      );
-
-      if (stockResult.rows.length === 0) {
-        throw new Error(`Item ${item.id} not found`);
-      }
-
-      const currentItem = stockResult.rows[0];
-      const newQuantity = currentItem.quantity - item.quantity;
-
-      if (newQuantity < 0) {
-        throw new Error(`Insufficient stock for ${currentItem.name}`);
-      }
-
-      // Update stock
-      await client.query(
-        'UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [newQuantity, item.id]
-      );
-
-      // Log transaction
-      await client.query(`
-        INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
-        VALUES ($1, 'out', $2, $3, $4, $5, $6)
-      `, [
-        item.id,
-        item.quantity,
-        currentItem.quantity,
-        newQuantity,
-        `Verkauf - Bestellung #${order_id} (${order_source || 'kasse'})`,
-        'kasse@fwv-raura.ch'
-      ]);
-
-      results.push({
-        id: item.id,
-        name: currentItem.name,
-        sold: item.quantity,
-        remaining: newQuantity
-      });
-    }
-
-    await client.query('COMMIT');
-
-    // Broadcast stock updates
-    for (const result of results) {
-      broadcast({ type: 'stock_updated', item_id: result.id, new_quantity: result.remaining });
-    }
-
-    res.json({ success: true, results });
-  } catch (error: any) {
-    await client.query('ROLLBACK');
-    console.error('Sell error:', error);
-    res.status(400).json({ error: error.message });
-  } finally {
-    client.release();
   }
 });
 
