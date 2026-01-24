@@ -1,3 +1,10 @@
+# [1.47.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.4...v1.47.0) (2026-01-24)
+
+
+### Features
+
+* **inventory:** add EAN barcode lookup from external databases ([a3f875b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a3f875b76d27233896cc62e77c5048feafbea235))
+
 ## [1.46.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.3...v1.46.4) (2026-01-24)
 
 
