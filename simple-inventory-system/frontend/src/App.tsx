@@ -591,7 +591,7 @@ function App() {
 
         {/* Reports Tab */}
         {tab === 'reports' && (
-          <ReportsView items={items} />
+          <ReportsView items={items} onRefresh={fetchItems} />
         )}
       </main>
 
@@ -750,21 +750,18 @@ function AddItemForm({ categories, locations, token, onSuccess }: {
 }
 
 // Reports View Component
-function ReportsView({ items }: { items: Item[] }) {
+function ReportsView({ items, onRefresh }: { items: Item[]; onRefresh: () => void }) {
   const [loading, setLoading] = useState(false);
 
-  const refreshData = () => {
+  const handleRefresh = () => {
     setLoading(true);
+    onRefresh();
     setTimeout(() => setLoading(false), 500);
   };
 
   const downloadCSV = () => {
     window.open(`${API_URL}/reports/inventory-list?format=csv`, '_blank');
   };
-
-  useEffect(() => {
-    fetchInventoryReport();
-  }, []);
 
   // Calculate summary from local items
   const totalItems = items.length;
@@ -813,7 +810,7 @@ function ReportsView({ items }: { items: Item[] }) {
             🖨️ Drucken
           </button>
           <button
-            onClick={fetchInventoryReport}
+            onClick={handleRefresh}
             disabled={loading}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2"
           >
