@@ -191,7 +191,11 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/items`);
       const data = await res.json();
-      setItems(data);
+      // Parse price as float since API returns it as string
+      setItems(data.map((item: any) => ({
+        ...item,
+        price: parseFloat(item.price) || 0
+      })));
     } catch (error) {
       console.error('Failed to fetch items:', error);
     }
