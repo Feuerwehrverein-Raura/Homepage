@@ -1645,7 +1645,15 @@
             <div class="p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h3 id="event-reg-modal-title" class="text-2xl font-bold text-gray-800">Anmeldungen verwalten</h3>
-                    <button onclick="closeEventRegistrationsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    <div class="flex items-center gap-3">
+                        <button onclick="downloadTeilnehmerliste()" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            PDF
+                        </button>
+                        <button onclick="closeEventRegistrationsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
                 </div>
                 <div id="event-reg-content">
                     <!-- Content will be loaded dynamically -->
@@ -3217,16 +3225,59 @@ ${grussformel}`;
         async function downloadTeilnehmerliste() {
             try {
                 const event = currentEventForRegistrations;
-                if (!event || !event.directRegistrations) {
-                    alert('Keine Teilnehmerdaten vorhanden');
+                if (!event) {
+                    alert('Keine Eventdaten vorhanden');
                     return;
                 }
 
-                const direct = event.directRegistrations;
-                const participants = [
-                    ...(direct.pending || []).map(r => ({...r, status: 'pending'})),
-                    ...(direct.approved || []).map(r => ({...r, status: 'approved'}))
-                ];
+                // Collect all participants: direct registrations + shift registrations
+                const participants = [];
+                const shifts = [];
+
+                // Shift registrations
+                if (event.shifts && event.shifts.length > 0) {
+                    for (const shift of event.shifts) {
+                        const regs = shift.registrations || { pending: [], approved: [] };
+                        const shiftParticipants = [
+                            ...(regs.pending || []).map(r => ({...r, status: 'pending', shiftId: shift.id})),
+                            ...(regs.approved || []).map(r => ({...r, status: 'approved', shiftId: shift.id}))
+                        ];
+
+                        if (shiftParticipants.length > 0) {
+                            shifts.push({
+                                id: shift.id,
+                                name: shift.name,
+                                bereich: shift.bereich || '',
+                                date: shift.date,
+                                startTime: shift.start_time,
+                                endTime: shift.end_time,
+                                participants: shiftParticipants
+                            });
+                            participants.push(...shiftParticipants);
+                        }
+                    }
+                }
+
+                // Direct registrations (without shifts)
+                if (event.directRegistrations) {
+                    const direct = event.directRegistrations;
+                    const directParticipants = [
+                        ...(direct.pending || []).map(r => ({...r, status: 'pending', shiftId: null})),
+                        ...(direct.approved || []).map(r => ({...r, status: 'approved', shiftId: null}))
+                    ];
+                    if (directParticipants.length > 0) {
+                        shifts.push({
+                            id: null,
+                            name: 'Teilnehmer (ohne Schicht)',
+                            bereich: '',
+                            date: null,
+                            startTime: null,
+                            endTime: null,
+                            participants: directParticipants
+                        });
+                        participants.push(...directParticipants);
+                    }
+                }
 
                 if (participants.length === 0) {
                     alert('Keine Teilnehmer zum Exportieren');
@@ -3241,7 +3292,8 @@ ${grussformel}`;
                     body: JSON.stringify({
                         eventId: event.id,
                         eventTitle: event.title,
-                        participants: participants
+                        participants: participants,
+                        shifts: shifts
                     })
                 });
 

@@ -2040,9 +2040,9 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
 
 app.post('/teilnehmerliste/pdf', async (req, res) => {
     try {
-        const { eventId, eventTitle, participants } = req.body;
+        const { eventId, eventTitle, participants, shifts } = req.body;
 
-        if (!eventId || !participants || participants.length === 0) {
+        if (!eventId || (!participants || participants.length === 0)) {
             return res.status(400).json({ error: 'eventId and participants are required' });
         }
 
@@ -2074,83 +2074,179 @@ app.post('/teilnehmerliste/pdf', async (req, res) => {
         doc.fillColor('#000000');
         doc.moveDown(1.5);
 
-        // Table header
-        const tableTop = doc.y;
-        const col1 = 50;  // Nr.
-        const col2 = 80;  // Name
-        const col3 = 280; // E-Mail
-        const col4 = 420; // Status
+        // Check if we have shifts data - if so, render by shift
+        if (shifts && shifts.length > 0) {
+            // Render participants grouped by shift
+            for (const shift of shifts) {
+                const shiftParticipants = shift.participants || [];
+                if (shiftParticipants.length === 0) continue;
 
-        doc.fontSize(10).font('Helvetica-Bold');
-        doc.text('Nr.', col1, tableTop);
-        doc.text('Name', col2, tableTop);
-        doc.text('E-Mail', col3, tableTop);
-        doc.text('Status', col4, tableTop);
+                // Check for page break before shift header
+                if (doc.y > 680) {
+                    doc.addPage();
+                }
 
-        // Line under header
-        doc.moveTo(col1, tableTop + 15).lineTo(550, tableTop + 15).stroke();
-        doc.moveDown(1);
+                // Shift header
+                doc.fontSize(12).font('Helvetica-Bold').fillColor('#1f2937');
+                let shiftTitle = shift.name;
+                if (shift.bereich) {
+                    shiftTitle = `${shift.bereich} - ${shift.name}`;
+                }
+                if (shift.date) {
+                    shiftTitle += `: ${shift.date}`;
+                    if (shift.startTime && shift.endTime) {
+                        shiftTitle += ` ${shift.startTime}-${shift.endTime}`;
+                    }
+                }
+                doc.text(shiftTitle);
+                doc.fillColor('#000000');
+                doc.moveDown(0.3);
 
-        // Table rows
-        let rowY = tableTop + 25;
-        doc.font('Helvetica').fontSize(10);
+                // Table header
+                const tableTop = doc.y;
+                const col1 = 50;  // Nr.
+                const col2 = 80;  // Name
+                const col3 = 280; // E-Mail
+                const col4 = 420; // Status
 
-        participants.forEach((p, index) => {
-            // Check for page break
-            if (rowY > 750) {
-                doc.addPage();
-                rowY = 50;
+                doc.fontSize(9).font('Helvetica-Bold').fillColor('#4b5563');
+                doc.text('Nr.', col1, tableTop);
+                doc.text('Name', col2, tableTop);
+                doc.text('E-Mail', col3, tableTop);
+                doc.text('Status', col4, tableTop);
+                doc.fillColor('#000000');
 
-                // Repeat header on new page
-                doc.fontSize(10).font('Helvetica-Bold');
-                doc.text('Nr.', col1, rowY);
-                doc.text('Name', col2, rowY);
-                doc.text('E-Mail', col3, rowY);
-                doc.text('Status', col4, rowY);
-                doc.moveTo(col1, rowY + 15).lineTo(550, rowY + 15).stroke();
-                rowY += 25;
-                doc.font('Helvetica').fontSize(10);
+                // Line under header
+                doc.moveTo(col1, tableTop + 12).lineTo(545, tableTop + 12).strokeColor('#d1d5db').stroke();
+                doc.strokeColor('#000000');
+
+                // Table rows
+                let rowY = tableTop + 18;
+                doc.font('Helvetica').fontSize(9);
+
+                shiftParticipants.forEach((p, index) => {
+                    // Check for page break
+                    if (rowY > 750) {
+                        doc.addPage();
+                        rowY = 50;
+
+                        // Continue shift title on new page
+                        doc.fontSize(10).font('Helvetica-Bold').fillColor('#6b7280');
+                        doc.text(`${shiftTitle} (Fortsetzung)`, col1, rowY);
+                        doc.fillColor('#000000');
+                        rowY += 20;
+
+                        // Repeat table header
+                        doc.fontSize(9).font('Helvetica-Bold').fillColor('#4b5563');
+                        doc.text('Nr.', col1, rowY);
+                        doc.text('Name', col2, rowY);
+                        doc.text('E-Mail', col3, rowY);
+                        doc.text('Status', col4, rowY);
+                        doc.fillColor('#000000');
+                        doc.moveTo(col1, rowY + 12).lineTo(545, rowY + 12).strokeColor('#d1d5db').stroke();
+                        doc.strokeColor('#000000');
+                        rowY += 18;
+                        doc.font('Helvetica').fontSize(9);
+                    }
+
+                    doc.fillColor('#374151').text(`${index + 1}.`, col1, rowY);
+                    doc.text(p.name || '-', col2, rowY, { width: 190 });
+                    doc.text(p.email || '-', col3, rowY, { width: 130 });
+
+                    // Status with color
+                    const statusText = p.status === 'approved' ? 'Bestätigt' :
+                                      p.status === 'pending' ? 'Ausstehend' :
+                                      p.status === 'rejected' ? 'Abgelehnt' : p.status;
+                    const statusColor = p.status === 'approved' ? '#22c55e' :
+                                       p.status === 'pending' ? '#f59e0b' :
+                                       p.status === 'rejected' ? '#ef4444' : '#666666';
+                    doc.fillColor(statusColor).text(statusText, col4, rowY);
+                    doc.fillColor('#000000');
+
+                    // Add notes if available
+                    if (p.notes) {
+                        rowY += 12;
+                        doc.fontSize(8).fillColor('#6b7280')
+                            .text(`Bemerkungen: ${p.notes}`, col2, rowY, { width: 400 });
+                        doc.fillColor('#000000').fontSize(9);
+                    }
+
+                    rowY += 16;
+                });
+
+                doc.y = rowY + 10;
+                doc.moveDown(0.5);
             }
+        } else {
+            // No shifts data - render simple flat list (backwards compatible)
+            const tableTop = doc.y;
+            const col1 = 50;
+            const col2 = 80;
+            const col3 = 280;
+            const col4 = 420;
 
-            doc.text(`${index + 1}.`, col1, rowY);
-            doc.text(p.name || '-', col2, rowY, { width: 190 });
-            doc.text(p.email || '-', col3, rowY, { width: 130 });
+            doc.fontSize(10).font('Helvetica-Bold');
+            doc.text('Nr.', col1, tableTop);
+            doc.text('Name', col2, tableTop);
+            doc.text('E-Mail', col3, tableTop);
+            doc.text('Status', col4, tableTop);
 
-            // Status with color
-            const statusText = p.status === 'approved' ? 'Bestätigt' :
-                              p.status === 'pending' ? 'Ausstehend' :
-                              p.status === 'rejected' ? 'Abgelehnt' : p.status;
-            const statusColor = p.status === 'approved' ? '#22c55e' :
-                               p.status === 'pending' ? '#f59e0b' :
-                               p.status === 'rejected' ? '#ef4444' : '#666666';
-            doc.fillColor(statusColor).text(statusText, col4, rowY);
-            doc.fillColor('#000000');
+            doc.moveTo(col1, tableTop + 15).lineTo(550, tableTop + 15).stroke();
 
-            // Add notes if available
-            if (p.notes) {
-                rowY += 15;
-                doc.fontSize(8).fillColor('#666666')
-                    .text(`Bemerkungen: ${p.notes}`, col2, rowY, { width: 400 });
-                doc.fillColor('#000000').fontSize(10);
-            }
+            let rowY = tableTop + 25;
+            doc.font('Helvetica').fontSize(10);
 
-            rowY += 20;
-        });
+            participants.forEach((p, index) => {
+                if (rowY > 750) {
+                    doc.addPage();
+                    rowY = 50;
+
+                    doc.fontSize(10).font('Helvetica-Bold');
+                    doc.text('Nr.', col1, rowY);
+                    doc.text('Name', col2, rowY);
+                    doc.text('E-Mail', col3, rowY);
+                    doc.text('Status', col4, rowY);
+                    doc.moveTo(col1, rowY + 15).lineTo(550, rowY + 15).stroke();
+                    rowY += 25;
+                    doc.font('Helvetica').fontSize(10);
+                }
+
+                doc.text(`${index + 1}.`, col1, rowY);
+                doc.text(p.name || '-', col2, rowY, { width: 190 });
+                doc.text(p.email || '-', col3, rowY, { width: 130 });
+
+                const statusText = p.status === 'approved' ? 'Bestätigt' :
+                                  p.status === 'pending' ? 'Ausstehend' :
+                                  p.status === 'rejected' ? 'Abgelehnt' : p.status;
+                const statusColor = p.status === 'approved' ? '#22c55e' :
+                                   p.status === 'pending' ? '#f59e0b' :
+                                   p.status === 'rejected' ? '#ef4444' : '#666666';
+                doc.fillColor(statusColor).text(statusText, col4, rowY);
+                doc.fillColor('#000000');
+
+                if (p.notes) {
+                    rowY += 15;
+                    doc.fontSize(8).fillColor('#666666')
+                        .text(`Bemerkungen: ${p.notes}`, col2, rowY, { width: 400 });
+                    doc.fillColor('#000000').fontSize(10);
+                }
+
+                rowY += 20;
+            });
+        }
 
         // Summary at the bottom
-        doc.moveDown(2);
-        const summaryY = Math.max(rowY + 20, doc.y);
-
-        if (summaryY < 750) {
+        if (doc.y < 700) {
+            doc.moveDown(1);
             doc.fontSize(10).font('Helvetica-Bold');
             const approvedCount = participants.filter(p => p.status === 'approved').length;
             const pendingCount = participants.filter(p => p.status === 'pending').length;
 
-            doc.text('Zusammenfassung:', col1, summaryY);
+            doc.text('Zusammenfassung:', 50);
             doc.font('Helvetica').fontSize(10);
-            doc.text(`Bestätigt: ${approvedCount}`, col1, summaryY + 15);
-            doc.text(`Ausstehend: ${pendingCount}`, col1, summaryY + 30);
-            doc.text(`Total: ${participants.length}`, col1, summaryY + 45);
+            doc.text(`Bestätigt: ${approvedCount}`, 50, doc.y + 5);
+            doc.text(`Ausstehend: ${pendingCount}`, 50, doc.y + 5);
+            doc.text(`Total: ${participants.length}`, 50, doc.y + 5);
         }
 
         // Footer
