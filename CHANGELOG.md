@@ -1,3 +1,10 @@
+# [1.51.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.50.0...v1.51.0) (2026-01-24)
+
+
+### Features
+
+* **order:** enable inventory system integration ([ae9c6df](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ae9c6dff9430810bbd9f1a52a32622366ff983b9))
+
 # [1.50.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.49.0...v1.50.0) (2026-01-24)
 
 
