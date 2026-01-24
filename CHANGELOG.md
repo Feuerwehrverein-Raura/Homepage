@@ -1,3 +1,10 @@
+## [1.55.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.0...v1.55.1) (2026-01-24)
+
+
+### Bug Fixes
+
+* **pdf:** improve participant list PDF for events with shifts ([6a65317](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6a6531760afb55e989af2f9cd88c0addc17ff089))
+
 # [1.55.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.54.0...v1.55.0) (2026-01-24)
 
 
