@@ -1,3 +1,10 @@
+## [1.46.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.3...v1.46.4) (2026-01-24)
+
+
+### Bug Fixes
+
+* **inventory:** fix TypeScript errors in ReportsView ([4d59e25](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4d59e250a51fb57dea3a8e950d842a120bcecf36))
+
 ## [1.46.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.2...v1.46.3) (2026-01-24)
 
 
