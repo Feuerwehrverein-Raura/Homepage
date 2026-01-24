@@ -71,6 +71,8 @@ function App() {
   const [scanResult, setScanResult] = useState<Item | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [lookupResult, setLookupResult] = useState<any | null>(null); // External barcode lookup result
+  const [prefillData, setPrefillData] = useState<any | null>(null); // Prefill data for new item form
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -240,6 +242,7 @@ function App() {
     setIsScanning(true);
     setScanResult(null);
     setScanError(null);
+    setLookupResult(null);
 
     try {
       codeReaderRef.current = new BrowserMultiFormatReader();
@@ -262,12 +265,22 @@ function App() {
             stopScanner();
 
             try {
-              const res = await fetch(`${API_URL}/items/barcode/${code}`);
+              // Use the new lookup endpoint that searches local + external databases
+              const res = await fetch(`${API_URL}/barcode/lookup/${code}`);
               if (res.ok) {
-                const item = await res.json();
-                setScanResult(item);
+                const data = await res.json();
+                if (data.source === 'local' && data.found) {
+                  // Found in local database
+                  setScanResult(data.item);
+                } else if (data.found) {
+                  // Found in external database - show option to create
+                  setLookupResult(data);
+                } else {
+                  // Not found anywhere
+                  setLookupResult({ source: 'none', found: false, ean_code: code });
+                }
               } else {
-                setScanError(`Artikel nicht gefunden: ${code}`);
+                setScanError(`Fehler beim Suchen: ${code}`);
               }
             } catch (error) {
               setScanError('Fehler beim Suchen');
@@ -435,7 +448,7 @@ function App() {
         {/* Scanner Tab */}
         {tab === 'scanner' && (
           <div className="space-y-4">
-            {!isScanning && !scanResult && (
+            {!isScanning && !scanResult && !lookupResult && (
               <button
                 onClick={startScanner}
                 className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-4 rounded-lg text-lg font-semibold touch-manipulation"
@@ -511,6 +524,97 @@ function App() {
               </div>
             )}
 
+            {/* External Lookup Result */}
+            {lookupResult && (
+              <div className="bg-white p-4 sm:p-6 rounded-lg shadow-lg">
+                {lookupResult.found ? (
+                  <>
+                    <div className="flex items-start gap-4 mb-4">
+                      {lookupResult.product?.image_url && (
+                        <img
+                          src={lookupResult.product.image_url}
+                          alt={lookupResult.product.name}
+                          className="w-20 h-20 object-contain rounded bg-gray-100"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-lg sm:text-xl font-bold">{lookupResult.product?.name || 'Unbekannt'}</h2>
+                        {lookupResult.product?.brand && (
+                          <p className="text-gray-600">{lookupResult.product.brand}</p>
+                        )}
+                        {lookupResult.product?.category && (
+                          <p className="text-sm text-gray-500">{lookupResult.product.category}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-50 p-3 rounded-lg mb-4">
+                      <p className="text-sm text-blue-700">
+                        <span className="font-semibold">Quelle:</span>{' '}
+                        {lookupResult.source === 'openfoodfacts' ? 'Open Food Facts' :
+                         lookupResult.source === 'opengtindb' ? 'OpenGTINDB' : lookupResult.source}
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        <span className="font-semibold">EAN:</span> {lookupResult.product?.ean_code}
+                      </p>
+                    </div>
+
+                    {lookupResult.product?.description && (
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-3">{lookupResult.product.description}</p>
+                    )}
+
+                    <p className="text-sm text-gray-500 mb-4">
+                      Dieser Artikel ist noch nicht in deinem Inventar. Möchtest du ihn anlegen?
+                    </p>
+
+                    <button
+                      onClick={() => {
+                        setPrefillData({
+                          name: lookupResult.product?.name || '',
+                          description: lookupResult.product?.description || '',
+                          ean_code: lookupResult.product?.ean_code || ''
+                        });
+                        setLookupResult(null);
+                        setTab('add');
+                      }}
+                      className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white py-3 rounded-lg text-lg font-semibold touch-manipulation"
+                    >
+                      + Artikel anlegen
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <div className="text-5xl mb-4">🔍</div>
+                    <h2 className="text-lg font-semibold mb-2">Barcode nicht gefunden</h2>
+                    <p className="text-gray-500 mb-4">
+                      Der Barcode <span className="font-mono bg-gray-100 px-2 py-1 rounded">{lookupResult.ean_code}</span> wurde weder lokal noch in externen Datenbanken gefunden.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setPrefillData({
+                          name: '',
+                          description: '',
+                          ean_code: lookupResult.ean_code || ''
+                        });
+                        setLookupResult(null);
+                        setTab('add');
+                      }}
+                      className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3 rounded-lg font-semibold touch-manipulation mb-3"
+                    >
+                      Manuell anlegen
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => { setLookupResult(null); startScanner(); }}
+                  className="w-full mt-3 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 py-3 rounded-lg touch-manipulation"
+                >
+                  Nächsten scannen
+                </button>
+              </div>
+            )}
+
             {/* Manual barcode input */}
             <div className="mt-6">
               <input
@@ -518,14 +622,30 @@ function App() {
                 placeholder="Barcode manuell eingeben..."
                 onKeyDown={async (e) => {
                   if (e.key === 'Enter') {
-                    const code = (e.target as HTMLInputElement).value;
+                    const code = (e.target as HTMLInputElement).value.trim();
+                    if (!code) return;
+
+                    setScanResult(null);
+                    setScanError(null);
+                    setLookupResult(null);
+
                     try {
-                      const res = await fetch(`${API_URL}/items/barcode/${code}`);
+                      // Use the new lookup endpoint that searches local + external databases
+                      const res = await fetch(`${API_URL}/barcode/lookup/${code}`);
                       if (res.ok) {
-                        setScanResult(await res.json());
-                        setScanError(null);
+                        const data = await res.json();
+                        if (data.source === 'local' && data.found) {
+                          // Found in local database
+                          setScanResult(data.item);
+                        } else if (data.found) {
+                          // Found in external database - show option to create
+                          setLookupResult(data);
+                        } else {
+                          // Not found anywhere
+                          setLookupResult({ source: 'none', found: false, ean_code: code });
+                        }
                       } else {
-                        setScanError(`Artikel nicht gefunden: ${code}`);
+                        setScanError(`Fehler beim Suchen: ${code}`);
                       }
                     } catch (error) {
                       setScanError('Fehler beim Suchen');
@@ -548,7 +668,8 @@ function App() {
             categories={categories}
             locations={locations}
             token={token!}
-            onSuccess={() => { fetchItems(); setTab('items'); }}
+            prefillData={prefillData}
+            onSuccess={() => { fetchItems(); setPrefillData(null); setTab('items'); }}
           />
         )}
 
@@ -611,22 +732,35 @@ function App() {
 }
 
 // Add Item Form Component
-function AddItemForm({ categories, locations, token, onSuccess }: {
+function AddItemForm({ categories, locations, token, prefillData, onSuccess }: {
   categories: Category[];
   locations: Location[];
   token: string;
+  prefillData?: { name?: string; description?: string; ean_code?: string } | null;
   onSuccess: () => void;
 }) {
   const [form, setForm] = useState({
-    name: '',
-    description: '',
+    name: prefillData?.name || '',
+    description: prefillData?.description || '',
     category_id: '',
     location_id: '',
-    ean_code: '',
+    ean_code: prefillData?.ean_code || '',
     quantity: '0',
     min_quantity: '0',
     unit: 'Stück'
   });
+
+  // Update form when prefillData changes
+  useEffect(() => {
+    if (prefillData) {
+      setForm(prev => ({
+        ...prev,
+        name: prefillData.name || prev.name,
+        description: prefillData.description || prev.description,
+        ean_code: prefillData.ean_code || prev.ean_code
+      }));
+    }
+  }, [prefillData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

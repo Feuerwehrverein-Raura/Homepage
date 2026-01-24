@@ -270,6 +270,109 @@ app.get('/api/items/barcode/:code', async (req, res) => {
   }
 });
 
+// ========================================
+// EAN BARCODE LOOKUP (External Databases)
+// ========================================
+
+// Lookup EAN barcode in external databases (Open Food Facts, Open EAN DB)
+app.get('/api/barcode/lookup/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    // First check if we already have this item in our database
+    const existingItem = await pool.query(`
+      SELECT i.*, c.name as category_name, l.name as location_name
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      LEFT JOIN locations l ON i.location_id = l.id
+      WHERE (i.ean_code = $1 OR i.custom_barcode = $1) AND i.active = true
+    `, [code]);
+
+    if (existingItem.rows.length > 0) {
+      return res.json({
+        source: 'local',
+        found: true,
+        item: existingItem.rows[0]
+      });
+    }
+
+    // Try Open Food Facts (good for food & beverages)
+    try {
+      const offResponse = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`, {
+        headers: { 'User-Agent': 'FWV-Raura-Inventory/1.0' }
+      });
+
+      if (offResponse.ok) {
+        const offData = await offResponse.json() as any;
+        if (offData.status === 1 && offData.product) {
+          const product = offData.product;
+          return res.json({
+            source: 'openfoodfacts',
+            found: true,
+            product: {
+              name: product.product_name || product.product_name_de || product.generic_name,
+              brand: product.brands,
+              category: product.categories_tags?.[0]?.replace('en:', '').replace('de:', ''),
+              description: product.generic_name_de || product.generic_name,
+              image_url: product.image_url || product.image_front_url,
+              quantity: product.quantity,
+              ean_code: code
+            }
+          });
+        }
+      }
+    } catch (offError) {
+      console.log('Open Food Facts lookup failed:', offError);
+    }
+
+    // Try Open EAN Database (general products)
+    try {
+      const eanResponse = await fetch(`https://opengtindb.org/?ean=${code}&cmd=query&queryid=400000000`, {
+        headers: { 'User-Agent': 'FWV-Raura-Inventory/1.0' }
+      });
+
+      if (eanResponse.ok) {
+        const eanText = await eanResponse.text();
+        // Parse the response (format: error=0\nname=Product Name\n...)
+        const lines = eanText.split('\n');
+        const data: Record<string, string> = {};
+        lines.forEach(line => {
+          const [key, ...valueParts] = line.split('=');
+          if (key && valueParts.length) {
+            data[key.trim()] = valueParts.join('=').trim();
+          }
+        });
+
+        if (data.error === '0' && data.name) {
+          return res.json({
+            source: 'opengtindb',
+            found: true,
+            product: {
+              name: data.name,
+              brand: data.vendor,
+              description: data.descr,
+              ean_code: code
+            }
+          });
+        }
+      }
+    } catch (eanError) {
+      console.log('Open EAN DB lookup failed:', eanError);
+    }
+
+    // Not found in any database
+    res.json({
+      source: 'none',
+      found: false,
+      ean_code: code
+    });
+
+  } catch (error) {
+    console.error('Barcode lookup error:', error);
+    res.status(500).json({ error: 'Lookup failed' });
+  }
+});
+
 app.get('/api/items/:id', async (req, res) => {
   try {
     const { id } = req.params;
