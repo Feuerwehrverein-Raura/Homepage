@@ -1870,8 +1870,41 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
             // Multiple events (grouped Arbeitsplan)
             eventsToProcess = events;
         } else if (event) {
-            // Single event object from frontend
-            eventsToProcess = [event];
+            // Single event object from frontend - load fresh registrations from DB
+            const eventDbId = event.dbId || event.id;
+            if (eventDbId) {
+                // Load shifts with current registrations from database
+                const shiftsResult = await pool.query(
+                    'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
+                    [eventDbId]
+                );
+
+                const shiftsWithRegs = await Promise.all(shiftsResult.rows.map(async (shift) => {
+                    const regsResult = await pool.query(`
+                        SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                        FROM registrations r
+                        LEFT JOIN members m ON r.member_id = m.id
+                        WHERE $1 = ANY(r.shift_ids) AND r.status IN ('approved', 'confirmed')
+                    `, [shift.id]);
+
+                    return {
+                        ...shift,
+                        registrations: {
+                            approved: regsResult.rows.map(r => ({
+                                id: r.id,
+                                name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                            }))
+                        }
+                    };
+                }));
+
+                eventsToProcess = [{
+                    ...event,
+                    shifts: shiftsWithRegs.length > 0 ? shiftsWithRegs : event.shifts
+                }];
+            } else {
+                eventsToProcess = [event];
+            }
         } else if (shifts && shifts.length > 0) {
             // Old format with just shifts
             eventsToProcess = [{ title: eventTitle || 'Event', shifts }];

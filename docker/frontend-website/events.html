@@ -251,6 +251,7 @@
                     // Map API format to internal format
                     return apiEvents.map(e => ({
                         id: e.slug || e.id,
+                        dbId: e.id, // Keep original database ID for API calls
                         title: e.title || 'Unbenanntes Event',
                         subtitle: e.subtitle || '',
                         category: e.category || 'Allgemein',
@@ -1553,6 +1554,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             event: {
+                                dbId: event.dbId, // Database ID for fresh registration lookup
                                 title: event.title,
                                 shifts: event.shifts,
                                 springer: event.springer || null,
