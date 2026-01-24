@@ -1,3 +1,10 @@
+## [1.51.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.51.0...v1.51.1) (2026-01-24)
+
+
+### Bug Fixes
+
+* **inventory:** move sellable routes before :id param route ([e37662d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e37662d3ed2d21f9eb95c1aa8c1e6bf7ae38f182))
+
 # [1.51.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.50.0...v1.51.0) (2026-01-24)
 
 
