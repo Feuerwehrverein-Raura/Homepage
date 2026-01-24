@@ -1808,6 +1808,72 @@ app.get('/members/emails/alias-config', authenticateAny, requireRole('vorstand',
     }
 });
 
+// Sync mitglieder@fwv-raura.ch alias with all zustellung emails
+app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const DISPATCH_API = process.env.DISPATCH_API || 'http://fwv-api-dispatch:3000';
+        const ALIAS_ADDRESS = 'mitglieder@fwv-raura.ch';
+
+        // Get all zustellung emails
+        const result = await pool.query(`
+            SELECT COALESCE(versand_email, email) as email
+            FROM members
+            WHERE zustellung_email = true
+            AND (email IS NOT NULL AND email != '')
+            AND status NOT IN ('Ausgetreten', 'Verstorben')
+            ORDER BY email
+        `);
+        const emails = result.rows.map(r => r.email).filter(e => e);
+
+        if (emails.length === 0) {
+            return res.status(400).json({ error: 'No emails with zustellung_email enabled' });
+        }
+
+        // Get existing aliases to find the mitglieder alias ID
+        const aliasesResponse = await axios.get(`${DISPATCH_API}/mailcow/aliases`, {
+            headers: { 'Authorization': req.headers.authorization }
+        });
+
+        const existingAlias = aliasesResponse.data.find(a => a.address === ALIAS_ADDRESS);
+
+        if (existingAlias) {
+            // Update existing alias
+            await axios.put(`${DISPATCH_API}/mailcow/aliases/${existingAlias.id}`, {
+                goto: emails.join(','),
+                active: true
+            }, {
+                headers: { 'Authorization': req.headers.authorization }
+            });
+            res.json({
+                success: true,
+                action: 'updated',
+                alias: ALIAS_ADDRESS,
+                recipients: emails.length,
+                emails: emails
+            });
+        } else {
+            // Create new alias
+            await axios.post(`${DISPATCH_API}/mailcow/aliases`, {
+                address: ALIAS_ADDRESS,
+                goto: emails.join(','),
+                active: true
+            }, {
+                headers: { 'Authorization': req.headers.authorization }
+            });
+            res.json({
+                success: true,
+                action: 'created',
+                alias: ALIAS_ADDRESS,
+                recipients: emails.length,
+                emails: emails
+            });
+        }
+    } catch (error) {
+        console.error('Alias sync error:', error.response?.data || error.message);
+        res.status(500).json({ error: error.response?.data?.error || error.message });
+    }
+});
+
 // ============================================
 // AUTHENTIK SYNC
 // ============================================

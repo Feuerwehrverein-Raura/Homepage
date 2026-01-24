@@ -700,10 +700,13 @@
                         <div class="bg-green-50 rounded-lg p-4">
                             <div class="text-sm font-medium text-green-800 mb-1">Alias für Rundmail:</div>
                             <code class="text-green-600 font-mono">mitglieder@fwv-raura.ch</code>
+                            <button id="sync-alias-btn" class="mt-2 w-full bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+                                ↻ Alias synchronisieren
+                            </button>
                         </div>
-                        <div class="bg-yellow-50 rounded-lg p-4">
-                            <div class="text-sm font-medium text-yellow-800 mb-1">Hinweis:</div>
-                            <div class="text-xs text-yellow-700">Der Alias wird automatisch mit allen aktiven Mitgliedern synchronisiert</div>
+                        <div class="bg-purple-50 rounded-lg p-4">
+                            <div class="text-sm font-medium text-purple-800 mb-1">Alias Status:</div>
+                            <div id="alias-status" class="text-xs text-purple-700">Klicke "Synchronisieren" um den Alias zu aktualisieren</div>
                         </div>
                     </div>
 
@@ -4325,6 +4328,7 @@ ${grussformel}`;
         // Zustellung Emails
         document.getElementById('copy-emails-btn').addEventListener('click', copyZustellungEmails);
         document.getElementById('refresh-emails-btn').addEventListener('click', loadZustellungEmails);
+        document.getElementById('sync-alias-btn').addEventListener('click', syncMitgliederAlias);
 
         // Dispatch
         document.querySelectorAll('input[name="delivery-method"]').forEach(radio => {
@@ -4556,6 +4560,38 @@ ${grussformel}`;
                 document.execCommand('copy');
                 showToast('E-Mail-Adressen kopiert!', 'success');
             });
+        }
+
+        async function syncMitgliederAlias() {
+            const btn = document.getElementById('sync-alias-btn');
+            const statusEl = document.getElementById('alias-status');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Synchronisiere...';
+            statusEl.textContent = 'Synchronisiere Alias...';
+
+            try {
+                const response = await fetch(`${API_BASE}/members/emails/sync-alias`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusEl.innerHTML = `✅ Alias ${data.action === 'created' ? 'erstellt' : 'aktualisiert'} mit <strong>${data.recipients}</strong> Empfängern`;
+                    showToast(`Alias erfolgreich ${data.action === 'created' ? 'erstellt' : 'aktualisiert'}!`, 'success');
+                } else {
+                    statusEl.textContent = `❌ Fehler: ${data.error}`;
+                    showToast('Fehler beim Synchronisieren: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Alias sync error:', error);
+                statusEl.textContent = '❌ Verbindungsfehler';
+                showToast('Fehler beim Synchronisieren', 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '↻ Alias synchronisieren';
         }
 
         function openNewMailboxModal() {
