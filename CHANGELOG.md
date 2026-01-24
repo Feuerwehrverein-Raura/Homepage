@@ -1,3 +1,10 @@
+## [1.47.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.47.0...v1.47.1) (2026-01-24)
+
+
+### Bug Fixes
+
+* **vorstand:** mobile-optimize navigation and tabs ([349cfe5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/349cfe5f2b2bb22897f27137115e6c7cc65ac6e6))
+
 # [1.47.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.46.4...v1.47.0) (2026-01-24)
 
 
