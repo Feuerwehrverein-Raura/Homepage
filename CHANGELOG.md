@@ -1,3 +1,10 @@
+# [1.63.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.62.0...v1.63.0) (2026-01-25)
+
+
+### Features
+
+* **inventory:** add item editing, image upload and improved mobile UI ([27975b0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/27975b0f24ff879dac91c492166bfa83a08a7492))
+
 # [1.62.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.3...v1.62.0) (2026-01-25)
 
 
