@@ -1,3 +1,10 @@
+# [1.61.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.60.0...v1.61.0) (2026-01-25)
+
+
+### Features
+
+* **inventory:** mobile optimization with bottom nav and responsive design ([c64f4aa](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c64f4aa9cb4c8a5f01fcfe3c6c8d58ba8f153d13))
+
 # [1.60.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.59.1...v1.60.0) (2026-01-25)
 
 
