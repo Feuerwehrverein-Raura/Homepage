@@ -384,7 +384,19 @@ async function createAuthentikUser(member) {
             is_active: true,
             path: 'users',
             type: 'internal',
-            groups: [MITGLIEDER_GROUP_PK]  // Add to Mitglieder group
+            groups: [MITGLIEDER_GROUP_PK],  // Add to Mitglieder group
+            attributes: {
+                settings: {
+                    locale: 'de_CH'  // German (Switzerland) as default
+                },
+                organisation: 'Feuerwehrverein Raura',
+                role: member.funktion || '',
+                phone: member.telefon || '',
+                mobile: member.mobile || '',
+                street: member.strasse || '',
+                postal_code: member.plz || '',
+                city: member.ort || ''
+            }
         };
 
         const response = await axios.post(
@@ -566,6 +578,170 @@ async function isUserInAuthentikGroup(authentikUserId, groupId) {
     } catch (error) {
         console.error(`Failed to check user ${authentikUserId} group membership:`, error.response?.data || error.message);
         return false;
+    }
+}
+
+// Sync member profile data to Authentik
+async function syncMemberToAuthentik(authentikUserId, member) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId) {
+        console.warn('Missing AUTHENTIK_API_TOKEN or user ID - skipping profile sync');
+        return false;
+    }
+
+    try {
+        // Build attributes object for Authentik
+        const attributes = {
+            // Default settings for all users
+            settings: {
+                locale: 'de_CH'  // German (Switzerland)
+            }
+        };
+
+        // Contact info
+        if (member.telefon) attributes.phone = member.telefon;
+        if (member.mobile) attributes.mobile = member.mobile;
+
+        // Address
+        if (member.strasse) attributes.street = member.strasse;
+        if (member.plz) attributes.postal_code = member.plz;
+        if (member.ort) attributes.city = member.ort;
+
+        // Other profile fields
+        if (member.geburtstag) attributes.birthdate = member.geburtstag;
+
+        // Organisation is always Feuerwehrverein Raura
+        attributes.organisation = 'Feuerwehrverein Raura';
+
+        // Role/Function from member data
+        if (member.funktion) {
+            attributes.role = member.funktion;
+        }
+
+        const updateData = {
+            name: `${member.vorname} ${member.nachname}`.trim(),
+            attributes: attributes
+        };
+
+        // Only update email if it changed (email is the login identifier)
+        if (member.email) {
+            updateData.email = member.email;
+        }
+
+        await axios.patch(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            updateData,
+            {
+                headers: {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
+
+        console.log(`Synced member profile to Authentik: ${member.vorname} ${member.nachname} (${authentikUserId})`);
+        return true;
+    } catch (error) {
+        console.error(`Failed to sync member to Authentik:`, error.response?.data || error.message);
+        return false;
+    }
+}
+
+// Sync Authentik user profile to member database
+async function syncAuthentikToMember(pool, authentikUserId) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId) {
+        return null;
+    }
+
+    try {
+        // Get Authentik user data
+        const userResponse = await axios.get(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            { headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` } }
+        );
+
+        const authentikUser = userResponse.data;
+        const attributes = authentikUser.attributes || {};
+
+        // Find member by authentik_user_id
+        const memberResult = await pool.query(
+            'SELECT * FROM members WHERE authentik_user_id = $1',
+            [authentikUserId.toString()]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return null;
+        }
+
+        const member = memberResult.rows[0];
+        const updates = {};
+        const changes = [];
+
+        // Check for changes (Authentik → Website)
+        // Only sync if Authentik has the data and it differs
+        if (attributes.phone && attributes.phone !== member.telefon) {
+            updates.telefon = attributes.phone;
+            changes.push('telefon');
+        }
+        if (attributes.mobile && attributes.mobile !== member.mobile) {
+            updates.mobile = attributes.mobile;
+            changes.push('mobile');
+        }
+        if (attributes.street && attributes.street !== member.strasse) {
+            updates.strasse = attributes.street;
+            changes.push('strasse');
+        }
+        if (attributes.postal_code && attributes.postal_code !== member.plz) {
+            updates.plz = attributes.postal_code;
+            changes.push('plz');
+        }
+        if (attributes.city && attributes.city !== member.ort) {
+            updates.ort = attributes.city;
+            changes.push('ort');
+        }
+
+        // Parse name if changed
+        if (authentikUser.name) {
+            const nameParts = authentikUser.name.trim().split(' ');
+            if (nameParts.length >= 2) {
+                const vorname = nameParts[0];
+                const nachname = nameParts.slice(1).join(' ');
+                if (vorname !== member.vorname) {
+                    updates.vorname = vorname;
+                    changes.push('vorname');
+                }
+                if (nachname !== member.nachname) {
+                    updates.nachname = nachname;
+                    changes.push('nachname');
+                }
+            }
+        }
+
+        if (changes.length === 0) {
+            return { member_id: member.id, changes: [] };
+        }
+
+        // Apply updates
+        const fields = Object.keys(updates);
+        const values = Object.values(updates);
+        const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+        values.push(member.id);
+
+        await pool.query(
+            `UPDATE members SET ${setClause}, updated_at = NOW() WHERE id = $${values.length}`,
+            values
+        );
+
+        console.log(`Synced Authentik profile to member: ${member.vorname} ${member.nachname} - changed: ${changes.join(', ')}`);
+        return { member_id: member.id, changes };
+    } catch (error) {
+        console.error(`Failed to sync Authentik to member:`, error.response?.data || error.message);
+        return null;
     }
 }
 
@@ -1282,6 +1458,14 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
         if (fields.includes('funktion') && result.rows[0].authentik_user_id) {
             syncMemberAuthentikGroups(result.rows[0].authentik_user_id, result.rows[0].funktion)
                 .catch(err => console.error('Authentik group sync failed:', err));
+        }
+
+        // Sync profile to Authentik if relevant fields changed
+        const profileFields = ['vorname', 'nachname', 'email', 'telefon', 'mobile', 'strasse', 'plz', 'ort', 'geburtstag'];
+        const hasProfileChanges = fields.some(f => profileFields.includes(f));
+        if (hasProfileChanges && result.rows[0].authentik_user_id) {
+            syncMemberToAuthentik(result.rows[0].authentik_user_id, result.rows[0])
+                .catch(err => console.error('Authentik profile sync failed:', err));
         }
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -2741,9 +2925,9 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
     }
 });
 
-// Periodic sync of Authentik groups (every hour)
-async function periodicAuthentikGroupsSync() {
-    console.log('Starting periodic Authentik groups sync...');
+// Periodic sync of Authentik groups and profiles (every hour)
+async function periodicAuthentikSync() {
+    console.log('Starting periodic Authentik sync (groups + profiles)...');
     try {
         const result = await pool.query(`
             SELECT id, vorname, nachname, funktion, authentik_user_id
@@ -2751,18 +2935,29 @@ async function periodicAuthentikGroupsSync() {
             WHERE authentik_user_id IS NOT NULL
         `);
 
-        let synced = 0;
+        let groupsSynced = 0;
+        let profilesUpdated = 0;
+
         for (const member of result.rows) {
             try {
+                // Sync groups (Website → Authentik)
                 await syncMemberAuthentikGroups(member.authentik_user_id, member.funktion);
-                synced++;
+                groupsSynced++;
+
+                // Sync profiles (Authentik → Website) - check for changes made in Authentik/Nextcloud
+                const profileResult = await syncAuthentikToMember(pool, member.authentik_user_id);
+                if (profileResult && profileResult.changes && profileResult.changes.length > 0) {
+                    profilesUpdated++;
+                    console.log(`  Profile updated from Authentik: ${member.vorname} ${member.nachname} - ${profileResult.changes.join(', ')}`);
+                }
             } catch (error) {
                 console.error(`Periodic sync failed for ${member.vorname} ${member.nachname}:`, error.message);
             }
         }
-        console.log(`Periodic Authentik groups sync completed: ${synced}/${result.rows.length} members synced`);
+
+        console.log(`Periodic Authentik sync completed: ${groupsSynced}/${result.rows.length} groups synced, ${profilesUpdated} profiles updated from Authentik`);
     } catch (error) {
-        console.error('Periodic Authentik groups sync error:', error.message);
+        console.error('Periodic Authentik sync error:', error.message);
     }
 }
 
@@ -2772,11 +2967,11 @@ app.listen(PORT, () => {
 
     // Run initial sync after 30 seconds (to allow container to fully start)
     setTimeout(() => {
-        periodicAuthentikGroupsSync();
+        periodicAuthentikSync();
     }, 30000);
 
     // Then run every hour
     setInterval(() => {
-        periodicAuthentikGroupsSync();
+        periodicAuthentikSync();
     }, 60 * 60 * 1000); // 1 hour
 });
