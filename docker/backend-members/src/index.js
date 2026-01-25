@@ -390,7 +390,7 @@ async function createAuthentikUser(member) {
                     locale: 'de_CH'  // German (Switzerland) as default
                 },
                 organisation: 'Feuerwehrverein Raura',
-                role: member.funktion || '',
+                role: getPrimaryRole(member.funktion),
                 phone: member.telefon || '',
                 mobile: member.mobile || '',
                 street: member.strasse || '',
@@ -581,6 +581,29 @@ async function isUserInAuthentikGroup(authentikUserId, groupId) {
     }
 }
 
+// Get primary role from function list (Vorstand functions have priority)
+function getPrimaryRole(funktion) {
+    if (!funktion) return '';
+
+    // Priority order for Vorstand functions
+    const vorstandPriority = ['präsident', 'praesident', 'aktuar', 'kassier', 'materialwart', 'beisitzer'];
+
+    // Parse functions (comma-separated)
+    const funktionen = funktion.split(',').map(f => f.trim()).filter(f => f);
+
+    if (funktionen.length === 0) return '';
+    if (funktionen.length === 1) return funktionen[0];
+
+    // Check for Vorstand functions first (in priority order)
+    for (const priority of vorstandPriority) {
+        const found = funktionen.find(f => f.toLowerCase().includes(priority));
+        if (found) return found;
+    }
+
+    // No Vorstand function found, return first function
+    return funktionen[0];
+}
+
 // Sync member profile data to Authentik
 async function syncMemberToAuthentik(authentikUserId, member) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
@@ -615,9 +638,9 @@ async function syncMemberToAuthentik(authentikUserId, member) {
         // Organisation is always Feuerwehrverein Raura
         attributes.organisation = 'Feuerwehrverein Raura';
 
-        // Role/Function from member data
+        // Role: Use primary role only (Vorstand functions have priority)
         if (member.funktion) {
-            attributes.role = member.funktion;
+            attributes.role = getPrimaryRole(member.funktion);
         }
 
         const updateData = {
