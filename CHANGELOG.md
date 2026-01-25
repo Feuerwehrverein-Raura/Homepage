@@ -1,3 +1,10 @@
+# [1.57.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.56.0...v1.57.0) (2026-01-25)
+
+
+### Features
+
+* **members:** complete Authentik groups auto-sync ([3161aa5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3161aa50b9a645d3e98bb985a3cd2226bea3aacf))
+
 # [1.56.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.4...v1.56.0) (2026-01-25)
 
 
