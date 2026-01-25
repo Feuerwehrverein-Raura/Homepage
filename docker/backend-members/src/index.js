@@ -1271,6 +1271,12 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
         if (fields.includes('zustellung_email') || fields.includes('email') || fields.includes('versand_email')) {
             syncMitgliederAlias();
         }
+
+        // Sync Authentik groups if funktion changed
+        if (fields.includes('funktion') && result.rows[0].authentik_user_id) {
+            syncMemberAuthentikGroups(result.rows[0].authentik_user_id, result.rows[0].funktion)
+                .catch(err => console.error('Authentik group sync failed:', err));
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2137,6 +2143,102 @@ app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand',
 // Group constants
 const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43e4-af75-e0241f06fb95';
 const SOCIAL_MEDIA_GROUP = process.env.AUTHENTIK_SOCIAL_MEDIA_GROUP || '494ef740-41d3-40c3-9e68-8a1e5d3b4ad9';
+const MITGLIEDER_GROUP = process.env.AUTHENTIK_MITGLIEDER_GROUP || '248db02d-6592-4571-9050-2ccc0fdf0b7e';
+
+// Mapping from functions to Authentik groups
+const FUNCTION_TO_GROUPS = {
+    // Vorstand functions -> Vorstand group
+    'präsident': VORSTAND_GROUP,
+    'praesident': VORSTAND_GROUP,
+    'aktuar': VORSTAND_GROUP,
+    'kassier': VORSTAND_GROUP,
+    'materialwart': VORSTAND_GROUP,
+    'beisitzer': VORSTAND_GROUP,
+    'vorstand': VORSTAND_GROUP,
+    // Social Media function -> Social Media group
+    'social media': SOCIAL_MEDIA_GROUP,
+    'social-media': SOCIAL_MEDIA_GROUP,
+    'socialmedia': SOCIAL_MEDIA_GROUP,
+};
+
+// Sync Authentik groups based on member's functions
+async function syncMemberAuthentikGroups(authentikUserId, funktion) {
+    if (!authentikUserId) {
+        console.warn('No Authentik user ID - skipping group sync');
+        return false;
+    }
+
+    try {
+        // Parse functions (comma-separated)
+        const funktionen = funktion ? funktion.split(',').map(f => f.trim().toLowerCase()).filter(f => f) : [];
+
+        // Determine which groups the member should be in
+        const shouldBeInGroups = new Set([MITGLIEDER_GROUP]); // Everyone gets Mitglieder
+
+        for (const f of funktionen) {
+            for (const [key, groupId] of Object.entries(FUNCTION_TO_GROUPS)) {
+                if (f.includes(key)) {
+                    shouldBeInGroups.add(groupId);
+                }
+            }
+        }
+
+        // Get current groups from Authentik
+        const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+        const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+        if (!AUTHENTIK_API_TOKEN) {
+            console.warn('AUTHENTIK_API_TOKEN not configured - skipping group sync');
+            return false;
+        }
+
+        const userResponse = await axios.get(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            { headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` } }
+        );
+
+        const currentGroups = new Set(userResponse.data.groups || []);
+
+        // Groups we manage (only sync these, leave others untouched)
+        const managedGroups = [MITGLIEDER_GROUP, VORSTAND_GROUP, SOCIAL_MEDIA_GROUP];
+
+        // Calculate changes
+        let changed = false;
+        for (const groupId of managedGroups) {
+            const shouldBeIn = shouldBeInGroups.has(groupId);
+            const isIn = currentGroups.has(groupId);
+
+            if (shouldBeIn && !isIn) {
+                currentGroups.add(groupId);
+                changed = true;
+                console.log(`Adding user ${authentikUserId} to group ${groupId}`);
+            } else if (!shouldBeIn && isIn) {
+                currentGroups.delete(groupId);
+                changed = true;
+                console.log(`Removing user ${authentikUserId} from group ${groupId}`);
+            }
+        }
+
+        if (changed) {
+            await axios.patch(
+                `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+                { groups: Array.from(currentGroups) },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+            console.log(`Synced Authentik groups for user ${authentikUserId}: ${Array.from(shouldBeInGroups).join(', ')}`);
+        }
+
+        return true;
+    } catch (error) {
+        console.error(`Failed to sync Authentik groups for user ${authentikUserId}:`, error.response?.data || error.message);
+        return false;
+    }
+}
 
 // Toggle Vorstand group status for a member
 app.post('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
@@ -2395,6 +2497,62 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
 
     } catch (error) {
         console.error('Authentik sync error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Sync Authentik groups for all members based on their functions
+app.post('/members/sync-authentik-groups', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        // Get all members with Authentik user ID
+        const result = await pool.query(`
+            SELECT id, vorname, nachname, email, funktion, authentik_user_id
+            FROM members
+            WHERE authentik_user_id IS NOT NULL
+            ORDER BY nachname, vorname
+        `);
+
+        const members = result.rows;
+        const synced = [];
+        const errors = [];
+
+        for (const member of members) {
+            try {
+                const success = await syncMemberAuthentikGroups(member.authentik_user_id, member.funktion);
+                if (success) {
+                    synced.push({
+                        member_id: member.id,
+                        name: `${member.vorname} ${member.nachname}`,
+                        funktion: member.funktion
+                    });
+                } else {
+                    errors.push({
+                        member_id: member.id,
+                        name: `${member.vorname} ${member.nachname}`,
+                        error: 'Sync returned false'
+                    });
+                }
+            } catch (error) {
+                console.error(`Failed to sync groups for member ${member.email}:`, error.message);
+                errors.push({
+                    member_id: member.id,
+                    name: `${member.vorname} ${member.nachname}`,
+                    error: error.message
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            total: members.length,
+            synced: synced.length,
+            errors: errors.length,
+            synced_members: synced,
+            error_details: errors
+        });
+
+    } catch (error) {
+        console.error('Authentik groups sync error:', error);
         res.status(500).json({ error: error.message });
     }
 });
