@@ -648,6 +648,14 @@ async function syncMemberToAuthentik(authentikUserId, member) {
             attributes.role = getPrimaryRole(member.funktion);
         }
 
+        // Avatar URL (not base64 - that caused token size issues)
+        // Authentik is configured to read avatar from attributes.avatar_url
+        if (member.foto) {
+            // Public URL to the member's photo
+            const apiUrl = process.env.API_URL || 'https://api.fwv-raura.ch';
+            attributes.avatar_url = `${apiUrl}${member.foto}`;
+        }
+
         const updateData = {
             name: `${member.vorname} ${member.nachname}`.trim(),
             attributes: attributes
