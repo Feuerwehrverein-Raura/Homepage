@@ -1,3 +1,10 @@
+## [1.58.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.58.0...v1.58.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* **members:** use primary role for Authentik profile (Vorstand priority) ([2387faa](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2387faad1a9f5aa1f972cd7208eee703a3f77712))
+
 # [1.58.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.57.0...v1.58.0) (2026-01-25)
 
 
