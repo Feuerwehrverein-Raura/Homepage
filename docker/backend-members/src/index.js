@@ -669,10 +669,11 @@ async function syncMemberToAuthentik(authentikUserId, member) {
             }
         );
 
-        // Sync avatar/photo if available
-        if (member.foto) {
-            await syncMemberAvatarToAuthentik(authentikUserId, member.foto);
-        }
+        // Avatar sync disabled - storing base64 in user attributes makes tokens too large
+        // causing "header too big" errors in browsers
+        // if (member.foto) {
+        //     await syncMemberAvatarToAuthentik(authentikUserId, member.foto);
+        // }
 
         console.log(`Synced member profile to Authentik: ${member.vorname} ${member.nachname} (${authentikUserId})`);
         return true;
