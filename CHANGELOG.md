@@ -1,3 +1,10 @@
+## [1.55.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.3...v1.55.4) (2026-01-25)
+
+
+### Bug Fixes
+
+* **mein:** show separate credentials and password change for each function email ([8b65d06](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8b65d06df01662205803f1e3118c65629e42da52))
+
 ## [1.55.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.55.2...v1.55.3) (2026-01-24)
 
 
