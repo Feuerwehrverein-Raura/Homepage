@@ -1,3 +1,10 @@
+# [1.62.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.3...v1.62.0) (2026-01-25)
+
+
+### Features
+
+* **auth:** sync avatar URL to Authentik instead of base64 ([9783b3c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9783b3ce561f5b2a011b12f0e573adc508e4a360))
+
 ## [1.61.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.2...v1.61.3) (2026-01-25)
 
 
