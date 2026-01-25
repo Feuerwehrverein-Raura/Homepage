@@ -687,10 +687,6 @@ async function syncMemberAvatarToAuthentik(authentikUserId, fotoPath) {
     }
 
     try {
-        const fs = require('fs');
-        const path = require('path');
-        const FormData = require('form-data');
-
         // Photo path is like /uploads/photo-xxx.jpg
         // Files are stored in /app/uploads/ inside the container
         const fullPath = path.join('/app', fotoPath);
@@ -700,16 +696,31 @@ async function syncMemberAvatarToAuthentik(authentikUserId, fotoPath) {
             return false;
         }
 
-        const form = new FormData();
-        form.append('avatar', fs.createReadStream(fullPath));
+        // Read photo and convert to base64 data URL
+        const photoData = fs.readFileSync(fullPath);
+        const ext = path.extname(fotoPath).toLowerCase().replace('.', '');
+        const mimeType = ext === 'jpg' ? 'jpeg' : ext;
+        const base64Photo = `data:image/${mimeType};base64,${photoData.toString('base64')}`;
 
-        await axios.post(
-            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/set_avatar/`,
-            form,
+        // First get current user attributes
+        const userRes = await axios.get(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            { headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` } }
+        );
+
+        // Store avatar in user attributes (Authentik doesn't have a direct avatar API)
+        await axios.patch(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
+            {
+                attributes: {
+                    ...userRes.data.attributes,
+                    picture: base64Photo
+                }
+            },
             {
                 headers: {
                     'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
-                    ...form.getHeaders()
+                    'Content-Type': 'application/json'
                 }
             }
         );
