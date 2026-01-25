@@ -1,3 +1,10 @@
+## [1.61.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.0...v1.61.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* **backend:** resolve duplicate ADMIN_GROUP constant declaration ([ed93688](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ed93688df8b3d5c9c4365304745270de4a8a4c73))
+
 # [1.61.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.60.0...v1.61.0) (2026-01-25)
 
 
