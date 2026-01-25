@@ -373,15 +373,15 @@ function App() {
         </div>
       </header>
 
-      {/* Tabs */}
-      <nav className="bg-white shadow overflow-x-auto">
-        <div className="container mx-auto flex min-w-max">
+      {/* Desktop Tabs - hidden on mobile */}
+      <nav className="bg-white shadow hidden sm:block">
+        <div className="container mx-auto flex">
           {(['items', 'scanner', 'add', 'low-stock', 'reports'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); if (t !== 'scanner') stopScanner(); }}
-              className={`flex-1 py-3 px-4 text-center font-medium whitespace-nowrap text-sm sm:text-base ${
-                tab === t ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'
+              className={`flex-1 py-3 px-4 text-center font-medium whitespace-nowrap text-base ${
+                tab === t ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {t === 'items' && '📋 Artikel'}
@@ -394,8 +394,8 @@ function App() {
         </div>
       </nav>
 
-      {/* Content */}
-      <main className="container mx-auto p-2 sm:p-4">
+      {/* Content - add bottom padding on mobile for nav */}
+      <main className="container mx-auto p-2 sm:p-4 pb-20 sm:pb-4">
         {/* Items Tab */}
         {tab === 'items' && (
           <div>
@@ -717,6 +717,30 @@ function App() {
           <ReportsView items={items} onRefresh={fetchItems} />
         )}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 sm:hidden z-40 safe-area-inset-bottom">
+        <div className="flex justify-around">
+          {([
+            { id: 'items', icon: '📋', label: 'Artikel' },
+            { id: 'scanner', icon: '📷', label: 'Scan' },
+            { id: 'add', icon: '➕', label: 'Neu' },
+            { id: 'low-stock', icon: '⚠️', label: 'Niedrig' },
+            { id: 'reports', icon: '📊', label: 'Berichte' },
+          ] as { id: Tab; icon: string; label: string }[]).map((t) => (
+            <button
+              key={t.id}
+              onClick={() => { setTab(t.id); if (t.id !== 'scanner') stopScanner(); }}
+              className={`flex-1 py-3 flex flex-col items-center gap-0.5 touch-manipulation ${
+                tab === t.id ? 'text-blue-600 bg-blue-50' : 'text-gray-500 active:bg-gray-100'
+              }`}
+            >
+              <span className="text-xl">{t.icon}</span>
+              <span className="text-xs font-medium">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* Item Detail Modal */}
       {selectedItem && (
@@ -1104,15 +1128,40 @@ function ReportsView({ items, onRefresh }: { items: Item[]; onRefresh: () => voi
         </div>
       </div>
 
-      {/* Full Inventory List (for print) */}
+      {/* Full Inventory List - Cards on mobile, Table on desktop */}
       <div className="bg-white p-4 rounded-lg shadow print:shadow-none">
         <h3 className="font-semibold mb-3">Vollständige Inventarliste</h3>
         <p className="text-sm text-gray-500 mb-4">
           Stand: {new Date().toLocaleString('de-CH')}
         </p>
 
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <table className="w-full min-w-[600px] text-sm">
+        {/* Mobile Card View */}
+        <div className="sm:hidden space-y-2">
+          {items.map((item) => (
+            <div
+              key={item.id}
+              className={`p-3 rounded-lg border ${item.quantity <= item.min_quantity ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
+            >
+              <div className="flex justify-between items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm truncate">{item.name}</h4>
+                  <p className="text-xs text-gray-500">{item.category_name || '-'} • {item.location_name || '-'}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <span className={`text-lg font-bold ${item.quantity <= item.min_quantity ? 'text-red-600' : 'text-green-600'}`}>
+                    {item.quantity}
+                  </span>
+                  <span className="text-xs text-gray-500 ml-1">{item.unit}</span>
+                  <p className="text-xs text-gray-400">Min: {item.min_quantity}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-2 py-2 text-left">Name</th>
