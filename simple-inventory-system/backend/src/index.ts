@@ -4,6 +4,10 @@ import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import pg from 'pg';
 import bwipjs from 'bwip-js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
 
 const app = express();
@@ -12,6 +16,39 @@ const wss = new WebSocketServer({ server });
 
 app.use(cors());
 app.use(express.json());
+
+// Upload directory setup
+const uploadDir = process.env.UPLOAD_DIR || '/app/uploads';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Serve uploaded images
+app.use('/api/uploads', express.static(uploadDir));
+
+// Multer configuration for image uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `item-${uuidv4()}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images are allowed'));
+    }
+  }
+});
 
 // Database setup
 const pool = new pg.Pool({
@@ -620,6 +657,87 @@ app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ========================================
+// IMAGE UPLOAD
+// ========================================
+
+// Upload image for an item
+app.post('/api/items/:id/image', authenticateToken, upload.single('image'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image provided' });
+    }
+
+    // Get the current item to delete old image if exists
+    const currentItem = await pool.query('SELECT image_url FROM items WHERE id = $1', [id]);
+    if (currentItem.rows.length === 0) {
+      // Delete the uploaded file since item doesn't exist
+      fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Delete old image if it exists and is a local file
+    const oldImageUrl = currentItem.rows[0].image_url;
+    if (oldImageUrl && oldImageUrl.startsWith('/api/uploads/')) {
+      const oldFilename = oldImageUrl.replace('/api/uploads/', '');
+      const oldPath = path.join(uploadDir, oldFilename);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+    }
+
+    // Update item with new image URL
+    const imageUrl = `/api/uploads/${req.file.filename}`;
+    const result = await pool.query(
+      'UPDATE items SET image_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+      [id, imageUrl]
+    );
+
+    broadcast({ type: 'item_updated', item: result.rows[0] });
+    res.json({ image_url: imageUrl, item: result.rows[0] });
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({ error: 'Failed to upload image' });
+  }
+});
+
+// Delete image from an item
+app.delete('/api/items/:id/image', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get current image URL
+    const currentItem = await pool.query('SELECT image_url FROM items WHERE id = $1', [id]);
+    if (currentItem.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const imageUrl = currentItem.rows[0].image_url;
+
+    // Delete the file if it's a local upload
+    if (imageUrl && imageUrl.startsWith('/api/uploads/')) {
+      const filename = imageUrl.replace('/api/uploads/', '');
+      const filePath = path.join(uploadDir, filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // Update item to remove image URL
+    const result = await pool.query(
+      'UPDATE items SET image_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+      [id]
+    );
+
+    broadcast({ type: 'item_updated', item: result.rows[0] });
+    res.json({ success: true, item: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete image' });
   }
 });
 

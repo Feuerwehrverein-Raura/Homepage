@@ -30,7 +30,9 @@ interface Item {
   id: number;
   name: string;
   description?: string;
+  category_id?: number;
   category_name?: string;
+  location_id?: number;
   location_name?: string;
   ean_code?: string;
   custom_barcode?: string;
@@ -38,6 +40,11 @@ interface Item {
   min_quantity: number;
   unit: string;
   purchase_price?: number;
+  image_url?: string;
+  sellable?: boolean;
+  sale_price?: number;
+  sale_category?: string;
+  printer_station?: string;
 }
 
 interface Category {
@@ -395,7 +402,7 @@ function App() {
       </nav>
 
       {/* Content - add bottom padding on mobile for nav */}
-      <main className="container mx-auto p-2 sm:p-4 pb-20 sm:pb-4">
+      <main className="container mx-auto p-3 sm:p-4 pb-24 sm:pb-4">
         {/* Items Tab */}
         {tab === 'items' && (
           <div>
@@ -404,40 +411,51 @@ function App() {
               placeholder="Suchen (Name, Barcode...)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full p-3 border rounded-lg mb-4 text-base"
+              className="w-full p-4 border-2 rounded-xl mb-4 text-lg"
             />
-            <div className="space-y-2">
+            <div className="space-y-3">
               {items.map(item => (
                 <div
                   key={item.id}
                   onClick={() => setSelectedItem(item)}
-                  className={`bg-white p-3 sm:p-4 rounded-lg shadow cursor-pointer active:bg-gray-50 touch-manipulation ${
+                  className={`bg-white p-4 rounded-xl shadow-md cursor-pointer active:bg-gray-50 touch-manipulation ${
                     item.quantity <= item.min_quantity ? 'border-l-4 border-red-500' : ''
                   }`}
                 >
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm sm:text-base truncate">{item.name}</h3>
-                      <p className="text-xs sm:text-sm text-gray-500 truncate">
-                        {item.category_name} • {item.location_name}
-                      </p>
-                      <p className="text-xs text-gray-400 truncate">
-                        {item.custom_barcode || item.ean_code || '-'}
-                      </p>
+                  <div className="flex justify-between items-center gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* Item image or placeholder */}
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url.startsWith('http') ? item.image_url : `${API_URL}${item.image_url}`}
+                          alt=""
+                          className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <span className="text-2xl text-gray-300">📦</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base sm:text-lg truncate">{item.name}</h3>
+                        <p className="text-sm text-gray-500 truncate">
+                          {item.category_name || '-'} • {item.location_name || '-'}
+                        </p>
+                      </div>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <span className={`text-xl sm:text-2xl font-bold ${
+                      <span className={`text-2xl sm:text-3xl font-bold ${
                         item.quantity <= item.min_quantity ? 'text-red-500' : 'text-green-600'
                       }`}>
                         {item.quantity}
                       </span>
-                      <span className="text-xs sm:text-sm text-gray-500 ml-1">{item.unit}</span>
+                      <span className="text-sm text-gray-500 ml-1">{item.unit}</span>
                     </div>
                   </div>
                 </div>
               ))}
               {items.length === 0 && (
-                <div className="text-center text-gray-500 py-8">
+                <div className="text-center text-gray-500 py-12 text-lg">
                   Keine Artikel gefunden
                 </div>
               )}
@@ -686,28 +704,47 @@ function App() {
 
         {/* Low Stock Tab */}
         {tab === 'low-stock' && (
-          <div className="space-y-2">
-            <h2 className="text-base sm:text-lg font-semibold mb-4">Artikel mit niedrigem Bestand</h2>
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold mb-4">⚠️ Artikel mit niedrigem Bestand</h2>
             {items.filter(i => i.quantity <= i.min_quantity).map(item => (
               <div
                 key={item.id}
                 onClick={() => setSelectedItem(item)}
-                className="bg-white p-3 sm:p-4 rounded-lg shadow border-l-4 border-red-500 cursor-pointer active:bg-gray-50 touch-manipulation"
+                className="bg-white p-4 rounded-xl shadow-md border-l-4 border-red-500 cursor-pointer active:bg-gray-50 touch-manipulation"
               >
-                <div className="flex justify-between items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-sm sm:text-base truncate">{item.name}</h3>
-                    <p className="text-xs sm:text-sm text-gray-500 truncate">{item.location_name}</p>
+                <div className="flex justify-between items-center gap-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* Item image or placeholder */}
+                    {item.image_url ? (
+                      <img
+                        src={item.image_url.startsWith('http') ? item.image_url : `${API_URL}${item.image_url}`}
+                        alt=""
+                        className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-2xl">⚠️</span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base sm:text-lg truncate">{item.name}</h3>
+                      <p className="text-sm text-gray-500 truncate">
+                        {item.category_name || '-'} • {item.location_name || '-'}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <span className="text-xl sm:text-2xl font-bold text-red-500">{item.quantity}</span>
-                    <span className="text-gray-400 text-sm"> / {item.min_quantity}</span>
+                    <span className="text-2xl sm:text-3xl font-bold text-red-500">{item.quantity}</span>
+                    <span className="text-sm text-gray-400 ml-1">/ {item.min_quantity}</span>
+                    <p className="text-xs text-gray-400">{item.unit}</p>
                   </div>
                 </div>
               </div>
             ))}
             {items.filter(i => i.quantity <= i.min_quantity).length === 0 && (
-              <p className="text-center text-gray-500 py-8">Alle Artikel ausreichend vorhanden ✓</p>
+              <div className="text-center text-gray-500 py-12 text-lg">
+                Alle Artikel ausreichend vorhanden ✓
+              </div>
             )}
           </div>
         )}
@@ -719,7 +756,7 @@ function App() {
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 sm:hidden z-40 safe-area-inset-bottom">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 sm:hidden z-40 safe-area-inset-bottom shadow-lg">
         <div className="flex justify-around">
           {([
             { id: 'items', icon: '📋', label: 'Artikel' },
@@ -731,12 +768,12 @@ function App() {
             <button
               key={t.id}
               onClick={() => { setTab(t.id); if (t.id !== 'scanner') stopScanner(); }}
-              className={`flex-1 py-3 flex flex-col items-center gap-0.5 touch-manipulation ${
+              className={`flex-1 py-4 flex flex-col items-center gap-1 touch-manipulation ${
                 tab === t.id ? 'text-blue-600 bg-blue-50' : 'text-gray-500 active:bg-gray-100'
               }`}
             >
-              <span className="text-xl">{t.icon}</span>
-              <span className="text-xs font-medium">{t.label}</span>
+              <span className="text-2xl">{t.icon}</span>
+              <span className="text-sm font-medium">{t.label}</span>
             </button>
           ))}
         </div>
@@ -751,6 +788,8 @@ function App() {
           onLogin={login}
           onClose={() => setSelectedItem(null)}
           onUpdate={fetchItems}
+          categories={categories}
+          locations={locations}
         />
       )}
     </div>
@@ -785,6 +824,25 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
   const [newLocation, setNewLocation] = useState('');
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [showNewLocation, setShowNewLocation] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageSelect = (file: File) => {
+    setSelectedImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (cameraInputRef.current) cameraInputRef.current.value = '';
+  };
 
   const createCategory = async () => {
     if (!newCategory.trim()) return;
@@ -842,6 +900,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
 
     try {
       const res = await fetch(`${API_URL}/items`, {
@@ -864,6 +923,21 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
       });
 
       if (res.ok) {
+        const newItem = await res.json();
+
+        // Upload image if selected
+        if (selectedImage && newItem.id) {
+          const formData = new FormData();
+          formData.append('image', selectedImage);
+
+          await fetch(`${API_URL}/items/${newItem.id}/image`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` },
+            body: formData
+          });
+        }
+
+        clearImage();
         onSuccess();
       } else {
         const error = await res.json();
@@ -872,11 +946,68 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
     } catch (error) {
       alert('Fehler beim Speichern');
     }
+    setSubmitting(false);
   };
 
   return (
     <form onSubmit={handleSubmit} className="bg-white p-4 sm:p-6 rounded-lg shadow space-y-4">
-      <h2 className="text-base sm:text-lg font-semibold">Neuen Artikel anlegen</h2>
+      <h2 className="text-lg font-semibold">Neuen Artikel anlegen</h2>
+
+      {/* Image Upload Section */}
+      <div className="border-2 border-dashed border-gray-300 rounded-xl p-4">
+        {imagePreview ? (
+          <div className="relative">
+            <img
+              src={imagePreview}
+              alt="Vorschau"
+              className="w-full h-40 object-contain rounded-lg bg-gray-50"
+            />
+            <button
+              type="button"
+              onClick={clearImage}
+              className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full text-sm w-8 h-8 flex items-center justify-center"
+            >
+              ✕
+            </button>
+          </div>
+        ) : (
+          <div className="text-center py-4">
+            <span className="text-4xl text-gray-300">📷</span>
+            <p className="text-sm text-gray-500 mt-2">Artikelbild (optional)</p>
+          </div>
+        )}
+        <div className="flex gap-2 mt-3">
+          <input
+            type="file"
+            ref={cameraInputRef}
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
+          />
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && handleImageSelect(e.target.files[0])}
+          />
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-3 px-4 rounded-lg text-base flex items-center justify-center gap-2 touch-manipulation"
+          >
+            📷 Foto aufnehmen
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex-1 bg-gray-200 hover:bg-gray-300 py-3 px-4 rounded-lg text-base flex items-center justify-center gap-2 touch-manipulation"
+          >
+            📁 Datei wählen
+          </button>
+        </div>
+      </div>
 
       <input
         type="text"
@@ -884,14 +1015,14 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
         value={form.name}
         onChange={(e) => setForm({ ...form, name: e.target.value })}
         required
-        className="w-full p-3 border rounded-lg text-base"
+        className="w-full p-4 border-2 rounded-xl text-lg"
       />
 
       <textarea
         placeholder="Beschreibung"
         value={form.description}
         onChange={(e) => setForm({ ...form, description: e.target.value })}
-        className="w-full p-3 border rounded-lg text-base"
+        className="w-full p-4 border-2 rounded-xl text-lg"
         rows={2}
       />
 
@@ -901,7 +1032,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
             <select
               value={form.category_id}
               onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-              className="flex-1 p-3 border rounded-lg text-base"
+              className="flex-1 p-4 border-2 rounded-xl text-lg"
             >
               <option value="">Kategorie wählen</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -909,7 +1040,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
             <button
               type="button"
               onClick={() => setShowNewCategory(!showNewCategory)}
-              className="px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold"
+              className="px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xl touch-manipulation"
             >+</button>
           </div>
           {showNewCategory && (
@@ -919,9 +1050,9 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
                 placeholder="Neue Kategorie"
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
-                className="flex-1 p-2 border rounded-lg text-sm"
+                className="flex-1 p-3 border-2 rounded-lg text-base"
               />
-              <button type="button" onClick={createCategory} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm">Erstellen</button>
+              <button type="button" onClick={createCategory} className="px-4 py-3 bg-green-600 text-white rounded-lg text-base touch-manipulation">Erstellen</button>
             </div>
           )}
         </div>
@@ -931,7 +1062,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
             <select
               value={form.location_id}
               onChange={(e) => setForm({ ...form, location_id: e.target.value })}
-              className="flex-1 p-3 border rounded-lg text-base"
+              className="flex-1 p-4 border-2 rounded-xl text-lg"
             >
               <option value="">Lagerort wählen</option>
               {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
@@ -939,7 +1070,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
             <button
               type="button"
               onClick={() => setShowNewLocation(!showNewLocation)}
-              className="px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold"
+              className="px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xl touch-manipulation"
             >+</button>
           </div>
           {showNewLocation && (
@@ -949,9 +1080,9 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
                 placeholder="Neuer Lagerort"
                 value={newLocation}
                 onChange={(e) => setNewLocation(e.target.value)}
-                className="flex-1 p-2 border rounded-lg text-sm"
+                className="flex-1 p-3 border-2 rounded-lg text-base"
               />
-              <button type="button" onClick={createLocation} className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm">Erstellen</button>
+              <button type="button" onClick={createLocation} className="px-4 py-3 bg-green-600 text-white rounded-lg text-base touch-manipulation">Erstellen</button>
             </div>
           )}
         </div>
@@ -962,83 +1093,84 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
         placeholder="EAN-Code (optional, sonst wird eigener generiert)"
         value={form.ean_code}
         onChange={(e) => setForm({ ...form, ean_code: e.target.value })}
-        className="w-full p-3 border rounded-lg text-base"
+        className="w-full p-4 border-2 rounded-xl text-lg"
       />
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Menge</label>
+          <label className="block text-sm text-gray-500 mb-1">Menge</label>
           <input
             type="number"
             inputMode="numeric"
             value={form.quantity}
             onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-            className="w-full p-3 border rounded-lg text-base"
+            className="w-full p-4 border-2 rounded-xl text-lg text-center"
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Min. Bestand</label>
+          <label className="block text-sm text-gray-500 mb-1">Min. Bestand</label>
           <input
             type="number"
             inputMode="numeric"
             value={form.min_quantity}
             onChange={(e) => setForm({ ...form, min_quantity: e.target.value })}
-            className="w-full p-3 border rounded-lg text-base"
+            className="w-full p-4 border-2 rounded-xl text-lg text-center"
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Einheit</label>
+          <label className="block text-sm text-gray-500 mb-1">Einheit</label>
           <input
             type="text"
             value={form.unit}
             onChange={(e) => setForm({ ...form, unit: e.target.value })}
-            className="w-full p-3 border rounded-lg text-base"
+            className="w-full p-4 border-2 rounded-xl text-lg text-center"
           />
         </div>
       </div>
 
       {/* Sellable Section for POS */}
-      <div className="border-t pt-4 mt-4">
-        <label className="flex items-center gap-3 cursor-pointer">
+      <div className="border-t-2 pt-4 mt-4">
+        <label className="flex items-center gap-3 cursor-pointer p-3 bg-gray-50 rounded-xl touch-manipulation">
           <input
             type="checkbox"
             checked={form.sellable}
             onChange={(e) => setForm({ ...form, sellable: e.target.checked })}
-            className="w-5 h-5 rounded"
+            className="w-6 h-6 rounded"
           />
-          <span className="font-medium">In Kasse verkaufen</span>
+          <span className="font-medium text-lg">🛒 In Kasse verkaufen</span>
         </label>
 
         {form.sellable && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Verkaufspreis (CHF)</label>
+              <label className="block text-sm text-gray-500 mb-1">Verkaufspreis (CHF)</label>
               <input
                 type="number"
                 step="0.05"
+                inputMode="decimal"
                 placeholder="z.B. 5.00"
                 value={form.sale_price}
                 onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
-                className="w-full p-3 border rounded-lg text-base"
+                className="w-full p-4 border-2 rounded-xl text-lg"
                 required={form.sellable}
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Verkaufskategorie</label>
+              <label className="block text-sm text-gray-500 mb-1">Verkaufskategorie</label>
               <input
                 type="text"
                 placeholder="z.B. Getränke"
                 value={form.sale_category}
                 onChange={(e) => setForm({ ...form, sale_category: e.target.value })}
-                className="w-full p-3 border rounded-lg text-base"
+                className="w-full p-4 border-2 rounded-xl text-lg"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Drucker</label>
+              <label className="block text-sm text-gray-500 mb-1">Drucker</label>
               <select
                 value={form.printer_station}
                 onChange={(e) => setForm({ ...form, printer_station: e.target.value })}
-                className="w-full p-3 border rounded-lg text-base"
+                className="w-full p-4 border-2 rounded-xl text-lg"
               >
                 <option value="bar">Bar (Getränke)</option>
                 <option value="kitchen">Küche (Essen)</option>
@@ -1050,9 +1182,10 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
 
       <button
         type="submit"
-        className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3 rounded-lg font-semibold touch-manipulation"
+        disabled={submitting}
+        className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-400 text-white py-4 rounded-xl font-semibold text-lg touch-manipulation"
       >
-        Artikel anlegen
+        {submitting ? '⏳ Wird gespeichert...' : '✓ Artikel anlegen'}
       </button>
     </form>
   );
@@ -1201,16 +1334,39 @@ function ReportsView({ items, onRefresh }: { items: Item[]; onRefresh: () => voi
   );
 }
 
-// Item Detail Modal
-function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate }: {
+// Item Detail Modal with Edit and Image functionality
+function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, categories, locations }: {
   item: Item;
   token: string | null;
   user: User | null;
   onLogin: () => void;
   onClose: () => void;
   onUpdate: () => void;
+  categories: Category[];
+  locations: Location[];
 }) {
+  const [activeTab, setActiveTab] = useState<'details' | 'stock' | 'edit'>('details');
   const [quantity, setQuantity] = useState(1);
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [currentItem, setCurrentItem] = useState(item);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: item.name,
+    description: item.description || '',
+    category_id: item.category_id?.toString() || '',
+    location_id: item.location_id?.toString() || '',
+    ean_code: item.ean_code || '',
+    min_quantity: item.min_quantity.toString(),
+    unit: item.unit,
+    sellable: item.sellable || false,
+    sale_price: item.sale_price?.toString() || '',
+    sale_category: item.sale_category || '',
+    printer_station: item.printer_station || 'bar'
+  });
 
   const updateStock = async (type: 'in' | 'out') => {
     if (!token) {
@@ -1229,8 +1385,9 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate }: {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        setCurrentItem(prev => ({ ...prev, quantity: data.new_quantity }));
         onUpdate();
-        onClose();
       } else {
         const error = await res.json();
         alert(error.error || 'Fehler');
@@ -1240,75 +1397,388 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate }: {
     }
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!token) {
+      alert('Bitte zuerst einloggen');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const res = await fetch(`${API_URL}/items/${item.id}/image`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentItem(prev => ({ ...prev, image_url: data.image_url }));
+        onUpdate();
+      } else {
+        const error = await res.json();
+        alert(error.error || 'Fehler beim Hochladen');
+      }
+    } catch (error) {
+      alert('Fehler beim Hochladen');
+    }
+    setUploading(false);
+  };
+
+  const handleDeleteImage = async () => {
+    if (!token || !confirm('Bild wirklich löschen?')) return;
+
+    try {
+      const res = await fetch(`${API_URL}/items/${item.id}/image`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        setCurrentItem(prev => ({ ...prev, image_url: undefined }));
+        onUpdate();
+      } else {
+        alert('Fehler beim Löschen');
+      }
+    } catch (error) {
+      alert('Fehler beim Löschen');
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!token) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/items/${item.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...editForm,
+          category_id: editForm.category_id || null,
+          location_id: editForm.location_id || null,
+          min_quantity: parseInt(editForm.min_quantity),
+          sellable: editForm.sellable,
+          sale_price: editForm.sellable && editForm.sale_price ? parseFloat(editForm.sale_price) : null,
+          sale_category: editForm.sellable ? editForm.sale_category : null,
+          printer_station: editForm.sellable ? editForm.printer_station : null
+        })
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setCurrentItem(updated);
+        onUpdate();
+        setActiveTab('details');
+      } else {
+        const error = await res.json();
+        alert(error.error || 'Fehler beim Speichern');
+      }
+    } catch (error) {
+      alert('Fehler beim Speichern');
+    }
+    setSaving(false);
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-start mb-4">
-          <h2 className="text-lg sm:text-xl font-bold pr-4">{item.name}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-start p-4 border-b">
+          <h2 className="text-lg sm:text-xl font-bold pr-4 truncate">{currentItem.name}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none flex-shrink-0">&times;</button>
         </div>
 
-        <div className="space-y-2 mb-6">
-          {item.description && <p className="text-gray-600 text-sm">{item.description}</p>}
-          <p className="text-xs sm:text-sm text-gray-500">Kategorie: {item.category_name || '-'}</p>
-          <p className="text-xs sm:text-sm text-gray-500">Lagerort: {item.location_name || '-'}</p>
-          <p className="text-xs sm:text-sm text-gray-500">Barcode: {item.custom_barcode || item.ean_code || '-'}</p>
-          {item.custom_barcode && (
-            <img
-              src={`${API_URL}/barcode/generate/${item.custom_barcode}`}
-              alt="Barcode"
-              className="h-12 sm:h-16"
-            />
-          )}
-        </div>
-
-        <div className="text-center mb-6">
-          <span className="text-4xl sm:text-5xl font-bold text-blue-600">{item.quantity}</span>
-          <span className="text-lg sm:text-xl text-gray-500 ml-2">{item.unit}</span>
-          <p className="text-xs sm:text-sm text-gray-400">Min: {item.min_quantity}</p>
-        </div>
-
-        {user ? (
-          <>
-            <div className="flex items-center justify-center gap-4 mb-4">
+        {/* Tabs */}
+        {user && (
+          <div className="flex border-b">
+            {[
+              { id: 'details', label: '📋 Details' },
+              { id: 'stock', label: '📦 Bestand' },
+              { id: 'edit', label: '✏️ Bearbeiten' }
+            ].map(tab => (
               <button
-                onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                className="w-10 h-10 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full text-xl font-bold touch-manipulation"
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as 'details' | 'stock' | 'edit')}
+                className={`flex-1 py-2 text-sm font-medium ${
+                  activeTab === tab.id ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'
+                }`}
               >
-                -
+                {tab.label}
               </button>
-              <span className="text-2xl font-bold w-12 text-center">{quantity}</span>
-              <button
-                onClick={() => setQuantity(quantity + 1)}
-                className="w-10 h-10 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full text-xl font-bold touch-manipulation"
-              >
-                +
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <button
-                onClick={() => updateStock('out')}
-                className="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-3 rounded-lg font-semibold touch-manipulation"
-              >
-                - Ausgang
-              </button>
-              <button
-                onClick={() => updateStock('in')}
-                className="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-3 rounded-lg font-semibold touch-manipulation"
-              >
-                + Eingang
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="text-center text-gray-500 py-4">
-            <button onClick={onLogin} className="text-blue-600 underline">
-              Anmelden
-            </button>
-            {' '}um Bestand zu ändern
+            ))}
           </div>
         )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {/* Details Tab */}
+          {activeTab === 'details' && (
+            <div className="space-y-4">
+              {/* Image */}
+              <div className="relative">
+                {currentItem.image_url ? (
+                  <div className="relative">
+                    <img
+                      src={currentItem.image_url.startsWith('http') ? currentItem.image_url : `${API_URL}${currentItem.image_url}`}
+                      alt={currentItem.name}
+                      className="w-full h-48 object-contain bg-gray-100 rounded-lg"
+                    />
+                    {user && (
+                      <button
+                        onClick={handleDeleteImage}
+                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full text-xs"
+                        title="Bild löschen"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <span className="text-gray-400 text-4xl">📷</span>
+                  </div>
+                )}
+
+                {/* Upload buttons */}
+                {user && (
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                    />
+                    <input
+                      type="file"
+                      ref={cameraInputRef}
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                    />
+                    <button
+                      onClick={() => cameraInputRef.current?.click()}
+                      disabled={uploading}
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-1"
+                    >
+                      📷 {uploading ? '...' : 'Foto'}
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="flex-1 bg-gray-200 hover:bg-gray-300 py-2 px-3 rounded-lg text-sm flex items-center justify-center gap-1"
+                    >
+                      📁 {uploading ? '...' : 'Datei'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Info */}
+              <div className="space-y-2">
+                {currentItem.description && <p className="text-gray-600 text-sm">{currentItem.description}</p>}
+                <p className="text-sm text-gray-500">Kategorie: {currentItem.category_name || '-'}</p>
+                <p className="text-sm text-gray-500">Lagerort: {currentItem.location_name || '-'}</p>
+                <p className="text-sm text-gray-500">Barcode: {currentItem.custom_barcode || currentItem.ean_code || '-'}</p>
+                {currentItem.custom_barcode && (
+                  <img
+                    src={`${API_URL}/barcode/generate/${currentItem.custom_barcode}`}
+                    alt="Barcode"
+                    className="h-12"
+                  />
+                )}
+              </div>
+
+              {/* Quick stock display */}
+              <div className="text-center py-4 bg-gray-50 rounded-lg">
+                <span className={`text-4xl font-bold ${currentItem.quantity <= currentItem.min_quantity ? 'text-red-500' : 'text-blue-600'}`}>
+                  {currentItem.quantity}
+                </span>
+                <span className="text-xl text-gray-500 ml-2">{currentItem.unit}</span>
+                <p className="text-sm text-gray-400">Min: {currentItem.min_quantity}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Stock Tab */}
+          {activeTab === 'stock' && user && (
+            <div className="space-y-4">
+              <div className="text-center py-4">
+                <span className="text-5xl font-bold text-blue-600">{currentItem.quantity}</span>
+                <span className="text-xl text-gray-500 ml-2">{currentItem.unit}</span>
+              </div>
+
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  className="w-12 h-12 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full text-2xl font-bold touch-manipulation"
+                >
+                  -
+                </button>
+                <span className="text-3xl font-bold w-16 text-center">{quantity}</span>
+                <button
+                  onClick={() => setQuantity(quantity + 1)}
+                  className="w-12 h-12 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full text-2xl font-bold touch-manipulation"
+                >
+                  +
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => updateStock('out')}
+                  className="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-4 rounded-lg text-lg font-semibold touch-manipulation"
+                >
+                  - Ausgang
+                </button>
+                <button
+                  onClick={() => updateStock('in')}
+                  className="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-4 rounded-lg text-lg font-semibold touch-manipulation"
+                >
+                  + Eingang
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Tab */}
+          {activeTab === 'edit' && user && (
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Name *"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                required
+                className="w-full p-3 border rounded-lg"
+              />
+
+              <textarea
+                placeholder="Beschreibung"
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                className="w-full p-3 border rounded-lg"
+                rows={2}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={editForm.category_id}
+                  onChange={(e) => setEditForm({ ...editForm, category_id: e.target.value })}
+                  className="p-3 border rounded-lg"
+                >
+                  <option value="">Kategorie</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+
+                <select
+                  value={editForm.location_id}
+                  onChange={(e) => setEditForm({ ...editForm, location_id: e.target.value })}
+                  className="p-3 border rounded-lg"
+                >
+                  <option value="">Lagerort</option>
+                  {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </div>
+
+              <input
+                type="text"
+                placeholder="EAN-Code"
+                value={editForm.ean_code}
+                onChange={(e) => setEditForm({ ...editForm, ean_code: e.target.value })}
+                className="w-full p-3 border rounded-lg"
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Min. Bestand</label>
+                  <input
+                    type="number"
+                    value={editForm.min_quantity}
+                    onChange={(e) => setEditForm({ ...editForm, min_quantity: e.target.value })}
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Einheit</label>
+                  <input
+                    type="text"
+                    value={editForm.unit}
+                    onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+              </div>
+
+              {/* Sellable Section */}
+              <div className="border-t pt-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.sellable}
+                    onChange={(e) => setEditForm({ ...editForm, sellable: e.target.checked })}
+                    className="w-5 h-5"
+                  />
+                  <span className="font-medium">In Kasse verkaufen</span>
+                </label>
+
+                {editForm.sellable && (
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    <input
+                      type="number"
+                      step="0.05"
+                      placeholder="Preis CHF"
+                      value={editForm.sale_price}
+                      onChange={(e) => setEditForm({ ...editForm, sale_price: e.target.value })}
+                      className="p-2 border rounded-lg text-sm"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Kategorie"
+                      value={editForm.sale_category}
+                      onChange={(e) => setEditForm({ ...editForm, sale_category: e.target.value })}
+                      className="p-2 border rounded-lg text-sm"
+                    />
+                    <select
+                      value={editForm.printer_station}
+                      onChange={(e) => setEditForm({ ...editForm, printer_station: e.target.value })}
+                      className="p-2 border rounded-lg text-sm"
+                    >
+                      <option value="bar">Bar</option>
+                      <option value="kitchen">Küche</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleSaveEdit}
+                disabled={saving}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold mt-4"
+              >
+                {saving ? 'Speichern...' : '💾 Speichern'}
+              </button>
+            </div>
+          )}
+
+          {/* Not logged in */}
+          {!user && (
+            <div className="text-center text-gray-500 py-8">
+              <button onClick={onLogin} className="text-blue-600 underline">
+                Anmelden
+              </button>
+              {' '}um Artikel zu bearbeiten
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
