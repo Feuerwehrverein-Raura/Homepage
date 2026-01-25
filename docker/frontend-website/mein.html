@@ -919,14 +919,6 @@
 
         document.getElementById('my-photo-delete-btn').addEventListener('click', deleteMyPhoto);
 
-        // Function email event listeners
-        document.getElementById('copy-email-btn').addEventListener('click', (e) => {
-            const email = document.getElementById('function-email-username').value;
-            copyToClipboard(email);
-        });
-
-        document.getElementById('change-email-password-btn').addEventListener('click', changeFunctionEmailPassword);
-
         // Initialize
         (async () => {
             if (await checkAuth()) {
