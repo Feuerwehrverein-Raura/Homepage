@@ -1,3 +1,10 @@
+# [1.65.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.64.0...v1.65.0) (2026-01-25)
+
+
+### Features
+
+* **pwa:** use custom logos for inventory and order system ([ed5cf21](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ed5cf2179f8feb2f51ded769e6a1834066d8de44))
+
 # [1.64.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.63.0...v1.64.0) (2026-01-25)
 
 
