@@ -468,8 +468,13 @@ async function deleteAuthentikUser(authentikUserId) {
     }
 }
 
+// Authentik group constants (used for group membership management)
+const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43e4-af75-e0241f06fb95';
+const SOCIAL_MEDIA_GROUP = process.env.AUTHENTIK_SOCIAL_MEDIA_GROUP || '494ef740-41d3-40c3-9e68-8a1e5d3b4ad9';
+const MITGLIEDER_GROUP = process.env.AUTHENTIK_MITGLIEDER_GROUP || '248db02d-6592-4571-9050-2ccc0fdf0b7e';
+const ADMIN_GROUP = process.env.AUTHENTIK_ADMIN_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
+
 // Authentik group membership management
-const NEXTCLOUD_ADMINS_GROUP = process.env.AUTHENTIK_NEXTCLOUD_ADMINS_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
 
 async function addUserToAuthentikGroup(authentikUserId, groupId) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
@@ -2359,9 +2364,9 @@ app.post('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand'
 
         let success;
         if (enabled) {
-            success = await addUserToAuthentikGroup(member.authentik_user_id, NEXTCLOUD_ADMINS_GROUP);
+            success = await addUserToAuthentikGroup(member.authentik_user_id, ADMIN_GROUP);
         } else {
-            success = await removeUserFromAuthentikGroup(member.authentik_user_id, NEXTCLOUD_ADMINS_GROUP);
+            success = await removeUserFromAuthentikGroup(member.authentik_user_id, ADMIN_GROUP);
         }
 
         if (!success) {
@@ -2407,7 +2412,7 @@ app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand',
             return res.json({ has_authentik: false, nextcloud_admin: false });
         }
 
-        const isAdmin = await isUserInAuthentikGroup(member.authentik_user_id, NEXTCLOUD_ADMINS_GROUP);
+        const isAdmin = await isUserInAuthentikGroup(member.authentik_user_id, ADMIN_GROUP);
 
         res.json({
             has_authentik: true,
@@ -2419,13 +2424,7 @@ app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand',
     }
 });
 
-// Group constants
-const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43e4-af75-e0241f06fb95';
-const SOCIAL_MEDIA_GROUP = process.env.AUTHENTIK_SOCIAL_MEDIA_GROUP || '494ef740-41d3-40c3-9e68-8a1e5d3b4ad9';
-const MITGLIEDER_GROUP = process.env.AUTHENTIK_MITGLIEDER_GROUP || '248db02d-6592-4571-9050-2ccc0fdf0b7e';
-const ADMIN_GROUP = process.env.AUTHENTIK_ADMIN_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
-
-// Mapping from functions to Authentik groups
+// Mapping from functions to Authentik groups (constants defined at top of group section)
 const FUNCTION_TO_GROUPS = {
     // Vorstand functions -> Vorstand group
     'präsident': VORSTAND_GROUP,
