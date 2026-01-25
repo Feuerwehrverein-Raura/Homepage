@@ -1008,6 +1008,12 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
                 newMember.authentik_user_id = authentikResult.pk.toString();
                 newMember.authentik_username = authentikResult.username;
 
+                // Sync Authentik groups based on function
+                if (funktion) {
+                    syncMemberAuthentikGroups(authentikResult.pk.toString(), funktion)
+                        .catch(err => console.error('Authentik group sync failed:', err));
+                }
+
                 // Create default notification preferences
                 const notificationTypes = ['shift_reminder', 'event_update', 'newsletter', 'general'];
                 for (const type of notificationTypes) {
@@ -1376,7 +1382,7 @@ app.get('/deletion-confirm/:token', async (req, res) => {
 
         // Find the request by token
         const requestResult = await pool.query(`
-            SELECT dr.*, m.vorname, m.nachname, m.email as member_email
+            SELECT dr.*, m.vorname, m.nachname, m.email as member_email, m.authentik_user_id
             FROM member_deletion_requests dr
             JOIN members m ON m.id = dr.member_id
             WHERE (dr.aktuar_token = $1 OR dr.kassier_token = $1)
@@ -1416,6 +1422,11 @@ app.get('/deletion-confirm/:token', async (req, res) => {
         if (req2.aktuar_confirmed_at && req2.kassier_confirmed_at) {
             // Both confirmed - execute deletion
             const memberId = request.member_id;
+
+            // Delete Authentik user if exists
+            if (request.authentik_user_id) {
+                await deleteAuthentikUser(request.authentik_user_id);
+            }
 
             // Clean up related records
             await pool.query('UPDATE dispatch_log SET member_id = NULL WHERE member_id = $1', [memberId]);
@@ -2730,7 +2741,42 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
     }
 });
 
+// Periodic sync of Authentik groups (every hour)
+async function periodicAuthentikGroupsSync() {
+    console.log('Starting periodic Authentik groups sync...');
+    try {
+        const result = await pool.query(`
+            SELECT id, vorname, nachname, funktion, authentik_user_id
+            FROM members
+            WHERE authentik_user_id IS NOT NULL
+        `);
+
+        let synced = 0;
+        for (const member of result.rows) {
+            try {
+                await syncMemberAuthentikGroups(member.authentik_user_id, member.funktion);
+                synced++;
+            } catch (error) {
+                console.error(`Periodic sync failed for ${member.vorname} ${member.nachname}:`, error.message);
+            }
+        }
+        console.log(`Periodic Authentik groups sync completed: ${synced}/${result.rows.length} members synced`);
+    } catch (error) {
+        console.error('Periodic Authentik groups sync error:', error.message);
+    }
+}
+
 // Start server
 app.listen(PORT, () => {
     console.log(`API-Members running on port ${PORT}`);
+
+    // Run initial sync after 30 seconds (to allow container to fully start)
+    setTimeout(() => {
+        periodicAuthentikGroupsSync();
+    }, 30000);
+
+    // Then run every hour
+    setInterval(() => {
+        periodicAuthentikGroupsSync();
+    }, 60 * 60 * 1000); // 1 hour
 });
