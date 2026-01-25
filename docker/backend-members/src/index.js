@@ -2423,7 +2423,7 @@ app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand',
 const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43e4-af75-e0241f06fb95';
 const SOCIAL_MEDIA_GROUP = process.env.AUTHENTIK_SOCIAL_MEDIA_GROUP || '494ef740-41d3-40c3-9e68-8a1e5d3b4ad9';
 const MITGLIEDER_GROUP = process.env.AUTHENTIK_MITGLIEDER_GROUP || '248db02d-6592-4571-9050-2ccc0fdf0b7e';
-const NEXTCLOUD_ADMINS_GROUP = process.env.AUTHENTIK_NEXTCLOUD_ADMINS_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
+const ADMIN_GROUP = process.env.AUTHENTIK_ADMIN_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
 
 // Mapping from functions to Authentik groups
 const FUNCTION_TO_GROUPS = {
@@ -2439,8 +2439,8 @@ const FUNCTION_TO_GROUPS = {
     'social media': SOCIAL_MEDIA_GROUP,
     'social-media': SOCIAL_MEDIA_GROUP,
     'socialmedia': SOCIAL_MEDIA_GROUP,
-    // Admin function -> Nextcloud Admins group
-    'admin': NEXTCLOUD_ADMINS_GROUP,
+    // Admin function -> admin group (grants Nextcloud admin rights)
+    'admin': ADMIN_GROUP,
 };
 
 // Sync Authentik groups based on member's functions
@@ -2482,7 +2482,7 @@ async function syncMemberAuthentikGroups(authentikUserId, funktion) {
         const currentGroups = new Set(userResponse.data.groups || []);
 
         // Groups we manage (only sync these, leave others untouched)
-        const managedGroups = [MITGLIEDER_GROUP, VORSTAND_GROUP, SOCIAL_MEDIA_GROUP, NEXTCLOUD_ADMINS_GROUP];
+        const managedGroups = [MITGLIEDER_GROUP, VORSTAND_GROUP, SOCIAL_MEDIA_GROUP, ADMIN_GROUP];
 
         // Calculate changes
         let changed = false;
