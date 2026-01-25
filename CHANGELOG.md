@@ -1,3 +1,10 @@
+## [1.61.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.2...v1.61.3) (2026-01-25)
+
+
+### Bug Fixes
+
+* **auth:** disable avatar sync to prevent token size overflow ([190bc60](https://github.com/Feuerwehrverein-Raura/Homepage/commit/190bc606fe700ebcba2003dc30f386f26b892a03))
+
 ## [1.61.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.1...v1.61.2) (2026-01-25)
 
 
