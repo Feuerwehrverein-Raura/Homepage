@@ -664,10 +664,60 @@ async function syncMemberToAuthentik(authentikUserId, member) {
             }
         );
 
+        // Sync avatar/photo if available
+        if (member.foto) {
+            await syncMemberAvatarToAuthentik(authentikUserId, member.foto);
+        }
+
         console.log(`Synced member profile to Authentik: ${member.vorname} ${member.nachname} (${authentikUserId})`);
         return true;
     } catch (error) {
         console.error(`Failed to sync member to Authentik:`, error.response?.data || error.message);
+        return false;
+    }
+}
+
+// Sync member avatar/photo to Authentik
+async function syncMemberAvatarToAuthentik(authentikUserId, fotoPath) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId || !fotoPath) {
+        return false;
+    }
+
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const FormData = require('form-data');
+
+        // Photo path is like /uploads/photo-xxx.jpg
+        // Files are stored in /app/uploads/ inside the container
+        const fullPath = path.join('/app', fotoPath);
+
+        if (!fs.existsSync(fullPath)) {
+            console.log(`Avatar file not found: ${fullPath}`);
+            return false;
+        }
+
+        const form = new FormData();
+        form.append('avatar', fs.createReadStream(fullPath));
+
+        await axios.post(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/set_avatar/`,
+            form,
+            {
+                headers: {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                    ...form.getHeaders()
+                }
+            }
+        );
+
+        console.log(`Synced avatar for user ${authentikUserId}`);
+        return true;
+    } catch (error) {
+        console.error(`Failed to sync avatar:`, error.response?.data || error.message);
         return false;
     }
 }
