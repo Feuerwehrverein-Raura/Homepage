@@ -1,3 +1,10 @@
+## [1.59.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.59.0...v1.59.1) (2026-01-25)
+
+
+### Bug Fixes
+
+* **authentik:** store avatar in user attributes instead of non-existent endpoint ([1d26280](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1d26280e977db88152486286910d733c254b12f7))
+
 # [1.59.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.58.1...v1.59.0) (2026-01-25)
 
 
