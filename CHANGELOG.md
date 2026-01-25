@@ -1,3 +1,10 @@
+## [1.61.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.1...v1.61.2) (2026-01-25)
+
+
+### Bug Fixes
+
+* **mein:** remove dead event listeners for non-existent elements ([011b9f2](https://github.com/Feuerwehrverein-Raura/Homepage/commit/011b9f2ce8f78e37b5dfe3f5a2923156657e70a7))
+
 ## [1.61.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.61.0...v1.61.1) (2026-01-25)
 
 
