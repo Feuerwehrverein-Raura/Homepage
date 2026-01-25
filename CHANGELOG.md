@@ -1,3 +1,10 @@
+# [1.64.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.63.0...v1.64.0) (2026-01-25)
+
+
+### Features
+
+* **pwa:** add install button and manifest for inventory and order system ([2d431a5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2d431a53fa1e2c5545056ce77d901700cd2837bd))
+
 # [1.63.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.62.0...v1.63.0) (2026-01-25)
 
 
