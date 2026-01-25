@@ -1,3 +1,10 @@
+# [1.58.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.57.0...v1.58.0) (2026-01-25)
+
+
+### Features
+
+* **members:** bidirectional Authentik profile sync ([8898461](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8898461a196dc73ba2519e733da1bd7895648bd2))
+
 # [1.57.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.56.0...v1.57.0) (2026-01-25)
 
 
