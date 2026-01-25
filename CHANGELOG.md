@@ -1,3 +1,10 @@
+# [1.60.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.59.1...v1.60.0) (2026-01-25)
+
+
+### Features
+
+* **authentik:** add Admin function -> nextcloud-admins group mapping ([0680230](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0680230e51f2d6c129fa2066896c1881238c1e93))
+
 ## [1.59.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.59.0...v1.59.1) (2026-01-25)
 
 
