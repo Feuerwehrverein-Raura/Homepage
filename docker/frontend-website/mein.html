@@ -172,15 +172,14 @@
                     <div id="function-email-section" class="bg-white rounded-lg shadow p-6 mt-6 hidden">
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">Funktions-E-Mails</h2>
 
-                        <!-- Container für mehrere Funktions-Emails -->
-                        <div id="function-emails-container" class="space-y-4 mb-6">
+                        <!-- Container für mehrere Funktions-Emails mit Zugangsdaten -->
+                        <div id="function-emails-container" class="space-y-6">
                             <!-- Wird dynamisch gefüllt -->
                         </div>
 
-                        <div class="space-y-4">
-                            <h3 class="font-semibold text-gray-700">Zugangsdaten</h3>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Allgemeine Infos -->
+                        <div class="mt-6 pt-6 border-t">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">IMAP/SMTP Server</label>
                                     <div class="flex">
@@ -193,59 +192,20 @@
                                     </div>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Benutzername</label>
-                                    <div class="flex">
-                                        <input type="text" id="function-email-username" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg bg-gray-50" readonly>
-                                        <button id="copy-email-btn" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg hover:bg-gray-200" title="Kopieren">
-                                            <span class="text-gray-600">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                            </span>
-                                        </button>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Ports</label>
+                                    <div class="text-sm text-gray-600">
+                                        <p>IMAP: 993 (SSL/TLS)</p>
+                                        <p>SMTP: 587 (STARTTLS)</p>
                                     </div>
                                 </div>
                             </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">IMAP Port</label>
-                                    <input type="text" value="993 (SSL/TLS)" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">SMTP Port</label>
-                                    <input type="text" value="587 (STARTTLS)" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50" readonly>
-                                </div>
-                            </div>
-
-                            <!-- Webmail Link -->
-                            <div class="pt-4 border-t">
-                                <a href="https://mail.test.juroct.net" target="_blank"
-                                   class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                    </svg>
-                                    Webmail öffnen
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Passwort ändern -->
-                        <div class="mt-6 pt-6 border-t">
-                            <h3 class="font-semibold text-gray-700 mb-4">Passwort ändern</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Neues Passwort</label>
-                                    <input type="password" id="function-email-password" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Mindestens 8 Zeichen">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Passwort bestätigen</label>
-                                    <input type="password" id="function-email-password-confirm" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Passwort wiederholen">
-                                </div>
-                                <div class="flex justify-end">
-                                    <button id="change-email-password-btn" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
-                                        Passwort ändern
-                                    </button>
-                                </div>
-                            </div>
+                            <a href="https://mail.test.juroct.net" target="_blank"
+                               class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                </svg>
+                                Webmail öffnen
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -457,26 +417,37 @@
                 return;
             }
 
-            // Build HTML for each function email
+            // Build HTML for each function email with its own credentials and password change
             container.innerHTML = emailEntries.map((entry, index) => `
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div class="flex items-start space-x-3">
                         <div class="text-blue-500 text-2xl">@</div>
                         <div class="flex-1">
                             <p class="text-sm text-blue-800 mb-1">Als <strong>${entry.funktion}</strong> hast du Zugang zu:</p>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 mb-3">
                                 <p class="text-lg font-mono font-semibold text-blue-900">${entry.email}</p>
                                 <button onclick="copyToClipboard('${entry.email}')" class="p-1 hover:bg-blue-100 rounded" title="Kopieren">
                                     <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 </button>
                             </div>
+
+                            <!-- Password change for this specific email -->
+                            <div class="bg-white rounded-lg p-3 mt-2">
+                                <p class="text-sm font-medium text-gray-700 mb-2">Passwort ändern für ${entry.email}</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <input type="password" id="password-${index}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Neues Passwort">
+                                    <input type="password" id="password-confirm-${index}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Bestätigen">
+                                </div>
+                                <div class="flex justify-end mt-2">
+                                    <button onclick="changeFunctionEmailPassword('${entry.email}', ${index})" class="px-4 py-1.5 text-sm bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
+                                        Passwort ändern
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             `).join('');
-
-            // Update the username field with first email (for password change)
-            document.getElementById('function-email-username').value = emailEntries[0].email;
 
             section.classList.remove('hidden');
         }
@@ -496,10 +467,10 @@
             });
         }
 
-        // Change function email password
-        async function changeFunctionEmailPassword() {
-            const password = document.getElementById('function-email-password').value;
-            const confirmPassword = document.getElementById('function-email-password-confirm').value;
+        // Change function email password for a specific email account
+        async function changeFunctionEmailPassword(email, index) {
+            const password = document.getElementById(`password-${index}`).value;
+            const confirmPassword = document.getElementById(`password-confirm-${index}`).value;
 
             if (!password || password.length < 8) {
                 alert('Das Passwort muss mindestens 8 Zeichen lang sein.');
@@ -511,7 +482,7 @@
                 return;
             }
 
-            const btn = document.getElementById('change-email-password-btn');
+            const btn = event.currentTarget;
             const originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = 'Wird geändert...';
@@ -524,7 +495,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ password, email })
                 });
 
                 if (!response.ok) {
@@ -532,9 +503,9 @@
                     throw new Error(errorData.error || `HTTP ${response.status}`);
                 }
 
-                alert('Passwort erfolgreich geändert!');
-                document.getElementById('function-email-password').value = '';
-                document.getElementById('function-email-password-confirm').value = '';
+                alert(`Passwort für ${email} erfolgreich geändert!`);
+                document.getElementById(`password-${index}`).value = '';
+                document.getElementById(`password-confirm-${index}`).value = '';
 
             } catch (error) {
                 console.error('Error changing password:', error);

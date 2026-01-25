@@ -2497,7 +2497,7 @@ const FUNCTION_EMAIL_MAP = {
 // Change function email password (self-service)
 app.put('/members/me/function-email-password', authenticateToken, async (req, res) => {
     try {
-        const { password } = req.body;
+        const { password, email: targetEmail } = req.body;
 
         if (!password || password.length < 8) {
             return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein' });
@@ -2516,11 +2516,32 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
         const member = memberResult.rows[0];
         const funktion = member.funktion;
 
-        if (!funktion || !FUNCTION_EMAIL_MAP[funktion]) {
+        if (!funktion) {
             return res.status(403).json({ error: 'Sie haben keine Funktion mit E-Mail-Adresse' });
         }
 
-        const functionEmail = FUNCTION_EMAIL_MAP[funktion];
+        // Parse multiple functions (comma-separated)
+        const funktionen = funktion.split(',').map(f => f.trim()).filter(f => f);
+        const allowedEmails = funktionen
+            .filter(f => FUNCTION_EMAIL_MAP[f])
+            .map(f => FUNCTION_EMAIL_MAP[f]);
+
+        if (allowedEmails.length === 0) {
+            return res.status(403).json({ error: 'Sie haben keine Funktion mit E-Mail-Adresse' });
+        }
+
+        // Determine which email to change
+        let functionEmail;
+        if (targetEmail) {
+            // Validate user has access to this specific email
+            if (!allowedEmails.includes(targetEmail)) {
+                return res.status(403).json({ error: 'Sie haben keinen Zugriff auf diese E-Mail-Adresse' });
+            }
+            functionEmail = targetEmail;
+        } else {
+            // Backward compatibility: use first email
+            functionEmail = allowedEmails[0];
+        }
 
         // Call Mailcow API via dispatch service
         const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
