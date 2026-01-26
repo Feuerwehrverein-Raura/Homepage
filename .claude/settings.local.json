@@ -63,7 +63,15 @@
       "Bash(gh release list:*)",
       "Bash(grep:*)",
       "Bash(gh run watch:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(gh repo list:*)",
+      "Bash(tar:*)",
+      "Bash(pdftotext:*)",
+      "Bash(AUTHENTIK_TOKEN=\"QWpdAtuD28w8bPSrvz3R16BlPWUMGlYjeb5CjZmkI3TJZPVIM6ikTgbwmKT8\")",
+      "Bash(identify:*)",
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []
