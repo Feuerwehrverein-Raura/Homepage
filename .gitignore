@@ -27,3 +27,6 @@ build/
 
 # Private member letters
 briefe/
+
+# Claude Code local settings (may contain secrets)
+.claude/settings.local.json
