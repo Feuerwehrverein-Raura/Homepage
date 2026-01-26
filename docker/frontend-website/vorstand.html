@@ -225,6 +225,11 @@
                             <button id="export-email-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                 E-Mail-Zustellung (zustellung_email)
                             </button>
+                            <hr class="my-1 border-gray-200">
+                            <button id="export-pdf-telefonliste-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path d="M4 18h12V6h-4V2H4v16zm8-15.5L14.5 5H12V2.5zM2 0h10l4 4v16H2V0z"/></svg>
+                                Telefonliste (PDF)
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -4548,6 +4553,10 @@ ${grussformel}`;
         });
         document.getElementById('export-email-btn').addEventListener('click', () => {
             exportCSV('email');
+            exportDropdown.classList.add('hidden');
+        });
+        document.getElementById('export-pdf-telefonliste-btn').addEventListener('click', () => {
+            window.open(`${API_BASE}/members/pdf/telefonliste`, '_blank');
             exportDropdown.classList.add('hidden');
         });
 

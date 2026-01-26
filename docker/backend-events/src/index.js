@@ -2074,6 +2074,307 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
 });
 
 // ============================================
+// DIRECT PDF LINKS (GET endpoints)
+// ============================================
+
+// Direct Arbeitsplan PDF via GET (for direct linking)
+app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Load event from database
+        const eventResult = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
+        if (eventResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        const event = eventResult.rows[0];
+
+        // Load shifts with registrations
+        const shiftsResult = await pool.query(
+            'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
+            [id]
+        );
+
+        const shiftsWithRegs = await Promise.all(shiftsResult.rows.map(async (shift) => {
+            const regsResult = await pool.query(`
+                SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE $1 = ANY(r.shift_ids) AND r.status IN ('approved', 'confirmed')
+            `, [shift.id]);
+
+            const dateStr = shift.date instanceof Date
+                ? shift.date.toISOString().split('T')[0]
+                : shift.date;
+
+            return {
+                ...shift,
+                date: dateStr,
+                registrations: {
+                    approved: regsResult.rows.map(r => ({
+                        id: r.id,
+                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                    }))
+                }
+            };
+        }));
+
+        if (shiftsWithRegs.length === 0) {
+            return res.status(400).json({ error: 'No shifts found for this event' });
+        }
+
+        // Create PDF document
+        const doc = new PDFDocument({
+            size: 'A4',
+            margin: 50,
+            info: {
+                Title: `Arbeitsplan ${event.title}`,
+                Author: 'Feuerwehrverein Raura'
+            }
+        });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        const safeTitle = event.title.replace(/[^a-zA-Z0-9äöüÄÖÜ ]/g, '_').substring(0, 50);
+        res.setHeader('Content-Disposition', `attachment; filename="Arbeitsplan_${safeTitle}.pdf"`);
+        doc.pipe(res);
+
+        // Header
+        doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
+        doc.moveDown(0.3);
+        doc.fontSize(16).font('Helvetica-Bold').text(event.title, { align: 'center' });
+        doc.moveDown(1);
+
+        // Get all unique Bereiche
+        const allBereiche = [...new Set(shiftsWithRegs.map(s => s.bereich || 'Allgemein'))].sort();
+
+        // Group shifts by date
+        const shiftsByDate = {};
+        shiftsWithRegs.forEach(shift => {
+            const date = shift.date || 'Unbekannt';
+            if (!shiftsByDate[date]) shiftsByDate[date] = [];
+            shiftsByDate[date].push(shift);
+        });
+
+        Object.keys(shiftsByDate).sort().forEach(date => {
+            const dateObj = new Date(date + 'T12:00:00');
+            const dateStr = dateObj.toLocaleDateString('de-CH', {
+                weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+            });
+
+            doc.fontSize(12).font('Helvetica-Bold').text(dateStr);
+            doc.moveDown(0.5);
+
+            const byTimeSlot = {};
+            shiftsByDate[date].forEach(shift => {
+                const startTime = shift.start_time || '';
+                const endTime = shift.end_time || '';
+                const timeKey = `${startTime}-${endTime}`;
+
+                if (!byTimeSlot[timeKey]) {
+                    byTimeSlot[timeKey] = { startTime, endTime, bereiche: {} };
+                }
+
+                const bereich = shift.bereich || 'Allgemein';
+                const helpers = shift.registrations?.approved?.map(r => r.name) || [];
+
+                byTimeSlot[timeKey].bereiche[bereich] = {
+                    needed: shift.max_helpers || 1,
+                    helpers
+                };
+            });
+
+            Object.entries(byTimeSlot).sort((a, b) => a[0].localeCompare(b[0])).forEach(([timeKey, slot]) => {
+                const timeDisplay = slot.startTime && slot.endTime
+                    ? `${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}`
+                    : timeKey;
+
+                doc.fontSize(10).font('Helvetica-Bold').text(`  ${timeDisplay}`);
+
+                allBereiche.forEach(bereich => {
+                    const data = slot.bereiche[bereich];
+                    if (data) {
+                        const helperList = data.helpers.length > 0 ? data.helpers.join(', ') : '(noch offen)';
+                        const countStr = `${data.helpers.length}/${data.needed}`;
+                        doc.fontSize(9).font('Helvetica').text(`      ${bereich} [${countStr}]: ${helperList}`);
+                    }
+                });
+                doc.moveDown(0.3);
+            });
+            doc.moveDown(0.5);
+        });
+
+        doc.moveDown(2);
+        doc.fontSize(8).font('Helvetica').fillColor('#666666')
+            .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
+
+        doc.end();
+
+    } catch (error) {
+        console.error('Direct Arbeitsplan PDF error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Direct Teilnehmerliste PDF via GET
+app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Load event
+        const eventResult = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
+        if (eventResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Event not found' });
+        }
+        const event = eventResult.rows[0];
+
+        // Load shifts
+        const shiftsResult = await pool.query(
+            'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
+            [id]
+        );
+
+        // Load all registrations for this event
+        const regsResult = await pool.query(`
+            SELECT DISTINCT r.id, r.guest_name, r.guest_email, r.status, r.shift_ids, r.notes,
+                   r.member_id, m.vorname, m.nachname, m.email as member_email
+            FROM registrations r
+            LEFT JOIN members m ON r.member_id = m.id
+            WHERE r.event_id = $1
+            ORDER BY COALESCE(m.nachname, r.guest_name)
+        `, [id]);
+
+        if (regsResult.rows.length === 0) {
+            return res.status(400).json({ error: 'No registrations found for this event' });
+        }
+
+        // Build participants and shifts data
+        const participants = regsResult.rows.map(r => ({
+            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+            email: r.member_email || r.guest_email,
+            status: r.status,
+            notes: r.notes,
+            shift_ids: r.shift_ids
+        }));
+
+        const shifts = shiftsResult.rows.map(s => {
+            const shiftParticipants = regsResult.rows
+                .filter(r => r.shift_ids && r.shift_ids.includes(s.id))
+                .map(r => ({
+                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                    email: r.member_email || r.guest_email,
+                    status: r.status,
+                    notes: r.notes
+                }));
+
+            const dateStr = s.date instanceof Date ? s.date.toISOString().split('T')[0] : s.date;
+
+            return {
+                id: s.id,
+                name: s.name,
+                bereich: s.bereich,
+                date: dateStr,
+                startTime: s.start_time,
+                endTime: s.end_time,
+                participants: shiftParticipants
+            };
+        });
+
+        // Create PDF
+        const doc = new PDFDocument({ size: 'A4', margin: 50, info: {
+            Title: `Teilnehmerliste ${event.title}`,
+            Author: 'Feuerwehrverein Raura'
+        }});
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Teilnehmerliste_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf"`);
+        doc.pipe(res);
+
+        // Header
+        doc.fontSize(20).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        doc.fontSize(16).font('Helvetica').text('Teilnehmerliste', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(14).font('Helvetica-Bold').text(event.title, { align: 'center' });
+        doc.moveDown(0.3);
+        doc.fontSize(10).font('Helvetica').fillColor('#666666')
+            .text(`${participants.length} Anmeldung${participants.length !== 1 ? 'en' : ''}`, { align: 'center' });
+        doc.fillColor('#000000');
+        doc.moveDown(1.5);
+
+        // Render by shift
+        for (const shift of shifts) {
+            if (shift.participants.length === 0) continue;
+
+            if (doc.y > 680) doc.addPage();
+
+            // Shift header
+            doc.fontSize(12).font('Helvetica-Bold').fillColor('#1f2937');
+            let shiftTitle = shift.name;
+            if (shift.bereich) shiftTitle = `${shift.bereich} - ${shift.name}`;
+            if (shift.date) {
+                const dateObj = new Date(shift.date + 'T12:00:00');
+                shiftTitle += `: ${dateObj.toLocaleDateString('de-CH')}`;
+                if (shift.startTime && shift.endTime) {
+                    shiftTitle += ` ${shift.startTime.substring(0,5)}-${shift.endTime.substring(0,5)}`;
+                }
+            }
+            doc.text(shiftTitle);
+            doc.fillColor('#000000');
+            doc.moveDown(0.3);
+
+            // Table header
+            const tableTop = doc.y;
+            const col1 = 50, col2 = 80, col3 = 280, col4 = 420;
+
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#4b5563');
+            doc.text('Nr.', col1, tableTop);
+            doc.text('Name', col2, tableTop);
+            doc.text('E-Mail', col3, tableTop);
+            doc.text('Status', col4, tableTop);
+            doc.fillColor('#000000');
+            doc.moveTo(col1, tableTop + 12).lineTo(545, tableTop + 12).strokeColor('#d1d5db').stroke();
+
+            let rowY = tableTop + 18;
+            doc.font('Helvetica').fontSize(9);
+
+            shift.participants.forEach((p, index) => {
+                if (rowY > 750) {
+                    doc.addPage();
+                    rowY = 50;
+                }
+
+                doc.fillColor('#374151').text(`${index + 1}.`, col1, rowY);
+                doc.text(p.name || '-', col2, rowY, { width: 190 });
+                doc.text(p.email || '-', col3, rowY, { width: 130 });
+
+                const statusText = p.status === 'approved' ? 'Bestätigt' :
+                                  p.status === 'pending' ? 'Ausstehend' :
+                                  p.status === 'rejected' ? 'Abgelehnt' : p.status;
+                const statusColor = p.status === 'approved' ? '#22c55e' :
+                                   p.status === 'pending' ? '#f59e0b' : '#ef4444';
+                doc.fillColor(statusColor).text(statusText, col4, rowY);
+                doc.fillColor('#000000');
+
+                rowY += 16;
+            });
+
+            doc.y = rowY + 10;
+            doc.moveDown(0.5);
+        }
+
+        doc.moveDown(2);
+        doc.fontSize(8).font('Helvetica').fillColor('#666666')
+            .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
+
+        doc.end();
+
+    } catch (error) {
+        console.error('Direct Teilnehmerliste PDF error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // TEILNEHMERLISTE PDF GENERATION
 // ============================================
 

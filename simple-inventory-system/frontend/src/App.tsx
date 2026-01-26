@@ -504,7 +504,7 @@ function App() {
                       {/* Item image or placeholder */}
                       {item.image_url ? (
                         <img
-                          src={item.image_url.startsWith('http') ? item.image_url : `${API_URL}${item.image_url}`}
+                          src={item.image_url.startsWith('http') || item.image_url.startsWith('/api') ? item.image_url : `${API_URL}${item.image_url}`}
                           alt=""
                           className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
                         />
@@ -794,7 +794,7 @@ function App() {
                     {/* Item image or placeholder */}
                     {item.image_url ? (
                       <img
-                        src={item.image_url.startsWith('http') ? item.image_url : `${API_URL}${item.image_url}`}
+                        src={item.image_url.startsWith('http') || item.image_url.startsWith('/api') ? item.image_url : `${API_URL}${item.image_url}`}
                         alt=""
                         className="w-14 h-14 object-cover rounded-lg flex-shrink-0"
                       />
@@ -1623,7 +1623,7 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
                 {currentItem.image_url ? (
                   <div className="relative">
                     <img
-                      src={currentItem.image_url.startsWith('http') ? currentItem.image_url : `${API_URL}${currentItem.image_url}`}
+                      src={currentItem.image_url.startsWith('http') || currentItem.image_url.startsWith('/api') ? currentItem.image_url : `${API_URL}${currentItem.image_url}`}
                       alt={currentItem.name}
                       className="w-full h-48 object-contain bg-gray-100 rounded-lg"
                     />
@@ -1992,7 +1992,7 @@ function PublicItemView({ code, onNavigateToApp }: { code: string; onNavigateToA
           {item.image_url && (
             <div className="bg-gray-100 p-4">
               <img
-                src={item.image_url.startsWith('http') ? item.image_url : `${API_URL}${item.image_url}`}
+                src={item.image_url.startsWith('http') || item.image_url.startsWith('/api') ? item.image_url : `${API_URL}${item.image_url}`}
                 alt={item.name}
                 className="w-full h-48 object-contain"
               />
