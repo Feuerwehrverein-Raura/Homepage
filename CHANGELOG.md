@@ -1,3 +1,10 @@
+## [1.69.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.0...v1.69.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* **inventory:** fix order system integration and add delete button ([d37efc0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d37efc00615b95507d6b04bc0d5b2e65ef24f910))
+
 # [1.69.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.5...v1.69.0) (2026-01-26)
 
 
