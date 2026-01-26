@@ -469,7 +469,7 @@ app.post('/api/items/from-order', authenticateOrderSystem, async (req, res) => {
       INSERT INTO items (
         name, custom_barcode, quantity, min_quantity, unit,
         sellable, sale_price, sale_category, printer_station
-      ) VALUES ($1, $2, 0, 0, 'Stück', true, $3, $4, $5)
+      ) VALUES ($1, $2, 1, 0, 'Stück', true, $3, $4, $5)
       RETURNING *
     `, [name, custom_barcode, sale_price, sale_category, printer_station || 'bar']);
 

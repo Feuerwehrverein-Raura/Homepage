@@ -1525,6 +1525,26 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
     }
   };
 
+  const handleDeleteItem = async () => {
+    if (!token || !confirm(`Artikel "${currentItem.name}" wirklich löschen?`)) return;
+
+    try {
+      const res = await fetch(`${API_URL}/items/${item.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        onClose();
+        onUpdate();
+      } else {
+        alert('Fehler beim Löschen des Artikels');
+      }
+    } catch (error) {
+      alert('Fehler beim Löschen des Artikels');
+    }
+  };
+
   const handleSaveEdit = async () => {
     if (!token) return;
 
@@ -1870,6 +1890,13 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold mt-4"
               >
                 {saving ? 'Speichern...' : '💾 Speichern'}
+              </button>
+
+              <button
+                onClick={handleDeleteItem}
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-semibold mt-2"
+              >
+                🗑️ Artikel löschen
               </button>
             </div>
           )}
