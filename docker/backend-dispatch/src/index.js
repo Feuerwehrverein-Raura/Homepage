@@ -1921,9 +1921,16 @@ function generateArbeitsplanHTML(event, logoBase64) {
                 };
             }
             const bereich = shift.bereich || 'Allgemein';
+            // Support both old format (assignments) and new format (registrations.approved)
+            let assignments = shift.assignments || [];
+            if (assignments.length === 0 && shift.registrations?.approved) {
+                assignments = shift.registrations.approved.map(r => ({
+                    member_name: r.name || r.member_name || 'Unbekannt'
+                }));
+            }
             timeSlots[timeKey].bereiche[bereich] = {
-                needed: shift.needed || 1,
-                assignments: shift.assignments || []
+                needed: shift.needed || shift.max_helpers || 1,
+                assignments: assignments
             };
         });
 
@@ -1938,7 +1945,12 @@ function generateArbeitsplanHTML(event, logoBase64) {
     <div class="date-header-with-task">${formattedDate} ${taskName}${timeInfo}</div>
     <div class="special-names">`;
 
-            const names = (shift.assignments || []).map(a => a.member_name || 'Unbekannt');
+            // Support both old format (assignments) and new format (registrations.approved)
+            let shiftAssignments = shift.assignments || [];
+            if (shiftAssignments.length === 0 && shift.registrations?.approved) {
+                shiftAssignments = shift.registrations.approved;
+            }
+            const names = shiftAssignments.map(a => a.member_name || a.name || 'Unbekannt');
             if (names.length > 0) {
                 html += `- ${names.join(', ')}`;
             }
@@ -1990,7 +2002,7 @@ function generateArbeitsplanHTML(event, logoBase64) {
 
                         if (assignments.length > 0) {
                             assignments.forEach(a => {
-                                html += `<div class="name-entry">-${a.member_name || 'Unbekannt'}</div>`;
+                                html += `<div class="name-entry">-${a.member_name || a.name || 'Unbekannt'}</div>`;
                             });
                             // Fill remaining slots with dashes
                             for (let i = assignments.length; i < needed; i++) {
