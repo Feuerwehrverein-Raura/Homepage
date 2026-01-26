@@ -1,3 +1,10 @@
+## [1.66.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.66.0...v1.66.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* **order-system:** combine local and inventory items in items list ([5f00515](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5f00515ee5d5e3c00ccbadbb719ccc2dd90ed39e))
+
 # [1.66.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.65.0...v1.66.0) (2026-01-26)
 
 
