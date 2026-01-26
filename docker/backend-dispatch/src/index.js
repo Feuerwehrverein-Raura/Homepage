@@ -622,9 +622,9 @@ app.post('/templates', async (req, res) => {
 // ============================================
 
 app.post('/email/send', async (req, res) => {
-    console.log('[EMAIL] /email/send called with:', { to: req.body.to, template_id: req.body.template_id, member_id: req.body.member_id });
+    console.log('[EMAIL] /email/send called with:', { to: req.body.to, cc: req.body.cc, template_id: req.body.template_id, member_id: req.body.member_id });
     try {
-        const { to, subject, body, template_id, variables, member_id, event_id } = req.body;
+        const { to, cc, subject, body, template_id, variables, member_id, event_id } = req.body;
 
         let emailSubject = subject;
         let emailBody = body;
@@ -658,13 +658,17 @@ app.post('/email/send', async (req, res) => {
             .replace(/\n/g, '<br>');
 
         // Send email with both text and HTML versions
-        const info = await transporter.sendMail({
+        const mailOptions = {
             from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
             to,
             subject: emailSubject,
             text: emailBody,
             html: emailHtml
-        });
+        };
+        if (cc) {
+            mailOptions.cc = cc;
+        }
+        const info = await transporter.sendMail(mailOptions);
 
         // Log
         await pool.query(`

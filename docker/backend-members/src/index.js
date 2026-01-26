@@ -1036,6 +1036,7 @@ async function sendFarewellMessage(memberData) {
                     const template = emailTemplate.rows[0];
                     await axios.post(`${DISPATCH_API}/email/send`, {
                         to: memberData.versand_email || memberData.email,
+                        cc: 'vorstand@fwv-raura.ch',
                         template_id: template.id,
                         variables: {
                             anrede: memberData.anrede || '',
@@ -1045,7 +1046,7 @@ async function sendFarewellMessage(memberData) {
                             aktuar_name: aktuarName
                         }
                     });
-                    console.log(`Farewell email sent to ${memberData.email}`);
+                    console.log(`Farewell email sent to ${memberData.email} (CC: vorstand@fwv-raura.ch)`);
                 } else {
                     console.warn('Farewell email template not found');
                 }
