@@ -1,3 +1,10 @@
+## [1.71.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.71.0...v1.71.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* **vorstand:** send auth token for PDF download ([c836d6c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c836d6c2a88db5edb03a87d76924537c15333250))
+
 # [1.71.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.70.0...v1.71.0) (2026-01-26)
 
 
