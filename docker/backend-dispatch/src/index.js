@@ -648,13 +648,14 @@ app.post('/email/send', async (req, res) => {
         }
 
         // Convert URLs to clickable links for HTML version
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        // IMPORTANT: Match URLs BEFORE replacing newlines, otherwise <br> gets included in URLs
+        const urlRegex = /(https?:\/\/[^\s<]+)/g;
         const emailHtml = emailBody
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/\n/g, '<br>')
-            .replace(urlRegex, '<a href="$1">$1</a>');
+            .replace(urlRegex, '<a href="$1">$1</a>')
+            .replace(/\n/g, '<br>');
 
         // Send email with both text and HTML versions
         const info = await transporter.sendMail({
