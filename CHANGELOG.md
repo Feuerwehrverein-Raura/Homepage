@@ -1,3 +1,10 @@
+## [1.68.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.1...v1.68.2) (2026-01-26)
+
+
+### Bug Fixes
+
+* **members:** update deletion request before deleting member (FK constraint) ([4d1a531](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4d1a531af224d2a0188d716b1144df1c40b3e145))
+
 ## [1.68.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.0...v1.68.1) (2026-01-26)
 
 
