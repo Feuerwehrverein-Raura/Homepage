@@ -1,3 +1,10 @@
+## [1.69.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.2...v1.69.3) (2026-01-26)
+
+
+### Bug Fixes
+
+* **inventory:** add persistent volume for uploads ([24dc2f6](https://github.com/Feuerwehrverein-Raura/Homepage/commit/24dc2f660e19cb3681383a1a20954c3d7975639a))
+
 ## [1.69.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.1...v1.69.2) (2026-01-26)
 
 
