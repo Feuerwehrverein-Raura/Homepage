@@ -1,3 +1,10 @@
+# [1.70.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.4...v1.70.0) (2026-01-26)
+
+
+### Features
+
+* **members:** add PDF export for member phone list ([c14c30c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c14c30c019f061f31c55ad6f34d41d8f6eec92b3))
+
 ## [1.69.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.3...v1.69.4) (2026-01-26)
 
 
