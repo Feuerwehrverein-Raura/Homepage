@@ -189,11 +189,59 @@ app.get('/api/items', async (req, res) => {
 app.post('/api/items', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { name, price, category, printer_station } = req.body;
+
+    // If inventory API is enabled, create item there as sellable
+    if (process.env.USE_INVENTORY_API === 'true') {
+      try {
+        // Forward the auth token to inventory API
+        const authHeader = req.headers.authorization;
+        const response = await fetch(`${INVENTORY_API_URL}/api/items`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader || '',
+          },
+          body: JSON.stringify({
+            name,
+            sale_price: price,
+            sale_category: category,
+            printer_station: printer_station || 'bar',
+            sellable: true,
+            quantity: 0,
+            min_quantity: 0,
+            unit: 'Stück'
+          })
+        });
+
+        if (response.ok) {
+          const inventoryItem = await response.json() as any;
+          // Return in order system format
+          return res.json({
+            id: `inv_${inventoryItem.id}`,
+            name: inventoryItem.name,
+            price: inventoryItem.sale_price,
+            category: inventoryItem.sale_category,
+            printer_station: inventoryItem.printer_station,
+            source: 'inventory',
+            inventory_id: inventoryItem.id
+          });
+        } else {
+          const error = await response.json() as any;
+          console.error('Inventory API error:', error);
+          return res.status(response.status).json({ error: error.error || 'Failed to create item in inventory' });
+        }
+      } catch (inventoryError) {
+        console.error('Inventory API error:', inventoryError);
+        return res.status(500).json({ error: 'Failed to connect to inventory system' });
+      }
+    }
+
+    // Fallback: create locally
     const result = await pool.query(
       'INSERT INTO items (name, price, category, printer_station) VALUES ($1, $2, $3, $4) RETURNING *',
       [name, price, category, printer_station]
     );
-    res.json(result.rows[0]);
+    res.json({ ...result.rows[0], source: 'local' });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
