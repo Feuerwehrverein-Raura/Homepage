@@ -4555,9 +4555,24 @@ ${grussformel}`;
             exportCSV('email');
             exportDropdown.classList.add('hidden');
         });
-        document.getElementById('export-pdf-telefonliste-btn').addEventListener('click', () => {
-            window.open(`${API_BASE}/members/pdf/telefonliste`, '_blank');
+        document.getElementById('export-pdf-telefonliste-btn').addEventListener('click', async () => {
             exportDropdown.classList.add('hidden');
+            try {
+                const response = await fetch(`${API_BASE}/members/pdf/telefonliste`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error('PDF konnte nicht erstellt werden');
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'Telefonliste_Mitglieder.pdf';
+                a.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error('PDF error:', error);
+                alert('Fehler beim Erstellen der PDF');
+            }
         });
 
         // Photo upload
