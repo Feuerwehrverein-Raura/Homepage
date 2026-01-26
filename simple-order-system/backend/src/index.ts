@@ -308,6 +308,125 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
+// Get open orders for a specific table
+app.get('/api/orders/open/:tableNumber', async (req, res) => {
+  try {
+    const { tableNumber } = req.params;
+    const result = await pool.query(`
+      SELECT o.*,
+        json_agg(
+          json_build_object(
+            'id', oi.id,
+            'item_name', i.name,
+            'quantity', oi.quantity,
+            'price', oi.price,
+            'notes', oi.notes,
+            'printer_station', i.printer_station
+          )
+        ) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN items i ON oi.item_id = i.id
+      WHERE o.status = 'pending' AND o.table_number = $1
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+    `, [tableNumber]);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Add items to an existing order
+app.post('/api/orders/:id/items', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { items } = req.body;
+
+    // Check if order exists and is still pending
+    const orderCheck = await client.query(
+      'SELECT * FROM orders WHERE id = $1 AND status = $2',
+      [id, 'pending']
+    );
+
+    if (orderCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Order not found or already closed' });
+    }
+
+    const order = orderCheck.rows[0];
+
+    // Calculate additional total
+    const additionalTotal = items.reduce((sum: number, item: any) =>
+      sum + (item.price * item.quantity), 0
+    );
+
+    // Add order items
+    for (const item of items) {
+      await client.query(
+        'INSERT INTO order_items (order_id, item_id, quantity, price, notes) VALUES ($1, $2, $3, $4, $5)',
+        [id, item.id, item.quantity, item.price, item.notes || null]
+      );
+    }
+
+    // Update order total
+    const newTotal = parseFloat(order.total) + additionalTotal;
+    await client.query(
+      'UPDATE orders SET total = $1 WHERE id = $2',
+      [newTotal, id]
+    );
+
+    await client.query('COMMIT');
+
+    // Reduce inventory stock if using inventory API
+    if (process.env.USE_INVENTORY_API === 'true') {
+      try {
+        const inventoryItems = items
+          .filter((item: any) => item.source === 'inventory')
+          .map((item: any) => ({ id: item.id, quantity: item.quantity }));
+
+        if (inventoryItems.length > 0) {
+          await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Order-API-Key': ORDER_API_KEY
+            },
+            body: JSON.stringify({
+              items: inventoryItems,
+              order_id: id,
+              order_source: 'kasse'
+            })
+          });
+        }
+      } catch (inventoryError) {
+        console.error('Failed to update inventory:', inventoryError);
+      }
+    }
+
+    // Print receipt for additional items
+    try {
+      await printReceipt(parseInt(id), order.table_number, items);
+    } catch (printError) {
+      console.error('Print error:', printError);
+    }
+
+    // Broadcast update
+    broadcast({ type: 'order_updated', order_id: id });
+
+    res.json({ success: true, total: newTotal });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Add items error:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    client.release();
+  }
+});
+
 app.patch('/api/orders/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;

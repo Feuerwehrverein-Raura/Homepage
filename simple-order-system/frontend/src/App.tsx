@@ -46,10 +46,23 @@ interface User {
   groups: string[];
 }
 
+interface OpenOrder {
+  id: number;
+  table_number: number;
+  total: string;
+  created_at: string;
+  items: { item_name: string; quantity: number; price: string }[];
+}
+
+type OrderType = 'bar' | 'mitnehmen' | 'tisch';
+
 function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [orderType, setOrderType] = useState<OrderType>('bar');
   const [tableNumber, setTableNumber] = useState<string>('');
+  const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<OpenOrder | null>(null);
   const [view, setView] = useState<'order' | 'inventory' | 'history' | 'settings'>('order');
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
@@ -254,6 +267,31 @@ function App() {
     }
   };
 
+  const fetchOpenOrders = async (tableNum: string) => {
+    if (!tableNum) {
+      setOpenOrders([]);
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/orders/open/${tableNum}`);
+      const data = await res.json();
+      setOpenOrders(data);
+    } catch (error) {
+      console.error('Failed to fetch open orders:', error);
+      setOpenOrders([]);
+    }
+  };
+
+  // Fetch open orders when table number changes
+  useEffect(() => {
+    if (orderType === 'tisch' && tableNumber) {
+      fetchOpenOrders(tableNumber);
+    } else {
+      setOpenOrders([]);
+      setSelectedOrder(null);
+    }
+  }, [tableNumber, orderType]);
+
   useEffect(() => {
     if (view === 'history' && user) {
       fetchHistory();
@@ -413,39 +451,92 @@ function App() {
     setCashPayment(null);
   };
 
+  const getTableNumber = (): number => {
+    switch (orderType) {
+      case 'bar': return 0;
+      case 'mitnehmen': return 99;
+      case 'tisch': return parseInt(tableNumber) || 0;
+      default: return 0;
+    }
+  };
+
   const submitOrder = async () => {
-    if (!tableNumber || cart.length === 0) {
-      alert('Bitte Tischnummer eingeben und Artikel auswählen!');
+    if (cart.length === 0) {
+      alert('Bitte Artikel auswählen!');
       return;
     }
 
+    if (orderType === 'tisch' && !tableNumber) {
+      alert('Bitte Tischnummer eingeben!');
+      return;
+    }
+
+    const tableNum = getTableNumber();
+
     setLoading(true);
     try {
-      const orderRes = await fetch(`${API_URL}/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          table_number: parseInt(tableNumber),
-          items: cart.map(c => ({
-            id: c.customPrice ? null : c.id,
-            quantity: c.quantity,
-            price: c.customPrice || c.price,
-            notes: c.notes,
-            item_name: c.name,
-            printer_station: c.printer_station,
-            is_custom: !!c.customPrice,
-          })),
-        }),
-      });
+      // If adding to existing order
+      if (selectedOrder) {
+        const res = await fetch(`${API_URL}/orders/${selectedOrder.id}/items`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            items: cart.map(c => ({
+              id: c.customPrice ? null : c.id,
+              quantity: c.quantity,
+              price: c.customPrice || c.price,
+              notes: c.notes,
+              item_name: c.name,
+              printer_station: c.printer_station,
+              is_custom: !!c.customPrice,
+            })),
+          }),
+        });
 
-      const order = await orderRes.json();
+        if (!res.ok) {
+          const error = await res.json();
+          alert(`Fehler: ${error.error || 'Konnte nicht hinzufügen'}`);
+          setLoading(false);
+          return;
+        }
 
-      // Show payment modal
-      setPendingOrder({ id: order.id, total });
-      setCart([]);
-      setTableNumber('');
+        const result = await res.json();
+        alert(`✅ Artikel zu Bestellung #${selectedOrder.id} hinzugefügt!\nNeue Summe: CHF ${parseFloat(result.total).toFixed(2)}`);
+        setCart([]);
+        setSelectedOrder(null);
+        fetchOpenOrders(tableNumber);
+      } else {
+        // Create new order
+        const orderRes = await fetch(`${API_URL}/orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            table_number: tableNum,
+            items: cart.map(c => ({
+              id: c.customPrice ? null : c.id,
+              quantity: c.quantity,
+              price: c.customPrice || c.price,
+              notes: c.notes,
+              item_name: c.name,
+              printer_station: c.printer_station,
+              is_custom: !!c.customPrice,
+            })),
+          }),
+        });
+
+        const order = await orderRes.json();
+
+        // Show payment modal
+        setPendingOrder({ id: order.id, total });
+        setCart([]);
+        if (orderType === 'tisch') {
+          setTableNumber('');
+        }
+      }
     } catch (error) {
       alert('Fehler beim Senden der Bestellung');
     } finally {
@@ -637,19 +728,98 @@ function App() {
               <div className="bg-white rounded-lg shadow p-3 sm:p-4 lg:sticky lg:top-4">
                 <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Bestellung</h2>
 
+                {/* Order Type Selection */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tischnummer
+                    Bestellart
                   </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={tableNumber}
-                    onChange={(e) => setTableNumber(e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-xl font-semibold text-center focus:border-fwv-red focus:outline-none"
-                    placeholder="Tisch..."
-                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => { setOrderType('bar'); setTableNumber(''); setSelectedOrder(null); }}
+                      className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
+                        orderType === 'bar'
+                          ? 'bg-fwv-red text-white'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      🍺 Bar
+                    </button>
+                    <button
+                      onClick={() => { setOrderType('mitnehmen'); setTableNumber(''); setSelectedOrder(null); }}
+                      className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
+                        orderType === 'mitnehmen'
+                          ? 'bg-fwv-red text-white'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      🥡 Take Away
+                    </button>
+                    <button
+                      onClick={() => { setOrderType('tisch'); setSelectedOrder(null); }}
+                      className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
+                        orderType === 'tisch'
+                          ? 'bg-fwv-red text-white'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      🪑 Tisch
+                    </button>
+                  </div>
                 </div>
+
+                {/* Table number input (only for Tisch) */}
+                {orderType === 'tisch' && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tischnummer
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={tableNumber}
+                      onChange={(e) => setTableNumber(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-xl font-semibold text-center focus:border-fwv-red focus:outline-none"
+                      placeholder="Tisch..."
+                    />
+                  </div>
+                )}
+
+                {/* Open orders for this table */}
+                {orderType === 'tisch' && tableNumber && openOrders.length > 0 && (
+                  <div className="mb-4 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
+                    <label className="block text-sm font-medium text-yellow-800 mb-2">
+                      Offene Bestellungen für Tisch {tableNumber}
+                    </label>
+                    <div className="space-y-2">
+                      {openOrders.map(order => (
+                        <button
+                          key={order.id}
+                          onClick={() => setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
+                          className={`w-full text-left p-2 rounded-lg transition ${
+                            selectedOrder?.id === order.id
+                              ? 'bg-yellow-400 text-yellow-900'
+                              : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold">#{order.id}</span>
+                            <span className="font-bold">CHF {parseFloat(order.total).toFixed(2)}</span>
+                          </div>
+                          <div className="text-xs mt-1">
+                            {order.items && order.items[0]?.item_name
+                              ? order.items.map(i => `${i.quantity}x ${i.item_name}`).join(', ')
+                              : 'Keine Artikel'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    {selectedOrder && (
+                      <p className="text-xs text-yellow-700 mt-2">
+                        Artikel werden zu Bestellung #{selectedOrder.id} hinzugefügt
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-3 mb-3 sm:mb-4 max-h-[40vh] sm:max-h-96 overflow-y-auto">
                   {cart.map((item, index) => (
@@ -707,10 +877,14 @@ function App() {
 
                   <button
                     onClick={submitOrder}
-                    disabled={loading || cart.length === 0 || !tableNumber}
-                    className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold py-4 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition text-lg sm:text-xl touch-manipulation min-h-[56px]"
+                    disabled={loading || cart.length === 0 || (orderType === 'tisch' && !tableNumber)}
+                    className={`w-full font-bold py-4 rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed transition text-lg sm:text-xl touch-manipulation min-h-[56px] ${
+                      selectedOrder
+                        ? 'bg-yellow-500 hover:bg-yellow-600 active:bg-yellow-700 text-yellow-900'
+                        : 'bg-green-600 hover:bg-green-700 active:bg-green-800 text-white'
+                    }`}
                   >
-                    {loading ? 'Sende...' : '✅ Bestellung senden'}
+                    {loading ? 'Sende...' : selectedOrder ? `➕ Zu #${selectedOrder.id} hinzufügen` : '✅ Bestellung senden'}
                   </button>
 
                   {cart.length > 0 && (
