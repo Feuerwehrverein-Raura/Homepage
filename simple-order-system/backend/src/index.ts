@@ -259,6 +259,25 @@ app.put('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, r
 app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
+
+    // Check if this is an inventory item (prefixed with inv_)
+    if (id.startsWith('inv_')) {
+      const inventoryId = id.replace('inv_', '');
+      const response = await fetch(`${INVENTORY_API_URL}/api/items/${inventoryId}`, {
+        method: 'DELETE',
+        headers: {
+          'X-Order-API-Key': ORDER_API_KEY
+        }
+      });
+
+      if (response.ok) {
+        return res.json({ success: true });
+      } else {
+        return res.status(response.status).json({ error: 'Failed to delete from inventory' });
+      }
+    }
+
+    // Local item
     await pool.query('UPDATE items SET active = false WHERE id = $1', [id]);
     res.json({ success: true });
   } catch (error) {

@@ -684,7 +684,24 @@ app.put('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, r
   }
 });
 
-app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+// Delete item - accepts both token auth and API key auth (for order system)
+app.delete('/api/items/:id', async (req, res, next) => {
+  // Check for API key first (order system)
+  const apiKey = req.headers['x-order-api-key'];
+  if (apiKey === ORDER_API_KEY) {
+    try {
+      const { id } = req.params;
+      await pool.query('UPDATE items SET active = false WHERE id = $1', [id]);
+      broadcast({ type: 'item_deleted', id });
+      return res.json({ success: true });
+    } catch (error) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+  }
+
+  // Fall back to token auth
+  authenticateToken(req as any, res, next);
+}, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
     await pool.query('UPDATE items SET active = false WHERE id = $1', [id]);
