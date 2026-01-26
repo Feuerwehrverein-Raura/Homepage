@@ -1982,11 +1982,9 @@ app.get('/members/deletion-confirm/:token', async (req, res) => {
             await pool.query('DELETE FROM registrations WHERE member_id = $1', [memberId]);
             await pool.query('DELETE FROM member_registrations WHERE member_id = $1', [memberId]);
 
-            // Update request status BEFORE deleting member (FK constraint)
-            await pool.query(
-                'UPDATE member_deletion_requests SET status = $1, executed_at = NOW(), member_id = NULL WHERE id = $2',
-                ['confirmed', request.id]
-            );
+            // Delete the deletion request BEFORE deleting member (FK constraint)
+            // The request info is saved to audit log below
+            await pool.query('DELETE FROM member_deletion_requests WHERE id = $1', [request.id]);
 
             // Delete member
             await pool.query('DELETE FROM members WHERE id = $1', [memberId]);
