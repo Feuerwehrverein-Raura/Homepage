@@ -1,3 +1,10 @@
+## [1.68.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.2...v1.68.3) (2026-01-26)
+
+
+### Bug Fixes
+
+* **members:** delete deletion request instead of setting member_id to NULL ([458fedd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/458fedd685cebd79bb47b3111d338d6e6f992300))
+
 ## [1.68.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.1...v1.68.2) (2026-01-26)
 
 
