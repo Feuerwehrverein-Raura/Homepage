@@ -1,3 +1,15 @@
+# [1.66.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.65.0...v1.66.0) (2026-01-26)
+
+
+### Bug Fixes
+
+* **arbeitsplan:** support registrations.approved format in PDF generation ([fa37ffa](https://github.com/Feuerwehrverein-Raura/Homepage/commit/fa37ffaa5432762950044386663e3c0198310a00))
+
+
+### Features
+
+* **order-system:** add quick order type selection and add-to-order ([3dd73a0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3dd73a0b5d7e414e078c22a9ed94f65547d1c633))
+
 # [1.65.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.64.0...v1.65.0) (2026-01-25)
 
 
