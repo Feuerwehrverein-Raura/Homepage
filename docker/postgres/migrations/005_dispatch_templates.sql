@@ -18,13 +18,13 @@ Wann: {{event_datum}}, {{event_zeit}}
 {{anmeldung_info}}
 
 Wir freuen uns über zahlreiches Erscheinen.
-Im Namen des Vorstandes.
 
 Mit freundlichen Grüssen
+Im Namen des Vorstandes
 
-{{praesident_name}}
-Präsident',
-    ARRAY['event_titel', 'event_ort', 'event_datum', 'event_zeit', 'event_beschreibung', 'anmeldung_info', 'praesident_name']
+{{aktuar_name}}
+Aktuar',
+    ARRAY['event_titel', 'event_ort', 'event_datum', 'event_zeit', 'event_beschreibung', 'anmeldung_info', 'aktuar_name']
 ),
 (
     gen_random_uuid(),
@@ -127,11 +127,12 @@ Deine Login-Daten für den Mitgliederbereich wurden separat per E-Mail verschick
 Bei Fragen stehen dir der Vorstand und alle Mitglieder gerne zur Verfügung.
 
 Mit kameradschaftlichen Grüssen
+Im Namen des Vorstandes
 
-{{praesident_name}}
-Präsident
+{{aktuar_name}}
+Aktuar
 Feuerwehrverein Raura Kaiseraugst',
-    ARRAY['anrede', 'vorname', 'nachname', 'mitgliedsnummer', 'status', 'eintrittsdatum', 'praesident_name']
+    ARRAY['anrede', 'vorname', 'nachname', 'mitgliedsnummer', 'status', 'eintrittsdatum', 'aktuar_name']
 ),
 (
     gen_random_uuid(),
@@ -168,10 +169,11 @@ Leider können wir deine Mitgliedschaftsanfrage aktuell nicht annehmen.
 Bei Fragen kannst du dich gerne beim Vorstand melden.
 
 Mit freundlichen Grüssen
+Im Namen des Vorstandes
 
-{{praesident_name}}
-Präsident
+{{aktuar_name}}
+Aktuar
 Feuerwehrverein Raura Kaiseraugst',
-    ARRAY['vorname', 'nachname', 'ablehnungsgrund', 'praesident_name']
+    ARRAY['vorname', 'nachname', 'ablehnungsgrund', 'aktuar_name']
 )
 ON CONFLICT (id) DO NOTHING;

@@ -916,6 +916,24 @@ function formatPhoneNumber(phone) {
     return phone;
 }
 
+// Helper to get the current Aktuar's name from the database
+async function getAktuarName() {
+    try {
+        const result = await pool.query(`
+            SELECT vorname, nachname
+            FROM members
+            WHERE funktion ILIKE '%aktuar%' AND funktion NOT ILIKE '%vize%'
+            LIMIT 1
+        `);
+        if (result.rows.length > 0) {
+            return `${result.rows[0].vorname} ${result.rows[0].nachname}`;
+        }
+    } catch (err) {
+        console.error('Failed to get Aktuar name:', err.message);
+    }
+    return 'Der Vorstand';
+}
+
 // Send notification email helper - sends to member AND aktuar
 async function sendNotificationEmail(memberId, templateName, variables = {}) {
     try {
@@ -972,6 +990,156 @@ async function sendNotificationEmail(memberId, templateName, variables = {}) {
 
     } catch (error) {
         console.error(`Failed to send notification email:`, error.message);
+    }
+}
+
+// Send farewell message to departing member based on delivery preferences
+async function sendFarewellMessage(memberData) {
+    try {
+        const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+
+        // Get Aktuar info for signature (letters are sent in the name of the Vorstand/Aktuar)
+        const aktuarResult = await pool.query(`
+            SELECT vorname, nachname, strasse, plz, ort
+            FROM members
+            WHERE funktion ILIKE '%aktuar%' AND funktion NOT ILIKE '%vize%'
+            LIMIT 1
+        `);
+        const aktuar = aktuarResult.rows[0] || {};
+        const aktuarName = aktuar.vorname && aktuar.nachname
+            ? `${aktuar.vorname} ${aktuar.nachname}`
+            : 'Der Vorstand';
+
+        // Format entry date
+        const eintrittsdatum = memberData.eintrittsdatum
+            ? new Date(memberData.eintrittsdatum).toLocaleDateString('de-CH')
+            : 'unbekannt';
+
+        // Determine formal address (Sie-Form for letters)
+        const anredeFormal = memberData.anrede === 'Frau'
+            ? 'Liebe Frau'
+            : memberData.anrede === 'Herr'
+                ? 'Lieber Herr'
+                : 'Liebe/r';
+
+        console.log(`Sending farewell message to ${memberData.vorname} ${memberData.nachname} (email: ${memberData.zustellung_email}, post: ${memberData.zustellung_post})`);
+
+        // Send farewell EMAIL if preference is set
+        if (memberData.zustellung_email && memberData.email) {
+            try {
+                // Get email template
+                const emailTemplate = await pool.query(
+                    "SELECT * FROM dispatch_templates WHERE name = 'Verabschiedung Mitglied' AND type = 'email'"
+                );
+
+                if (emailTemplate.rows.length > 0) {
+                    const template = emailTemplate.rows[0];
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: memberData.versand_email || memberData.email,
+                        template_id: template.id,
+                        variables: {
+                            anrede: memberData.anrede || '',
+                            vorname: memberData.vorname || '',
+                            nachname: memberData.nachname || '',
+                            eintrittsdatum: eintrittsdatum,
+                            aktuar_name: aktuarName
+                        }
+                    });
+                    console.log(`Farewell email sent to ${memberData.email}`);
+                } else {
+                    console.warn('Farewell email template not found');
+                }
+            } catch (emailError) {
+                console.error('Failed to send farewell email:', emailError.message);
+            }
+        }
+
+        // Send farewell LETTER if preference is set
+        if (memberData.zustellung_post && memberData.strasse && memberData.plz && memberData.ort) {
+            try {
+                // Get letter template
+                const letterTemplate = await pool.query(
+                    "SELECT * FROM dispatch_templates WHERE name = 'Verabschiedung Mitglied Brief' AND type = 'post'"
+                );
+
+                if (letterTemplate.rows.length > 0) {
+                    const template = letterTemplate.rows[0];
+                    const datum = new Date().toLocaleDateString('de-CH', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                    });
+
+                    // Get logo as base64 (same as invoice generation)
+                    let logoBase64 = '';
+                    try {
+                        const logoPath = '/app/logo.png';
+                        if (fs.existsSync(logoPath)) {
+                            logoBase64 = fs.readFileSync(logoPath).toString('base64');
+                        }
+                    } catch (logoErr) {
+                        console.warn('Could not load logo for farewell letter');
+                    }
+
+                    // Replace variables in template
+                    let html = template.body;
+                    const variables = {
+                        anrede: memberData.anrede || '',
+                        vorname: memberData.vorname || '',
+                        nachname: memberData.nachname || '',
+                        anrede_formal: anredeFormal,
+                        eintrittsdatum: eintrittsdatum,
+                        aktuar_name: aktuarName,
+                        aktuar_adresse: aktuar.strasse || '',
+                        aktuar_plz: aktuar.plz || '',
+                        aktuar_ort: aktuar.ort || '',
+                        datum: datum,
+                        empfaenger_anrede: memberData.anrede || '',
+                        empfaenger_vorname: memberData.vorname || '',
+                        empfaenger_nachname: memberData.nachname || '',
+                        empfaenger_strasse: memberData.strasse || '',
+                        empfaenger_plz: memberData.plz || '',
+                        empfaenger_ort: memberData.ort || '',
+                        logo_base64: logoBase64
+                    };
+
+                    for (const [key, value] of Object.entries(variables)) {
+                        html = html.replace(new RegExp(`{{${key}}}`, 'g'), value || '');
+                    }
+
+                    // Build recipient address for Pingen
+                    const recipientAddress = [
+                        `${memberData.anrede || ''} ${memberData.vorname} ${memberData.nachname}`.trim(),
+                        memberData.strasse,
+                        memberData.adresszusatz,
+                        `${memberData.plz} ${memberData.ort}`
+                    ].filter(Boolean).join('\n');
+
+                    // Send via Pingen
+                    await axios.post(`${DISPATCH_API}/pingen/send`, {
+                        html: html,
+                        recipientAddress: recipientAddress,
+                        recipientName: `${memberData.vorname} ${memberData.nachname}`,
+                        recipientCountry: 'CH'
+                    });
+
+                    console.log(`Farewell letter sent to ${memberData.vorname} ${memberData.nachname}`);
+                } else {
+                    console.warn('Farewell letter template not found');
+                }
+            } catch (letterError) {
+                console.error('Failed to send farewell letter:', letterError.message);
+            }
+        }
+
+        // If neither preference is set, log it
+        if (!memberData.zustellung_email && !memberData.zustellung_post) {
+            console.log(`No farewell message sent - member has no delivery preferences set`);
+        }
+
+    } catch (error) {
+        console.error('Failed to send farewell message:', error.message);
+        // Don't throw - we don't want farewell message failure to block deletion
     }
 }
 
@@ -1602,7 +1770,7 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
 
         const request = requestResult.rows[0];
         const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
-        const BASE_URL = process.env.BASE_URL || 'https://fwv-raura.ch';
+        const API_BASE_URL = process.env.API_BASE_URL || 'https://api.fwv-raura.ch';
 
         // Get Aktuar and Kassier emails from database
         const aktuarResult = await pool.query(
@@ -1624,7 +1792,7 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
         const kassier = kassierResult.rows[0];
 
         // Send confirmation email to Aktuar
-        const aktuarConfirmUrl = `${BASE_URL}/api/members/deletion-confirm/${request.aktuar_token}`;
+        const aktuarConfirmUrl = `${API_BASE_URL}/members/deletion-confirm/${request.aktuar_token}`;
         await axios.post(`${DISPATCH_API}/email/send`, {
             to: aktuar.email,
             subject: `Bestätigung Mitglieder-Löschung: ${memberName}`,
@@ -1632,7 +1800,7 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
         });
 
         // Send confirmation email to Kassier
-        const kassierConfirmUrl = `${BASE_URL}/api/members/deletion-confirm/${request.kassier_token}`;
+        const kassierConfirmUrl = `${API_BASE_URL}/members/deletion-confirm/${request.kassier_token}`;
         await axios.post(`${DISPATCH_API}/email/send`, {
             to: kassier.email,
             subject: `Bestätigung Mitglieder-Löschung: ${memberName}`,
@@ -1658,7 +1826,7 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
 });
 
 // Confirm member deletion (via email link)
-app.get('/deletion-confirm/:token', async (req, res) => {
+app.get('/members/deletion-confirm/:token', async (req, res) => {
     try {
         const { token } = req.params;
 
@@ -1672,14 +1840,98 @@ app.get('/deletion-confirm/:token', async (req, res) => {
             AND dr.expires_at > NOW()
         `, [token]);
 
+        // Helper function for styled HTML pages
+        const renderPage = (title, content, type = 'info') => {
+            const colors = {
+                success: { bg: '#dcfce7', border: '#22c55e', icon: '✓' },
+                warning: { bg: '#fef3c7', border: '#f59e0b', icon: '⏳' },
+                error: { bg: '#fee2e2', border: '#ef4444', icon: '✗' },
+                info: { bg: '#dbeafe', border: '#3b82f6', icon: 'ℹ' }
+            };
+            const c = colors[type] || colors.info;
+            return `<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title} - FWV Raura</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 500px; width: 100%; overflow: hidden; }
+        .header { background: #1e3a5f; color: white; padding: 24px; text-align: center; }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .logo { font-size: 32px; margin-bottom: 8px; }
+        .content { padding: 24px; }
+        .alert { background: ${c.bg}; border-left: 4px solid ${c.border}; padding: 16px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px; }
+        .alert-icon { font-size: 24px; }
+        .alert-text h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .alert-text p { font-size: 14px; color: #4b5563; }
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+        .status-item { background: #f9fafb; border-radius: 8px; padding: 16px; text-align: center; }
+        .status-item.confirmed { background: #dcfce7; }
+        .status-item.pending { background: #fef3c7; }
+        .status-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-value { font-size: 18px; font-weight: 600; margin-top: 4px; }
+        .status-item.confirmed .status-value { color: #16a34a; }
+        .status-item.pending .status-value { color: #d97706; }
+        .footer { padding: 16px 24px; background: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="header">
+            <div class="logo">🔥</div>
+            <h1>Feuerwehrverein Raura</h1>
+        </div>
+        <div class="content">${content}</div>
+        <div class="footer">Feuerwehrverein Raura Kaiseraugst</div>
+    </div>
+</body>
+</html>`;
+        };
+
         if (requestResult.rows.length === 0) {
-            return res.status(404).send('<html><body><h1>Ungültiger oder abgelaufener Link</h1><p>Der Bestätigungslink ist ungültig oder bereits abgelaufen.</p></body></html>');
+            return res.status(404).send(renderPage('Link ungültig', `
+                <div class="alert">
+                    <span class="alert-icon">✗</span>
+                    <div class="alert-text">
+                        <h2>Ungültiger oder abgelaufener Link</h2>
+                        <p>Der Bestätigungslink ist ungültig, wurde bereits verwendet oder ist abgelaufen.</p>
+                    </div>
+                </div>
+            `, 'error'));
         }
 
         const request = requestResult.rows[0];
         const memberName = `${request.vorname} ${request.nachname}`;
         const isAktuar = request.aktuar_token === token;
         const role = isAktuar ? 'aktuar' : 'kassier';
+
+        // Check if this person already confirmed
+        const alreadyConfirmed = isAktuar ? request.aktuar_confirmed_at : request.kassier_confirmed_at;
+        if (alreadyConfirmed) {
+            const otherConfirmed = isAktuar ? request.kassier_confirmed_at : request.aktuar_confirmed_at;
+            return res.send(renderPage('Bereits bestätigt', `
+                <div class="alert">
+                    <span class="alert-icon">ℹ</span>
+                    <div class="alert-text">
+                        <h2>Du hast bereits bestätigt</h2>
+                        <p>Deine Bestätigung für die Löschung von <strong>${memberName}</strong> wurde bereits registriert.</p>
+                    </div>
+                </div>
+                <div class="status-grid">
+                    <div class="status-item confirmed">
+                        <div class="status-label">Aktuar</div>
+                        <div class="status-value">✓ Bestätigt</div>
+                    </div>
+                    <div class="status-item ${otherConfirmed ? 'confirmed' : 'pending'}">
+                        <div class="status-label">Kassier</div>
+                        <div class="status-value">${otherConfirmed ? '✓ Bestätigt' : '⏳ Ausstehend'}</div>
+                    </div>
+                </div>
+            `, 'info'));
+        }
 
         // Update confirmation
         if (isAktuar) {
@@ -1704,6 +1956,14 @@ app.get('/deletion-confirm/:token', async (req, res) => {
         if (req2.aktuar_confirmed_at && req2.kassier_confirmed_at) {
             // Both confirmed - execute deletion
             const memberId = request.member_id;
+
+            // Fetch full member data BEFORE deletion for farewell message
+            const memberResult = await pool.query('SELECT * FROM members WHERE id = $1', [memberId]);
+            if (memberResult.rows.length > 0) {
+                const memberData = memberResult.rows[0];
+                // Send farewell message based on delivery preferences (email and/or letter)
+                await sendFarewellMessage(memberData);
+            }
 
             // Delete Authentik user if exists
             if (request.authentik_user_id) {
@@ -1743,16 +2003,72 @@ app.get('/deletion-confirm/:token', async (req, res) => {
             // Sync mitglieder alias in background (member removed)
             syncMitgliederAlias();
 
-            return res.send(`<html><body><h1>Mitglied gelöscht</h1><p>Das Mitglied "${memberName}" wurde erfolgreich gelöscht.</p><p>Beide Bestätigungen (Aktuar und Kassier) wurden erhalten.</p></body></html>`);
+            return res.send(renderPage('Mitglied gelöscht', `
+                <div class="alert">
+                    <span class="alert-icon">✓</span>
+                    <div class="alert-text">
+                        <h2>Mitglied erfolgreich gelöscht</h2>
+                        <p><strong>${memberName}</strong> wurde aus der Mitgliederliste entfernt.</p>
+                    </div>
+                </div>
+                <div class="status-grid">
+                    <div class="status-item confirmed">
+                        <div class="status-label">Aktuar</div>
+                        <div class="status-value">✓ Bestätigt</div>
+                    </div>
+                    <div class="status-item confirmed">
+                        <div class="status-label">Kassier</div>
+                        <div class="status-value">✓ Bestätigt</div>
+                    </div>
+                </div>
+            `, 'success'));
         }
 
         // Only one confirmed so far
         const otherRole = isAktuar ? 'Kassier' : 'Aktuar';
-        res.send(`<html><body><h1>Bestätigung erfolgreich</h1><p>Deine Bestätigung als ${isAktuar ? 'Aktuar' : 'Kassier'} wurde registriert.</p><p>Die Löschung von "${memberName}" wird durchgeführt sobald auch der ${otherRole} bestätigt hat.</p></body></html>`);
+        const otherConfirmed = isAktuar ? req2.kassier_confirmed_at : req2.aktuar_confirmed_at;
+        res.send(renderPage('Bestätigung erfolgreich', `
+            <div class="alert">
+                <span class="alert-icon">✓</span>
+                <div class="alert-text">
+                    <h2>Deine Bestätigung wurde registriert</h2>
+                    <p>Die Löschung von <strong>${memberName}</strong> wird durchgeführt, sobald auch der ${otherRole} bestätigt hat.</p>
+                </div>
+            </div>
+            <div class="status-grid">
+                <div class="status-item ${isAktuar ? 'confirmed' : (otherConfirmed ? 'confirmed' : 'pending')}">
+                    <div class="status-label">Aktuar</div>
+                    <div class="status-value">${isAktuar || otherConfirmed ? '✓ Bestätigt' : '⏳ Ausstehend'}</div>
+                </div>
+                <div class="status-item ${!isAktuar ? 'confirmed' : (otherConfirmed ? 'confirmed' : 'pending')}">
+                    <div class="status-label">Kassier</div>
+                    <div class="status-value">${!isAktuar || otherConfirmed ? '✓ Bestätigt' : '⏳ Ausstehend'}</div>
+                </div>
+            </div>
+        `, 'warning'));
 
     } catch (error) {
         console.error('Deletion confirm error:', error);
-        res.status(500).send('<html><body><h1>Fehler</h1><p>Ein Fehler ist aufgetreten.</p></body></html>');
+        res.status(500).send(`<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fehler - FWV Raura</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #f3f4f6; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card { background: white; border-radius: 12px; padding: 24px; max-width: 400px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #ef4444; margin-bottom: 8px; }
+        p { color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Fehler</h1>
+        <p>Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es später erneut.</p>
+    </div>
+</body>
+</html>`);
     }
 });
 
@@ -2084,12 +2400,14 @@ app.post('/registrations/:id/approve', authenticateVorstand, async (req, res) =>
 
         // Send welcome email to new member
         const today = new Date().toLocaleDateString('de-CH');
-        sendNotificationEmail(memberId, 'Willkommen neues Mitglied', {
-            mitgliedsnummer: memberId.substring(0, 8),
-            status: memberStatus,
-            eintrittsdatum: today,
-            praesident_name: 'René Käslin'
-        }).catch(err => console.error('Welcome email failed:', err));
+        getAktuarName().then(aktuarName => {
+            sendNotificationEmail(memberId, 'Willkommen neues Mitglied', {
+                mitgliedsnummer: memberId.substring(0, 8),
+                status: memberStatus,
+                eintrittsdatum: today,
+                aktuar_name: aktuarName
+            }).catch(err => console.error('Welcome email failed:', err));
+        });
 
         res.json({
             success: true,
@@ -2144,11 +2462,12 @@ app.post('/registrations/:id/reject', authenticateVorstand, async (req, res) => 
                 const templateResult = await pool.query('SELECT * FROM dispatch_templates WHERE name = $1', ['Registrierung abgelehnt']);
                 if (templateResult.rows.length > 0) {
                     const template = templateResult.rows[0];
+                    const aktuarName = await getAktuarName();
                     const variables = {
                         vorname: registration.vorname,
                         nachname: registration.nachname,
                         ablehnungsgrund: reason || 'Keine Begründung angegeben',
-                        praesident_name: 'René Käslin'
+                        aktuar_name: aktuarName
                     };
 
                     // Send to applicant
