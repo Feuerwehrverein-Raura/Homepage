@@ -1888,7 +1888,7 @@ app.get('/members/deletion-confirm/:token', async (req, res) => {
             AND dr.expires_at > NOW()
         `, [token]);
 
-        // Helper function for styled HTML pages
+        // Helper function for styled HTML pages (matching FWV website design)
         const renderPage = (title, content, type = 'info') => {
             const colors = {
                 success: { bg: '#dcfce7', border: '#22c55e', icon: '✓' },
@@ -1903,37 +1903,41 @@ app.get('/members/deletion-confirm/:token', async (req, res) => {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title} - FWV Raura</title>
+    <link rel="icon" type="image/png" href="https://fwv-raura.ch/images/favicon.png">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 500px; width: 100%; overflow: hidden; }
-        .header { background: #1e3a5f; color: white; padding: 24px; text-align: center; }
-        .header h1 { font-size: 20px; font-weight: 600; }
-        .header .logo { font-size: 32px; margin-bottom: 8px; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 500px; width: 100%; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%); color: white; padding: 28px 24px; text-align: center; }
+        .header h1 { font-size: 20px; font-weight: 600; margin-top: 8px; }
+        .header .logo { width: 56px; height: 56px; background: white; border-radius: 50%; padding: 6px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .header .logo img { width: 100%; height: 100%; object-fit: contain; }
         .content { padding: 24px; }
         .alert { background: ${c.bg}; border-left: 4px solid ${c.border}; padding: 16px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: flex-start; gap: 12px; }
-        .alert-icon { font-size: 24px; }
-        .alert-text h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-        .alert-text p { font-size: 14px; color: #4b5563; }
+        .alert-icon { font-size: 24px; line-height: 1; }
+        .alert-text h2 { font-size: 16px; font-weight: 600; margin-bottom: 4px; color: #1f2937; }
+        .alert-text p { font-size: 14px; color: #4b5563; line-height: 1.5; }
         .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
-        .status-item { background: #f9fafb; border-radius: 8px; padding: 16px; text-align: center; }
-        .status-item.confirmed { background: #dcfce7; }
-        .status-item.pending { background: #fef3c7; }
-        .status-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-item { background: #f9fafb; border-radius: 8px; padding: 16px; text-align: center; border: 1px solid #e5e7eb; }
+        .status-item.confirmed { background: #dcfce7; border-color: #86efac; }
+        .status-item.pending { background: #fef3c7; border-color: #fcd34d; }
+        .status-label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
         .status-value { font-size: 18px; font-weight: 600; margin-top: 4px; }
         .status-item.confirmed .status-value { color: #16a34a; }
         .status-item.pending .status-value { color: #d97706; }
         .footer { padding: 16px 24px; background: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center; font-size: 12px; color: #6b7280; }
+        .footer a { color: #b91c1c; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
     <div class="card">
         <div class="header">
-            <div class="logo">🔥</div>
+            <div class="logo"><img src="https://fwv-raura.ch/images/logo.png" alt="FWV Raura Logo"></div>
             <h1>Feuerwehrverein Raura</h1>
         </div>
         <div class="content">${content}</div>
-        <div class="footer">Feuerwehrverein Raura Kaiseraugst</div>
+        <div class="footer"><a href="https://fwv-raura.ch">Feuerwehrverein Raura Kaiseraugst</a></div>
     </div>
 </body>
 </html>`;
