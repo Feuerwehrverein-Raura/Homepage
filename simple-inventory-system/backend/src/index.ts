@@ -423,7 +423,7 @@ app.get('/api/items/sellable', async (req, res) => {
         i.id,
         i.name,
         i.sale_price as price,
-        i.sale_category as category,
+        COALESCE(NULLIF(i.sale_category, ''), c.name) as category,
         i.printer_station,
         i.quantity as stock,
         i.custom_barcode,
@@ -431,8 +431,12 @@ app.get('/api/items/sellable', async (req, res) => {
         c.name as inventory_category
       FROM items i
       LEFT JOIN categories c ON i.category_id = c.id
-      WHERE i.sellable = true AND i.active = true AND i.quantity > 0
-      ORDER BY i.sale_category, i.name
+      WHERE i.sellable = true
+        AND i.active = true
+        AND i.quantity > 0
+        AND i.sale_price IS NOT NULL
+        AND i.sale_price > 0
+      ORDER BY COALESCE(NULLIF(i.sale_category, ''), c.name), i.name
     `);
     res.json(result.rows);
   } catch (error) {
