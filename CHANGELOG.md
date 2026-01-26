@@ -1,3 +1,10 @@
+# [1.71.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.70.0...v1.71.0) (2026-01-26)
+
+
+### Features
+
+* add PDF download button, fix inventory images, add direct PDF links ([0eba294](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0eba294baf5881cec1ed42faaa5fd775591e291b))
+
 # [1.70.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.4...v1.70.0) (2026-01-26)
 
 
