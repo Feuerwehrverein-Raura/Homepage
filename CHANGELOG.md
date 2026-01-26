@@ -1,3 +1,10 @@
+## [1.69.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.1...v1.69.2) (2026-01-26)
+
+
+### Bug Fixes
+
+* **order:** sync item deletion between order and inventory systems ([5b7e29a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5b7e29aef0e5a9b8cf03239641909efb25852d6f))
+
 ## [1.69.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.0...v1.69.1) (2026-01-26)
 
 
