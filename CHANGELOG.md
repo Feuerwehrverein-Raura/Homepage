@@ -1,3 +1,10 @@
+## [1.68.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.4...v1.68.5) (2026-01-26)
+
+
+### Bug Fixes
+
+* **dispatch:** prevent URLs from capturing <br> tags in HTML emails ([21239f2](https://github.com/Feuerwehrverein-Raura/Homepage/commit/21239f2f62564b0c40a541afbb066f3004b7c7fe))
+
 ## [1.68.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.3...v1.68.4) (2026-01-26)
 
 
