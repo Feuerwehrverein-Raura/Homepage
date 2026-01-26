@@ -1,3 +1,10 @@
+## [1.68.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.3...v1.68.4) (2026-01-26)
+
+
+### Bug Fixes
+
+* **members:** show only changed fields with old/new values in notification email ([4ab65c8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4ab65c8ec167ffd9f85edf6fdb79cbd2e5f79f7a))
+
 ## [1.68.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.2...v1.68.3) (2026-01-26)
 
 
