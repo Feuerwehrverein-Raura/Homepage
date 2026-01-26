@@ -1,3 +1,10 @@
+# [1.69.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.5...v1.69.0) (2026-01-26)
+
+
+### Features
+
+* **dispatch:** add CC support to email/send endpoint ([7e0a562](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7e0a562bcbb7b99fdda5de48b124ff76195cb5f7))
+
 ## [1.68.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.4...v1.68.5) (2026-01-26)
 
 
