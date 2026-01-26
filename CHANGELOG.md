@@ -1,3 +1,10 @@
+# [1.68.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.67.1...v1.68.0) (2026-01-26)
+
+
+### Features
+
+* **inventory:** add QR codes with logo for item identification ([5450775](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5450775d6dd5af6ee40460f6cfb9a9470df89cb1))
+
 ## [1.67.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.67.0...v1.67.1) (2026-01-26)
 
 
