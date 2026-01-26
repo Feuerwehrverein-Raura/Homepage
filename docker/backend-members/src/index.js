@@ -8,6 +8,7 @@ const { ImapFlow } = require('imapflow');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const PDFDocument = require('pdfkit');
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
@@ -1376,6 +1377,119 @@ app.get('/members/me', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('/members/me error:', error.message);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ===========================================
+// PDF EXPORTS
+// ===========================================
+
+// Generate member phone list PDF (Vorstand only)
+app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { status } = req.query;
+        let query = `
+            SELECT vorname, nachname, telefon, mobile, email, status, funktion
+            FROM members
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (status) {
+            params.push(status);
+            query += ` AND status = $${params.length}`;
+        }
+
+        query += ' ORDER BY nachname, vorname';
+
+        const result = await pool.query(query, params);
+        const members = result.rows;
+
+        // Create PDF
+        const doc = new PDFDocument({
+            size: 'A4',
+            margin: 40,
+            info: {
+                Title: 'Telefonliste Feuerwehrverein Raura',
+                Author: 'Feuerwehrverein Raura'
+            }
+        });
+
+        // Set response headers
+        const filename = `Telefonliste_FWV_${new Date().toISOString().split('T')[0]}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        doc.pipe(res);
+
+        // Header
+        doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        doc.fontSize(14).font('Helvetica').text('Telefonliste', { align: 'center' });
+        doc.fontSize(10).text(`Stand: ${new Date().toLocaleDateString('de-CH')}`, { align: 'center' });
+        doc.moveDown(1.5);
+
+        // Table settings
+        const tableTop = doc.y;
+        const colName = 40;
+        const colTelefon = 200;
+        const colMobile = 320;
+        const colStatus = 440;
+        const rowHeight = 20;
+
+        // Table header
+        doc.fontSize(10).font('Helvetica-Bold');
+        doc.text('Name', colName, tableTop);
+        doc.text('Telefon', colTelefon, tableTop);
+        doc.text('Mobile', colMobile, tableTop);
+        doc.text('Status', colStatus, tableTop);
+
+        // Draw header line
+        doc.moveTo(colName, tableTop + 15).lineTo(555, tableTop + 15).stroke();
+
+        // Table rows
+        doc.font('Helvetica').fontSize(9);
+        let y = tableTop + rowHeight;
+        let currentStatus = null;
+
+        for (const member of members) {
+            // Check if we need a new page
+            if (y > 750) {
+                doc.addPage();
+                y = 50;
+
+                // Repeat header on new page
+                doc.fontSize(10).font('Helvetica-Bold');
+                doc.text('Name', colName, y);
+                doc.text('Telefon', colTelefon, y);
+                doc.text('Mobile', colMobile, y);
+                doc.text('Status', colStatus, y);
+                doc.moveTo(colName, y + 15).lineTo(555, y + 15).stroke();
+                doc.font('Helvetica').fontSize(9);
+                y += rowHeight;
+            }
+
+            const name = `${member.nachname}, ${member.vorname}`;
+            const telefon = member.telefon || '-';
+            const mobile = member.mobile || '-';
+            const statusText = member.funktion ? `${member.status} (${member.funktion})` : member.status || '-';
+
+            doc.text(name, colName, y, { width: 155 });
+            doc.text(telefon, colTelefon, y, { width: 115 });
+            doc.text(mobile, colMobile, y, { width: 115 });
+            doc.text(statusText, colStatus, y, { width: 115 });
+
+            y += rowHeight;
+        }
+
+        // Footer with count
+        doc.moveDown(2);
+        doc.fontSize(9).font('Helvetica-Oblique');
+        doc.text(`Total: ${members.length} Mitglieder`, { align: 'right' });
+
+        doc.end();
+
+    } catch (error) {
+        console.error('PDF generation error:', error);
+        res.status(500).json({ error: 'PDF Generierung fehlgeschlagen' });
     }
 });
 
