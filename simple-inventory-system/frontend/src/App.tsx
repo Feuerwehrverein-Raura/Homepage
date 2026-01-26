@@ -82,6 +82,7 @@ function App() {
   const [prefillData, setPrefillData] = useState<any | null>(null); // Prefill data for new item form
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [publicItemCode, setPublicItemCode] = useState<string | null>(null); // For public QR code scans
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -120,6 +121,16 @@ function App() {
       setInstallPrompt(null);
     }
   };
+
+  // Check for /item/:code URL path (QR code scans from external devices)
+  useEffect(() => {
+    const path = window.location.pathname;
+    const itemMatch = path.match(/^\/item\/([A-Z0-9]+)$/i);
+
+    if (itemMatch) {
+      setPublicItemCode(itemMatch[1]);
+    }
+  }, []);
 
   // Check for OAuth callback on mount
   useEffect(() => {
@@ -305,11 +316,18 @@ function App() {
         videoRef.current!,
         async (result) => {
           if (result) {
-            const code = result.getText();
+            const scannedValue = result.getText();
             stopScanner();
 
+            // Check if this is a QR code URL from our inventory system
+            const urlPattern = /^https?:\/\/inventar\.fwv-raura\.ch\/item\/([A-Z0-9]+)$/i;
+            const match = scannedValue.match(urlPattern);
+
+            // Extract barcode from URL or use raw scanned value
+            const code = match ? match[1] : scannedValue;
+
             try {
-              // Use the new lookup endpoint that searches local + external databases
+              // Use the lookup endpoint that searches local + external databases
               const res = await fetch(`${API_URL}/barcode/lookup/${code}`);
               if (res.ok) {
                 const data = await res.json();
@@ -381,6 +399,19 @@ function App() {
       alert('Fehler beim Aktualisieren');
     }
   };
+
+  // Render public item view if accessed via /item/:code URL
+  if (publicItemCode) {
+    return (
+      <PublicItemView
+        code={publicItemCode}
+        onNavigateToApp={() => {
+          window.history.pushState({}, '', '/');
+          setPublicItemCode(null);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -1634,12 +1665,40 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
                 <p className="text-sm text-gray-500">Kategorie: {currentItem.category_name || '-'}</p>
                 <p className="text-sm text-gray-500">Lagerort: {currentItem.location_name || '-'}</p>
                 <p className="text-sm text-gray-500">Barcode: {currentItem.custom_barcode || currentItem.ean_code || '-'}</p>
-                {currentItem.custom_barcode && (
-                  <img
-                    src={`${API_URL}/barcode/generate/${currentItem.custom_barcode}`}
-                    alt="Barcode"
-                    className="h-12"
-                  />
+                {(currentItem.custom_barcode || currentItem.ean_code) && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex flex-wrap items-start gap-4">
+                      {/* QR Code */}
+                      {currentItem.custom_barcode && (
+                        <div className="text-center">
+                          <img
+                            src={`${API_URL}/qrcode/generate/${currentItem.custom_barcode}?size=100&logoSize=18`}
+                            alt="QR Code"
+                            className="h-24 w-24"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">QR-Code</p>
+                        </div>
+                      )}
+                      {/* Barcode */}
+                      <div className="text-center">
+                        <img
+                          src={`${API_URL}/barcode/generate/${currentItem.custom_barcode || currentItem.ean_code}`}
+                          alt="Barcode"
+                          className="h-12"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Barcode</p>
+                      </div>
+                    </div>
+                    {/* Print Button */}
+                    {currentItem.custom_barcode && (
+                      <button
+                        onClick={() => window.open(`${API_URL}/qrcode/label/${currentItem.custom_barcode}`, '_blank')}
+                        className="mt-3 w-full bg-gray-200 hover:bg-gray-300 py-2 px-4 rounded-lg text-sm flex items-center justify-center gap-2"
+                      >
+                        🏷️ QR-Etikett drucken
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -1826,6 +1885,176 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ========================================
+// PUBLIC ITEM VIEW (for external QR code scans)
+// ========================================
+
+function PublicItemView({ code, onNavigateToApp }: { code: string; onNavigateToApp: () => void }) {
+  const [item, setItem] = useState<Item | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchItem() {
+      try {
+        const res = await fetch(`${API_URL}/public/item/${code}`);
+        if (res.ok) {
+          setItem(await res.json());
+        } else if (res.status === 404) {
+          setError('Artikel nicht gefunden');
+        } else {
+          setError('Fehler beim Laden');
+        }
+      } catch {
+        setError('Netzwerkfehler');
+      }
+      setLoading(false);
+    }
+    fetchItem();
+  }, [code]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-lg text-gray-600">Lädt...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !item) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md w-full">
+          <div className="text-6xl mb-4">❌</div>
+          <h1 className="text-xl font-bold mb-2 text-gray-800">{error || 'Artikel nicht gefunden'}</h1>
+          <p className="text-gray-500 mb-6 font-mono">{code}</p>
+          <button
+            onClick={onNavigateToApp}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold w-full"
+          >
+            📱 Zur Inventar-App
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const isLowStock = item.quantity <= item.min_quantity;
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-blue-600 text-white p-4 shadow-lg">
+        <div className="container mx-auto flex items-center gap-3">
+          <img src="/logo.png" alt="FWV Raura" className="h-10 w-10 rounded-full bg-white p-1" />
+          <h1 className="text-lg font-bold">Lagerverwaltung</h1>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="container mx-auto p-4 max-w-lg">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          {/* Image */}
+          {item.image_url && (
+            <div className="bg-gray-100 p-4">
+              <img
+                src={item.image_url.startsWith('http') ? item.image_url : `${API_URL}${item.image_url}`}
+                alt={item.name}
+                className="w-full h-48 object-contain"
+              />
+            </div>
+          )}
+
+          {/* Details */}
+          <div className="p-6">
+            <h1 className="text-2xl font-bold mb-2 text-gray-800">{item.name}</h1>
+
+            {item.description && (
+              <p className="text-gray-600 mb-4">{item.description}</p>
+            )}
+
+            {/* Stock Display */}
+            <div className={`text-center p-4 rounded-lg mb-4 ${isLowStock ? 'bg-red-50' : 'bg-green-50'}`}>
+              <span className={`text-4xl font-bold ${isLowStock ? 'text-red-600' : 'text-green-600'}`}>
+                {item.quantity}
+              </span>
+              <span className="text-xl text-gray-500 ml-2">{item.unit}</span>
+              {isLowStock && (
+                <p className="text-red-600 text-sm mt-1">Bestand niedrig!</p>
+              )}
+            </div>
+
+            {/* Info Table */}
+            <div className="space-y-3 border-t pt-4">
+              {item.category_name && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Kategorie:</span>
+                  <span className="font-medium text-gray-800">{item.category_name}</span>
+                </div>
+              )}
+              {item.location_name && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Lagerort:</span>
+                  <span className="font-medium text-gray-800">{item.location_name}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-gray-500">Barcode:</span>
+                <span className="font-mono text-gray-800">{item.custom_barcode || item.ean_code || '-'}</span>
+              </div>
+            </div>
+
+            {/* QR Code and Barcode */}
+            {(item.custom_barcode || item.ean_code) && (
+              <div className="mt-6 border-t pt-6">
+                <div className="flex justify-center items-start gap-6">
+                  {/* QR Code */}
+                  {item.custom_barcode && (
+                    <div className="text-center">
+                      <img
+                        src={`${API_URL}/qrcode/generate/${item.custom_barcode}?size=140`}
+                        alt="QR Code"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">QR-Code</p>
+                    </div>
+                  )}
+                  {/* Barcode */}
+                  <div className="text-center">
+                    <img
+                      src={`${API_URL}/barcode/generate/${item.custom_barcode || item.ean_code}`}
+                      alt="Barcode"
+                      className="h-16"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">Barcode</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="mt-4">
+          <button
+            onClick={onNavigateToApp}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-semibold text-lg"
+          >
+            📱 Inventar-App öffnen
+          </button>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-gray-400 text-sm mt-6">
+          Feuerwehrverein Raura - Lagerverwaltung
+        </p>
+      </main>
     </div>
   );
 }

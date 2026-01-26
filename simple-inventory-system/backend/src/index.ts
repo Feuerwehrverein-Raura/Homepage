@@ -9,6 +9,7 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
+import { generateQRCodeWithLogo, getItemUrl } from './qrcode.js';
 
 const app = express();
 const server = createServer(app);
@@ -941,6 +942,210 @@ app.get('/api/barcode/next', authenticateToken, async (req, res) => {
     const nextNumber = result.rows[0].last_number + 1;
     const nextCode = `FWV${String(nextNumber).padStart(6, '0')}`;
     res.json({ next_code: nextCode });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ========================================
+// QR CODE GENERATION
+// ========================================
+
+// Generate QR code with logo for an item
+app.get('/api/qrcode/generate/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { size = '300', logoSize = '20' } = req.query;
+
+    const qrBuffer = await generateQRCodeWithLogo(code, {
+      size: Number(size),
+      logoSize: Number(logoSize)
+    });
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24h
+    res.send(qrBuffer);
+  } catch (error) {
+    console.error('QR code generation failed:', error);
+    res.status(500).json({ error: 'QR code generation failed' });
+  }
+});
+
+// Get the URL that would be encoded in the QR code
+app.get('/api/qrcode/url/:code', (req, res) => {
+  const { code } = req.params;
+  res.json({ url: getItemUrl(code) });
+});
+
+// Generate printable QR code label (HTML page for Brother QL printers - 62mm x 29mm)
+app.get('/api/qrcode/label/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const { copies = '1' } = req.query;
+
+    // Get item info for label
+    const result = await pool.query(
+      'SELECT name, custom_barcode FROM items WHERE custom_barcode = $1 AND active = true',
+      [code]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const item = result.rows[0];
+    const qrUrl = `/api/qrcode/generate/${code}?size=150&logoSize=18`;
+    const numCopies = Math.min(parseInt(copies as string) || 1, 20);
+
+    // Generate printable HTML optimized for Brother QL (62mm x 29mm labels)
+    const html = `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Etikett - ${item.name}</title>
+  <style>
+    @page {
+      size: 62mm 29mm;
+      margin: 0;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .label {
+      width: 62mm;
+      height: 29mm;
+      padding: 2mm;
+      display: flex;
+      align-items: center;
+      gap: 3mm;
+      page-break-after: always;
+      overflow: hidden;
+    }
+    .label:last-child {
+      page-break-after: auto;
+    }
+    .qr {
+      width: 25mm;
+      height: 25mm;
+      flex-shrink: 0;
+    }
+    .info {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1mm;
+    }
+    .name {
+      font-size: 9pt;
+      font-weight: bold;
+      line-height: 1.2;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .barcode {
+      font-size: 7pt;
+      font-family: 'Courier New', monospace;
+      color: #333;
+    }
+    .controls {
+      padding: 20px;
+      text-align: center;
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+    }
+    .controls button {
+      padding: 12px 24px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      margin: 0 8px;
+    }
+    .controls button:hover {
+      background: #1d4ed8;
+    }
+    .controls .secondary {
+      background: #6b7280;
+    }
+    .controls .secondary:hover {
+      background: #4b5563;
+    }
+    @media print {
+      .controls { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button onclick="window.print()">Drucken</button>
+    <button class="secondary" onclick="window.close()">Schliessen</button>
+  </div>
+  ${Array(numCopies).fill(`
+  <div class="label">
+    <img class="qr" src="${qrUrl}" alt="QR">
+    <div class="info">
+      <div class="name">${item.name}</div>
+      <div class="barcode">${item.custom_barcode}</div>
+    </div>
+  </div>
+  `).join('')}
+</body>
+</html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('Label generation failed:', error);
+    res.status(500).json({ error: 'Label generation failed' });
+  }
+});
+
+// ========================================
+// PUBLIC ITEM VIEW (for external QR code scans)
+// ========================================
+
+// Public endpoint - no authentication required
+app.get('/api/public/item/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+
+    const result = await pool.query(`
+      SELECT
+        i.id,
+        i.name,
+        i.description,
+        i.image_url,
+        i.quantity,
+        i.unit,
+        i.custom_barcode,
+        i.ean_code,
+        c.name as category_name,
+        l.name as location_name
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      LEFT JOIN locations l ON i.location_id = l.id
+      WHERE (i.custom_barcode = $1 OR i.ean_code = $1) AND i.active = true
+    `, [code]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Return limited public information (no prices, suppliers, etc.)
+    res.json(result.rows[0]);
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }

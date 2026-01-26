@@ -8,25 +8,28 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "pg": "^8.11.3",
+    "bwip-js": "^4.1.1",
     "cors": "^2.8.5",
-    "ws": "^8.16.0",
+    "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.1.0",
-    "bwip-js": "^4.1.1",
     "multer": "^1.4.5-lts.1",
-    "uuid": "^9.0.1"
+    "pg": "^8.11.3",
+    "qrcode": "^1.5.4",
+    "sharp": "^0.34.5",
+    "uuid": "^9.0.1",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/cors": "^2.8.17",
-    "@types/pg": "^8.10.9",
-    "@types/ws": "^8.5.10",
-    "@types/jsonwebtoken": "^9.0.5",
     "@types/bwip-js": "^3.2.3",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^1.4.11",
+    "@types/pg": "^8.10.9",
+    "@types/qrcode": "^1.5.6",
     "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }
