@@ -193,23 +193,18 @@ app.post('/api/items', authenticateToken, async (req: AuthenticatedRequest, res)
     // If inventory API is enabled, create item there as sellable
     if (process.env.USE_INVENTORY_API === 'true') {
       try {
-        // Forward the auth token to inventory API
-        const authHeader = req.headers.authorization;
-        const response = await fetch(`${INVENTORY_API_URL}/api/items`, {
+        // Use API key authentication for server-to-server communication
+        const response = await fetch(`${INVENTORY_API_URL}/api/items/from-order`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': authHeader || '',
+            'X-Order-API-Key': ORDER_API_KEY,
           },
           body: JSON.stringify({
             name,
             sale_price: price,
             sale_category: category,
-            printer_station: printer_station || 'bar',
-            sellable: true,
-            quantity: 0,
-            min_quantity: 0,
-            unit: 'Stück'
+            printer_station: printer_station || 'bar'
           })
         });
 

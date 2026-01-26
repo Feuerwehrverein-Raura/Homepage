@@ -450,6 +450,40 @@ function authenticateOrderSystem(req: express.Request, res: express.Response, ne
   next();
 }
 
+// Create item from order system (API key authentication)
+app.post('/api/items/from-order', authenticateOrderSystem, async (req, res) => {
+  try {
+    const {
+      name, sale_price, sale_category, printer_station
+    } = req.body;
+
+    // Generate custom barcode
+    const counterResult = await pool.query(
+      'UPDATE barcode_counter SET last_number = last_number + 1 RETURNING last_number'
+    );
+    const number = counterResult.rows[0].last_number;
+    const custom_barcode = `FWV${String(number).padStart(6, '0')}`;
+
+    const result = await pool.query(`
+      INSERT INTO items (
+        name, custom_barcode, quantity, min_quantity, unit,
+        sellable, sale_price, sale_category, printer_station
+      ) VALUES ($1, $2, 0, 0, 'Stück', true, $3, $4, $5)
+      RETURNING *
+    `, [name, custom_barcode, sale_price, sale_category, printer_station || 'bar']);
+
+    broadcast({ type: 'item_created', item: result.rows[0] });
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error('Create item from order error:', error);
+    if (error.code === '23505') {
+      res.status(400).json({ error: 'Barcode already exists' });
+    } else {
+      res.status(500).json({ error: 'Database error' });
+    }
+  }
+});
+
 app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
   const client = await pool.connect();
   try {
