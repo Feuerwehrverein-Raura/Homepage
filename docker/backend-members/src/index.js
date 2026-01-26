@@ -1510,7 +1510,7 @@ app.put('/members/me', authenticateToken, async (req, res) => {
         const currentMember = currentResult.rows[0];
         const memberId = currentMember.id;
 
-        // Track which fields changed
+        // Track which fields changed with old and new values
         const changedFields = [];
         const fieldLabels = {
             telefon: 'Telefon',
@@ -1528,7 +1528,13 @@ app.put('/members/me', authenticateToken, async (req, res) => {
         const updates = { telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen };
         for (const [field, value] of Object.entries(updates)) {
             if (value !== undefined && value !== currentMember[field]) {
-                changedFields.push(fieldLabels[field] || field);
+                const oldValue = currentMember[field] || '(leer)';
+                const newValue = value || '(leer)';
+                changedFields.push({
+                    label: fieldLabels[field] || field,
+                    oldValue,
+                    newValue
+                });
             }
         }
 
@@ -1554,7 +1560,9 @@ app.put('/members/me', authenticateToken, async (req, res) => {
 
         // Send notification email if fields changed
         if (changedFields.length > 0) {
-            const changedFieldsList = changedFields.map(f => `- ${f}`).join('\n');
+            const changedFieldsList = changedFields.map(f =>
+                `- ${f.label}: ${f.oldValue} → ${f.newValue}`
+            ).join('\n');
             sendNotificationEmail(memberId, 'Datenänderung bestätigt', {
                 changed_fields: changedFieldsList
             }).catch(err => console.error('Email notification failed:', err));
@@ -1562,7 +1570,7 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             // Write audit log with real client IP
             const clientIp = getClientIp(req);
             logAudit(pool, 'member_self_update', memberId, req.user.email, clientIp, {
-                updated_fields: changedFields
+                updated_fields: changedFields.map(f => f.label)
             });
         }
 
@@ -1681,8 +1689,9 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
             return res.status(400).json({ error: 'No fields to update' });
         }
 
-        // Get old values for audit log
-        const oldResult = await pool.query('SELECT vorname, nachname FROM members WHERE id = $1', [id]);
+        // Get old values for comparison and audit log
+        const oldResult = await pool.query('SELECT * FROM members WHERE id = $1', [id]);
+        const oldMember = oldResult.rows[0] || {};
 
         const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
         values.push(id);
@@ -1707,11 +1716,50 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
             updated_fields: fields
         });
 
-        // Send notification email to member and aktuar
-        const changedFieldsList = fields.map(f => `- ${f}`).join('\n');
-        sendNotificationEmail(id, 'Datenänderung bestätigt', {
-            changed_fields: changedFieldsList
-        }).catch(err => console.error('Email notification failed:', err));
+        // Send notification email to member - only show actually changed fields
+        const fieldLabels = {
+            vorname: 'Vorname',
+            nachname: 'Nachname',
+            email: 'E-Mail',
+            versand_email: 'Versand E-Mail',
+            telefon: 'Telefon',
+            mobile: 'Mobile',
+            strasse: 'Strasse',
+            adresszusatz: 'Adresszusatz',
+            plz: 'PLZ',
+            ort: 'Ort',
+            geburtstag: 'Geburtstag',
+            eintrittsdatum: 'Eintrittsdatum',
+            funktion: 'Funktion',
+            status: 'Status',
+            iban: 'IBAN',
+            bemerkungen: 'Bemerkungen',
+            zustellung_post: 'Zustellung Post',
+            zustellung_email: 'Zustellung E-Mail'
+        };
+
+        // Filter to only fields that actually changed
+        const actuallyChangedFields = fields.filter(f => {
+            const oldVal = oldMember[f];
+            const newVal = updates[f];
+            // Compare as strings to handle null/undefined/empty consistently
+            const oldStr = oldVal === null || oldVal === undefined ? '' : String(oldVal);
+            const newStr = newVal === null || newVal === undefined ? '' : String(newVal);
+            return oldStr !== newStr;
+        });
+
+        if (actuallyChangedFields.length > 0) {
+            const changedFieldsList = actuallyChangedFields.map(f => {
+                const label = fieldLabels[f] || f;
+                const oldVal = oldMember[f] || '(leer)';
+                const newVal = updates[f] || '(leer)';
+                return `- ${label}: ${oldVal} → ${newVal}`;
+            }).join('\n');
+
+            sendNotificationEmail(id, 'Datenänderung bestätigt', {
+                changed_fields: changedFieldsList
+            }).catch(err => console.error('Email notification failed:', err));
+        }
 
         res.json(result.rows[0]);
 
