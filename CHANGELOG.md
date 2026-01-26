@@ -1,3 +1,10 @@
+# [1.67.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.66.1...v1.67.0) (2026-01-26)
+
+
+### Features
+
+* **order-system:** create items in inventory when adding via order system ([4b44c5c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4b44c5c187a91c5c1f93def3050f8e36603f2a89))
+
 ## [1.66.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.66.0...v1.66.1) (2026-01-26)
 
 
