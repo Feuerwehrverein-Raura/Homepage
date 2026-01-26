@@ -1,3 +1,10 @@
+## [1.68.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.68.0...v1.68.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* **members:** correct deletion confirmation URL routing and improve UI ([41114d8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/41114d809c41c97374b3dbf18b6a806595d6e051))
+
 # [1.68.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.67.1...v1.68.0) (2026-01-26)
 
 
