@@ -134,34 +134,52 @@ const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
 // Routes: Items (from Inventory or local)
 app.get('/api/items', async (req, res) => {
   try {
-    // Try to fetch from inventory system first
+    let allItems: any[] = [];
+
+    // Fetch local items first
+    const localResult = await pool.query(
+      'SELECT * FROM items WHERE active = true ORDER BY category, name'
+    );
+    const localItems = localResult.rows.map((item: any) => ({
+      ...item,
+      source: 'local',
+      price: parseFloat(item.price)
+    }));
+    allItems = [...localItems];
+
+    // Also fetch from inventory system if enabled
     if (process.env.USE_INVENTORY_API === 'true') {
       try {
         const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
         if (response.ok) {
           const inventoryItems = await response.json() as any[];
-          // Map inventory items to order system format
-          const items = inventoryItems.map((item) => ({
-            id: item.id,
+          // Map inventory items to order system format with prefixed ID to avoid conflicts
+          const mappedInventoryItems = inventoryItems.map((item) => ({
+            id: `inv_${item.id}`,
             name: item.name,
             price: parseFloat(item.price),
             category: item.category,
             printer_station: item.printer_station,
             stock: item.stock,
-            source: 'inventory'
+            source: 'inventory',
+            inventory_id: item.id
           }));
-          return res.json(items);
+          allItems = [...allItems, ...mappedInventoryItems];
         }
       } catch (inventoryError) {
-        console.error('Inventory API error, falling back to local:', inventoryError);
+        console.error('Inventory API error:', inventoryError);
       }
     }
 
-    // Fallback to local items
-    const result = await pool.query(
-      'SELECT * FROM items WHERE active = true ORDER BY category, name'
-    );
-    res.json(result.rows.map((item: any) => ({ ...item, source: 'local' })));
+    // Sort by category then name
+    allItems.sort((a, b) => {
+      if (a.category !== b.category) {
+        return (a.category || '').localeCompare(b.category || '');
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    res.json(allItems);
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
