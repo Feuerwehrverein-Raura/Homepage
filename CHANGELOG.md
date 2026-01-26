@@ -1,3 +1,10 @@
+## [1.69.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.3...v1.69.4) (2026-01-26)
+
+
+### Bug Fixes
+
+* **inventory:** filter sellable items by price and use inventory category as fallback ([bad1169](https://github.com/Feuerwehrverein-Raura/Homepage/commit/bad1169412636b1b785e0a4bc0197c539e7777d1))
+
 ## [1.69.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.69.2...v1.69.3) (2026-01-26)
 
 
