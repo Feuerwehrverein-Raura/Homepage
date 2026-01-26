@@ -1,3 +1,10 @@
+## [1.67.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.67.0...v1.67.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* **inventory:** use API key auth for order-to-inventory item creation ([c003573](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c003573d7dbd401b9b5308a16ac9afd3d2b3e5f4))
+
 # [1.67.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.66.1...v1.67.0) (2026-01-26)
 
 
