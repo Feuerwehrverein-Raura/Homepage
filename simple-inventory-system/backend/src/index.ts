@@ -635,7 +635,41 @@ app.post('/api/items', authenticateToken, async (req: AuthenticatedRequest, res)
   }
 });
 
-app.put('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+// Update item - accepts both token auth and API key auth (for order system)
+app.put('/api/items/:id', async (req, res, next) => {
+  // Check for API key first (order system)
+  const apiKey = req.headers['x-order-api-key'];
+  if (apiKey === ORDER_API_KEY) {
+    try {
+      const { id } = req.params;
+      const { name, sale_price, sale_category, printer_station, sellable } = req.body;
+
+      const result = await pool.query(`
+        UPDATE items SET
+          name = COALESCE($2, name),
+          sale_price = COALESCE($3, sale_price),
+          sale_category = COALESCE($4, sale_category),
+          printer_station = COALESCE($5, printer_station),
+          sellable = COALESCE($6, sellable),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING *
+      `, [id, name, sale_price, sale_category, printer_station, sellable]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Item not found' });
+      }
+
+      broadcast({ type: 'item_updated', item: result.rows[0] });
+      return res.json(result.rows[0]);
+    } catch (error) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+  }
+
+  // Fall back to token auth
+  authenticateToken(req as any, res, next);
+}, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
     const {

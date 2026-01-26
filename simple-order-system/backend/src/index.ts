@@ -37,6 +37,7 @@ const pool = new pg.Pool({
 
 // Initialize database
 async function initDB() {
+  // Keep items table for backwards compatibility but we only use inventory items now
   await pool.query(`
     CREATE TABLE IF NOT EXISTS items (
       id SERIAL PRIMARY KEY,
@@ -65,15 +66,38 @@ async function initDB() {
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)
   `);
 
+  // Create order_items without foreign key to items (we store item_name directly)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS order_items (
       id SERIAL PRIMARY KEY,
       order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
-      item_id INTEGER REFERENCES items(id),
+      item_id VARCHAR(50),
+      item_name VARCHAR(255),
       quantity INTEGER NOT NULL,
       price DECIMAL(10, 2) NOT NULL,
-      notes TEXT
+      notes TEXT,
+      printer_station VARCHAR(50) DEFAULT 'bar'
     )
+  `);
+
+  // Add columns if they don't exist (migration for existing DBs)
+  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS item_name VARCHAR(255)`);
+  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS printer_station VARCHAR(50) DEFAULT 'bar'`);
+
+  // Drop foreign key constraint if it exists
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_item_id_fkey;
+    EXCEPTION WHEN undefined_object THEN NULL;
+    END $$;
+  `);
+
+  // Change item_id to VARCHAR if it's still INTEGER
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE order_items ALTER COLUMN item_id TYPE VARCHAR(50) USING item_id::VARCHAR;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;
   `);
 
   await pool.query(`
@@ -131,178 +155,157 @@ function broadcast(data: any) {
 const INVENTORY_API_URL = process.env.INVENTORY_API_URL || 'http://inventory-backend:3000';
 const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
 
-// Routes: Items (from Inventory or local)
+// Routes: Items (ONLY from Inventory system)
 app.get('/api/items', async (req, res) => {
   try {
-    let allItems: any[] = [];
-
-    // Fetch local items first
-    const localResult = await pool.query(
-      'SELECT * FROM items WHERE active = true ORDER BY category, name'
-    );
-    const localItems = localResult.rows.map((item: any) => ({
-      ...item,
-      source: 'local',
-      price: parseFloat(item.price)
-    }));
-    allItems = [...localItems];
-
-    // Also fetch from inventory system if enabled
-    if (process.env.USE_INVENTORY_API === 'true') {
-      try {
-        const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
-        if (response.ok) {
-          const inventoryItems = await response.json() as any[];
-          // Map inventory items to order system format with prefixed ID to avoid conflicts
-          const mappedInventoryItems = inventoryItems.map((item) => ({
-            id: `inv_${item.id}`,
-            name: item.name,
-            price: parseFloat(item.price),
-            category: item.category,
-            printer_station: item.printer_station,
-            stock: item.stock,
-            source: 'inventory',
-            inventory_id: item.id
-          }));
-          allItems = [...allItems, ...mappedInventoryItems];
-        }
-      } catch (inventoryError) {
-        console.error('Inventory API error:', inventoryError);
-      }
+    // Fetch all items from inventory system
+    const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
+    if (!response.ok) {
+      console.error('Inventory API returned:', response.status);
+      return res.json([]); // Return empty array if inventory unavailable
     }
 
+    const inventoryItems = await response.json() as any[];
+    // Map inventory items to order system format
+    const items = inventoryItems.map((item) => ({
+      id: item.id, // Use actual inventory ID (no prefix needed)
+      name: item.name,
+      price: parseFloat(item.price),
+      category: item.category,
+      printer_station: item.printer_station || 'bar',
+      stock: item.stock,
+      source: 'inventory'
+    }));
+
     // Sort by category then name
-    allItems.sort((a, b) => {
+    items.sort((a, b) => {
       if (a.category !== b.category) {
         return (a.category || '').localeCompare(b.category || '');
       }
       return a.name.localeCompare(b.name);
     });
 
-    res.json(allItems);
+    res.json(items);
   } catch (error) {
-    res.status(500).json({ error: 'Database error' });
+    console.error('Inventory API error:', error);
+    res.json([]); // Return empty array on error
   }
 });
 
-// Admin routes for items - require authentication
+// Admin routes for items - require authentication (creates in inventory system)
 app.post('/api/items', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { name, price, category, printer_station } = req.body;
 
-    // If inventory API is enabled, create item there as sellable
-    if (process.env.USE_INVENTORY_API === 'true') {
-      try {
-        // Use API key authentication for server-to-server communication
-        const response = await fetch(`${INVENTORY_API_URL}/api/items/from-order`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Order-API-Key': ORDER_API_KEY,
-          },
-          body: JSON.stringify({
-            name,
-            sale_price: price,
-            sale_category: category,
-            printer_station: printer_station || 'bar'
-          })
-        });
+    // Create item in inventory system
+    const response = await fetch(`${INVENTORY_API_URL}/api/items/from-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Order-API-Key': ORDER_API_KEY,
+      },
+      body: JSON.stringify({
+        name,
+        sale_price: price,
+        sale_category: category,
+        printer_station: printer_station || 'bar'
+      })
+    });
 
-        if (response.ok) {
-          const inventoryItem = await response.json() as any;
-          // Return in order system format
-          return res.json({
-            id: `inv_${inventoryItem.id}`,
-            name: inventoryItem.name,
-            price: inventoryItem.sale_price,
-            category: inventoryItem.sale_category,
-            printer_station: inventoryItem.printer_station,
-            source: 'inventory',
-            inventory_id: inventoryItem.id
-          });
-        } else {
-          const error = await response.json() as any;
-          console.error('Inventory API error:', error);
-          return res.status(response.status).json({ error: error.error || 'Failed to create item in inventory' });
-        }
-      } catch (inventoryError) {
-        console.error('Inventory API error:', inventoryError);
-        return res.status(500).json({ error: 'Failed to connect to inventory system' });
-      }
+    if (response.ok) {
+      const inventoryItem = await response.json() as any;
+      return res.json({
+        id: inventoryItem.id,
+        name: inventoryItem.name,
+        price: inventoryItem.sale_price,
+        category: inventoryItem.sale_category,
+        printer_station: inventoryItem.printer_station,
+        source: 'inventory'
+      });
+    } else {
+      const error = await response.json() as any;
+      console.error('Inventory API error:', error);
+      return res.status(response.status).json({ error: error.error || 'Failed to create item in inventory' });
     }
-
-    // Fallback: create locally
-    const result = await pool.query(
-      'INSERT INTO items (name, price, category, printer_station) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, price, category, printer_station]
-    );
-    res.json({ ...result.rows[0], source: 'local' });
   } catch (error) {
-    res.status(500).json({ error: 'Database error' });
+    console.error('Inventory API error:', error);
+    res.status(500).json({ error: 'Verbindung zum Inventar-System fehlgeschlagen' });
   }
 });
 
+// Update item in inventory system
 app.put('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
-    const { name, price, category, printer_station, active } = req.body;
-    const result = await pool.query(
-      'UPDATE items SET name = $1, price = $2, category = $3, printer_station = $4, active = $5 WHERE id = $6 RETURNING *',
-      [name, price, category, printer_station, active, id]
-    );
-    res.json(result.rows[0]);
+    const { name, price, category, printer_station, sellable } = req.body;
+
+    const response = await fetch(`${INVENTORY_API_URL}/api/items/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Order-API-Key': ORDER_API_KEY
+      },
+      body: JSON.stringify({
+        name,
+        sale_price: price,
+        sale_category: category,
+        printer_station: printer_station || 'bar',
+        sellable: sellable !== false
+      })
+    });
+
+    if (response.ok) {
+      const item = await response.json() as any;
+      res.json(item);
+    } else {
+      res.status(response.status).json({ error: 'Failed to update item in inventory' });
+    }
   } catch (error) {
-    res.status(500).json({ error: 'Database error' });
+    console.error('Inventory API error:', error);
+    res.status(500).json({ error: 'Verbindung zum Inventar-System fehlgeschlagen' });
   }
 });
 
+// Delete item from inventory system
 app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
 
-    // Check if this is an inventory item (prefixed with inv_)
-    if (id.startsWith('inv_')) {
-      const inventoryId = id.replace('inv_', '');
-      const response = await fetch(`${INVENTORY_API_URL}/api/items/${inventoryId}`, {
-        method: 'DELETE',
-        headers: {
-          'X-Order-API-Key': ORDER_API_KEY
-        }
-      });
-
-      if (response.ok) {
-        return res.json({ success: true });
-      } else {
-        return res.status(response.status).json({ error: 'Failed to delete from inventory' });
+    const response = await fetch(`${INVENTORY_API_URL}/api/items/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'X-Order-API-Key': ORDER_API_KEY
       }
-    }
+    });
 
-    // Local item
-    await pool.query('UPDATE items SET active = false WHERE id = $1', [id]);
-    res.json({ success: true });
+    if (response.ok) {
+      res.json({ success: true });
+    } else {
+      res.status(response.status).json({ error: 'Failed to delete from inventory' });
+    }
   } catch (error) {
-    res.status(500).json({ error: 'Database error' });
+    console.error('Inventory API error:', error);
+    res.status(500).json({ error: 'Verbindung zum Inventar-System fehlgeschlagen' });
   }
 });
 
-// Routes: Orders
+// Routes: Orders (item_name and printer_station stored directly in order_items)
 app.get('/api/orders', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT o.*, 
+      SELECT o.*,
         json_agg(
           json_build_object(
             'id', oi.id,
-            'item_name', i.name,
+            'item_name', oi.item_name,
             'quantity', oi.quantity,
             'price', oi.price,
             'notes', oi.notes,
-            'printer_station', i.printer_station
+            'printer_station', oi.printer_station
           )
-        ) as items
+        ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      LEFT JOIN items i ON oi.item_id = i.id
       WHERE o.status = 'pending'
       GROUP BY o.id
       ORDER BY o.created_at DESC
@@ -332,41 +335,37 @@ app.post('/api/orders', async (req, res) => {
     );
     const order = orderResult.rows[0];
 
-    // Add order items
+    // Add order items (store item_name and printer_station directly)
     for (const item of items) {
       await client.query(
-        'INSERT INTO order_items (order_id, item_id, quantity, price, notes) VALUES ($1, $2, $3, $4, $5)',
-        [order.id, item.id, item.quantity, item.price, item.notes || null]
+        'INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [order.id, item.id, item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
       );
     }
 
     await client.query('COMMIT');
 
-    // Reduce inventory stock if using inventory API
-    if (process.env.USE_INVENTORY_API === 'true') {
-      try {
-        const inventoryItems = items
-          .filter((item: any) => item.source === 'inventory')
-          .map((item: any) => ({ id: item.id, quantity: item.quantity }));
+    // Reduce inventory stock (all items come from inventory now)
+    try {
+      const inventoryItems = items.map((item: any) => ({ id: item.id, quantity: item.quantity }));
 
-        if (inventoryItems.length > 0) {
-          await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Order-API-Key': ORDER_API_KEY
-            },
-            body: JSON.stringify({
-              items: inventoryItems,
-              order_id: order.id,
-              order_source: 'kasse'
-            })
-          });
-        }
-      } catch (inventoryError) {
-        console.error('Failed to update inventory:', inventoryError);
-        // Don't fail the order, just log the error
+      if (inventoryItems.length > 0) {
+        await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Order-API-Key': ORDER_API_KEY
+          },
+          body: JSON.stringify({
+            items: inventoryItems,
+            order_id: order.id,
+            order_source: 'kasse'
+          })
+        });
       }
+    } catch (inventoryError) {
+      console.error('Failed to update inventory:', inventoryError);
+      // Don't fail the order, just log the error
     }
 
     // Print receipt
@@ -397,16 +396,15 @@ app.get('/api/orders/open/:tableNumber', async (req, res) => {
         json_agg(
           json_build_object(
             'id', oi.id,
-            'item_name', i.name,
+            'item_name', oi.item_name,
             'quantity', oi.quantity,
             'price', oi.price,
             'notes', oi.notes,
-            'printer_station', i.printer_station
+            'printer_station', oi.printer_station
           )
-        ) as items
+        ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      LEFT JOIN items i ON oi.item_id = i.id
       WHERE o.status = 'pending' AND o.table_number = $1
       GROUP BY o.id
       ORDER BY o.created_at DESC
@@ -444,11 +442,11 @@ app.post('/api/orders/:id/items', async (req, res) => {
       sum + (item.price * item.quantity), 0
     );
 
-    // Add order items
+    // Add order items (store item_name and printer_station directly)
     for (const item of items) {
       await client.query(
-        'INSERT INTO order_items (order_id, item_id, quantity, price, notes) VALUES ($1, $2, $3, $4, $5)',
-        [id, item.id, item.quantity, item.price, item.notes || null]
+        'INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+        [id, item.id, item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
       );
     }
 
@@ -461,30 +459,26 @@ app.post('/api/orders/:id/items', async (req, res) => {
 
     await client.query('COMMIT');
 
-    // Reduce inventory stock if using inventory API
-    if (process.env.USE_INVENTORY_API === 'true') {
-      try {
-        const inventoryItems = items
-          .filter((item: any) => item.source === 'inventory')
-          .map((item: any) => ({ id: item.id, quantity: item.quantity }));
+    // Reduce inventory stock (all items come from inventory now)
+    try {
+      const inventoryItems = items.map((item: any) => ({ id: item.id, quantity: item.quantity }));
 
-        if (inventoryItems.length > 0) {
-          await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Order-API-Key': ORDER_API_KEY
-            },
-            body: JSON.stringify({
-              items: inventoryItems,
-              order_id: id,
-              order_source: 'kasse'
-            })
-          });
-        }
-      } catch (inventoryError) {
-        console.error('Failed to update inventory:', inventoryError);
+      if (inventoryItems.length > 0) {
+        await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Order-API-Key': ORDER_API_KEY
+          },
+          body: JSON.stringify({
+            items: inventoryItems,
+            order_id: id,
+            order_source: 'kasse'
+          })
+        });
       }
+    } catch (inventoryError) {
+      console.error('Failed to update inventory:', inventoryError);
     }
 
     // Print receipt for additional items
@@ -550,15 +544,14 @@ app.get('/api/orders/history', async (req, res) => {
         json_agg(
           json_build_object(
             'id', oi.id,
-            'item_name', COALESCE(i.name, 'Unbekannt'),
+            'item_name', COALESCE(oi.item_name, 'Unbekannt'),
             'quantity', oi.quantity,
             'price', oi.price,
             'notes', oi.notes
           )
-        ) as items
+        ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      LEFT JOIN items i ON oi.item_id = i.id
     `;
     const params: any[] = [];
 
@@ -625,14 +618,13 @@ app.get('/api/stats/daily', async (req, res) => {
     // Best selling items for this business day
     const itemsResult = await pool.query(`
       SELECT
-        COALESCE(i.name, 'Sonderposten') as name,
+        COALESCE(oi.item_name, 'Sonderposten') as name,
         SUM(oi.quantity) as total_sold,
         SUM(oi.quantity * oi.price) as total_revenue
       FROM order_items oi
-      LEFT JOIN items i ON oi.item_id = i.id
       JOIN orders o ON oi.order_id = o.id
       WHERE o.created_at >= $1 AND o.created_at < $2
-      GROUP BY i.name
+      GROUP BY oi.item_name
       ORDER BY total_sold DESC
       LIMIT 10
     `, [startDate.toISOString(), endDate.toISOString()]);
@@ -694,14 +686,13 @@ app.post('/api/stats/send-report', authenticateToken, async (req: AuthenticatedR
     // Get top items
     const itemsResult = await pool.query(`
       SELECT
-        COALESCE(i.name, 'Sonderposten') as name,
+        COALESCE(oi.item_name, 'Sonderposten') as name,
         SUM(oi.quantity) as total_sold,
         SUM(oi.quantity * oi.price) as total_revenue
       FROM order_items oi
-      LEFT JOIN items i ON oi.item_id = i.id
       JOIN orders o ON oi.order_id = o.id
       WHERE o.created_at >= $1 AND o.created_at < $2
-      GROUP BY i.name
+      GROUP BY oi.item_name
       ORDER BY total_sold DESC
       LIMIT 10
     `, [startDate.toISOString(), endDate.toISOString()]);
