@@ -1,3 +1,10 @@
+# [1.73.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.72.0...v1.73.0) (2026-01-27)
+
+
+### Features
+
+* **kitchen:** use kitchen.fwv-raura.ch subdomain and fix API URLs ([1d00c57](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1d00c57f5ab017c709e3a8352faaae33d5627cdd))
+
 # [1.72.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.71.1...v1.72.0) (2026-01-27)
 
 
