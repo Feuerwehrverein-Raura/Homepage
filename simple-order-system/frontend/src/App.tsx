@@ -54,7 +54,7 @@ interface OpenOrder {
   items: { item_name: string; quantity: number; price: string }[];
 }
 
-type OrderType = 'bar' | 'mitnehmen' | 'tisch';
+type OrderType = 'bar' | 'tisch';
 
 function App() {
   const [items, setItems] = useState<Item[]>([]);
@@ -491,7 +491,6 @@ function App() {
   const getTableNumber = (): number => {
     switch (orderType) {
       case 'bar': return 0;
-      case 'mitnehmen': return 99;
       case 'tisch': return parseInt(tableNumber) || 0;
       default: return 0;
     }
@@ -770,7 +769,7 @@ function App() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Bestellart
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => { setOrderType('bar'); setTableNumber(''); setSelectedOrder(null); }}
                       className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
@@ -780,16 +779,6 @@ function App() {
                       }`}
                     >
                       🍺 Bar
-                    </button>
-                    <button
-                      onClick={() => { setOrderType('mitnehmen'); setTableNumber(''); setSelectedOrder(null); }}
-                      className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
-                        orderType === 'mitnehmen'
-                          ? 'bg-fwv-red text-white'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      🥡 Take Away
                     </button>
                     <button
                       onClick={() => { setOrderType('tisch'); setSelectedOrder(null); }}

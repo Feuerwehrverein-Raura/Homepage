@@ -181,7 +181,10 @@ function App() {
     // Browser notification
     if (notificationsEnabled && 'Notification' in window) {
       const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
-      new Notification(`Neue Bestellung - Tisch ${order.table_number}`, {
+      const title = order.table_number === 0
+        ? `Neue Bestellung #${order.id}`
+        : `Neue Bestellung - Tisch ${order.table_number}`;
+      new Notification(title, {
         body: `${itemCount} Artikel`,
         icon: '/logo-192.png',
         tag: `order-${order.id}`,
@@ -329,8 +332,8 @@ function OrderCard({
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div>
-          <div className="text-3xl font-bold text-blue-400">
-            Tisch {order.table_number}
+          <div className={`text-3xl font-bold ${order.table_number === 0 ? 'text-yellow-400' : 'text-blue-400'}`}>
+            {order.table_number === 0 ? `Bestellung #${order.id}` : `Tisch ${order.table_number}`}
           </div>
           <div className={`text-sm font-semibold ${
             isUrgent ? 'text-red-400' : 'text-gray-400'
@@ -338,9 +341,11 @@ function OrderCard({
             vor {time}
           </div>
         </div>
-        <div className="text-sm text-gray-500">
-          #{order.id}
-        </div>
+        {order.table_number !== 0 && (
+          <div className="text-sm text-gray-500">
+            #{order.id}
+          </div>
+        )}
       </div>
 
       {/* Items */}
