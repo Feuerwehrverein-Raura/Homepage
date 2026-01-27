@@ -481,7 +481,7 @@ app.get('/api/orders', checkIpWhitelist, async (req, res) => {
         ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      WHERE o.status = 'pending'
+      WHERE o.status IN ('pending', 'paid')
       GROUP BY o.id
       ORDER BY o.created_at DESC
     `);
@@ -584,7 +584,7 @@ app.get('/api/orders/open/:tableNumber', checkIpWhitelist, async (req, res) => {
         ) FILTER (WHERE oi.id IS NOT NULL) as items
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      WHERE o.status = 'pending' AND o.table_number = $1
+      WHERE o.status IN ('pending', 'paid') AND o.table_number = $1
       GROUP BY o.id
       ORDER BY o.created_at DESC
     `, [tableNumber]);
