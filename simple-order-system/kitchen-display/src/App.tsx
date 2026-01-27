@@ -64,11 +64,12 @@ function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [station, setStation] = useState<string>('all');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Request notification permission
-  const requestNotificationPermission = useCallback(async () => {
-    console.log('Button clicked - requesting permissions');
+  // Enable sound - must be triggered by user interaction
+  const enableSound = useCallback(async () => {
+    console.log('Enabling sound...');
     try {
       // Initialize audio context on user interaction (required by browsers)
       if (!audioContext) {
@@ -81,35 +82,40 @@ function App() {
         console.log('AudioContext resumed');
       }
 
+      // Test beep to confirm audio works
+      playBeep();
+      setSoundEnabled(true);
+      localStorage.setItem('kitchenSoundEnabled', 'true');
+      console.log('Sound enabled successfully');
+    } catch (error) {
+      console.error('Sound enable error:', error);
+      alert('Fehler beim Aktivieren des Tons: ' + (error as Error).message);
+    }
+  }, []);
+
+  // Request notification permission
+  const requestNotificationPermission = useCallback(async () => {
+    console.log('Button clicked - requesting permissions');
+
+    // First enable sound
+    await enableSound();
+
+    try {
       if ('Notification' in window) {
         console.log('Requesting notification permission...');
         const permission = await Notification.requestPermission();
         console.log('Permission result:', permission);
         setNotificationsEnabled(permission === 'granted');
-        if (permission === 'granted') {
-          // Test beep to confirm audio works
-          playBeep();
-        } else if (permission === 'denied') {
-          alert('Benachrichtigungen wurden blockiert. Bitte in den Browser-Einstellungen erlauben.');
-        } else {
-          // Permission was dismissed or is 'default'
-          alert('Bitte erlaube Benachrichtigungen im Browser-Dialog.');
+        if (permission === 'denied') {
+          alert('Browser-Benachrichtigungen blockiert - Ton funktioniert trotzdem!');
         }
       } else {
         console.log('Notification API not available, using audio only');
-        // No notification API, but audio should work
-        setNotificationsEnabled(true);
-        playBeep();
-        alert('Browser unterstützt keine Benachrichtigungen - Audio aktiviert.');
       }
     } catch (error) {
       console.error('Notification permission error:', error);
-      alert('Fehler beim Aktivieren: ' + (error as Error).message);
-      // Still enable audio notifications
-      setNotificationsEnabled(true);
-      playBeep();
     }
-  }, []);
+  }, [enableSound]);
 
   useEffect(() => {
     fetchOrders();
@@ -118,6 +124,13 @@ function App() {
     // Check existing notification permission
     if ('Notification' in window && Notification.permission === 'granted') {
       setNotificationsEnabled(true);
+    }
+
+    // Check if sound was previously enabled (but still need user interaction to resume)
+    const savedSoundEnabled = localStorage.getItem('kitchenSoundEnabled');
+    if (savedSoundEnabled === 'true') {
+      // We'll show a smaller "resume" button instead of the full enable button
+      // But we can't auto-resume audio - need user interaction
     }
 
     return () => {
@@ -168,15 +181,17 @@ function App() {
     wsRef.current = ws;
   };
 
-  const playNotification = (order: Order) => {
-    // Visual flash
+  const playNotification = useCallback((order: Order) => {
+    // Visual flash - always happens
     document.body.style.backgroundColor = '#fef3c7';
     setTimeout(() => {
       document.body.style.backgroundColor = '';
     }, 500);
 
-    // Play sound
-    playBeep();
+    // Play sound only if sound is enabled
+    if (soundEnabled) {
+      playBeep();
+    }
 
     // Browser notification
     if (notificationsEnabled && 'Notification' in window) {
@@ -191,7 +206,7 @@ function App() {
         requireInteraction: true
       });
     }
-  };
+  }, [soundEnabled, notificationsEnabled]);
 
   const completeOrder = async (orderId: number) => {
     try {
@@ -252,19 +267,25 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4">
-            {!notificationsEnabled && (
+            {!soundEnabled ? (
               <button
                 onClick={requestNotificationPermission}
-                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded font-semibold text-sm flex items-center gap-2"
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-bold text-lg flex items-center gap-2 animate-pulse"
               >
-                <span>🔔</span>
-                <span>Benachrichtigungen aktivieren</span>
+                <span className="text-2xl">🔊</span>
+                <span>TON AKTIVIEREN</span>
               </button>
-            )}
-            {notificationsEnabled && (
-              <span className="text-green-400 text-sm flex items-center gap-1">
-                <span>🔔</span> Aktiv
-              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-green-400 text-sm flex items-center gap-1">
+                  <span>🔊</span> Ton aktiv
+                </span>
+                {notificationsEnabled && (
+                  <span className="text-green-400 text-sm flex items-center gap-1">
+                    <span>🔔</span> Push aktiv
+                  </span>
+                )}
+              </div>
             )}
             <div className="text-xl font-bold">
               {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}
