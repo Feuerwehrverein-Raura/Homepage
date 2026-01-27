@@ -514,10 +514,11 @@ app.post('/api/orders', checkIpWhitelist, async (req, res) => {
     const order = orderResult.rows[0];
 
     // Add order items (store item_name and printer_station directly)
+    // Support both item.name and item.item_name from frontend
     for (const item of items) {
       await client.query(
         'INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [order.id, item.id, item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
+        [order.id, item.id, item.item_name || item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
       );
     }
 
@@ -624,10 +625,11 @@ app.post('/api/orders/:id/items', checkIpWhitelist, async (req, res) => {
     );
 
     // Add order items (store item_name and printer_station directly)
+    // Support both item.name and item.item_name from frontend
     for (const item of items) {
       await client.query(
         'INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [id, item.id, item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
+        [id, item.id, item.item_name || item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
       );
     }
 

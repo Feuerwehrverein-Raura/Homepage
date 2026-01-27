@@ -68,13 +68,35 @@ function App() {
 
   // Request notification permission
   const requestNotificationPermission = useCallback(async () => {
-    if ('Notification' in window) {
-      const permission = await Notification.requestPermission();
-      setNotificationsEnabled(permission === 'granted');
-      // Initialize audio context on user interaction
+    try {
+      // Initialize audio context on user interaction (required by browsers)
       if (!audioContext) {
         audioContext = new AudioContext();
       }
+      // Resume audio context if suspended
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        setNotificationsEnabled(permission === 'granted');
+        if (permission === 'granted') {
+          // Test beep to confirm audio works
+          playBeep();
+        } else if (permission === 'denied') {
+          alert('Benachrichtigungen wurden blockiert. Bitte in den Browser-Einstellungen erlauben.');
+        }
+      } else {
+        // No notification API, but audio should work
+        setNotificationsEnabled(true);
+        playBeep();
+      }
+    } catch (error) {
+      console.error('Notification permission error:', error);
+      // Still enable audio notifications
+      setNotificationsEnabled(true);
+      playBeep();
     }
   }, []);
 
@@ -320,7 +342,7 @@ function OrderCard({
                   {item.quantity}×
                 </span>
                 <span className="text-xl font-semibold">
-                  {item.item_name}
+                  {item.item_name || '(Unbekannter Artikel)'}
                 </span>
               </div>
               <div className="text-xs bg-gray-600 px-2 py-1 rounded">
