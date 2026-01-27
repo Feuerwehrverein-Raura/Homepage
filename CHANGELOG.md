@@ -1,3 +1,10 @@
+# [1.82.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.4...v1.82.0) (2026-01-27)
+
+
+### Features
+
+* **order:** add printer station selector for custom items ([4912212](https://github.com/Feuerwehrverein-Raura/Homepage/commit/49122120c431ef867d1ad68439786d4a50ff15b7))
+
 ## [1.81.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.3...v1.81.4) (2026-01-27)
 
 
