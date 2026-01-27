@@ -1,3 +1,10 @@
+## [1.75.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.75.0...v1.75.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* **order:** fix item_name not saved and notification activation ([8911e12](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8911e12f8eece28342d9fea38d594be279fc2cf3))
+
 # [1.75.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.74.0...v1.75.0) (2026-01-27)
 
 
