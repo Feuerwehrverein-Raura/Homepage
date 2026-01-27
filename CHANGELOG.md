@@ -1,3 +1,10 @@
+# [1.77.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.76.0...v1.77.0) (2026-01-27)
+
+
+### Features
+
+* **register:** replace PIN with Authentik OAuth authentication ([9a47aa1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9a47aa1ecbfbb776544602cce8895ecd5ad1a5c4))
+
 # [1.76.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.75.1...v1.76.0) (2026-01-27)
 
 
