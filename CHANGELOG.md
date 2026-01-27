@@ -1,3 +1,10 @@
+## [1.77.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.0...v1.77.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* **whitelist:** improve client IP detection for reverse proxy ([e32ce92](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e32ce920e94018a659d5fb4d4e5f730af0490901))
+
 # [1.77.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.76.0...v1.77.0) (2026-01-27)
 
 
