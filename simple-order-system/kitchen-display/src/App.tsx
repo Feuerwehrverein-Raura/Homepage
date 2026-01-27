@@ -119,6 +119,7 @@ function App() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const playNotificationRef = useRef<(order: Order) => void>(() => {});
 
   // Enable sound - must be triggered by user interaction
   const enableSound = useCallback(async () => {
@@ -207,8 +208,8 @@ function App() {
 
       if (data.type === 'new_order') {
         setOrders(prev => [data.order, ...prev]);
-        // Play sound and show notification
-        playNotification(data.order);
+        // Play sound and show notification - use ref to get latest callback
+        playNotificationRef.current(data.order);
       } else if (data.type === 'order_completed') {
         setOrders(prev => prev.filter(o => o.id !== data.order_id));
       }
@@ -227,6 +228,8 @@ function App() {
   };
 
   const playNotification = useCallback((order: Order) => {
+    console.log('playNotification called, soundEnabled:', soundEnabled);
+
     // Visual flash - always happens
     document.body.style.backgroundColor = '#fef3c7';
     setTimeout(() => {
@@ -235,7 +238,10 @@ function App() {
 
     // Play sound only if sound is enabled
     if (soundEnabled) {
+      console.log('Sound is enabled, calling playBeep');
       playBeep();
+    } else {
+      console.log('Sound is NOT enabled, skipping playBeep');
     }
 
     // Browser notification
@@ -252,6 +258,11 @@ function App() {
       });
     }
   }, [soundEnabled, notificationsEnabled]);
+
+  // Keep ref updated with latest callback
+  useEffect(() => {
+    playNotificationRef.current = playNotification;
+  }, [playNotification]);
 
   const completeOrder = async (orderId: number) => {
     try {
