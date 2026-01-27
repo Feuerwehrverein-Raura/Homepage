@@ -1301,10 +1301,24 @@ app.get('/vorstand', async (req, res) => {
                 nachname
         `);
 
-        // Map personal emails to official fwv-raura.ch emails
+        // Vorstand function priority (only show primary Vorstand function publicly)
+        const vorstandFunctions = ['präsident', 'praesident', 'aktuar', 'kassier', 'materialwart', 'beisitzer'];
+
+        // Map personal emails to official fwv-raura.ch emails and extract primary Vorstand function
         const vorstandMembers = result.rows.map(m => {
             const funktionLower = m.funktion.toLowerCase();
             let officialEmail = m.email; // fallback to personal email
+            let primaryFunction = m.funktion; // fallback to full function
+
+            // Find the primary Vorstand function (first match in priority order)
+            const funktionen = m.funktion.split(',').map(f => f.trim());
+            for (const vf of vorstandFunctions) {
+                const found = funktionen.find(f => f.toLowerCase().includes(vf));
+                if (found) {
+                    primaryFunction = found;
+                    break;
+                }
+            }
 
             for (const [key, email] of Object.entries(funktionToEmail)) {
                 if (funktionLower.includes(key)) {
@@ -1315,6 +1329,7 @@ app.get('/vorstand', async (req, res) => {
 
             return {
                 ...m,
+                funktion: primaryFunction,
                 email: officialEmail
             };
         });
