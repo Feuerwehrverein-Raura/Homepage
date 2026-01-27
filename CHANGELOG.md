@@ -1,3 +1,10 @@
+# [1.72.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.71.1...v1.72.0) (2026-01-27)
+
+
+### Features
+
+* **order:** add manual card payment confirmation for SumUp 3G+ ([5cff35d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5cff35d810fca657180e053ba7f8c90a45440053))
+
 ## [1.71.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.71.0...v1.71.1) (2026-01-26)
 
 
