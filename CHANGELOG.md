@@ -1,3 +1,10 @@
+## [1.77.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.1...v1.77.2) (2026-01-27)
+
+
+### Bug Fixes
+
+* **backend:** enable trust proxy for correct client IP detection ([6e5ab1f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6e5ab1f520003f66e4b5e89199c486cd5d008e6f))
+
 ## [1.77.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.0...v1.77.1) (2026-01-27)
 
 
