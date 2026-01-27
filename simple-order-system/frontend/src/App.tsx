@@ -77,6 +77,13 @@ function App() {
   const [cardPayment, setCardPayment] = useState<{ orderId: number; total: number } | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [orderConfirmation, setOrderConfirmation] = useState<{
+    orderId: number;
+    orderType: 'bar' | 'tisch';
+    tableNumber?: number;
+    total: number;
+    message?: string;
+  } | null>(null);
 
   // PWA Install prompt
   useEffect(() => {
@@ -411,14 +418,20 @@ function App() {
         body: JSON.stringify({ status: 'paid', payment_method: 'card' }),
       });
 
-      if (res.ok) {
-        alert(`✅ Bestellung #${cardPayment.orderId} - Kartenzahlung bestätigt!`);
-      } else {
-        alert(`✅ Bestellung #${cardPayment.orderId} als Kartenzahlung erfasst.`);
-      }
+      setOrderConfirmation({
+        orderId: cardPayment.orderId,
+        orderType: 'bar',
+        total: cardPayment.total,
+        message: 'Kartenzahlung bestätigt'
+      });
     } catch (error) {
       console.error('Error marking order as paid:', error);
-      alert(`✅ Bestellung #${cardPayment.orderId} als Kartenzahlung erfasst.`);
+      setOrderConfirmation({
+        orderId: cardPayment.orderId,
+        orderType: 'bar',
+        total: cardPayment.total,
+        message: 'Kartenzahlung erfasst'
+      });
     }
 
     setCardPayment(null);
@@ -469,20 +482,22 @@ function App() {
         body: JSON.stringify({ status: 'paid', payment_method: 'cash' }),
       });
 
-      if (res.ok) {
-        const received = parseFloat(cashPayment.received) || cashPayment.total;
-        const change = received - cashPayment.total;
-        if (change > 0) {
-          alert(`✅ Bestellung #${cashPayment.orderId} bezahlt!\n\nWechselgeld: CHF ${change.toFixed(2)}`);
-        } else {
-          alert(`✅ Bestellung #${cashPayment.orderId} bezahlt!`);
-        }
-      } else {
-        alert(`✅ Bestellung #${cashPayment.orderId} als Barzahlung erfasst.`);
-      }
+      const received = parseFloat(cashPayment.received) || cashPayment.total;
+      const change = received - cashPayment.total;
+      setOrderConfirmation({
+        orderId: cashPayment.orderId,
+        orderType: 'bar',
+        total: cashPayment.total,
+        message: change > 0 ? `Barzahlung - Wechselgeld: CHF ${change.toFixed(2)}` : 'Barzahlung bestätigt'
+      });
     } catch (error) {
       console.error('Error marking order as paid:', error);
-      alert(`✅ Bestellung #${cashPayment.orderId} als Barzahlung erfasst.`);
+      setOrderConfirmation({
+        orderId: cashPayment.orderId,
+        orderType: 'bar',
+        total: cashPayment.total,
+        message: 'Barzahlung erfasst'
+      });
     }
 
     setCashPayment(null);
@@ -539,7 +554,13 @@ function App() {
         }
 
         const result = await res.json();
-        alert(`✅ Artikel zu Bestellung #${selectedOrder.id} hinzugefügt!\nNeue Summe: CHF ${parseFloat(result.total).toFixed(2)}`);
+        setOrderConfirmation({
+          orderId: selectedOrder.id,
+          orderType: 'tisch',
+          tableNumber: parseInt(tableNumber),
+          total: parseFloat(result.total),
+          message: 'Artikel hinzugefügt'
+        });
         setCart([]);
         setSelectedOrder(null);
         fetchOpenOrders(tableNumber);
@@ -589,6 +610,32 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Order Confirmation Modal */}
+      {orderConfirmation && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="text-6xl mb-4">✅</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              {orderConfirmation.orderType === 'bar'
+                ? `Bestellung #${orderConfirmation.orderId}`
+                : `Tisch ${orderConfirmation.tableNumber}`}
+            </h2>
+            <p className="text-3xl font-bold text-fwv-red mb-2">
+              CHF {orderConfirmation.total.toFixed(2)}
+            </p>
+            {orderConfirmation.message && (
+              <p className="text-gray-600 mb-4">{orderConfirmation.message}</p>
+            )}
+            <button
+              onClick={() => setOrderConfirmation(null)}
+              className="w-full bg-fwv-red hover:bg-red-700 text-white font-bold py-4 rounded-xl text-lg touch-manipulation"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-fwv-red text-white p-2 sm:p-4 shadow-lg">
         <div className="max-w-7xl mx-auto">
