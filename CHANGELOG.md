@@ -1,3 +1,10 @@
+## [1.77.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.2...v1.77.3) (2026-01-27)
+
+
+### Bug Fixes
+
+* **backend:** add type assertions for TypeScript strict mode ([8beda5e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8beda5ef2fe616a80bef7a2cb1d183e01c964044))
+
 ## [1.77.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.1...v1.77.2) (2026-01-27)
 
 
