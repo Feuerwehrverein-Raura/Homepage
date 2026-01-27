@@ -83,7 +83,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.order-frontend.rule=Host(`order.fwv-raura.ch`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`) && !PathPrefix(`/kitchen`)
+      - traefik.http.routers.order-frontend.rule=Host(`order.fwv-raura.ch`) && !PathPrefix(`/api`) && !PathPrefix(`/ws`)
       - traefik.http.routers.order-frontend.entrypoints=https
       - traefik.http.routers.order-frontend.tls=true
       - traefik.http.routers.order-frontend.tls.certresolver=letsencrypt
@@ -100,13 +100,11 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.order-kitchen.rule=Host(`order.fwv-raura.ch`) && PathPrefix(`/kitchen`)
+      - traefik.http.routers.order-kitchen.rule=Host(`kitchen.fwv-raura.ch`)
       - traefik.http.routers.order-kitchen.entrypoints=https
       - traefik.http.routers.order-kitchen.tls=true
       - traefik.http.routers.order-kitchen.tls.certresolver=letsencrypt
       - traefik.http.services.order-kitchen.loadbalancer.server.port=80
-      - traefik.http.middlewares.order-kitchen-strip.stripprefix.prefixes=/kitchen
-      - traefik.http.routers.order-kitchen.middlewares=order-kitchen-strip
       - com.centurylinklabs.watchtower.enable=true
 
 networks:

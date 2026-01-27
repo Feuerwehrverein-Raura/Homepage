@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://order.fwv-raura.ch/api';
+const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch';
+
 interface OrderItem {
   id: number;
   item_name: string;
@@ -33,7 +36,7 @@ function App() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders');
+      const res = await fetch(`${API_URL}/orders`);
       const data = await res.json();
       setOrders(data);
     } catch (error) {
@@ -42,9 +45,7 @@ function App() {
   };
 
   const connectWebSocket = () => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    const ws = new WebSocket(`${protocol}//${host}:3000`);
+    const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -84,7 +85,7 @@ function App() {
 
   const completeOrder = async (orderId: number) => {
     try {
-      await fetch(`/api/orders/${orderId}/complete`, {
+      await fetch(`${API_URL}/orders/${orderId}/complete`, {
         method: 'PATCH',
       });
       setOrders(orders.filter(o => o.id !== orderId));
