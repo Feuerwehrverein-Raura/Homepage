@@ -1,10 +1,10 @@
 {
   "name": "FWV Raura - Zugang freischalten",
   "short_name": "FWV Register",
-  "description": "IP-Freischaltung für das FWV Raura Bestellsystem",
+  "description": "Mitglieder-Anmeldung für das FWV Raura Kassensystem",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#111827",
+  "background_color": "#f9fafb",
   "theme_color": "#dc2626",
   "orientation": "portrait",
   "icons": [

@@ -1,112 +1,237 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="de" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#dc2626">
+    <meta name="description" content="FWV Raura Kassensystem - Zugang freischalten">
     <title>FWV Raura - Zugang freischalten</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon-192.png">
     <link rel="apple-touch-icon" href="icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'fire': {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        .pin-input {
-            letter-spacing: 0.5em;
-            text-align: center;
-            font-size: 2rem;
-            font-weight: bold;
-        }
     </style>
 </head>
-<body class="bg-gray-900 min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-        <!-- Header -->
-        <div class="text-center mb-8">
-            <div class="text-5xl mb-4">🔓</div>
-            <h1 class="text-2xl font-bold text-gray-800">Zugang freischalten</h1>
-            <p class="text-gray-600 mt-2">FWV Raura Bestellsystem</p>
-        </div>
-
-        <!-- IP Display -->
-        <div class="bg-gray-100 rounded-xl p-4 mb-6">
-            <div class="text-sm text-gray-600 mb-1">Deine öffentliche IP:</div>
-            <div id="ip-display" class="text-2xl font-mono font-bold text-gray-800">
-                Wird geladen...
-            </div>
-        </div>
-
-        <!-- Status -->
-        <div id="status-box" class="hidden rounded-xl p-4 mb-6">
-            <div id="status-text" class="font-semibold"></div>
-        </div>
-
-        <!-- Registration Form -->
-        <form id="register-form" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Gerätename</label>
-                <input
-                    type="text"
-                    id="device-name"
-                    placeholder="z.B. Stefans Handy"
-                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none text-lg"
-                >
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">PIN (vom Vorstand)</label>
-                <input
-                    type="text"
-                    id="pin"
-                    inputmode="numeric"
-                    pattern="[0-9]*"
-                    maxlength="6"
-                    placeholder="****"
-                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none pin-input"
-                    required
-                >
-            </div>
-
-            <button
-                type="submit"
-                id="submit-btn"
-                class="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold py-4 rounded-xl text-lg transition-colors"
-            >
-                Freischalten
-            </button>
-        </form>
-
-        <!-- Already Whitelisted -->
-        <div id="already-whitelisted" class="hidden text-center py-8">
-            <div class="text-5xl mb-4">✅</div>
-            <h2 class="text-xl font-bold text-green-600 mb-2">Bereits freigeschaltet!</h2>
-            <p id="device-info" class="text-gray-600 mb-6"></p>
-            <div class="space-y-3">
-                <a href="https://order.fwv-raura.ch" class="block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">
-                    Zur Kasse
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-fire-700 text-white shadow-lg fixed top-0 w-full z-50">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <a href="https://fwv-raura.ch" class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full overflow-hidden bg-white p-1">
+                        <img src="https://fwv-raura.ch/images/logo.png" alt="Logo" class="w-full h-full object-contain">
+                    </div>
+                    <span class="text-xl font-bold">FWV Raura</span>
                 </a>
-                <a href="https://kitchen.fwv-raura.ch" class="block bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl">
-                    Zum Kitchen Display
-                </a>
+                <div class="hidden md:flex space-x-6">
+                    <a href="https://fwv-raura.ch" class="hover:text-fire-200 transition-colors">Home</a>
+                    <a href="https://order.fwv-raura.ch" class="hover:text-fire-200 transition-colors">Kasse</a>
+                    <a href="https://kitchen.fwv-raura.ch" class="hover:text-fire-200 transition-colors">Kitchen Display</a>
+                </div>
             </div>
         </div>
+    </nav>
 
-        <!-- Footer -->
-        <div class="text-center mt-8 text-sm text-gray-500">
-            Feuerwehrverein Raura
+    <!-- Main Content -->
+    <main class="pt-20 pb-12 px-4">
+        <div class="max-w-md mx-auto mt-8">
+            <!-- Hero -->
+            <div class="text-center mb-8">
+                <div class="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden border-4 border-fire-500 bg-white p-2">
+                    <img src="https://fwv-raura.ch/images/logo.png" alt="Logo" class="w-full h-full object-contain">
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Zugang freischalten</h1>
+                <p class="text-gray-600">FWV Raura Kassensystem</p>
+            </div>
+
+            <!-- Card -->
+            <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
+                <!-- IP Display -->
+                <div class="bg-gradient-to-r from-fire-600 to-fire-700 p-6 text-white">
+                    <div class="text-sm text-fire-100 mb-1">Deine IP-Adresse:</div>
+                    <div id="ip-display" class="text-2xl font-mono font-bold">
+                        Wird geladen...
+                    </div>
+                </div>
+
+                <div class="p-6">
+                    <!-- Status Messages -->
+                    <div id="status-box" class="hidden rounded-xl p-4 mb-6">
+                        <div id="status-text" class="font-semibold"></div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="loading-state" class="text-center py-8">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-fire-500 mx-auto mb-4"></div>
+                        <p class="text-gray-600">Status wird geprüft...</p>
+                    </div>
+
+                    <!-- Login Form (shown if not authenticated) -->
+                    <div id="login-form" class="hidden">
+                        <p class="text-gray-600 mb-6 text-center">
+                            Melde dich mit deinem FWV-Konto an, um dieses Gerät für das Kassensystem freizuschalten.
+                        </p>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Gerätename (optional)</label>
+                            <input
+                                type="text"
+                                id="device-name"
+                                placeholder="z.B. Stefans Handy"
+                                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-fire-500 focus:outline-none text-lg"
+                            >
+                        </div>
+
+                        <button
+                            id="login-btn"
+                            onclick="loginWithAuthentik()"
+                            class="w-full bg-fire-600 hover:bg-fire-700 active:bg-fire-800 text-white font-bold py-4 rounded-xl text-lg transition-colors flex items-center justify-center gap-3"
+                        >
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                            Mit FWV-Konto anmelden
+                        </button>
+
+                        <div class="mt-4 text-center text-sm text-gray-500">
+                            Du wirst zu auth.fwv-raura.ch weitergeleitet
+                        </div>
+                    </div>
+
+                    <!-- Already Whitelisted -->
+                    <div id="already-whitelisted" class="hidden">
+                        <div class="text-center py-4">
+                            <div class="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-xl font-bold text-green-600 mb-2">Bereits freigeschaltet!</h2>
+                            <p id="device-info" class="text-gray-600 mb-2"></p>
+                            <p id="expires-info" class="text-sm text-gray-500 mb-6"></p>
+                        </div>
+
+                        <div class="space-y-3">
+                            <a href="https://order.fwv-raura.ch" class="block bg-fire-600 hover:bg-fire-700 text-white font-bold py-3 rounded-xl text-center transition-colors">
+                                Zur Kasse
+                            </a>
+                            <a href="https://kitchen.fwv-raura.ch" class="block bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 rounded-xl text-center transition-colors">
+                                Zum Kitchen Display
+                            </a>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-gray-200">
+                            <button
+                                onclick="extendAccess()"
+                                id="extend-btn"
+                                class="w-full text-fire-600 hover:text-fire-700 font-semibold py-2 text-sm"
+                            >
+                                Zugang verlängern
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Success State (after registration) -->
+                    <div id="success-state" class="hidden">
+                        <div class="text-center py-4">
+                            <div class="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            <h2 class="text-xl font-bold text-green-600 mb-2">Erfolgreich freigeschaltet!</h2>
+                            <p id="success-device" class="text-gray-600 mb-2"></p>
+                            <p id="success-expires" class="text-sm text-gray-500 mb-6"></p>
+                        </div>
+
+                        <div class="space-y-3">
+                            <a href="https://order.fwv-raura.ch" class="block bg-fire-600 hover:bg-fire-700 text-white font-bold py-3 rounded-xl text-center transition-colors">
+                                Zur Kasse
+                            </a>
+                            <a href="https://kitchen.fwv-raura.ch" class="block bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 rounded-xl text-center transition-colors">
+                                Zum Kitchen Display
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="mt-6 bg-fire-50 rounded-xl p-4 border border-fire-200">
+                <h3 class="font-semibold text-fire-800 mb-2">Warum muss ich mich anmelden?</h3>
+                <p class="text-sm text-fire-700">
+                    Das Kassensystem ist nur für Vereinsmitglieder zugänglich. Nach der Anmeldung
+                    wird dein Gerät für 24 Stunden freigeschaltet.
+                </p>
+            </div>
         </div>
-    </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-400 text-sm">
+                &copy; 2025 Feuerwehrverein Raura Kaiseraugst
+            </p>
+        </div>
+    </footer>
 
     <script>
+        // Configuration
         const API_BASE = 'https://order.fwv-raura.ch/api';
+        const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
+        const CLIENT_ID = 'order-register';
+        const REDIRECT_URI = window.location.origin + window.location.pathname;
+
         let currentIp = '';
 
-        // Load current IP and check status
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', init);
+
         async function init() {
+            // Check for OAuth callback
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            const state = params.get('state');
+
+            if (code && state) {
+                await handleOAuthCallback(code, state);
+                return;
+            }
+
+            // Normal init
+            await checkStatus();
+        }
+
+        async function checkStatus() {
             try {
                 // Get IP
                 const ipRes = await fetch(`${API_BASE}/whitelist/my-ip`);
@@ -118,76 +243,141 @@
                 const checkRes = await fetch(`${API_BASE}/whitelist/check`);
                 const checkData = await checkRes.json();
 
+                document.getElementById('loading-state').classList.add('hidden');
+
                 if (checkData.whitelisted) {
-                    document.getElementById('register-form').classList.add('hidden');
-                    document.getElementById('already-whitelisted').classList.remove('hidden');
-                    document.getElementById('device-info').textContent =
-                        `Gerät: ${checkData.device_name || 'Unbekannt'}`;
+                    showWhitelisted(checkData);
+                } else {
+                    document.getElementById('login-form').classList.remove('hidden');
                 }
             } catch (error) {
                 console.error('Init error:', error);
                 document.getElementById('ip-display').textContent = 'Fehler beim Laden';
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('login-form').classList.remove('hidden');
             }
         }
 
-        // Show status message
+        function showWhitelisted(data) {
+            document.getElementById('already-whitelisted').classList.remove('hidden');
+            document.getElementById('device-info').textContent = `Gerät: ${data.device_name || 'Unbekannt'}`;
+
+            if (data.expires_at && !data.is_permanent) {
+                const expires = new Date(data.expires_at);
+                const now = new Date();
+                const hoursLeft = Math.round((expires - now) / (1000 * 60 * 60));
+                document.getElementById('expires-info').textContent =
+                    hoursLeft > 0 ? `Gültig für noch ${hoursLeft} Stunde${hoursLeft !== 1 ? 'n' : ''}` : 'Läuft bald ab';
+            } else if (data.is_permanent) {
+                document.getElementById('expires-info').textContent = 'Dauerhaft freigeschaltet';
+            }
+        }
+
+        function loginWithAuthentik() {
+            // Store device name in sessionStorage
+            const deviceName = document.getElementById('device-name').value;
+            sessionStorage.setItem('register_device_name', deviceName);
+
+            // Generate state for CSRF protection
+            const state = generateRandomString(32);
+            sessionStorage.setItem('oauth_state', state);
+
+            // Build OAuth URL
+            const authUrl = new URL(`${AUTHENTIK_URL}/application/o/authorize/`);
+            authUrl.searchParams.set('client_id', CLIENT_ID);
+            authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+            authUrl.searchParams.set('response_type', 'code');
+            authUrl.searchParams.set('scope', 'openid email profile');
+            authUrl.searchParams.set('state', state);
+
+            // Redirect to Authentik
+            window.location.href = authUrl.toString();
+        }
+
+        async function handleOAuthCallback(code, state) {
+            // Verify state
+            const storedState = sessionStorage.getItem('oauth_state');
+            if (state !== storedState) {
+                showStatus('Sicherheitsfehler - bitte erneut versuchen', true);
+                sessionStorage.clear();
+                setTimeout(() => window.location.href = REDIRECT_URI, 2000);
+                return;
+            }
+
+            const deviceName = sessionStorage.getItem('register_device_name') || '';
+            sessionStorage.clear();
+
+            // Clear URL parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+
+            // Show loading
+            document.getElementById('loading-state').classList.remove('hidden');
+
+            try {
+                // Exchange code for IP registration
+                const response = await fetch(`${API_BASE}/whitelist/register-oauth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: code,
+                        redirect_uri: REDIRECT_URI,
+                        device_name: deviceName
+                    })
+                });
+
+                const data = await response.json();
+
+                document.getElementById('loading-state').classList.add('hidden');
+
+                if (response.ok && data.success) {
+                    // Update IP display
+                    document.getElementById('ip-display').textContent = data.ip;
+
+                    // Show success
+                    document.getElementById('success-state').classList.remove('hidden');
+                    document.getElementById('success-device').textContent =
+                        `Gerät: ${deviceName || data.user_name || 'Registriert'}`;
+
+                    const expires = new Date(data.expires_at);
+                    const hoursLeft = Math.round((expires - new Date()) / (1000 * 60 * 60));
+                    document.getElementById('success-expires').textContent =
+                        `Gültig für ${hoursLeft} Stunden`;
+                } else {
+                    showStatus(data.error || 'Registrierung fehlgeschlagen', true);
+                    document.getElementById('login-form').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('OAuth callback error:', error);
+                document.getElementById('loading-state').classList.add('hidden');
+                showStatus('Netzwerkfehler - bitte erneut versuchen', true);
+                document.getElementById('login-form').classList.remove('hidden');
+            }
+        }
+
+        async function extendAccess() {
+            loginWithAuthentik();
+        }
+
         function showStatus(message, isError = false) {
             const box = document.getElementById('status-box');
             const text = document.getElementById('status-text');
-            box.classList.remove('hidden', 'bg-green-100', 'bg-red-100', 'text-green-800', 'text-red-800');
+            box.classList.remove('hidden', 'bg-green-100', 'bg-red-100');
             box.classList.add(isError ? 'bg-red-100' : 'bg-green-100');
             text.classList.remove('text-green-800', 'text-red-800');
             text.classList.add(isError ? 'text-red-800' : 'text-green-800');
             text.textContent = message;
         }
 
-        // Handle form submit
-        document.getElementById('register-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const pin = document.getElementById('pin').value;
-            const deviceName = document.getElementById('device-name').value;
-            const btn = document.getElementById('submit-btn');
-
-            if (!pin) {
-                showStatus('Bitte PIN eingeben', true);
-                return;
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            const randomValues = new Uint8Array(length);
+            crypto.getRandomValues(randomValues);
+            for (let i = 0; i < length; i++) {
+                result += chars[randomValues[i] % chars.length];
             }
-
-            btn.disabled = true;
-            btn.textContent = 'Wird freigeschaltet...';
-
-            try {
-                const res = await fetch(`${API_BASE}/whitelist/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin, device_name: deviceName })
-                });
-
-                const data = await res.json();
-
-                if (res.ok) {
-                    showStatus('Erfolgreich freigeschaltet!');
-                    setTimeout(() => {
-                        document.getElementById('register-form').classList.add('hidden');
-                        document.getElementById('already-whitelisted').classList.remove('hidden');
-                        document.getElementById('device-info').textContent =
-                            `Gerät: ${deviceName || 'Unbekannt'}`;
-                    }, 1000);
-                } else {
-                    showStatus(data.error || 'Fehler bei der Registrierung', true);
-                }
-            } catch (error) {
-                console.error('Register error:', error);
-                showStatus('Netzwerkfehler - bitte erneut versuchen', true);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Freischalten';
-            }
-        });
-
-        // Init on load
-        init();
+            return result;
+        }
     </script>
 </body>
 </html>

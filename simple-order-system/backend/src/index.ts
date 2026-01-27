@@ -161,12 +161,6 @@ async function initDB() {
   await pool.query(`ALTER TABLE ip_whitelist ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP`);
   await pool.query(`ALTER TABLE ip_whitelist ADD COLUMN IF NOT EXISTS is_permanent BOOLEAN DEFAULT false`);
 
-  // Set default whitelist PIN if not exists
-  const existingPin = await pool.query("SELECT value FROM settings WHERE key = 'whitelist_pin'");
-  if (existingPin.rows.length === 0) {
-    await pool.query("INSERT INTO settings (key, value) VALUES ('whitelist_pin', '1234')");
-  }
-
   console.log('Database initialized');
 }
 
@@ -1114,42 +1108,85 @@ app.get('/api/whitelist/check', async (req, res) => {
   }
 });
 
-// Register IP with PIN (public endpoint) - 24h validity
-app.post('/api/whitelist/register', async (req, res) => {
+// Register IP via OAuth (Authentik) - 24h validity
+app.post('/api/whitelist/register-oauth', async (req, res) => {
   try {
-    const { pin, device_name } = req.body;
+    const { code, redirect_uri, device_name } = req.body;
     const ip = getClientIp(req);
 
-    if (!pin) {
-      return res.status(400).json({ error: 'PIN erforderlich' });
+    if (!code || !redirect_uri) {
+      return res.status(400).json({ error: 'Code und Redirect URI erforderlich' });
     }
 
-    // Check PIN
-    const storedPin = await getSetting('whitelist_pin');
-    if (pin !== storedPin) {
-      return res.status(403).json({ error: 'Falscher PIN' });
+    // Exchange code for tokens with Authentik
+    const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const CLIENT_ID = 'order-register';
+    const CLIENT_SECRET = process.env.AUTHENTIK_REGISTER_SECRET || '';
+
+    const tokenResponse = await fetch(`${AUTHENTIK_URL}/application/o/token/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: redirect_uri,
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Token exchange failed:', errorText);
+      return res.status(401).json({ error: 'Authentifizierung fehlgeschlagen' });
     }
+
+    const tokens = await tokenResponse.json();
+
+    // Get user info
+    const userInfoResponse = await fetch(`${AUTHENTIK_URL}/application/o/userinfo/`, {
+      headers: {
+        'Authorization': `Bearer ${tokens.access_token}`,
+      },
+    });
+
+    if (!userInfoResponse.ok) {
+      return res.status(401).json({ error: 'Benutzerinformationen konnten nicht abgerufen werden' });
+    }
+
+    const userInfo = await userInfoResponse.json();
+    const userEmail = userInfo.email || userInfo.preferred_username || 'unknown';
+    const userName = userInfo.name || userInfo.preferred_username || userEmail;
 
     // Add or update IP with 24h expiry
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+    const deviceLabel = device_name || `${userName}'s Gerät`;
+
     await pool.query(`
       INSERT INTO ip_whitelist (ip_address, device_name, created_by, expires_at, is_permanent)
-      VALUES ($1, $2, 'self-register', $3, false)
+      VALUES ($1, $2, $3, $4, false)
       ON CONFLICT (ip_address) DO UPDATE SET
         device_name = $2,
+        created_by = $3,
         created_at = NOW(),
-        expires_at = $3,
+        expires_at = $4,
         is_permanent = false
-    `, [ip, device_name || 'Unbekanntes Gerät', expiresAt]);
+    `, [ip, deviceLabel, userEmail, expiresAt]);
+
+    console.log(`IP ${ip} whitelisted for user ${userEmail}`);
 
     res.json({
       success: true,
       ip,
       expires_at: expiresAt,
+      user_email: userEmail,
+      user_name: userName,
       message: 'IP für 24 Stunden freigeschaltet'
     });
   } catch (error) {
-    console.error('Whitelist register error:', error);
+    console.error('OAuth whitelist register error:', error);
     res.status(500).json({ error: 'Registrierung fehlgeschlagen' });
   }
 });
@@ -1194,30 +1231,6 @@ app.delete('/api/whitelist/:id', authenticateToken, async (req: AuthenticatedReq
     res.json({ success: true, message: 'IP entfernt' });
   } catch (error) {
     res.status(500).json({ error: 'Fehler beim Entfernen' });
-  }
-});
-
-// Update whitelist PIN (protected)
-app.put('/api/whitelist/pin', authenticateToken, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { pin } = req.body;
-    if (!pin || pin.length < 4) {
-      return res.status(400).json({ error: 'PIN muss mindestens 4 Zeichen haben' });
-    }
-    await setSetting('whitelist_pin', pin);
-    res.json({ success: true, message: 'PIN aktualisiert' });
-  } catch (error) {
-    res.status(500).json({ error: 'Fehler beim Aktualisieren' });
-  }
-});
-
-// Get current PIN (protected)
-app.get('/api/whitelist/pin', authenticateToken, async (req: AuthenticatedRequest, res) => {
-  try {
-    const pin = await getSetting('whitelist_pin');
-    res.json({ pin: pin || '1234' });
-  } catch (error) {
-    res.status(500).json({ error: 'Fehler beim Laden' });
   }
 });
 
