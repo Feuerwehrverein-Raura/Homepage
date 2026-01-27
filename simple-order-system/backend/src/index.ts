@@ -11,6 +11,9 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
+// Trust reverse proxy (Traefik) for X-Forwarded-* headers
+app.set('trust proxy', true);
+
 app.use(cors());
 app.use(express.json());
 
