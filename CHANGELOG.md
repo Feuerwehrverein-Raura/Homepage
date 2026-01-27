@@ -1,3 +1,10 @@
+# [1.78.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.6...v1.78.0) (2026-01-27)
+
+
+### Features
+
+* **kitchen:** highlight allergy notes prominently ([d755cc0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d755cc014aca6381262e73c3b70230615541715f))
+
 ## [1.77.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.5...v1.77.6) (2026-01-27)
 
 
