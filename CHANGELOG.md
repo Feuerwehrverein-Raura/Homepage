@@ -1,3 +1,10 @@
+## [1.81.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.3...v1.81.4) (2026-01-27)
+
+
+### Bug Fixes
+
+* **kitchen:** use ref to fix stale closure in WebSocket handler ([5934d0a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5934d0a97ff87e85c8bf376770264a33b8e58eaa))
+
 ## [1.81.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.2...v1.81.3) (2026-01-27)
 
 
