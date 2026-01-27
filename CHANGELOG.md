@@ -1,3 +1,10 @@
+## [1.77.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.4...v1.77.5) (2026-01-27)
+
+
+### Bug Fixes
+
+* **order:** show paid orders in Kitchen Display ([afbf66f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/afbf66f53761c807ef4bb56366340bb1232a7118))
+
 ## [1.77.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.3...v1.77.4) (2026-01-27)
 
 
