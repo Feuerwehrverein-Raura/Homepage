@@ -1,3 +1,10 @@
+## [1.81.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.2...v1.81.3) (2026-01-27)
+
+
+### Bug Fixes
+
+* **kitchen:** use Web Audio API oscillators for reliable sound ([c89ced8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c89ced8926121e7c7e9803a5be2c55a1533d7b9e))
+
 ## [1.81.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.1...v1.81.2) (2026-01-27)
 
 
