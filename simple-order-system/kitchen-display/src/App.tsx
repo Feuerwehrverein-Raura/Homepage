@@ -68,32 +68,43 @@ function App() {
 
   // Request notification permission
   const requestNotificationPermission = useCallback(async () => {
+    console.log('Button clicked - requesting permissions');
     try {
       // Initialize audio context on user interaction (required by browsers)
       if (!audioContext) {
         audioContext = new AudioContext();
+        console.log('AudioContext created');
       }
       // Resume audio context if suspended
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
+        console.log('AudioContext resumed');
       }
 
       if ('Notification' in window) {
+        console.log('Requesting notification permission...');
         const permission = await Notification.requestPermission();
+        console.log('Permission result:', permission);
         setNotificationsEnabled(permission === 'granted');
         if (permission === 'granted') {
           // Test beep to confirm audio works
           playBeep();
         } else if (permission === 'denied') {
           alert('Benachrichtigungen wurden blockiert. Bitte in den Browser-Einstellungen erlauben.');
+        } else {
+          // Permission was dismissed or is 'default'
+          alert('Bitte erlaube Benachrichtigungen im Browser-Dialog.');
         }
       } else {
+        console.log('Notification API not available, using audio only');
         // No notification API, but audio should work
         setNotificationsEnabled(true);
         playBeep();
+        alert('Browser unterstützt keine Benachrichtigungen - Audio aktiviert.');
       }
     } catch (error) {
       console.error('Notification permission error:', error);
+      alert('Fehler beim Aktivieren: ' + (error as Error).message);
       // Still enable audio notifications
       setNotificationsEnabled(true);
       playBeep();
