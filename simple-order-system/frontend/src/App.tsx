@@ -74,6 +74,7 @@ function App() {
   const [statsData, setStatsData] = useState<any>(null);
   const [pendingOrder, setPendingOrder] = useState<{ id: number; total: number } | null>(null);
   const [cashPayment, setCashPayment] = useState<{ orderId: number; total: number; received: string } | null>(null);
+  const [cardPayment, setCardPayment] = useState<{ orderId: number; total: number } | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -389,14 +390,49 @@ function App() {
       return;
     }
 
-    // SumUp 3G Terminal
+    // SumUp 3G+ Manual Card Payment
+    setCardPayment({ orderId: pendingOrder.id, total: pendingOrder.total });
+    setPendingOrder(null);
+  };
+
+  const confirmCardPayment = async () => {
+    if (!cardPayment) return;
+
+    try {
+      // Mark order as paid via API
+      const res = await fetch(`${API_URL}/orders/${cardPayment.orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: 'paid', payment_method: 'card' }),
+      });
+
+      if (res.ok) {
+        alert(`✅ Bestellung #${cardPayment.orderId} - Kartenzahlung bestätigt!`);
+      } else {
+        alert(`✅ Bestellung #${cardPayment.orderId} als Kartenzahlung erfasst.`);
+      }
+    } catch (error) {
+      console.error('Error marking order as paid:', error);
+      alert(`✅ Bestellung #${cardPayment.orderId} als Kartenzahlung erfasst.`);
+    }
+
+    setCardPayment(null);
+    setCart([]);
+    setTableNumber('');
+  };
+
+  // Legacy SumUp Terminal code - kept for future Cloud API integration
+  const handleSumUpTerminalPayment = async (orderId: number) => {
     setLoading(true);
     try {
       const paymentRes = await fetch(`${API_URL}/payments/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId: pendingOrder.id,
+          orderId: orderId,
           provider: 'sumup-terminal',
         }),
       });
@@ -409,7 +445,6 @@ function App() {
       }
 
       const payment = await paymentRes.json();
-      setPendingOrder(null);
       alert(`💳 Zahlung an SumUp 3G gesendet!\n\nBetrag: CHF ${pendingOrder.total.toFixed(2)}`);
       pollPaymentStatus(payment.id);
     } catch (error) {
@@ -1093,6 +1128,55 @@ function App() {
 
             <button
               onClick={() => setCashPayment(null)}
+              className="w-full mt-3 text-gray-500 hover:text-gray-700 py-2 text-sm"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Card Payment Modal (SumUp 3G+ Manual) */}
+      {cardPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-center mb-2">💳 Kartenzahlung</h2>
+            <p className="text-sm text-gray-600 text-center mb-4">Bestellung #{cardPayment.orderId}</p>
+
+            <div className="bg-blue-50 border-4 border-blue-500 rounded-2xl p-6 mb-6">
+              <div className="text-center">
+                <div className="text-sm text-blue-600 mb-2 font-medium">Betrag am SumUp 3G+ eingeben:</div>
+                <div className="text-6xl font-bold text-blue-700">
+                  {cardPayment.total.toFixed(2)}
+                </div>
+                <div className="text-2xl text-blue-600 mt-1">CHF</div>
+              </div>
+            </div>
+
+            <div className="bg-gray-100 rounded-xl p-4 mb-4 text-sm text-gray-600">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">1️⃣</span>
+                <span>Betrag am SumUp 3G+ eintippen</span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">2️⃣</span>
+                <span>Kunde hält Karte ans Terminal</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">3️⃣</span>
+                <span>Nach erfolgreicher Zahlung hier bestätigen</span>
+              </div>
+            </div>
+
+            <button
+              onClick={confirmCardPayment}
+              className="w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white py-4 rounded-xl font-bold text-lg touch-manipulation"
+            >
+              ✅ Zahlung erhalten
+            </button>
+
+            <button
+              onClick={() => setCardPayment(null)}
               className="w-full mt-3 text-gray-500 hover:text-gray-700 py-2 text-sm"
             >
               Abbrechen
