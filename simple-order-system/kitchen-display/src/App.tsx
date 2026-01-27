@@ -361,8 +361,25 @@ function OrderCard({
               </div>
             </div>
             {item.notes && (
-              <div className="mt-2 text-sm text-yellow-300 bg-gray-800 p-2 rounded">
-                📝 {item.notes}
+              <div className={`mt-2 p-3 rounded-lg border-2 ${
+                item.notes.toLowerCase().includes('allergi') ||
+                item.notes.toLowerCase().includes('laktose') ||
+                item.notes.toLowerCase().includes('gluten') ||
+                item.notes.toLowerCase().includes('nuss') ||
+                item.notes.toLowerCase().includes('vegan')
+                  ? 'bg-red-900 border-red-500 text-red-100'
+                  : 'bg-yellow-900 border-yellow-500 text-yellow-100'
+              }`}>
+                <span className="text-lg font-bold">
+                  {item.notes.toLowerCase().includes('allergi') ||
+                   item.notes.toLowerCase().includes('laktose') ||
+                   item.notes.toLowerCase().includes('gluten') ||
+                   item.notes.toLowerCase().includes('nuss') ||
+                   item.notes.toLowerCase().includes('vegan')
+                    ? '⚠️ '
+                    : '📝 '}
+                  {item.notes}
+                </span>
               </div>
             )}
           </div>
