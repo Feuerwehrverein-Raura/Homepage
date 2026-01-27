@@ -1,3 +1,10 @@
+# [1.80.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.79.0...v1.80.0) (2026-01-27)
+
+
+### Features
+
+* **order:** replace alerts with confirmation modal ([5fad8e8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5fad8e800703ef023e324e972507258fbe4b630b))
+
 # [1.79.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.78.1...v1.79.0) (2026-01-27)
 
 
