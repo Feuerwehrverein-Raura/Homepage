@@ -1,3 +1,10 @@
+## [1.80.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.1...v1.80.2) (2026-01-27)
+
+
+### Bug Fixes
+
+* **vorstand:** show only primary Vorstand function on homepage ([8c71aa1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8c71aa11a8546ada96bb567a122fe1fd3a900efb))
+
 ## [1.80.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.0...v1.80.1) (2026-01-27)
 
 
