@@ -1099,6 +1099,19 @@ app.get('/api/whitelist/my-ip', (req, res) => {
   res.json({ ip });
 });
 
+// Debug endpoint to check headers (temporary)
+app.get('/api/whitelist/debug-headers', (req, res) => {
+  res.json({
+    ip: getClientIp(req),
+    'x-forwarded-for': req.headers['x-forwarded-for'],
+    'x-real-ip': req.headers['x-real-ip'],
+    'x-forwarded-proto': req.headers['x-forwarded-proto'],
+    'req.ip': req.ip,
+    'req.ips': req.ips,
+    'socket.remoteAddress': req.socket?.remoteAddress,
+  });
+});
+
 // Check if current IP is whitelisted (and not expired)
 app.get('/api/whitelist/check', async (req, res) => {
   try {
