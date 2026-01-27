@@ -1,3 +1,10 @@
+# [1.81.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.3...v1.81.0) (2026-01-27)
+
+
+### Features
+
+* **kitchen:** add prominent sound enable button ([cd608ed](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cd608ed4344165e0e3d7371de26cf3ce6ac46987))
+
 ## [1.80.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.2...v1.80.3) (2026-01-27)
 
 
