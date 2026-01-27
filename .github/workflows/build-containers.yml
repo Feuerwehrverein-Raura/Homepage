@@ -75,6 +75,7 @@ jobs:
       order-backend: ${{ steps.filter.outputs.order-backend }}
       order-frontend: ${{ steps.filter.outputs.order-frontend }}
       order-kitchen: ${{ steps.filter.outputs.order-kitchen }}
+      order-register: ${{ steps.filter.outputs.order-register }}
       inventory-backend: ${{ steps.filter.outputs.inventory-backend }}
       inventory-frontend: ${{ steps.filter.outputs.inventory-frontend }}
     steps:
@@ -101,6 +102,8 @@ jobs:
               - 'simple-order-system/frontend/**'
             order-kitchen:
               - 'simple-order-system/kitchen-display/**'
+            order-register:
+              - 'simple-order-system/register-app/**'
             inventory-backend:
               - 'simple-inventory-system/backend/**'
             inventory-frontend:
@@ -380,6 +383,34 @@ jobs:
             ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:latest
             ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:${{ github.sha }}
+
+  build-order-register:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.order-register == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./simple-order-system/register-app
+          push: true
+          no-cache: true
+          tags: |
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-register:latest
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-register:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/order-register:${{ github.sha }}
 
   # Inventory System
   build-inventory-backend:

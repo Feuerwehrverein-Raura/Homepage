@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://order.fwv-raura.ch/api';
 const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch';
@@ -18,14 +18,74 @@ interface Order {
   items: OrderItem[];
 }
 
+// Audio context for notification sound
+let audioContext: AudioContext | null = null;
+
+function playBeep() {
+  try {
+    if (!audioContext) {
+      audioContext = new AudioContext();
+    }
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.frequency.value = 880; // A5 note
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+
+    // Play a second beep
+    setTimeout(() => {
+      const osc2 = audioContext!.createOscillator();
+      const gain2 = audioContext!.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioContext!.destination);
+      osc2.frequency.value = 1100;
+      osc2.type = 'sine';
+      gain2.gain.setValueAtTime(0.3, audioContext!.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioContext!.currentTime + 0.5);
+      osc2.start(audioContext!.currentTime);
+      osc2.stop(audioContext!.currentTime + 0.5);
+    }, 200);
+  } catch (e) {
+    console.error('Audio error:', e);
+  }
+}
+
 function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [station, setStation] = useState<string>('all');
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Request notification permission
+  const requestNotificationPermission = useCallback(async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationsEnabled(permission === 'granted');
+      // Initialize audio context on user interaction
+      if (!audioContext) {
+        audioContext = new AudioContext();
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchOrders();
     connectWebSocket();
+
+    // Check existing notification permission
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setNotificationsEnabled(true);
+    }
 
     return () => {
       if (wsRef.current) {
@@ -53,11 +113,11 @@ function App() {
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      
+
       if (data.type === 'new_order') {
         setOrders(prev => [data.order, ...prev]);
-        // Play sound or visual notification
-        playNotification();
+        // Play sound and show notification
+        playNotification(data.order);
       } else if (data.type === 'order_completed') {
         setOrders(prev => prev.filter(o => o.id !== data.order_id));
       }
@@ -75,12 +135,26 @@ function App() {
     wsRef.current = ws;
   };
 
-  const playNotification = () => {
-    // Simple notification - you can add audio or more visual feedback
+  const playNotification = (order: Order) => {
+    // Visual flash
     document.body.style.backgroundColor = '#fef3c7';
     setTimeout(() => {
       document.body.style.backgroundColor = '';
     }, 500);
+
+    // Play sound
+    playBeep();
+
+    // Browser notification
+    if (notificationsEnabled && 'Notification' in window) {
+      const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
+      new Notification(`Neue Bestellung - Tisch ${order.table_number}`, {
+        body: `${itemCount} Artikel`,
+        icon: '/logo-192.png',
+        tag: `order-${order.id}`,
+        requireInteraction: true
+      });
+    }
   };
 
   const completeOrder = async (orderId: number) => {
@@ -141,8 +215,24 @@ function App() {
             </button>
           </div>
 
-          <div className="text-xl font-bold">
-            {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}
+          <div className="flex items-center gap-4">
+            {!notificationsEnabled && (
+              <button
+                onClick={requestNotificationPermission}
+                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded font-semibold text-sm flex items-center gap-2"
+              >
+                <span>🔔</span>
+                <span>Benachrichtigungen aktivieren</span>
+              </button>
+            )}
+            {notificationsEnabled && (
+              <span className="text-green-400 text-sm flex items-center gap-1">
+                <span>🔔</span> Aktiv
+              </span>
+            )}
+            <div className="text-xl font-bold">
+              {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}
+            </div>
           </div>
         </div>
       </div>

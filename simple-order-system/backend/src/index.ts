@@ -125,6 +125,29 @@ async function initDB() {
     )
   `);
 
+  // IP Whitelist table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ip_whitelist (
+      id SERIAL PRIMARY KEY,
+      ip_address VARCHAR(45) NOT NULL UNIQUE,
+      device_name VARCHAR(100),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP,
+      created_by VARCHAR(100),
+      is_permanent BOOLEAN DEFAULT false
+    )
+  `);
+
+  // Add expires_at column if not exists (migration)
+  await pool.query(`ALTER TABLE ip_whitelist ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE ip_whitelist ADD COLUMN IF NOT EXISTS is_permanent BOOLEAN DEFAULT false`);
+
+  // Set default whitelist PIN if not exists
+  const existingPin = await pool.query("SELECT value FROM settings WHERE key = 'whitelist_pin'");
+  if (existingPin.rows.length === 0) {
+    await pool.query("INSERT INTO settings (key, value) VALUES ('whitelist_pin', '1234')");
+  }
+
   console.log('Database initialized');
 }
 
@@ -155,8 +178,8 @@ function broadcast(data: any) {
 const INVENTORY_API_URL = process.env.INVENTORY_API_URL || 'http://inventory-backend:3000';
 const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
 
-// Routes: Items (ONLY from Inventory system)
-app.get('/api/items', async (req, res) => {
+// Routes: Items (ONLY from Inventory system) - protected by IP whitelist
+app.get('/api/items', checkIpWhitelist, async (req, res) => {
   try {
     // Fetch all items from inventory system
     const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
@@ -290,7 +313,8 @@ app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest
 });
 
 // Routes: Orders (item_name and printer_station stored directly in order_items)
-app.get('/api/orders', async (req, res) => {
+// Protected by IP whitelist
+app.get('/api/orders', checkIpWhitelist, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT o.*,
@@ -316,7 +340,7 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', checkIpWhitelist, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -388,7 +412,7 @@ app.post('/api/orders', async (req, res) => {
 });
 
 // Get open orders for a specific table
-app.get('/api/orders/open/:tableNumber', async (req, res) => {
+app.get('/api/orders/open/:tableNumber', checkIpWhitelist, async (req, res) => {
   try {
     const { tableNumber } = req.params;
     const result = await pool.query(`
@@ -416,7 +440,7 @@ app.get('/api/orders/open/:tableNumber', async (req, res) => {
 });
 
 // Add items to an existing order
-app.post('/api/orders/:id/items', async (req, res) => {
+app.post('/api/orders/:id/items', checkIpWhitelist, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -501,7 +525,7 @@ app.post('/api/orders/:id/items', async (req, res) => {
   }
 });
 
-app.patch('/api/orders/:id/complete', async (req, res) => {
+app.patch('/api/orders/:id/complete', checkIpWhitelist, async (req, res) => {
   try {
     const { id } = req.params;
     await pool.query(
@@ -516,7 +540,7 @@ app.patch('/api/orders/:id/complete', async (req, res) => {
 });
 
 // Update order status with payment method
-app.put('/api/orders/:id/status', async (req, res) => {
+app.put('/api/orders/:id/status', checkIpWhitelist, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, payment_method } = req.body;
@@ -806,6 +830,224 @@ app.post('/api/settings/test-printer', authenticateToken, async (req: Authentica
   } catch (error: any) {
     console.error('Test printer error:', error);
     res.status(500).json({ error: `Drucker nicht erreichbar: ${error.message}` });
+  }
+});
+
+// ============================================
+// IP WHITELIST MANAGEMENT
+// ============================================
+
+// Helper to get client IP
+function getClientIp(req: any): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || req.ip || 'unknown';
+}
+
+// IP Whitelist middleware - allows requests if:
+// 1. Whitelist is disabled (empty or setting disabled)
+// 2. IP is whitelisted and not expired
+// 3. Request has valid auth token (admins bypass whitelist)
+async function checkIpWhitelist(req: any, res: any, next: any) {
+  try {
+    // Check if whitelist is enabled
+    const enabled = await getSetting('whitelist_enabled');
+    if (enabled !== 'true') {
+      return next(); // Whitelist disabled, allow all
+    }
+
+    // Check if whitelist is empty (allow all if no entries)
+    const countResult = await pool.query('SELECT COUNT(*) FROM ip_whitelist');
+    if (parseInt(countResult.rows[0].count) === 0) {
+      return next(); // No whitelist entries, allow all
+    }
+
+    // Check if request has valid auth token (admin bypass)
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // If auth token present, let the request through (auth middleware will validate)
+      return next();
+    }
+
+    // Check if IP is whitelisted
+    const ip = getClientIp(req);
+    const result = await pool.query(`
+      SELECT * FROM ip_whitelist
+      WHERE ip_address = $1
+        AND (is_permanent = true OR expires_at IS NULL OR expires_at > NOW())
+    `, [ip]);
+
+    if (result.rows.length > 0) {
+      return next(); // IP is whitelisted
+    }
+
+    // Not whitelisted
+    res.status(403).json({
+      error: 'Zugriff verweigert',
+      message: 'Diese IP-Adresse ist nicht freigeschaltet. Bitte registrieren Sie sich unter register.fwv-raura.ch',
+      ip: ip
+    });
+  } catch (error) {
+    console.error('Whitelist check error:', error);
+    next(); // On error, allow request (fail open for usability)
+  }
+}
+
+// Enable/disable whitelist protection (protected)
+app.get('/api/whitelist/enabled', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const enabled = await getSetting('whitelist_enabled');
+    res.json({ enabled: enabled === 'true' });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.put('/api/whitelist/enabled', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { enabled } = req.body;
+    await setSetting('whitelist_enabled', enabled ? 'true' : 'false');
+    res.json({ success: true, enabled });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get caller's public IP
+app.get('/api/whitelist/my-ip', (req, res) => {
+  const ip = getClientIp(req);
+  res.json({ ip });
+});
+
+// Check if current IP is whitelisted (and not expired)
+app.get('/api/whitelist/check', async (req, res) => {
+  try {
+    const ip = getClientIp(req);
+    const result = await pool.query(`
+      SELECT * FROM ip_whitelist
+      WHERE ip_address = $1
+        AND (is_permanent = true OR expires_at IS NULL OR expires_at > NOW())
+    `, [ip]);
+    const isWhitelisted = result.rows.length > 0;
+    const entry = result.rows[0];
+    res.json({
+      ip,
+      whitelisted: isWhitelisted,
+      device_name: entry?.device_name || null,
+      expires_at: entry?.expires_at || null,
+      is_permanent: entry?.is_permanent || false
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Register IP with PIN (public endpoint) - 24h validity
+app.post('/api/whitelist/register', async (req, res) => {
+  try {
+    const { pin, device_name } = req.body;
+    const ip = getClientIp(req);
+
+    if (!pin) {
+      return res.status(400).json({ error: 'PIN erforderlich' });
+    }
+
+    // Check PIN
+    const storedPin = await getSetting('whitelist_pin');
+    if (pin !== storedPin) {
+      return res.status(403).json({ error: 'Falscher PIN' });
+    }
+
+    // Add or update IP with 24h expiry
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+    await pool.query(`
+      INSERT INTO ip_whitelist (ip_address, device_name, created_by, expires_at, is_permanent)
+      VALUES ($1, $2, 'self-register', $3, false)
+      ON CONFLICT (ip_address) DO UPDATE SET
+        device_name = $2,
+        created_at = NOW(),
+        expires_at = $3,
+        is_permanent = false
+    `, [ip, device_name || 'Unbekanntes Gerät', expiresAt]);
+
+    res.json({
+      success: true,
+      ip,
+      expires_at: expiresAt,
+      message: 'IP für 24 Stunden freigeschaltet'
+    });
+  } catch (error) {
+    console.error('Whitelist register error:', error);
+    res.status(500).json({ error: 'Registrierung fehlgeschlagen' });
+  }
+});
+
+// List all whitelisted IPs (protected)
+app.get('/api/whitelist', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM ip_whitelist ORDER BY created_at DESC');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Add IP manually (protected)
+app.post('/api/whitelist', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { ip_address, device_name } = req.body;
+
+    if (!ip_address) {
+      return res.status(400).json({ error: 'IP-Adresse erforderlich' });
+    }
+
+    await pool.query(`
+      INSERT INTO ip_whitelist (ip_address, device_name, created_by)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (ip_address) DO UPDATE SET device_name = $2, created_at = NOW()
+    `, [ip_address, device_name || 'Manuell hinzugefügt', req.user?.email || 'admin']);
+
+    res.json({ success: true, message: 'IP hinzugefügt' });
+  } catch (error) {
+    console.error('Whitelist add error:', error);
+    res.status(500).json({ error: 'Fehler beim Hinzufügen' });
+  }
+});
+
+// Delete IP from whitelist (protected)
+app.delete('/api/whitelist/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('DELETE FROM ip_whitelist WHERE id = $1', [id]);
+    res.json({ success: true, message: 'IP entfernt' });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Entfernen' });
+  }
+});
+
+// Update whitelist PIN (protected)
+app.put('/api/whitelist/pin', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { pin } = req.body;
+    if (!pin || pin.length < 4) {
+      return res.status(400).json({ error: 'PIN muss mindestens 4 Zeichen haben' });
+    }
+    await setSetting('whitelist_pin', pin);
+    res.json({ success: true, message: 'PIN aktualisiert' });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Aktualisieren' });
+  }
+});
+
+// Get current PIN (protected)
+app.get('/api/whitelist/pin', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const pin = await getSetting('whitelist_pin');
+    res.json({ pin: pin || '1234' });
+  } catch (error) {
+    res.status(500).json({ error: 'Fehler beim Laden' });
   }
 });
 

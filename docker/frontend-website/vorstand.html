@@ -143,6 +143,9 @@
                 <button id="tab-pingen" class="tab-btn py-3 md:py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap text-sm md:text-base touch-manipulation">
                     Post
                 </button>
+                <button id="tab-whitelist" class="tab-btn py-3 md:py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap text-sm md:text-base touch-manipulation">
+                    IP-Whitelist
+                </button>
             </div>
         </div>
     </section>
@@ -1320,6 +1323,175 @@
                 </div>
             </div>
         </section>
+    </div>
+
+    <!-- IP Whitelist Section -->
+    <div id="whitelist-section" class="hidden">
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">IP-Whitelist</h1>
+                        <p class="text-gray-600 mt-1">Zugelassene IP-Adressen für Kasse und Kitchen Display</p>
+                    </div>
+                    <button id="add-whitelist-btn" class="bg-fire-500 text-white px-6 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-2">
+                        <span>+</span>
+                        <span>IP hinzufügen</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Whitelist Toggle -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+                    <div>
+                        <div class="font-semibold text-gray-800">IP-Whitelist Schutz</div>
+                        <p class="text-sm text-gray-600">Wenn aktiviert, können nur freigeschaltete IP-Adressen die Kasse und das Kitchen Display nutzen.</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="whitelist-enabled-toggle" class="sr-only peer">
+                        <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-fire-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-fire-500"></div>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- PIN Config -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="text-blue-600 text-sm font-medium">Registrierungs-PIN</div>
+                                <div id="whitelist-pin-display" class="text-2xl font-bold text-gray-800 font-mono">****</div>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="show-pin-btn" class="text-blue-600 hover:text-blue-800 text-sm">Anzeigen</button>
+                                <button id="change-pin-btn" class="text-blue-600 hover:text-blue-800 text-sm">Ändern</button>
+                            </div>
+                        </div>
+                        <p class="text-blue-600 text-xs mt-2">Diesen PIN an Helfer weitergeben für die Selbst-Registrierung</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <div class="text-green-600 text-sm font-medium">Register-App URL</div>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <code class="text-lg font-bold text-gray-800 bg-white px-2 py-1 rounded">register.fwv-raura.ch</code>
+                            <button id="copy-register-url-btn" class="text-green-600 hover:text-green-800" title="URL kopieren">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-green-600 text-xs mt-2">Helfer können sich hier mit PIN selbst registrieren (24h gültig)</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Whitelist Table -->
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">IP-Adresse</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Gerätename</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Erstellt von</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Erstellt am</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Gültig bis</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="whitelist-tbody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="whitelist-loading" class="text-center py-12">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                    <p class="mt-4 text-gray-600">Lade IP-Whitelist...</p>
+                </div>
+
+                <div id="whitelist-empty" class="text-center py-12 hidden">
+                    <p class="text-gray-600">Keine IP-Adressen in der Whitelist.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Whitelist Add Modal -->
+    <div id="whitelist-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">IP-Adresse hinzufügen</h3>
+                    <button id="close-whitelist-modal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+
+                <form id="whitelist-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">IP-Adresse *</label>
+                        <input type="text" id="whitelist-ip" required
+                            pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+                            placeholder="z.B. 192.168.1.100"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Gerätename</label>
+                        <input type="text" id="whitelist-device-name"
+                            placeholder="z.B. Kassen-Tablet"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-lg text-sm text-blue-700">
+                        <strong>Hinweis:</strong> Manuell hinzugefügte IPs sind permanent gültig (kein Ablaufdatum).
+                    </div>
+                    <div class="flex space-x-3 pt-4">
+                        <button type="button" id="cancel-whitelist-btn" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            Abbrechen
+                        </button>
+                        <button type="submit" class="flex-1 bg-fire-500 text-white py-2 rounded-lg hover:bg-fire-600">
+                            Hinzufügen
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Change Modal -->
+    <div id="pin-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">PIN ändern</h3>
+                    <button id="close-pin-modal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+
+                <form id="pin-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Neuer PIN (4-6 Ziffern) *</label>
+                        <input type="text" id="new-pin" required
+                            inputmode="numeric"
+                            pattern="[0-9]{4,6}"
+                            maxlength="6"
+                            placeholder="z.B. 1234"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-center text-2xl font-mono tracking-widest">
+                    </div>
+                    <div class="flex space-x-3 pt-4">
+                        <button type="button" id="cancel-pin-btn" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                            Abbrechen
+                        </button>
+                        <button type="submit" class="flex-1 bg-fire-500 text-white py-2 rounded-lg hover:bg-fire-600">
+                            PIN speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Pingen Send Letter Modal -->
@@ -4469,6 +4641,7 @@ ${grussformel}`;
             document.getElementById('email-section').classList.add('hidden');
             document.getElementById('registrations-section').classList.add('hidden');
             document.getElementById('pingen-section').classList.add('hidden');
+            document.getElementById('whitelist-section').classList.add('hidden');
 
             if (tab === 'members') {
                 document.getElementById('tab-members').classList.add('border-fire-500', 'text-fire-600');
@@ -4503,6 +4676,10 @@ ${grussformel}`;
                 document.getElementById('tab-pingen').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('pingen-section').classList.remove('hidden');
                 loadPingenData();
+            } else if (tab === 'whitelist') {
+                document.getElementById('tab-whitelist').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('whitelist-section').classList.remove('hidden');
+                loadWhitelist();
             }
         }
 
@@ -4518,6 +4695,7 @@ ${grussformel}`;
         document.getElementById('tab-email').addEventListener('click', () => switchTab('email'));
         document.getElementById('tab-registrations').addEventListener('click', () => switchTab('registrations'));
         document.getElementById('tab-pingen').addEventListener('click', () => switchTab('pingen'));
+        document.getElementById('tab-whitelist').addEventListener('click', () => switchTab('whitelist'));
 
         // Members
         document.getElementById('add-member-btn').addEventListener('click', openNewMemberModal);
@@ -5617,6 +5795,214 @@ ${grussformel}`;
         document.getElementById('logout-btn-mobile').addEventListener('click', () => {
             localStorage.removeItem('vorstand_token');
             window.location.href = '/';
+        });
+
+        // ============================================
+        // IP WHITELIST
+        // ============================================
+
+        const ORDER_API = 'https://order.fwv-raura.ch/api';
+        let whitelistPin = '';
+
+        async function loadWhitelist() {
+            document.getElementById('whitelist-loading').classList.remove('hidden');
+            document.getElementById('whitelist-empty').classList.add('hidden');
+            document.getElementById('whitelist-tbody').innerHTML = '';
+
+            try {
+                const [listRes, pinRes, enabledRes] = await Promise.all([
+                    fetch(`${ORDER_API}/whitelist`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    }),
+                    fetch(`${ORDER_API}/whitelist/pin`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    }),
+                    fetch(`${ORDER_API}/whitelist/enabled`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    })
+                ]);
+
+                if (!listRes.ok) throw new Error('Failed to load whitelist');
+
+                const whitelist = await listRes.json();
+                if (pinRes.ok) {
+                    const pinData = await pinRes.json();
+                    whitelistPin = pinData.pin || '';
+                }
+                if (enabledRes.ok) {
+                    const enabledData = await enabledRes.json();
+                    document.getElementById('whitelist-enabled-toggle').checked = enabledData.enabled;
+                }
+
+                document.getElementById('whitelist-loading').classList.add('hidden');
+
+                if (whitelist.length === 0) {
+                    document.getElementById('whitelist-empty').classList.remove('hidden');
+                    return;
+                }
+
+                const tbody = document.getElementById('whitelist-tbody');
+                tbody.innerHTML = whitelist.map(entry => {
+                    const createdAt = new Date(entry.created_at).toLocaleString('de-CH');
+                    const expiresAt = entry.expires_at
+                        ? new Date(entry.expires_at).toLocaleString('de-CH')
+                        : '<span class="text-green-600">Permanent</span>';
+                    const isExpired = entry.expires_at && new Date(entry.expires_at) < new Date();
+
+                    return `
+                        <tr class="${isExpired ? 'bg-red-50' : ''}">
+                            <td class="px-6 py-4 whitespace-nowrap font-mono">${entry.ip_address}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${entry.device_name || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">${entry.created_by || '-'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${createdAt}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm ${isExpired ? 'text-red-600 font-semibold' : 'text-gray-500'}">${isExpired ? 'Abgelaufen' : expiresAt}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                <button onclick="deleteWhitelistEntry(${entry.id})" class="text-red-600 hover:text-red-800">
+                                    Entfernen
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading whitelist:', error);
+                document.getElementById('whitelist-loading').classList.add('hidden');
+                document.getElementById('whitelist-empty').classList.remove('hidden');
+            }
+        }
+
+        async function deleteWhitelistEntry(id) {
+            if (!confirm('Diese IP-Adresse wirklich aus der Whitelist entfernen?')) return;
+
+            try {
+                const res = await fetch(`${ORDER_API}/whitelist/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to delete');
+                loadWhitelist();
+            } catch (error) {
+                console.error('Error deleting whitelist entry:', error);
+                alert('Fehler beim Entfernen der IP-Adresse');
+            }
+        }
+
+        async function addWhitelistEntry(e) {
+            e.preventDefault();
+            const ip = document.getElementById('whitelist-ip').value;
+            const deviceName = document.getElementById('whitelist-device-name').value;
+
+            try {
+                const res = await fetch(`${ORDER_API}/whitelist`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ ip_address: ip, device_name: deviceName })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Failed to add');
+                }
+
+                document.getElementById('whitelist-modal').classList.add('hidden');
+                document.getElementById('whitelist-form').reset();
+                loadWhitelist();
+            } catch (error) {
+                console.error('Error adding whitelist entry:', error);
+                alert('Fehler: ' + error.message);
+            }
+        }
+
+        function showWhitelistPin() {
+            const display = document.getElementById('whitelist-pin-display');
+            if (display.textContent === '****') {
+                display.textContent = whitelistPin || 'Nicht gesetzt';
+                document.getElementById('show-pin-btn').textContent = 'Verstecken';
+            } else {
+                display.textContent = '****';
+                document.getElementById('show-pin-btn').textContent = 'Anzeigen';
+            }
+        }
+
+        async function saveWhitelistPin(e) {
+            e.preventDefault();
+            const newPin = document.getElementById('new-pin').value;
+
+            try {
+                const res = await fetch(`${ORDER_API}/whitelist/pin`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ pin: newPin })
+                });
+
+                if (!res.ok) throw new Error('Failed to save PIN');
+
+                whitelistPin = newPin;
+                document.getElementById('whitelist-pin-display').textContent = '****';
+                document.getElementById('show-pin-btn').textContent = 'Anzeigen';
+                document.getElementById('pin-modal').classList.add('hidden');
+                document.getElementById('pin-form').reset();
+                alert('PIN wurde gespeichert');
+            } catch (error) {
+                console.error('Error saving PIN:', error);
+                alert('Fehler beim Speichern des PIN');
+            }
+        }
+
+        // Whitelist Event Listeners
+        document.getElementById('add-whitelist-btn').addEventListener('click', () => {
+            document.getElementById('whitelist-modal').classList.remove('hidden');
+        });
+        document.getElementById('close-whitelist-modal').addEventListener('click', () => {
+            document.getElementById('whitelist-modal').classList.add('hidden');
+        });
+        document.getElementById('cancel-whitelist-btn').addEventListener('click', () => {
+            document.getElementById('whitelist-modal').classList.add('hidden');
+        });
+        document.getElementById('whitelist-form').addEventListener('submit', addWhitelistEntry);
+
+        document.getElementById('show-pin-btn').addEventListener('click', showWhitelistPin);
+        document.getElementById('change-pin-btn').addEventListener('click', () => {
+            document.getElementById('pin-modal').classList.remove('hidden');
+        });
+        document.getElementById('close-pin-modal').addEventListener('click', () => {
+            document.getElementById('pin-modal').classList.add('hidden');
+        });
+        document.getElementById('cancel-pin-btn').addEventListener('click', () => {
+            document.getElementById('pin-modal').classList.add('hidden');
+        });
+        document.getElementById('pin-form').addEventListener('submit', saveWhitelistPin);
+
+        document.getElementById('copy-register-url-btn').addEventListener('click', () => {
+            navigator.clipboard.writeText('https://register.fwv-raura.ch');
+            alert('URL in die Zwischenablage kopiert!');
+        });
+
+        document.getElementById('whitelist-enabled-toggle').addEventListener('change', async (e) => {
+            try {
+                const enabled = e.target.checked;
+                const res = await fetch(`${ORDER_API}/whitelist/enabled`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ enabled })
+                });
+                if (!res.ok) throw new Error('Failed to update');
+                alert(enabled ? 'IP-Whitelist Schutz aktiviert' : 'IP-Whitelist Schutz deaktiviert');
+            } catch (error) {
+                console.error('Error toggling whitelist:', error);
+                e.target.checked = !e.target.checked; // Revert on error
+                alert('Fehler beim Ändern des Status');
+            }
         });
 
         // ============================================

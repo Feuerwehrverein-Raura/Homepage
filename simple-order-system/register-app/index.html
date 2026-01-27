@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#dc2626">
+    <title>FWV Raura - Zugang freischalten</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .pin-input {
+            letter-spacing: 0.5em;
+            text-align: center;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="text-5xl mb-4">🔓</div>
+            <h1 class="text-2xl font-bold text-gray-800">Zugang freischalten</h1>
+            <p class="text-gray-600 mt-2">FWV Raura Bestellsystem</p>
+        </div>
+
+        <!-- IP Display -->
+        <div class="bg-gray-100 rounded-xl p-4 mb-6">
+            <div class="text-sm text-gray-600 mb-1">Deine öffentliche IP:</div>
+            <div id="ip-display" class="text-2xl font-mono font-bold text-gray-800">
+                Wird geladen...
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status-box" class="hidden rounded-xl p-4 mb-6">
+            <div id="status-text" class="font-semibold"></div>
+        </div>
+
+        <!-- Registration Form -->
+        <form id="register-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Gerätename</label>
+                <input
+                    type="text"
+                    id="device-name"
+                    placeholder="z.B. Stefans Handy"
+                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none text-lg"
+                >
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">PIN (vom Vorstand)</label>
+                <input
+                    type="text"
+                    id="pin"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="6"
+                    placeholder="****"
+                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:outline-none pin-input"
+                    required
+                >
+            </div>
+
+            <button
+                type="submit"
+                id="submit-btn"
+                class="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold py-4 rounded-xl text-lg transition-colors"
+            >
+                Freischalten
+            </button>
+        </form>
+
+        <!-- Already Whitelisted -->
+        <div id="already-whitelisted" class="hidden text-center py-8">
+            <div class="text-5xl mb-4">✅</div>
+            <h2 class="text-xl font-bold text-green-600 mb-2">Bereits freigeschaltet!</h2>
+            <p id="device-info" class="text-gray-600 mb-6"></p>
+            <div class="space-y-3">
+                <a href="https://order.fwv-raura.ch" class="block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">
+                    Zur Kasse
+                </a>
+                <a href="https://kitchen.fwv-raura.ch" class="block bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl">
+                    Zum Kitchen Display
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8 text-sm text-gray-500">
+            Feuerwehrverein Raura
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://order.fwv-raura.ch/api';
+        let currentIp = '';
+
+        // Load current IP and check status
+        async function init() {
+            try {
+                // Get IP
+                const ipRes = await fetch(`${API_BASE}/whitelist/my-ip`);
+                const ipData = await ipRes.json();
+                currentIp = ipData.ip;
+                document.getElementById('ip-display').textContent = currentIp;
+
+                // Check if already whitelisted
+                const checkRes = await fetch(`${API_BASE}/whitelist/check`);
+                const checkData = await checkRes.json();
+
+                if (checkData.whitelisted) {
+                    document.getElementById('register-form').classList.add('hidden');
+                    document.getElementById('already-whitelisted').classList.remove('hidden');
+                    document.getElementById('device-info').textContent =
+                        `Gerät: ${checkData.device_name || 'Unbekannt'}`;
+                }
+            } catch (error) {
+                console.error('Init error:', error);
+                document.getElementById('ip-display').textContent = 'Fehler beim Laden';
+            }
+        }
+
+        // Show status message
+        function showStatus(message, isError = false) {
+            const box = document.getElementById('status-box');
+            const text = document.getElementById('status-text');
+            box.classList.remove('hidden', 'bg-green-100', 'bg-red-100', 'text-green-800', 'text-red-800');
+            box.classList.add(isError ? 'bg-red-100' : 'bg-green-100');
+            text.classList.remove('text-green-800', 'text-red-800');
+            text.classList.add(isError ? 'text-red-800' : 'text-green-800');
+            text.textContent = message;
+        }
+
+        // Handle form submit
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const pin = document.getElementById('pin').value;
+            const deviceName = document.getElementById('device-name').value;
+            const btn = document.getElementById('submit-btn');
+
+            if (!pin) {
+                showStatus('Bitte PIN eingeben', true);
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Wird freigeschaltet...';
+
+            try {
+                const res = await fetch(`${API_BASE}/whitelist/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin, device_name: deviceName })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    showStatus('Erfolgreich freigeschaltet!');
+                    setTimeout(() => {
+                        document.getElementById('register-form').classList.add('hidden');
+                        document.getElementById('already-whitelisted').classList.remove('hidden');
+                        document.getElementById('device-info').textContent =
+                            `Gerät: ${deviceName || 'Unbekannt'}`;
+                    }, 1000);
+                } else {
+                    showStatus(data.error || 'Fehler bei der Registrierung', true);
+                }
+            } catch (error) {
+                console.error('Register error:', error);
+                showStatus('Netzwerkfehler - bitte erneut versuchen', true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Freischalten';
+            }
+        });
+
+        // Init on load
+        init();
+    </script>
+</body>
+</html>

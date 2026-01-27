@@ -1,92 +1,134 @@
-version: '3.8'
-
-# Lokales Setup für Events ohne Internet
-# Einfach auf einem Laptop/Mini-PC starten
+# Local deployment for Raspberry Pi
+# Runs Kasse + Inventar + Kitchen Display locally with cloud sync
+#
+# Usage:
+#   1. Copy .env.local.example to .env
+#   2. Configure printer IPs and cloud sync settings
+#   3. docker compose -f docker-compose.local.yml up -d
+#
+# Access:
+#   - Kasse: http://kasse.local or http://<pi-ip>:8080
+#   - Kitchen: http://kitchen.local or http://<pi-ip>:8081
+#   - Inventar: http://inventar.local or http://<pi-ip>:8082
 
 services:
-  # Lokale Postgres
+  # Shared PostgreSQL for both systems
   postgres:
     image: postgres:16-alpine
-    container_name: order-postgres-local
+    container_name: local-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: orderuser
-      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-localpass123}
-      POSTGRES_DB: orderdb
+      POSTGRES_USER: ${DB_USER:-localuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-localpass}
+      POSTGRES_DB: ${DB_NAME:-localdb}
     volumes:
-      - order_postgres_local:/var/lib/postgresql/data
-    networks:
-      - order-local
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U orderuser"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-localuser}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Backend
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: order-backend-local
+  # Order System Backend (Kasse)
+  order-backend:
+    image: ghcr.io/feuerwehrverein-raura/order-backend:latest
+    container_name: local-order-backend
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Local Database
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: orderdb
-      DB_USER: orderuser
-      DB_PASSWORD: ${ORDER_DB_PASSWORD:-localpass123}
-      # Lokale Auth (einfaches Passwort)
-      LOCAL_MODE: "true"
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-fwv2026}
-    ports:
-      - "3000:3000"
+      DB_NAME: ${DB_NAME:-localdb}
+      DB_USER: ${DB_USER:-localuser}
+      DB_PASSWORD: ${DB_PASSWORD:-localpass}
+      # No auth needed locally
+      JWT_SECRET: local-secret-not-important
+      # Printers (direct local network access!)
+      PRINTER_BAR_IP: ${PRINTER_BAR_IP:-}
+      PRINTER_BAR_PORT: ${PRINTER_BAR_PORT:-9100}
+      PRINTER_KITCHEN_IP: ${PRINTER_KITCHEN_IP:-}
+      PRINTER_KITCHEN_PORT: ${PRINTER_KITCHEN_PORT:-9100}
+      # Local Inventory
+      USE_INVENTORY_API: "true"
+      INVENTORY_API_URL: http://inventory-backend:3000
+      # Cloud Sync (optional)
+      CLOUD_SYNC_ENABLED: ${CLOUD_SYNC_ENABLED:-false}
+      CLOUD_API_URL: ${CLOUD_API_URL:-https://order.fwv-raura.ch/api}
+      CLOUD_SYNC_KEY: ${CLOUD_SYNC_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
-    networks:
-      - order-local
+    ports:
+      - "3000:3000"
 
-  # Frontend - Bestelloberfläche
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://${LOCAL_IP:-localhost}:3000/api
-        VITE_WS_URL: ws://${LOCAL_IP:-localhost}:3000
-        VITE_LOCAL_MODE: "true"
-    container_name: order-frontend-local
+  # Order System Frontend (Kasse UI)
+  order-frontend:
+    image: ghcr.io/feuerwehrverein-raura/order-frontend:latest
+    container_name: local-order-frontend
     restart: unless-stopped
     ports:
       - "8080:80"
-    depends_on:
-      - backend
-    networks:
-      - order-local
 
   # Kitchen Display
-  kitchen-display:
-    build:
-      context: ./kitchen-display
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://${LOCAL_IP:-localhost}:3000/api
-        VITE_WS_URL: ws://${LOCAL_IP:-localhost}:3000
-    container_name: order-kitchen-local
+  order-kitchen:
+    image: ghcr.io/feuerwehrverein-raura/order-kitchen:latest
+    container_name: local-order-kitchen
     restart: unless-stopped
     ports:
       - "8081:80"
-    depends_on:
-      - backend
-    networks:
-      - order-local
 
-networks:
-  order-local:
-    driver: bridge
+  # Inventory Backend
+  inventory-backend:
+    image: ghcr.io/feuerwehrverein-raura/inventory-backend:latest
+    container_name: local-inventory-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Local Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-localdb}
+      DB_USER: ${DB_USER:-localuser}
+      DB_PASSWORD: ${DB_PASSWORD:-localpass}
+      # No auth needed locally
+      JWT_SECRET: local-secret-not-important
+      # Cloud Sync (optional)
+      CLOUD_SYNC_ENABLED: ${CLOUD_SYNC_ENABLED:-false}
+      CLOUD_API_URL: ${CLOUD_API_URL:-https://inventar.fwv-raura.ch/api}
+      CLOUD_SYNC_KEY: ${CLOUD_SYNC_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+
+  # Inventory Frontend
+  inventory-frontend:
+    image: ghcr.io/feuerwehrverein-raura/inventory-frontend:latest
+    container_name: local-inventory-frontend
+    restart: unless-stopped
+    ports:
+      - "8082:80"
+
+  # Nginx Reverse Proxy (combines everything under nice URLs)
+  nginx:
+    image: nginx:alpine
+    container_name: local-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - order-backend
+      - order-frontend
+      - order-kitchen
+      - inventory-backend
+      - inventory-frontend
 
 volumes:
-  order_postgres_local:
+  postgres_data:
