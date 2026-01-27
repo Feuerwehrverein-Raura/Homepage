@@ -1,3 +1,10 @@
+## [1.80.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.2...v1.80.3) (2026-01-27)
+
+
+### Bug Fixes
+
+* **order:** correct WebSocket URL in build args ([6167fdd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6167fddd68aeb45ade5ae7c6dd4a0f88dbec8049))
+
 ## [1.80.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.1...v1.80.2) (2026-01-27)
 
 
