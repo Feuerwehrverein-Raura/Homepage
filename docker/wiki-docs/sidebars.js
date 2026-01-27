@@ -24,6 +24,25 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Kassensystem',
+      items: [
+        'kassensystem/uebersicht',
+        'kassensystem/kitchen-display',
+        'kassensystem/ip-whitelist',
+        'kassensystem/tagesbericht',
+        'kassensystem/lokale-instanz',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Inventar',
+      items: [
+        'inventar/uebersicht',
+        'inventar/scanner',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Administration',
       items: [
         'admin/rollen',

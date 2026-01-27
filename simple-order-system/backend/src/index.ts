@@ -66,6 +66,25 @@ async function initDB() {
     ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)
   `);
 
+  // Sync columns for bidirectional sync
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS sync_source VARCHAR(100)`);
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS sync_source_id INTEGER`);
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS synced_at TIMESTAMP`);
+
+  // Sync queue for offline sync
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sync_queue (
+      id SERIAL PRIMARY KEY,
+      entity_type VARCHAR(50) NOT NULL,
+      entity_id INTEGER NOT NULL,
+      action VARCHAR(20) NOT NULL,
+      data JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      synced_at TIMESTAMP,
+      error TEXT
+    )
+  `);
+
   // Create order_items without foreign key to items (we store item_name directly)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS order_items (
@@ -172,6 +191,141 @@ function broadcast(data: any) {
       client.send(JSON.stringify(data));
     }
   });
+}
+
+// ============================================
+// REAL-TIME SYNC
+// ============================================
+
+const CLOUD_SYNC_ENABLED = process.env.CLOUD_SYNC_ENABLED === 'true';
+const SYNC_CLOUD_URL = process.env.CLOUD_API_URL || '';
+const SYNC_KEY = process.env.CLOUD_SYNC_KEY || '';
+const SYNC_SOURCE = process.env.SYNC_SOURCE || 'local';
+
+// Queue an order for sync to cloud
+async function queueOrderSync(orderId: number, action: 'create' | 'update') {
+  if (!CLOUD_SYNC_ENABLED || !SYNC_CLOUD_URL) return;
+
+  try {
+    const result = await pool.query(`
+      SELECT o.*,
+        json_agg(json_build_object(
+          'item_id', oi.item_id, 'item_name', oi.item_name,
+          'quantity', oi.quantity, 'price', oi.price,
+          'notes', oi.notes, 'printer_station', oi.printer_station
+        )) FILTER (WHERE oi.id IS NOT NULL) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `, [orderId]);
+
+    if (result.rows.length === 0) return;
+
+    await pool.query(`
+      INSERT INTO sync_queue (entity_type, entity_id, action, data)
+      VALUES ('order', $1, $2, $3)
+    `, [orderId, action, JSON.stringify(result.rows[0])]);
+
+    syncToCloud();
+  } catch (error) {
+    console.error('Queue sync error:', error);
+  }
+}
+
+// Background sync to cloud
+async function syncToCloud() {
+  if (!CLOUD_SYNC_ENABLED || !SYNC_CLOUD_URL || !SYNC_KEY) return;
+
+  try {
+    const pending = await pool.query(`
+      SELECT * FROM sync_queue WHERE synced_at IS NULL ORDER BY created_at LIMIT 50
+    `);
+
+    if (pending.rows.length === 0) return;
+
+    const orders = pending.rows.filter(r => r.entity_type === 'order').map(r => r.data);
+    if (orders.length === 0) return;
+
+    const response = await fetch(`${SYNC_CLOUD_URL}/sync/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Sync-Key': SYNC_KEY },
+      body: JSON.stringify({ orders, source: SYNC_SOURCE })
+    });
+
+    if (response.ok) {
+      await pool.query(`UPDATE sync_queue SET synced_at = NOW() WHERE id = ANY($1)`, [pending.rows.map(r => r.id)]);
+      console.log(`Synced ${orders.length} orders to cloud`);
+    }
+  } catch (error) {
+    console.error('Sync to cloud error:', error);
+  }
+}
+
+// Pull updates from cloud
+async function syncFromCloud() {
+  if (!CLOUD_SYNC_ENABLED || !SYNC_CLOUD_URL || !SYNC_KEY) return;
+
+  try {
+    const lastSyncResult = await pool.query("SELECT value FROM settings WHERE key = 'last_cloud_sync'");
+    const lastSync = lastSyncResult.rows[0]?.value || '1970-01-01T00:00:00Z';
+
+    const response = await fetch(`${SYNC_CLOUD_URL}/sync/orders?since=${encodeURIComponent(lastSync)}`, {
+      headers: { 'X-Sync-Key': SYNC_KEY }
+    });
+
+    if (!response.ok) return;
+    const data = await response.json();
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let imported = 0;
+
+      for (const order of data.orders || []) {
+        if (order.sync_source === SYNC_SOURCE) continue;
+
+        const existing = await client.query(
+          'SELECT id FROM orders WHERE sync_source = $1 AND sync_source_id = $2',
+          [order.sync_source || 'cloud', order.id]
+        );
+        if (existing.rows.length > 0) continue;
+
+        const orderResult = await client.query(`
+          INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id, synced_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id
+        `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, order.sync_source || 'cloud', order.id]);
+
+        for (const item of (order.items || [])) {
+          await client.query(`
+            INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `, [orderResult.rows[0].id, item.item_id, item.item_name, item.quantity, item.price, item.notes, item.printer_station]);
+        }
+        imported++;
+      }
+
+      await client.query(`
+        INSERT INTO settings (key, value, updated_at) VALUES ('last_cloud_sync', $1, NOW())
+        ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+      `, [data.timestamp]);
+
+      await client.query('COMMIT');
+      if (imported > 0) console.log(`Imported ${imported} orders from cloud`);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Sync from cloud error:', error);
+  }
+}
+
+// Start periodic sync (every 30 seconds)
+if (CLOUD_SYNC_ENABLED) {
+  setInterval(() => { syncToCloud(); syncFromCloud(); }, 30000);
 }
 
 // Inventory API integration
@@ -402,6 +556,9 @@ app.post('/api/orders', checkIpWhitelist, async (req, res) => {
     // Broadcast to kitchen display
     broadcast({ type: 'new_order', order: { ...order, items } });
 
+    // Queue for cloud sync
+    queueOrderSync(order.id, 'create');
+
     res.json(order);
   } catch (error) {
     await client.query('ROLLBACK');
@@ -515,6 +672,9 @@ app.post('/api/orders/:id/items', checkIpWhitelist, async (req, res) => {
     // Broadcast update
     broadcast({ type: 'order_updated', order_id: id });
 
+    // Queue for cloud sync
+    queueOrderSync(parseInt(id), 'update');
+
     res.json({ success: true, total: newTotal });
   } catch (error) {
     await client.query('ROLLBACK');
@@ -533,6 +693,10 @@ app.patch('/api/orders/:id/complete', checkIpWhitelist, async (req, res) => {
       ['completed', id]
     );
     broadcast({ type: 'order_completed', order_id: id });
+
+    // Queue for cloud sync
+    queueOrderSync(parseInt(id), 'update');
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
@@ -551,6 +715,10 @@ app.put('/api/orders/:id/status', checkIpWhitelist, async (req, res) => {
     );
 
     broadcast({ type: 'order_updated', order_id: id, status, payment_method });
+
+    // Queue for cloud sync
+    queueOrderSync(parseInt(id), 'update');
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating order status:', error);
@@ -1410,6 +1578,232 @@ app.post('/api/webhooks/sumup', async (req, res) => {
   } catch (error) {
     console.error('Webhook error:', error);
     res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// ============================================
+// SYNC API (for Local <-> Cloud synchronization)
+// ============================================
+
+const CLOUD_SYNC_KEY = process.env.CLOUD_SYNC_KEY || '';
+const CLOUD_API_URL = process.env.CLOUD_API_URL || '';
+
+// Middleware to verify sync key
+function verifySyncKey(req: any, res: any, next: any) {
+  const syncKey = req.headers['x-sync-key'];
+  if (!CLOUD_SYNC_KEY || syncKey !== CLOUD_SYNC_KEY) {
+    return res.status(401).json({ error: 'Invalid sync key' });
+  }
+  next();
+}
+
+// Get all orders since a timestamp (for local to pull from cloud)
+app.get('/api/sync/orders', verifySyncKey, async (req, res) => {
+  try {
+    const since = req.query.since ? new Date(req.query.since as string) : new Date(0);
+    const result = await pool.query(`
+      SELECT o.*,
+        json_agg(
+          json_build_object(
+            'id', oi.id,
+            'item_id', oi.item_id,
+            'item_name', oi.item_name,
+            'quantity', oi.quantity,
+            'price', oi.price,
+            'notes', oi.notes,
+            'printer_station', oi.printer_station
+          )
+        ) FILTER (WHERE oi.id IS NOT NULL) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.created_at >= $1
+      GROUP BY o.id
+      ORDER BY o.created_at ASC
+    `, [since]);
+
+    res.json({
+      orders: result.rows,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Sync orders error:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+// Upload orders from local to cloud
+app.post('/api/sync/orders', verifySyncKey, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { orders, source } = req.body;
+    let imported = 0;
+
+    for (const order of orders) {
+      // Check if order already exists (by source and original ID)
+      const existing = await client.query(
+        'SELECT id FROM orders WHERE sync_source = $1 AND sync_source_id = $2',
+        [source, order.id]
+      );
+
+      if (existing.rows.length > 0) continue; // Skip existing
+
+      // Insert order
+      const orderResult = await client.query(`
+        INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id
+      `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, source, order.id]);
+
+      const newOrderId = orderResult.rows[0].id;
+
+      // Insert order items
+      for (const item of (order.items || [])) {
+        await client.query(`
+          INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [newOrderId, item.item_id, item.item_name, item.quantity, item.price, item.notes, item.printer_station]);
+      }
+
+      imported++;
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, imported });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Sync upload error:', error);
+    res.status(500).json({ error: 'Failed to upload orders' });
+  } finally {
+    client.release();
+  }
+});
+
+// Get daily stats (for sync)
+app.get('/api/sync/stats', verifySyncKey, async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) as order_count,
+        COALESCE(SUM(total), 0) as total_revenue,
+        COUNT(CASE WHEN payment_method = 'bar' THEN 1 END) as cash_count,
+        COALESCE(SUM(CASE WHEN payment_method = 'bar' THEN total END), 0) as cash_total,
+        COUNT(CASE WHEN payment_method = 'card' THEN 1 END) as card_count,
+        COALESCE(SUM(CASE WHEN payment_method = 'card' THEN total END), 0) as card_total
+      FROM orders
+      WHERE DATE(created_at) = $1 AND status IN ('paid', 'completed')
+    `, [date]);
+
+    res.json({
+      date,
+      stats: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Sync stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// Full bidirectional sync
+app.post('/api/sync/full', verifySyncKey, async (req, res) => {
+  try {
+    const { lastSync, localOrders, source } = req.body;
+    const since = lastSync ? new Date(lastSync) : new Date(0);
+
+    // 1. Get orders from cloud that are newer than lastSync
+    const cloudOrders = await pool.query(`
+      SELECT o.*,
+        json_agg(
+          json_build_object(
+            'id', oi.id,
+            'item_id', oi.item_id,
+            'item_name', oi.item_name,
+            'quantity', oi.quantity,
+            'price', oi.price,
+            'notes', oi.notes,
+            'printer_station', oi.printer_station
+          )
+        ) FILTER (WHERE oi.id IS NOT NULL) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.created_at >= $1 AND (o.sync_source IS NULL OR o.sync_source != $2)
+      GROUP BY o.id
+      ORDER BY o.created_at ASC
+    `, [since, source]);
+
+    // 2. Import local orders to cloud
+    const client = await pool.connect();
+    let imported = 0;
+
+    try {
+      await client.query('BEGIN');
+
+      for (const order of (localOrders || [])) {
+        const existing = await client.query(
+          'SELECT id FROM orders WHERE sync_source = $1 AND sync_source_id = $2',
+          [source, order.id]
+        );
+
+        if (existing.rows.length > 0) continue;
+
+        const orderResult = await client.query(`
+          INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id
+        `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, source, order.id]);
+
+        const newOrderId = orderResult.rows[0].id;
+
+        for (const item of (order.items || [])) {
+          await client.query(`
+            INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+          `, [newOrderId, item.item_id, item.item_name, item.quantity, item.price, item.notes, item.printer_station]);
+        }
+
+        imported++;
+      }
+
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    res.json({
+      success: true,
+      cloudOrders: cloudOrders.rows,
+      imported,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Full sync error:', error);
+    res.status(500).json({ error: 'Sync failed' });
+  }
+});
+
+// Sync items/products from inventory
+app.get('/api/sync/items', verifySyncKey, async (req, res) => {
+  try {
+    // Fetch from inventory system
+    const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
+    if (!response.ok) {
+      return res.status(502).json({ error: 'Inventory API unavailable' });
+    }
+
+    const items = await response.json();
+    res.json({
+      items,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Sync items error:', error);
+    res.status(500).json({ error: 'Failed to fetch items' });
   }
 });
 

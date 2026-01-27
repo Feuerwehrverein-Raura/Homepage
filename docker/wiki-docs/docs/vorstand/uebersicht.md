@@ -18,6 +18,7 @@ URL: [fwv-raura.ch/vorstand.html](https://fwv-raura.ch/vorstand.html)
 | **Events** | Anlässe erstellen und verwalten |
 | **Anmeldungen** | Helfer-Anmeldungen genehmigen/ablehnen |
 | **E-Mail** | Mailcow-Postfächer verwalten |
+| **IP-Whitelist** | Kassensystem-Zugriff verwalten |
 | **Audit-Log** | Aktivitäten einsehen |
 
 ## Berechtigungen

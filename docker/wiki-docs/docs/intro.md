@@ -22,6 +22,11 @@ Diese Dokumentation erklärt alle Funktionen der Feuerwehrverein Raura Website.
 - [Rollen & Berechtigungen](/admin/rollen) - Zugriffsrechte verwalten
 - [Audit-Log](/admin/audit-log) - Aktivitäten überwachen
 
+### Für Anlässe
+- [Kassensystem](/kassensystem/uebersicht) - Bestellungen aufnehmen und abrechnen
+- [Kitchen Display](/kassensystem/kitchen-display) - Bestellungen in Küche/Bar anzeigen
+- [Inventar](/inventar/uebersicht) - Lagerverwaltung und Artikelstamm
+
 ## System-Architektur
 
 Die Website besteht aus mehreren Komponenten:
@@ -32,6 +37,9 @@ Die Website besteht aus mehreren Komponenten:
 | API Members | Mitgliederverwaltung | api.fwv-raura.ch |
 | API Events | Event-Management | events.fwv-raura.ch |
 | API Dispatch | E-Mail & Briefe | (intern) |
+| Kassensystem | Bestellungen bei Anlässen | order.fwv-raura.ch |
+| Kitchen Display | Bestellanzeige Küche/Bar | kitchen.fwv-raura.ch |
+| Inventar | Lagerverwaltung | inventar.fwv-raura.ch |
 | Wiki | Diese Dokumentation | wiki.fwv-raura.ch |
 
 ## Versionierung
