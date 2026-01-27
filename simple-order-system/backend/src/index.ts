@@ -1006,6 +1006,12 @@ app.post('/api/settings/test-printer', authenticateToken, async (req: Authentica
 
 // Helper to get client IP (handles reverse proxy headers)
 function getClientIp(req: any): string {
+  // Cloudflare sets this header
+  const cfConnectingIp = req.headers['cf-connecting-ip'];
+  if (cfConnectingIp) {
+    return cfConnectingIp.trim();
+  }
+
   // Traefik and other proxies set these headers
   const xRealIp = req.headers['x-real-ip'];
   if (xRealIp) {
@@ -1016,6 +1022,11 @@ function getClientIp(req: any): string {
   if (forwarded) {
     // Take the first IP (original client)
     return forwarded.split(',')[0].trim();
+  }
+
+  // Express's req.ip when trust proxy is enabled
+  if (req.ip && !req.ip.startsWith('172.') && !req.ip.startsWith('10.') && !req.ip.startsWith('192.168.')) {
+    return req.ip.replace(/^::ffff:/, '');
   }
 
   // Fallback to direct connection IP
@@ -1103,6 +1114,7 @@ app.get('/api/whitelist/my-ip', (req, res) => {
 app.get('/api/whitelist/debug-headers', (req, res) => {
   res.json({
     ip: getClientIp(req),
+    'cf-connecting-ip': req.headers['cf-connecting-ip'],
     'x-forwarded-for': req.headers['x-forwarded-for'],
     'x-real-ip': req.headers['x-real-ip'],
     'x-forwarded-proto': req.headers['x-forwarded-proto'],
