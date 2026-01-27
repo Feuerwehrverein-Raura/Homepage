@@ -18,14 +18,42 @@ interface Order {
   items: OrderItem[];
 }
 
-// Audio context for notification sound
-let audioContext: AudioContext | null = null;
+// Audio for notification sound - use HTML Audio for better Android compatibility
+let notificationAudio: HTMLAudioElement | null = null;
+
+// Base64 encoded beep sound (two-tone notification)
+const BEEP_SOUND_BASE64 = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2PlpqWkIl+dGlkXl1XV1dZXWRteoiYqLK2sa2jlYV1ZVVJQTs4Ojs/RExVXWp3hZKdpamonZKGe3BnYV1aWVlaXWFla3F2fIGGi46QkY+LhX13b2hhWlRQTUtLTE5TWl9mbXR6gIWJjY+Pjo2LiYeEgX57eHVycG5samhnaGlrbW9xc3V3eXp7fH1+f4CAgICAgH9/fn59fXx7enl4d3Z1dHNycXBvbm1sa2ppaGdmZWVkZGRkZGVlZmdnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr/AwcLDxMXGx8jJysvMzc7P0NHS09TV1tfY2drb3N3e3+Dh4uPk5ebn6Onq6+zt7u/w8fLz9PX29/j5+vv8/f7/AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w==';
+
+function initAudio() {
+  if (!notificationAudio) {
+    notificationAudio = new Audio(BEEP_SOUND_BASE64);
+    notificationAudio.volume = 0.5;
+    // Preload
+    notificationAudio.load();
+  }
+}
 
 function playBeep() {
+  console.log('playBeep called');
+
+  // Try HTML Audio first (better Android compatibility)
   try {
-    if (!audioContext) {
-      audioContext = new AudioContext();
+    if (notificationAudio) {
+      notificationAudio.currentTime = 0;
+      const playPromise = notificationAudio.play();
+      if (playPromise) {
+        playPromise.catch(e => console.error('Audio play error:', e));
+      }
+      console.log('Playing via HTML Audio');
+      return;
     }
+  } catch (e) {
+    console.error('HTML Audio error:', e);
+  }
+
+  // Fallback to Web Audio API
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
 
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -33,7 +61,7 @@ function playBeep() {
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
-    oscillator.frequency.value = 880; // A5 note
+    oscillator.frequency.value = 880;
     oscillator.type = 'sine';
 
     gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
@@ -42,21 +70,9 @@ function playBeep() {
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.5);
 
-    // Play a second beep
-    setTimeout(() => {
-      const osc2 = audioContext!.createOscillator();
-      const gain2 = audioContext!.createGain();
-      osc2.connect(gain2);
-      gain2.connect(audioContext!.destination);
-      osc2.frequency.value = 1100;
-      osc2.type = 'sine';
-      gain2.gain.setValueAtTime(0.3, audioContext!.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.01, audioContext!.currentTime + 0.5);
-      osc2.start(audioContext!.currentTime);
-      osc2.stop(audioContext!.currentTime + 0.5);
-    }, 200);
+    console.log('Playing via Web Audio API');
   } catch (e) {
-    console.error('Audio error:', e);
+    console.error('Web Audio API error:', e);
   }
 }
 
@@ -71,16 +87,8 @@ function App() {
   const enableSound = useCallback(async () => {
     console.log('Enabling sound...');
     try {
-      // Initialize audio context on user interaction (required by browsers)
-      if (!audioContext) {
-        audioContext = new AudioContext();
-        console.log('AudioContext created');
-      }
-      // Resume audio context if suspended
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-        console.log('AudioContext resumed');
-      }
+      // Initialize HTML Audio element (requires user interaction)
+      initAudio();
 
       // Test beep to confirm audio works
       playBeep();
