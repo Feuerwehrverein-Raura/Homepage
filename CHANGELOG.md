@@ -1,3 +1,15 @@
+# [1.79.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.78.1...v1.79.0) (2026-01-27)
+
+
+### Bug Fixes
+
+* **order:** fix WebSocket path for Kitchen Display ([6cdaa53](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6cdaa538fb3aa7dc3c9c11de92297e4096daecb0))
+
+
+### Features
+
+* **order:** remove takeaway, show order number for bar ([0c33297](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0c332978efb7f1ba34a24f30845e1031a0784cb0))
+
 ## [1.78.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.78.0...v1.78.1) (2026-01-27)
 
 
