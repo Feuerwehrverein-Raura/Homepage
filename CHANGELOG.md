@@ -1,3 +1,10 @@
+## [1.77.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.5...v1.77.6) (2026-01-27)
+
+
+### Bug Fixes
+
+* **order:** improve IP detection with Cloudflare support ([db49d8d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/db49d8d49915e2d40d1eb5496e043644c01f364c))
+
 ## [1.77.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.4...v1.77.5) (2026-01-27)
 
 
