@@ -345,7 +345,7 @@ jobs:
           no-cache: true
           build-args: |
             VITE_API_URL=https://order.fwv-raura.ch/api
-            VITE_WS_URL=wss://order.fwv-raura.ch
+            VITE_WS_URL=wss://order.fwv-raura.ch/ws
             VITE_AUTHENTIK_URL=https://auth.fwv-raura.ch
             VITE_AUTHENTIK_CLIENT_ID=order-system
           tags: |
@@ -378,7 +378,7 @@ jobs:
           no-cache: true
           build-args: |
             VITE_API_URL=https://order.fwv-raura.ch/api
-            VITE_WS_URL=wss://order.fwv-raura.ch
+            VITE_WS_URL=wss://order.fwv-raura.ch/ws
           tags: |
             ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:latest
             ${{ env.REGISTRY }}/feuerwehrverein-raura/order-kitchen:v${{ needs.release.outputs.version }}
