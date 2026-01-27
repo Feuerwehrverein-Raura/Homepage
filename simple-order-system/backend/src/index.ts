@@ -272,7 +272,7 @@ async function syncFromCloud() {
     });
 
     if (!response.ok) return;
-    const data = await response.json();
+    const data = await response.json() as { orders?: any[]; timestamp?: string };
 
     const client = await pool.connect();
     try {
@@ -1157,7 +1157,7 @@ app.post('/api/whitelist/register-oauth', async (req, res) => {
       return res.status(401).json({ error: 'Authentifizierung fehlgeschlagen' });
     }
 
-    const tokens = await tokenResponse.json();
+    const tokens = await tokenResponse.json() as { access_token: string };
 
     // Get user info
     const userInfoResponse = await fetch(`${AUTHENTIK_URL}/application/o/userinfo/`, {
@@ -1170,7 +1170,7 @@ app.post('/api/whitelist/register-oauth', async (req, res) => {
       return res.status(401).json({ error: 'Benutzerinformationen konnten nicht abgerufen werden' });
     }
 
-    const userInfo = await userInfoResponse.json();
+    const userInfo = await userInfoResponse.json() as { email?: string; preferred_username?: string; name?: string };
     const userEmail = userInfo.email || userInfo.preferred_username || 'unknown';
     const userName = userInfo.name || userInfo.preferred_username || userEmail;
 
