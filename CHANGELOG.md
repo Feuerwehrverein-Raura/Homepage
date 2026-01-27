@@ -1,3 +1,10 @@
+# [1.74.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.73.0...v1.74.0) (2026-01-27)
+
+
+### Features
+
+* **order:** add IP whitelist, local Pi deployment, kitchen PWA ([6747906](https://github.com/Feuerwehrverein-Raura/Homepage/commit/67479063b1d3259f4cabb4ff91a1667f7f5f182b))
+
 # [1.73.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.72.0...v1.73.0) (2026-01-27)
 
 
