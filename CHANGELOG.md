@@ -1,3 +1,10 @@
+## [1.81.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.0...v1.81.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* **kitchen:** use HTML Audio for better sound compatibility ([9e6f6f1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9e6f6f162e28cf444590d428f8edc20a9757cc67))
+
 # [1.81.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.3...v1.81.0) (2026-01-27)
 
 
