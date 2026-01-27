@@ -1,3 +1,10 @@
+## [1.81.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.1...v1.81.2) (2026-01-27)
+
+
+### Bug Fixes
+
+* **kitchen:** use properly generated WAV beep sound ([3e696a9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3e696a9497c03269b1cc0cea7a24d84370f7b69c))
+
 ## [1.81.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.0...v1.81.1) (2026-01-27)
 
 
