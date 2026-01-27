@@ -1,3 +1,10 @@
+# [1.76.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.75.1...v1.76.0) (2026-01-27)
+
+
+### Features
+
+* **website:** use Nextcloud for statuten.pdf download ([c0fb494](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c0fb494f6c7bc19460ba70cd81921c1ace629295))
+
 ## [1.75.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.75.0...v1.75.1) (2026-01-27)
 
 
