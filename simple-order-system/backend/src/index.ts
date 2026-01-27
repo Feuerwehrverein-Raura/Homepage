@@ -1001,13 +1001,24 @@ app.post('/api/settings/test-printer', authenticateToken, async (req: Authentica
 // IP WHITELIST MANAGEMENT
 // ============================================
 
-// Helper to get client IP
+// Helper to get client IP (handles reverse proxy headers)
 function getClientIp(req: any): string {
+  // Traefik and other proxies set these headers
+  const xRealIp = req.headers['x-real-ip'];
+  if (xRealIp) {
+    return xRealIp.trim();
+  }
+
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
+    // Take the first IP (original client)
     return forwarded.split(',')[0].trim();
   }
-  return req.socket?.remoteAddress || req.ip || 'unknown';
+
+  // Fallback to direct connection IP
+  const remoteAddr = req.socket?.remoteAddress || req.ip || 'unknown';
+  // Remove IPv6 prefix if present (::ffff:192.168.1.1 -> 192.168.1.1)
+  return remoteAddr.replace(/^::ffff:/, '');
 }
 
 // IP Whitelist middleware - allows requests if:
