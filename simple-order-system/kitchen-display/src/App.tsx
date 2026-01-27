@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://order.fwv-raura.ch/api';
-const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch';
+const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch/ws';
 
 interface OrderItem {
   id: number;

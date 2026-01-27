@@ -9,7 +9,7 @@ import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, loc
 
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ server, path: '/ws' });
 
 // Trust reverse proxy (Traefik) for X-Forwarded-* headers
 app.set('trust proxy', true);
