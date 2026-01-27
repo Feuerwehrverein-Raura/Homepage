@@ -1,3 +1,10 @@
+## [1.80.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.80.0...v1.80.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* **inventory:** preserve image_url when updating items ([b98a2da](https://github.com/Feuerwehrverein-Raura/Homepage/commit/b98a2da73857a4641337c9dfe1152241a866609a))
+
 # [1.80.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.79.0...v1.80.0) (2026-01-27)
 
 
