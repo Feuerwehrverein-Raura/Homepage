@@ -69,7 +69,7 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [showCustomItem, setShowCustomItem] = useState(false);
-  const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges' });
+  const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges', printer_station: 'bar' });
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
   const [pendingOrder, setPendingOrder] = useState<{ id: number; total: number } | null>(null);
@@ -330,14 +330,14 @@ function App() {
       name: customItem.name,
       price: price,
       category: customItem.category,
-      printer_station: 'bar',
+      printer_station: customItem.printer_station,
       quantity: 1,
       notes: '',
       customPrice: price,
     };
 
     setCart([...cart, newItem]);
-    setCustomItem({ name: '', price: '', category: 'Sonstiges' });
+    setCustomItem({ name: '', price: '', category: 'Sonstiges', printer_station: 'bar' });
     setShowCustomItem(false);
   };
 
@@ -747,7 +747,7 @@ function App() {
                 {showCustomItem && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <h3 className="font-semibold mb-2">Sonderposten hinzufügen</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <input
                         type="text"
                         placeholder="Bezeichnung"
@@ -763,6 +763,14 @@ function App() {
                         onChange={(e) => setCustomItem({ ...customItem, price: e.target.value })}
                         className="px-3 py-2 border border-gray-300 rounded text-sm"
                       />
+                      <select
+                        value={customItem.printer_station}
+                        onChange={(e) => setCustomItem({ ...customItem, printer_station: e.target.value })}
+                        className="px-3 py-2 border border-gray-300 rounded text-sm bg-white"
+                      >
+                        <option value="bar">Bar</option>
+                        <option value="kitchen">Küche</option>
+                      </select>
                       <button
                         onClick={addCustomItemToCart}
                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm"
