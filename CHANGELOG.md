@@ -1,3 +1,10 @@
+## [1.77.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.3...v1.77.4) (2026-01-27)
+
+
+### Bug Fixes
+
+* **kitchen:** add debug logging and alerts for notification permission ([c208dfb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c208dfb237055c601aa4e132693b79af7c3c9ad0))
+
 ## [1.77.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.2...v1.77.3) (2026-01-27)
 
 
