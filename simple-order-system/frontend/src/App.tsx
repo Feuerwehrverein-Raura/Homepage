@@ -300,14 +300,16 @@ function App() {
   }, [view, user]);
 
   const addToCart = (item: Item) => {
-    const existing = cart.find(c => c.id === item.id && !c.customPrice);
-    if (existing) {
-      setCart(cart.map(c =>
-        c.id === item.id && !c.customPrice ? { ...c, quantity: c.quantity + 1 } : c
-      ));
-    } else {
-      setCart([...cart, { ...item, quantity: 1, notes: '' }]);
-    }
+    setCart(prevCart => {
+      const existing = prevCart.find(c => c.id === item.id && !c.customPrice);
+      if (existing) {
+        return prevCart.map(c =>
+          c.id === item.id && !c.customPrice ? { ...c, quantity: c.quantity + 1 } : c
+        );
+      } else {
+        return [...prevCart, { ...item, quantity: 1, notes: '' }];
+      }
+    });
   };
 
   const addCustomItemToCart = () => {
@@ -334,16 +336,16 @@ function App() {
 
   const updateQuantity = (id: number, customPrice: number | undefined, quantity: number) => {
     if (quantity <= 0) {
-      setCart(cart.filter(c => !(c.id === id && c.customPrice === customPrice)));
+      setCart(prevCart => prevCart.filter(c => !(c.id === id && c.customPrice === customPrice)));
     } else {
-      setCart(cart.map(c =>
+      setCart(prevCart => prevCart.map(c =>
         c.id === id && c.customPrice === customPrice ? { ...c, quantity } : c
       ));
     }
   };
 
   const updateNotes = (id: number, customPrice: number | undefined, notes: string) => {
-    setCart(cart.map(c =>
+    setCart(prevCart => prevCart.map(c =>
       c.id === id && c.customPrice === customPrice ? { ...c, notes } : c
     ));
   };
