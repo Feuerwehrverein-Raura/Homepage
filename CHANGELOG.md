@@ -1,3 +1,10 @@
+## [1.78.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.78.0...v1.78.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* **order:** use functional state updates for cart ([9c110e7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9c110e77d448e3a6b5d1c915c0f6457ae7e78ef9))
+
 # [1.78.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.77.6...v1.78.0) (2026-01-27)
 
 
