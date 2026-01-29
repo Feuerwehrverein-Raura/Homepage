@@ -1,3 +1,10 @@
+## [1.82.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.1...v1.82.2) (2026-01-29)
+
+
+### Bug Fixes
+
+* **vorstand:** show direct registrations count for events without shifts ([716a836](https://github.com/Feuerwehrverein-Raura/Homepage/commit/716a836ce0b18c488a5202003e4c5dc9b62b2465))
+
 ## [1.82.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.0...v1.82.1) (2026-01-29)
 
 
