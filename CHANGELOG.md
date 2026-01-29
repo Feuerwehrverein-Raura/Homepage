@@ -1,3 +1,10 @@
+## [1.85.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.85.0...v1.85.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* **vorstand:** add missing shift types to edit modal ([ff52ac9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ff52ac931e6a92fd273e70f3b69547a21f619102))
+
 # [1.85.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.84.0...v1.85.0) (2026-01-29)
 
 
