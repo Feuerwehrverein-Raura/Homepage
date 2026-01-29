@@ -1,3 +1,10 @@
+# [1.92.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.91.0...v1.92.0) (2026-01-29)
+
+
+### Features
+
+* **templates:** add event placeholders and blocks ([d22096e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d22096e520ddfbdd2a770a684e53ad219ac462fb))
+
 # [1.91.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.3...v1.91.0) (2026-01-29)
 
 
