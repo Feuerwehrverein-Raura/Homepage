@@ -2077,6 +2077,12 @@
                         <button type="button" onclick="insertPlaceholder('plz')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{plz}}</button>
                         <button type="button" onclick="insertPlaceholder('ort')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{ort}}</button>
                         <button type="button" onclick="insertPlaceholder('email')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{email}}</button>
+                        <span class="text-gray-300">|</span>
+                        <span class="text-sm text-gray-600">Event:</span>
+                        <button type="button" onclick="insertPlaceholder('event_titel')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_titel}}</button>
+                        <button type="button" onclick="insertPlaceholder('event_datum')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_datum}}</button>
+                        <button type="button" onclick="insertPlaceholder('event_zeit')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_zeit}}</button>
+                        <button type="button" onclick="insertPlaceholder('event_ort')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_ort}}</button>
                         <button type="button" onclick="addCustomPlaceholder()" class="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">+ Eigene...</button>
                     </div>
 
@@ -2206,13 +2212,19 @@
         let editorTemplates = [];
 
         const sampleMemberData = {
+            // Mitglieder-Daten
             anrede: 'Herr',
             vorname: 'Max',
             nachname: 'Mustermann',
             strasse: 'Musterstrasse 1',
             plz: '6000',
             ort: 'Luzern',
-            email: 'max.muster@example.ch'
+            email: 'max.muster@example.ch',
+            // Event-Daten
+            event_titel: 'Generalversammlung 2026',
+            event_datum: '15. März 2026',
+            event_zeit: '19:00 Uhr',
+            event_ort: 'Vereinslokal Raura'
         };
 
         function openTemplateEditor() {
@@ -2264,6 +2276,18 @@
                 label: 'Grussformel',
                 category: 'Brief',
                 content: '<p style="margin-top:30px;">Freundliche Grüsse<br><br>Feuerwehrverein Raura</p>'
+            });
+
+            bm.add('event-info', {
+                label: 'Event-Info',
+                category: 'Event',
+                content: '<div style="background:#f3f4f6;padding:15px;border-radius:8px;margin:15px 0;"><strong>{{event_titel}}</strong><br>📅 {{event_datum}} um {{event_zeit}}<br>📍 {{event_ort}}</div>'
+            });
+
+            bm.add('event-invitation', {
+                label: 'Einladung',
+                category: 'Event',
+                content: '<div><p>Wir laden Sie herzlich ein zur:</p><h2 style="color:#dc2626;margin:10px 0;">{{event_titel}}</h2><p><strong>Datum:</strong> {{event_datum}}<br><strong>Zeit:</strong> {{event_zeit}}<br><strong>Ort:</strong> {{event_ort}}</p></div>'
             });
 
             templateEditor.on('change:changesCount', updateTemplatePreview);
