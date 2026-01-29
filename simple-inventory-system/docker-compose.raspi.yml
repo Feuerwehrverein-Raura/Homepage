@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Raspberry Pi config - lokal mit Sync zum Server
 
 services:
@@ -17,7 +15,7 @@ services:
     networks:
       - inventory-local
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U inventoryuser"]
+      test: [CMD-SHELL, pg_isready -U inventoryuser]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,7 +41,7 @@ services:
       # Sync
       SYNC_SECRET: ${INVENTORY_SYNC_SECRET}
     ports:
-      - "3000:3000"
+      - 3000:3000
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,7 +59,7 @@ services:
     container_name: inventory-frontend-local
     restart: unless-stopped
     ports:
-      - "8082:80"
+      - 8082:80
     depends_on:
       - backend
     networks:

@@ -13,7 +13,7 @@ services:
       DB_USER: orderuser
       DB_PASSWORD: orderpass
     ports:
-      - "3000:3000"
+      - 3000:3000
     depends_on:
       postgres:
         condition: service_healthy

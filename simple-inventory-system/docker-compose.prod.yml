@@ -15,7 +15,9 @@ services:
     networks:
       - proxy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_DB_USER:-inventoryuser}"]
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${INVENTORY_DB_USER:-inventoryuser}
       interval: 10s
       timeout: 5s
       retries: 5

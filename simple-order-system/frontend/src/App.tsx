@@ -357,38 +357,6 @@ function App() {
     ));
   };
 
-  const pollPaymentStatus = async (paymentId: number) => {
-    let attempts = 0;
-    const maxAttempts = 60;
-
-    const interval = setInterval(async () => {
-      attempts++;
-
-      try {
-        const res = await fetch(`${API_URL}/payments/${paymentId}`);
-        const data = await res.json();
-
-        if (data.status === 'completed' || data.status === 'PAID') {
-          clearInterval(interval);
-          alert('✅ Zahlung erfolgreich abgeschlossen!');
-          setCart([]);
-          setTableNumber('');
-          setLoading(false);
-        } else if (data.status === 'failed' || data.status === 'FAILED') {
-          clearInterval(interval);
-          alert('❌ Zahlung fehlgeschlagen. Bitte erneut versuchen.');
-          setLoading(false);
-        } else if (attempts >= maxAttempts) {
-          clearInterval(interval);
-          alert('⏱️ Timeout: Zahlung dauert zu lange. Bitte Status prüfen.');
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Payment status check error:', error);
-      }
-    }, 2000);
-  };
-
   const handlePayment = async (method: 'bar' | 'sumup') => {
     if (!pendingOrder) return;
 
@@ -409,7 +377,7 @@ function App() {
 
     try {
       // Mark order as paid via API
-      const res = await fetch(`${API_URL}/orders/${cardPayment.orderId}/status`, {
+      await fetch(`${API_URL}/orders/${cardPayment.orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -439,41 +407,12 @@ function App() {
     setTableNumber('');
   };
 
-  // Legacy SumUp Terminal code - kept for future Cloud API integration
-  const handleSumUpTerminalPayment = async (orderId: number) => {
-    setLoading(true);
-    try {
-      const paymentRes = await fetch(`${API_URL}/payments/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: orderId,
-          provider: 'sumup-terminal',
-        }),
-      });
-
-      if (!paymentRes.ok) {
-        const error = await paymentRes.json();
-        alert(`Fehler: ${error.message || 'Zahlung konnte nicht erstellt werden'}`);
-        setLoading(false);
-        return;
-      }
-
-      const payment = await paymentRes.json();
-      alert(`💳 Zahlung an SumUp 3G gesendet!\n\nBetrag: CHF ${pendingOrder.total.toFixed(2)}`);
-      pollPaymentStatus(payment.id);
-    } catch (error) {
-      alert('Fehler bei der Zahlung');
-      setLoading(false);
-    }
-  };
-
   const confirmCashPayment = async () => {
     if (!cashPayment) return;
 
     try {
       // Mark order as paid via API
-      const res = await fetch(`${API_URL}/orders/${cashPayment.orderId}/status`, {
+      await fetch(`${API_URL}/orders/${cashPayment.orderId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
