@@ -39,7 +39,8 @@ const config = {
         title: 'FWV Raura Wiki',
         logo: {
           alt: 'FWV Logo',
-          src: 'img/logo.svg',
+          src: 'img/logo.png',
+          height: 32,
         },
         items: [
           {
