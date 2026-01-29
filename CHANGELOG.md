@@ -1,3 +1,10 @@
+# [1.87.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.86.0...v1.87.0) (2026-01-29)
+
+
+### Features
+
+* **shifts:** add Springer generation from existing time slots ([01602c8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/01602c8069e739d6ac3a02b75d023ac3efe68b4c))
+
 # [1.86.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.85.1...v1.86.0) (2026-01-29)
 
 
