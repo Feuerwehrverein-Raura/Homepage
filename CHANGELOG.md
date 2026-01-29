@@ -1,3 +1,10 @@
+## [1.94.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.94.0...v1.94.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* **templates:** improve preview layout with tabs ([14a6273](https://github.com/Feuerwehrverein-Raura/Homepage/commit/14a6273edb947939dfeb00c4671077c85e672e6f))
+
 # [1.94.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.93.0...v1.94.0) (2026-01-29)
 
 
