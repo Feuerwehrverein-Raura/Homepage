@@ -299,7 +299,7 @@ function App() {
             <p className="text-gray-600 mt-2">Zugriff nur für Vorstand</p>
           </div>
           <a
-            href="https://www.fwv-raura.ch/vorstand.html"
+            href={`https://www.fwv-raura.ch/vorstand.html?redirect=${encodeURIComponent(window.location.href)}`}
             className="block w-full bg-fire-600 text-white text-center py-3 rounded-lg hover:bg-fire-700 transition"
           >
             Zum Vorstand-Login
