@@ -1,3 +1,10 @@
+# [1.95.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.94.2...v1.95.0) (2026-01-29)
+
+
+### Features
+
+* **templates:** add auto-address toggle for letter templates ([cdb86b7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cdb86b7869ccc80d1f9fcb2fab07dd75a07e1846))
+
 ## [1.94.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.94.1...v1.94.2) (2026-01-29)
 
 
