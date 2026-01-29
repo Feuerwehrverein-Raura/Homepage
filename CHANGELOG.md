@@ -1,3 +1,10 @@
+# [1.97.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.96.0...v1.97.0) (2026-01-29)
+
+
+### Features
+
+* **pdf:** add PDF template infrastructure ([16c7b93](https://github.com/Feuerwehrverein-Raura/Homepage/commit/16c7b932e90b2f82ba8b6d4991fd5aa037db8483))
+
 # [1.96.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.95.0...v1.96.0) (2026-01-29)
 
 
