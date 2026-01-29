@@ -70,7 +70,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/uploads`) || PathPrefix(`/member-registrations`))
+      - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/uploads`) || PathPrefix(`/member-registrations`) || PathPrefix(`/funktionen`))
       - traefik.http.routers.api-members.entrypoints=https
       - traefik.http.routers.api-members.tls=true
       - traefik.http.routers.api-members.tls.certresolver=letsencrypt
