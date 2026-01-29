@@ -8,18 +8,16 @@
     <!-- Quill Rich Text Editor -->
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
-    <!-- GrapesJS Template Editor -->
-    <link href="https://unpkg.com/grapesjs@0.21.10/dist/css/grapes.min.css" rel="stylesheet">
-    <script src="https://unpkg.com/grapesjs@0.21.10"></script>
-    <script src="https://unpkg.com/grapesjs-preset-newsletter@1.0.2"></script>
+    <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
     <style>
-        /* GrapesJS customization */
-        .gjs-one-bg { background-color: #1f2937; }
-        .gjs-two-color { color: #f3f4f6; }
-        .gjs-three-bg { background-color: #374151; }
-        .gjs-four-color, .gjs-four-color-h:hover { color: #dc2626; }
-        #template-editor-gjs { height: 500px; border: 1px solid #e5e7eb; border-radius: 8px; }
-        .gjs-block { padding: 10px; }
+        /* Template Editor Quill customization */
+        #template-editor-quill { height: 400px; background: white; }
+        #template-editor-quill .ql-editor { font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6; }
+        .variable-table { max-height: 300px; overflow-y: auto; }
+        .variable-table table { width: 100%; font-size: 12px; }
+        .variable-table td { padding: 4px 8px; cursor: pointer; }
+        .variable-table tr:hover { background: #f3f4f6; }
+        .variable-table .var-name { font-family: monospace; color: #2563eb; }
         .letter-preview-a4 {
             width: 210mm; max-width: 100%; aspect-ratio: 210/297;
             background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -2089,61 +2087,93 @@
                         </div>
                     </div>
 
-                    <!-- Placeholder Buttons -->
-                    <div class="px-4 py-2 border-b bg-gray-50">
-                        <div class="flex flex-wrap gap-2 items-center">
-                            <span class="text-sm font-medium text-gray-700">Mitglied:</span>
-                            <button type="button" onclick="insertPlaceholder('anrede')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{anrede}}</button>
-                            <button type="button" onclick="insertPlaceholder('vorname')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{vorname}}</button>
-                            <button type="button" onclick="insertPlaceholder('nachname')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{nachname}}</button>
-                            <button type="button" onclick="insertPlaceholder('strasse')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{strasse}}</button>
-                            <button type="button" onclick="insertPlaceholder('plz')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{plz}}</button>
-                            <button type="button" onclick="insertPlaceholder('ort')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{ort}}</button>
-                            <button type="button" onclick="insertPlaceholder('email')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{email}}</button>
+                    <!-- Quill Editor -->
+                    <div class="flex-1 flex">
+                        <!-- Editor Area -->
+                        <div class="flex-1 p-4 flex flex-col">
+                            <div id="template-editor-quill" class="flex-1 border rounded-lg"></div>
                         </div>
-                        <!-- Event Placeholders -->
-                        <div id="placeholders-event" class="flex flex-wrap gap-2 items-center mt-2 hidden">
-                            <span class="text-sm font-medium text-green-700">Event:</span>
-                            <button type="button" onclick="insertPlaceholder('event_titel')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_titel}}</button>
-                            <button type="button" onclick="insertPlaceholder('event_datum')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_datum}}</button>
-                            <button type="button" onclick="insertPlaceholder('event_zeit')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_zeit}}</button>
-                            <button type="button" onclick="insertPlaceholder('event_ort')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_ort}}</button>
-                            <button type="button" onclick="insertPlaceholder('event_beschreibung')" class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">{{event_beschreibung}}</button>
-                        </div>
-                        <!-- Finanzen Placeholders -->
-                        <div id="placeholders-finanzen" class="flex flex-wrap gap-2 items-center mt-2 hidden">
-                            <span class="text-sm font-medium text-amber-700">Finanzen:</span>
-                            <button type="button" onclick="insertPlaceholder('beitrag')" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200">{{beitrag}}</button>
-                            <button type="button" onclick="insertPlaceholder('beitragsjahr')" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200">{{beitragsjahr}}</button>
-                            <button type="button" onclick="insertPlaceholder('zahlungsfrist')" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200">{{zahlungsfrist}}</button>
-                            <button type="button" onclick="insertPlaceholder('iban')" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200">{{iban}}</button>
-                            <button type="button" onclick="insertPlaceholder('qr_referenz')" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200">{{qr_referenz}}</button>
-                            <button type="button" onclick="insertPlaceholder('kassier_name')" class="text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200">{{kassier_name}}</button>
-                        </div>
-                        <!-- Schicht Placeholders -->
-                        <div id="placeholders-schicht" class="flex flex-wrap gap-2 items-center mt-2 hidden">
-                            <span class="text-sm font-medium text-purple-700">Schicht:</span>
-                            <button type="button" onclick="insertPlaceholder('schicht_typ')" class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">{{schicht_typ}}</button>
-                            <button type="button" onclick="insertPlaceholder('schicht_datum')" class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">{{schicht_datum}}</button>
-                            <button type="button" onclick="insertPlaceholder('schicht_zeit')" class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">{{schicht_zeit}}</button>
-                            <button type="button" onclick="insertPlaceholder('schicht_event')" class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded hover:bg-purple-200">{{schicht_event}}</button>
-                        </div>
-                        <!-- Geburtstag Placeholders -->
-                        <div id="placeholders-geburtstag" class="flex flex-wrap gap-2 items-center mt-2 hidden">
-                            <span class="text-sm font-medium text-pink-700">Geburtstag:</span>
-                            <button type="button" onclick="insertPlaceholder('geburtstag')" class="text-xs px-2 py-1 bg-pink-100 text-pink-700 rounded hover:bg-pink-200">{{geburtstag}}</button>
-                            <button type="button" onclick="insertPlaceholder('alter')" class="text-xs px-2 py-1 bg-pink-100 text-pink-700 rounded hover:bg-pink-200">{{alter}}</button>
-                            <button type="button" onclick="insertPlaceholder('mitglied_seit')" class="text-xs px-2 py-1 bg-pink-100 text-pink-700 rounded hover:bg-pink-200">{{mitglied_seit}}</button>
-                            <button type="button" onclick="insertPlaceholder('mitgliedsjahre')" class="text-xs px-2 py-1 bg-pink-100 text-pink-700 rounded hover:bg-pink-200">{{mitgliedsjahre}}</button>
-                        </div>
-                        <div class="flex gap-2 items-center mt-2">
-                            <button type="button" onclick="addCustomPlaceholder()" class="text-xs px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">+ Eigener Platzhalter...</button>
-                        </div>
-                    </div>
 
-                    <!-- GrapesJS Editor -->
-                    <div class="flex-1 p-4">
-                        <div id="template-editor-gjs"></div>
+                        <!-- Variables Sidebar -->
+                        <div class="w-64 border-l bg-gray-50 p-3 overflow-y-auto">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-2">Variablen einfügen</h4>
+                            <p class="text-xs text-gray-500 mb-3">Klicke auf eine Variable um sie einzufügen</p>
+
+                            <!-- Mitglied -->
+                            <div class="mb-3">
+                                <div class="text-xs font-semibold text-blue-600 mb-1">Mitglied</div>
+                                <div class="variable-table bg-white rounded border">
+                                    <table>
+                                        <tr onclick="insertPlaceholder('anrede')"><td class="var-name">{{anrede}}</td><td class="text-gray-500">Herr/Frau</td></tr>
+                                        <tr onclick="insertPlaceholder('vorname')"><td class="var-name">{{vorname}}</td><td class="text-gray-500">Vorname</td></tr>
+                                        <tr onclick="insertPlaceholder('nachname')"><td class="var-name">{{nachname}}</td><td class="text-gray-500">Nachname</td></tr>
+                                        <tr onclick="insertPlaceholder('strasse')"><td class="var-name">{{strasse}}</td><td class="text-gray-500">Strasse</td></tr>
+                                        <tr onclick="insertPlaceholder('plz')"><td class="var-name">{{plz}}</td><td class="text-gray-500">PLZ</td></tr>
+                                        <tr onclick="insertPlaceholder('ort')"><td class="var-name">{{ort}}</td><td class="text-gray-500">Ort</td></tr>
+                                        <tr onclick="insertPlaceholder('email')"><td class="var-name">{{email}}</td><td class="text-gray-500">E-Mail</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Event (collapsible) -->
+                            <details class="mb-3" id="var-section-event">
+                                <summary class="text-xs font-semibold text-green-600 cursor-pointer mb-1">Event</summary>
+                                <div class="variable-table bg-white rounded border">
+                                    <table>
+                                        <tr onclick="insertPlaceholder('event_titel')"><td class="var-name">{{event_titel}}</td><td class="text-gray-500">Titel</td></tr>
+                                        <tr onclick="insertPlaceholder('event_datum')"><td class="var-name">{{event_datum}}</td><td class="text-gray-500">Datum</td></tr>
+                                        <tr onclick="insertPlaceholder('event_zeit')"><td class="var-name">{{event_zeit}}</td><td class="text-gray-500">Zeit</td></tr>
+                                        <tr onclick="insertPlaceholder('event_ort')"><td class="var-name">{{event_ort}}</td><td class="text-gray-500">Ort</td></tr>
+                                        <tr onclick="insertPlaceholder('event_beschreibung')"><td class="var-name">{{event_beschreibung}}</td><td class="text-gray-500">Beschreibung</td></tr>
+                                    </table>
+                                </div>
+                            </details>
+
+                            <!-- Finanzen (collapsible) -->
+                            <details class="mb-3" id="var-section-finanzen">
+                                <summary class="text-xs font-semibold text-amber-600 cursor-pointer mb-1">Finanzen</summary>
+                                <div class="variable-table bg-white rounded border">
+                                    <table>
+                                        <tr onclick="insertPlaceholder('beitrag')"><td class="var-name">{{beitrag}}</td><td class="text-gray-500">Betrag</td></tr>
+                                        <tr onclick="insertPlaceholder('beitragsjahr')"><td class="var-name">{{beitragsjahr}}</td><td class="text-gray-500">Jahr</td></tr>
+                                        <tr onclick="insertPlaceholder('zahlungsfrist')"><td class="var-name">{{zahlungsfrist}}</td><td class="text-gray-500">Frist</td></tr>
+                                        <tr onclick="insertPlaceholder('iban')"><td class="var-name">{{iban}}</td><td class="text-gray-500">IBAN</td></tr>
+                                        <tr onclick="insertPlaceholder('qr_referenz')"><td class="var-name">{{qr_referenz}}</td><td class="text-gray-500">QR-Ref</td></tr>
+                                        <tr onclick="insertPlaceholder('kassier_name')"><td class="var-name">{{kassier_name}}</td><td class="text-gray-500">Kassier</td></tr>
+                                    </table>
+                                </div>
+                            </details>
+
+                            <!-- Schicht (collapsible) -->
+                            <details class="mb-3" id="var-section-schicht">
+                                <summary class="text-xs font-semibold text-purple-600 cursor-pointer mb-1">Schicht</summary>
+                                <div class="variable-table bg-white rounded border">
+                                    <table>
+                                        <tr onclick="insertPlaceholder('schicht_typ')"><td class="var-name">{{schicht_typ}}</td><td class="text-gray-500">Typ</td></tr>
+                                        <tr onclick="insertPlaceholder('schicht_datum')"><td class="var-name">{{schicht_datum}}</td><td class="text-gray-500">Datum</td></tr>
+                                        <tr onclick="insertPlaceholder('schicht_zeit')"><td class="var-name">{{schicht_zeit}}</td><td class="text-gray-500">Zeit</td></tr>
+                                        <tr onclick="insertPlaceholder('schicht_event')"><td class="var-name">{{schicht_event}}</td><td class="text-gray-500">Event</td></tr>
+                                    </table>
+                                </div>
+                            </details>
+
+                            <!-- Geburtstag (collapsible) -->
+                            <details class="mb-3" id="var-section-geburtstag">
+                                <summary class="text-xs font-semibold text-pink-600 cursor-pointer mb-1">Geburtstag</summary>
+                                <div class="variable-table bg-white rounded border">
+                                    <table>
+                                        <tr onclick="insertPlaceholder('geburtstag')"><td class="var-name">{{geburtstag}}</td><td class="text-gray-500">Datum</td></tr>
+                                        <tr onclick="insertPlaceholder('alter')"><td class="var-name">{{alter}}</td><td class="text-gray-500">Alter</td></tr>
+                                        <tr onclick="insertPlaceholder('mitglied_seit')"><td class="var-name">{{mitglied_seit}}</td><td class="text-gray-500">Seit</td></tr>
+                                        <tr onclick="insertPlaceholder('mitgliedsjahre')"><td class="var-name">{{mitgliedsjahre}}</td><td class="text-gray-500">Jahre</td></tr>
+                                    </table>
+                                </div>
+                            </details>
+
+                            <button type="button" onclick="addCustomPlaceholder()" class="w-full text-xs px-2 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 mt-2">
+                                + Eigene Variable...
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -2260,7 +2290,7 @@
         }
 
         // ============================================
-        // TEMPLATE EDITOR (GrapesJS)
+        // TEMPLATE EDITOR (Quill)
         // ============================================
 
         let templateEditor = null;
@@ -2305,7 +2335,7 @@
             document.getElementById('template-editor-modal').classList.remove('hidden');
             loadEditorTemplates();
             if (!templateEditor) {
-                initGrapesEditor();
+                initQuillEditor();
             }
         }
 
@@ -2313,103 +2343,31 @@
             document.getElementById('template-editor-modal').classList.add('hidden');
         }
 
-        function initGrapesEditor() {
-            templateEditor = grapesjs.init({
-                container: '#template-editor-gjs',
-                height: '500px',
-                width: 'auto',
-                storageManager: false,
-                plugins: ['gjs-preset-newsletter'],
-                pluginsOpts: {
-                    'gjs-preset-newsletter': {
-                        modalTitleImport: 'HTML importieren',
-                    }
+        function initQuillEditor() {
+            templateEditor = new Quill('#template-editor-quill', {
+                theme: 'snow',
+                modules: {
+                    toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'color': [] }, { 'background': [] }],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        [{ 'align': [] }],
+                        ['link', 'image'],
+                        ['clean']
+                    ]
                 },
-                canvas: {
-                    styles: ['https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap']
-                },
-                // Default content
-                components: '<div style="font-family:Arial,sans-serif;padding:20px;"><p>Sehr geehrte(r) {{anrede}} {{nachname}},</p><p>Ihr Text hier...</p></div>',
+                placeholder: 'Schreiben Sie Ihren Text hier...'
             });
 
-            // Add custom blocks
-            const bm = templateEditor.BlockManager;
+            // Set default content
+            templateEditor.root.innerHTML = '<p>Sehr geehrte(r) {{anrede}} {{nachname}},</p><p><br></p><p>Ihr Text hier...</p><p><br></p><p>Freundliche Grüsse</p><p>Feuerwehrverein Raura</p>';
 
-            bm.add('placeholder-name', {
-                label: 'Name',
-                category: 'Platzhalter',
-                content: '<span style="color:#2563eb;">{{anrede}} {{vorname}} {{nachname}}</span>'
+            // Update preview on text change
+            templateEditor.on('text-change', function() {
+                updateTemplatePreview();
             });
 
-            bm.add('placeholder-address', {
-                label: 'Adresse',
-                category: 'Platzhalter',
-                content: '<div>{{vorname}} {{nachname}}<br>{{strasse}}<br>{{plz}} {{ort}}</div>'
-            });
-
-            bm.add('letter-salutation', {
-                label: 'Anrede',
-                category: 'Brief',
-                content: '<p>Sehr geehrte(r) {{anrede}} {{nachname}},</p>'
-            });
-
-            bm.add('letter-closing', {
-                label: 'Grussformel',
-                category: 'Brief',
-                content: '<p style="margin-top:30px;">Freundliche Grüsse<br><br>Feuerwehrverein Raura</p>'
-            });
-
-            bm.add('event-info', {
-                label: 'Event-Info',
-                category: 'Event',
-                content: '<div style="background:#f3f4f6;padding:15px;border-radius:8px;margin:15px 0;"><strong>{{event_titel}}</strong><br>📅 {{event_datum}} um {{event_zeit}}<br>📍 {{event_ort}}</div>'
-            });
-
-            bm.add('event-invitation', {
-                label: 'Einladung',
-                category: 'Event',
-                content: '<div><p>Wir laden Sie herzlich ein zur:</p><h2 style="color:#dc2626;margin:10px 0;">{{event_titel}}</h2><p><strong>Datum:</strong> {{event_datum}}<br><strong>Zeit:</strong> {{event_zeit}}<br><strong>Ort:</strong> {{event_ort}}</p></div>'
-            });
-
-            // Basic blocks
-            bm.add('text-paragraph', {
-                label: 'Text',
-                category: 'Basis',
-                content: '<p>Ihr Text hier...</p>'
-            });
-
-            bm.add('text-heading', {
-                label: 'Überschrift',
-                category: 'Basis',
-                content: '<h2 style="color:#1f2937;margin:15px 0;">Überschrift</h2>'
-            });
-
-            bm.add('divider', {
-                label: 'Trennlinie',
-                category: 'Basis',
-                content: '<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">'
-            });
-
-            bm.add('spacer', {
-                label: 'Abstand',
-                category: 'Basis',
-                content: '<div style="height:30px;"></div>'
-            });
-
-            // Logo block
-            bm.add('logo-fwv', {
-                label: 'FWV Logo',
-                category: 'Bilder',
-                content: '<img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="max-width:150px;height:auto;margin:10px 0;">'
-            });
-
-            bm.add('logo-header', {
-                label: 'Briefkopf',
-                category: 'Bilder',
-                content: '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;padding-bottom:15px;border-bottom:2px solid #dc2626;"><img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="height:60px;"><div style="text-align:right;font-size:12px;color:#6b7280;">Feuerwehrverein Raura<br>6017 Ruswil</div></div>'
-            });
-
-            templateEditor.on('change:changesCount', updateTemplatePreview);
             createNewTemplate();
         }
 
@@ -2503,11 +2461,9 @@
             let body = template.body || '';
             if (!body.includes('<') || !body.includes('>')) {
                 // Plain text - convert to HTML
-                body = '<div style="font-family:Arial,sans-serif;padding:20px;">' +
-                       body.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '<br>').join('') +
-                       '</div>';
+                body = body.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '<p><br></p>').join('');
             }
-            templateEditor.setComponents(body);
+            templateEditor.root.innerHTML = body;
 
             onTemplateTypeChange();
             renderTemplateList();
@@ -2519,8 +2475,9 @@
             document.getElementById('template-edit-name').value = '';
             document.getElementById('template-edit-type').value = 'email';
             document.getElementById('template-edit-subject').value = '';
+            document.getElementById('template-edit-autoaddress').checked = true;
             if (templateEditor) {
-                templateEditor.setComponents('<div style="font-family:Arial,sans-serif;padding:20px;"><p>Sehr geehrte(r) {{anrede}} {{nachname}},</p><p>Ihr Text hier...</p><p style="margin-top:30px;">Freundliche Grüsse<br>Feuerwehrverein Raura</p></div>');
+                templateEditor.root.innerHTML = '<p>Sehr geehrte(r) {{anrede}} {{nachname}},</p><p><br></p><p>Ihr Text hier...</p><p><br></p><p>Freundliche Grüsse</p><p>Feuerwehrverein Raura</p>';
             }
             onTemplateTypeChange();
             renderTemplateList();
@@ -2561,7 +2518,7 @@
             const type = document.getElementById('template-edit-type').value;
             const subject = document.getElementById('template-edit-subject').value.trim();
             const autoAddress = document.getElementById('template-edit-autoaddress').checked;
-            const body = templateEditor.getHtml();
+            const body = templateEditor.root.innerHTML;
             if (!name) { showToast('Bitte Template-Namen eingeben', 'error'); return; }
 
             const variableMatches = body.match(/\{\{(\w+)\}\}/g) || [];
@@ -2615,37 +2572,38 @@
 
         function onTemplateContextChange() {
             const context = document.getElementById('template-edit-context').value;
-            // Hide all context-specific placeholders
-            document.getElementById('placeholders-event').classList.add('hidden');
-            document.getElementById('placeholders-finanzen').classList.add('hidden');
-            document.getElementById('placeholders-schicht').classList.add('hidden');
-            document.getElementById('placeholders-geburtstag').classList.add('hidden');
-            // Show relevant ones
-            if (context === 'event') document.getElementById('placeholders-event').classList.remove('hidden');
-            if (context === 'finanzen') document.getElementById('placeholders-finanzen').classList.remove('hidden');
+            // Open relevant variable sections
+            const sections = ['event', 'finanzen', 'schicht', 'geburtstag'];
+            sections.forEach(s => {
+                const el = document.getElementById(`var-section-${s}`);
+                if (el) el.open = false;
+            });
+            if (context === 'event') document.getElementById('var-section-event').open = true;
+            if (context === 'finanzen') document.getElementById('var-section-finanzen').open = true;
             if (context === 'schicht') {
-                document.getElementById('placeholders-schicht').classList.remove('hidden');
-                document.getElementById('placeholders-event').classList.remove('hidden'); // Schicht bezieht sich oft auf Event
+                document.getElementById('var-section-schicht').open = true;
+                document.getElementById('var-section-event').open = true;
             }
-            if (context === 'geburtstag') document.getElementById('placeholders-geburtstag').classList.remove('hidden');
+            if (context === 'geburtstag') document.getElementById('var-section-geburtstag').open = true;
         }
 
         function insertPlaceholder(name) {
             if (!templateEditor) return;
-            const html = templateEditor.getHtml();
-            templateEditor.setComponents(html + `<span style="color:#2563eb;">{{${name}}}</span>`);
+            const range = templateEditor.getSelection(true);
+            templateEditor.insertText(range.index, `{{${name}}}`);
+            templateEditor.setSelection(range.index + name.length + 4);
             updateTemplatePreview();
         }
 
         function addCustomPlaceholder() {
-            const name = prompt('Name des Platzhalters (ohne {{}}):');
+            const name = prompt('Name der Variable (ohne {{}}):');
             if (name && /^\w+$/.test(name)) insertPlaceholder(name);
-            else if (name) showToast('Ungültiger Name', 'error');
+            else if (name) showToast('Ungültiger Name (nur Buchstaben, Zahlen, _)', 'error');
         }
 
         function updateTemplatePreview() {
             if (!templateEditor) return;
-            let html = templateEditor.getHtml();
+            let html = templateEditor.root.innerHTML;
             const subject = document.getElementById('template-edit-subject').value;
 
             // Replace with sample data
