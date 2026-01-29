@@ -357,3 +357,66 @@ CREATE INDEX idx_audit_user ON audit_log(user_id);
 CREATE INDEX idx_members_status ON members(status);
 CREATE INDEX idx_events_date ON events(start_date);
 CREATE INDEX idx_transactions_date ON transactions(date);
+
+-- ============================================
+-- PDF TEMPLATES SCHEMA (pdfme)
+-- ============================================
+
+CREATE TABLE pdf_templates (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+
+    -- Identifikation
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT,
+    category VARCHAR(50), -- 'rechnung', 'arbeitsplan', 'mitgliederliste', 'brief', etc.
+
+    -- pdfme Template Schema (JSON)
+    template_schema JSONB NOT NULL,
+
+    -- Basis-PDF (optional, als Base64)
+    base_pdf TEXT,
+
+    -- Verfügbare Variablen für dieses Template
+    variables TEXT[],
+
+    -- Status
+    is_default BOOLEAN DEFAULT false,
+    is_active BOOLEAN DEFAULT true,
+
+    -- Meta
+    created_by UUID REFERENCES members(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_pdf_templates_slug ON pdf_templates(slug);
+CREATE INDEX idx_pdf_templates_category ON pdf_templates(category);
+
+-- ============================================
+-- ORGANISATION SETTINGS
+-- ============================================
+
+CREATE TABLE organisation_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    key VARCHAR(100) UNIQUE NOT NULL,
+    value TEXT,
+    value_json JSONB,
+    description TEXT,
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Default Organisation Settings
+INSERT INTO organisation_settings (key, value, description) VALUES
+('org_name', 'Feuerwehrverein Raura', 'Name der Organisation'),
+('org_address', 'Ruswil', 'Adresse'),
+('org_plz', '6017', 'PLZ'),
+('org_ort', 'Ruswil', 'Ort'),
+('org_email', 'info@fwv-raura.ch', 'E-Mail'),
+('org_website', 'www.fwv-raura.ch', 'Website'),
+('org_phone', '', 'Telefon'),
+('bank_name', 'Raiffeisenbank', 'Bank Name'),
+('bank_iban', 'CH93 0076 2011 6238 5295 7', 'IBAN'),
+('bank_qr_iban', '', 'QR-IBAN für QR-Rechnungen'),
+('primary_color', '#dc2626', 'Primärfarbe (Hex)'),
+('secondary_color', '#1f2937', 'Sekundärfarbe (Hex)');

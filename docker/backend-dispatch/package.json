@@ -1,7 +1,7 @@
 {
   "name": "fwv-api-dispatch",
   "version": "1.0.0",
-  "description": "Versand API (Email, Pingen, SMS)",
+  "description": "Versand API (Email, Pingen, SMS, PDF)",
   "main": "src/index.js",
   "dependencies": {
     "express": "^4.18.2",
@@ -12,6 +12,10 @@
     "puppeteer": "^21.7.0",
     "axios": "^1.6.5",
     "pdf-lib": "^1.17.1",
-    "@pdf-lib/fontkit": "^1.1.1"
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@pdfme/generator": "^4.0.0",
+    "@pdfme/common": "^4.0.0",
+    "@pdfme/schemas": "^4.0.0",
+    "swissqrbill": "^4.0.0"
   }
 }
