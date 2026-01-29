@@ -438,17 +438,63 @@ function App() {
           </div>
 
           {/* Variables Info */}
-          <div className="p-4 border-t bg-gray-50">
+          <div className="p-4 border-t bg-gray-50 overflow-y-auto" style={{ maxHeight: '300px' }}>
             <h4 className="text-xs font-semibold text-gray-600 mb-2">
-              Verfügbare Felder
+              Verfügbare Variablen
             </h4>
-            <div className="text-xs text-gray-500 space-y-1">
-              <div>• logo - Vereinslogo</div>
-              <div>• organisation - Absender</div>
-              <div>• titel - Dokumenttitel</div>
-              <div>• inhalt - Haupttext</div>
-              <div>• fusszeile - Fusszeile</div>
-              <div>• qrcode - QR-Rechnung</div>
+            <p className="text-xs text-gray-400 mb-2">
+              Felder die beim Versand ersetzt werden:
+            </p>
+
+            {/* Mitglied */}
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-blue-600">Mitglied</div>
+              <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
+                <div>vorname</div>
+                <div>nachname</div>
+                <div>anrede</div>
+                <div>strasse</div>
+                <div>plz</div>
+                <div>ort</div>
+                <div>email</div>
+                <div>status</div>
+              </div>
+            </div>
+
+            {/* Finanzen */}
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-amber-600">Finanzen</div>
+              <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
+                <div>betrag</div>
+                <div>jahr</div>
+                <div>zahlungsfrist</div>
+                <div>iban</div>
+                <div>referenz</div>
+              </div>
+            </div>
+
+            {/* Event */}
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-green-600">Event</div>
+              <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
+                <div>event_titel</div>
+                <div>event_datum</div>
+                <div>event_zeit</div>
+                <div>event_ort</div>
+              </div>
+            </div>
+
+            {/* Layout */}
+            <div className="mb-3">
+              <div className="text-xs font-semibold text-purple-600">Layout</div>
+              <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
+                <div>logo</div>
+                <div>organisation</div>
+                <div>titel</div>
+                <div>inhalt</div>
+                <div>fusszeile</div>
+                <div>datum</div>
+              </div>
             </div>
           </div>
         </div>

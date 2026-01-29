@@ -2064,22 +2064,15 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Typ</label>
-                            <select id="template-edit-type" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-fire-500" onchange="onTemplateTypeChange()">
-                                <option value="email">E-Mail</option>
-                                <option value="post">Brief (Pingen)</option>
-                            </select>
+                            <div class="text-sm text-gray-600 py-2">E-Mail Template</div>
+                            <input type="hidden" id="template-edit-type" value="email">
+                            <p class="text-xs text-gray-500">
+                                Für Brief/PDF-Templates: <a href="https://pdf.fwv-raura.ch" target="_blank" class="text-blue-600 hover:underline">PDF-Designer</a>
+                            </p>
                         </div>
                         <div id="template-subject-row">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Betreff (E-Mail)</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Betreff</label>
                             <input type="text" id="template-edit-subject" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="E-Mail Betreff">
-                        </div>
-                        <div id="template-autoaddress-row" class="hidden">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Adresse</label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" id="template-edit-autoaddress" checked class="w-4 h-4 text-fire-600 rounded focus:ring-fire-500">
-                                <span class="text-sm text-gray-600">Automatisch im Fensterkuvert einfügen</span>
-                            </label>
-                            <p class="text-xs text-gray-500 mt-1">Deaktivieren, wenn du die Adresse selbst im Template platzierst</p>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Bezug</label>
