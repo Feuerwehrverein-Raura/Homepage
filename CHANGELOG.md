@@ -1,3 +1,10 @@
+# [1.84.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.83.0...v1.84.0) (2026-01-29)
+
+
+### Features
+
+* **vorstand:** add Springer and Vorbereitung shift types ([44c3415](https://github.com/Feuerwehrverein-Raura/Homepage/commit/44c341548cad4f10ba611239a8c3436173332e63))
+
 # [1.83.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.3...v1.83.0) (2026-01-29)
 
 
