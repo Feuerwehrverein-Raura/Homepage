@@ -2304,13 +2304,20 @@
         function initGrapesEditor() {
             templateEditor = grapesjs.init({
                 container: '#template-editor-gjs',
-                height: '100%',
+                height: '500px',
                 width: 'auto',
                 storageManager: false,
                 plugins: ['gjs-preset-newsletter'],
                 pluginsOpts: {
-                    'gjs-preset-newsletter': {}
-                }
+                    'gjs-preset-newsletter': {
+                        modalTitleImport: 'HTML importieren',
+                    }
+                },
+                canvas: {
+                    styles: ['https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap']
+                },
+                // Default content
+                components: '<div style="font-family:Arial,sans-serif;padding:20px;"><p>Sehr geehrte(r) {{anrede}} {{nachname}},</p><p>Ihr Text hier...</p></div>',
             });
 
             // Add custom blocks
@@ -2431,7 +2438,17 @@
             document.getElementById('template-edit-name').value = template.name;
             document.getElementById('template-edit-type').value = template.type;
             document.getElementById('template-edit-subject').value = template.subject || '';
-            templateEditor.setComponents(template.body || '');
+
+            // Convert plain text to HTML if needed
+            let body = template.body || '';
+            if (!body.includes('<') || !body.includes('>')) {
+                // Plain text - convert to HTML
+                body = '<div style="font-family:Arial,sans-serif;padding:20px;">' +
+                       body.split('\n').map(line => line.trim() ? `<p>${line}</p>` : '<br>').join('') +
+                       '</div>';
+            }
+            templateEditor.setComponents(body);
+
             onTemplateTypeChange();
             renderTemplateList();
             updateTemplatePreview();
