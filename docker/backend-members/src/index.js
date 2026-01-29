@@ -1341,6 +1341,48 @@ app.get('/vorstand', async (req, res) => {
     }
 });
 
+// Get members with functions (public, for website display)
+// Excludes Vorstand members (Präsident, Aktuar, Kassier, Materialwart, Beisitzer)
+app.get('/funktionen', async (req, res) => {
+    try {
+        // Query members with functions, excluding Vorstand
+        const result = await pool.query(`
+            SELECT
+                id, vorname, nachname, funktion, foto
+            FROM members
+            WHERE funktion IS NOT NULL
+              AND funktion != ''
+              AND funktion != '-'
+              AND status = 'Aktiv'
+              AND NOT (
+                  funktion ILIKE '%Präsident%' OR
+                  funktion ILIKE '%Praesident%' OR
+                  funktion ILIKE '%Aktuar%' OR
+                  funktion ILIKE '%Kassier%' OR
+                  funktion ILIKE '%Materialwart%' OR
+                  funktion ILIKE '%Beisitzer%'
+              )
+            ORDER BY
+                funktion,
+                nachname
+        `);
+
+        // Format the response
+        const funktionMembers = result.rows.map(m => ({
+            id: m.id,
+            vorname: m.vorname,
+            nachname: m.nachname,
+            funktion: m.funktion,
+            foto: m.foto
+        }));
+
+        res.json(funktionMembers);
+    } catch (error) {
+        console.error('GET /funktionen error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ============================================
 // MEMBERS ROUTES (protected)
 // ============================================
