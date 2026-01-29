@@ -1780,6 +1780,12 @@
                 <div class="flex justify-between items-center mb-6">
                     <h3 id="event-reg-modal-title" class="text-2xl font-bold text-gray-800">Anmeldungen verwalten</h3>
                     <div class="flex items-center gap-3">
+                        <button onclick="openAddShiftModal()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Neue Schicht
+                        </button>
                         <button onclick="downloadTeilnehmerliste()" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1831,6 +1837,97 @@
                 </div>
                 <input type="hidden" id="suggest-alt-registration-id">
                 <input type="hidden" id="suggest-alt-email">
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Registration Modal -->
+    <div id="edit-registration-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Anmeldung bearbeiten</h3>
+                    <button onclick="closeEditRegistrationModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                        <input type="text" id="edit-reg-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail</label>
+                        <input type="email" id="edit-reg-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
+                        <input type="text" id="edit-reg-phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div class="flex space-x-3 pt-4">
+                        <button onclick="saveRegistrationEdit()" class="flex-1 bg-fire-500 text-white py-2 px-4 rounded-lg hover:bg-fire-600 transition-colors">
+                            Speichern
+                        </button>
+                        <button onclick="closeEditRegistrationModal()" class="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors">
+                            Abbrechen
+                        </button>
+                    </div>
+                </div>
+                <input type="hidden" id="edit-reg-id">
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Shift Modal -->
+    <div id="add-shift-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Neue Schicht erstellen</h3>
+                    <button onclick="closeAddShiftModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Bereich *</label>
+                        <select id="add-shift-bereich" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <option value="Bar">Bar</option>
+                            <option value="Kueche">Kueche</option>
+                            <option value="Service">Service</option>
+                            <option value="Aufbau">Aufbau</option>
+                            <option value="Abbau">Abbau</option>
+                            <option value="Allgemein">Allgemein</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                        <input type="text" id="add-shift-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500" placeholder="z.B. Schicht 1">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Datum *</label>
+                        <input type="date" id="add-shift-date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Von *</label>
+                            <input type="time" id="add-shift-start" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Bis *</label>
+                            <input type="time" id="add-shift-end" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Benoetigte Personen</label>
+                        <input type="number" id="add-shift-needed" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500" value="2" min="1">
+                    </div>
+                    <div class="flex space-x-3 pt-4">
+                        <button onclick="saveNewShift()" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                            Schicht erstellen
+                        </button>
+                        <button onclick="closeAddShiftModal()" class="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors">
+                            Abbrechen
+                        </button>
+                    </div>
+                </div>
+                <input type="hidden" id="add-shift-event-id">
             </div>
         </div>
     </div>
@@ -3102,11 +3199,13 @@ ${grussformel}`;
                         time: `${shift.start_time}-${shift.end_time}`
                     }).replace(/'/g, "\\'");
 
+                    const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${(reg.name || '').replace(/'/g, "\\'")}', '${(reg.email || '').replace(/'/g, "\\'")}', '${(reg.phone || '').replace(/'/g, "\\'")}')" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
+
                     const actions = reg.status === 'pending'
-                        ? `<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
+                        ? `${editBtn}<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
                            <button onclick="openSuggestAlternativeModal('${reg.id}', '${(reg.name || '').replace(/'/g, "\\'")}', '${(reg.email || '').replace(/'/g, "\\'")}', '${shiftInfo}')" class="text-blue-600 hover:text-blue-800 mr-2">Alternative</button>
                            <button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Ablehnen</button>`
-                        : `<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
+                        : `${editBtn}<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
 
                     html += `
                         <tr>
@@ -3163,10 +3262,12 @@ ${grussformel}`;
                             ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Bestaetigt</span>'
                             : '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Offen</span>';
 
+                        const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${(reg.name || '').replace(/'/g, "\\'")}', '${(reg.email || '').replace(/'/g, "\\'")}', '${(reg.phone || '').replace(/'/g, "\\'")}')" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
+
                         const actions = reg.status === 'pending'
-                            ? `<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
+                            ? `${editBtn}<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
                                <button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Ablehnen</button>`
-                            : `<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
+                            : `${editBtn}<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
 
                         // Parse notes for extra info
                         let extraInfo = '';
@@ -3240,6 +3341,115 @@ ${grussformel}`;
                 await loadEvents();
                 currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
                 renderEventRegistrations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // ============================================
+        // EDIT REGISTRATION
+        // ============================================
+
+        function openEditRegistrationModal(regId, name, email, phone) {
+            document.getElementById('edit-reg-id').value = regId;
+            document.getElementById('edit-reg-name').value = name || '';
+            document.getElementById('edit-reg-email').value = email || '';
+            document.getElementById('edit-reg-phone').value = phone || '';
+            document.getElementById('edit-registration-modal').classList.remove('hidden');
+        }
+
+        function closeEditRegistrationModal() {
+            document.getElementById('edit-registration-modal').classList.add('hidden');
+        }
+
+        async function saveRegistrationEdit() {
+            const id = document.getElementById('edit-reg-id').value;
+            const guest_name = document.getElementById('edit-reg-name').value.trim();
+            const guest_email = document.getElementById('edit-reg-email').value.trim();
+            const phone = document.getElementById('edit-reg-phone').value.trim();
+
+            if (!guest_name) {
+                alert('Name ist erforderlich');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/registrations/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ guest_name, guest_email, phone })
+                });
+
+                if (!response.ok) throw new Error('Fehler beim Speichern');
+
+                closeEditRegistrationModal();
+                await loadEvents();
+                currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
+                renderEventRegistrations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // ============================================
+        // ADD SHIFT
+        // ============================================
+
+        function openAddShiftModal() {
+            const event = currentEventForRegistrations;
+            if (!event) return;
+
+            document.getElementById('add-shift-event-id').value = event.id;
+            // Pre-fill date with event date if available
+            if (event.date) {
+                document.getElementById('add-shift-date').value = event.date;
+            }
+            document.getElementById('add-shift-name').value = '';
+            document.getElementById('add-shift-start').value = '';
+            document.getElementById('add-shift-end').value = '';
+            document.getElementById('add-shift-needed').value = '2';
+            document.getElementById('add-shift-bereich').value = 'Bar';
+            document.getElementById('add-shift-modal').classList.remove('hidden');
+        }
+
+        function closeAddShiftModal() {
+            document.getElementById('add-shift-modal').classList.add('hidden');
+        }
+
+        async function saveNewShift() {
+            const event_id = document.getElementById('add-shift-event-id').value;
+            const name = document.getElementById('add-shift-name').value.trim();
+            const date = document.getElementById('add-shift-date').value;
+            const start_time = document.getElementById('add-shift-start').value;
+            const end_time = document.getElementById('add-shift-end').value;
+            const needed = parseInt(document.getElementById('add-shift-needed').value) || 2;
+            const bereich = document.getElementById('add-shift-bereich').value;
+
+            if (!name || !date || !start_time || !end_time) {
+                alert('Bitte alle Pflichtfelder ausfuellen');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/shifts`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ event_id, name, date, start_time, end_time, needed, bereich })
+                });
+
+                if (!response.ok) throw new Error('Fehler beim Erstellen der Schicht');
+
+                closeAddShiftModal();
+                await loadEvents();
+                currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
+                renderEventRegistrations();
+                alert('Schicht erfolgreich erstellt!');
             } catch (error) {
                 alert(error.message);
             }
