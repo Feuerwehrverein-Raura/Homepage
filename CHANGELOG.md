@@ -1,3 +1,10 @@
+# [1.93.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.92.0...v1.93.0) (2026-01-29)
+
+
+### Features
+
+* **templates:** add context dropdown and extended placeholders ([85014da](https://github.com/Feuerwehrverein-Raura/Homepage/commit/85014da3b079bd0d3d93f0c6dcfffcff85b73bd3))
+
 # [1.92.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.91.0...v1.92.0) (2026-01-29)
 
 
