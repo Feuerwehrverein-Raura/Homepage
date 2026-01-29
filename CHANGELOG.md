@@ -1,3 +1,10 @@
+## [1.94.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.94.1...v1.94.2) (2026-01-29)
+
+
+### Bug Fixes
+
+* **templates:** improve GrapesJS loading and plain text conversion ([aa18565](https://github.com/Feuerwehrverein-Raura/Homepage/commit/aa18565a1e1e49fc853c79af229ffbeaf5b2ea12))
+
 ## [1.94.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.94.0...v1.94.1) (2026-01-29)
 
 
