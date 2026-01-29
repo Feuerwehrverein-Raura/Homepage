@@ -4,27 +4,110 @@ sidebar_position: 1
 
 # Erste Schritte
 
-## Als Mitglied registrieren
+Willkommen beim Feuerwehrverein Raura! Diese Anleitung hilft dir, dich auf unserer Website zurechtzufinden.
 
-1. Besuche [fwv-raura.ch](https://fwv-raura.ch)
-2. Klicke auf "Mitglieder-Login"
-3. Melde dich mit deinem Authentik-Account an
+## Was kann ich als Mitglied tun?
 
-:::info
-Falls du noch keinen Account hast, wird dieser automatisch erstellt, sobald du vom Vorstand als Mitglied erfasst wurdest.
+Als Mitglied des FWV Raura hast du Zugang zu:
+
+| Funktion | Beschreibung |
+|----------|--------------|
+| **Veranstaltungen** | Alle Vereinsanlässe einsehen |
+| **Helfer-Anmeldung** | Dich für Schichten bei Events anmelden |
+| **Kalender** | Termine abonnieren und in deinen Kalender importieren |
+| **Persönlicher Bereich** | Dein Profil und deine Anmeldungen verwalten |
+| **Arbeitsplan** | Sehen, wann und wo du eingeteilt bist |
+
+## Schnellstart
+
+### 1. Website besuchen
+
+Öffne [fwv-raura.ch](https://fwv-raura.ch) in deinem Browser.
+
+### 2. Anmelden (optional)
+
+Für erweiterte Funktionen:
+1. Klicke oben rechts auf **"Anmelden"**
+2. Du wirst zu Authentik weitergeleitet
+3. Gib deine Zugangsdaten ein
+4. Nach der Anmeldung siehst du deinen Namen oben rechts
+
+:::info Zugangsdaten
+Deine Zugangsdaten erhältst du automatisch per E-Mail, sobald du vom Vorstand als Mitglied erfasst wurdest. Dein Benutzername ist deine E-Mail-Adresse.
 :::
 
-## Als Helfer für Events anmelden
+### 3. Events ansehen
 
-1. Gehe zur [Startseite](https://fwv-raura.ch)
-2. Scrolle zu "Kommende Anlässe"
-3. Klicke auf den gewünschten Anlass
-4. Wähle "Als Helfer anmelden"
-5. Wähle deine Schichten aus
-6. Bestätige die Anmeldung
+1. Klicke auf **"Veranstaltungen"** im Menü
+2. Du siehst alle kommenden Anlässe
+3. Klicke auf einen Anlass für Details
+
+### 4. Als Helfer anmelden
+
+Bei Events wie dem Dorffest oder der Fasnacht:
+1. Öffne das Event
+2. Klicke auf **"Als Helfer anmelden"**
+3. Wähle deine bevorzugten Schichten
+4. Bestätige die Anmeldung
+5. Du erhältst eine Bestätigung per E-Mail
+
+## Die Hauptbereiche
+
+### Startseite
+- Aktuelle Neuigkeiten
+- Nächste Veranstaltungen
+- Schnellzugriff auf wichtige Funktionen
+
+### Veranstaltungen
+- Liste aller Anlässe
+- Filter nach Datum oder Kategorie
+- Details und Anmeldung
+
+### Kalender
+- Monats-, Wochen- und Listenansicht
+- Export für deinen persönlichen Kalender
+- Direkt-Links zu Events
+
+### Mein Bereich
+- Dein Profil bearbeiten
+- Deine Anmeldungen sehen
+- Deine Schichten einsehen
+- Benachrichtigungen verwalten
+
+## Häufige Fragen
+
+### Ich habe noch keinen Account
+Der Vorstand muss dich zuerst als Mitglied erfassen. Danach erhältst du automatisch eine E-Mail mit deinen Zugangsdaten. Wende dich an [aktuar@fwv-raura.ch](mailto:aktuar@fwv-raura.ch).
+
+### Ich habe mein Passwort vergessen
+1. Gehe zu [auth.fwv-raura.ch](https://auth.fwv-raura.ch)
+2. Klicke auf "Passwort vergessen"
+3. Gib deine E-Mail-Adresse ein
+4. Du erhältst einen Link zum Zurücksetzen
+
+### Ich kann mich nicht für Events anmelden
+- Prüfe, ob die Anmeldung noch offen ist (Anmeldeschluss beachten)
+- Prüfe, ob du angemeldet bist
+- Bei Problemen: Kontaktiere den Vorstand
+
+### Meine Daten stimmen nicht
+Du kannst einige Daten selbst ändern (siehe [Profil verwalten](./profil)). Andere Daten wie Name oder Mitgliedsstatus müssen vom Vorstand geändert werden.
 
 ## Kontakt
 
-Bei Fragen wende dich an:
-- **E-Mail:** kontakt@fwv-raura.ch
-- **Präsident:** praesident@fwv-raura.ch
+Bei Fragen oder Problemen:
+
+| Anliegen | Kontakt |
+|----------|---------|
+| **Allgemeine Fragen** | [kontakt@fwv-raura.ch](mailto:kontakt@fwv-raura.ch) |
+| **Mitgliedschaft** | [aktuar@fwv-raura.ch](mailto:aktuar@fwv-raura.ch) |
+| **Events & Anmeldung** | [admin@fwv-raura.ch](mailto:admin@fwv-raura.ch) |
+| **Finanzen & Beiträge** | [kassier@fwv-raura.ch](mailto:kassier@fwv-raura.ch) |
+| **Technische Probleme** | [admin@fwv-raura.ch](mailto:admin@fwv-raura.ch) |
+
+## Nächste Schritte
+
+- [Login im Detail](./login) - Alles zur Anmeldung
+- [Profil verwalten](./profil) - Deine Daten aktualisieren
+- [Events & Anmeldung](./events) - So meldest du dich an
+- [Kalender nutzen](./kalender) - Termine abonnieren
