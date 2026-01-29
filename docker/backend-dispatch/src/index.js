@@ -767,8 +767,20 @@ app.post('/email/bulk', async (req, res) => {
 
 app.post('/pingen/send', async (req, res) => {
     try {
-        const { html, recipient, member_id, event_id, staging = false, use_cover_page = false } = req.body;
+        const { html, recipient, member_id, event_id, staging = false, use_cover_page = false, template_id } = req.body;
         const PINGEN_API = getPingenApi(staging);
+
+        // Check if template has _no_auto_address flag
+        let skipAutoAddress = use_cover_page;
+        if (template_id && !skipAutoAddress) {
+            const templateResult = await pool.query('SELECT variables FROM dispatch_templates WHERE id = $1', [template_id]);
+            if (templateResult.rows.length > 0 && templateResult.rows[0].variables) {
+                skipAutoAddress = templateResult.rows[0].variables.includes('_no_auto_address');
+                if (skipAutoAddress) {
+                    console.log('[PINGEN] Template has _no_auto_address flag - skipping auto address embed');
+                }
+            }
+        }
 
         // Convert HTML to PDF
         const browser = await puppeteer.launch({
@@ -790,11 +802,11 @@ app.post('/pingen/send', async (req, res) => {
             recipient.city
         );
 
-        // PDF buffer: embed address or use original depending on use_cover_page option
+        // PDF buffer: embed address or use original depending on skipAutoAddress option
         let pdfBuffer;
         let detectedCountry = recipient.country || 'CH';
-        console.log(`[PINGEN] use_cover_page=${use_cover_page}, recipient address:\n${recipientAddressStr}`);
-        if (use_cover_page) {
+        console.log(`[PINGEN] skipAutoAddress=${skipAutoAddress}, recipient address:\n${recipientAddressStr}`);
+        if (skipAutoAddress) {
             // Use original PDF, cover page will be created by Pingen
             console.log('[PINGEN] Using cover page approach - NOT embedding address');
             pdfBuffer = originalPdfBuffer;
@@ -846,7 +858,7 @@ app.post('/pingen/send', async (req, res) => {
             file_original_name: 'brief.pdf',
             file_url: fileUrl,
             file_url_signature: fileUrlSignature,
-            auto_send: !use_cover_page,  // auto_send wenn Adresse im PDF, sonst manuell
+            auto_send: !skipAutoAddress,  // auto_send wenn Adresse im PDF, sonst manuell
             delivery_product: 'cheap',
             print_mode: 'simplex',
             print_spectrum: 'grayscale',
@@ -863,8 +875,8 @@ app.post('/pingen/send', async (req, res) => {
             }
         };
 
-        // Only specify address_position when NOT using cover page (address already in PDF)
-        if (!use_cover_page) {
+        // Only specify address_position when NOT skipping auto address (address already in PDF)
+        if (!skipAutoAddress) {
             // CH = rechts (Schweizer C5/6 Couvert), DE = links (DIN Standard)
             letterAttributes.address_position = detectedCountry === 'DE' ? 'left' : 'right';
         }
@@ -887,8 +899,8 @@ app.post('/pingen/send', async (req, res) => {
 
         const letterId = uploadResponse.data.data?.id;
 
-        // Step 4: Handle based on use_cover_page option
-        if (use_cover_page) {
+        // Step 4: Handle based on skipAutoAddress option
+        if (skipAutoAddress) {
             // Small delay to let Pingen process the upload, then create cover page immediately
             // Don't wait for full processing - that would result in action_required status
             await new Promise(resolve => setTimeout(resolve, 1000));
