@@ -1,3 +1,10 @@
+# [1.98.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.97.0...v1.98.0) (2026-01-29)
+
+
+### Features
+
+* **pdf-designer:** add visual PDF template editor ([994f3fb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/994f3fb49f7e87ea7ea0134387b26ab11b5b217d))
+
 # [1.97.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.96.0...v1.97.0) (2026-01-29)
 
 
