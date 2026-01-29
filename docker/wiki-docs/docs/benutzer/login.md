@@ -40,17 +40,19 @@ Die Anmeldung erfolgt über unser zentrales Login-System "Authentik".
 
 ### Erstes Login
 
-Wenn du zum ersten Mal Zugang erhältst:
+Wenn du zum ersten Mal Zugang erhältst (nachdem der Vorstand dich erfasst hat):
 
-1. Du erhältst eine E-Mail von `noreply@fwv-raura.ch`
-2. Die E-Mail enthält einen Link zum Setzen deines Passworts
-3. Klicke auf den Link (gültig für 24 Stunden)
-4. Wähle ein sicheres Passwort:
+1. Gehe zu [auth.fwv-raura.ch](https://auth.fwv-raura.ch)
+2. Klicke auf **"Passwort vergessen?"** oder **"Forgot password?"**
+3. Gib deine E-Mail-Adresse ein (mit der du registriert wurdest)
+4. Du erhältst eine E-Mail mit einem Reset-Link
+5. Klicke auf den Link (gültig für 24 Stunden)
+6. Wähle ein sicheres Passwort:
    - Mindestens 8 Zeichen
    - Gross- und Kleinbuchstaben
    - Mindestens eine Zahl
-5. Bestätige das Passwort
-6. Du kannst dich nun anmelden
+7. Bestätige das Passwort
+8. Du kannst dich nun anmelden
 
 :::tip Passwort-Tipp
 Verwende einen Passwort-Manager oder einen leicht merkbaren Satz als Passwort, z.B. "MeinHund-ist-7-Jahre-alt!"

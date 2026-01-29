@@ -36,14 +36,16 @@ Alle natürlichen Personen können Mitglied werden. Eine Zugehörigkeit zur akti
    - Bei Fragen meldet sich jemand bei dir
 
 3. **Entscheidung**
-   - **Angenommen:** Du erhältst eine E-Mail mit einem Link zum Setzen deines Passworts
+   - **Angenommen:** Du wirst im System erfasst und kannst dein Passwort setzen
    - **Abgelehnt:** Du erhältst eine Begründung per E-Mail
 
 4. **Passwort setzen & Anmelden**
-   - Klicke auf den Link in der E-Mail
+   - Gehe zu [auth.fwv-raura.ch](https://auth.fwv-raura.ch)
+   - Klicke auf **"Passwort vergessen?"**
+   - Gib deine E-Mail-Adresse ein
+   - Du erhältst einen Reset-Link per E-Mail
    - Wähle ein sicheres Passwort
    - Danach kannst du dich auf der Website anmelden
-   - Du erhältst Zugang zum Mitgliederbereich
 
 ### Aufnahmegebühr
 Für neue Mitglieder fällt eine einmalige Aufnahmegebühr an. Der aktuelle Betrag wird dir im Antragsformular angezeigt.

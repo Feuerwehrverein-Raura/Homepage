@@ -33,7 +33,7 @@ Für erweiterte Funktionen:
 4. Nach der Anmeldung siehst du deinen Namen oben rechts
 
 :::info Erstes Login
-Sobald du vom Vorstand als Mitglied erfasst wurdest, erhältst du eine E-Mail mit einem Link zum Setzen deines Passworts. Dein Benutzername ist deine E-Mail-Adresse. Siehe [Login → Erstes Login](./login#erstes-login) für Details.
+Sobald du vom Vorstand als Mitglied erfasst wurdest, kannst du dein Passwort setzen. Gehe dazu auf die Login-Seite und klicke auf **"Passwort vergessen?"** um einen Reset-Link zu erhalten. Dein Benutzername ist deine E-Mail-Adresse. Siehe [Login → Erstes Login](./login#erstes-login) für Details.
 :::
 
 ### 3. Events ansehen
@@ -77,7 +77,7 @@ Bei Events wie dem Dorffest oder der Fasnacht:
 ## Häufige Fragen
 
 ### Ich habe noch keinen Account
-Der Vorstand muss dich zuerst als Mitglied erfassen. Danach erhältst du eine E-Mail mit einem Link, um dein Passwort zu setzen. Wende dich an [aktuar@fwv-raura.ch](mailto:aktuar@fwv-raura.ch).
+Der Vorstand muss dich zuerst als Mitglied erfassen. Danach kannst du auf [auth.fwv-raura.ch](https://auth.fwv-raura.ch) über "Passwort vergessen?" dein Passwort setzen. Wende dich an [aktuar@fwv-raura.ch](mailto:aktuar@fwv-raura.ch).
 
 ### Ich habe mein Passwort vergessen
 1. Gehe zu [auth.fwv-raura.ch](https://auth.fwv-raura.ch)
