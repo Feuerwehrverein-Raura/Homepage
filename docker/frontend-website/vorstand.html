@@ -64,7 +64,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Passwort</label>
-                    <input type="password" id="login-password" required
+                    <input type="password" id="login-password" required autocomplete="current-password"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 focus:border-fire-500">
                 </div>
                 <div id="login-error" class="hidden text-red-600 text-sm text-center"></div>
@@ -815,7 +815,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Passwort</label>
-                        <input type="password" id="mailbox-password" placeholder="Mindestens 8 Zeichen"
+                        <input type="password" id="mailbox-password" placeholder="Mindestens 8 Zeichen" autocomplete="new-password"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
                         <p class="text-xs text-gray-500 mt-1" id="mailbox-password-hint">Erforderlich fuer neue Mailbox</p>
                     </div>
@@ -1979,6 +1979,9 @@
         </div>
     </div>
 
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
     <script>
         const API_BASE = 'https://api.fwv-raura.ch';
         const DISPATCH_API = 'https://api.fwv-raura.ch';
@@ -2006,6 +2009,35 @@
         ];
 
         const VORSTAND_ROLES = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
+
+        // Toast notification function
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            };
+
+            toast.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 translate-x-full`;
+            toast.textContent = message;
+
+            container.appendChild(toast);
+
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-full');
+            });
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
         // Helper: Generate <option> tags from SHIFT_TYPES
         function generateShiftTypeOptions(selectedValue = 'Allgemein') {
