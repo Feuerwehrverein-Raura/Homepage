@@ -1,3 +1,10 @@
+## [1.90.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.1...v1.90.2) (2026-01-29)
+
+
+### Bug Fixes
+
+* **funktionen:** remove status filter from query ([764d58a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/764d58a83d242750ee5c7325529e654703f37a57))
+
 ## [1.90.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.0...v1.90.1) (2026-01-29)
 
 
