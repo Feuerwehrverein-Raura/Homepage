@@ -1,3 +1,10 @@
+# [1.91.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.3...v1.91.0) (2026-01-29)
+
+
+### Features
+
+* **templates:** add visual template editor with GrapesJS ([4c94031](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4c94031ad5aba9931f520801baa4710f0c6a3cd0))
+
 ## [1.90.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.2...v1.90.3) (2026-01-29)
 
 
