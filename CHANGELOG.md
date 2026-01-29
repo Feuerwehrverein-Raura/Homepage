@@ -1,3 +1,10 @@
+# [1.86.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.85.1...v1.86.0) (2026-01-29)
+
+
+### Features
+
+* **order:** sync cloud orders to kitchen display and printers ([8fb699b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8fb699bfabf17a34067a922ac9259fd6ce62d984))
+
 ## [1.85.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.85.0...v1.85.1) (2026-01-29)
 
 
