@@ -3408,6 +3408,163 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
     return { letterId };
 }
 
+// ============================================
+// PDF TEMPLATES API (pdfme)
+// ============================================
+
+// Get all PDF templates
+app.get('/pdf-templates', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, name, slug, description, category, variables, is_default, is_active, created_at, updated_at
+            FROM pdf_templates
+            WHERE is_active = true
+            ORDER BY category, name
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        logError('Failed to fetch PDF templates', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get single PDF template
+app.get('/pdf-templates/:id', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'SELECT * FROM pdf_templates WHERE id = $1',
+            [req.params.id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Template nicht gefunden' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        logError('Failed to fetch PDF template', { error: error.message, id: req.params.id });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create PDF template
+app.post('/pdf-templates', async (req, res) => {
+    try {
+        const { name, slug, description, category, template_schema, base_pdf, variables } = req.body;
+
+        if (!name || !slug || !template_schema) {
+            return res.status(400).json({ error: 'Name, Slug und Template-Schema sind erforderlich' });
+        }
+
+        const result = await pool.query(`
+            INSERT INTO pdf_templates (name, slug, description, category, template_schema, base_pdf, variables)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING *
+        `, [name, slug, description, category, JSON.stringify(template_schema), base_pdf, variables]);
+
+        logInfo('PDF template created', { name, slug, category });
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        logError('Failed to create PDF template', { error: error.message });
+        if (error.code === '23505') {
+            return res.status(409).json({ error: 'Ein Template mit diesem Slug existiert bereits' });
+        }
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update PDF template
+app.put('/pdf-templates/:id', async (req, res) => {
+    try {
+        const { name, slug, description, category, template_schema, base_pdf, variables, is_default } = req.body;
+
+        const result = await pool.query(`
+            UPDATE pdf_templates
+            SET name = COALESCE($1, name),
+                slug = COALESCE($2, slug),
+                description = COALESCE($3, description),
+                category = COALESCE($4, category),
+                template_schema = COALESCE($5, template_schema),
+                base_pdf = COALESCE($6, base_pdf),
+                variables = COALESCE($7, variables),
+                is_default = COALESCE($8, is_default),
+                updated_at = NOW()
+            WHERE id = $9
+            RETURNING *
+        `, [name, slug, description, category, template_schema ? JSON.stringify(template_schema) : null, base_pdf, variables, is_default, req.params.id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Template nicht gefunden' });
+        }
+
+        logInfo('PDF template updated', { id: req.params.id, name });
+        res.json(result.rows[0]);
+    } catch (error) {
+        logError('Failed to update PDF template', { error: error.message, id: req.params.id });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete PDF template
+app.delete('/pdf-templates/:id', async (req, res) => {
+    try {
+        const result = await pool.query(
+            'DELETE FROM pdf_templates WHERE id = $1 RETURNING name',
+            [req.params.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Template nicht gefunden' });
+        }
+
+        logInfo('PDF template deleted', { id: req.params.id, name: result.rows[0].name });
+        res.json({ success: true });
+    } catch (error) {
+        logError('Failed to delete PDF template', { error: error.message, id: req.params.id });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// ORGANISATION SETTINGS API
+// ============================================
+
+// Get all settings
+app.get('/organisation-settings', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT key, value, value_json, description FROM organisation_settings');
+        const settings = {};
+        result.rows.forEach(row => {
+            settings[row.key] = row.value_json || row.value;
+        });
+        res.json(settings);
+    } catch (error) {
+        logError('Failed to fetch organisation settings', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update setting
+app.put('/organisation-settings/:key', async (req, res) => {
+    try {
+        const { value, value_json } = req.body;
+
+        const result = await pool.query(`
+            INSERT INTO organisation_settings (key, value, value_json, updated_at)
+            VALUES ($1, $2, $3, NOW())
+            ON CONFLICT (key) DO UPDATE SET
+                value = COALESCE($2, organisation_settings.value),
+                value_json = COALESCE($3, organisation_settings.value_json),
+                updated_at = NOW()
+            RETURNING *
+        `, [req.params.key, value, value_json ? JSON.stringify(value_json) : null]);
+
+        logInfo('Organisation setting updated', { key: req.params.key });
+        res.json(result.rows[0]);
+    } catch (error) {
+        logError('Failed to update organisation setting', { error: error.message, key: req.params.key });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`API-Dispatch running on port ${PORT}`);
 });

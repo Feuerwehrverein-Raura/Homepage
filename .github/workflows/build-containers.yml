@@ -71,6 +71,7 @@ jobs:
       backend-dispatch: ${{ steps.filter.outputs.backend-dispatch }}
       backend-accounting: ${{ steps.filter.outputs.backend-accounting }}
       frontend-website: ${{ steps.filter.outputs.frontend-website }}
+      frontend-pdf-designer: ${{ steps.filter.outputs.frontend-pdf-designer }}
       wiki-docs: ${{ steps.filter.outputs.wiki-docs }}
       order-backend: ${{ steps.filter.outputs.order-backend }}
       order-frontend: ${{ steps.filter.outputs.order-frontend }}
@@ -94,6 +95,8 @@ jobs:
               - 'docker/backend-accounting/**'
             frontend-website:
               - 'docker/frontend-website/**'
+            frontend-pdf-designer:
+              - 'docker/frontend-pdf-designer/**'
             wiki-docs:
               - 'docker/wiki-docs/**'
             order-backend:
@@ -258,6 +261,36 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend:${{ github.sha }}
+
+  build-frontend-pdf-designer:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.frontend-pdf-designer == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/frontend-pdf-designer
+          push: true
+          no-cache: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-pdf-designer:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-pdf-designer:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-pdf-designer:${{ github.sha }}
 
   build-wiki-docs:
     needs: [release, detect-changes]
