@@ -1353,7 +1353,6 @@ app.get('/funktionen', async (req, res) => {
             WHERE funktion IS NOT NULL
               AND funktion != ''
               AND funktion != '-'
-              AND status = 'Aktiv'
               AND NOT (
                   funktion ILIKE '%Präsident%' OR
                   funktion ILIKE '%Praesident%' OR
