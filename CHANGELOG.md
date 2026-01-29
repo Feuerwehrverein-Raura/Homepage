@@ -1,3 +1,10 @@
+## [1.82.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.2...v1.82.3) (2026-01-29)
+
+
+### Bug Fixes
+
+* **registrations:** separate member and event registrations endpoints ([abe2336](https://github.com/Feuerwehrverein-Raura/Homepage/commit/abe2336b8e0921e67319cd10f70a052d5890f53f))
+
 ## [1.82.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.1...v1.82.2) (2026-01-29)
 
 
