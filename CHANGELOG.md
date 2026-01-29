@@ -1,3 +1,10 @@
+# [1.88.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.87.0...v1.88.0) (2026-01-29)
+
+
+### Features
+
+* **wiki:** add logo.png and update navbar config ([f4bee35](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f4bee35e5118372a9c9657b14dce979d7df46c39))
+
 # [1.87.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.86.0...v1.87.0) (2026-01-29)
 
 
