@@ -36,11 +36,13 @@ Alle natürlichen Personen können Mitglied werden. Eine Zugehörigkeit zur akti
    - Bei Fragen meldet sich jemand bei dir
 
 3. **Entscheidung**
-   - **Angenommen:** Du erhältst eine Willkommens-E-Mail mit deinen Zugangsdaten
+   - **Angenommen:** Du erhältst eine E-Mail mit einem Link zum Setzen deines Passworts
    - **Abgelehnt:** Du erhältst eine Begründung per E-Mail
 
-4. **Account aktiviert**
-   - Du kannst dich auf der Website anmelden
+4. **Passwort setzen & Anmelden**
+   - Klicke auf den Link in der E-Mail
+   - Wähle ein sicheres Passwort
+   - Danach kannst du dich auf der Website anmelden
    - Du erhältst Zugang zum Mitgliederbereich
 
 ### Aufnahmegebühr
