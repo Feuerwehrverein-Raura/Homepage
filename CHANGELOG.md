@@ -1,3 +1,10 @@
+## [1.90.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.2...v1.90.3) (2026-01-29)
+
+
+### Bug Fixes
+
+* **vorstand:** add missing showToast function and autocomplete attributes ([dc9b1a1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dc9b1a15e7de35b7281d86b480c7de653d2c0fec))
+
 ## [1.90.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.1...v1.90.2) (2026-01-29)
 
 
