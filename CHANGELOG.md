@@ -1,3 +1,10 @@
+## [1.82.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.0...v1.82.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* **vorstand:** use correct field name for shift capacity ([369f936](https://github.com/Feuerwehrverein-Raura/Homepage/commit/369f936e19890463c39cd51ffdebdce33732bf1c))
+
 # [1.82.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.81.4...v1.82.0) (2026-01-27)
 
 
