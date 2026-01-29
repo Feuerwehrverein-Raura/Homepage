@@ -1748,7 +1748,10 @@
                         <div id="shifts-section" class="md:col-span-2 border-t pt-4 mt-2">
                             <div class="flex justify-between items-center mb-3">
                                 <h4 class="font-medium text-gray-800">Helfer-Schichten</h4>
-                                <button type="button" onclick="addShiftRow()" class="text-sm text-fire-600 hover:text-fire-800">+ Schicht hinzufuegen</button>
+                                <div class="flex gap-3">
+                                    <button type="button" onclick="generateSpringerShifts()" class="text-sm text-blue-600 hover:text-blue-800" title="Erstellt Springer-Schichten fuer alle existierenden Zeitslots">Springer generieren</button>
+                                    <button type="button" onclick="addShiftRow()" class="text-sm text-fire-600 hover:text-fire-800">+ Schicht hinzufuegen</button>
+                                </div>
                             </div>
                             <p class="text-xs text-gray-500 mb-3">Fuer Dorffeste und andere Events mit Helfer-Einsaetzen</p>
                             <div id="event-shifts-container" class="space-y-3">
@@ -3031,6 +3034,66 @@ ${grussformel}`;
         function removeShiftRow(button) {
             const row = button.closest('.shift-row');
             row.remove();
+        }
+
+        function generateSpringerShifts() {
+            // Collect all existing shifts
+            const existingShifts = [];
+            document.querySelectorAll('.shift-row').forEach(row => {
+                existingShifts.push({
+                    bereich: row.querySelector('.shift-bereich').value,
+                    date: row.querySelector('.shift-date').value,
+                    start_time: row.querySelector('.shift-start').value,
+                    end_time: row.querySelector('.shift-end').value
+                });
+            });
+
+            // Find unique time slots from non-Springer/non-Vorbereitung shifts
+            const timeSlots = new Map();
+            existingShifts.forEach(shift => {
+                if (shift.bereich !== 'Springer' && shift.bereich !== 'Vorbereitung' && shift.date && shift.start_time) {
+                    const key = `${shift.date}|${shift.start_time}|${shift.end_time}`;
+                    if (!timeSlots.has(key)) {
+                        timeSlots.set(key, {
+                            date: shift.date,
+                            start_time: shift.start_time,
+                            end_time: shift.end_time
+                        });
+                    }
+                }
+            });
+
+            // Check which time slots already have Springer shifts
+            const existingSpringerSlots = new Set();
+            existingShifts.forEach(shift => {
+                if (shift.bereich === 'Springer') {
+                    existingSpringerSlots.add(`${shift.date}|${shift.start_time}|${shift.end_time}`);
+                }
+            });
+
+            // Create Springer shifts for missing time slots
+            let created = 0;
+            timeSlots.forEach((slot, key) => {
+                if (!existingSpringerSlots.has(key)) {
+                    addShiftRow({
+                        bereich: 'Springer',
+                        name: 'Springer',
+                        date: slot.date,
+                        start_time: slot.start_time,
+                        end_time: slot.end_time,
+                        needed: 1
+                    });
+                    created++;
+                }
+            });
+
+            if (created > 0) {
+                alert(`${created} Springer-Schicht(en) erstellt basierend auf existierenden Zeitslots.`);
+            } else if (timeSlots.size === 0) {
+                alert('Keine Zeitslots gefunden. Bitte zuerst andere Schichten (Bar, Kueche, etc.) anlegen.');
+            } else {
+                alert('Alle Zeitslots haben bereits Springer-Schichten.');
+            }
         }
 
         function collectShiftsData() {
