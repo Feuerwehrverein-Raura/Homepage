@@ -1,3 +1,10 @@
+# [1.89.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.88.1...v1.89.0) (2026-01-29)
+
+
+### Features
+
+* **events:** add member login button to registration forms ([dadcee4](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dadcee4a8c1db1972e361077081a17d6e2c85e11))
+
 ## [1.88.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.88.0...v1.88.1) (2026-01-29)
 
 
