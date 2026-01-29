@@ -1,3 +1,10 @@
+## [1.90.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.90.0...v1.90.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* **traefik:** add /funktionen route to api-members ([25b25d4](https://github.com/Feuerwehrverein-Raura/Homepage/commit/25b25d4ed1328b8a5018bf4ccd4a3db980aa2e4f))
+
 # [1.90.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.89.0...v1.90.0) (2026-01-29)
 
 
