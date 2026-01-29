@@ -1,3 +1,10 @@
+# [1.96.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.95.0...v1.96.0) (2026-01-29)
+
+
+### Features
+
+* **dispatch:** add template groups and smart dispatch ([0dfae35](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0dfae35ebe7de8e48c4f60d036f5b5e5967f89e3))
+
 # [1.95.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.94.2...v1.95.0) (2026-01-29)
 
 
