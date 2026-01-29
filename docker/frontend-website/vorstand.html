@@ -1882,14 +1882,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Bereich *</label>
                         <select id="add-shift-bereich" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
-                            <option value="Bar">Bar</option>
-                            <option value="Kueche">Kueche</option>
-                            <option value="Service">Service</option>
-                            <option value="Springer">Springer</option>
-                            <option value="Vorbereitung">Vorbereitung</option>
-                            <option value="Aufbau">Aufbau</option>
-                            <option value="Abbau">Abbau</option>
-                            <option value="Allgemein">Allgemein</option>
+                            <!-- Options werden via JavaScript aus SHIFT_TYPES generiert -->
                         </select>
                     </div>
                     <div>
@@ -1986,6 +1979,43 @@
     <script>
         const API_BASE = 'https://api.fwv-raura.ch';
         const DISPATCH_API = 'https://api.fwv-raura.ch';
+
+        // ============================================
+        // ZENTRALE KONSTANTEN (Single Source of Truth)
+        // ============================================
+
+        const SHIFT_TYPES = [
+            { value: 'Allgemein', label: 'Allgemein' },
+            { value: 'Kueche', label: 'Küche' },
+            { value: 'Bar', label: 'Bar' },
+            { value: 'Service', label: 'Service' },
+            { value: 'Kasse', label: 'Kasse' },
+            { value: 'Springer', label: 'Springer' },
+            { value: 'Vorbereitung', label: 'Vorbereitung' },
+            { value: 'Aufbau', label: 'Aufbau' },
+            { value: 'Abbau', label: 'Abbau' }
+        ];
+
+        const MEMBER_STATUS_TYPES = [
+            { value: 'Aktivmitglied', label: 'Aktivmitglied', color: 'bg-green-100 text-green-800' },
+            { value: 'Passivmitglied', label: 'Passivmitglied', color: 'bg-blue-100 text-blue-800' },
+            { value: 'Ehrenmitglied', label: 'Ehrenmitglied', color: 'bg-yellow-100 text-yellow-800' }
+        ];
+
+        const VORSTAND_ROLES = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
+
+        // Helper: Generate <option> tags from SHIFT_TYPES
+        function generateShiftTypeOptions(selectedValue = 'Allgemein') {
+            return SHIFT_TYPES.map(t =>
+                `<option value="${t.value}" ${selectedValue === t.value ? 'selected' : ''}>${t.label}</option>`
+            ).join('');
+        }
+
+        // Helper: Get member status color class
+        function getMemberStatusColor(status) {
+            const found = MEMBER_STATUS_TYPES.find(s => s.value === status);
+            return found ? found.color : 'bg-gray-100 text-gray-800';
+        }
 
         let members = [];
         let events = [];
@@ -2174,12 +2204,7 @@
         }
 
         function getStatusClass(status) {
-            const classes = {
-                'Aktivmitglied': 'bg-green-100 text-green-800',
-                'Passivmitglied': 'bg-blue-100 text-blue-800',
-                'Ehrenmitglied': 'bg-yellow-100 text-yellow-800'
-            };
-            return classes[status] || 'bg-gray-100 text-gray-800';
+            return getMemberStatusColor(status);
         }
 
         function openNewMemberModal() {
@@ -2316,10 +2341,9 @@
         // Sync cloud permissions based on functions
         async function syncCloudPermissions(memberId, funktionen) {
             const funktionenList = funktionen.split(',').map(f => f.trim());
-            const vorstandRoles = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
 
             const isAdmin = funktionenList.includes('Admin');
-            const isVorstand = funktionenList.some(f => vorstandRoles.includes(f));
+            const isVorstand = funktionenList.some(f => VORSTAND_ROLES.includes(f));
             const isSocialMedia = funktionenList.includes('Social Media');
 
             const statusEl = document.getElementById('cloud-permissions-status');
@@ -2378,8 +2402,7 @@
         function validateFunktionen() {
             const checked = Array.from(document.querySelectorAll('input[name="funktion"]:checked'))
                 .map(cb => cb.value);
-            const vorstandRoles = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
-            const hasVorstand = checked.some(f => vorstandRoles.includes(f));
+            const hasVorstand = checked.some(f => VORSTAND_ROLES.includes(f));
             const hasRevisor = checked.includes('Revisor');
 
             if (hasVorstand && hasRevisor) {
@@ -2392,18 +2415,17 @@
         // Add event listener for Revisor validation
         document.querySelectorAll('input[name="funktion"]').forEach(cb => {
             cb.addEventListener('change', function() {
-                const vorstandRoles = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
                 const revisorCb = document.querySelector('input[name="funktion"][value="Revisor"]');
                 const checked = Array.from(document.querySelectorAll('input[name="funktion"]:checked'))
                     .map(c => c.value);
 
                 if (this.value === 'Revisor' && this.checked) {
                     // Uncheck all Vorstand roles when Revisor is selected
-                    vorstandRoles.forEach(role => {
+                    VORSTAND_ROLES.forEach(role => {
                         const cb = document.querySelector(`input[name="funktion"][value="${role}"]`);
                         if (cb) cb.checked = false;
                     });
-                } else if (vorstandRoles.includes(this.value) && this.checked && revisorCb?.checked) {
+                } else if (VORSTAND_ROLES.includes(this.value) && this.checked && revisorCb?.checked) {
                     // Uncheck Revisor when a Vorstand role is selected
                     revisorCb.checked = false;
                 }
@@ -2973,15 +2995,7 @@ ${grussformel}`;
                 <div class="grid grid-cols-1 md:grid-cols-7 gap-2">
                     <div>
                         <select class="shift-bereich w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
-                            <option value="Allgemein" ${bereichValue === 'Allgemein' ? 'selected' : ''}>Allgemein</option>
-                            <option value="Kueche" ${bereichValue === 'Kueche' ? 'selected' : ''}>Küche</option>
-                            <option value="Bar" ${bereichValue === 'Bar' ? 'selected' : ''}>Bar</option>
-                            <option value="Service" ${bereichValue === 'Service' ? 'selected' : ''}>Service</option>
-                            <option value="Kasse" ${bereichValue === 'Kasse' ? 'selected' : ''}>Kasse</option>
-                            <option value="Springer" ${bereichValue === 'Springer' ? 'selected' : ''}>Springer</option>
-                            <option value="Vorbereitung" ${bereichValue === 'Vorbereitung' ? 'selected' : ''}>Vorbereitung</option>
-                            <option value="Aufbau" ${bereichValue === 'Aufbau' ? 'selected' : ''}>Aufbau</option>
-                            <option value="Abbau" ${bereichValue === 'Abbau' ? 'selected' : ''}>Abbau</option>
+                            ${generateShiftTypeOptions(bereichValue)}
                         </select>
                     </div>
                     <div>
@@ -3597,7 +3611,8 @@ ${grussformel}`;
             document.getElementById('add-shift-start').value = '';
             document.getElementById('add-shift-end').value = '';
             document.getElementById('add-shift-needed').value = '2';
-            document.getElementById('add-shift-bereich').value = 'Bar';
+            // Populate shift type options from central constants
+            document.getElementById('add-shift-bereich').innerHTML = generateShiftTypeOptions('Bar');
             document.getElementById('add-shift-modal').classList.remove('hidden');
         }
 
@@ -5365,12 +5380,7 @@ ${grussformel}`;
                         <td class="px-4 py-2 font-medium">${m.vorname} ${m.nachname}</td>
                         <td class="px-4 py-2 font-mono text-sm">${m.email}</td>
                         <td class="px-4 py-2">
-                            <span class="px-2 py-1 rounded text-xs ${
-                                m.status === 'Aktivmitglied' ? 'bg-green-100 text-green-800' :
-                                m.status === 'Passivmitglied' ? 'bg-blue-100 text-blue-800' :
-                                m.status === 'Ehrenmitglied' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
-                            }">${m.status}</span>
+                            <span class="px-2 py-1 rounded text-xs ${getMemberStatusColor(m.status)}">${m.status}</span>
                         </td>
                     </tr>
                 `).join('');
