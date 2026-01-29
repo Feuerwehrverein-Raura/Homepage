@@ -1,3 +1,10 @@
+# [1.90.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.89.0...v1.90.0) (2026-01-29)
+
+
+### Features
+
+* **website:** add "Weitere Funktionen" section below Vorstand ([fdc11d8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/fdc11d82c90917c3f26827a64ff1a72762287bd4))
+
 # [1.89.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.88.1...v1.89.0) (2026-01-29)
 
 
