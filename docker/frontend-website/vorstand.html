@@ -2351,6 +2351,44 @@
                 content: '<div><p>Wir laden Sie herzlich ein zur:</p><h2 style="color:#dc2626;margin:10px 0;">{{event_titel}}</h2><p><strong>Datum:</strong> {{event_datum}}<br><strong>Zeit:</strong> {{event_zeit}}<br><strong>Ort:</strong> {{event_ort}}</p></div>'
             });
 
+            // Basic blocks
+            bm.add('text-paragraph', {
+                label: 'Text',
+                category: 'Basis',
+                content: '<p>Ihr Text hier...</p>'
+            });
+
+            bm.add('text-heading', {
+                label: 'Überschrift',
+                category: 'Basis',
+                content: '<h2 style="color:#1f2937;margin:15px 0;">Überschrift</h2>'
+            });
+
+            bm.add('divider', {
+                label: 'Trennlinie',
+                category: 'Basis',
+                content: '<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;">'
+            });
+
+            bm.add('spacer', {
+                label: 'Abstand',
+                category: 'Basis',
+                content: '<div style="height:30px;"></div>'
+            });
+
+            // Logo block
+            bm.add('logo-fwv', {
+                label: 'FWV Logo',
+                category: 'Bilder',
+                content: '<img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="max-width:150px;height:auto;margin:10px 0;">'
+            });
+
+            bm.add('logo-header', {
+                label: 'Briefkopf',
+                category: 'Bilder',
+                content: '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;padding-bottom:15px;border-bottom:2px solid #dc2626;"><img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="height:60px;"><div style="text-align:right;font-size:12px;color:#6b7280;">Feuerwehrverein Raura<br>6017 Ruswil</div></div>'
+            });
+
             templateEditor.on('change:changesCount', updateTemplatePreview);
             createNewTemplate();
         }
