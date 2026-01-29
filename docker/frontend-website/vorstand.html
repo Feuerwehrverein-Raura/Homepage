@@ -8,6 +8,35 @@
     <!-- Quill Rich Text Editor -->
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+    <!-- GrapesJS Template Editor -->
+    <link href="https://unpkg.com/grapesjs@0.21.10/dist/css/grapes.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/grapesjs@0.21.10"></script>
+    <script src="https://unpkg.com/grapesjs-preset-newsletter@1.0.2"></script>
+    <style>
+        /* GrapesJS customization */
+        .gjs-one-bg { background-color: #1f2937; }
+        .gjs-two-color { color: #f3f4f6; }
+        .gjs-three-bg { background-color: #374151; }
+        .gjs-four-color, .gjs-four-color-h:hover { color: #dc2626; }
+        #template-editor-gjs { height: 500px; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .gjs-block { padding: 10px; }
+        .letter-preview-a4 {
+            width: 210mm; max-width: 100%; aspect-ratio: 210/297;
+            background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20mm; font-family: Arial, sans-serif; font-size: 11pt;
+            position: relative; overflow: hidden;
+        }
+        .letter-address-zone-ch {
+            position: absolute; right: 20mm; top: 45mm;
+            width: 85mm; height: 45mm;
+            border: 1px dashed #dc2626; background: rgba(220,38,38,0.05);
+        }
+        .letter-address-zone-de {
+            position: absolute; left: 20mm; top: 45mm;
+            width: 85mm; height: 45mm;
+            border: 1px dashed #2563eb; background: rgba(37,99,235,0.05);
+        }
+    </style>
     <style>
         .ql-editor { min-height: 200px; font-size: 14px; }
         .ql-toolbar { background: #f9fafb; border-radius: 8px 8px 0 0; }
@@ -967,7 +996,13 @@
 
                     <!-- Template Selection -->
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Vorlage</label>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-sm font-medium text-gray-700">Vorlage</label>
+                            <button type="button" onclick="openTemplateEditor()" class="text-xs px-3 py-1 bg-fire-100 text-fire-700 hover:bg-fire-200 rounded-lg flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                                Templates verwalten
+                            </button>
+                        </div>
                         <select id="dispatch-template" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
                             <option value="">Freier Text (keine Vorlage)</option>
                         </select>
@@ -1979,6 +2014,129 @@
         </div>
     </div>
 
+    <!-- Template Editor Modal -->
+    <div id="template-editor-modal" class="fixed inset-0 bg-black/50 z-50 hidden">
+        <div class="h-full w-full bg-white flex flex-col">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+                <h2 class="text-xl font-bold text-gray-800">Template-Editor</h2>
+                <div class="flex items-center gap-4">
+                    <button onclick="saveCurrentTemplate()" class="px-4 py-2 bg-fire-600 text-white rounded-lg hover:bg-fire-700 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Speichern
+                    </button>
+                    <button onclick="closeTemplateEditor()" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="flex-1 flex overflow-hidden">
+                <!-- Left: Template List -->
+                <div class="w-64 border-r bg-gray-50 flex flex-col">
+                    <div class="p-4 border-b">
+                        <button onclick="createNewTemplate()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Neues Template
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2" id="template-list-container">
+                        <!-- Templates werden hier geladen -->
+                    </div>
+                </div>
+
+                <!-- Center: Editor -->
+                <div class="flex-1 flex flex-col">
+                    <!-- Template Meta -->
+                    <div class="p-4 border-b bg-white grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <input type="text" id="template-edit-name" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Template-Name">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Typ</label>
+                            <select id="template-edit-type" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-fire-500" onchange="onTemplateTypeChange()">
+                                <option value="email">E-Mail</option>
+                                <option value="post">Brief (Pingen)</option>
+                            </select>
+                        </div>
+                        <div id="template-subject-row">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Betreff (E-Mail)</label>
+                            <input type="text" id="template-edit-subject" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="E-Mail Betreff">
+                        </div>
+                    </div>
+
+                    <!-- Placeholder Buttons -->
+                    <div class="px-4 py-2 border-b bg-gray-50 flex flex-wrap gap-2">
+                        <span class="text-sm text-gray-600 mr-2">Platzhalter:</span>
+                        <button type="button" onclick="insertPlaceholder('anrede')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{anrede}}</button>
+                        <button type="button" onclick="insertPlaceholder('vorname')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{vorname}}</button>
+                        <button type="button" onclick="insertPlaceholder('nachname')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{nachname}}</button>
+                        <button type="button" onclick="insertPlaceholder('strasse')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{strasse}}</button>
+                        <button type="button" onclick="insertPlaceholder('plz')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{plz}}</button>
+                        <button type="button" onclick="insertPlaceholder('ort')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{ort}}</button>
+                        <button type="button" onclick="insertPlaceholder('email')" class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">{{email}}</button>
+                        <button type="button" onclick="addCustomPlaceholder()" class="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">+ Eigene...</button>
+                    </div>
+
+                    <!-- GrapesJS Editor -->
+                    <div class="flex-1 p-4">
+                        <div id="template-editor-gjs"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Dual Preview -->
+                <div class="w-96 border-l bg-gray-100 flex flex-col overflow-hidden">
+                    <div class="p-3 border-b bg-white">
+                        <h3 class="font-semibold text-gray-700">Vorschau</h3>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                        <!-- Email Preview -->
+                        <div class="bg-white rounded-lg shadow overflow-hidden">
+                            <div class="px-3 py-2 bg-blue-50 border-b flex items-center gap-2">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                <span class="text-sm font-medium text-blue-800">E-Mail Vorschau</span>
+                            </div>
+                            <div class="p-3">
+                                <div class="text-xs text-gray-500 mb-1">An: max.muster@example.ch</div>
+                                <div class="text-xs text-gray-500 mb-2">Betreff: <span id="preview-email-subject">-</span></div>
+                                <div id="preview-email-body" class="text-sm dispatch-preview-html border-t pt-2 max-h-48 overflow-y-auto"></div>
+                            </div>
+                        </div>
+
+                        <!-- Letter Preview -->
+                        <div class="bg-white rounded-lg shadow overflow-hidden">
+                            <div class="px-3 py-2 bg-amber-50 border-b flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76"></path></svg>
+                                    <span class="text-sm font-medium text-amber-800">Brief Vorschau</span>
+                                </div>
+                                <select id="preview-letter-country" class="text-xs border rounded px-2 py-1" onchange="updateLetterPreview()">
+                                    <option value="CH">Schweiz</option>
+                                    <option value="DE">Deutschland</option>
+                                </select>
+                            </div>
+                            <div class="p-3">
+                                <div class="letter-preview-a4 text-xs mx-auto" style="transform: scale(0.35); transform-origin: top center; margin-bottom: -400px;">
+                                    <div id="letter-address-zone" class="letter-address-zone-ch">
+                                        <div class="p-2 text-gray-400 text-center text-xs">Adressfeld<br>(wird automatisch eingefügt)</div>
+                                    </div>
+                                    <div class="mt-[60mm]" id="preview-letter-body">
+                                        <!-- Briefinhalt -->
+                                    </div>
+                                </div>
+                                <div class="mt-4 p-2 bg-amber-50 rounded text-xs text-amber-700">
+                                    <strong>Hinweis:</strong> Die Empfängeradresse wird automatisch im markierten Bereich eingefügt (CH: rechts, DE: links nach DIN-Norm).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
@@ -2037,6 +2195,224 @@
                 toast.classList.add('translate-x-full', 'opacity-0');
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
+        }
+
+        // ============================================
+        // TEMPLATE EDITOR (GrapesJS)
+        // ============================================
+
+        let templateEditor = null;
+        let currentEditingTemplate = null;
+        let editorTemplates = [];
+
+        const sampleMemberData = {
+            anrede: 'Herr',
+            vorname: 'Max',
+            nachname: 'Mustermann',
+            strasse: 'Musterstrasse 1',
+            plz: '6000',
+            ort: 'Luzern',
+            email: 'max.muster@example.ch'
+        };
+
+        function openTemplateEditor() {
+            document.getElementById('template-editor-modal').classList.remove('hidden');
+            loadEditorTemplates();
+            if (!templateEditor) {
+                initGrapesEditor();
+            }
+        }
+
+        function closeTemplateEditor() {
+            document.getElementById('template-editor-modal').classList.add('hidden');
+        }
+
+        function initGrapesEditor() {
+            templateEditor = grapesjs.init({
+                container: '#template-editor-gjs',
+                height: '100%',
+                width: 'auto',
+                storageManager: false,
+                plugins: ['gjs-preset-newsletter'],
+                pluginsOpts: {
+                    'gjs-preset-newsletter': {}
+                }
+            });
+
+            // Add custom blocks
+            const bm = templateEditor.BlockManager;
+
+            bm.add('placeholder-name', {
+                label: 'Name',
+                category: 'Platzhalter',
+                content: '<span style="color:#2563eb;">{{anrede}} {{vorname}} {{nachname}}</span>'
+            });
+
+            bm.add('placeholder-address', {
+                label: 'Adresse',
+                category: 'Platzhalter',
+                content: '<div>{{vorname}} {{nachname}}<br>{{strasse}}<br>{{plz}} {{ort}}</div>'
+            });
+
+            bm.add('letter-salutation', {
+                label: 'Anrede',
+                category: 'Brief',
+                content: '<p>Sehr geehrte(r) {{anrede}} {{nachname}},</p>'
+            });
+
+            bm.add('letter-closing', {
+                label: 'Grussformel',
+                category: 'Brief',
+                content: '<p style="margin-top:30px;">Freundliche Grüsse<br><br>Feuerwehrverein Raura</p>'
+            });
+
+            templateEditor.on('change:changesCount', updateTemplatePreview);
+            createNewTemplate();
+        }
+
+        async function loadEditorTemplates() {
+            try {
+                const response = await fetch(`${API_BASE}/templates`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                editorTemplates = await response.json();
+                renderTemplateList();
+            } catch (error) {
+                showToast('Fehler beim Laden der Templates', 'error');
+            }
+        }
+
+        function renderTemplateList() {
+            const container = document.getElementById('template-list-container');
+            container.innerHTML = editorTemplates.map(t => `
+                <div class="p-2 rounded-lg mb-1 cursor-pointer hover:bg-gray-200 ${currentEditingTemplate?.id === t.id ? 'bg-fire-100' : 'bg-white'}"
+                     onclick="loadTemplateForEdit('${t.id}')">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="font-medium text-sm">${t.name}</div>
+                            <div class="text-xs text-gray-500">${t.type === 'email' ? 'E-Mail' : 'Brief'}</div>
+                        </div>
+                        <button onclick="event.stopPropagation(); deleteTemplate('${t.id}')" class="text-red-500 hover:text-red-700 p-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('') || '<p class="text-sm text-gray-500 p-2">Keine Templates</p>';
+        }
+
+        function loadTemplateForEdit(templateId) {
+            const template = editorTemplates.find(t => t.id === templateId);
+            if (!template) return;
+            currentEditingTemplate = template;
+            document.getElementById('template-edit-name').value = template.name;
+            document.getElementById('template-edit-type').value = template.type;
+            document.getElementById('template-edit-subject').value = template.subject || '';
+            templateEditor.setComponents(template.body || '');
+            onTemplateTypeChange();
+            renderTemplateList();
+            updateTemplatePreview();
+        }
+
+        function createNewTemplate() {
+            currentEditingTemplate = null;
+            document.getElementById('template-edit-name').value = '';
+            document.getElementById('template-edit-type').value = 'email';
+            document.getElementById('template-edit-subject').value = '';
+            if (templateEditor) {
+                templateEditor.setComponents('<div style="font-family:Arial,sans-serif;padding:20px;"><p>Sehr geehrte(r) {{anrede}} {{nachname}},</p><p>Ihr Text hier...</p><p style="margin-top:30px;">Freundliche Grüsse<br>Feuerwehrverein Raura</p></div>');
+            }
+            onTemplateTypeChange();
+            renderTemplateList();
+            updateTemplatePreview();
+        }
+
+        async function saveCurrentTemplate() {
+            const name = document.getElementById('template-edit-name').value.trim();
+            const type = document.getElementById('template-edit-type').value;
+            const subject = document.getElementById('template-edit-subject').value.trim();
+            const body = templateEditor.getHtml();
+            if (!name) { showToast('Bitte Template-Namen eingeben', 'error'); return; }
+
+            const variableMatches = body.match(/\{\{(\w+)\}\}/g) || [];
+            const variables = [...new Set(variableMatches.map(v => v.replace(/[{}]/g, '')))];
+
+            try {
+                const url = currentEditingTemplate ? `${API_BASE}/templates/${currentEditingTemplate.id}` : `${API_BASE}/templates`;
+                const method = currentEditingTemplate ? 'PUT' : 'POST';
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ name, type, subject, body, variables })
+                });
+                if (!response.ok) throw new Error('Fehler');
+                currentEditingTemplate = await response.json();
+                showToast('Template gespeichert!', 'success');
+                loadEditorTemplates();
+                loadDispatchTemplates();
+            } catch (error) {
+                showToast('Fehler beim Speichern', 'error');
+            }
+        }
+
+        async function deleteTemplate(templateId) {
+            if (!confirm('Template wirklich löschen?')) return;
+            try {
+                await fetch(`${API_BASE}/templates/${templateId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                showToast('Template gelöscht', 'success');
+                if (currentEditingTemplate?.id === templateId) createNewTemplate();
+                loadEditorTemplates();
+                loadDispatchTemplates();
+            } catch (error) {
+                showToast('Fehler beim Löschen', 'error');
+            }
+        }
+
+        function onTemplateTypeChange() {
+            const type = document.getElementById('template-edit-type').value;
+            document.getElementById('template-subject-row').style.display = type === 'email' ? 'block' : 'none';
+            updateTemplatePreview();
+        }
+
+        function insertPlaceholder(name) {
+            if (!templateEditor) return;
+            const html = templateEditor.getHtml();
+            templateEditor.setComponents(html + `<span style="color:#2563eb;">{{${name}}}</span>`);
+            updateTemplatePreview();
+        }
+
+        function addCustomPlaceholder() {
+            const name = prompt('Name des Platzhalters (ohne {{}}):');
+            if (name && /^\w+$/.test(name)) insertPlaceholder(name);
+            else if (name) showToast('Ungültiger Name', 'error');
+        }
+
+        function updateTemplatePreview() {
+            if (!templateEditor) return;
+            let html = templateEditor.getHtml();
+            const subject = document.getElementById('template-edit-subject').value;
+
+            // Replace with sample data
+            Object.keys(sampleMemberData).forEach(key => {
+                html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), `<span style="background:#fef3c7;">${sampleMemberData[key]}</span>`);
+            });
+            html = html.replace(/\{\{(\w+)\}\}/g, '<span style="background:#fee2e2;">{{$1}}</span>');
+
+            document.getElementById('preview-email-subject').textContent = subject || '(kein Betreff)';
+            document.getElementById('preview-email-body').innerHTML = html;
+            document.getElementById('preview-letter-body').innerHTML = html;
+            updateLetterPreview();
+        }
+
+        function updateLetterPreview() {
+            const country = document.getElementById('preview-letter-country').value;
+            const zone = document.getElementById('letter-address-zone');
+            zone.className = country === 'CH' ? 'letter-address-zone-ch' : 'letter-address-zone-de';
+            zone.innerHTML = country === 'CH'
+                ? '<div class="p-2 text-red-400 text-center text-xs">CH Adressfeld<br>(rechts)</div>'
+                : '<div class="p-2 text-blue-400 text-center text-xs">DE Adressfeld<br>(links, DIN)</div>';
         }
 
         // Helper: Generate <option> tags from SHIFT_TYPES

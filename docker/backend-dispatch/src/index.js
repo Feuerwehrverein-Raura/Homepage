@@ -617,6 +617,37 @@ app.post('/templates', async (req, res) => {
     }
 });
 
+app.put('/templates/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, type, subject, body, variables } = req.body;
+        const result = await pool.query(`
+            UPDATE dispatch_templates
+            SET name = $1, type = $2, subject = $3, body = $4, variables = $5, updated_at = NOW()
+            WHERE id = $6 RETURNING *
+        `, [name, type, subject, body, variables, id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Template nicht gefunden' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/templates/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query('DELETE FROM dispatch_templates WHERE id = $1 RETURNING id', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Template nicht gefunden' });
+        }
+        res.json({ success: true, deleted: id });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ============================================
 // EMAIL
 // ============================================
