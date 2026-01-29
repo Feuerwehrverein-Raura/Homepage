@@ -2539,11 +2539,15 @@
                     approvedCount += event.directRegistrations.approvedCount || 0;
                 }
 
-                // Schichten/Personen Display: "4/16"
+                // Schichten/Personen Display: "4/16" oder bei Events ohne Schichten die direkten Anmeldungen
                 const shiftCount = event.shifts?.length || 0;
+                const directApprovedCount = event.directRegistrations?.approvedCount || 0;
                 let shiftsDisplay = '-';
                 if (shiftCount > 0) {
                     shiftsDisplay = `${totalShiftRegistered}/${totalShiftCapacity > 0 ? totalShiftCapacity : shiftCount}`;
+                } else if (directApprovedCount > 0) {
+                    // Keine Schichten, aber direkte Anmeldungen vorhanden
+                    shiftsDisplay = `${directApprovedCount} Pers.`;
                 }
 
                 const hasPending = pendingCount > 0;
