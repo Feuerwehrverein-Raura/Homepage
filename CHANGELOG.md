@@ -1,3 +1,10 @@
+# [1.99.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.98.0...v1.99.0) (2026-01-29)
+
+
+### Features
+
+* **pdf-designer:** context-sensitive variable list ([6264517](https://github.com/Feuerwehrverein-Raura/Homepage/commit/62645177cd4c0b7aca705217f282f76058088312))
+
 # [1.98.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.97.0...v1.98.0) (2026-01-29)
 
 
