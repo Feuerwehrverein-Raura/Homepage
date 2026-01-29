@@ -192,6 +192,11 @@
     </div>
 
     <script>
+        // Auth configuration
+        const API_BASE = 'https://api.fwv-raura.ch';
+        const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
+        const CLIENT_ID = 'fwv-members';
+
         class EventsManager {
             constructor() {
                 this.events = [];
@@ -203,12 +208,93 @@
                 this.selectedEvent = null;
                 this.selectedShifts = [];
                 this.arbeitsplanData = {};
-                
+                this.memberData = null;
+                this.authToken = localStorage.getItem('auth_token');
+
                 this.init();
+            }
+
+            // Fill form with member data (login if needed)
+            async fillMemberData() {
+                // Check if already logged in
+                if (!this.authToken) {
+                    // Build return URL with autofill parameter
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (this.selectedEvent) {
+                        urlParams.set('event', this.selectedEvent.slug || this.selectedEvent.id);
+                    }
+                    urlParams.set('autofill', 'member');
+                    const returnPath = window.location.pathname + '?' + urlParams.toString();
+
+                    // Redirect to OAuth login
+                    const REDIRECT_URI = window.location.origin + '/auth-callback.html';
+                    const state = encodeURIComponent(returnPath);
+                    window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
+                    return;
+                }
+
+                // Already logged in - fetch member data
+                try {
+                    const response = await fetch(`${API_BASE}/members/me`, {
+                        headers: { 'Authorization': `Bearer ${this.authToken}` }
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 401 || response.status === 403) {
+                            // Token expired - re-login
+                            localStorage.removeItem('auth_token');
+                            this.authToken = null;
+                            this.fillMemberData();
+                            return;
+                        }
+                        throw new Error('Fehler beim Laden der Mitgliederdaten');
+                    }
+
+                    this.memberData = await response.json();
+
+                    // Fill form fields
+                    const fullName = `${this.memberData.first_name || ''} ${this.memberData.last_name || ''}`.trim();
+                    const nameInput = document.querySelector('input[name="name"]');
+                    const emailInput = document.querySelector('input[name="email"]');
+                    const phoneInput = document.querySelector('input[name="phone"]');
+
+                    if (nameInput) nameInput.value = fullName;
+                    if (emailInput) emailInput.value = this.memberData.email || '';
+                    if (phoneInput) phoneInput.value = this.memberData.phone || '';
+
+                    // Hide the login button section and show success message
+                    const loginSection = document.getElementById('member-login-section') || document.getElementById('member-login-section-participant');
+                    if (loginSection) {
+                        loginSection.innerHTML = `
+                            <div class="flex items-center gap-2 text-green-700">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span>Angemeldet als <strong>${fullName}</strong></span>
+                            </div>
+                        `;
+                        loginSection.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
+                    }
+
+                } catch (error) {
+                    console.error('Fehler beim Laden der Mitgliederdaten:', error);
+                    alert('Fehler beim Laden deiner Daten. Bitte versuche es erneut.');
+                }
             }
 
             async init() {
                 console.log('🔄 Initialisiere Event-System...');
+
+                // Check if returning from login
+                const returnToEvent = sessionStorage.getItem('returnToEvent');
+                const openRegistration = sessionStorage.getItem('openRegistration');
+                if (returnToEvent && openRegistration) {
+                    sessionStorage.removeItem('returnToEvent');
+                    sessionStorage.removeItem('openRegistration');
+                    // Token should be set by auth-callback, refresh it
+                    this.authToken = localStorage.getItem('auth_token');
+                }
+
                 await this.loadEvents();
                 await this.loadArbeitsplanData();
                 this.setupEventListeners();
@@ -219,9 +305,19 @@
                 // Check for event parameter in URL and auto-open modal
                 const urlParams = new URLSearchParams(window.location.search);
                 const eventSlug = urlParams.get('event');
+                const autoFillMember = urlParams.get('autofill') === 'member';
+
                 if (eventSlug) {
                     console.log('🔗 Opening event from URL:', eventSlug);
-                    this.showEventModal(eventSlug);
+                    await this.showEventModal(eventSlug);
+
+                    // If returning from member login, auto-fill the registration form
+                    if (autoFillMember && this.authToken) {
+                        // Small delay to ensure modal is rendered
+                        setTimeout(() => {
+                            this.fillMemberData();
+                        }, 500);
+                    }
                 }
             }
 
@@ -1163,21 +1259,33 @@
 
                 content.innerHTML = `
                     <form id="shift-registration-form" class="space-y-6">
+                        <!-- Member Login Button -->
+                        <div id="member-login-section" class="bg-fire-50 border border-fire-200 rounded-lg p-4">
+                            <p class="text-sm text-fire-800 mb-3">Bist du Mitglied? Melde dich an um deine Daten automatisch auszufüllen:</p>
+                            <button type="button" onclick="eventsManager.fillMemberData()"
+                                    class="w-full bg-fire-600 text-white px-4 py-2 rounded-lg hover:bg-fire-700 transition-colors flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                                Als Mitglied anmelden
+                            </button>
+                        </div>
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                            <input type="text" name="name" required 
+                            <input type="text" name="name" id="reg-name" required
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
-                        
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail *</label>
-                            <input type="email" name="email" required 
+                            <input type="email" name="email" id="reg-email" required
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
-                        
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
-                            <input type="tel" name="phone" 
+                            <input type="tel" name="phone" id="reg-phone"
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
                         
@@ -1264,21 +1372,33 @@
 
                 content.innerHTML = `
                     <form id="participant-registration-form" class="space-y-6">
+                        <!-- Member Login Button -->
+                        <div id="member-login-section-participant" class="bg-fire-50 border border-fire-200 rounded-lg p-4">
+                            <p class="text-sm text-fire-800 mb-3">Bist du Mitglied? Melde dich an um deine Daten automatisch auszufüllen:</p>
+                            <button type="button" onclick="eventsManager.fillMemberData()"
+                                    class="w-full bg-fire-600 text-white px-4 py-2 rounded-lg hover:bg-fire-700 transition-colors flex items-center justify-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                                Als Mitglied anmelden
+                            </button>
+                        </div>
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                            <input type="text" name="name" required 
+                            <input type="text" name="name" id="reg-name" required
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
-                        
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail *</label>
-                            <input type="email" name="email" required 
+                            <input type="email" name="email" id="reg-email" required
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
-                        
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
-                            <input type="tel" name="phone" 
+                            <input type="tel" name="phone" id="reg-phone"
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
                         
@@ -1367,7 +1487,7 @@
 
                     if (response.ok && result.success) {
                         document.getElementById('registration-modal').classList.add('hidden');
-                        this.showSuccessMessage('Vielen Dank für Ihre Anmeldung!\n\nIhre Anmeldung wird vom Vorstand geprüft. Sie erhalten eine Bestätigung per E-Mail.');
+                        this.showSuccessAndRedirect();
                     } else if (response.status === 409 && result.isMember) {
                         // User ist Mitglied - zum Login auffordern
                         this.showMemberLoginPrompt(result.memberName, payload);
@@ -1413,7 +1533,7 @@
 
                     if (response.ok && result.success) {
                         document.getElementById('registration-modal').classList.add('hidden');
-                        this.showSuccessMessage('Vielen Dank für Ihre Anmeldung!\n\nIhre Anmeldung wird vom Vorstand geprüft. Sie erhalten eine Bestätigung per E-Mail.');
+                        this.showSuccessAndRedirect();
                     } else if (response.status === 409 && result.isMember) {
                         // User ist Mitglied - zum Login auffordern
                         this.showMemberLoginPrompt(result.memberName, payload);
@@ -1474,7 +1594,7 @@
 
                     if (response.ok && result.success) {
                         document.getElementById('registration-modal').classList.add('hidden');
-                        this.showSuccessMessage('Vielen Dank für Ihre Anmeldung!\n\nIhre Anmeldung wird vom Vorstand geprüft. Sie erhalten eine Bestätigung per E-Mail.');
+                        this.showSuccessAndRedirect();
                     } else {
                         throw new Error(result.message || 'Unbekannter Fehler');
                     }
@@ -1484,6 +1604,19 @@
                 }
 
                 this.pendingGuestPayload = null;
+            }
+
+            showSuccessAndRedirect() {
+                const message = 'Vielen Dank für deine Anmeldung!\n\nDeine Anmeldung wird vom Vorstand geprüft. Du erhältst eine Bestätigung per E-Mail.';
+
+                if (this.authToken && this.memberData) {
+                    // User is logged in as member - redirect to "Meine Veranstaltungen"
+                    alert(message + '\n\nDu wirst jetzt zu "Meine Veranstaltungen" weitergeleitet...');
+                    window.location.href = '/mein.html#events';
+                } else {
+                    // Guest registration - just show message
+                    alert(message);
+                }
             }
 
             showSuccessMessage(message) {
@@ -1651,6 +1784,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             eventsManager = new EventsManager();
         });
+
     </script>
 </body>
 </html>
