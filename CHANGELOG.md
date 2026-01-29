@@ -1,3 +1,10 @@
+# [1.85.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.84.0...v1.85.0) (2026-01-29)
+
+
+### Features
+
+* **vorstand:** add ability to assign members/guests to shifts ([1cee184](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1cee1844c54e5a1d5648ae0d922c8d85d36cece0))
+
 # [1.84.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.83.0...v1.84.0) (2026-01-29)
 
 
