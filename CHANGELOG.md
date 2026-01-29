@@ -1,3 +1,10 @@
+## [1.88.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.88.0...v1.88.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* resolve TypeScript and yamllint errors across project ([185dac0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/185dac01b220b94521d62030bda48095337970ae))
+
 # [1.88.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.87.0...v1.88.0) (2026-01-29)
 
 
