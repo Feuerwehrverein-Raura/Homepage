@@ -1,3 +1,10 @@
+## [1.99.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.0...v1.99.1) (2026-01-29)
+
+
+### Bug Fixes
+
+* **auth:** add redirect support after vorstand login ([c862dab](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c862dab1b46cc9d27633cb19e39a193c30059d99))
+
 # [1.99.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.98.0...v1.99.0) (2026-01-29)
 
 
