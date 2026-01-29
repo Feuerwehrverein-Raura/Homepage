@@ -762,6 +762,146 @@ app.post('/email/bulk', async (req, res) => {
 });
 
 // ============================================
+// SMART DISPATCH (Auto-select email/brief_ch/brief_de)
+// ============================================
+
+app.post('/dispatch/smart', async (req, res) => {
+    console.log('[SMART DISPATCH] Starting smart dispatch...');
+    try {
+        const { template_group, member_ids, variables = {}, staging = false } = req.body;
+
+        if (!template_group) {
+            return res.status(400).json({ error: 'template_group is required' });
+        }
+
+        // Load all template variants
+        const templatesResult = await pool.query(
+            `SELECT * FROM dispatch_templates WHERE name IN ($1, $2, $3)`,
+            [`${template_group}_email`, `${template_group}_brief_ch`, `${template_group}_brief_de`]
+        );
+        const templates = {};
+        templatesResult.rows.forEach(t => {
+            if (t.name.endsWith('_email')) templates.email = t;
+            else if (t.name.endsWith('_brief_ch')) templates.brief_ch = t;
+            else if (t.name.endsWith('_brief_de')) templates.brief_de = t;
+        });
+
+        console.log('[SMART DISPATCH] Found templates:', Object.keys(templates));
+
+        // Get members
+        const membersResponse = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
+            params: { ids: member_ids.join(',') }
+        });
+        const members = membersResponse.data;
+        console.log('[SMART DISPATCH] Processing', members.length, 'members');
+
+        const results = { email: [], brief_ch: [], brief_de: [], skipped: [] };
+
+        for (const member of members) {
+            const mergedVars = {
+                anrede: member.anrede,
+                vorname: member.vorname,
+                nachname: member.nachname,
+                strasse: member.strasse,
+                plz: member.plz,
+                ort: member.ort,
+                email: member.email,
+                ...variables
+            };
+
+            // Determine delivery method
+            const hasEmail = member.email && member.zustellung_email;
+            const hasPost = member.zustellung_post && member.strasse && member.plz && member.ort;
+
+            // Detect country from PLZ (4 digits = CH, 5 digits = DE)
+            const isDE = member.plz && member.plz.toString().length === 5;
+            const country = isDE ? 'DE' : 'CH';
+
+            try {
+                if (hasEmail && templates.email) {
+                    // Send email
+                    await axios.post(`http://localhost:${PORT}/email/send`, {
+                        to: member.versand_email || member.email,
+                        template_id: templates.email.id,
+                        variables: mergedVars,
+                        member_id: member.id
+                    });
+                    results.email.push({ member_id: member.id, name: `${member.vorname} ${member.nachname}` });
+                } else if (hasPost) {
+                    // Send letter
+                    const template = country === 'DE' ? templates.brief_de : templates.brief_ch;
+                    if (template) {
+                        // Replace variables in template body
+                        let html = template.body;
+                        Object.keys(mergedVars).forEach(key => {
+                            html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), mergedVars[key] || '');
+                        });
+
+                        await axios.post(`http://localhost:${PORT}/pingen/send`, {
+                            html,
+                            recipient: {
+                                name: `${member.vorname} ${member.nachname}`,
+                                street: member.strasse,
+                                zip: member.plz,
+                                city: member.ort,
+                                country
+                            },
+                            member_id: member.id,
+                            staging,
+                            template_id: template.id
+                        });
+                        results[country === 'DE' ? 'brief_de' : 'brief_ch'].push({
+                            member_id: member.id,
+                            name: `${member.vorname} ${member.nachname}`
+                        });
+                    } else {
+                        results.skipped.push({
+                            member_id: member.id,
+                            name: `${member.vorname} ${member.nachname}`,
+                            reason: `Kein Template für ${country}`
+                        });
+                    }
+                } else {
+                    results.skipped.push({
+                        member_id: member.id,
+                        name: `${member.vorname} ${member.nachname}`,
+                        reason: 'Keine gültige Zustellmethode'
+                    });
+                }
+            } catch (err) {
+                console.error('[SMART DISPATCH] Error for member', member.id, err.message);
+                results.skipped.push({
+                    member_id: member.id,
+                    name: `${member.vorname} ${member.nachname}`,
+                    reason: err.message
+                });
+            }
+        }
+
+        console.log('[SMART DISPATCH] Complete:', {
+            email: results.email.length,
+            brief_ch: results.brief_ch.length,
+            brief_de: results.brief_de.length,
+            skipped: results.skipped.length
+        });
+
+        res.json({
+            success: true,
+            summary: {
+                email: results.email.length,
+                brief_ch: results.brief_ch.length,
+                brief_de: results.brief_de.length,
+                skipped: results.skipped.length
+            },
+            details: results
+        });
+    } catch (error) {
+        console.error('[SMART DISPATCH] ERROR:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // PINGEN (Post)
 // ============================================
 
