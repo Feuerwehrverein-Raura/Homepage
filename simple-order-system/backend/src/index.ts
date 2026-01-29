@@ -275,6 +275,8 @@ async function syncFromCloud() {
     const data = await response.json() as { orders?: any[]; timestamp?: string };
 
     const client = await pool.connect();
+    const ordersToPrint: { orderId: number; tableNumber: number; items: any[] }[] = [];
+
     try {
       await client.query('BEGIN');
       let imported = 0;
@@ -290,15 +292,44 @@ async function syncFromCloud() {
 
         const orderResult = await client.query(`
           INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id, synced_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id, table_number, status, total, payment_method, created_at
         `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, order.sync_source || 'cloud', order.id]);
 
+        const insertedOrder = orderResult.rows[0];
+        const insertedItems: any[] = [];
+
         for (const item of (order.items || [])) {
-          await client.query(`
+          const itemResult = await client.query(`
             INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-          `, [orderResult.rows[0].id, item.item_id, item.item_name, item.quantity, item.price, item.notes, item.printer_station]);
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+          `, [insertedOrder.id, item.item_id, item.item_name, item.quantity, item.price, item.notes, item.printer_station]);
+          insertedItems.push(itemResult.rows[0]);
         }
+
+        // Queue for printing and broadcasting if order is pending (open)
+        if (order.status === 'pending') {
+          // Broadcast to kitchen display
+          broadcast({
+            type: 'new_order',
+            order: {
+              id: insertedOrder.id,
+              table_number: insertedOrder.table_number,
+              status: insertedOrder.status,
+              total: insertedOrder.total,
+              payment_method: insertedOrder.payment_method,
+              created_at: insertedOrder.created_at,
+              items: insertedItems
+            }
+          });
+
+          // Queue for printing after transaction commits
+          ordersToPrint.push({
+            orderId: insertedOrder.id,
+            tableNumber: insertedOrder.table_number,
+            items: insertedItems
+          });
+        }
+
         imported++;
       }
 
@@ -308,6 +339,17 @@ async function syncFromCloud() {
       `, [data.timestamp]);
 
       await client.query('COMMIT');
+
+      // Print receipts after successful commit
+      for (const orderToPrint of ordersToPrint) {
+        try {
+          await printReceipt(orderToPrint.orderId, orderToPrint.tableNumber, orderToPrint.items);
+          console.log(`Printed synced order #${orderToPrint.orderId} from cloud`);
+        } catch (printError) {
+          console.error(`Failed to print synced order #${orderToPrint.orderId}:`, printError);
+        }
+      }
+
       if (imported > 0) console.log(`Imported ${imported} orders from cloud`);
     } catch (e) {
       await client.query('ROLLBACK');
@@ -324,6 +366,44 @@ async function syncFromCloud() {
 if (CLOUD_SYNC_ENABLED) {
   setInterval(() => { syncToCloud(); syncFromCloud(); }, 30000);
 }
+
+// Auto-cancel orders older than 2 hours
+const ORDER_AUTO_CANCEL_HOURS = parseInt(process.env.ORDER_AUTO_CANCEL_HOURS || '2');
+const ORDER_AUTO_CANCEL_MS = ORDER_AUTO_CANCEL_HOURS * 60 * 60 * 1000;
+
+async function autoCancelOldOrders() {
+  try {
+    const cutoffTime = new Date(Date.now() - ORDER_AUTO_CANCEL_MS).toISOString();
+
+    // Find and cancel old pending orders
+    const result = await pool.query(`
+      UPDATE orders
+      SET status = 'cancelled'
+      WHERE status = 'pending'
+        AND created_at < $1
+      RETURNING id, table_number
+    `, [cutoffTime]);
+
+    if (result.rows.length > 0) {
+      console.log(`Auto-cancelled ${result.rows.length} orders older than ${ORDER_AUTO_CANCEL_HOURS}h:`,
+        result.rows.map(r => `#${r.id}`).join(', '));
+
+      // Broadcast cancellations to kitchen display
+      for (const order of result.rows) {
+        broadcast({ type: 'order_completed', order_id: order.id });
+        // Queue for cloud sync
+        queueOrderSync(order.id, 'update');
+      }
+    }
+  } catch (error) {
+    console.error('Auto-cancel error:', error);
+  }
+}
+
+// Run auto-cancel check every 5 minutes
+setInterval(autoCancelOldOrders, 5 * 60 * 1000);
+// Also run once at startup (after 30 seconds to let DB initialize)
+setTimeout(autoCancelOldOrders, 30000);
 
 // Inventory API integration
 const INVENTORY_API_URL = process.env.INVENTORY_API_URL || 'http://inventory-backend:3000';
