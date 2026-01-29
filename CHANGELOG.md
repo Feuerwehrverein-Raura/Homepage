@@ -1,3 +1,10 @@
+# [1.94.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.93.0...v1.94.0) (2026-01-29)
+
+
+### Features
+
+* **templates:** add text blocks and logo integration ([4929af5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4929af55de7565bfda795c95e989688f09f2e915))
+
 # [1.93.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.92.0...v1.93.0) (2026-01-29)
 
 
