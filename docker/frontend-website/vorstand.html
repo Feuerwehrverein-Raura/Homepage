@@ -1928,6 +1928,61 @@
         </div>
     </div>
 
+    <!-- Add Person to Shift Modal -->
+    <div id="add-person-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-800">Person hinzufuegen</h3>
+                    <button onclick="closeAddPersonModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div class="mb-4 text-sm text-gray-600" id="add-person-shift-info"></div>
+                <div class="space-y-4">
+                    <!-- Toggle between Member and Guest -->
+                    <div class="flex border rounded-lg overflow-hidden">
+                        <button id="add-person-tab-member" onclick="switchAddPersonTab('member')" class="flex-1 py-2 px-4 bg-fire-500 text-white font-medium">Mitglied</button>
+                        <button id="add-person-tab-guest" onclick="switchAddPersonTab('guest')" class="flex-1 py-2 px-4 bg-gray-100 text-gray-700 font-medium">Gast</button>
+                    </div>
+
+                    <!-- Member Selection -->
+                    <div id="add-person-member-section">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Mitglied auswaehlen *</label>
+                        <select id="add-person-member" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <option value="">Bitte waehlen...</option>
+                        </select>
+                    </div>
+
+                    <!-- Guest Input -->
+                    <div id="add-person-guest-section" class="hidden space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
+                            <input type="text" id="add-person-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail</label>
+                            <input type="email" id="add-person-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
+                            <input type="text" id="add-person-phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-3 pt-4">
+                        <button onclick="saveAddPerson()" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+                            Hinzufuegen
+                        </button>
+                        <button onclick="closeAddPersonModal()" class="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors">
+                            Abbrechen
+                        </button>
+                    </div>
+                </div>
+                <input type="hidden" id="add-person-shift-id">
+                <input type="hidden" id="add-person-mode" value="member">
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = 'https://api.fwv-raura.ch';
         const DISPATCH_API = 'https://api.fwv-raura.ch';
@@ -3165,13 +3220,27 @@ ${grussformel}`;
                 const approved = regs.approved || [];
                 const all = [...pending.map(r => ({...r, status: 'pending'})), ...approved.map(r => ({...r, status: 'approved'}))];
 
-                if (all.length === 0) continue;
+                const shiftDisplayName = `${shift.bereich || ''} - ${shift.name}: ${shift.date} ${shift.start_time}-${shift.end_time}`;
 
                 html += `
                     <div class="border rounded-lg p-4">
-                        <h4 class="font-semibold text-gray-800 mb-3">
-                            ${shift.bereich || ''} - ${shift.name}: ${shift.date} ${shift.start_time}-${shift.end_time}
-                        </h4>
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-semibold text-gray-800">
+                                ${shiftDisplayName}
+                            </h4>
+                            <button onclick="openAddPersonModal('${shift.id}', '${shiftDisplayName.replace(/'/g, "\\'")}')" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                                </svg>
+                                Person
+                            </button>
+                        </div>
+                `;
+
+                if (all.length === 0) {
+                    html += `<p class="text-gray-400 text-sm italic">Keine Anmeldungen</p>`;
+                } else {
+                    html += `
                         <table class="min-w-full">
                             <thead class="bg-gray-50">
                                 <tr>
@@ -3181,7 +3250,7 @@ ${grussformel}`;
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200">
-                `;
+                    `;
 
                 for (const reg of all) {
                     const statusBadge = reg.status === 'approved'
@@ -3210,13 +3279,15 @@ ${grussformel}`;
                             <td class="px-4 py-2 text-right text-sm">${actions}</td>
                         </tr>
                     `;
+                    }
+
+                    html += `
+                                </tbody>
+                            </table>
+                    `;
                 }
 
-                html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
+                html += `</div>`;
             }
 
             // Direkte Teilnehmer-Registrierungen (ohne Schichten)
@@ -3382,6 +3453,121 @@ ${grussformel}`;
                 if (!response.ok) throw new Error('Fehler beim Speichern');
 
                 closeEditRegistrationModal();
+                await loadEvents();
+                currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
+                renderEventRegistrations();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        // ============================================
+        // ADD PERSON TO SHIFT
+        // ============================================
+
+        function openAddPersonModal(shiftId, shiftDisplayName) {
+            document.getElementById('add-person-shift-id').value = shiftId;
+            document.getElementById('add-person-shift-info').textContent = `Schicht: ${shiftDisplayName}`;
+            document.getElementById('add-person-mode').value = 'member';
+            document.getElementById('add-person-name').value = '';
+            document.getElementById('add-person-email').value = '';
+            document.getElementById('add-person-phone').value = '';
+            document.getElementById('add-person-member').value = '';
+
+            // Populate member dropdown
+            const select = document.getElementById('add-person-member');
+            select.innerHTML = '<option value="">Bitte waehlen...</option>';
+            const sortedMembers = [...members].sort((a, b) =>
+                `${a.nachname} ${a.vorname}`.localeCompare(`${b.nachname} ${b.vorname}`)
+            );
+            for (const member of sortedMembers) {
+                const option = document.createElement('option');
+                option.value = member.id;
+                option.textContent = `${member.nachname}, ${member.vorname}`;
+                option.dataset.email = member.email || '';
+                select.appendChild(option);
+            }
+
+            switchAddPersonTab('member');
+            document.getElementById('add-person-modal').classList.remove('hidden');
+        }
+
+        function closeAddPersonModal() {
+            document.getElementById('add-person-modal').classList.add('hidden');
+        }
+
+        function switchAddPersonTab(mode) {
+            document.getElementById('add-person-mode').value = mode;
+            if (mode === 'member') {
+                document.getElementById('add-person-tab-member').classList.add('bg-fire-500', 'text-white');
+                document.getElementById('add-person-tab-member').classList.remove('bg-gray-100', 'text-gray-700');
+                document.getElementById('add-person-tab-guest').classList.remove('bg-fire-500', 'text-white');
+                document.getElementById('add-person-tab-guest').classList.add('bg-gray-100', 'text-gray-700');
+                document.getElementById('add-person-member-section').classList.remove('hidden');
+                document.getElementById('add-person-guest-section').classList.add('hidden');
+            } else {
+                document.getElementById('add-person-tab-guest').classList.add('bg-fire-500', 'text-white');
+                document.getElementById('add-person-tab-guest').classList.remove('bg-gray-100', 'text-gray-700');
+                document.getElementById('add-person-tab-member').classList.remove('bg-fire-500', 'text-white');
+                document.getElementById('add-person-tab-member').classList.add('bg-gray-100', 'text-gray-700');
+                document.getElementById('add-person-guest-section').classList.remove('hidden');
+                document.getElementById('add-person-member-section').classList.add('hidden');
+            }
+        }
+
+        async function saveAddPerson() {
+            const shiftId = document.getElementById('add-person-shift-id').value;
+            const mode = document.getElementById('add-person-mode').value;
+            const event = currentEventForRegistrations;
+
+            if (!event || !shiftId) {
+                alert('Fehler: Event oder Schicht nicht gefunden');
+                return;
+            }
+
+            let payload = {
+                event_id: event.id,
+                shift_ids: [shiftId],
+                status: 'approved'
+            };
+
+            if (mode === 'member') {
+                const memberId = document.getElementById('add-person-member').value;
+                if (!memberId) {
+                    alert('Bitte ein Mitglied auswaehlen');
+                    return;
+                }
+                const memberOption = document.getElementById('add-person-member').selectedOptions[0];
+                payload.member_id = memberId;
+                payload.guest_name = memberOption.textContent;
+                payload.guest_email = memberOption.dataset.email || '';
+            } else {
+                const name = document.getElementById('add-person-name').value.trim();
+                const email = document.getElementById('add-person-email').value.trim();
+                const phone = document.getElementById('add-person-phone').value.trim();
+
+                if (!name) {
+                    alert('Bitte einen Namen eingeben');
+                    return;
+                }
+                payload.guest_name = name;
+                payload.guest_email = email;
+                payload.notes = JSON.stringify({ phone });
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/registrations`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error('Fehler beim Hinzufuegen');
+
+                closeAddPersonModal();
                 await loadEvents();
                 currentEventForRegistrations = events.find(e => e.id === currentEventForRegistrations.id);
                 renderEventRegistrations();
