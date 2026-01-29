@@ -1,3 +1,10 @@
+# [1.83.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.3...v1.83.0) (2026-01-29)
+
+
+### Features
+
+* **vorstand:** add edit registration and new shift functionality ([8bdd7e6](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8bdd7e60b399d17fc044f048b5b10ba9b0784036))
+
 ## [1.82.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.82.2...v1.82.3) (2026-01-29)
 
 
