@@ -1,3 +1,10 @@
+# [1.107.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.106.0...v1.107.0) (2026-01-30)
+
+
+### Features
+
+* **inventory:** add multi-box storage with Kisten tab ([838ad8f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/838ad8f03991adadf41eef239d5750d6976819b6))
+
 # [1.106.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.105.0...v1.106.0) (2026-01-30)
 
 
