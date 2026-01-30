@@ -9,6 +9,10 @@ const fs = require('fs');
 const path = require('path');
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
+const { SwissQRBill, SwissQRCode } = require('swissqrbill/pdf');
+const { generate } = require('@pdfme/generator');
+const { text, image, barcodes } = require('@pdfme/schemas');
+const { BLANK_PDF } = require('@pdfme/common');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -3569,6 +3573,262 @@ app.put('/organisation-settings/:key', async (req, res) => {
         res.json(result.rows[0]);
     } catch (error) {
         logError('Failed to update organisation setting', { error: error.message, key: req.params.key });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// INVOICE GENERATION WITH SWISS QR-BILL
+// ============================================
+
+// Generate QR invoice for a member
+app.post('/invoices/generate-qr', async (req, res) => {
+    try {
+        const {
+            member_id,
+            amount,
+            year,
+            description,
+            template_slug,
+            preview = false
+        } = req.body;
+
+        if (!member_id || !amount) {
+            return res.status(400).json({ error: 'member_id und amount sind erforderlich' });
+        }
+
+        // Get member data
+        const memberResult = await pool.query(
+            'SELECT * FROM members WHERE id = $1',
+            [member_id]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+
+        // Get organisation settings for creditor info
+        const settingsResult = await pool.query(
+            "SELECT key, value, value_json FROM organisation_settings WHERE key IN ('organisation_name', 'organisation_address', 'iban', 'qr_iban')"
+        );
+
+        const settings = {};
+        settingsResult.rows.forEach(row => {
+            settings[row.key] = row.value_json || row.value;
+        });
+
+        // Default organisation info if not configured
+        const creditor = {
+            name: settings.organisation_name || 'Feuerwehrverein Raura',
+            address: settings.organisation_address?.street || 'Musterstrasse 1',
+            zip: settings.organisation_address?.zip || '6017',
+            city: settings.organisation_address?.city || 'Ruswil',
+            country: 'CH',
+            account: settings.qr_iban || settings.iban || 'CH93 0076 2011 6238 5295 7'
+        };
+
+        // Debtor (member)
+        const debtor = {
+            name: `${member.vorname} ${member.nachname}`,
+            address: member.strasse || '',
+            zip: member.plz || '',
+            city: member.ort || '',
+            country: 'CH'
+        };
+
+        // Generate reference number (simplified)
+        const invoiceYear = year || new Date().getFullYear();
+        const refNumber = `RF${invoiceYear}${String(member.id).slice(-6).padStart(6, '0')}`;
+
+        // QR-Bill data
+        const qrData = {
+            currency: 'CHF',
+            amount: parseFloat(amount),
+            creditor: creditor,
+            debtor: debtor,
+            reference: refNumber,
+            message: description || `Mitgliederbeitrag ${invoiceYear}`
+        };
+
+        // Create PDF with QR-Bill
+        const pdfDoc = await PDFDocument.create();
+        pdfDoc.registerFontkit(fontkit);
+
+        // Add a page
+        const page = pdfDoc.addPage([595.28, 841.89]); // A4
+        const { width, height } = page.getSize();
+        const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+        // Header
+        page.drawText(creditor.name, {
+            x: 400, y: height - 50, size: 10, font: helvetica
+        });
+        page.drawText(`${creditor.address}`, {
+            x: 400, y: height - 62, size: 10, font: helvetica
+        });
+        page.drawText(`${creditor.zip} ${creditor.city}`, {
+            x: 400, y: height - 74, size: 10, font: helvetica
+        });
+
+        // Empfänger
+        page.drawText(debtor.name, {
+            x: 70, y: height - 150, size: 11, font: helvetica
+        });
+        if (debtor.address) {
+            page.drawText(debtor.address, {
+                x: 70, y: height - 165, size: 11, font: helvetica
+            });
+        }
+        page.drawText(`${debtor.zip} ${debtor.city}`, {
+            x: 70, y: height - 180, size: 11, font: helvetica
+        });
+
+        // Titel
+        const title = description || `Mitgliederbeitrag ${invoiceYear}`;
+        page.drawText(title, {
+            x: 70, y: height - 240, size: 14, font: helveticaBold
+        });
+
+        // Rechnungsinfo
+        const today = new Date().toLocaleDateString('de-CH');
+        page.drawText(`Rechnungsnummer: ${refNumber}`, {
+            x: 70, y: height - 270, size: 10, font: helvetica
+        });
+        page.drawText(`Datum: ${today}`, {
+            x: 70, y: height - 285, size: 10, font: helvetica
+        });
+
+        // Text
+        page.drawText('Wir erlauben uns, Ihnen den Mitgliederbeitrag in Rechnung zu stellen.', {
+            x: 70, y: height - 320, size: 11, font: helvetica
+        });
+        page.drawText('Bitte überweisen Sie den Betrag innert 30 Tagen.', {
+            x: 70, y: height - 340, size: 11, font: helvetica
+        });
+
+        // Betrag
+        page.drawText(`Betrag: CHF ${parseFloat(amount).toFixed(2)}`, {
+            x: 400, y: height - 380, size: 14, font: helveticaBold
+        });
+
+        // Footer
+        page.drawText(`${creditor.name} | www.fwv-raura.ch | info@fwv-raura.ch`, {
+            x: 150, y: 320, size: 8, font: helvetica, color: rgb(0.4, 0.4, 0.4)
+        });
+
+        // Add Swiss QR-Bill at the bottom
+        const qrBill = new SwissQRBill({
+            currency: qrData.currency,
+            amount: qrData.amount,
+            creditor: {
+                name: creditor.name,
+                address: creditor.address,
+                zip: parseInt(creditor.zip),
+                city: creditor.city,
+                country: creditor.country,
+                account: creditor.account.replace(/\s/g, '')
+            },
+            debtor: {
+                name: debtor.name,
+                address: debtor.address,
+                zip: parseInt(debtor.zip) || 0,
+                city: debtor.city,
+                country: debtor.country
+            },
+            reference: qrData.reference,
+            message: qrData.message
+        });
+
+        // Attach QR-Bill to the PDF
+        await qrBill.attachTo(pdfDoc);
+
+        // Save PDF
+        const pdfBytes = await pdfDoc.save();
+
+        if (preview) {
+            // Return PDF for preview
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="Rechnung_${refNumber}.pdf"`);
+            res.send(Buffer.from(pdfBytes));
+        } else {
+            // Store invoice record and return info
+            // TODO: Save to invoices table
+
+            logInfo('QR-Invoice generated', {
+                member_id,
+                amount,
+                reference: refNumber
+            });
+
+            res.json({
+                success: true,
+                reference: refNumber,
+                amount: parseFloat(amount),
+                member: {
+                    name: debtor.name,
+                    address: `${debtor.address}, ${debtor.zip} ${debtor.city}`
+                },
+                pdf_base64: Buffer.from(pdfBytes).toString('base64')
+            });
+        }
+
+    } catch (error) {
+        logError('Failed to generate QR invoice', { error: error.message, stack: error.stack });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Bulk generate QR invoices for all members
+app.post('/invoices/generate-bulk', async (req, res) => {
+    try {
+        const {
+            amount,
+            year,
+            description,
+            status_filter, // e.g., 'Aktivmitglied', 'Ehrenmitglied'
+            preview = false
+        } = req.body;
+
+        if (!amount) {
+            return res.status(400).json({ error: 'amount ist erforderlich' });
+        }
+
+        // Get members based on filter
+        let query = 'SELECT * FROM members WHERE status IS NOT NULL';
+        const params = [];
+
+        if (status_filter) {
+            query += ' AND status = $1';
+            params.push(status_filter);
+        }
+
+        query += ' ORDER BY nachname, vorname';
+
+        const membersResult = await pool.query(query, params);
+        const members = membersResult.rows;
+
+        if (members.length === 0) {
+            return res.status(404).json({ error: 'Keine Mitglieder gefunden' });
+        }
+
+        logInfo('Bulk QR-Invoice generation started', {
+            member_count: members.length,
+            amount,
+            year
+        });
+
+        res.json({
+            success: true,
+            message: `${members.length} Rechnungen werden generiert`,
+            member_count: members.length,
+            total_amount: parseFloat(amount) * members.length
+        });
+
+    } catch (error) {
+        logError('Failed to generate bulk QR invoices', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });

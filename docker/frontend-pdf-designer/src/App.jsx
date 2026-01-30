@@ -184,8 +184,135 @@ const getInvoiceTemplate = () => ({
   ],
 })
 
+// Layout-Template für dynamische PDFs (Telefonliste, Arbeitsplan, etc.)
+const getLayoutTemplate = () => ({
+  basePdf: BLANK_PDF,
+  schemas: [
+    {
+      // === HEADER ZONE ===
+      // Logo oben links
+      logo: {
+        type: 'image',
+        position: { x: 20, y: 10 },
+        width: 30,
+        height: 15,
+      },
+      // Organisation oben rechts
+      organisation: {
+        type: 'text',
+        position: { x: 130, y: 10 },
+        width: 60,
+        height: 20,
+        fontSize: 9,
+        alignment: 'right',
+        lineHeight: 1.2,
+      },
+      // Dokumenttitel
+      titel: {
+        type: 'text',
+        position: { x: 20, y: 35 },
+        width: 170,
+        height: 12,
+        fontSize: 16,
+        fontWeight: 'bold',
+      },
+      // Untertitel/Datum
+      untertitel: {
+        type: 'text',
+        position: { x: 20, y: 48 },
+        width: 170,
+        height: 8,
+        fontSize: 10,
+        fontColor: '#666666',
+      },
+      // Header-Linie (als dünnes Rechteck dargestellt)
+      header_linie: {
+        type: 'text',
+        position: { x: 20, y: 58 },
+        width: 170,
+        height: 1,
+        backgroundColor: '#cc0000',
+      },
+
+      // === CONTENT ZONE MARKER ===
+      // Diese Felder markieren wo der dynamische Inhalt beginnt/endet
+      // Sie werden im finalen PDF nicht gerendert, nur als Referenz
+      content_start_y: {
+        type: 'text',
+        position: { x: 20, y: 65 },
+        width: 5,
+        height: 5,
+        fontSize: 6,
+        fontColor: '#cccccc',
+      },
+      content_end_y: {
+        type: 'text',
+        position: { x: 20, y: 270 },
+        width: 5,
+        height: 5,
+        fontSize: 6,
+        fontColor: '#cccccc',
+      },
+
+      // === FOOTER ZONE ===
+      // Trennlinie Footer
+      footer_linie: {
+        type: 'text',
+        position: { x: 20, y: 275 },
+        width: 170,
+        height: 1,
+        backgroundColor: '#cc0000',
+      },
+      // Fusszeile
+      fusszeile: {
+        type: 'text',
+        position: { x: 20, y: 280 },
+        width: 130,
+        height: 8,
+        fontSize: 7,
+        fontColor: '#666666',
+      },
+      // Seitenzahl
+      seitenzahl: {
+        type: 'text',
+        position: { x: 170, y: 280 },
+        width: 20,
+        height: 8,
+        fontSize: 7,
+        alignment: 'right',
+        fontColor: '#666666',
+      },
+    },
+  ],
+  // Zusätzliche Layout-Einstellungen (werden im Backend ausgewertet)
+  layoutSettings: {
+    headerHeight: 60,      // mm - Höhe des Header-Bereichs
+    footerHeight: 22,      // mm - Höhe des Footer-Bereichs
+    contentMarginLeft: 20, // mm
+    contentMarginRight: 20,// mm
+    primaryColor: '#cc0000',
+    fontFamily: 'Helvetica',
+    tableFontSize: 9,
+    tableHeaderBold: true,
+  },
+})
+
 // Sample inputs for preview
 const getSampleInputs = (category) => {
+  if (category === 'layout') {
+    return [{
+      logo: '',
+      organisation: 'Feuerwehrverein Raura\n6017 Ruswil',
+      titel: 'Beispiel-Dokument',
+      untertitel: `Stand: ${new Date().toLocaleDateString('de-CH')}`,
+      header_linie: '',
+      content_start_y: '▼',
+      content_end_y: '▲',
+      footer_linie: '',
+      fusszeile: 'Feuerwehrverein Raura | www.fwv-raura.ch',
+      seitenzahl: 'Seite 1',
+    }]
+  }
   if (category === 'rechnung') {
     return [{
       logo: '',
@@ -337,7 +464,17 @@ function App() {
     setTemplateName('')
     setTemplateCategory(category)
 
-    const template = category === 'rechnung' ? getInvoiceTemplate() : getDefaultTemplate()
+    let template
+    switch (category) {
+      case 'rechnung':
+        template = getInvoiceTemplate()
+        break
+      case 'layout':
+        template = getLayoutTemplate()
+        break
+      default:
+        template = getDefaultTemplate()
+    }
 
     if (designerInstance.current) {
       try {
@@ -550,6 +687,7 @@ function App() {
               >
                 <option value="brief">Brief</option>
                 <option value="rechnung">Rechnung (QR)</option>
+                <option value="layout">Layout (für Listen)</option>
               </select>
             </div>
             <div className="flex gap-2">
@@ -660,6 +798,32 @@ function App() {
                 </div>
                 <p className="mt-2 text-gray-400">
                   QR-Code wird automatisch mit swissqrbill generiert.
+                </p>
+              </div>
+            )}
+
+            {templateCategory === 'layout' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="font-semibold text-gray-600 mb-1">Header:</div>
+                <div className="grid grid-cols-2 gap-1 mb-2">
+                  <span>logo</span>
+                  <span>organisation</span>
+                  <span>titel</span>
+                  <span>untertitel</span>
+                </div>
+                <div className="font-semibold text-gray-600 mb-1">Footer:</div>
+                <div className="grid grid-cols-2 gap-1 mb-2">
+                  <span>fusszeile</span>
+                  <span>seitenzahl</span>
+                </div>
+                <div className="font-semibold text-gray-600 mb-1">Content-Zone:</div>
+                <div className="grid grid-cols-2 gap-1">
+                  <span>content_start_y</span>
+                  <span>content_end_y</span>
+                </div>
+                <p className="mt-2 text-gray-400">
+                  Dieses Layout wird für Telefonliste, Arbeitsplan, etc. verwendet.
+                  Der Bereich zwischen den Markern wird mit dynamischen Daten gefüllt.
                 </p>
               </div>
             )}
