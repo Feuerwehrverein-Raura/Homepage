@@ -5,20 +5,18 @@ import { text, image, barcodes } from '@pdfme/schemas'
 
 const API_BASE = 'https://api.fwv-raura.ch'
 
-// Default A4 Template
+// Default A4 Template (pdfme v4 format: schemas is array of objects per page)
 const getDefaultTemplate = () => ({
   basePdf: { width: 210, height: 297, padding: [20, 20, 20, 20] },
   schemas: [
-    [
-      {
-        name: 'logo',
+    {
+      logo: {
         type: 'image',
         position: { x: 20, y: 15 },
         width: 40,
         height: 20,
       },
-      {
-        name: 'organisation',
+      organisation: {
         type: 'text',
         position: { x: 140, y: 15 },
         width: 50,
@@ -26,8 +24,7 @@ const getDefaultTemplate = () => ({
         fontSize: 10,
         alignment: 'right',
       },
-      {
-        name: 'titel',
+      titel: {
         type: 'text',
         position: { x: 20, y: 50 },
         width: 170,
@@ -35,16 +32,14 @@ const getDefaultTemplate = () => ({
         fontSize: 18,
         fontWeight: 'bold',
       },
-      {
-        name: 'inhalt',
+      inhalt: {
         type: 'text',
         position: { x: 20, y: 70 },
         width: 170,
         height: 180,
         fontSize: 11,
       },
-      {
-        name: 'fusszeile',
+      fusszeile: {
         type: 'text',
         position: { x: 20, y: 280 },
         width: 170,
@@ -52,7 +47,7 @@ const getDefaultTemplate = () => ({
         fontSize: 8,
         alignment: 'center',
       },
-    ],
+    },
   ],
 })
 

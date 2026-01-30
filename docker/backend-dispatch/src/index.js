@@ -533,9 +533,17 @@ async function uploadToNextcloud(filename, buffer, subfolder = '') {
     }
 }
 
-// CORS vor Helmet konfigurieren
+// CORS vor Helmet konfigurieren - allow all fwv-raura.ch subdomains
 app.use(cors({
-    origin: ['https://fwv-raura.ch', 'https://www.fwv-raura.ch', 'http://localhost:3000', 'http://localhost:5173'],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+        // Allow all fwv-raura.ch subdomains and localhost for dev
+        const allowed = /^https:\/\/([a-z0-9-]+\.)?fwv-raura\.ch$/.test(origin) ||
+                        origin === 'http://localhost:3000' ||
+                        origin === 'http://localhost:5173';
+        callback(null, allowed);
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true
