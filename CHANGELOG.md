@@ -1,3 +1,10 @@
+# [1.103.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.102.0...v1.103.0) (2026-01-30)
+
+
+### Features
+
+* **pwa:** add fullscreen PWA support and wake lock for order system ([6ed1505](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6ed150530824c38ed1e626c41b2f726501d30dab))
+
 # [1.102.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.101.1...v1.102.0) (2026-01-30)
 
 
