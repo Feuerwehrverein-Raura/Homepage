@@ -15,6 +15,30 @@ registerSW({
   },
 });
 
+// Keep screen awake using Wake Lock API
+let wakeLock: WakeLockSentinel | null = null;
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock active - screen will stay on');
+    }
+  } catch (err) {
+    console.log('Wake Lock not available:', err);
+  }
+}
+
+// Re-request wake lock when tab becomes visible again
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && !wakeLock) {
+    await requestWakeLock();
+  }
+});
+
+// Request wake lock on load
+requestWakeLock();
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
