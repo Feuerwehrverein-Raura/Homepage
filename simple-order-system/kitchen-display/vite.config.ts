@@ -14,7 +14,7 @@ export default defineConfig({
         description: 'Küchen-Display für das FWV Raura Bestellsystem',
         theme_color: '#111827',
         background_color: '#111827',
-        display: 'standalone',
+        display: 'fullscreen',
         orientation: 'landscape',
         start_url: '/',
         icons: [
