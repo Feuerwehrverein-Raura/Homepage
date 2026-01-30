@@ -1,3 +1,10 @@
+# [1.102.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.101.1...v1.102.0) (2026-01-30)
+
+
+### Features
+
+* **pwa:** set display to fullscreen for all PWAs ([cfa4bc5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cfa4bc5e77b2f93a931401b4933814b0b0f5014f))
+
 ## [1.101.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.101.0...v1.101.1) (2026-01-30)
 
 
