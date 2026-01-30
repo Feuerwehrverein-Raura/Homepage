@@ -2751,7 +2751,8 @@
                 const response = await fetch(`${API_BASE}/auth/vorstand/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+                    body: JSON.stringify({ email, password }),
+                    credentials: 'include' // Required for cross-origin cookies
                 });
 
                 const data = await response.json();

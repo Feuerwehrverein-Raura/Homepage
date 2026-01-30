@@ -112,7 +112,15 @@ const pool = new Pool({
 
 // Middleware - CORS must be before helmet
 const corsOptions = {
-    origin: ['https://fwv-raura.ch', 'https://www.fwv-raura.ch', 'http://localhost:3000', 'http://localhost:8080'],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+        // Allow all fwv-raura.ch subdomains and localhost for dev
+        const allowed = /^https:\/\/([a-z0-9-]+\.)?fwv-raura\.ch$/.test(origin) ||
+                        origin === 'http://localhost:3000' ||
+                        origin === 'http://localhost:8080';
+        callback(null, allowed);
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     credentials: true,
