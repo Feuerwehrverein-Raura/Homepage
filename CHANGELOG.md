@@ -1,3 +1,10 @@
+# [1.104.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.103.0...v1.104.0) (2026-01-30)
+
+
+### Features
+
+* **inventory:** add vite-plugin-pwa for proper PWA with auto-update ([cf0966c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cf0966c66eef894d899716b8f7c55e992b9bf209))
+
 # [1.103.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.102.0...v1.103.0) (2026-01-30)
 
 
