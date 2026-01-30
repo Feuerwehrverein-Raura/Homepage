@@ -1,3 +1,10 @@
+## [1.99.7](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.6...v1.99.7) (2026-01-30)
+
+
+### Bug Fixes
+
+* **pdf-designer:** remove inputs from Designer constructor (pdfme v4) ([91aece8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/91aece80d1299cb4551b4713798da3c7cf70ae74))
+
 ## [1.99.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.5...v1.99.6) (2026-01-30)
 
 
