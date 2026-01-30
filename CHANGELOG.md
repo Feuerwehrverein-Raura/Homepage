@@ -1,3 +1,10 @@
+## [1.99.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.1...v1.99.2) (2026-01-30)
+
+
+### Bug Fixes
+
+* **auth:** handle redirect parameter on page load ([7b6a888](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7b6a888f1ce761f72ad3e8429cc90530718dbd0a))
+
 ## [1.99.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.0...v1.99.1) (2026-01-29)
 
 
