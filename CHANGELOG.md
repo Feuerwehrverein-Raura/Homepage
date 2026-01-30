@@ -1,3 +1,10 @@
+## [1.108.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.1...v1.108.2) (2026-01-30)
+
+
+### Bug Fixes
+
+* **events:** use inline onclick for arbeitsplan buttons ([a773462](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a77346258955412aa0ede8f7d505bd10bd6b6323))
+
 ## [1.108.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.0...v1.108.1) (2026-01-30)
 
 
