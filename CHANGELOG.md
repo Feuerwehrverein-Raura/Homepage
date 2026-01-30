@@ -1,3 +1,11 @@
+## [1.108.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.3...v1.108.4) (2026-01-30)
+
+
+### Bug Fixes
+
+* **events:** fix async/await issues and initialize pendingGuestPayload ([cd69cc3](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cd69cc3454988adec35bf9b250a3179e3b00e270))
+* **mein:** fix copyToClipboard event context issue ([e048be7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e048be7ba24a3693b53f46082180d4a74de2f8f4))
+
 ## [1.108.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.2...v1.108.3) (2026-01-30)
 
 
