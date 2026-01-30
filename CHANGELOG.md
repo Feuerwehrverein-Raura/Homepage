@@ -1,3 +1,12 @@
+# [1.100.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.7...v1.100.0) (2026-01-30)
+
+
+### Features
+
+* add layout templates and QR invoice generation ([94c1c98](https://github.com/Feuerwehrverein-Raura/Homepage/commit/94c1c9844634865e9b32ad1e73c5b0a7bac98dfe))
+* **api:** add endpoint to get active layout template ([bc8d18f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/bc8d18f6a693d605dcae28dbc9a810943ad7cbd2))
+* **pdf-designer:** complete pdfme v4 rewrite ([663a3cb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/663a3cb9c3f93dc0c87b920b79354b4cb3e0e0e8))
+
 ## [1.99.7](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.6...v1.99.7) (2026-01-30)
 
 
