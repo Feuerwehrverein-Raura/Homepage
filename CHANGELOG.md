@@ -1,3 +1,10 @@
+## [1.101.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.101.0...v1.101.1) (2026-01-30)
+
+
+### Bug Fixes
+
+* **kitchen-display:** add PWA manifest link and service worker registration ([072b4d8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/072b4d866e21816fce6442d4d6b3a347c779b2f8))
+
 # [1.101.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.100.0...v1.101.0) (2026-01-30)
 
 
