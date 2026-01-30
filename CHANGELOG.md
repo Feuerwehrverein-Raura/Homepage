@@ -1,3 +1,10 @@
+## [1.108.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.2...v1.108.3) (2026-01-30)
+
+
+### Bug Fixes
+
+* **calendar:** fix this-context issues in onclick handlers ([c8ddb6e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c8ddb6ef08360ddffdbb67950bd0f1eac7288408))
+
 ## [1.108.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.1...v1.108.2) (2026-01-30)
 
 
