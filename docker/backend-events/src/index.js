@@ -2036,6 +2036,11 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
 
                             doc.fontSize(9).font('Helvetica')
                                 .text(`      ${bereich} [${countStr}]: ${helperList}`);
+                        } else {
+                            // No shift exists for this time/bereich - show as blocked
+                            doc.fontSize(9).font('Helvetica').fillColor('#666666')
+                                .text(`      ${bereich}: ▬▬▬`)
+                                .fillColor('#000000');
                         }
                     });
                     doc.moveDown(0.3);
@@ -2197,6 +2202,11 @@ app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
                         const helperList = data.helpers.length > 0 ? data.helpers.join(', ') : '(noch offen)';
                         const countStr = `${data.helpers.length}/${data.needed}`;
                         doc.fontSize(9).font('Helvetica').text(`      ${bereich} [${countStr}]: ${helperList}`);
+                    } else {
+                        // No shift exists for this time/bereich - show as blocked
+                        doc.fontSize(9).font('Helvetica').fillColor('#666666')
+                            .text(`      ${bereich}: ▬▬▬`)
+                            .fillColor('#000000');
                     }
                 });
                 doc.moveDown(0.3);
