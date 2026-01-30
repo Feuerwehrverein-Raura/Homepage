@@ -100,21 +100,22 @@ function App() {
     }
     if (token) {
       // Verify token and check permissions
-      fetch(`${API_BASE}/auth/verify`, {
+      fetch(`${API_BASE}/auth/vorstand/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error('Not authenticated')
+          return res.json()
+        })
         .then((data) => {
-          if (data.valid) {
-            // Check if user has access (Vorstand or Social Media function)
-            const hasAccess =
-              data.roles?.includes('admin') ||
-              data.roles?.includes('vorstand') ||
-              data.funktion?.toLowerCase().includes('social media')
-            if (hasAccess) {
-              setIsAuthenticated(true)
-              setUser(data)
-            }
+          // Check if user has access (Vorstand or Social Media function)
+          const hasAccess =
+            data.role === 'admin' ||
+            data.groups?.includes('vorstand') ||
+            data.funktion?.toLowerCase().includes('social media')
+          if (hasAccess) {
+            setIsAuthenticated(true)
+            setUser(data)
           }
           setLoading(false)
         })
