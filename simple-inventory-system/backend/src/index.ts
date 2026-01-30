@@ -158,12 +158,28 @@ async function initDB() {
     ON CONFLICT (id) DO NOTHING
   `);
 
+  // Item-Location assignments (many-to-many: same item can be in multiple boxes)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS item_locations (
+      id SERIAL PRIMARY KEY,
+      item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+      location_id INTEGER REFERENCES locations(id) ON DELETE CASCADE,
+      quantity INTEGER DEFAULT 0,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(item_id, location_id)
+    )
+  `);
+
   // Indices
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_ean ON items(ean_code)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_custom ON items(custom_barcode)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_location ON items(location_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_transactions_item ON transactions(item_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_item_locations_item ON item_locations(item_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_item_locations_location ON item_locations(location_id)`);
 
   console.log('Database initialized');
 }
@@ -236,6 +252,129 @@ app.post('/api/locations', authenticateToken, async (req: AuthenticatedRequest, 
       [name, description]
     );
     res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get location with its contents (items assigned to this box)
+app.get('/api/locations/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const locationResult = await pool.query('SELECT * FROM locations WHERE id = $1', [id]);
+    if (locationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Location not found' });
+    }
+
+    // Get items assigned to this location via item_locations
+    const contentsResult = await pool.query(`
+      SELECT il.id as assignment_id, il.quantity as box_quantity, il.notes as box_notes,
+             i.id, i.name, i.description, i.unit, i.image_url, i.custom_barcode, i.ean_code,
+             c.name as category_name
+      FROM item_locations il
+      JOIN items i ON il.item_id = i.id
+      LEFT JOIN categories c ON i.category_id = c.id
+      WHERE il.location_id = $1 AND i.active = true
+      ORDER BY c.name NULLS LAST, i.name
+    `, [id]);
+
+    res.json({
+      ...locationResult.rows[0],
+      contents: contentsResult.rows
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Add item to a box (location)
+app.post('/api/locations/:id/items', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { item_id, quantity, notes } = req.body;
+
+    // Check if location exists
+    const locationResult = await pool.query('SELECT id FROM locations WHERE id = $1', [id]);
+    if (locationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Location not found' });
+    }
+
+    // Check if item exists
+    const itemResult = await pool.query('SELECT id, name FROM items WHERE id = $1 AND active = true', [item_id]);
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    // Add or update item-location assignment
+    const result = await pool.query(`
+      INSERT INTO item_locations (item_id, location_id, quantity, notes)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (item_id, location_id) DO UPDATE SET
+        quantity = item_locations.quantity + $3,
+        notes = COALESCE($4, item_locations.notes),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [item_id, id, quantity || 1, notes]);
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Update item quantity in a box
+app.put('/api/locations/:locationId/items/:itemId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { locationId, itemId } = req.params;
+    const { quantity, notes } = req.body;
+
+    const result = await pool.query(`
+      UPDATE item_locations
+      SET quantity = $3, notes = $4, updated_at = CURRENT_TIMESTAMP
+      WHERE location_id = $1 AND item_id = $2
+      RETURNING *
+    `, [locationId, itemId, quantity, notes]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not in this location' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Remove item from a box
+app.delete('/api/locations/:locationId/items/:itemId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { locationId, itemId } = req.params;
+
+    await pool.query(
+      'DELETE FROM item_locations WHERE location_id = $1 AND item_id = $2',
+      [locationId, itemId]
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get all locations with item counts
+app.get('/api/locations/overview', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT l.*,
+             COUNT(DISTINCT il.item_id) as item_count,
+             COALESCE(SUM(il.quantity), 0) as total_quantity
+      FROM locations l
+      LEFT JOIN item_locations il ON l.id = il.location_id
+      GROUP BY l.id
+      ORDER BY l.name
+    `);
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
@@ -1184,12 +1323,13 @@ app.get('/api/locations/:id/content-label', async (req, res) => {
     }
     const location = locationResult.rows[0];
 
-    // Get all items at this location
+    // Get all items at this location via item_locations junction table
     const itemsResult = await pool.query(`
-      SELECT i.name, i.quantity, i.unit, c.name as category_name
-      FROM items i
+      SELECT i.name, il.quantity, i.unit, c.name as category_name, il.notes
+      FROM item_locations il
+      JOIN items i ON il.item_id = i.id
       LEFT JOIN categories c ON i.category_id = c.id
-      WHERE i.location_id = $1 AND i.active = true
+      WHERE il.location_id = $1 AND i.active = true
       ORDER BY c.name NULLS LAST, i.name
     `, [id]);
 

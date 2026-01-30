@@ -113,7 +113,22 @@ interface User {
   groups: string[];
 }
 
-type Tab = 'items' | 'scanner' | 'add' | 'low-stock' | 'reports';
+type Tab = 'items' | 'scanner' | 'add' | 'low-stock' | 'reports' | 'kisten';
+
+interface BoxOverview {
+  id: number;
+  name: string;
+  item_count: number;
+  total_quantity: number;
+}
+
+interface BoxContent {
+  item_id: number;
+  item_name: string;
+  quantity: number;
+  notes: string | null;
+  unit: string;
+}
 
 function App() {
   const [tab, setTab] = useState<Tab>('items');
@@ -513,7 +528,7 @@ function App() {
       {/* Desktop Tabs - hidden on mobile */}
       <nav className="bg-white shadow hidden sm:block">
         <div className="container mx-auto flex">
-          {(['items', 'scanner', 'add', 'low-stock', 'reports'] as Tab[]).map((t) => (
+          {(['items', 'scanner', 'add', 'low-stock', 'kisten', 'reports'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); if (t !== 'scanner') stopScanner(); }}
@@ -525,6 +540,7 @@ function App() {
               {t === 'scanner' && '📷 Scanner'}
               {t === 'add' && '➕ Neu'}
               {t === 'low-stock' && '⚠️ Niedrig'}
+              {t === 'kisten' && '📦 Kisten'}
               {t === 'reports' && '📊 Berichte'}
             </button>
           ))}
@@ -879,6 +895,17 @@ function App() {
           </div>
         )}
 
+        {/* Kisten Tab */}
+        {tab === 'kisten' && (
+          <KistenView
+            items={items}
+            token={token}
+            user={user}
+            onLogin={login}
+            onRefresh={fetchItems}
+          />
+        )}
+
         {/* Reports Tab */}
         {tab === 'reports' && (
           <ReportsView items={items} locations={locations} onRefresh={fetchItems} />
@@ -893,6 +920,7 @@ function App() {
             { id: 'scanner', icon: '📷', label: 'Scan' },
             { id: 'add', icon: '➕', label: 'Neu' },
             { id: 'low-stock', icon: '⚠️', label: 'Niedrig' },
+            { id: 'kisten', icon: '📦', label: 'Kisten' },
             { id: 'reports', icon: '📊', label: 'Berichte' },
           ] as { id: Tab; icon: string; label: string }[]).map((t) => (
             <button
@@ -902,8 +930,8 @@ function App() {
                 tab === t.id ? 'text-blue-600 bg-blue-50' : 'text-gray-500 active:bg-gray-100'
               }`}
             >
-              <span className="text-2xl">{t.icon}</span>
-              <span className="text-sm font-medium">{t.label}</span>
+              <span className="text-xl">{t.icon}</span>
+              <span className="text-xs font-medium">{t.label}</span>
             </button>
           ))}
         </div>
@@ -1318,6 +1346,422 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
         {submitting ? '⏳ Wird gespeichert...' : '✓ Artikel anlegen'}
       </button>
     </form>
+  );
+}
+
+// Kisten (Boxes) View Component
+function KistenView({ items, token, user, onLogin, onRefresh }: {
+  items: Item[];
+  token: string | null;
+  user: User | null;
+  onLogin: () => void;
+  onRefresh: () => void;
+}) {
+  const [selectedBox, setSelectedBox] = useState<Location | null>(null);
+  const [boxContents, setBoxContents] = useState<BoxContent[]>([]);
+  const [loadingContents, setLoadingContents] = useState(false);
+  const [boxOverview, setBoxOverview] = useState<BoxOverview[]>([]);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [addItemId, setAddItemId] = useState('');
+  const [addItemQuantity, setAddItemQuantity] = useState('1');
+  const [addItemNotes, setAddItemNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editingItem, setEditingItem] = useState<BoxContent | null>(null);
+  const [editQuantity, setEditQuantity] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+
+  // Fetch box overview on mount
+  useEffect(() => {
+    fetchBoxOverview();
+  }, []);
+
+  const fetchBoxOverview = async () => {
+    try {
+      const res = await fetch(`${API_URL}/locations/overview`);
+      if (res.ok) {
+        setBoxOverview(await res.json());
+      }
+    } catch (error) {
+      console.error('Error fetching box overview:', error);
+    }
+  };
+
+  const fetchBoxContents = async (locationId: number) => {
+    setLoadingContents(true);
+    try {
+      const res = await fetch(`${API_URL}/locations/${locationId}`);
+      if (res.ok) {
+        const data = await res.json();
+        // Map the API response to our BoxContent interface
+        const contents = (data.contents || []).map((c: any) => ({
+          item_id: c.id,
+          item_name: c.name,
+          quantity: c.box_quantity,
+          notes: c.box_notes,
+          unit: c.unit
+        }));
+        setBoxContents(contents);
+      }
+    } catch (error) {
+      console.error('Error fetching box contents:', error);
+    }
+    setLoadingContents(false);
+  };
+
+  const handleSelectBox = (box: Location) => {
+    setSelectedBox(box);
+    fetchBoxContents(box.id);
+    setShowAddItem(false);
+    setEditingItem(null);
+  };
+
+  const handleAddItemToBox = async () => {
+    if (!token || !selectedBox || !addItemId) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/locations/${selectedBox.id}/items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          item_id: parseInt(addItemId),
+          quantity: parseInt(addItemQuantity) || 1,
+          notes: addItemNotes || null
+        })
+      });
+
+      if (res.ok) {
+        fetchBoxContents(selectedBox.id);
+        fetchBoxOverview();
+        onRefresh();
+        setShowAddItem(false);
+        setAddItemId('');
+        setAddItemQuantity('1');
+        setAddItemNotes('');
+      } else {
+        const error = await res.json();
+        alert(error.error || 'Fehler beim Hinzufügen');
+      }
+    } catch (error) {
+      alert('Fehler beim Hinzufügen');
+    }
+    setSaving(false);
+  };
+
+  const handleUpdateItem = async () => {
+    if (!token || !selectedBox || !editingItem) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/locations/${selectedBox.id}/items/${editingItem.item_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          quantity: parseInt(editQuantity) || 0,
+          notes: editNotes || null
+        })
+      });
+
+      if (res.ok) {
+        fetchBoxContents(selectedBox.id);
+        fetchBoxOverview();
+        onRefresh();
+        setEditingItem(null);
+      } else {
+        const error = await res.json();
+        alert(error.error || 'Fehler beim Aktualisieren');
+      }
+    } catch (error) {
+      alert('Fehler beim Aktualisieren');
+    }
+    setSaving(false);
+  };
+
+  const handleRemoveItem = async (itemId: number) => {
+    if (!token || !selectedBox || !confirm('Artikel aus dieser Kiste entfernen?')) return;
+
+    try {
+      const res = await fetch(`${API_URL}/locations/${selectedBox.id}/items/${itemId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        fetchBoxContents(selectedBox.id);
+        fetchBoxOverview();
+        onRefresh();
+      } else {
+        alert('Fehler beim Entfernen');
+      }
+    } catch (error) {
+      alert('Fehler beim Entfernen');
+    }
+  };
+
+  const printBoxLabel = (locationId: number) => {
+    window.open(`${API_URL}/locations/${locationId}/content-label`, '_blank');
+  };
+
+  // Items not yet in the selected box (for add dropdown)
+  const availableItems = selectedBox
+    ? items.filter(item => !boxContents.some(bc => bc.item_id === item.id))
+    : [];
+
+  return (
+    <div className="space-y-4">
+      {!selectedBox ? (
+        // Box Overview Grid
+        <>
+          <h2 className="text-lg font-semibold">📦 Kisten-Übersicht</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Wähle eine Kiste um den Inhalt zu verwalten
+          </p>
+
+          {boxOverview.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-6xl mb-4">📦</div>
+              <p>Keine Lagerorte vorhanden</p>
+              <p className="text-sm mt-2">Erstelle zuerst Lagerorte im "Neu" Tab</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {boxOverview.map((box) => (
+                <button
+                  key={box.id}
+                  onClick={() => handleSelectBox(box)}
+                  className="p-4 bg-white rounded-xl shadow-md hover:shadow-lg active:bg-gray-50 transition text-left touch-manipulation border-2 border-transparent hover:border-blue-400"
+                >
+                  <div className="text-3xl mb-2">📦</div>
+                  <div className="font-bold text-lg truncate">{box.name}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {box.item_count} {box.item_count === 1 ? 'Artikel' : 'Artikel'}
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {box.total_quantity} Stück total
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        // Box Detail View
+        <>
+          {/* Back Button & Header */}
+          <div className="flex items-center gap-3 mb-4">
+            <button
+              onClick={() => { setSelectedBox(null); setBoxContents([]); }}
+              className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg touch-manipulation"
+            >
+              ← Zurück
+            </button>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                📦 {selectedBox.name}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {boxContents.length} {boxContents.length === 1 ? 'Artikel' : 'Artikel'} in dieser Kiste
+              </p>
+            </div>
+            <button
+              onClick={() => printBoxLabel(selectedBox.id)}
+              className="p-2 bg-gray-200 hover:bg-gray-300 rounded-lg touch-manipulation"
+              title="Etikett drucken"
+            >
+              🏷️
+            </button>
+          </div>
+
+          {/* Add Item Button */}
+          {user && !showAddItem && !editingItem && (
+            <button
+              onClick={() => setShowAddItem(true)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold touch-manipulation mb-4"
+            >
+              + Artikel hinzufügen
+            </button>
+          )}
+
+          {/* Add Item Form */}
+          {showAddItem && user && (
+            <div className="bg-white p-4 rounded-lg shadow mb-4">
+              <h3 className="font-semibold mb-3">Artikel hinzufügen</h3>
+              <div className="space-y-3">
+                <select
+                  value={addItemId}
+                  onChange={(e) => setAddItemId(e.target.value)}
+                  className="w-full p-3 border-2 rounded-lg"
+                >
+                  <option value="">Artikel wählen...</option>
+                  {availableItems.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({item.quantity} {item.unit} verfügbar)
+                    </option>
+                  ))}
+                </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Anzahl in Kiste</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={addItemQuantity}
+                      onChange={(e) => setAddItemQuantity(e.target.value)}
+                      className="w-full p-3 border-2 rounded-lg"
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Notizen (optional)</label>
+                    <input
+                      type="text"
+                      value={addItemNotes}
+                      onChange={(e) => setAddItemNotes(e.target.value)}
+                      placeholder="z.B. oben links"
+                      className="w-full p-3 border-2 rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowAddItem(false); setAddItemId(''); }}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 py-3 rounded-lg touch-manipulation"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={handleAddItemToBox}
+                    disabled={!addItemId || saving}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 rounded-lg font-semibold touch-manipulation"
+                  >
+                    {saving ? '...' : 'Hinzufügen'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit Item Form */}
+          {editingItem && user && (
+            <div className="bg-white p-4 rounded-lg shadow mb-4">
+              <h3 className="font-semibold mb-3">"{editingItem.item_name}" bearbeiten</h3>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Anzahl in Kiste</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={editQuantity}
+                      onChange={(e) => setEditQuantity(e.target.value)}
+                      className="w-full p-3 border-2 rounded-lg"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Notizen</label>
+                    <input
+                      type="text"
+                      value={editNotes}
+                      onChange={(e) => setEditNotes(e.target.value)}
+                      placeholder="z.B. oben links"
+                      className="w-full p-3 border-2 rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditingItem(null)}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 py-3 rounded-lg touch-manipulation"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={handleUpdateItem}
+                    disabled={saving}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-3 rounded-lg font-semibold touch-manipulation"
+                  >
+                    {saving ? '...' : 'Speichern'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Box Contents List */}
+          {loadingContents ? (
+            <div className="text-center py-8 text-gray-500">Lädt...</div>
+          ) : boxContents.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 bg-white rounded-lg">
+              <div className="text-5xl mb-4">📭</div>
+              <p>Diese Kiste ist leer</p>
+              {user && (
+                <p className="text-sm mt-2">Füge Artikel mit dem Button oben hinzu</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {boxContents.map((content) => (
+                <div
+                  key={content.item_id}
+                  className="bg-white p-4 rounded-lg shadow flex items-center justify-between gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium truncate">{content.item_name}</h4>
+                    {content.notes && (
+                      <p className="text-sm text-gray-500 truncate">{content.notes}</p>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-xl font-bold text-blue-600">{content.quantity}</span>
+                    <span className="text-sm text-gray-500 ml-1">{content.unit}</span>
+                  </div>
+                  {user && (
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditingItem(content);
+                          setEditQuantity(content.quantity.toString());
+                          setEditNotes(content.notes || '');
+                          setShowAddItem(false);
+                        }}
+                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded touch-manipulation"
+                        title="Bearbeiten"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleRemoveItem(content.item_id)}
+                        className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded touch-manipulation"
+                        title="Entfernen"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Login prompt for non-logged-in users */}
+          {!user && boxContents.length > 0 && (
+            <div className="text-center py-4 text-gray-500">
+              <button onClick={onLogin} className="text-blue-600 underline">
+                Anmelden
+              </button>
+              {' '}um Inhalt zu bearbeiten
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
