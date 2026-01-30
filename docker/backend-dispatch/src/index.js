@@ -1908,6 +1908,14 @@ app.get('/mailcow/quota', async (req, res) => {
 // ARBEITSPLAN PDF GENERATION
 // ============================================
 
+// Default layout settings for Arbeitsplan
+const defaultLayoutSettings = {
+    primaryColor: '#cc0000',
+    fontFamily: 'Arial, sans-serif',
+    organisationName: 'Feuerwehrverein Raura, Kaiseraugst',
+    footerText: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch'
+};
+
 app.post('/arbeitsplan/pdf', async (req, res) => {
     try {
         const { event, logoBase64 } = req.body;
@@ -1916,8 +1924,26 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
             return res.status(400).json({ error: 'Event mit Schichten erforderlich' });
         }
 
+        // Fetch layout template settings
+        let layoutSettings = defaultLayoutSettings;
+        try {
+            const templateResult = await pool.query(`
+                SELECT content FROM pdf_templates
+                WHERE type = 'layout' AND is_active = true
+                ORDER BY updated_at DESC LIMIT 1
+            `);
+            if (templateResult.rows.length > 0) {
+                const template = templateResult.rows[0].content;
+                if (template.layoutSettings) {
+                    layoutSettings = { ...defaultLayoutSettings, ...template.layoutSettings };
+                }
+            }
+        } catch (err) {
+            console.log('No layout template found, using defaults');
+        }
+
         // Generate HTML matching the PDF template exactly
-        const html = generateArbeitsplanHTML(event, logoBase64);
+        const html = generateArbeitsplanHTML(event, logoBase64, layoutSettings);
 
         // Convert HTML to PDF using Puppeteer
         const browser = await puppeteer.launch({
@@ -1949,8 +1975,11 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
     }
 });
 
-function generateArbeitsplanHTML(event, logoBase64) {
+function generateArbeitsplanHTML(event, logoBase64, layoutSettings = {}) {
     const shifts = event.shifts || [];
+    const orgName = layoutSettings.organisationName || 'Feuerwehrverein Raura, Kaiseraugst';
+    const primaryColor = layoutSettings.primaryColor || '#cc0000';
+    const fontFamily = layoutSettings.fontFamily || 'Arial, sans-serif';
 
     // Group shifts by date
     const shiftsByDate = {};
@@ -1997,7 +2026,7 @@ function generateArbeitsplanHTML(event, logoBase64) {
 <style>
     @page { margin: 0; }
     body {
-        font-family: Arial, sans-serif;
+        font-family: ${fontFamily};
         font-size: 11pt;
         line-height: 1.4;
         color: #000;
@@ -2022,6 +2051,7 @@ function generateArbeitsplanHTML(event, logoBase64) {
         font-size: 14pt;
         font-weight: bold;
         margin-bottom: 5px;
+        color: ${primaryColor};
     }
     .arbeitsplan-title {
         font-size: 16pt;
@@ -2082,6 +2112,16 @@ function generateArbeitsplanHTML(event, logoBase64) {
         font-style: normal;
         font-size: 10pt;
     }
+    .footer {
+        position: fixed;
+        bottom: 10mm;
+        left: 15mm;
+        right: 15mm;
+        font-size: 8pt;
+        color: #666;
+        border-top: 1px solid #ccc;
+        padding-top: 5px;
+    }
 </style>
 </head>
 <body>
@@ -2095,7 +2135,7 @@ function generateArbeitsplanHTML(event, logoBase64) {
 
     html += `
     <div class="title-section">
-        <div class="org-name">Feuerwehrverein Raura, Kaiseraugst</div>
+        <div class="org-name">${orgName}</div>
         <div class="arbeitsplan-title">Arbeitsplan ${event.title}</div>
     </div>
 </div>`;
@@ -2242,7 +2282,10 @@ function generateArbeitsplanHTML(event, logoBase64) {
 <div class="note">${event.notes}</div>`;
     }
 
+    // Add footer with organization info
+    const footerText = layoutSettings.footerText || 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch';
     html += `
+<div class="footer">${footerText}</div>
 </body>
 </html>`;
 

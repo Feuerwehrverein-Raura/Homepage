@@ -48,6 +48,35 @@ const upload = multer({
 });
 
 const app = express();
+
+// Helper function to fetch active layout template from dispatch API
+async function getLayoutTemplate() {
+    try {
+        const dispatchUrl = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+        const response = await axios.get(`${dispatchUrl}/pdf-templates/layout/active`);
+        if (response.data && response.data.template) {
+            return response.data;
+        }
+        return null;
+    } catch (error) {
+        console.log('No layout template found, using defaults:', error.message);
+        return null;
+    }
+}
+
+// Default layout settings
+const defaultLayoutSettings = {
+    headerHeight: 60,
+    footerHeight: 22,
+    contentMarginLeft: 40,
+    contentMarginRight: 40,
+    primaryColor: '#cc0000',
+    fontFamily: 'Helvetica',
+    tableFontSize: 9,
+    tableHeaderBold: true,
+    organisationName: 'Feuerwehrverein Raura',
+    footerText: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch'
+};
 const PORT = process.env.PORT || 3000;
 const SERVICE_NAME = 'api-members';
 
@@ -1487,13 +1516,18 @@ app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'a
         const result = await pool.query(query, params);
         const members = result.rows;
 
+        // Fetch layout template settings
+        const layoutData = await getLayoutTemplate();
+        const layout = layoutData?.layoutSettings || defaultLayoutSettings;
+        const orgName = layout.organisationName || defaultLayoutSettings.organisationName;
+
         // Create PDF
         const doc = new PDFDocument({
             size: 'A4',
-            margin: 40,
+            margin: layout.contentMarginLeft || 40,
             info: {
-                Title: 'Telefonliste Feuerwehrverein Raura',
-                Author: 'Feuerwehrverein Raura'
+                Title: `Telefonliste ${orgName}`,
+                Author: orgName
             }
         });
 
@@ -1503,22 +1537,50 @@ app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'a
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         doc.pipe(res);
 
-        // Header
-        doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+        const marginLeft = layout.contentMarginLeft || 40;
+        const marginRight = layout.contentMarginRight || 40;
+        const pageWidth = 595 - marginLeft - marginRight;
+
+        // Parse primary color from hex
+        const primaryColor = layout.primaryColor || '#cc0000';
+        const hexToRgb = (hex) => {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16) / 255,
+                g: parseInt(result[2], 16) / 255,
+                b: parseInt(result[3], 16) / 255
+            } : { r: 0.8, g: 0, b: 0 };
+        };
+        const rgb = hexToRgb(primaryColor);
+
+        // Header with optional logo
+        if (layoutData?.template?.content?.logo) {
+            // If logo exists in template, it would be rendered here
+            // For now, use text header with styling from template
+        }
+
+        doc.fillColor(primaryColor);
+        doc.fontSize(18).font('Helvetica-Bold').text(orgName, { align: 'center' });
+        doc.fillColor('black');
         doc.fontSize(14).font('Helvetica').text('Telefonliste', { align: 'center' });
         doc.fontSize(10).text(`Stand: ${new Date().toLocaleDateString('de-CH')}`, { align: 'center' });
         doc.moveDown(1.5);
 
         // Table settings
         const tableTop = doc.y;
-        const colName = 40;
-        const colTelefon = 200;
-        const colMobile = 320;
-        const colStatus = 440;
+        const colName = marginLeft;
+        const colTelefon = marginLeft + 160;
+        const colMobile = marginLeft + 280;
+        const colStatus = marginLeft + 400;
         const rowHeight = 20;
+        const tableFontSize = layout.tableFontSize || 9;
+
+        // Draw header line with primary color
+        doc.strokeColor(primaryColor);
 
         // Table header
-        doc.fontSize(10).font('Helvetica-Bold');
+        const headerFont = layout.tableHeaderBold !== false ? 'Helvetica-Bold' : 'Helvetica';
+        doc.fontSize(10).font(headerFont);
         doc.text('Name', colName, tableTop);
         doc.text('Telefon', colTelefon, tableTop);
         doc.text('Mobile', colMobile, tableTop);
@@ -1526,26 +1588,38 @@ app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'a
 
         // Draw header line
         doc.moveTo(colName, tableTop + 15).lineTo(555, tableTop + 15).stroke();
+        doc.strokeColor('black');
 
         // Table rows
-        doc.font('Helvetica').fontSize(9);
+        doc.font('Helvetica').fontSize(tableFontSize);
         let y = tableTop + rowHeight;
-        let currentStatus = null;
+        const footerY = 841 - (layout.footerHeight || 22) - 30;
 
         for (const member of members) {
-            // Check if we need a new page
-            if (y > 750) {
+            // Check if we need a new page (leave room for footer)
+            if (y > footerY) {
+                // Draw footer before new page
+                doc.fontSize(7).fillColor('gray');
+                doc.text(layout.footerText || defaultLayoutSettings.footerText, marginLeft, 841 - (layout.footerHeight || 22), {
+                    width: pageWidth - 50,
+                    align: 'left'
+                });
+                doc.text(`Seite ${doc.bufferedPageRange().count}`, 500, 841 - (layout.footerHeight || 22), { align: 'right' });
+
                 doc.addPage();
                 y = 50;
+                doc.fillColor('black');
 
                 // Repeat header on new page
-                doc.fontSize(10).font('Helvetica-Bold');
+                doc.fontSize(10).font(headerFont);
                 doc.text('Name', colName, y);
                 doc.text('Telefon', colTelefon, y);
                 doc.text('Mobile', colMobile, y);
                 doc.text('Status', colStatus, y);
+                doc.strokeColor(primaryColor);
                 doc.moveTo(colName, y + 15).lineTo(555, y + 15).stroke();
-                doc.font('Helvetica').fontSize(9);
+                doc.strokeColor('black');
+                doc.font('Helvetica').fontSize(tableFontSize);
                 y += rowHeight;
             }
 
@@ -1566,6 +1640,13 @@ app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'a
         doc.moveDown(2);
         doc.fontSize(9).font('Helvetica-Oblique');
         doc.text(`Total: ${members.length} Mitglieder`, { align: 'right' });
+
+        // Final page footer
+        doc.fontSize(7).fillColor('gray');
+        doc.text(layout.footerText || defaultLayoutSettings.footerText, marginLeft, 841 - (layout.footerHeight || 22), {
+            width: pageWidth - 50,
+            align: 'left'
+        });
 
         doc.end();
 
