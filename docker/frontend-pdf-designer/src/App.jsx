@@ -354,6 +354,7 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [designerReady, setDesignerReady] = useState(false)
+  const [showAddressOverlay, setShowAddressOverlay] = useState(null) // null, 'ch', 'de'
 
   // Helper to get cookie value
   const getCookie = (name) => {
@@ -707,6 +708,54 @@ function App() {
                 📄
               </button>
             </div>
+
+            {/* Pingen Address Zone Overlay Toggle */}
+            <div className="mt-3 pt-3 border-t">
+              <label className="block text-xs font-medium text-gray-600 mb-2">
+                📬 Pingen Adresszone anzeigen
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAddressOverlay(showAddressOverlay === 'ch' ? null : 'ch')}
+                  className={`flex-1 px-3 py-2 text-xs rounded-lg border transition ${
+                    showAddressOverlay === 'ch'
+                      ? 'bg-red-100 border-red-500 text-red-700'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                  title="Schweizer Briefstandard: Adressfeld rechts"
+                >
+                  🇨🇭 Schweiz
+                </button>
+                <button
+                  onClick={() => setShowAddressOverlay(showAddressOverlay === 'de' ? null : 'de')}
+                  className={`flex-1 px-3 py-2 text-xs rounded-lg border transition ${
+                    showAddressOverlay === 'de'
+                      ? 'bg-blue-100 border-blue-500 text-blue-700'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                  title="Deutscher Briefstandard (DIN 5008): Adressfeld links"
+                >
+                  🇩🇪 Deutschland
+                </button>
+              </div>
+              {showAddressOverlay && (
+                <div className="text-xs text-gray-500 mt-2 space-y-1">
+                  <p className="flex items-center gap-1">
+                    <span className="w-3 h-3 border border-orange-500 bg-orange-100 inline-block"></span>
+                    <span>Frankierzone (Briefmarke/Stempel)</span>
+                  </p>
+                  <p className="flex items-center gap-1">
+                    <span className={`w-3 h-3 border inline-block ${showAddressOverlay === 'ch' ? 'border-red-500 bg-red-100' : 'border-blue-500 bg-blue-100'}`}></span>
+                    <span>Adressfeld für Pingen-Versand</span>
+                  </p>
+                  <p className="mt-1 text-gray-400">
+                    {showAddressOverlay === 'ch'
+                      ? 'CH: Adresse RECHTS, Frankierung oben rechts'
+                      : 'DE (DIN 5008): Adresse LINKS, Frankierung oben rechts'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Template List */}
@@ -831,12 +880,139 @@ function App() {
         </div>
 
         {/* Designer Area */}
-        <div className="flex-1 overflow-hidden bg-gray-200">
+        <div className="flex-1 overflow-hidden bg-gray-200 relative">
           <div
             ref={designerRef}
             className="w-full h-full"
             style={{ minHeight: '100%' }}
           />
+
+          {/* Pingen Address Zone Overlay */}
+          {showAddressOverlay && (
+            <div
+              className="absolute pointer-events-none"
+              style={{
+                // Position the overlay to match the A4 preview in pdfme
+                // pdfme shows A4 at roughly 595px width (at 72dpi)
+                // We need to calculate based on the visible area
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '595px',  // A4 width at 72dpi
+                height: '842px', // A4 height at 72dpi
+                maxWidth: '100%',
+                maxHeight: '100%',
+              }}
+            >
+              {/* Swiss Post Standard (SN 010130) */}
+              {showAddressOverlay === 'ch' && (
+                <>
+                  {/* Frankierzone (oben rechts) - 140-202mm von links, 0-41mm von oben */}
+                  <div
+                    className="absolute border-2 border-dashed border-orange-500 bg-orange-100 bg-opacity-30"
+                    style={{
+                      right: '8px',      // ~8mm vom rechten Rand
+                      top: '0',
+                      width: '175px',    // ~62mm = 175px at 72dpi
+                      height: '116px',   // ~41mm = 116px at 72dpi
+                    }}
+                  >
+                    <span className="absolute top-1 left-1 text-xs font-bold text-orange-600 bg-white px-1 rounded">
+                      Frankierzone
+                    </span>
+                    <span className="absolute bottom-1 right-1 text-xs text-orange-500">
+                      62×41mm
+                    </span>
+                  </div>
+
+                  {/* Adressfeld (rechts, unter Frankierzone) - 118-202mm von links, 41-81mm von oben */}
+                  <div
+                    className="absolute border-2 border-dashed border-red-500 bg-red-100 bg-opacity-30"
+                    style={{
+                      right: '8px',      // ~8mm vom rechten Rand
+                      top: '127px',      // ~45mm von oben = 127px
+                      width: '241px',    // ~85mm = 241px at 72dpi
+                      height: '127px',   // ~45mm = 127px at 72dpi
+                    }}
+                  >
+                    <span className="absolute top-1 left-1 text-xs font-bold text-red-600 bg-white px-1 rounded">
+                      🇨🇭 Adressfeld
+                    </span>
+                    <span className="absolute bottom-1 right-1 text-xs text-red-500">
+                      85×45mm
+                    </span>
+                  </div>
+
+                  {/* Absenderzone (klein, über Adressfeld) */}
+                  <div
+                    className="absolute border border-dashed border-gray-400 bg-gray-100 bg-opacity-20"
+                    style={{
+                      right: '8px',
+                      top: '116px',
+                      width: '241px',
+                      height: '11px',
+                    }}
+                  >
+                    <span className="text-xs text-gray-500 ml-1">Absender (klein)</span>
+                  </div>
+                </>
+              )}
+
+              {/* German Standard (DIN 5008) */}
+              {showAddressOverlay === 'de' && (
+                <>
+                  {/* Frankierzone (oben rechts) */}
+                  <div
+                    className="absolute border-2 border-dashed border-orange-500 bg-orange-100 bg-opacity-30"
+                    style={{
+                      right: '0',
+                      top: '0',
+                      width: '170px',    // ~60mm
+                      height: '127px',   // ~45mm
+                    }}
+                  >
+                    <span className="absolute top-1 left-1 text-xs font-bold text-orange-600 bg-white px-1 rounded">
+                      Frankierzone
+                    </span>
+                    <span className="absolute bottom-1 right-1 text-xs text-orange-500">
+                      60×45mm
+                    </span>
+                  </div>
+
+                  {/* Adressfeld (links) - DIN 5008: 20-105mm von links, 45-90mm von oben */}
+                  <div
+                    className="absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-30"
+                    style={{
+                      left: '57px',      // ~20mm = 57px at 72dpi
+                      top: '127px',      // ~45mm von oben
+                      width: '241px',    // ~85mm
+                      height: '127px',   // ~45mm
+                    }}
+                  >
+                    <span className="absolute top-1 left-1 text-xs font-bold text-blue-600 bg-white px-1 rounded">
+                      🇩🇪 Adressfeld
+                    </span>
+                    <span className="absolute bottom-1 right-1 text-xs text-blue-500">
+                      85×45mm
+                    </span>
+                  </div>
+
+                  {/* Rücksendeangabe (über Adressfeld) */}
+                  <div
+                    className="absolute border border-dashed border-gray-400 bg-gray-100 bg-opacity-20"
+                    style={{
+                      left: '57px',
+                      top: '113px',
+                      width: '241px',
+                      height: '14px',
+                    }}
+                  >
+                    <span className="text-xs text-gray-500 ml-1">Rücksendeangabe</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
