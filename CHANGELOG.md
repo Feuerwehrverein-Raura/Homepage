@@ -1,3 +1,10 @@
+## [1.99.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.5...v1.99.6) (2026-01-30)
+
+
+### Bug Fixes
+
+* **pdf-designer:** fix pdfme v4 schema format and CORS ([54be666](https://github.com/Feuerwehrverein-Raura/Homepage/commit/54be6663cb3c6cb16671fd3432e525c8ab94baa8))
+
 ## [1.99.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.4...v1.99.5) (2026-01-30)
 
 
