@@ -750,8 +750,8 @@ function App() {
                   </p>
                   <p className="mt-1 text-gray-400">
                     {showAddressOverlay === 'ch'
-                      ? 'CH: Adresse RECHTS, Frankierung oben rechts'
-                      : 'DE (DIN 5008): Adresse LINKS, Frankierung oben rechts'}
+                      ? 'CH: Adresse + Frankierung RECHTS'
+                      : 'DE: Adresse + Frankierung LINKS'}
                   </p>
                 </div>
               )}
@@ -904,110 +904,88 @@ function App() {
                 maxHeight: '100%',
               }}
             >
-              {/* Swiss Post Standard (SN 010130) */}
+              {/* Swiss Post - Pingen Right Window */}
+              {/* Franking: 116mm from left, 40mm from top, 89.5×47.5mm */}
+              {/* Address: 118mm from left, 60mm from top, 85.5×25.5mm */}
               {showAddressOverlay === 'ch' && (
                 <>
-                  {/* Frankierzone (oben rechts) - 140-202mm von links, 0-41mm von oben */}
+                  {/* Frankierzone (rechts oben) */}
                   <div
                     className="absolute border-2 border-dashed border-orange-500 bg-orange-100 bg-opacity-30"
                     style={{
-                      right: '8px',      // ~8mm vom rechten Rand
-                      top: '0',
-                      width: '175px',    // ~62mm = 175px at 72dpi
-                      height: '116px',   // ~41mm = 116px at 72dpi
+                      left: '329px',     // 116mm = 329px at 72dpi
+                      top: '113px',      // 40mm = 113px
+                      width: '254px',    // 89.5mm = 254px
+                      height: '135px',   // 47.5mm = 135px
                     }}
                   >
                     <span className="absolute top-1 left-1 text-xs font-bold text-orange-600 bg-white px-1 rounded">
                       Frankierzone
                     </span>
                     <span className="absolute bottom-1 right-1 text-xs text-orange-500">
-                      62×41mm
+                      89.5×47.5mm
                     </span>
                   </div>
 
-                  {/* Adressfeld (rechts, unter Frankierzone) - 118-202mm von links, 41-81mm von oben */}
+                  {/* Adressfeld (rechts, unter Frankierzone) */}
                   <div
                     className="absolute border-2 border-dashed border-red-500 bg-red-100 bg-opacity-30"
                     style={{
-                      right: '8px',      // ~8mm vom rechten Rand
-                      top: '127px',      // ~45mm von oben = 127px
-                      width: '241px',    // ~85mm = 241px at 72dpi
-                      height: '127px',   // ~45mm = 127px at 72dpi
+                      left: '335px',     // 118mm = 335px
+                      top: '170px',      // 60mm = 170px
+                      width: '242px',    // 85.5mm = 242px
+                      height: '72px',    // 25.5mm = 72px
                     }}
                   >
                     <span className="absolute top-1 left-1 text-xs font-bold text-red-600 bg-white px-1 rounded">
                       🇨🇭 Adressfeld
                     </span>
                     <span className="absolute bottom-1 right-1 text-xs text-red-500">
-                      85×45mm
+                      85.5×25.5mm
                     </span>
-                  </div>
-
-                  {/* Absenderzone (klein, über Adressfeld) */}
-                  <div
-                    className="absolute border border-dashed border-gray-400 bg-gray-100 bg-opacity-20"
-                    style={{
-                      right: '8px',
-                      top: '116px',
-                      width: '241px',
-                      height: '11px',
-                    }}
-                  >
-                    <span className="text-xs text-gray-500 ml-1">Absender (klein)</span>
                   </div>
                 </>
               )}
 
-              {/* German Standard (DIN 5008) */}
+              {/* German Post - Pingen Left Window */}
+              {/* Franking: 20mm from left, 40mm from top, 89.5×47.5mm */}
+              {/* Address: 22mm from left, 60mm from top, 85.5×25.5mm */}
               {showAddressOverlay === 'de' && (
                 <>
-                  {/* Frankierzone (oben rechts) */}
+                  {/* Frankierzone (LINKS oben - über Adressfeld!) */}
                   <div
                     className="absolute border-2 border-dashed border-orange-500 bg-orange-100 bg-opacity-30"
                     style={{
-                      right: '0',
-                      top: '0',
-                      width: '170px',    // ~60mm
-                      height: '127px',   // ~45mm
+                      left: '57px',      // 20mm = 57px at 72dpi
+                      top: '113px',      // 40mm = 113px
+                      width: '254px',    // 89.5mm = 254px
+                      height: '135px',   // 47.5mm = 135px
                     }}
                   >
                     <span className="absolute top-1 left-1 text-xs font-bold text-orange-600 bg-white px-1 rounded">
                       Frankierzone
                     </span>
                     <span className="absolute bottom-1 right-1 text-xs text-orange-500">
-                      60×45mm
+                      89.5×47.5mm
                     </span>
                   </div>
 
-                  {/* Adressfeld (links) - DIN 5008: 20-105mm von links, 45-90mm von oben */}
+                  {/* Adressfeld (links, unter Frankierzone) */}
                   <div
                     className="absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-30"
                     style={{
-                      left: '57px',      // ~20mm = 57px at 72dpi
-                      top: '127px',      // ~45mm von oben
-                      width: '241px',    // ~85mm
-                      height: '127px',   // ~45mm
+                      left: '62px',      // 22mm = 62px
+                      top: '170px',      // 60mm = 170px
+                      width: '242px',    // 85.5mm = 242px
+                      height: '72px',    // 25.5mm = 72px
                     }}
                   >
                     <span className="absolute top-1 left-1 text-xs font-bold text-blue-600 bg-white px-1 rounded">
                       🇩🇪 Adressfeld
                     </span>
                     <span className="absolute bottom-1 right-1 text-xs text-blue-500">
-                      85×45mm
+                      85.5×25.5mm
                     </span>
-                  </div>
-
-                  {/* Rücksendeangabe (über Adressfeld) */}
-                  <div
-                    className="absolute border border-dashed border-gray-400 bg-gray-100 bg-opacity-20"
-                    style={{
-                      left: '57px',
-                      top: '113px',
-                      width: '241px',
-                      height: '14px',
-                    }}
-                  >
-                    <span className="text-xs text-gray-500 ml-1">Rücksendeangabe</span>
                   </div>
                 </>
               )}
