@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { Pool } = require('pg');
 const nodemailer = require('nodemailer');
+const { authenticateAny, requireRole, requireApiKey } = require('./auth-middleware');
 const puppeteer = require('puppeteer');
 const axios = require('axios');
 const fs = require('fs');
@@ -600,7 +601,7 @@ app.get('/health', (req, res) => {
 // TEMPLATES
 // ============================================
 
-app.get('/templates', async (req, res) => {
+app.get('/templates', authenticateAny, async (req, res) => {
     try {
         const { type } = req.query;
         let query = 'SELECT * FROM dispatch_templates';
@@ -616,7 +617,7 @@ app.get('/templates', async (req, res) => {
     }
 });
 
-app.post('/templates', async (req, res) => {
+app.post('/templates', authenticateAny, async (req, res) => {
     try {
         const { name, type, subject, body, variables } = req.body;
         const result = await pool.query(`
@@ -629,7 +630,7 @@ app.post('/templates', async (req, res) => {
     }
 });
 
-app.put('/templates/:id', async (req, res) => {
+app.put('/templates/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
         const { name, type, subject, body, variables } = req.body;
@@ -647,7 +648,7 @@ app.put('/templates/:id', async (req, res) => {
     }
 });
 
-app.delete('/templates/:id', async (req, res) => {
+app.delete('/templates/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM dispatch_templates WHERE id = $1 RETURNING id', [id]);
@@ -664,7 +665,7 @@ app.delete('/templates/:id', async (req, res) => {
 // EMAIL
 // ============================================
 
-app.post('/email/send', async (req, res) => {
+app.post('/email/send', authenticateAny, async (req, res) => {
     console.log('[EMAIL] /email/send called with:', { to: req.body.to, cc: req.body.cc, template_id: req.body.template_id, member_id: req.body.member_id });
     try {
         const { to, cc, subject, body, template_id, variables, member_id, event_id } = req.body;
@@ -727,7 +728,7 @@ app.post('/email/send', async (req, res) => {
     }
 });
 
-app.post('/email/bulk', async (req, res) => {
+app.post('/email/bulk', authenticateAny, async (req, res) => {
     console.log('[EMAIL BULK] /email/bulk called with:', { member_ids: req.body.member_ids, template_id: req.body.template_id });
     try {
         const { member_ids, template_id, variables } = req.body;
@@ -777,7 +778,7 @@ app.post('/email/bulk', async (req, res) => {
 // SMART DISPATCH (Auto-select email/brief_ch/brief_de)
 // ============================================
 
-app.post('/dispatch/smart', async (req, res) => {
+app.post('/dispatch/smart', authenticateAny, async (req, res) => {
     console.log('[SMART DISPATCH] Starting smart dispatch...');
     try {
         const { template_group, member_ids, variables = {}, staging = false } = req.body;
@@ -917,7 +918,7 @@ app.post('/dispatch/smart', async (req, res) => {
 // PINGEN (Post)
 // ============================================
 
-app.post('/pingen/send', async (req, res) => {
+app.post('/pingen/send', authenticateAny, async (req, res) => {
     try {
         const { html, recipient, member_id, event_id, staging = false, use_cover_page = false, template_id } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -1409,7 +1410,7 @@ Feuerwehrverein Raura
 // ============================================
 
 // Anzahl der ausstehenden Registrierungen
-app.get('/member-registrations/count/pending', async (req, res) => {
+app.get('/member-registrations/count/pending', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT COUNT(*) as count FROM member_registrations WHERE status = 'pending'`
@@ -1422,7 +1423,7 @@ app.get('/member-registrations/count/pending', async (req, res) => {
 });
 
 // Alle Registrierungen abrufen
-app.get('/member-registrations', async (req, res) => {
+app.get('/member-registrations', authenticateAny, async (req, res) => {
     try {
         const { status } = req.query;
         let query = `
@@ -1449,7 +1450,7 @@ app.get('/member-registrations', async (req, res) => {
 });
 
 // Einzelne Registrierung abrufen
-app.get('/member-registrations/:id', async (req, res) => {
+app.get('/member-registrations/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
@@ -1472,7 +1473,7 @@ app.get('/member-registrations/:id', async (req, res) => {
 });
 
 // Registrierung genehmigen
-app.post('/member-registrations/:id/approve', async (req, res) => {
+app.post('/member-registrations/:id/approve', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
         const { processed_by = 'vorstand' } = req.body;
@@ -1548,7 +1549,7 @@ Feuerwehrverein Raura
 });
 
 // Registrierung ablehnen
-app.post('/member-registrations/:id/reject', async (req, res) => {
+app.post('/member-registrations/:id/reject', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
         const { processed_by = 'vorstand', reason = '' } = req.body;
@@ -1726,7 +1727,7 @@ async function mailcowApi(method, endpoint, data = null) {
 }
 
 // Alle Mailboxen abrufen
-app.get('/mailcow/mailboxes', async (req, res) => {
+app.get('/mailcow/mailboxes', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/mailbox/all');
         // Filter by domain since domain-specific endpoint returns empty
@@ -1741,7 +1742,7 @@ app.get('/mailcow/mailboxes', async (req, res) => {
 });
 
 // Einzelne Mailbox abrufen
-app.get('/mailcow/mailboxes/:email', async (req, res) => {
+app.get('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', `/get/mailbox/${req.params.email}`);
         res.json(response.data);
@@ -1751,7 +1752,7 @@ app.get('/mailcow/mailboxes/:email', async (req, res) => {
 });
 
 // Mailbox erstellen
-app.post('/mailcow/mailboxes', async (req, res) => {
+app.post('/mailcow/mailboxes', authenticateAny, async (req, res) => {
     try {
         const { local_part, name, password, quota = 1024, active = 1 } = req.body;
 
@@ -1776,7 +1777,7 @@ app.post('/mailcow/mailboxes', async (req, res) => {
 });
 
 // Mailbox aktualisieren
-app.put('/mailcow/mailboxes/:email', async (req, res) => {
+app.put('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     try {
         const { name, quota, active, password } = req.body;
         const updateData = {
@@ -1801,7 +1802,7 @@ app.put('/mailcow/mailboxes/:email', async (req, res) => {
 });
 
 // Mailbox löschen
-app.delete('/mailcow/mailboxes/:email', async (req, res) => {
+app.delete('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('POST', '/delete/mailbox', [req.params.email]);
         res.json(response.data);
@@ -1811,7 +1812,7 @@ app.delete('/mailcow/mailboxes/:email', async (req, res) => {
 });
 
 // Alle Aliase abrufen
-app.get('/mailcow/aliases', async (req, res) => {
+app.get('/mailcow/aliases', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/alias/all');
         // Filter by domain since domain-specific endpoint returns empty
@@ -1825,7 +1826,7 @@ app.get('/mailcow/aliases', async (req, res) => {
 });
 
 // Alias erstellen
-app.post('/mailcow/aliases', async (req, res) => {
+app.post('/mailcow/aliases', authenticateAny, async (req, res) => {
     try {
         const { address, goto, active = 1 } = req.body;
 
@@ -1846,7 +1847,7 @@ app.post('/mailcow/aliases', async (req, res) => {
 });
 
 // Alias aktualisieren
-app.put('/mailcow/aliases/:id', async (req, res) => {
+app.put('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
     try {
         const { goto, active } = req.body;
         const updateData = {
@@ -1865,7 +1866,7 @@ app.put('/mailcow/aliases/:id', async (req, res) => {
 });
 
 // Alias löschen
-app.delete('/mailcow/aliases/:id', async (req, res) => {
+app.delete('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('POST', '/delete/alias', [req.params.id]);
         res.json(response.data);
@@ -1875,7 +1876,7 @@ app.delete('/mailcow/aliases/:id', async (req, res) => {
 });
 
 // Domain-Informationen
-app.get('/mailcow/domain', async (req, res) => {
+app.get('/mailcow/domain', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', `/get/domain/${MAILCOW_DOMAIN}`);
         res.json(response.data);
@@ -1885,7 +1886,7 @@ app.get('/mailcow/domain', async (req, res) => {
 });
 
 // Quota-Nutzung aller Mailboxen
-app.get('/mailcow/quota', async (req, res) => {
+app.get('/mailcow/quota', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/mailbox/all');
         const mailboxes = Array.isArray(response.data)
@@ -1916,7 +1917,7 @@ const defaultLayoutSettings = {
     footerText: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch'
 };
 
-app.post('/arbeitsplan/pdf', async (req, res) => {
+app.post('/arbeitsplan/pdf', authenticateAny, async (req, res) => {
     try {
         const { event, logoBase64 } = req.body;
 
@@ -2296,7 +2297,7 @@ function generateArbeitsplanHTML(event, logoBase64, layoutSettings = {}) {
 // DISPATCH LOG
 // ============================================
 
-app.get('/dispatch-log', async (req, res) => {
+app.get('/dispatch-log', authenticateAny, async (req, res) => {
     try {
         const { type, status, member_id, event_id, limit = 100 } = req.query;
         let query = 'SELECT * FROM dispatch_log WHERE 1=1';
@@ -2333,7 +2334,7 @@ app.get('/dispatch-log', async (req, res) => {
 // ============================================
 
 // Alle Pingen-Briefe abrufen
-app.get('/pingen/letters', async (req, res) => {
+app.get('/pingen/letters', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id, limit = 50 } = req.query;
         let query = `
@@ -2365,7 +2366,7 @@ app.get('/pingen/letters', async (req, res) => {
 });
 
 // Pingen Brief-Status von API abrufen
-app.get('/pingen/letters/:letterId/status', async (req, res) => {
+app.get('/pingen/letters/:letterId/status', authenticateAny, async (req, res) => {
     try {
         const { letterId } = req.params;
         const staging = req.query.staging === 'true';
@@ -2426,7 +2427,7 @@ app.get('/pingen/letters/:letterId/status', async (req, res) => {
 });
 
 // Pingen Guthaben/Info abrufen
-app.get('/pingen/account', async (req, res) => {
+app.get('/pingen/account', authenticateAny, async (req, res) => {
     try {
         const staging = req.query.staging === 'true';
         const PINGEN_API = getPingenApi(staging);
@@ -2466,7 +2467,7 @@ app.get('/pingen/account', async (req, res) => {
 });
 
 // Pingen Statistiken
-app.get('/pingen/stats', async (req, res) => {
+app.get('/pingen/stats', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT
@@ -2487,7 +2488,7 @@ app.get('/pingen/stats', async (req, res) => {
 });
 
 // Mitglieder mit Post-Zustellung abrufen
-app.get('/pingen/post-members', async (req, res) => {
+app.get('/pingen/post-members', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT id, vorname, nachname, strasse, adresszusatz, plz, ort, email
@@ -2517,7 +2518,7 @@ app.get('/pingen/post-members', async (req, res) => {
 });
 
 // Massen-PDF an alle Post-Empfänger senden
-app.post('/pingen/send-bulk-pdf', async (req, res) => {
+app.post('/pingen/send-bulk-pdf', authenticateAny, async (req, res) => {
     try {
         const { pdf_base64, subject, member_ids, staging = false, use_cover_page = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -2714,7 +2715,7 @@ app.post('/pingen/send-bulk-pdf', async (req, res) => {
 });
 
 // Brief manuell senden
-app.post('/pingen/send-manual', async (req, res) => {
+app.post('/pingen/send-manual', authenticateAny, async (req, res) => {
     try {
         const { member_id, event_id, subject, body, staging = false, use_cover_page = false } = req.body;
 
@@ -2796,7 +2797,7 @@ app.post('/pingen/send-manual', async (req, res) => {
 });
 
 // Arbeitsplan per Post senden
-app.post('/pingen/send-arbeitsplan', async (req, res) => {
+app.post('/pingen/send-arbeitsplan', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id, pdf_base64, staging = false, use_cover_page = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -3138,7 +3139,7 @@ app.post('/pingen/webhook', async (req, res) => {
 });
 
 // Webhook registrieren/verwalten
-app.post('/pingen/webhooks/register', async (req, res) => {
+app.post('/pingen/webhooks/register', authenticateAny, async (req, res) => {
     try {
         const { webhook_url, staging = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -3188,7 +3189,7 @@ app.post('/pingen/webhooks/register', async (req, res) => {
 });
 
 // Registrierte Webhooks abrufen
-app.get('/pingen/webhooks', async (req, res) => {
+app.get('/pingen/webhooks', authenticateAny, async (req, res) => {
     try {
         const staging = req.query.staging === 'true';
         const PINGEN_API = getPingenApi(staging);
@@ -3221,7 +3222,7 @@ app.get('/pingen/webhooks', async (req, res) => {
 });
 
 // Webhook löschen
-app.delete('/pingen/webhooks/:id', async (req, res) => {
+app.delete('/pingen/webhooks/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
         const staging = req.query.staging === 'true';
@@ -3468,7 +3469,7 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
 // ============================================
 
 // Get all PDF templates
-app.get('/pdf-templates', async (req, res) => {
+app.get('/pdf-templates', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT id, name, slug, description, category, variables, is_default, is_active, created_at, updated_at
@@ -3484,7 +3485,7 @@ app.get('/pdf-templates', async (req, res) => {
 });
 
 // Get single PDF template
-app.get('/pdf-templates/:id', async (req, res) => {
+app.get('/pdf-templates/:id', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
             'SELECT * FROM pdf_templates WHERE id = $1',
@@ -3501,7 +3502,7 @@ app.get('/pdf-templates/:id', async (req, res) => {
 });
 
 // Create PDF template
-app.post('/pdf-templates', async (req, res) => {
+app.post('/pdf-templates', authenticateAny, async (req, res) => {
     try {
         const { name, slug, description, category, template_schema, base_pdf, variables } = req.body;
 
@@ -3527,7 +3528,7 @@ app.post('/pdf-templates', async (req, res) => {
 });
 
 // Update PDF template
-app.put('/pdf-templates/:id', async (req, res) => {
+app.put('/pdf-templates/:id', authenticateAny, async (req, res) => {
     try {
         const { name, slug, description, category, template_schema, base_pdf, variables, is_default } = req.body;
 
@@ -3559,7 +3560,7 @@ app.put('/pdf-templates/:id', async (req, res) => {
 });
 
 // Delete PDF template
-app.delete('/pdf-templates/:id', async (req, res) => {
+app.delete('/pdf-templates/:id', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
             'DELETE FROM pdf_templates WHERE id = $1 RETURNING name',
@@ -3579,7 +3580,7 @@ app.delete('/pdf-templates/:id', async (req, res) => {
 });
 
 // Get active layout template (for dynamic PDFs)
-app.get('/pdf-templates/layout/active', async (req, res) => {
+app.get('/pdf-templates/layout/active', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
             "SELECT * FROM pdf_templates WHERE category = 'layout' AND is_active = true ORDER BY is_default DESC, updated_at DESC LIMIT 1"
@@ -3649,7 +3650,7 @@ app.get('/pdf-templates/layout/active', async (req, res) => {
 // ============================================
 
 // Get all settings
-app.get('/organisation-settings', async (req, res) => {
+app.get('/organisation-settings', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value, value_json, description FROM organisation_settings');
         const settings = {};
@@ -3664,7 +3665,7 @@ app.get('/organisation-settings', async (req, res) => {
 });
 
 // Update setting
-app.put('/organisation-settings/:key', async (req, res) => {
+app.put('/organisation-settings/:key', authenticateAny, async (req, res) => {
     try {
         const { value, value_json } = req.body;
 
@@ -3691,7 +3692,7 @@ app.put('/organisation-settings/:key', async (req, res) => {
 // ============================================
 
 // Generate QR invoice for a member
-app.post('/invoices/generate-qr', async (req, res) => {
+app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
     try {
         const {
             member_id,
@@ -3891,7 +3892,7 @@ app.post('/invoices/generate-qr', async (req, res) => {
 });
 
 // Bulk generate QR invoices for all members
-app.post('/invoices/generate-bulk', async (req, res) => {
+app.post('/invoices/generate-bulk', authenticateAny, async (req, res) => {
     try {
         const {
             amount,
