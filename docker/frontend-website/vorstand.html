@@ -2670,8 +2670,24 @@
         // AUTHENTICATION
         // ============================================
 
+        // Helper to get cookie value
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
         async function checkAuth() {
-            const token = localStorage.getItem('vorstand_token');
+            // Check localStorage first, then cookie (for cross-subdomain auth)
+            let token = localStorage.getItem('vorstand_token');
+            if (!token) {
+                token = getCookie('vorstand_token');
+                // Sync cookie to localStorage for consistency
+                if (token) {
+                    localStorage.setItem('vorstand_token', token);
+                }
+            }
             if (!token) {
                 showLoginModal();
                 return false;
@@ -2753,13 +2769,11 @@
 
                 hideLoginModal();
 
-                // Check for redirect parameter
+                // Check for redirect parameter (cookie handles cross-subdomain auth)
                 const urlParams = new URLSearchParams(window.location.search);
                 const redirectUrl = urlParams.get('redirect');
                 if (redirectUrl && redirectUrl.startsWith('https://') && redirectUrl.includes('fwv-raura.ch')) {
-                    // Pass token in URL for cross-subdomain auth
-                    const separator = redirectUrl.includes('?') ? '&' : '?';
-                    window.location.href = `${redirectUrl}${separator}token=${encodeURIComponent(data.token)}`;
+                    window.location.href = redirectUrl;
                     return;
                 }
 

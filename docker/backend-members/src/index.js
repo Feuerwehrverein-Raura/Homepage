@@ -227,6 +227,15 @@ app.post('/auth/vorstand/login', async (req, res) => {
 
         await logAudit(pool, 'LOGIN_SUCCESS', null, emailLower, clientIp, { role: 'admin', method: 'password' });
 
+        // Set cookie for cross-subdomain auth
+        res.cookie('vorstand_token', token, {
+            domain: '.fwv-raura.ch',
+            httpOnly: false, // Allow JS access for API calls
+            secure: true,
+            sameSite: 'lax',
+            maxAge: 8 * 60 * 60 * 1000 // 8 hours
+        });
+
         return res.json({
             success: true,
             token: token,
@@ -308,6 +317,15 @@ app.post('/auth/vorstand/login', async (req, res) => {
 
             // Log successful login
             await logAudit(pool, 'LOGIN_SUCCESS', null, emailLower, clientIp, { role });
+
+            // Set cookie for cross-subdomain auth
+            res.cookie('vorstand_token', token, {
+                domain: '.fwv-raura.ch',
+                httpOnly: false, // Allow JS access for API calls
+                secure: true,
+                sameSite: 'lax',
+                maxAge: 8 * 60 * 60 * 1000 // 8 hours
+            });
 
             res.json({
                 success: true,

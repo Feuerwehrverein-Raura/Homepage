@@ -79,18 +79,25 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
+  // Helper to get cookie value
+  const getCookie = (name) => {
+    const value = `; ${document.cookie}`
+    const parts = value.split(`; ${name}=`)
+    if (parts.length === 2) return parts.pop().split(';').shift()
+    return null
+  }
+
   // Check authentication
   useEffect(() => {
-    // Check for token in URL (cross-subdomain auth)
-    const urlParams = new URLSearchParams(window.location.search)
-    const urlToken = urlParams.get('token')
-    if (urlToken) {
-      localStorage.setItem('vorstand_token', urlToken)
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname)
+    // Check localStorage first, then cookie (for cross-subdomain auth)
+    let token = localStorage.getItem('vorstand_token')
+    if (!token) {
+      token = getCookie('vorstand_token')
+      // Sync cookie to localStorage for consistency
+      if (token) {
+        localStorage.setItem('vorstand_token', token)
+      }
     }
-
-    const token = urlToken || localStorage.getItem('vorstand_token')
     if (token) {
       // Verify token and check permissions
       fetch(`${API_BASE}/auth/verify`, {
