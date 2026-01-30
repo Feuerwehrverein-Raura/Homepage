@@ -135,7 +135,6 @@ function App() {
       designerInstance.current = new Designer({
         domContainer: designerRef.current,
         template,
-        inputs: getSampleInputs(),
         plugins: { text, image, ...barcodes },
       })
     }
