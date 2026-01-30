@@ -1,3 +1,10 @@
+# [1.109.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.4...v1.109.0) (2026-01-30)
+
+
+### Features
+
+* **pdf-designer:** add Pingen address zone overlay for CH and DE ([23fbcc4](https://github.com/Feuerwehrverein-Raura/Homepage/commit/23fbcc4fd0480e4ea0703704c60277ba52d48356))
+
 ## [1.108.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.3...v1.108.4) (2026-01-30)
 
 
