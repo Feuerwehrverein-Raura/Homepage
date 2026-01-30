@@ -1,6 +1,56 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 
+// Offline Banner Component
+function OfflineBanner({ apiUrl }: { apiUrl: string }) {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [backendReachable, setBackendReachable] = useState(true);
+  const checkIntervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Check backend connectivity periodically
+    const checkBackend = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(`${apiUrl}/health`, {
+          method: 'GET',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        setBackendReachable(res.ok);
+      } catch {
+        setBackendReachable(false);
+      }
+    };
+
+    checkBackend();
+    checkIntervalRef.current = window.setInterval(checkBackend, 10000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+    };
+  }, [apiUrl]);
+
+  if (isOnline && backendReachable) return null;
+
+  return (
+    <div className="bg-red-600 text-white px-4 py-2 text-center text-sm font-medium">
+      {!isOnline
+        ? '⚠️ Keine Internetverbindung'
+        : '⚠️ Server nicht erreichbar'}
+    </div>
+  );
+}
+
 // OAuth2 PKCE helper functions
 function generateCodeVerifier(): string {
   const array = new Uint8Array(32);
@@ -415,6 +465,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Offline Warning Banner */}
+      <OfflineBanner apiUrl={API_URL} />
+
       {/* Header */}
       <header className="bg-blue-600 text-white p-3 sm:p-4 shadow-lg">
         <div className="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
@@ -1977,6 +2030,9 @@ function PublicItemView({ code, onNavigateToApp }: { code: string; onNavigateToA
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Offline Warning Banner */}
+      <OfflineBanner apiUrl={API_URL} />
+
       {/* Header */}
       <header className="bg-blue-600 text-white p-4 shadow-lg">
         <div className="container mx-auto flex items-center gap-3">

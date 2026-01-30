@@ -1,5 +1,55 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+// Offline Banner Component
+function OfflineBanner({ apiUrl }: { apiUrl: string }) {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [backendReachable, setBackendReachable] = useState(true);
+  const checkIntervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Check backend connectivity periodically
+    const checkBackend = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(`${apiUrl}/health`, {
+          method: 'GET',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        setBackendReachable(res.ok);
+      } catch {
+        setBackendReachable(false);
+      }
+    };
+
+    checkBackend();
+    checkIntervalRef.current = window.setInterval(checkBackend, 10000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (checkIntervalRef.current) clearInterval(checkIntervalRef.current);
+    };
+  }, [apiUrl]);
+
+  if (isOnline && backendReachable) return null;
+
+  return (
+    <div className="bg-red-600 text-white px-4 py-3 text-center text-lg font-bold">
+      {!isOnline
+        ? '⚠️ KEINE INTERNETVERBINDUNG'
+        : '⚠️ SERVER NICHT ERREICHBAR - BESTELLUNGEN WERDEN NICHT EMPFANGEN'}
+    </div>
+  );
+}
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://order.fwv-raura.ch/api';
 const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch/ws';
 
@@ -284,6 +334,9 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
+      {/* Offline Warning Banner */}
+      <OfflineBanner apiUrl={API_URL} />
+
       {/* Header */}
       <div className="bg-gray-800 p-4 shadow-lg">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
