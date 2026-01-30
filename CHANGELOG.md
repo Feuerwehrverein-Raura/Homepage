@@ -1,3 +1,10 @@
+# [1.101.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.100.0...v1.101.0) (2026-01-30)
+
+
+### Features
+
+* **pdf:** integrate layout templates into PDF generators ([620e07d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/620e07d6e6810380615fa44a9c7fc8f1aa2d2c48))
+
 # [1.100.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.7...v1.100.0) (2026-01-30)
 
 
