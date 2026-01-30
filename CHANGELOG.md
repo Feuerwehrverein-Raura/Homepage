@@ -1,3 +1,10 @@
+## [1.109.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.109.0...v1.109.1) (2026-01-30)
+
+
+### Bug Fixes
+
+* **pdf-designer:** correct Pingen zone positions per official docs ([cd10cf1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cd10cf1f9f5b59713d5153e03360f9073f4cbc87))
+
 # [1.109.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.4...v1.109.0) (2026-01-30)
 
 
