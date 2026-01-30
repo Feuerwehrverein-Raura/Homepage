@@ -172,6 +172,85 @@ async function initDB() {
     )
   `);
 
+  // Recipe Categories (Rezept-Kategorien)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS recipe_categories (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      sort_order INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Insert default recipe categories
+  await pool.query(`
+    INSERT INTO recipe_categories (name, sort_order) VALUES
+      ('Hauptgerichte', 1),
+      ('Vorspeisen', 2),
+      ('Desserts', 3),
+      ('Getränke', 4),
+      ('Snacks', 5)
+    ON CONFLICT (name) DO NOTHING
+  `);
+
+  // Recipes (Rezepte)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS recipes (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      recipe_category_id INTEGER REFERENCES recipe_categories(id),
+
+      -- Calculated cost (cached, updated on ingredient change)
+      calculated_cost DECIMAL(10, 2) DEFAULT 0,
+
+      -- POS integration
+      sellable BOOLEAN DEFAULT false,
+      sale_price DECIMAL(10, 2),
+      sale_category VARCHAR(100),
+      printer_station VARCHAR(50) DEFAULT 'kitchen',
+
+      -- Additional info
+      image_url TEXT,
+      prep_time_minutes INTEGER,
+      servings INTEGER DEFAULT 1,
+      instructions TEXT,
+
+      active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Recipe Ingredients (Rezept-Zutaten)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS recipe_ingredients (
+      id SERIAL PRIMARY KEY,
+      recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
+      item_id INTEGER REFERENCES items(id) ON DELETE RESTRICT,
+      quantity DECIMAL(10, 3) NOT NULL,
+      unit VARCHAR(50),
+      notes TEXT,
+      optional BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(recipe_id, item_id)
+    )
+  `);
+
+  // Recipe Preparations (Zubereitungs-Historie)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS recipe_preparations (
+      id SERIAL PRIMARY KEY,
+      recipe_id INTEGER REFERENCES recipes(id),
+      quantity INTEGER DEFAULT 1,
+      order_id INTEGER,
+      user_email VARCHAR(255),
+      reason VARCHAR(100),
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Indices
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_ean ON items(ean_code)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_custom ON items(custom_barcode)`);
@@ -180,6 +259,11 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_transactions_item ON transactions(item_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_item_locations_item ON item_locations(item_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_item_locations_location ON item_locations(location_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipes_category ON recipes(recipe_category_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipes_sellable ON recipes(sellable) WHERE sellable = true`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_item ON recipe_ingredients(item_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipe_preparations_recipe ON recipe_preparations(recipe_id)`);
 
   console.log('Database initialized');
 }
@@ -381,6 +465,400 @@ app.get('/api/locations/overview', async (req, res) => {
 });
 
 // ========================================
+// RECIPE CATEGORIES
+// ========================================
+
+app.get('/api/recipe-categories', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM recipe_categories ORDER BY sort_order, name');
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/recipe-categories', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { name, sort_order } = req.body;
+    const result = await pool.query(
+      'INSERT INTO recipe_categories (name, sort_order) VALUES ($1, $2) RETURNING *',
+      [name, sort_order || 0]
+    );
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ========================================
+// RECIPES
+// ========================================
+
+// Helper: Calculate recipe cost from ingredients
+async function recalculateRecipeCost(recipeId: number): Promise<number> {
+  const result = await pool.query(`
+    SELECT COALESCE(SUM(ri.quantity * COALESCE(i.purchase_price, 0)), 0) as total_cost
+    FROM recipe_ingredients ri
+    JOIN items i ON ri.item_id = i.id
+    WHERE ri.recipe_id = $1
+  `, [recipeId]);
+
+  const cost = parseFloat(result.rows[0]?.total_cost) || 0;
+
+  await pool.query(
+    'UPDATE recipes SET calculated_cost = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+    [cost, recipeId]
+  );
+
+  return cost;
+}
+
+// Helper: Calculate available portions for a recipe
+async function calculateRecipeAvailability(recipeId: number): Promise<number> {
+  const result = await pool.query(`
+    SELECT MIN(FLOOR(i.quantity / NULLIF(ri.quantity, 0))) as available_portions
+    FROM recipe_ingredients ri
+    JOIN items i ON ri.item_id = i.id
+    WHERE ri.recipe_id = $1 AND ri.optional = false AND i.active = true
+  `, [recipeId]);
+
+  return parseInt(result.rows[0]?.available_portions) || 0;
+}
+
+// Get all recipes
+app.get('/api/recipes', async (req, res) => {
+  try {
+    const { category_id, sellable, search } = req.query;
+
+    let query = `
+      SELECT r.*, rc.name as category_name
+      FROM recipes r
+      LEFT JOIN recipe_categories rc ON r.recipe_category_id = rc.id
+      WHERE r.active = true
+    `;
+    const params: any[] = [];
+
+    if (category_id) {
+      params.push(category_id);
+      query += ` AND r.recipe_category_id = $${params.length}`;
+    }
+
+    if (sellable === 'true') {
+      query += ` AND r.sellable = true`;
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      query += ` AND r.name ILIKE $${params.length}`;
+    }
+
+    query += ' ORDER BY rc.sort_order, r.name';
+
+    const result = await pool.query(query, params);
+
+    // Add availability to each recipe
+    const recipesWithAvailability = await Promise.all(
+      result.rows.map(async (recipe) => ({
+        ...recipe,
+        available_portions: await calculateRecipeAvailability(recipe.id)
+      }))
+    );
+
+    res.json(recipesWithAvailability);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get single recipe with ingredients
+app.get('/api/recipes/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const recipeResult = await pool.query(`
+      SELECT r.*, rc.name as category_name
+      FROM recipes r
+      LEFT JOIN recipe_categories rc ON r.recipe_category_id = rc.id
+      WHERE r.id = $1
+    `, [id]);
+
+    if (recipeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    const ingredientsResult = await pool.query(`
+      SELECT ri.*, i.name as item_name, i.unit as item_unit, i.quantity as item_stock,
+             i.purchase_price as item_price, i.image_url as item_image
+      FROM recipe_ingredients ri
+      JOIN items i ON ri.item_id = i.id
+      WHERE ri.recipe_id = $1
+      ORDER BY i.name
+    `, [id]);
+
+    const recipe = recipeResult.rows[0];
+    recipe.ingredients = ingredientsResult.rows;
+    recipe.available_portions = await calculateRecipeAvailability(recipe.id);
+
+    res.json(recipe);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Create recipe
+app.post('/api/recipes', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const {
+      name, description, recipe_category_id,
+      sellable, sale_price, sale_category, printer_station,
+      image_url, prep_time_minutes, servings, instructions
+    } = req.body;
+
+    const result = await pool.query(`
+      INSERT INTO recipes (
+        name, description, recipe_category_id,
+        sellable, sale_price, sale_category, printer_station,
+        image_url, prep_time_minutes, servings, instructions
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *
+    `, [
+      name, description, recipe_category_id,
+      sellable || false, sale_price, sale_category, printer_station || 'kitchen',
+      image_url, prep_time_minutes, servings || 1, instructions
+    ]);
+
+    broadcast({ type: 'recipe_created', recipe: result.rows[0] });
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Update recipe
+app.put('/api/recipes/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      name, description, recipe_category_id,
+      sellable, sale_price, sale_category, printer_station,
+      image_url, prep_time_minutes, servings, instructions
+    } = req.body;
+
+    const result = await pool.query(`
+      UPDATE recipes SET
+        name = COALESCE($2, name),
+        description = COALESCE($3, description),
+        recipe_category_id = $4,
+        sellable = COALESCE($5, sellable),
+        sale_price = $6,
+        sale_category = $7,
+        printer_station = COALESCE($8, printer_station),
+        image_url = COALESCE($9, image_url),
+        prep_time_minutes = $10,
+        servings = COALESCE($11, servings),
+        instructions = $12,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `, [
+      id, name, description, recipe_category_id,
+      sellable, sale_price, sale_category, printer_station,
+      image_url, prep_time_minutes, servings, instructions
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    broadcast({ type: 'recipe_updated', recipe: result.rows[0] });
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Delete recipe (soft delete)
+app.delete('/api/recipes/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query('UPDATE recipes SET active = false WHERE id = $1', [id]);
+    broadcast({ type: 'recipe_deleted', id });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ========================================
+// RECIPE INGREDIENTS
+// ========================================
+
+// Add ingredient to recipe
+app.post('/api/recipes/:id/ingredients', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { item_id, quantity, unit, notes, optional } = req.body;
+
+    // Check recipe exists
+    const recipeCheck = await pool.query('SELECT id FROM recipes WHERE id = $1', [id]);
+    if (recipeCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    // Check item exists
+    const itemCheck = await pool.query('SELECT id, name FROM items WHERE id = $1 AND active = true', [item_id]);
+    if (itemCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO recipe_ingredients (recipe_id, item_id, quantity, unit, notes, optional)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (recipe_id, item_id) DO UPDATE SET
+        quantity = $3, unit = $4, notes = $5, optional = $6
+      RETURNING *
+    `, [id, item_id, quantity, unit, notes, optional || false]);
+
+    // Recalculate recipe cost
+    await recalculateRecipeCost(parseInt(id));
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Update ingredient
+app.put('/api/recipes/:recipeId/ingredients/:ingredientId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { recipeId, ingredientId } = req.params;
+    const { quantity, unit, notes, optional } = req.body;
+
+    const result = await pool.query(`
+      UPDATE recipe_ingredients
+      SET quantity = $3, unit = $4, notes = $5, optional = $6
+      WHERE recipe_id = $1 AND id = $2
+      RETURNING *
+    `, [recipeId, ingredientId, quantity, unit, notes, optional]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Ingredient not found' });
+    }
+
+    // Recalculate recipe cost
+    await recalculateRecipeCost(parseInt(recipeId));
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Remove ingredient
+app.delete('/api/recipes/:recipeId/ingredients/:ingredientId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { recipeId, ingredientId } = req.params;
+
+    await pool.query(
+      'DELETE FROM recipe_ingredients WHERE recipe_id = $1 AND id = $2',
+      [recipeId, ingredientId]
+    );
+
+    // Recalculate recipe cost
+    await recalculateRecipeCost(parseInt(recipeId));
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get recipe availability
+app.get('/api/recipes/:id/availability', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const available = await calculateRecipeAvailability(parseInt(id));
+    res.json({ recipe_id: parseInt(id), available_portions: available });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Prepare recipe (manually deduct ingredients)
+app.post('/api/recipes/:id/prepare', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { quantity, notes } = req.body;
+    const portions = quantity || 1;
+
+    // Get recipe and ingredients
+    const recipeResult = await client.query('SELECT * FROM recipes WHERE id = $1 AND active = true', [id]);
+    if (recipeResult.rows.length === 0) {
+      throw new Error('Recipe not found');
+    }
+
+    const ingredientsResult = await client.query(`
+      SELECT ri.*, i.id as item_id, i.name as item_name, i.quantity as item_stock
+      FROM recipe_ingredients ri
+      JOIN items i ON ri.item_id = i.id
+      WHERE ri.recipe_id = $1 AND ri.optional = false
+    `, [id]);
+
+    // Check and deduct each ingredient
+    for (const ing of ingredientsResult.rows) {
+      const deductQty = ing.quantity * portions;
+      const newStock = ing.item_stock - deductQty;
+
+      if (newStock < 0) {
+        throw new Error(`Nicht genug ${ing.item_name} auf Lager`);
+      }
+
+      // Update item stock
+      await client.query(
+        'UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [newStock, ing.item_id]
+      );
+
+      // Log transaction
+      await client.query(`
+        INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
+        VALUES ($1, 'out', $2, $3, $4, $5, $6)
+      `, [
+        ing.item_id,
+        deductQty,
+        ing.item_stock,
+        newStock,
+        `Rezept: ${recipeResult.rows[0].name} (${portions}x)`,
+        req.user?.email
+      ]);
+    }
+
+    // Log preparation
+    await client.query(`
+      INSERT INTO recipe_preparations (recipe_id, quantity, user_email, reason, notes)
+      VALUES ($1, $2, $3, 'manual', $4)
+    `, [id, portions, req.user?.email, notes]);
+
+    await client.query('COMMIT');
+
+    // Broadcast stock updates
+    for (const ing of ingredientsResult.rows) {
+      broadcast({ type: 'stock_updated', item_id: ing.item_id });
+    }
+
+    res.json({ success: true, portions_prepared: portions });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    res.status(400).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+});
+
+// ========================================
 // ITEMS
 // ========================================
 
@@ -554,10 +1032,11 @@ app.get('/api/barcode/lookup/:code', async (req, res) => {
 // SELLABLE ITEMS (für Kasse-Integration)
 // ========================================
 
-// Get all sellable items for the POS system
+// Get all sellable items AND recipes for the POS system
 app.get('/api/items/sellable', async (req, res) => {
   try {
-    const result = await pool.query(`
+    // Get sellable inventory items
+    const itemsResult = await pool.query(`
       SELECT
         i.id,
         i.name,
@@ -567,7 +1046,8 @@ app.get('/api/items/sellable', async (req, res) => {
         i.quantity as stock,
         i.custom_barcode,
         i.ean_code,
-        c.name as inventory_category
+        c.name as inventory_category,
+        'inventory' as source
       FROM items i
       LEFT JOIN categories c ON i.category_id = c.id
       WHERE i.sellable = true
@@ -577,7 +1057,46 @@ app.get('/api/items/sellable', async (req, res) => {
         AND i.sale_price > 0
       ORDER BY COALESCE(NULLIF(i.sale_category, ''), c.name), i.name
     `);
-    res.json(result.rows);
+
+    // Get sellable recipes with calculated availability
+    const recipesResult = await pool.query(`
+      SELECT
+        r.id,
+        r.name,
+        r.sale_price as price,
+        COALESCE(NULLIF(r.sale_category, ''), rc.name) as category,
+        r.printer_station,
+        rc.name as recipe_category,
+        'recipe' as source
+      FROM recipes r
+      LEFT JOIN recipe_categories rc ON r.recipe_category_id = rc.id
+      WHERE r.sellable = true
+        AND r.active = true
+        AND r.sale_price IS NOT NULL
+        AND r.sale_price > 0
+    `);
+
+    // Calculate stock (available portions) for each recipe
+    const recipesWithStock = await Promise.all(
+      recipesResult.rows.map(async (recipe) => {
+        const stock = await calculateRecipeAvailability(recipe.id);
+        return { ...recipe, stock };
+      })
+    );
+
+    // Filter recipes that have at least 1 portion available and combine
+    const availableRecipes = recipesWithStock.filter(r => r.stock > 0);
+    const combined = [...itemsResult.rows, ...availableRecipes];
+
+    // Sort by category, then name
+    combined.sort((a, b) => {
+      const catA = a.category || '';
+      const catB = b.category || '';
+      if (catA !== catB) return catA.localeCompare(catB);
+      return a.name.localeCompare(b.name);
+    });
+
+    res.json(combined);
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
@@ -634,60 +1153,129 @@ app.post('/api/items/sell', authenticateOrderSystem, async (req, res) => {
     await client.query('BEGIN');
 
     const { items, order_id, order_source } = req.body;
-    // items: [{ id: number, quantity: number }]
+    // items: [{ id: number, quantity: number, source?: 'inventory' | 'recipe' }]
 
     const results = [];
+    const affectedItemIds: number[] = [];
 
     for (const item of items) {
-      // Get current stock
-      const stockResult = await client.query(
-        'SELECT id, name, quantity FROM items WHERE id = $1 AND active = true',
-        [item.id]
-      );
+      const source = item.source || 'inventory';
 
-      if (stockResult.rows.length === 0) {
-        throw new Error(`Item ${item.id} not found`);
+      if (source === 'recipe') {
+        // Handle recipe: deduct all ingredients
+        const recipeResult = await client.query(
+          'SELECT id, name FROM recipes WHERE id = $1 AND active = true',
+          [item.id]
+        );
+
+        if (recipeResult.rows.length === 0) {
+          throw new Error(`Recipe ${item.id} not found`);
+        }
+
+        const recipe = recipeResult.rows[0];
+
+        // Get recipe ingredients
+        const ingredientsResult = await client.query(`
+          SELECT ri.item_id, ri.quantity as ingredient_qty, i.name as item_name, i.quantity as item_stock
+          FROM recipe_ingredients ri
+          JOIN items i ON ri.item_id = i.id
+          WHERE ri.recipe_id = $1 AND ri.optional = false
+        `, [item.id]);
+
+        // Deduct each ingredient
+        for (const ing of ingredientsResult.rows) {
+          const deductQty = ing.ingredient_qty * item.quantity;
+          const newStock = ing.item_stock - deductQty;
+
+          if (newStock < 0) {
+            throw new Error(`Insufficient stock for ${ing.item_name} (Recipe: ${recipe.name})`);
+          }
+
+          await client.query(
+            'UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [newStock, ing.item_id]
+          );
+
+          await client.query(`
+            INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
+            VALUES ($1, 'out', $2, $3, $4, $5, $6)
+          `, [
+            ing.item_id,
+            deductQty,
+            ing.item_stock,
+            newStock,
+            `Verkauf Rezept "${recipe.name}" - Bestellung #${order_id} (${order_source || 'kasse'})`,
+            'kasse@fwv-raura.ch'
+          ]);
+
+          affectedItemIds.push(ing.item_id);
+        }
+
+        // Log recipe preparation
+        await client.query(`
+          INSERT INTO recipe_preparations (recipe_id, quantity, order_id, reason)
+          VALUES ($1, $2, $3, 'sale')
+        `, [item.id, item.quantity, order_id]);
+
+        results.push({
+          id: item.id,
+          name: recipe.name,
+          sold: item.quantity,
+          source: 'recipe'
+        });
+
+      } else {
+        // Handle regular inventory item
+        const stockResult = await client.query(
+          'SELECT id, name, quantity FROM items WHERE id = $1 AND active = true',
+          [item.id]
+        );
+
+        if (stockResult.rows.length === 0) {
+          throw new Error(`Item ${item.id} not found`);
+        }
+
+        const currentItem = stockResult.rows[0];
+        const newQuantity = currentItem.quantity - item.quantity;
+
+        if (newQuantity < 0) {
+          throw new Error(`Insufficient stock for ${currentItem.name}`);
+        }
+
+        await client.query(
+          'UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [newQuantity, item.id]
+        );
+
+        await client.query(`
+          INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
+          VALUES ($1, 'out', $2, $3, $4, $5, $6)
+        `, [
+          item.id,
+          item.quantity,
+          currentItem.quantity,
+          newQuantity,
+          `Verkauf - Bestellung #${order_id} (${order_source || 'kasse'})`,
+          'kasse@fwv-raura.ch'
+        ]);
+
+        affectedItemIds.push(item.id);
+
+        results.push({
+          id: item.id,
+          name: currentItem.name,
+          sold: item.quantity,
+          remaining: newQuantity,
+          source: 'inventory'
+        });
       }
-
-      const currentItem = stockResult.rows[0];
-      const newQuantity = currentItem.quantity - item.quantity;
-
-      if (newQuantity < 0) {
-        throw new Error(`Insufficient stock for ${currentItem.name}`);
-      }
-
-      // Update stock
-      await client.query(
-        'UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [newQuantity, item.id]
-      );
-
-      // Log transaction
-      await client.query(`
-        INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
-        VALUES ($1, 'out', $2, $3, $4, $5, $6)
-      `, [
-        item.id,
-        item.quantity,
-        currentItem.quantity,
-        newQuantity,
-        `Verkauf - Bestellung #${order_id} (${order_source || 'kasse'})`,
-        'kasse@fwv-raura.ch'
-      ]);
-
-      results.push({
-        id: item.id,
-        name: currentItem.name,
-        sold: item.quantity,
-        remaining: newQuantity
-      });
     }
 
     await client.query('COMMIT');
 
-    // Broadcast stock updates
-    for (const result of results) {
-      broadcast({ type: 'stock_updated', item_id: result.id, new_quantity: result.remaining });
+    // Broadcast stock updates for all affected items
+    for (const itemId of affectedItemIds) {
+      broadcast({ type: 'stock_updated', item_id: itemId });
     }
 
     res.json({ success: true, results });

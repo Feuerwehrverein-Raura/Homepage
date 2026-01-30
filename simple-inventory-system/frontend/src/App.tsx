@@ -113,7 +113,47 @@ interface User {
   groups: string[];
 }
 
-type Tab = 'items' | 'scanner' | 'add' | 'low-stock' | 'reports' | 'kisten';
+type Tab = 'items' | 'scanner' | 'add' | 'low-stock' | 'reports' | 'kisten' | 'rezepte';
+
+interface RecipeCategory {
+  id: number;
+  name: string;
+  sort_order: number;
+}
+
+interface Recipe {
+  id: number;
+  name: string;
+  description?: string;
+  recipe_category_id?: number;
+  category_name?: string;
+  calculated_cost: number;
+  sellable: boolean;
+  sale_price?: number;
+  sale_category?: string;
+  printer_station?: string;
+  image_url?: string;
+  prep_time_minutes?: number;
+  servings: number;
+  instructions?: string;
+  available_portions: number;
+  ingredients?: RecipeIngredient[];
+}
+
+interface RecipeIngredient {
+  id: number;
+  recipe_id: number;
+  item_id: number;
+  item_name: string;
+  item_unit: string;
+  item_stock: number;
+  item_price?: number;
+  item_image?: string;
+  quantity: number;
+  unit?: string;
+  notes?: string;
+  optional: boolean;
+}
 
 interface BoxOverview {
   id: number;
@@ -528,7 +568,7 @@ function App() {
       {/* Desktop Tabs - hidden on mobile */}
       <nav className="bg-white shadow hidden sm:block">
         <div className="container mx-auto flex">
-          {(['items', 'scanner', 'add', 'low-stock', 'kisten', 'reports'] as Tab[]).map((t) => (
+          {(['items', 'scanner', 'add', 'low-stock', 'kisten', 'rezepte', 'reports'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); if (t !== 'scanner') stopScanner(); }}
@@ -541,6 +581,7 @@ function App() {
               {t === 'add' && '➕ Neu'}
               {t === 'low-stock' && '⚠️ Niedrig'}
               {t === 'kisten' && '📦 Kisten'}
+              {t === 'rezepte' && '🍳 Rezepte'}
               {t === 'reports' && '📊 Berichte'}
             </button>
           ))}
@@ -906,6 +947,16 @@ function App() {
           />
         )}
 
+        {/* Rezepte Tab */}
+        {tab === 'rezepte' && (
+          <RecipeView
+            items={items}
+            token={token}
+            user={user}
+            onLogin={login}
+          />
+        )}
+
         {/* Reports Tab */}
         {tab === 'reports' && (
           <ReportsView items={items} locations={locations} onRefresh={fetchItems} />
@@ -919,19 +970,19 @@ function App() {
             { id: 'items', icon: '📋', label: 'Artikel' },
             { id: 'scanner', icon: '📷', label: 'Scan' },
             { id: 'add', icon: '➕', label: 'Neu' },
-            { id: 'low-stock', icon: '⚠️', label: 'Niedrig' },
             { id: 'kisten', icon: '📦', label: 'Kisten' },
-            { id: 'reports', icon: '📊', label: 'Berichte' },
+            { id: 'rezepte', icon: '🍳', label: 'Rezepte' },
+            { id: 'reports', icon: '📊', label: 'Mehr' },
           ] as { id: Tab; icon: string; label: string }[]).map((t) => (
             <button
               key={t.id}
               onClick={() => { setTab(t.id); if (t.id !== 'scanner') stopScanner(); }}
-              className={`flex-1 py-4 flex flex-col items-center gap-1 touch-manipulation ${
+              className={`flex-1 py-3 flex flex-col items-center gap-0.5 touch-manipulation ${
                 tab === t.id ? 'text-blue-600 bg-blue-50' : 'text-gray-500 active:bg-gray-100'
               }`}
             >
-              <span className="text-xl">{t.icon}</span>
-              <span className="text-xs font-medium">{t.label}</span>
+              <span className="text-lg">{t.icon}</span>
+              <span className="text-[10px] font-medium">{t.label}</span>
             </button>
           ))}
         </div>
@@ -973,6 +1024,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
     quantity: '0',
     min_quantity: '0',
     unit: 'Stück',
+    purchase_price: '',
     sellable: false,
     sale_price: '',
     sale_category: '',
@@ -1073,6 +1125,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
           location_id: form.location_id || null,
           quantity: parseInt(form.quantity),
           min_quantity: parseInt(form.min_quantity),
+          purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : null,
           sellable: form.sellable,
           sale_price: form.sellable && form.sale_price ? parseFloat(form.sale_price) : null,
           sale_category: form.sellable ? form.sale_category : null,
@@ -1284,6 +1337,20 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
             className="w-full p-4 border-2 rounded-xl text-lg text-center"
           />
         </div>
+      </div>
+
+      {/* Purchase Price */}
+      <div>
+        <label className="block text-sm text-gray-500 mb-1">Einkaufspreis (CHF, optional)</label>
+        <input
+          type="number"
+          step="0.01"
+          inputMode="decimal"
+          placeholder="z.B. 2.50"
+          value={form.purchase_price}
+          onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+          className="w-full p-4 border-2 rounded-xl text-lg"
+        />
       </div>
 
       {/* Sellable Section for POS */}
@@ -1945,6 +2012,761 @@ function ReportsView({ items, locations, onRefresh }: { items: Item[]; locations
   );
 }
 
+// Recipe View Component
+function RecipeView({ items, token, user, onLogin }: {
+  items: Item[];
+  token: string | null;
+  user: User | null;
+  onLogin: () => void;
+}) {
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [categories, setCategories] = useState<RecipeCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_URL}/recipe-categories`);
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipe categories:', err);
+    }
+  };
+
+  const fetchRecipes = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (selectedCategory) params.set('category_id', selectedCategory.toString());
+      if (searchQuery) params.set('search', searchQuery);
+      const res = await fetch(`${API_URL}/recipes?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecipes(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipes:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRecipeDetails = async (id: number) => {
+    try {
+      const res = await fetch(`${API_URL}/recipes/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedRecipe(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch recipe details:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+    fetchRecipes();
+  }, []);
+
+  useEffect(() => {
+    fetchRecipes();
+  }, [selectedCategory, searchQuery]);
+
+  const handlePrepare = async (recipeId: number, quantity: number = 1) => {
+    if (!token) {
+      onLogin();
+      return;
+    }
+    try {
+      const res = await fetch(`${API_URL}/recipes/${recipeId}/prepare`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ quantity, reason: 'manual' })
+      });
+      if (res.ok) {
+        alert('Rezept zubereitet - Zutaten wurden abgebucht');
+        fetchRecipes();
+        if (selectedRecipe?.id === recipeId) {
+          fetchRecipeDetails(recipeId);
+        }
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Fehler beim Zubereiten');
+      }
+    } catch (err) {
+      alert('Fehler beim Zubereiten');
+    }
+  };
+
+  const handleDelete = async (recipeId: number) => {
+    if (!token) {
+      onLogin();
+      return;
+    }
+    if (!confirm('Rezept wirklich löschen?')) return;
+    try {
+      const res = await fetch(`${API_URL}/recipes/${recipeId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchRecipes();
+        setSelectedRecipe(null);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Fehler beim Löschen');
+      }
+    } catch (err) {
+      alert('Fehler beim Löschen');
+    }
+  };
+
+  const filteredRecipes = recipes.filter(r =>
+    r.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Header with Search and Add Button */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Rezept suchen..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 px-4 py-3 border rounded-lg text-base"
+        />
+        {user && (
+          <button
+            onClick={() => { setEditingRecipe(null); setShowForm(true); }}
+            className="bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold whitespace-nowrap"
+          >
+            + Neu
+          </button>
+        )}
+      </div>
+
+      {/* Category Filter */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        <button
+          onClick={() => setSelectedCategory(null)}
+          className={`px-4 py-2 rounded-full whitespace-nowrap ${
+            selectedCategory === null
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          Alle
+        </button>
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setSelectedCategory(cat.id)}
+            className={`px-4 py-2 rounded-full whitespace-nowrap ${
+              selectedCategory === cat.id
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700'
+            }`}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Recipe List */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Laden...</div>
+      ) : filteredRecipes.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          {searchQuery || selectedCategory ? 'Keine Rezepte gefunden' : 'Noch keine Rezepte vorhanden'}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredRecipes.map(recipe => (
+            <div
+              key={recipe.id}
+              onClick={() => fetchRecipeDetails(recipe.id)}
+              className="bg-white p-4 rounded-xl shadow-md cursor-pointer active:bg-gray-50"
+            >
+              <div className="flex gap-3">
+                {recipe.image_url ? (
+                  <img
+                    src={recipe.image_url.startsWith('http') ? recipe.image_url : `${API_URL}${recipe.image_url}`}
+                    alt=""
+                    className="w-16 h-16 object-cover rounded-lg flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🍳</span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-semibold text-lg">{recipe.name}</h3>
+                      <p className="text-sm text-gray-500">{recipe.category_name || 'Ohne Kategorie'}</p>
+                    </div>
+                    {recipe.sellable && recipe.sale_price && (
+                      <span className="text-lg font-bold text-green-600">
+                        CHF {recipe.sale_price.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm text-gray-500">
+                      Kosten: CHF {recipe.calculated_cost.toFixed(2)}
+                    </span>
+                    <div className={`px-2 py-1 rounded text-sm font-medium ${
+                      recipe.available_portions > 5
+                        ? 'bg-green-100 text-green-700'
+                        : recipe.available_portions > 0
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-red-100 text-red-700'
+                    }`}>
+                      {recipe.available_portions} Portionen
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Recipe Detail Modal */}
+      {selectedRecipe && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-white w-full sm:max-w-lg sm:rounded-xl max-h-[90vh] overflow-y-auto rounded-t-xl">
+            {/* Header Image */}
+            {selectedRecipe.image_url ? (
+              <div className="relative h-48">
+                <img
+                  src={selectedRecipe.image_url.startsWith('http') ? selectedRecipe.image_url : `${API_URL}${selectedRecipe.image_url}`}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => setSelectedRecipe(null)}
+                  className="absolute top-3 right-3 bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="relative h-32 bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
+                <span className="text-6xl">🍳</span>
+                <button
+                  onClick={() => setSelectedRecipe(null)}
+                  className="absolute top-3 right-3 bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            <div className="p-4">
+              {/* Title and Badges */}
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h2 className="text-2xl font-bold">{selectedRecipe.name}</h2>
+                  <p className="text-gray-500">{selectedRecipe.category_name || 'Ohne Kategorie'}</p>
+                </div>
+                <div className="text-right">
+                  {selectedRecipe.sellable && selectedRecipe.sale_price && (
+                    <div className="text-xl font-bold text-green-600">
+                      CHF {selectedRecipe.sale_price.toFixed(2)}
+                    </div>
+                  )}
+                  <div className="text-sm text-gray-500">
+                    Kosten: CHF {selectedRecipe.calculated_cost.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedRecipe.description && (
+                <p className="text-gray-600 mb-4">{selectedRecipe.description}</p>
+              )}
+
+              {/* Meta Info */}
+              <div className="flex gap-4 mb-4 text-sm text-gray-500">
+                {selectedRecipe.servings > 1 && (
+                  <span>🍽️ {selectedRecipe.servings} Portionen</span>
+                )}
+                {selectedRecipe.prep_time_minutes && (
+                  <span>⏱️ {selectedRecipe.prep_time_minutes} Min.</span>
+                )}
+              </div>
+
+              {/* Availability */}
+              <div className={`p-3 rounded-lg mb-4 ${
+                selectedRecipe.available_portions > 5
+                  ? 'bg-green-100 text-green-800'
+                  : selectedRecipe.available_portions > 0
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-red-100 text-red-800'
+              }`}>
+                <span className="font-semibold">{selectedRecipe.available_portions}</span> Portionen verfügbar
+              </div>
+
+              {/* Ingredients */}
+              {selectedRecipe.ingredients && selectedRecipe.ingredients.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-semibold mb-2">Zutaten</h3>
+                  <div className="space-y-2">
+                    {selectedRecipe.ingredients.map(ing => (
+                      <div key={ing.id} className="flex justify-between items-center py-2 border-b">
+                        <div className="flex items-center gap-2">
+                          {ing.item_image ? (
+                            <img
+                              src={ing.item_image.startsWith('http') ? ing.item_image : `${API_URL}${ing.item_image}`}
+                              alt=""
+                              className="w-8 h-8 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center text-xs">📦</div>
+                          )}
+                          <span>{ing.item_name}</span>
+                          {ing.optional && <span className="text-xs text-gray-400">(optional)</span>}
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{ing.quantity} {ing.unit || ing.item_unit}</div>
+                          <div className={`text-xs ${ing.item_stock >= ing.quantity ? 'text-green-600' : 'text-red-600'}`}>
+                            Lager: {ing.item_stock}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Instructions */}
+              {selectedRecipe.instructions && (
+                <div className="mb-4">
+                  <h3 className="font-semibold mb-2">Zubereitung</h3>
+                  <p className="text-gray-600 whitespace-pre-line">{selectedRecipe.instructions}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-4">
+                {user && (
+                  <>
+                    <button
+                      onClick={() => handlePrepare(selectedRecipe.id)}
+                      disabled={selectedRecipe.available_portions < 1}
+                      className={`flex-1 py-3 rounded-lg font-semibold ${
+                        selectedRecipe.available_portions < 1
+                          ? 'bg-gray-200 text-gray-500'
+                          : 'bg-green-600 text-white'
+                      }`}
+                    >
+                      🍳 Zubereiten
+                    </button>
+                    <button
+                      onClick={() => { setEditingRecipe(selectedRecipe); setShowForm(true); setSelectedRecipe(null); }}
+                      className="px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDelete(selectedRecipe.id)}
+                      className="px-4 py-3 bg-red-600 text-white rounded-lg font-semibold"
+                    >
+                      🗑️
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recipe Form Modal */}
+      {showForm && (
+        <RecipeFormModal
+          recipe={editingRecipe}
+          categories={categories}
+          items={items}
+          token={token!}
+          onClose={() => { setShowForm(false); setEditingRecipe(null); }}
+          onSave={() => { setShowForm(false); setEditingRecipe(null); fetchRecipes(); fetchCategories(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Recipe Form Modal Component
+function RecipeFormModal({ recipe, categories, items, token, onClose, onSave }: {
+  recipe: Recipe | null;
+  categories: RecipeCategory[];
+  items: Item[];
+  token: string;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: recipe?.name || '',
+    description: recipe?.description || '',
+    recipe_category_id: recipe?.recipe_category_id?.toString() || '',
+    sellable: recipe?.sellable || false,
+    sale_price: recipe?.sale_price?.toString() || '',
+    sale_category: recipe?.sale_category || 'Essen',
+    printer_station: recipe?.printer_station || 'kitchen',
+    servings: recipe?.servings?.toString() || '1',
+    prep_time_minutes: recipe?.prep_time_minutes?.toString() || '',
+    instructions: recipe?.instructions || ''
+  });
+  const [ingredients, setIngredients] = useState<{item_id: number; quantity: number; unit?: string; notes?: string; optional: boolean}[]>(
+    recipe?.ingredients?.map(i => ({ item_id: i.item_id, quantity: i.quantity, unit: i.unit, notes: i.notes, optional: i.optional })) || []
+  );
+  const [newIngredient, setNewIngredient] = useState({ item_id: '', quantity: '', unit: '' });
+  const [saving, setSaving] = useState(false);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  const calculateCost = () => {
+    return ingredients.reduce((sum, ing) => {
+      const item = items.find(i => i.id === ing.item_id);
+      return sum + (item?.purchase_price || 0) * ing.quantity;
+    }, 0);
+  };
+
+  const addIngredient = () => {
+    if (!newIngredient.item_id || !newIngredient.quantity) return;
+    const itemId = parseInt(newIngredient.item_id);
+    if (ingredients.some(i => i.item_id === itemId)) {
+      alert('Zutat bereits vorhanden');
+      return;
+    }
+    setIngredients([...ingredients, {
+      item_id: itemId,
+      quantity: parseFloat(newIngredient.quantity),
+      unit: newIngredient.unit || undefined,
+      optional: false
+    }]);
+    setNewIngredient({ item_id: '', quantity: '', unit: '' });
+  };
+
+  const removeIngredient = (itemId: number) => {
+    setIngredients(ingredients.filter(i => i.item_id !== itemId));
+  };
+
+  const createCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/recipe-categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name: newCategoryName.trim() })
+      });
+      if (res.ok) {
+        const cat = await res.json();
+        setForm({ ...form, recipe_category_id: cat.id.toString() });
+        setNewCategoryName('');
+        setShowNewCategory(false);
+      }
+    } catch { alert('Fehler'); }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      alert('Name ist erforderlich');
+      return;
+    }
+    if (ingredients.length === 0) {
+      alert('Mindestens eine Zutat ist erforderlich');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const url = recipe ? `${API_URL}/recipes/${recipe.id}` : `${API_URL}/recipes`;
+      const method = recipe ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          name: form.name,
+          description: form.description || null,
+          recipe_category_id: form.recipe_category_id ? parseInt(form.recipe_category_id) : null,
+          sellable: form.sellable,
+          sale_price: form.sellable && form.sale_price ? parseFloat(form.sale_price) : null,
+          sale_category: form.sellable ? form.sale_category : null,
+          printer_station: form.printer_station,
+          servings: parseInt(form.servings) || 1,
+          prep_time_minutes: form.prep_time_minutes ? parseInt(form.prep_time_minutes) : null,
+          instructions: form.instructions || null,
+          ingredients: ingredients
+        })
+      });
+
+      if (res.ok) {
+        onSave();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Fehler beim Speichern');
+      }
+    } catch {
+      alert('Fehler beim Speichern');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white w-full sm:max-w-lg sm:rounded-xl max-h-[90vh] overflow-y-auto rounded-t-xl">
+        <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+          <h2 className="text-xl font-bold">{recipe ? 'Rezept bearbeiten' : 'Neues Rezept'}</h2>
+          <button onClick={onClose} className="text-2xl text-gray-500">✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {/* Basic Info */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Beschreibung</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg"
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Kategorie</label>
+            {showNewCategory ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Neue Kategorie"
+                  className="flex-1 px-3 py-2 border rounded-lg"
+                />
+                <button type="button" onClick={createCategory} className="px-3 py-2 bg-green-600 text-white rounded-lg">✓</button>
+                <button type="button" onClick={() => setShowNewCategory(false)} className="px-3 py-2 bg-gray-300 rounded-lg">✕</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select
+                  value={form.recipe_category_id}
+                  onChange={(e) => setForm({ ...form, recipe_category_id: e.target.value })}
+                  className="flex-1 px-3 py-2 border rounded-lg"
+                >
+                  <option value="">Ohne Kategorie</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={() => setShowNewCategory(true)} className="px-3 py-2 bg-gray-100 rounded-lg">+</button>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">Portionen</label>
+              <input
+                type="number"
+                value={form.servings}
+                onChange={(e) => setForm({ ...form, servings: e.target.value })}
+                min="1"
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Zeit (Min.)</label>
+              <input
+                type="number"
+                value={form.prep_time_minutes}
+                onChange={(e) => setForm({ ...form, prep_time_minutes: e.target.value })}
+                min="0"
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+            </div>
+          </div>
+
+          {/* Ingredients */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Zutaten *</label>
+
+            {/* Ingredient list */}
+            <div className="space-y-2 mb-3">
+              {ingredients.map(ing => {
+                const item = items.find(i => i.id === ing.item_id);
+                return (
+                  <div key={ing.item_id} className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                    <span className="flex-1">{item?.name || 'Unbekannt'}</span>
+                    <input
+                      type="number"
+                      value={ing.quantity}
+                      onChange={(e) => setIngredients(ingredients.map(i =>
+                        i.item_id === ing.item_id ? { ...i, quantity: parseFloat(e.target.value) || 0 } : i
+                      ))}
+                      className="w-20 px-2 py-1 border rounded text-center"
+                      step="0.1"
+                    />
+                    <span className="text-sm text-gray-500 w-12">{item?.unit}</span>
+                    <button type="button" onClick={() => removeIngredient(ing.item_id)} className="text-red-500 px-2">✕</button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add ingredient */}
+            <div className="flex gap-2">
+              <select
+                value={newIngredient.item_id}
+                onChange={(e) => setNewIngredient({ ...newIngredient, item_id: e.target.value })}
+                className="flex-1 px-3 py-2 border rounded-lg text-sm"
+              >
+                <option value="">Zutat wählen...</option>
+                {items.filter(i => !ingredients.some(ing => ing.item_id === i.id)).map(item => (
+                  <option key={item.id} value={item.id}>{item.name} ({item.quantity} {item.unit})</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                value={newIngredient.quantity}
+                onChange={(e) => setNewIngredient({ ...newIngredient, quantity: e.target.value })}
+                placeholder="Menge"
+                className="w-20 px-2 py-2 border rounded-lg"
+                step="0.1"
+              />
+              <button
+                type="button"
+                onClick={addIngredient}
+                disabled={!newIngredient.item_id || !newIngredient.quantity}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-300"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Cost display */}
+            {ingredients.length > 0 && (
+              <div className="mt-2 text-right text-sm">
+                Berechnete Kosten: <strong>CHF {calculateCost().toFixed(2)}</strong>
+              </div>
+            )}
+          </div>
+
+          {/* Sale Settings */}
+          <div className="border-t pt-4">
+            <label className="flex items-center gap-2 mb-3">
+              <input
+                type="checkbox"
+                checked={form.sellable}
+                onChange={(e) => setForm({ ...form, sellable: e.target.checked })}
+                className="w-5 h-5"
+              />
+              <span className="font-medium">In Kasse verkaufen</span>
+            </label>
+
+            {form.sellable && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Verkaufspreis (CHF)</label>
+                  <input
+                    type="number"
+                    value={form.sale_price}
+                    onChange={(e) => setForm({ ...form, sale_price: e.target.value })}
+                    step="0.5"
+                    min="0"
+                    className="w-full px-3 py-2 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Kategorie</label>
+                  <select
+                    value={form.sale_category}
+                    onChange={(e) => setForm({ ...form, sale_category: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="Essen">Essen</option>
+                    <option value="Getränke">Getränke</option>
+                    <option value="Snacks">Snacks</option>
+                    <option value="Desserts">Desserts</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1">Drucker</label>
+                  <select
+                    value={form.printer_station}
+                    onChange={(e) => setForm({ ...form, printer_station: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg"
+                  >
+                    <option value="kitchen">Küche</option>
+                    <option value="bar">Bar</option>
+                    <option value="none">Kein Druck</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Instructions */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Zubereitungsanleitung</label>
+            <textarea
+              value={form.instructions}
+              onChange={(e) => setForm({ ...form, instructions: e.target.value })}
+              className="w-full px-3 py-2 border rounded-lg"
+              rows={4}
+              placeholder="Schritt-für-Schritt Anleitung..."
+            />
+          </div>
+
+          {/* Submit */}
+          <div className="flex gap-2 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 bg-gray-200 rounded-lg font-semibold"
+            >
+              Abbrechen
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-semibold disabled:bg-gray-400"
+            >
+              {saving ? 'Speichern...' : 'Speichern'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // Item Detail Modal with Edit and Image functionality
 function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, categories, locations }: {
   item: Item;
@@ -1973,6 +2795,7 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
     ean_code: item.ean_code || '',
     min_quantity: item.min_quantity.toString(),
     unit: item.unit,
+    purchase_price: item.purchase_price?.toString() || '',
     sellable: item.sellable || false,
     sale_price: item.sale_price?.toString() || '',
     sale_category: item.sale_category || '',
@@ -2095,6 +2918,7 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
           category_id: editForm.category_id || null,
           location_id: editForm.location_id || null,
           min_quantity: parseInt(editForm.min_quantity),
+          purchase_price: editForm.purchase_price ? parseFloat(editForm.purchase_price) : null,
           sellable: editForm.sellable,
           sale_price: editForm.sellable && editForm.sale_price ? parseFloat(editForm.sale_price) : null,
           sale_category: editForm.sellable ? editForm.sale_category : null,
@@ -2356,7 +3180,7 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
                 className="w-full p-3 border rounded-lg"
               />
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Min. Bestand</label>
                   <input
@@ -2372,6 +3196,17 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
                     type="text"
                     value={editForm.unit}
                     onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">EK-Preis (CHF)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={editForm.purchase_price}
+                    onChange={(e) => setEditForm({ ...editForm, purchase_price: e.target.value })}
                     className="w-full p-3 border rounded-lg"
                   />
                 </div>
