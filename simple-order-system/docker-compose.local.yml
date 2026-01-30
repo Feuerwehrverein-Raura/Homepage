@@ -22,7 +22,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-localpass}
       POSTGRES_DB: ${DB_NAME:-localdb}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test:
@@ -131,6 +131,3 @@ services:
       - order-kitchen
       - inventory-backend
       - inventory-frontend
-
-volumes:
-  postgres_data:

@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-localpass123}
       POSTGRES_DB: inventorydb
     volumes:
-      - inventory_postgres_local:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     networks:
       - inventory-local
     healthcheck:
@@ -96,6 +96,3 @@ services:
 networks:
   inventory-local:
     driver: bridge
-
-volumes:
-  inventory_postgres_local:

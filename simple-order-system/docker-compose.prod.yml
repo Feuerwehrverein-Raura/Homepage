@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD}
       POSTGRES_DB: ${ORDER_DB_NAME:-orderdb}
     volumes:
-      - order_postgres_data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
     networks:
       - proxy
     healthcheck:
@@ -129,6 +129,3 @@ services:
 networks:
   proxy:
     external: true
-
-volumes:
-  order_postgres_data:

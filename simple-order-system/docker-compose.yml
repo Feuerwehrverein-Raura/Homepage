@@ -30,6 +30,3 @@ services:
 networks:
   order-network:
     driver: bridge
-
-volumes:
-  postgres_data:
