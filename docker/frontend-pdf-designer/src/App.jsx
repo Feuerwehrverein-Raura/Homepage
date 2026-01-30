@@ -2,65 +2,218 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Designer } from '@pdfme/ui'
 import { generate } from '@pdfme/generator'
 import { text, image, barcodes } from '@pdfme/schemas'
+import { BLANK_PDF } from '@pdfme/common'
 
 const API_BASE = 'https://api.fwv-raura.ch'
 
-// Default A4 Template (pdfme v4 format: schemas is array of objects per page)
+// Default A4 Brief Template
 const getDefaultTemplate = () => ({
-  basePdf: { width: 210, height: 297, padding: [20, 20, 20, 20] },
+  basePdf: BLANK_PDF,
   schemas: [
     {
-      logo: {
-        type: 'image',
-        position: { x: 20, y: 15 },
-        width: 40,
-        height: 20,
-      },
-      organisation: {
+      // Absender oben rechts
+      absender: {
         type: 'text',
-        position: { x: 140, y: 15 },
-        width: 50,
-        height: 20,
+        position: { x: 120, y: 15 },
+        width: 75,
+        height: 25,
+        fontSize: 9,
+        lineHeight: 1.2,
+      },
+      // Empfänger Adresse
+      empfaenger: {
+        type: 'text',
+        position: { x: 25, y: 50 },
+        width: 80,
+        height: 30,
+        fontSize: 11,
+        lineHeight: 1.3,
+      },
+      // Ort und Datum
+      ort_datum: {
+        type: 'text',
+        position: { x: 120, y: 85 },
+        width: 70,
+        height: 8,
         fontSize: 10,
         alignment: 'right',
       },
-      titel: {
+      // Betreff
+      betreff: {
         type: 'text',
-        position: { x: 20, y: 50 },
-        width: 170,
-        height: 12,
-        fontSize: 18,
+        position: { x: 25, y: 100 },
+        width: 160,
+        height: 10,
+        fontSize: 12,
         fontWeight: 'bold',
       },
-      inhalt: {
+      // Anrede
+      anrede: {
         type: 'text',
-        position: { x: 20, y: 70 },
-        width: 170,
-        height: 180,
+        position: { x: 25, y: 115 },
+        width: 160,
+        height: 8,
         fontSize: 11,
       },
+      // Inhalt
+      inhalt: {
+        type: 'text',
+        position: { x: 25, y: 128 },
+        width: 160,
+        height: 100,
+        fontSize: 11,
+        lineHeight: 1.4,
+      },
+      // Grussformel
+      gruss: {
+        type: 'text',
+        position: { x: 25, y: 235 },
+        width: 160,
+        height: 25,
+        fontSize: 11,
+        lineHeight: 1.4,
+      },
+      // Fusszeile
       fusszeile: {
         type: 'text',
-        position: { x: 20, y: 280 },
-        width: 170,
+        position: { x: 25, y: 280 },
+        width: 160,
         height: 8,
         fontSize: 8,
         alignment: 'center',
+        fontColor: '#666666',
+      },
+    },
+  ],
+})
+
+// Rechnungs-Template mit QR-Bereich
+const getInvoiceTemplate = () => ({
+  basePdf: BLANK_PDF,
+  schemas: [
+    {
+      // Logo
+      logo: {
+        type: 'image',
+        position: { x: 25, y: 10 },
+        width: 35,
+        height: 18,
+      },
+      // Absender
+      absender: {
+        type: 'text',
+        position: { x: 120, y: 15 },
+        width: 75,
+        height: 25,
+        fontSize: 9,
+        lineHeight: 1.2,
+      },
+      // Empfänger
+      empfaenger: {
+        type: 'text',
+        position: { x: 25, y: 50 },
+        width: 80,
+        height: 30,
+        fontSize: 11,
+        lineHeight: 1.3,
+      },
+      // Titel
+      titel: {
+        type: 'text',
+        position: { x: 25, y: 90 },
+        width: 160,
+        height: 10,
+        fontSize: 14,
+        fontWeight: 'bold',
+      },
+      // Rechnungsnummer & Datum
+      rechnung_info: {
+        type: 'text',
+        position: { x: 25, y: 105 },
+        width: 160,
+        height: 15,
+        fontSize: 10,
+        lineHeight: 1.4,
+      },
+      // Rechnungstext
+      text: {
+        type: 'text',
+        position: { x: 25, y: 125 },
+        width: 160,
+        height: 50,
+        fontSize: 11,
+        lineHeight: 1.4,
+      },
+      // Betrag gross
+      betrag: {
+        type: 'text',
+        position: { x: 130, y: 180 },
+        width: 55,
+        height: 12,
+        fontSize: 16,
+        fontWeight: 'bold',
+        alignment: 'right',
+      },
+      // QR-Code Bereich (wird vom Backend mit swissqrbill gefüllt)
+      qr_code: {
+        type: 'image',
+        position: { x: 25, y: 200 },
+        width: 46,
+        height: 46,
+      },
+      // Zahlungsinformationen
+      zahlungsinfo: {
+        type: 'text',
+        position: { x: 80, y: 200 },
+        width: 105,
+        height: 45,
+        fontSize: 9,
+        lineHeight: 1.3,
+      },
+      // Fusszeile
+      fusszeile: {
+        type: 'text',
+        position: { x: 25, y: 280 },
+        width: 160,
+        height: 8,
+        fontSize: 8,
+        alignment: 'center',
+        fontColor: '#666666',
       },
     },
   ],
 })
 
 // Sample inputs for preview
-const getSampleInputs = () => [
-  {
-    logo: '',
-    organisation: 'Feuerwehrverein Raura\n6017 Ruswil',
-    titel: 'Beispiel-Dokument',
-    inhalt: 'Hier kommt der Inhalt des Dokuments...\n\nMit mehreren Zeilen und Absätzen.',
+const getSampleInputs = (category) => {
+  if (category === 'rechnung') {
+    return [{
+      logo: '',
+      absender: 'Feuerwehrverein Raura\nMusterstrasse 1\n6017 Ruswil',
+      empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
+      titel: 'Mitgliederbeitrag 2026',
+      rechnung_info: 'Rechnungsnummer: 2026-001\nDatum: 30.01.2026',
+      text: 'Wir erlauben uns, Ihnen den Mitgliederbeitrag für das Jahr 2026 in Rechnung zu stellen.\n\nBitte überweisen Sie den Betrag innert 30 Tagen.',
+      betrag: 'CHF 50.00',
+      qr_code: '',
+      zahlungsinfo: 'Konto: CH93 0076 2011 6238 5295 7\nZahlbar innert 30 Tagen\nReferenz: RF26 0001',
+      fusszeile: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch',
+    }]
+  }
+  return [{
+    absender: 'Feuerwehrverein Raura\nMusterstrasse 1\n6017 Ruswil',
+    empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
+    ort_datum: 'Ruswil, 30. Januar 2026',
+    betreff: 'Einladung zur Generalversammlung',
+    anrede: 'Sehr geehrter Herr Mustermann',
+    inhalt: 'Wir laden Sie herzlich zu unserer diesjährigen Generalversammlung ein.\n\nDie Versammlung findet am Samstag, 15. März 2026 um 19:00 Uhr im Vereinslokal statt.\n\nWir freuen uns auf Ihre Teilnahme.',
+    gruss: 'Freundliche Grüsse\n\nFeuerwehrverein Raura\nDer Präsident',
     fusszeile: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch',
-  },
-]
+  }]
+}
+
+// Plugin configuration
+const plugins = { text, image, ...barcodes }
 
 function App() {
   const designerRef = useRef(null)
@@ -68,11 +221,12 @@ function App() {
   const [templates, setTemplates] = useState([])
   const [currentTemplate, setCurrentTemplate] = useState(null)
   const [templateName, setTemplateName] = useState('')
-  const [templateCategory, setTemplateCategory] = useState('allgemein')
+  const [templateCategory, setTemplateCategory] = useState('brief')
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [designerReady, setDesignerReady] = useState(false)
 
   // Helper to get cookie value
   const getCookie = (name) => {
@@ -84,17 +238,14 @@ function App() {
 
   // Check authentication
   useEffect(() => {
-    // Check localStorage first, then cookie (for cross-subdomain auth)
     let token = localStorage.getItem('vorstand_token')
     if (!token) {
       token = getCookie('vorstand_token')
-      // Sync cookie to localStorage for consistency
       if (token) {
         localStorage.setItem('vorstand_token', token)
       }
     }
     if (token) {
-      // Verify token and check permissions
       fetch(`${API_BASE}/auth/vorstand/me`, {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -103,7 +254,6 @@ function App() {
           return res.json()
         })
         .then((data) => {
-          // Check if user has access (Vorstand or Social Media function)
           const hasAccess =
             data.role === 'admin' ||
             data.groups?.includes('vorstand') ||
@@ -130,19 +280,25 @@ function App() {
   // Initialize pdfme Designer
   useEffect(() => {
     if (isAuthenticated && designerRef.current && !designerInstance.current) {
-      const template = currentTemplate?.template_schema || getDefaultTemplate()
+      try {
+        const template = currentTemplate?.template_schema || getDefaultTemplate()
 
-      designerInstance.current = new Designer({
-        domContainer: designerRef.current,
-        template,
-        plugins: { text, image, ...barcodes },
-      })
+        designerInstance.current = new Designer({
+          domContainer: designerRef.current,
+          template,
+          plugins,
+        })
+        setDesignerReady(true)
+      } catch (err) {
+        console.error('Designer init error:', err)
+      }
     }
 
     return () => {
       if (designerInstance.current) {
         designerInstance.current.destroy()
         designerInstance.current = null
+        setDesignerReady(false)
       }
     }
   }, [isAuthenticated])
@@ -165,20 +321,30 @@ function App() {
   const loadTemplate = (template) => {
     setCurrentTemplate(template)
     setTemplateName(template.name)
-    setTemplateCategory(template.category || 'allgemein')
+    setTemplateCategory(template.category || 'brief')
 
-    if (designerInstance.current) {
-      designerInstance.current.updateTemplate(template.template_schema)
+    if (designerInstance.current && template.template_schema) {
+      try {
+        designerInstance.current.updateTemplate(template.template_schema)
+      } catch (err) {
+        console.error('Error loading template:', err)
+      }
     }
   }
 
-  const createNewTemplate = () => {
+  const createNewTemplate = (category = 'brief') => {
     setCurrentTemplate(null)
     setTemplateName('')
-    setTemplateCategory('allgemein')
+    setTemplateCategory(category)
+
+    const template = category === 'rechnung' ? getInvoiceTemplate() : getDefaultTemplate()
 
     if (designerInstance.current) {
-      designerInstance.current.updateTemplate(getDefaultTemplate())
+      try {
+        designerInstance.current.updateTemplate(template)
+      } catch (err) {
+        console.error('Error creating template:', err)
+      }
     }
   }
 
@@ -198,12 +364,24 @@ function App() {
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9-]/g, '')
 
+      // Extract variable names from schema
+      const variables = []
+      if (templateSchema.schemas) {
+        templateSchema.schemas.forEach((page) => {
+          Object.keys(page).forEach((fieldName) => {
+            if (!variables.includes(fieldName)) {
+              variables.push(fieldName)
+            }
+          })
+        })
+      }
+
       const body = {
         name: templateName,
         slug,
         category: templateCategory,
         template_schema: templateSchema,
-        variables: extractVariables(templateSchema),
+        variables,
       }
 
       const url = currentTemplate
@@ -227,7 +405,8 @@ function App() {
         loadTemplates()
         alert('Template gespeichert!')
       } else {
-        throw new Error('Speichern fehlgeschlagen')
+        const error = await res.json()
+        throw new Error(error.error || 'Speichern fehlgeschlagen')
       }
     } catch (err) {
       alert('Fehler beim Speichern: ' + err.message)
@@ -258,34 +437,25 @@ function App() {
   }
 
   const generatePreview = async () => {
+    if (!designerInstance.current) return
+
     try {
       const template = designerInstance.current.getTemplate()
+      const inputs = getSampleInputs(templateCategory)
+
       const pdf = await generate({
         template,
-        inputs: getSampleInputs(),
-        plugins: { text, image, ...barcodes },
+        inputs,
+        plugins,
       })
 
       const blob = new Blob([pdf.buffer], { type: 'application/pdf' })
       const url = URL.createObjectURL(blob)
       window.open(url, '_blank')
     } catch (err) {
+      console.error('Preview error:', err)
       alert('Fehler bei der Vorschau: ' + err.message)
     }
-  }
-
-  const extractVariables = (template) => {
-    const vars = []
-    if (template.schemas) {
-      template.schemas.forEach((page) => {
-        page.forEach((field) => {
-          if (field.name && !vars.includes(field.name)) {
-            vars.push(field.name)
-          }
-        })
-      })
-    }
-    return vars
   }
 
   if (loading) {
@@ -311,7 +481,7 @@ function App() {
           </div>
           <a
             href={`https://www.fwv-raura.ch/vorstand.html?redirect=${encodeURIComponent(window.location.href)}`}
-            className="block w-full bg-fire-600 text-white text-center py-3 rounded-lg hover:bg-fire-700 transition"
+            className="block w-full bg-red-600 text-white text-center py-3 rounded-lg hover:bg-red-700 transition"
           >
             Zum Vorstand-Login
           </a>
@@ -335,11 +505,11 @@ function App() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-600">
-              {user?.vorname} {user?.nachname}
+              {user?.vorname || user?.name} {user?.nachname || ''}
             </span>
             <a
               href="https://www.fwv-raura.ch/vorstand.html"
-              className="text-sm text-fire-600 hover:text-fire-700"
+              className="text-sm text-red-600 hover:text-red-700"
             >
               Zurück zum Vorstand
             </a>
@@ -360,8 +530,8 @@ function App() {
                 type="text"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="z.B. Mitgliederbeitrags-Rechnung"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-fire-500 focus:border-fire-500"
+                placeholder="z.B. Mitgliederbeitrag-Rechnung"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
               />
             </div>
             <div className="mb-3">
@@ -370,31 +540,33 @@ function App() {
               </label>
               <select
                 value={templateCategory}
-                onChange={(e) => setTemplateCategory(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-fire-500"
+                onChange={(e) => {
+                  setTemplateCategory(e.target.value)
+                  if (!currentTemplate) {
+                    createNewTemplate(e.target.value)
+                  }
+                }}
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
               >
-                <option value="allgemein">Allgemein</option>
-                <option value="rechnung">Rechnung</option>
-                <option value="arbeitsplan">Arbeitsplan</option>
-                <option value="mitgliederliste">Mitgliederliste</option>
-                <option value="teilnehmerliste">Teilnehmerliste</option>
                 <option value="brief">Brief</option>
+                <option value="rechnung">Rechnung (QR)</option>
               </select>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={saveTemplate}
-                disabled={saving}
-                className="flex-1 bg-fire-600 text-white py-2 rounded-lg hover:bg-fire-700 disabled:opacity-50"
+                disabled={saving || !designerReady}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
                 {saving ? 'Speichern...' : 'Speichern'}
               </button>
               <button
                 onClick={generatePreview}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                title="Vorschau"
+                disabled={!designerReady}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                title="Vorschau generieren"
               >
-                👁
+                📄
               </button>
             </div>
           </div>
@@ -405,8 +577,8 @@ function App() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-gray-700">Templates</h3>
                 <button
-                  onClick={createNewTemplate}
-                  className="text-sm text-fire-600 hover:text-fire-700"
+                  onClick={() => createNewTemplate(templateCategory)}
+                  className="text-sm text-red-600 hover:text-red-700"
                 >
                   + Neu
                 </button>
@@ -417,7 +589,7 @@ function App() {
                     key={t.id}
                     className={`p-3 rounded-lg cursor-pointer border ${
                       currentTemplate?.id === t.id
-                        ? 'border-fire-500 bg-fire-50'
+                        ? 'border-red-500 bg-red-50'
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                     onClick={() => loadTemplate(t)}
@@ -425,7 +597,7 @@ function App() {
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="font-medium text-sm">{t.name}</div>
-                        <div className="text-xs text-gray-500">{t.category}</div>
+                        <div className="text-xs text-gray-500 capitalize">{t.category}</div>
                       </div>
                       <button
                         onClick={(e) => {
@@ -448,112 +620,58 @@ function App() {
             </div>
           </div>
 
-          {/* Variables Info - context-sensitive */}
-          <div className="p-4 border-t bg-gray-50 overflow-y-auto" style={{ maxHeight: '300px' }}>
+          {/* Variables Info */}
+          <div className="p-4 border-t bg-gray-50 max-h-64 overflow-y-auto">
             <h4 className="text-xs font-semibold text-gray-600 mb-2">
-              Verfügbare Variablen
+              Verfügbare Variablen ({templateCategory})
             </h4>
-            <p className="text-xs text-gray-400 mb-2">
-              Felder für "{templateCategory}":
-            </p>
 
-            {/* Layout - immer verfügbar */}
-            <div className="mb-3">
-              <div className="text-xs font-semibold text-purple-600">Layout</div>
-              <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
-                <div>logo</div>
-                <div>organisation</div>
-                <div>titel</div>
-                <div>datum</div>
-                <div>fusszeile</div>
-              </div>
-            </div>
-
-            {/* Mitglied - für brief, rechnung, mitgliederliste */}
-            {['brief', 'rechnung', 'mitgliederliste', 'allgemein'].includes(templateCategory) && (
-              <div className="mb-3">
-                <div className="text-xs font-semibold text-blue-600">Mitglied</div>
-                <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
-                  <div>vorname</div>
-                  <div>nachname</div>
-                  <div>anrede</div>
-                  <div>strasse</div>
-                  <div>plz</div>
-                  <div>ort</div>
-                  <div>email</div>
-                  <div>status</div>
+            {templateCategory === 'brief' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="grid grid-cols-2 gap-1">
+                  <span>absender</span>
+                  <span>empfaenger</span>
+                  <span>ort_datum</span>
+                  <span>betreff</span>
+                  <span>anrede</span>
+                  <span>inhalt</span>
+                  <span>gruss</span>
+                  <span>fusszeile</span>
                 </div>
+                <p className="mt-2 text-gray-400">
+                  Diese Felder werden beim Versand automatisch mit Mitgliederdaten gefüllt.
+                </p>
               </div>
             )}
 
-            {/* Finanzen - für rechnung */}
-            {['rechnung'].includes(templateCategory) && (
-              <div className="mb-3">
-                <div className="text-xs font-semibold text-amber-600">Finanzen</div>
-                <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
-                  <div>betrag</div>
-                  <div>jahr</div>
-                  <div>zahlungsfrist</div>
-                  <div>iban</div>
-                  <div>referenz</div>
-                  <div>qr_payload</div>
+            {templateCategory === 'rechnung' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="grid grid-cols-2 gap-1">
+                  <span>logo</span>
+                  <span>absender</span>
+                  <span>empfaenger</span>
+                  <span>titel</span>
+                  <span>rechnung_info</span>
+                  <span>text</span>
+                  <span>betrag</span>
+                  <span>qr_code</span>
+                  <span>zahlungsinfo</span>
+                  <span>fusszeile</span>
                 </div>
-              </div>
-            )}
-
-            {/* Event - für arbeitsplan, teilnehmerliste */}
-            {['arbeitsplan', 'teilnehmerliste', 'allgemein'].includes(templateCategory) && (
-              <div className="mb-3">
-                <div className="text-xs font-semibold text-green-600">Event</div>
-                <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
-                  <div>event_titel</div>
-                  <div>event_datum</div>
-                  <div>event_zeit</div>
-                  <div>event_ort</div>
-                </div>
-              </div>
-            )}
-
-            {/* Schichten - für arbeitsplan */}
-            {['arbeitsplan'].includes(templateCategory) && (
-              <div className="mb-3">
-                <div className="text-xs font-semibold text-orange-600">Schichten</div>
-                <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
-                  <div>schichten_tabelle</div>
-                  <div>total_schichten</div>
-                </div>
-              </div>
-            )}
-
-            {/* Teilnehmer - für teilnehmerliste */}
-            {['teilnehmerliste'].includes(templateCategory) && (
-              <div className="mb-3">
-                <div className="text-xs font-semibold text-teal-600">Teilnehmer</div>
-                <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
-                  <div>teilnehmer_tabelle</div>
-                  <div>total_teilnehmer</div>
-                </div>
-              </div>
-            )}
-
-            {/* Mitglieder-Liste - für mitgliederliste */}
-            {['mitgliederliste'].includes(templateCategory) && (
-              <div className="mb-3">
-                <div className="text-xs font-semibold text-indigo-600">Liste</div>
-                <div className="text-xs text-gray-500 grid grid-cols-2 gap-1 mt-1">
-                  <div>mitglieder_tabelle</div>
-                  <div>total_mitglieder</div>
-                </div>
+                <p className="mt-2 text-gray-400">
+                  QR-Code wird automatisch mit swissqrbill generiert.
+                </p>
               </div>
             )}
           </div>
         </div>
 
         {/* Designer Area */}
-        <div className="flex-1 p-4">
+        <div className="flex-1 overflow-hidden bg-gray-200">
           <div
             ref={designerRef}
-            className="pdfme-designer bg-white rounded-lg shadow-lg overflow-hidden"
+            className="w-full h-full"
+            style={{ minHeight: '100%' }}
           />
         </div>
       </div>
