@@ -3535,6 +3535,72 @@ app.delete('/pdf-templates/:id', async (req, res) => {
     }
 });
 
+// Get active layout template (for dynamic PDFs)
+app.get('/pdf-templates/layout/active', async (req, res) => {
+    try {
+        const result = await pool.query(
+            "SELECT * FROM pdf_templates WHERE category = 'layout' AND is_active = true ORDER BY is_default DESC, updated_at DESC LIMIT 1"
+        );
+
+        if (result.rows.length === 0) {
+            // Return default layout settings if no template exists
+            return res.json({
+                id: null,
+                name: 'Standard Layout',
+                layoutSettings: {
+                    headerHeight: 60,
+                    footerHeight: 22,
+                    contentMarginLeft: 20,
+                    contentMarginRight: 20,
+                    primaryColor: '#cc0000',
+                    fontFamily: 'Helvetica',
+                    tableFontSize: 9,
+                    tableHeaderBold: true,
+                    logo: null,
+                    organisation: 'Feuerwehrverein Raura\n6017 Ruswil',
+                    fusszeile: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch'
+                }
+            });
+        }
+
+        const template = result.rows[0];
+
+        // Extract layout settings from template schema
+        const layoutSettings = template.template_schema?.layoutSettings || {};
+
+        // Extract field values from schema for default content
+        const schema = template.template_schema?.schemas?.[0] || {};
+
+        res.json({
+            id: template.id,
+            name: template.name,
+            layoutSettings: {
+                headerHeight: layoutSettings.headerHeight || 60,
+                footerHeight: layoutSettings.footerHeight || 22,
+                contentMarginLeft: layoutSettings.contentMarginLeft || 20,
+                contentMarginRight: layoutSettings.contentMarginRight || 20,
+                primaryColor: layoutSettings.primaryColor || '#cc0000',
+                fontFamily: layoutSettings.fontFamily || 'Helvetica',
+                tableFontSize: layoutSettings.tableFontSize || 9,
+                tableHeaderBold: layoutSettings.tableHeaderBold !== false,
+                // Field positions from template
+                logo: schema.logo,
+                organisation: schema.organisation,
+                titel: schema.titel,
+                untertitel: schema.untertitel,
+                fusszeile: schema.fusszeile,
+                seitenzahl: schema.seitenzahl,
+                contentStartY: schema.content_start_y?.position?.y || 65,
+                contentEndY: schema.content_end_y?.position?.y || 270
+            },
+            template_schema: template.template_schema
+        });
+    } catch (error) {
+        logError('Failed to fetch active layout template', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ============================================
 // ORGANISATION SETTINGS API
 // ============================================
