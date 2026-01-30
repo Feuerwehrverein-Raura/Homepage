@@ -210,6 +210,7 @@
                 this.arbeitsplanData = {};
                 this.memberData = null;
                 this.authToken = localStorage.getItem('auth_token');
+                this.pendingGuestPayload = null;
 
                 this.init();
             }
@@ -309,7 +310,7 @@
 
                 if (eventSlug) {
                     console.log('🔗 Opening event from URL:', eventSlug);
-                    await this.showEventModal(eventSlug);
+                    this.showEventModal(eventSlug);
 
                     // If returning from member login, auto-fill the registration form
                     if (autoFillMember && this.authToken) {
@@ -1343,9 +1344,9 @@
                 `;
 
                 // Add form submit handler
-                document.getElementById('shift-registration-form').addEventListener('submit', (e) => {
+                document.getElementById('shift-registration-form').addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    this.submitShiftRegistration(new FormData(e.target));
+                    await this.submitShiftRegistration(new FormData(e.target));
                 });
 
                 modal.classList.remove('hidden');
@@ -1423,9 +1424,9 @@
                 `;
 
                 // Add form submit handler
-                document.getElementById('participant-registration-form').addEventListener('submit', (e) => {
+                document.getElementById('participant-registration-form').addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    this.submitParticipantRegistration(new FormData(e.target));
+                    await this.submitParticipantRegistration(new FormData(e.target));
                 });
 
                 modal.classList.remove('hidden');
