@@ -1,3 +1,10 @@
+## [1.99.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.2...v1.99.3) (2026-01-30)
+
+
+### Bug Fixes
+
+* **auth:** pass token in URL for cross-subdomain auth ([26a0cfb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/26a0cfbd216f8ee54bb05546383d274efc43f7d8))
+
 ## [1.99.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.1...v1.99.2) (2026-01-30)
 
 
