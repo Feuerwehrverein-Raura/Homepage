@@ -1,3 +1,10 @@
+## [1.99.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.4...v1.99.5) (2026-01-30)
+
+
+### Bug Fixes
+
+* **pdf-designer:** use correct auth endpoint /auth/vorstand/me ([626467f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/626467f5b3951422d3638ab26f5a098b3d4c724c))
+
 ## [1.99.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.3...v1.99.4) (2026-01-30)
 
 
