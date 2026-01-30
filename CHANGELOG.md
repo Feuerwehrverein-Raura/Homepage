@@ -1,3 +1,10 @@
+# [1.110.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.109.1...v1.110.0) (2026-01-30)
+
+
+### Features
+
+* **pdf-templates:** add type-specific templates for all PDF types ([49a3685](https://github.com/Feuerwehrverein-Raura/Homepage/commit/49a3685d161216606684205ba0f1bc09b7672188))
+
 ## [1.109.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.109.0...v1.109.1) (2026-01-30)
 
 
