@@ -1888,15 +1888,15 @@
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                        <input type="text" id="edit-reg-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <input type="text" id="edit-reg-name" autocomplete="new-password" data-lpignore="true" data-form-type="other" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail</label>
-                        <input type="email" id="edit-reg-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <input type="email" id="edit-reg-email" autocomplete="new-password" data-lpignore="true" data-form-type="other" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
-                        <input type="text" id="edit-reg-phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <input type="text" id="edit-reg-phone" autocomplete="new-password" data-lpignore="true" data-form-type="other" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                     </div>
                     <div class="flex space-x-3 pt-4">
                         <button onclick="saveRegistrationEdit()" class="flex-1 bg-fire-500 text-white py-2 px-4 rounded-lg hover:bg-fire-600 transition-colors">
@@ -1991,15 +1991,15 @@
                     <div id="add-person-guest-section" class="hidden space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Name *</label>
-                            <input type="text" id="add-person-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <input type="text" id="add-person-name" autocomplete="new-password" data-lpignore="true" data-form-type="other" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">E-Mail</label>
-                            <input type="email" id="add-person-email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <input type="email" id="add-person-email" autocomplete="new-password" data-lpignore="true" data-form-type="other" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
-                            <input type="text" id="add-person-phone" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <input type="text" id="add-person-phone" autocomplete="new-password" data-lpignore="true" data-form-type="other" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         </div>
                     </div>
 
@@ -2256,6 +2256,16 @@
             { value: 'Passivmitglied', label: 'Passivmitglied', color: 'bg-blue-100 text-blue-800' },
             { value: 'Ehrenmitglied', label: 'Ehrenmitglied', color: 'bg-yellow-100 text-yellow-800' }
         ];
+
+        // Helper to safely escape strings for use in template literals and onclick handlers
+        function escapeForOnclick(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/\\/g, '\\\\')     // Escape backslashes first
+                .replace(/`/g, '\\`')       // Escape backticks for template literals
+                .replace(/\$/g, '\\$')      // Escape $ to prevent ${} interpolation
+                .replace(/'/g, "\\'");      // Escape single quotes for onclick
+        }
 
         const VORSTAND_ROLES = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
 
@@ -3982,7 +3992,7 @@ ${grussformel}`;
                             <h4 class="font-semibold text-gray-800">
                                 ${shiftDisplayName}
                             </h4>
-                            <button onclick="openAddPersonModal('${shift.id}', '${shiftDisplayName.replace(/'/g, "\\'")}')" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1">
+                            <button onclick="openAddPersonModal('${shift.id}', '${escapeForOnclick(shiftDisplayName)}')" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                 </svg>
@@ -4016,13 +4026,13 @@ ${grussformel}`;
                         name: shift.name,
                         date: shift.date,
                         time: `${shift.start_time}-${shift.end_time}`
-                    }).replace(/'/g, "\\'");
+                    }).replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-                    const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${(reg.name || '').replace(/'/g, "\\'")}', '${(reg.email || '').replace(/'/g, "\\'")}', '${(reg.phone || '').replace(/'/g, "\\'")}')" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
+                    const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${escapeForOnclick(reg.name)}', '${escapeForOnclick(reg.email)}', '${escapeForOnclick(reg.phone)}')" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
 
                     const actions = reg.status === 'pending'
                         ? `${editBtn}<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
-                           <button onclick="openSuggestAlternativeModal('${reg.id}', '${(reg.name || '').replace(/'/g, "\\'")}', '${(reg.email || '').replace(/'/g, "\\'")}', '${shiftInfo}')" class="text-blue-600 hover:text-blue-800 mr-2">Alternative</button>
+                           <button onclick="openSuggestAlternativeModal('${reg.id}', '${escapeForOnclick(reg.name)}', '${escapeForOnclick(reg.email)}', '${shiftInfo}')" class="text-blue-600 hover:text-blue-800 mr-2">Alternative</button>
                            <button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Ablehnen</button>`
                         : `${editBtn}<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
 
@@ -4083,7 +4093,7 @@ ${grussformel}`;
                             ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Bestaetigt</span>'
                             : '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Offen</span>';
 
-                        const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${(reg.name || '').replace(/'/g, "\\'")}', '${(reg.email || '').replace(/'/g, "\\'")}', '${(reg.phone || '').replace(/'/g, "\\'")}')" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
+                        const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${escapeForOnclick(reg.name)}', '${escapeForOnclick(reg.email)}', '${escapeForOnclick(reg.phone)}')" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
 
                         const actions = reg.status === 'pending'
                             ? `${editBtn}<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
@@ -4402,7 +4412,9 @@ ${grussformel}`;
 
             let currentShift;
             try {
-                currentShift = JSON.parse(currentShiftJson);
+                // Decode HTML entities that were escaped for the onclick attribute
+                const decodedJson = currentShiftJson.replace(/&quot;/g, '"');
+                currentShift = JSON.parse(decodedJson);
             } catch(e) {
                 currentShift = { name: 'Unbekannt' };
             }
