@@ -1,3 +1,10 @@
+# [1.105.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.104.0...v1.105.0) (2026-01-30)
+
+
+### Features
+
+* **pwa:** add offline warning banner to all apps ([fb4d537](https://github.com/Feuerwehrverein-Raura/Homepage/commit/fb4d537f70cd80184553d58abd47d10863b137b7))
+
 # [1.104.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.103.0...v1.104.0) (2026-01-30)
 
 
