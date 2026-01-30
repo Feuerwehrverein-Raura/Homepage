@@ -167,11 +167,11 @@
                     <!-- Arbeitsplan content will be loaded here -->
                 </div>
                 <div class="mt-6 flex gap-3">
-                    <button id="download-arbeitsplan" class="flex-1 bg-fire-500 text-white px-4 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
+                    <button id="download-arbeitsplan" onclick="eventsManager.downloadArbeitsplanPDF()" class="flex-1 bg-fire-500 text-white px-4 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
                         <span>📄</span>
                         <span>PDF herunterladen</span>
                     </button>
-                    <button id="edit-arbeitsplan" class="flex-1 border border-blue-500 text-blue-500 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
+                    <button id="edit-arbeitsplan" onclick="eventsManager.editArbeitsplan()" class="flex-1 border border-blue-500 text-blue-500 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
                         <span>✏️</span>
                         <span>Bearbeiten</span>
                     </button>
@@ -712,19 +712,6 @@
                 // Mobile menu
                 document.getElementById('mobile-menu-button').addEventListener('click', () => {
                     document.getElementById('mobile-menu').classList.toggle('hidden');
-                });
-
-                // Arbeitsplan actions
-                document.getElementById('edit-arbeitsplan').addEventListener('click', () => {
-                    if (this.selectedEvent) {
-                        window.location.href = `event-dashboard.html?event=${this.selectedEvent.id}`;
-                    }
-                });
-
-                document.getElementById('download-arbeitsplan').addEventListener('click', async () => {
-                    if (this.selectedEvent) {
-                        await this.downloadArbeitsplanPDF();
-                    }
                 });
             }
 
@@ -1653,6 +1640,12 @@
 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
+            }
+
+            editArbeitsplan() {
+                if (this.selectedEvent) {
+                    window.location.href = `event-dashboard.html?event=${this.selectedEvent.id}`;
+                }
             }
 
             async downloadArbeitsplanPDF() {
