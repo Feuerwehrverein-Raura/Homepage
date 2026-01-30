@@ -184,7 +184,7 @@
                                     <label class="block text-sm font-medium text-gray-700 mb-1">IMAP/SMTP Server</label>
                                     <div class="flex">
                                         <input type="text" value="mail.test.juroct.net" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg bg-gray-50" readonly>
-                                        <button onclick="copyToClipboard('mail.test.juroct.net')" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg hover:bg-gray-200" title="Kopieren">
+                                        <button onclick="copyToClipboard('mail.test.juroct.net', this)" class="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg hover:bg-gray-200" title="Kopieren">
                                             <span class="text-gray-600">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                             </span>
@@ -426,7 +426,7 @@
                             <p class="text-sm text-blue-800 mb-1">Als <strong>${entry.funktion}</strong> hast du Zugang zu:</p>
                             <div class="flex items-center gap-2 mb-3">
                                 <p class="text-lg font-mono font-semibold text-blue-900">${entry.email}</p>
-                                <button onclick="copyToClipboard('${entry.email}')" class="p-1 hover:bg-blue-100 rounded" title="Kopieren">
+                                <button onclick="copyToClipboard('${entry.email}', this)" class="p-1 hover:bg-blue-100 rounded" title="Kopieren">
                                     <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 </button>
                             </div>
@@ -453,13 +453,13 @@
         }
 
         // Copy text to clipboard
-        function copyToClipboard(text) {
+        function copyToClipboard(text, btn) {
+            const originalHTML = btn.innerHTML;
             navigator.clipboard.writeText(text).then(() => {
                 // Show brief feedback
-                const originalText = event.currentTarget.innerHTML;
-                event.currentTarget.innerHTML = '<span class="text-green-600">✓</span>';
+                btn.innerHTML = '<span class="text-green-600">✓</span>';
                 setTimeout(() => {
-                    event.currentTarget.innerHTML = originalText;
+                    btn.innerHTML = originalHTML;
                 }, 1000);
             }).catch(err => {
                 console.error('Copy failed:', err);
