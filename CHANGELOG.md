@@ -1,3 +1,10 @@
+## [1.99.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.3...v1.99.4) (2026-01-30)
+
+
+### Bug Fixes
+
+* **auth:** add credentials and fix CORS for cookie auth ([6d41f71](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6d41f7145e0fbe6946aef91d3063897d49d46f9e))
+
 ## [1.99.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.99.2...v1.99.3) (2026-01-30)
 
 
