@@ -629,9 +629,9 @@
 
                         bereiche.forEach(bereich => {
                             const data = slot.bereiche[bereich];
-                            html += '<td class="px-3 py-2 border border-gray-400 align-top">';
 
                             if (data) {
+                                html += '<td class="px-3 py-2 border border-gray-400 align-top bg-white">';
                                 const assignments = data.assignments || [];
                                 const needed = data.needed || 1;
 
@@ -650,7 +650,8 @@
                                     }
                                 }
                             } else {
-                                html += '<div class="text-gray-300">-</div>';
+                                // No shift exists for this time/bereich - black cell
+                                html += '<td class="px-3 py-2 border border-gray-400 align-top bg-gray-900">';
                             }
 
                             html += '</td>';
