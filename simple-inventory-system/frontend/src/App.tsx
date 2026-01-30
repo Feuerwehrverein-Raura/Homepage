@@ -881,7 +881,7 @@ function App() {
 
         {/* Reports Tab */}
         {tab === 'reports' && (
-          <ReportsView items={items} onRefresh={fetchItems} />
+          <ReportsView items={items} locations={locations} onRefresh={fetchItems} />
         )}
       </main>
 
@@ -1322,7 +1322,7 @@ function AddItemForm({ categories, locations, token, prefillData, onSuccess, onC
 }
 
 // Reports View Component
-function ReportsView({ items, onRefresh }: { items: Item[]; onRefresh: () => void }) {
+function ReportsView({ items, locations, onRefresh }: { items: Item[]; locations: Location[]; onRefresh: () => void }) {
   const [loading, setLoading] = useState(false);
 
   const handleRefresh = () => {
@@ -1335,11 +1335,22 @@ function ReportsView({ items, onRefresh }: { items: Item[]; onRefresh: () => voi
     window.open(`${API_URL}/reports/inventory-list?format=csv`, '_blank');
   };
 
+  const printBoxContent = (locationId: number) => {
+    window.open(`${API_URL}/locations/${locationId}/content-label`, '_blank');
+  };
+
   // Calculate summary from local items
   const totalItems = items.length;
   const totalUnits = items.reduce((sum, item) => sum + item.quantity, 0);
   const lowStockItems = items.filter(item => item.quantity <= item.min_quantity).length;
   const totalValue = items.reduce((sum, item) => sum + (item.quantity * (item.purchase_price || 0)), 0);
+
+  // Count items per location
+  const itemsPerLocation = locations.map(loc => ({
+    ...loc,
+    itemCount: items.filter(item => item.location_id === loc.id).length,
+    totalQuantity: items.filter(item => item.location_id === loc.id).reduce((sum, item) => sum + item.quantity, 0)
+  }));
 
   return (
     <div className="space-y-4">
@@ -1389,6 +1400,32 @@ function ReportsView({ items, onRefresh }: { items: Item[]; onRefresh: () => voi
             🔄 Aktualisieren
           </button>
         </div>
+      </div>
+
+      {/* Box Content Labels */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h3 className="font-semibold mb-3">📦 Kisten-Etiketten</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Drucke eine Inhaltsliste für den Kistendeckel
+        </p>
+        {itemsPerLocation.length === 0 ? (
+          <p className="text-gray-500 text-sm">Keine Lagerorte vorhanden</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            {itemsPerLocation.map((loc) => (
+              <button
+                key={loc.id}
+                onClick={() => printBoxContent(loc.id)}
+                className="p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100 transition text-left touch-manipulation"
+              >
+                <div className="font-bold text-lg">{loc.name}</div>
+                <div className="text-xs text-gray-500">
+                  {loc.itemCount} Artikel • {loc.totalQuantity} Stk
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Full Inventory List - Cards on mobile, Table on desktop */}

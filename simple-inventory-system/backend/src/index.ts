@@ -1169,6 +1169,208 @@ app.get('/api/qrcode/label/:code', async (req, res) => {
 });
 
 // ========================================
+// BOX CONTENT LABEL (Kisteninhalt-Etikett)
+// ========================================
+
+// Generate printable content list for a storage box/location
+app.get('/api/locations/:id/content-label', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get location info
+    const locationResult = await pool.query('SELECT * FROM locations WHERE id = $1', [id]);
+    if (locationResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Location not found' });
+    }
+    const location = locationResult.rows[0];
+
+    // Get all items at this location
+    const itemsResult = await pool.query(`
+      SELECT i.name, i.quantity, i.unit, c.name as category_name
+      FROM items i
+      LEFT JOIN categories c ON i.category_id = c.id
+      WHERE i.location_id = $1 AND i.active = true
+      ORDER BY c.name NULLS LAST, i.name
+    `, [id]);
+
+    const items = itemsResult.rows;
+    const date = new Date().toLocaleDateString('de-CH');
+
+    // Generate printable HTML for A4 or smaller label
+    const html = `
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Kisteninhalt - ${location.name}</title>
+  <style>
+    @page {
+      size: A5 portrait;
+      margin: 10mm;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11pt;
+      line-height: 1.4;
+    }
+    .container {
+      max-width: 148mm;
+      margin: 0 auto;
+    }
+    .header {
+      text-align: center;
+      padding: 4mm 0;
+      border-bottom: 2px solid #333;
+      margin-bottom: 4mm;
+    }
+    .location-name {
+      font-size: 24pt;
+      font-weight: bold;
+      margin-bottom: 2mm;
+    }
+    .date {
+      font-size: 9pt;
+      color: #666;
+    }
+    .category-section {
+      margin-bottom: 4mm;
+    }
+    .category-title {
+      font-size: 10pt;
+      font-weight: bold;
+      background: #e5e5e5;
+      padding: 2mm 3mm;
+      margin-bottom: 1mm;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .items-table td {
+      padding: 1.5mm 3mm;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+    }
+    .items-table .qty {
+      width: 60px;
+      text-align: right;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    .items-table .name {
+      font-size: 10pt;
+    }
+    .empty-message {
+      text-align: center;
+      padding: 10mm;
+      color: #666;
+      font-style: italic;
+    }
+    .footer {
+      margin-top: 6mm;
+      padding-top: 3mm;
+      border-top: 1px solid #ccc;
+      font-size: 8pt;
+      color: #666;
+      text-align: center;
+    }
+    .controls {
+      padding: 15px;
+      text-align: center;
+      background: #f5f5f5;
+      border-bottom: 1px solid #ddd;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+    }
+    .controls button {
+      padding: 10px 20px;
+      font-size: 14px;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      margin: 0 5px;
+    }
+    .controls button:hover {
+      background: #1d4ed8;
+    }
+    .controls .secondary {
+      background: #6b7280;
+    }
+    .print-wrapper {
+      padding-top: 60px;
+    }
+    @media print {
+      .controls { display: none; }
+      .print-wrapper { padding-top: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button onclick="window.print()">🖨️ Drucken</button>
+    <button class="secondary" onclick="window.close()">Schliessen</button>
+  </div>
+  <div class="print-wrapper">
+    <div class="container">
+      <div class="header">
+        <div class="location-name">${location.name}</div>
+        <div class="date">Stand: ${date}</div>
+      </div>
+
+      ${items.length === 0 ? `
+        <div class="empty-message">Diese Kiste ist leer</div>
+      ` : (() => {
+        // Group items by category
+        const grouped: Record<string, typeof items> = {};
+        items.forEach(item => {
+          const cat = item.category_name || 'Ohne Kategorie';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(item);
+        });
+
+        return Object.entries(grouped).map(([category, categoryItems]) => `
+          <div class="category-section">
+            <div class="category-title">${category}</div>
+            <table class="items-table">
+              ${categoryItems.map(item => `
+                <tr>
+                  <td class="qty">${item.quantity} ${item.unit}</td>
+                  <td class="name">${item.name}</td>
+                </tr>
+              `).join('')}
+            </table>
+          </div>
+        `).join('');
+      })()}
+
+      <div class="footer">
+        ${items.length} Artikel • FWV Raura Lagerverwaltung
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('Box content label generation failed:', error);
+    res.status(500).json({ error: 'Label generation failed' });
+  }
+});
+
+// ========================================
 // PUBLIC ITEM VIEW (for external QR code scans)
 // ========================================
 
