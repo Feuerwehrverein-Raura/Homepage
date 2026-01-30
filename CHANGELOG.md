@@ -1,3 +1,10 @@
+# [1.106.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.105.0...v1.106.0) (2026-01-30)
+
+
+### Features
+
+* **inventory:** add box content label printing feature ([441bf82](https://github.com/Feuerwehrverein-Raura/Homepage/commit/441bf82c6f3f7d0ca1c613e81d536d5cd0dfd9b7))
+
 # [1.105.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.104.0...v1.105.0) (2026-01-30)
 
 
