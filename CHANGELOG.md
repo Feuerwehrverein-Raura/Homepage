@@ -1,3 +1,10 @@
+## [1.108.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.108.0...v1.108.1) (2026-01-30)
+
+
+### Bug Fixes
+
+* **vorstand:** escape special chars in onclick handlers to prevent JS syntax errors ([2628b4c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2628b4c488659580ddf3e25bbd0534432280a0ff))
+
 # [1.108.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.107.0...v1.108.0) (2026-01-30)
 
 
