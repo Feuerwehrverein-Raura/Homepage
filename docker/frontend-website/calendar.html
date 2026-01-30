@@ -604,7 +604,7 @@
                                         <input type="text" value="${webcalUrl}" readonly 
                                                class="flex-1 px-3 py-2 border border-gray-300 rounded text-sm font-mono bg-white"
                                                id="calendar-url-input">
-                                        <button onclick="navigator.clipboard.writeText('${webcalUrl}').then(() => this.textContent = '✅ Kopiert!').catch(() => this.textContent = '📋 Kopieren')" 
+                                        <button onclick="const btn=this; navigator.clipboard.writeText('${webcalUrl}').then(() => btn.textContent = '✅ Kopiert!').catch(() => btn.textContent = '📋 Kopieren')"
                                                 class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors text-sm">
                                             📋 Kopieren
                                         </button>
@@ -626,7 +626,7 @@
                             </div>
                         </div>
                         <div class="bg-gray-50 px-6 py-3 rounded-b-lg flex justify-end">
-                            <button onclick="this.closest('.fixed').remove()" 
+                            <button onclick="event.target.closest('.fixed').remove()"
                                     class="px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
                                 Schließen
                             </button>
