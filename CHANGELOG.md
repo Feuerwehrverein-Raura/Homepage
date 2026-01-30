@@ -1,3 +1,10 @@
+# [1.108.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.107.0...v1.108.0) (2026-01-30)
+
+
+### Features
+
+* **inventory:** add recipe management system with POS integration ([3ac65b7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3ac65b7070fd52f922a8aac3d22ea3d07bde9b17))
+
 # [1.107.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.106.0...v1.107.0) (2026-01-30)
 
 
