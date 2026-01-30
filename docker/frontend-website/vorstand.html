@@ -2693,6 +2693,15 @@
                 const userInfoMobile = document.getElementById('user-info-mobile');
                 if (userInfoMobile) userInfoMobile.textContent = currentUser.name;
                 hideLoginModal();
+
+                // Check for redirect parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                const redirectUrl = urlParams.get('redirect');
+                if (redirectUrl && redirectUrl.startsWith('https://') && redirectUrl.includes('fwv-raura.ch')) {
+                    window.location.href = redirectUrl;
+                    return true;
+                }
+
                 return true;
             } catch (error) {
                 console.error('Auth check failed:', error);
