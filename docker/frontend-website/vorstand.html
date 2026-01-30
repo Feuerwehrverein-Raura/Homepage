@@ -2757,7 +2757,9 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const redirectUrl = urlParams.get('redirect');
                 if (redirectUrl && redirectUrl.startsWith('https://') && redirectUrl.includes('fwv-raura.ch')) {
-                    window.location.href = redirectUrl;
+                    // Pass token in URL for cross-subdomain auth
+                    const separator = redirectUrl.includes('?') ? '&' : '?';
+                    window.location.href = `${redirectUrl}${separator}token=${encodeURIComponent(data.token)}`;
                     return;
                 }
 

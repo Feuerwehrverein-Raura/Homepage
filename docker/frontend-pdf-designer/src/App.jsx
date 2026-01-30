@@ -81,7 +81,16 @@ function App() {
 
   // Check authentication
   useEffect(() => {
-    const token = localStorage.getItem('vorstand_token')
+    // Check for token in URL (cross-subdomain auth)
+    const urlParams = new URLSearchParams(window.location.search)
+    const urlToken = urlParams.get('token')
+    if (urlToken) {
+      localStorage.setItem('vorstand_token', urlToken)
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+
+    const token = urlToken || localStorage.getItem('vorstand_token')
     if (token) {
       // Verify token and check permissions
       fetch(`${API_BASE}/auth/verify`, {
