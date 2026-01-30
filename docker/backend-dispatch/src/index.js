@@ -1925,17 +1925,21 @@ app.post('/arbeitsplan/pdf', authenticateAny, async (req, res) => {
             return res.status(400).json({ error: 'Event mit Schichten erforderlich' });
         }
 
-        // Fetch layout template settings
+        // Fetch layout template settings (first try arbeitsplan-specific, then fallback to layout)
         let layoutSettings = defaultLayoutSettings;
         try {
             const templateResult = await pool.query(`
-                SELECT content FROM pdf_templates
-                WHERE type = 'layout' AND is_active = true
-                ORDER BY updated_at DESC LIMIT 1
+                SELECT template_schema FROM pdf_templates
+                WHERE category IN ('arbeitsplan', 'layout') AND is_active = true
+                ORDER BY
+                    CASE WHEN category = 'arbeitsplan' THEN 0 ELSE 1 END,
+                    is_default DESC,
+                    updated_at DESC
+                LIMIT 1
             `);
             if (templateResult.rows.length > 0) {
-                const template = templateResult.rows[0].content;
-                if (template.layoutSettings) {
+                const template = templateResult.rows[0].template_schema;
+                if (template && template.layoutSettings) {
                     layoutSettings = { ...defaultLayoutSettings, ...template.layoutSettings };
                 }
             }
@@ -3691,6 +3695,25 @@ app.put('/organisation-settings/:key', authenticateAny, async (req, res) => {
 // INVOICE GENERATION WITH SWISS QR-BILL
 // ============================================
 
+// Default Mitgliederbeitrag Layout Settings (positions in points, A4 = 595.28 x 841.89)
+const defaultMitgliederbeitragLayout = {
+    absender: { x: 400, y: 50, size: 10, lineHeight: 12 },
+    empfaenger: { x: 70, y: 150, size: 11, lineHeight: 15 },
+    titel: { x: 70, y: 240, size: 14 },
+    rechnungsnummer: { x: 70, y: 270, size: 10 },
+    datum: { x: 70, y: 285, size: 10 },
+    text: { x: 70, y: 320, size: 11, lineHeight: 20 },
+    betrag: { x: 400, y: 380, size: 14 },
+    footer: { x: 150, y: 320, size: 8, fromBottom: true }, // y from bottom when QR-Bill is attached
+    rechnungstext: [
+        'Wir erlauben uns, Ihnen den Mitgliederbeitrag in Rechnung zu stellen.',
+        'Bitte überweisen Sie den Betrag innert 30 Tagen.'
+    ]
+};
+
+// Helper to convert mm to points (for template positions)
+const mmToPoints = (mm) => mm * 2.83465;
+
 // Generate QR invoice for a member
 app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
     try {
@@ -3700,6 +3723,7 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
             year,
             description,
             template_slug,
+            custom_text,
             preview = false
         } = req.body;
 
@@ -3718,6 +3742,66 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
         }
 
         const member = memberResult.rows[0];
+
+        // Try to fetch template settings (by slug or default for category)
+        let layoutSettings = { ...defaultMitgliederbeitragLayout };
+        try {
+            let templateQuery;
+            if (template_slug) {
+                templateQuery = await pool.query(
+                    "SELECT template_schema FROM pdf_templates WHERE slug = $1 AND is_active = true",
+                    [template_slug]
+                );
+            } else {
+                templateQuery = await pool.query(
+                    "SELECT template_schema FROM pdf_templates WHERE category = 'mitgliederbeitrag' AND is_active = true ORDER BY is_default DESC, updated_at DESC LIMIT 1"
+                );
+            }
+            if (templateQuery.rows.length > 0) {
+                const templateSchema = templateQuery.rows[0].template_schema;
+                // Extract positions from pdfme schema and convert to points
+                if (templateSchema && templateSchema.schemas && templateSchema.schemas[0]) {
+                    const schema = templateSchema.schemas[0];
+                    // Map pdfme field positions to layoutSettings
+                    if (schema.absender_name) {
+                        layoutSettings.absender = {
+                            x: mmToPoints(schema.absender_name.position?.x || 118),
+                            y: mmToPoints(schema.absender_name.position?.y || 15),
+                            size: schema.absender_name.fontSize || 10,
+                            lineHeight: 12
+                        };
+                    }
+                    if (schema.empfaenger) {
+                        layoutSettings.empfaenger = {
+                            x: mmToPoints(schema.empfaenger.position?.x || 25),
+                            y: mmToPoints(schema.empfaenger.position?.y || 50),
+                            size: schema.empfaenger.fontSize || 11,
+                            lineHeight: 15
+                        };
+                    }
+                    if (schema.titel) {
+                        layoutSettings.titel = {
+                            x: mmToPoints(schema.titel.position?.x || 25),
+                            y: mmToPoints(schema.titel.position?.y || 85),
+                            size: schema.titel.fontSize || 14
+                        };
+                    }
+                    if (schema.betrag) {
+                        layoutSettings.betrag = {
+                            x: mmToPoints(schema.betrag.position?.x || 118),
+                            y: mmToPoints(schema.betrag.position?.y || 158),
+                            size: schema.betrag.fontSize || 14
+                        };
+                    }
+                }
+                // Custom text from template layoutSettings
+                if (templateSchema.layoutSettings?.rechnungstext) {
+                    layoutSettings.rechnungstext = templateSchema.layoutSettings.rechnungstext;
+                }
+            }
+        } catch (err) {
+            console.log('No mitgliederbeitrag template found, using defaults');
+        }
 
         // Get organisation settings for creditor info
         const settingsResult = await pool.query(
@@ -3772,59 +3856,62 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
         const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-        // Header
+        // Layout positions (use template settings or defaults)
+        const L = layoutSettings;
+
+        // Header (Absender oben rechts)
         page.drawText(creditor.name, {
-            x: 400, y: height - 50, size: 10, font: helvetica
+            x: L.absender.x, y: height - L.absender.y, size: L.absender.size, font: helvetica
         });
         page.drawText(`${creditor.address}`, {
-            x: 400, y: height - 62, size: 10, font: helvetica
+            x: L.absender.x, y: height - L.absender.y - L.absender.lineHeight, size: L.absender.size, font: helvetica
         });
         page.drawText(`${creditor.zip} ${creditor.city}`, {
-            x: 400, y: height - 74, size: 10, font: helvetica
+            x: L.absender.x, y: height - L.absender.y - L.absender.lineHeight * 2, size: L.absender.size, font: helvetica
         });
 
         // Empfänger
         page.drawText(debtor.name, {
-            x: 70, y: height - 150, size: 11, font: helvetica
+            x: L.empfaenger.x, y: height - L.empfaenger.y, size: L.empfaenger.size, font: helvetica
         });
         if (debtor.address) {
             page.drawText(debtor.address, {
-                x: 70, y: height - 165, size: 11, font: helvetica
+                x: L.empfaenger.x, y: height - L.empfaenger.y - L.empfaenger.lineHeight, size: L.empfaenger.size, font: helvetica
             });
         }
         page.drawText(`${debtor.zip} ${debtor.city}`, {
-            x: 70, y: height - 180, size: 11, font: helvetica
+            x: L.empfaenger.x, y: height - L.empfaenger.y - L.empfaenger.lineHeight * 2, size: L.empfaenger.size, font: helvetica
         });
 
         // Titel
         const title = description || `Mitgliederbeitrag ${invoiceYear}`;
         page.drawText(title, {
-            x: 70, y: height - 240, size: 14, font: helveticaBold
+            x: L.titel.x, y: height - L.titel.y, size: L.titel.size, font: helveticaBold
         });
 
         // Rechnungsinfo
         const today = new Date().toLocaleDateString('de-CH');
         page.drawText(`Rechnungsnummer: ${refNumber}`, {
-            x: 70, y: height - 270, size: 10, font: helvetica
+            x: L.rechnungsnummer.x, y: height - L.rechnungsnummer.y, size: L.rechnungsnummer.size, font: helvetica
         });
         page.drawText(`Datum: ${today}`, {
-            x: 70, y: height - 285, size: 10, font: helvetica
+            x: L.datum.x, y: height - L.datum.y, size: L.datum.size, font: helvetica
         });
 
-        // Text
-        page.drawText('Wir erlauben uns, Ihnen den Mitgliederbeitrag in Rechnung zu stellen.', {
-            x: 70, y: height - 320, size: 11, font: helvetica
-        });
-        page.drawText('Bitte überweisen Sie den Betrag innert 30 Tagen.', {
-            x: 70, y: height - 340, size: 11, font: helvetica
+        // Text (custom_text überschreibt Template-Text)
+        const textLines = custom_text ? custom_text.split('\n') : L.rechnungstext;
+        textLines.forEach((line, i) => {
+            page.drawText(line, {
+                x: L.text.x, y: height - L.text.y - (i * L.text.lineHeight), size: L.text.size, font: helvetica
+            });
         });
 
         // Betrag
         page.drawText(`Betrag: CHF ${parseFloat(amount).toFixed(2)}`, {
-            x: 400, y: height - 380, size: 14, font: helveticaBold
+            x: L.betrag.x, y: height - L.betrag.y, size: L.betrag.size, font: helveticaBold
         });
 
-        // Footer
+        // Footer (oberhalb des QR-Bill Bereichs, ca. 320pt vom unteren Rand)
         page.drawText(`${creditor.name} | www.fwv-raura.ch | info@fwv-raura.ch`, {
             x: 150, y: 320, size: 8, font: helvetica, color: rgb(0.4, 0.4, 0.4)
         });
@@ -3865,12 +3952,11 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
             res.send(Buffer.from(pdfBytes));
         } else {
             // Store invoice record and return info
-            // TODO: Save to invoices table
-
             logInfo('QR-Invoice generated', {
                 member_id,
                 amount,
-                reference: refNumber
+                reference: refNumber,
+                template_used: template_slug || 'default'
             });
 
             res.json({

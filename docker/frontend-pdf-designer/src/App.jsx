@@ -297,6 +297,368 @@ const getLayoutTemplate = () => ({
   },
 })
 
+// Mitgliederbeitrag-Template (Rechnung mit QR-Bill für Mitgliederbeiträge)
+const getMitgliederbeitragTemplate = () => ({
+  basePdf: BLANK_PDF,
+  schemas: [
+    {
+      // Absender oben rechts
+      absender_name: {
+        type: 'text',
+        position: { x: 118, y: 15 },
+        width: 75,
+        height: 6,
+        fontSize: 10,
+        alignment: 'left',
+      },
+      absender_adresse: {
+        type: 'text',
+        position: { x: 118, y: 21 },
+        width: 75,
+        height: 12,
+        fontSize: 10,
+        lineHeight: 1.2,
+        alignment: 'left',
+      },
+      // Empfänger
+      empfaenger: {
+        type: 'text',
+        position: { x: 25, y: 50 },
+        width: 85,
+        height: 28,
+        fontSize: 11,
+        lineHeight: 1.3,
+      },
+      // Titel (z.B. "Mitgliederbeitrag 2026")
+      titel: {
+        type: 'text',
+        position: { x: 25, y: 85 },
+        width: 160,
+        height: 10,
+        fontSize: 14,
+        fontWeight: 'bold',
+      },
+      // Rechnungsnummer
+      rechnungsnummer: {
+        type: 'text',
+        position: { x: 25, y: 97 },
+        width: 80,
+        height: 6,
+        fontSize: 10,
+      },
+      // Datum
+      datum: {
+        type: 'text',
+        position: { x: 25, y: 103 },
+        width: 80,
+        height: 6,
+        fontSize: 10,
+      },
+      // Rechnungstext
+      text: {
+        type: 'text',
+        position: { x: 25, y: 118 },
+        width: 160,
+        height: 35,
+        fontSize: 11,
+        lineHeight: 1.4,
+      },
+      // Betrag (gross, rechts)
+      betrag: {
+        type: 'text',
+        position: { x: 118, y: 158 },
+        width: 70,
+        height: 10,
+        fontSize: 14,
+        fontWeight: 'bold',
+        alignment: 'right',
+      },
+      // Footer
+      footer: {
+        type: 'text',
+        position: { x: 50, y: 185 },
+        width: 110,
+        height: 6,
+        fontSize: 8,
+        alignment: 'center',
+        fontColor: '#666666',
+      },
+      // QR-Bill wird vom Backend angehängt (untere 105mm)
+    },
+  ],
+})
+
+// Arbeitsplan-Template
+const getArbeitsplanTemplate = () => ({
+  basePdf: BLANK_PDF,
+  schemas: [
+    {
+      // Logo oben links
+      logo: {
+        type: 'image',
+        position: { x: 15, y: 10 },
+        width: 25,
+        height: 12,
+      },
+      // Organisation oben rechts
+      organisation: {
+        type: 'text',
+        position: { x: 140, y: 10 },
+        width: 55,
+        height: 15,
+        fontSize: 9,
+        alignment: 'right',
+        lineHeight: 1.2,
+      },
+      // Haupttitel
+      titel: {
+        type: 'text',
+        position: { x: 15, y: 28 },
+        width: 180,
+        height: 10,
+        fontSize: 18,
+        fontWeight: 'bold',
+        alignment: 'center',
+      },
+      // Event-Name
+      event_name: {
+        type: 'text',
+        position: { x: 15, y: 40 },
+        width: 180,
+        height: 8,
+        fontSize: 14,
+        alignment: 'center',
+      },
+      // Datum
+      datum: {
+        type: 'text',
+        position: { x: 15, y: 50 },
+        width: 180,
+        height: 6,
+        fontSize: 12,
+        alignment: 'center',
+        fontColor: '#666666',
+      },
+      // Header-Linie
+      header_linie: {
+        type: 'text',
+        position: { x: 15, y: 60 },
+        width: 180,
+        height: 1,
+        backgroundColor: '#cc0000',
+      },
+      // Schichten werden dynamisch vom Backend generiert (ab Y=65)
+      // Footer
+      footer: {
+        type: 'text',
+        position: { x: 15, y: 280 },
+        width: 180,
+        height: 6,
+        fontSize: 7,
+        alignment: 'center',
+        fontColor: '#666666',
+      },
+    },
+  ],
+  layoutSettings: {
+    headerHeight: 65,
+    footerHeight: 15,
+    contentMarginLeft: 15,
+    contentMarginRight: 15,
+    primaryColor: '#cc0000',
+    tableFontSize: 9,
+    tableHeaderBold: true,
+  },
+})
+
+// Telefonliste-Template
+const getTelefonlisteTemplate = () => ({
+  basePdf: BLANK_PDF,
+  schemas: [
+    {
+      // Logo oben links
+      logo: {
+        type: 'image',
+        position: { x: 15, y: 10 },
+        width: 25,
+        height: 12,
+      },
+      // Organisation oben rechts
+      organisation: {
+        type: 'text',
+        position: { x: 140, y: 10 },
+        width: 55,
+        height: 15,
+        fontSize: 9,
+        alignment: 'right',
+        lineHeight: 1.2,
+      },
+      // Haupttitel
+      titel: {
+        type: 'text',
+        position: { x: 15, y: 28 },
+        width: 180,
+        height: 10,
+        fontSize: 16,
+        fontWeight: 'bold',
+        alignment: 'center',
+      },
+      // Stand-Datum
+      datum: {
+        type: 'text',
+        position: { x: 15, y: 40 },
+        width: 180,
+        height: 6,
+        fontSize: 10,
+        alignment: 'center',
+        fontColor: '#666666',
+      },
+      // Header-Linie
+      header_linie: {
+        type: 'text',
+        position: { x: 15, y: 50 },
+        width: 180,
+        height: 1,
+        backgroundColor: '#cc0000',
+      },
+      // Mitglieder-Liste wird dynamisch vom Backend generiert (ab Y=55)
+      // Footer
+      footer: {
+        type: 'text',
+        position: { x: 15, y: 280 },
+        width: 140,
+        height: 6,
+        fontSize: 7,
+        fontColor: '#666666',
+      },
+      // Seitenzahl
+      seitenzahl: {
+        type: 'text',
+        position: { x: 170, y: 280 },
+        width: 25,
+        height: 6,
+        fontSize: 7,
+        alignment: 'right',
+        fontColor: '#666666',
+      },
+    },
+  ],
+  layoutSettings: {
+    headerHeight: 55,
+    footerHeight: 15,
+    contentMarginLeft: 15,
+    contentMarginRight: 15,
+    primaryColor: '#cc0000',
+    tableFontSize: 9,
+    tableHeaderBold: true,
+    columns: ['Name', 'Funktion', 'Telefon', 'E-Mail'],
+  },
+})
+
+// Mahnbrief-Template
+const getMahnbriefTemplate = () => ({
+  basePdf: BLANK_PDF,
+  schemas: [
+    {
+      // Absender oben rechts
+      absender: {
+        type: 'text',
+        position: { x: 118, y: 15 },
+        width: 75,
+        height: 18,
+        fontSize: 10,
+        lineHeight: 1.2,
+      },
+      // Empfänger
+      empfaenger: {
+        type: 'text',
+        position: { x: 25, y: 50 },
+        width: 85,
+        height: 28,
+        fontSize: 11,
+        lineHeight: 1.3,
+      },
+      // Mahnstufe (rot, rechts)
+      mahnstufe: {
+        type: 'text',
+        position: { x: 150, y: 85 },
+        width: 40,
+        height: 8,
+        fontSize: 12,
+        fontWeight: 'bold',
+        alignment: 'right',
+        fontColor: '#dc2626',
+      },
+      // Titel
+      titel: {
+        type: 'text',
+        position: { x: 25, y: 85 },
+        width: 120,
+        height: 10,
+        fontSize: 14,
+        fontWeight: 'bold',
+      },
+      // Rechnungsreferenz
+      referenz: {
+        type: 'text',
+        position: { x: 25, y: 97 },
+        width: 160,
+        height: 10,
+        fontSize: 10,
+        lineHeight: 1.3,
+      },
+      // Mahntext
+      text: {
+        type: 'text',
+        position: { x: 25, y: 115 },
+        width: 160,
+        height: 50,
+        fontSize: 11,
+        lineHeight: 1.4,
+      },
+      // Offener Betrag (gross)
+      offener_betrag: {
+        type: 'text',
+        position: { x: 118, y: 170 },
+        width: 70,
+        height: 10,
+        fontSize: 14,
+        fontWeight: 'bold',
+        alignment: 'right',
+      },
+      // Frist
+      frist: {
+        type: 'text',
+        position: { x: 25, y: 185 },
+        width: 160,
+        height: 8,
+        fontSize: 11,
+        fontWeight: 'bold',
+        fontColor: '#dc2626',
+      },
+      // Gruss
+      gruss: {
+        type: 'text',
+        position: { x: 25, y: 205 },
+        width: 160,
+        height: 25,
+        fontSize: 11,
+        lineHeight: 1.4,
+      },
+      // Footer
+      footer: {
+        type: 'text',
+        position: { x: 25, y: 280 },
+        width: 160,
+        height: 6,
+        fontSize: 8,
+        alignment: 'center',
+        fontColor: '#666666',
+      },
+    },
+  ],
+})
+
 // Sample inputs for preview
 const getSampleInputs = (category) => {
   if (category === 'layout') {
@@ -327,6 +689,56 @@ const getSampleInputs = (category) => {
       fusszeile: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch',
     }]
   }
+  if (category === 'mitgliederbeitrag') {
+    return [{
+      absender_name: 'Feuerwehrverein Raura',
+      absender_adresse: 'Musterstrasse 1\n6017 Ruswil',
+      empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
+      titel: 'Mitgliederbeitrag 2026',
+      rechnungsnummer: 'Rechnungsnummer: RF26-000001',
+      datum: `Datum: ${new Date().toLocaleDateString('de-CH')}`,
+      text: 'Wir erlauben uns, Ihnen den Mitgliederbeitrag für das Jahr 2026 in Rechnung zu stellen.\n\nBitte überweisen Sie den Betrag innert 30 Tagen.',
+      betrag: 'CHF 50.00',
+      footer: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch',
+    }]
+  }
+  if (category === 'arbeitsplan') {
+    return [{
+      logo: '',
+      organisation: 'Feuerwehrverein Raura\n6017 Ruswil',
+      titel: 'ARBEITSPLAN',
+      event_name: 'Räbeliechtliumzug 2026',
+      datum: 'Samstag, 9. November 2026',
+      header_linie: '',
+      footer: 'Feuerwehrverein Raura | Bei Fragen: info@fwv-raura.ch',
+    }]
+  }
+  if (category === 'telefonliste') {
+    return [{
+      logo: '',
+      organisation: 'Feuerwehrverein Raura\n6017 Ruswil',
+      titel: 'Telefonliste Mitglieder',
+      datum: `Stand: ${new Date().toLocaleDateString('de-CH')}`,
+      header_linie: '',
+      footer: 'Feuerwehrverein Raura | Nur für internen Gebrauch',
+      seitenzahl: 'Seite 1/3',
+    }]
+  }
+  if (category === 'mahnbrief') {
+    return [{
+      absender: 'Feuerwehrverein Raura\nMusterstrasse 1\n6017 Ruswil',
+      empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
+      mahnstufe: '2. Mahnung',
+      titel: 'Zahlungserinnerung',
+      referenz: 'Betr.: Rechnung RF26-000001 vom 15.01.2026\nUrsprünglicher Betrag: CHF 50.00',
+      text: 'Trotz unserer Erinnerung vom 15.02.2026 haben wir bis heute keinen Zahlungseingang verzeichnen können.\n\nWir bitten Sie, den ausstehenden Betrag umgehend zu begleichen, um weitere Mahnkosten zu vermeiden.',
+      offener_betrag: 'CHF 60.00',
+      frist: 'Zahlungsfrist: 7 Tage',
+      gruss: 'Freundliche Grüsse\n\nFeuerwehrverein Raura\nDer Kassier',
+      footer: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch',
+    }]
+  }
+  // Default: Brief
   return [{
     absender: 'Feuerwehrverein Raura\nMusterstrasse 1\n6017 Ruswil',
     empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
@@ -472,6 +884,18 @@ function App() {
         break
       case 'layout':
         template = getLayoutTemplate()
+        break
+      case 'mitgliederbeitrag':
+        template = getMitgliederbeitragTemplate()
+        break
+      case 'arbeitsplan':
+        template = getArbeitsplanTemplate()
+        break
+      case 'telefonliste':
+        template = getTelefonlisteTemplate()
+        break
+      case 'mahnbrief':
+        template = getMahnbriefTemplate()
         break
       default:
         template = getDefaultTemplate()
@@ -684,11 +1108,21 @@ function App() {
                     createNewTemplate(e.target.value)
                   }
                 }}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 text-sm"
               >
-                <option value="brief">Brief</option>
-                <option value="rechnung">Rechnung (QR)</option>
-                <option value="layout">Layout (für Listen)</option>
+                <optgroup label="Dokumente">
+                  <option value="brief">Brief</option>
+                  <option value="mahnbrief">Mahnbrief</option>
+                </optgroup>
+                <optgroup label="Rechnungen">
+                  <option value="mitgliederbeitrag">Mitgliederbeitrag</option>
+                  <option value="rechnung">Generische Rechnung</option>
+                </optgroup>
+                <optgroup label="Listen & Pläne">
+                  <option value="arbeitsplan">Arbeitsplan</option>
+                  <option value="telefonliste">Telefonliste</option>
+                  <option value="layout">Layout (Allgemein)</option>
+                </optgroup>
               </select>
             </div>
             <div className="flex gap-2">
@@ -851,6 +1285,79 @@ function App() {
               </div>
             )}
 
+            {templateCategory === 'mitgliederbeitrag' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="grid grid-cols-2 gap-1">
+                  <span>absender_name</span>
+                  <span>absender_adresse</span>
+                  <span>empfaenger</span>
+                  <span>titel</span>
+                  <span>rechnungsnummer</span>
+                  <span>datum</span>
+                  <span>text</span>
+                  <span>betrag</span>
+                  <span>footer</span>
+                </div>
+                <p className="mt-2 text-gray-400">
+                  Swiss QR-Bill wird automatisch unten angehängt (105mm Bereich).
+                </p>
+              </div>
+            )}
+
+            {templateCategory === 'arbeitsplan' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="grid grid-cols-2 gap-1">
+                  <span>logo</span>
+                  <span>organisation</span>
+                  <span>titel</span>
+                  <span>event_name</span>
+                  <span>datum</span>
+                  <span>header_linie</span>
+                  <span>footer</span>
+                </div>
+                <p className="mt-2 text-gray-400">
+                  Schichten-Tabelle wird dynamisch vom Backend generiert.
+                </p>
+              </div>
+            )}
+
+            {templateCategory === 'telefonliste' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="grid grid-cols-2 gap-1">
+                  <span>logo</span>
+                  <span>organisation</span>
+                  <span>titel</span>
+                  <span>datum</span>
+                  <span>header_linie</span>
+                  <span>footer</span>
+                  <span>seitenzahl</span>
+                </div>
+                <p className="mt-2 text-gray-400">
+                  Mitglieder-Tabelle wird dynamisch vom Backend generiert.
+                </p>
+              </div>
+            )}
+
+            {templateCategory === 'mahnbrief' && (
+              <div className="text-xs text-gray-500 space-y-1">
+                <div className="grid grid-cols-2 gap-1">
+                  <span>absender</span>
+                  <span>empfaenger</span>
+                  <span>mahnstufe</span>
+                  <span>titel</span>
+                  <span>referenz</span>
+                  <span>text</span>
+                  <span>offener_betrag</span>
+                  <span>frist</span>
+                  <span>gruss</span>
+                  <span>footer</span>
+                </div>
+                <p className="mt-2 text-gray-400">
+                  Mahnstufe wird rot hervorgehoben.
+                </p>
+              </div>
+            )}
+
             {templateCategory === 'layout' && (
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="font-semibold text-gray-600 mb-1">Header:</div>
@@ -871,8 +1378,7 @@ function App() {
                   <span>content_end_y</span>
                 </div>
                 <p className="mt-2 text-gray-400">
-                  Dieses Layout wird für Telefonliste, Arbeitsplan, etc. verwendet.
-                  Der Bereich zwischen den Markern wird mit dynamischen Daten gefüllt.
+                  Allgemeines Layout für dynamische Listen.
                 </p>
               </div>
             )}
