@@ -1,3 +1,10 @@
+## [1.113.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.113.1...v1.113.2) (2026-01-31)
+
+
+### Bug Fixes
+
+* **auth:** enable cross-subdomain authentication for PDF Designer ([c28269f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c28269f965769193293b5019635f15971988e8db))
+
 ## [1.113.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.113.0...v1.113.1) (2026-01-31)
 
 
