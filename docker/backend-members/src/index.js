@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const crypto = require('crypto');
 const { Pool, types } = require('pg');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
@@ -100,6 +101,44 @@ function logWarn(message, data = {}) { log('WARN', message, data); }
 function logError(message, data = {}) { log('ERROR', message, data); }
 function logDebug(message, data = {}) {
     if (process.env.DEBUG === 'true') log('DEBUG', message, data);
+}
+
+// ===========================================
+// ENCRYPTION UTILITIES FOR SHARED PASSWORDS
+// ===========================================
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+
+function encryptPassword(password) {
+    const iv = crypto.randomBytes(16);
+    const key = Buffer.from(ENCRYPTION_KEY.slice(0, 64), 'hex');
+    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+
+    let encrypted = cipher.update(password, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
+
+    // Format: iv:authTag:encryptedData
+    return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+function decryptPassword(encryptedData) {
+    try {
+        const [ivHex, authTagHex, encrypted] = encryptedData.split(':');
+        const iv = Buffer.from(ivHex, 'hex');
+        const authTag = Buffer.from(authTagHex, 'hex');
+        const key = Buffer.from(ENCRYPTION_KEY.slice(0, 64), 'hex');
+
+        const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
+        decipher.setAuthTag(authTag);
+
+        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+        decrypted += decipher.final('utf8');
+        return decrypted;
+    } catch (error) {
+        console.error('Decryption failed:', error.message);
+        return null;
+    }
 }
 
 // Trust proxy for correct client IP behind Traefik
@@ -529,6 +568,19 @@ const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43
 const SOCIAL_MEDIA_GROUP = process.env.AUTHENTIK_SOCIAL_MEDIA_GROUP || '494ef740-41d3-40c3-9e68-8a1e5d3b4ad9';
 const MITGLIEDER_GROUP = process.env.AUTHENTIK_MITGLIEDER_GROUP || '248db02d-6592-4571-9050-2ccc0fdf0b7e';
 const ADMIN_GROUP = process.env.AUTHENTIK_ADMIN_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
+
+// Nextcloud configuration for GroupFolders API
+const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'https://nextcloud.fwv-raura.ch';
+const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER || 'admin';
+const NEXTCLOUD_PASSWORD = process.env.NEXTCLOUD_PASSWORD;
+
+// Map Authentik groups to Nextcloud group names
+const AUTHENTIK_TO_NEXTCLOUD_GROUP = {
+    [VORSTAND_GROUP]: 'vorstand',
+    [SOCIAL_MEDIA_GROUP]: 'social-media',
+    [MITGLIEDER_GROUP]: 'mitglieder',
+    [ADMIN_GROUP]: 'admin'
+};
 
 // Authentik group membership management
 
@@ -3653,6 +3705,15 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
             throw new Error(errorData.error || 'Passwortänderung fehlgeschlagen');
         }
 
+        // Save encrypted password for shared mailbox access
+        const encryptedPassword = encryptPassword(password);
+        await pool.query(`
+            INSERT INTO shared_mailbox_passwords (email, encrypted_password, updated_at, updated_by)
+            VALUES ($1, $2, NOW(), $3)
+            ON CONFLICT (email)
+            DO UPDATE SET encrypted_password = $2, updated_at = NOW(), updated_by = $3
+        `, [functionEmail, encryptedPassword, member.id]);
+
         // Log the change with real client IP
         await logAudit(pool, 'FUNCTION_EMAIL_PASSWORD_CHANGED', member.id, req.user.email, getClientIp(req), {
             function_email: functionEmail,
@@ -3663,6 +3724,203 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
 
     } catch (error) {
         console.error('Function email password change error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// NEXTCLOUD GROUPFOLDERS API
+// ============================================
+
+async function getNextcloudGroupFolders(userGroups) {
+    if (!NEXTCLOUD_PASSWORD) {
+        console.warn('NEXTCLOUD_PASSWORD not configured');
+        return [];
+    }
+
+    try {
+        const response = await fetch(
+            `${NEXTCLOUD_URL}/ocs/v2.php/apps/groupfolders/folders`,
+            {
+                headers: {
+                    'Authorization': `Basic ${Buffer.from(`${NEXTCLOUD_USER}:${NEXTCLOUD_PASSWORD}`).toString('base64')}`,
+                    'OCS-APIRequest': 'true',
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        if (!response.ok) {
+            console.error('Nextcloud GroupFolders API error:', response.status);
+            return [];
+        }
+
+        const data = await response.json();
+        const folders = data.ocs?.data || {};
+
+        // Convert object to array and filter by user groups
+        return Object.values(folders)
+            .filter(folder => {
+                const folderGroups = Object.keys(folder.groups || {});
+                return folderGroups.some(g => userGroups.includes(g));
+            })
+            .map(folder => ({
+                id: folder.id,
+                name: folder.mount_point,
+                quota: folder.quota,
+                size: folder.size,
+                groups: Object.keys(folder.groups || {}),
+                acl: folder.acl
+            }));
+    } catch (error) {
+        console.error('Nextcloud GroupFolders fetch error:', error.message);
+        return [];
+    }
+}
+
+// ============================================
+// USER ACCESSES ENDPOINT
+// ============================================
+
+// Get all accesses for the current user
+app.get('/members/me/accesses', authenticateToken, async (req, res) => {
+    try {
+        // Get member with function and authentik info
+        const memberResult = await pool.query(
+            'SELECT id, funktion, authentik_user_id FROM members WHERE email = $1',
+            [req.user.email]
+        );
+
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const member = memberResult.rows[0];
+        const funktion = member.funktion || '';
+        const funktionen = funktion.split(',').map(f => f.trim()).filter(f => f);
+
+        // 1. Get function emails with passwords
+        const functionEmails = [];
+        for (const func of funktionen) {
+            const email = FUNCTION_EMAIL_MAP[func];
+            if (email) {
+                // Get stored password
+                const pwResult = await pool.query(
+                    'SELECT encrypted_password, updated_at FROM shared_mailbox_passwords WHERE email = $1',
+                    [email]
+                );
+
+                let password = null;
+                let passwordUpdatedAt = null;
+                if (pwResult.rows.length > 0) {
+                    password = decryptPassword(pwResult.rows[0].encrypted_password);
+                    passwordUpdatedAt = pwResult.rows[0].updated_at;
+                }
+
+                functionEmails.push({
+                    function: func,
+                    email: email,
+                    password: password,
+                    passwordUpdatedAt: passwordUpdatedAt,
+                    server: 'mail.fwv-raura.ch',
+                    imapPort: 993,
+                    smtpPort: 587,
+                    webmail: 'https://mail.fwv-raura.ch'
+                });
+            }
+        }
+
+        // 2. Get Nextcloud group folders
+        let nextcloudFolders = [];
+        if (member.authentik_user_id) {
+            // Determine user's Nextcloud groups based on Authentik groups
+            const userAuthentikGroups = [];
+
+            // Check each managed group
+            for (const [authentikGroup, nextcloudGroup] of Object.entries(AUTHENTIK_TO_NEXTCLOUD_GROUP)) {
+                const isInGroup = await isUserInAuthentikGroup(member.authentik_user_id, authentikGroup);
+                if (isInGroup) {
+                    userAuthentikGroups.push(nextcloudGroup);
+                }
+            }
+
+            // Always add 'mitglieder' as all authenticated members should have it
+            if (!userAuthentikGroups.includes('mitglieder')) {
+                userAuthentikGroups.push('mitglieder');
+            }
+
+            nextcloudFolders = await getNextcloudGroupFolders(userAuthentikGroups);
+        }
+
+        // 3. Determine system accesses
+        const isVorstand = funktionen.some(f =>
+            ['Präsident', 'Praesident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer', 'Beisitzerin'].includes(f)
+        );
+        const isKassier = funktionen.includes('Kassier');
+        const isAdmin = funktionen.includes('Admin');
+        const isSocialMedia = funktionen.some(f =>
+            ['Social Media', 'Social-Media', 'SocialMedia'].includes(f)
+        );
+
+        const systemAccesses = [
+            {
+                system: 'Website',
+                url: 'https://fwv-raura.ch',
+                access: 'Mitglied',
+                enabled: true
+            },
+            {
+                system: 'Nextcloud',
+                url: NEXTCLOUD_URL,
+                access: 'Mitglied',
+                enabled: true
+            }
+        ];
+
+        if (isVorstand) {
+            systemAccesses.push({
+                system: 'Vorstand-Portal',
+                url: 'https://fwv-raura.ch/vorstand.html',
+                access: 'Vorstand',
+                enabled: true
+            });
+        }
+
+        if (isKassier) {
+            systemAccesses.push({
+                system: 'Kassensystem',
+                url: 'https://kasse.fwv-raura.ch',
+                access: 'Kassier',
+                enabled: true
+            });
+        }
+
+        if (isAdmin) {
+            systemAccesses.push({
+                system: 'Admin-Bereich',
+                url: 'https://fwv-raura.ch/vorstand.html',
+                access: 'Administrator',
+                enabled: true
+            });
+        }
+
+        if (isSocialMedia) {
+            systemAccesses.push({
+                system: 'Social Media Tools',
+                url: NEXTCLOUD_URL + '/apps/files/?dir=/Marketing',
+                access: 'Social Media',
+                enabled: true
+            });
+        }
+
+        res.json({
+            functionEmails,
+            nextcloudFolders,
+            systemAccesses
+        });
+
+    } catch (error) {
+        console.error('Get accesses error:', error);
         res.status(500).json({ error: error.message });
     }
 });

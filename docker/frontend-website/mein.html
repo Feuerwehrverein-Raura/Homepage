@@ -56,6 +56,9 @@
                 <button id="tab-events" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                     Meine Events
                 </button>
+                <button id="tab-accesses" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                    Zugänge
+                </button>
             </div>
         </div>
     </section>
@@ -265,6 +268,68 @@
         </section>
     </div>
 
+    <!-- Accesses Section -->
+    <div id="accesses-section" class="hidden">
+        <section class="py-8">
+            <div class="container mx-auto px-4">
+                <div class="max-w-4xl mx-auto space-y-6">
+
+                    <!-- Function Emails -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-fire-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Funktions-E-Mails
+                        </h2>
+                        <div id="function-emails-list" class="space-y-4">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                        <div id="no-function-emails" class="text-center py-4 text-gray-500 hidden">
+                            Sie haben keine Funktions-E-Mail-Adressen.
+                        </div>
+                    </div>
+
+                    <!-- Nextcloud Folders -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                            Nextcloud Gruppenordner
+                        </h2>
+                        <div id="nextcloud-folders-list" class="space-y-3">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                        <div id="no-nextcloud-folders" class="text-center py-4 text-gray-500 hidden">
+                            Keine Gruppenordner verfügbar.
+                        </div>
+                    </div>
+
+                    <!-- System Accesses -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                            </svg>
+                            System-Zugänge
+                        </h2>
+                        <div id="system-accesses-list" class="space-y-2">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="accesses-loading" class="text-center py-8">
+                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
+                        <p class="mt-4 text-gray-600">Lade Zugänge...</p>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    </div>
+
     <script>
         const API_BASE = 'https://api.fwv-raura.ch';
         const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
@@ -275,6 +340,7 @@
         let currentTab = 'profile';
         let memberData = null;
         let notifications = [];
+        let accessesLoaded = false;
 
         // Mapping von Funktionen zu E-Mail-Adressen
         const FUNCTION_EMAIL_MAP = {
@@ -790,6 +856,214 @@
             return labels[status] || status;
         }
 
+        // ============================================
+        // ACCESSES (ZUGÄNGE) FUNCTIONS
+        // ============================================
+
+        async function loadAccesses() {
+            try {
+                document.getElementById('accesses-loading').classList.remove('hidden');
+
+                const response = await fetch(`${API_BASE}/members/me/accesses`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load accesses');
+                }
+
+                const data = await response.json();
+                accessesLoaded = true;
+
+                renderFunctionEmails(data.functionEmails || []);
+                renderNextcloudFolders(data.nextcloudFolders || []);
+                renderSystemAccesses(data.systemAccesses || []);
+
+            } catch (error) {
+                console.error('Error loading accesses:', error);
+            } finally {
+                document.getElementById('accesses-loading').classList.add('hidden');
+            }
+        }
+
+        function renderFunctionEmails(emails) {
+            const container = document.getElementById('function-emails-list');
+            const noEmails = document.getElementById('no-function-emails');
+
+            if (emails.length === 0) {
+                container.innerHTML = '';
+                noEmails.classList.remove('hidden');
+                return;
+            }
+
+            noEmails.classList.add('hidden');
+
+            container.innerHTML = emails.map(email => `
+                <div class="border border-blue-100 bg-blue-50 rounded-lg p-4">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h4 class="font-semibold text-gray-800">${email.function}</h4>
+                            <p class="text-blue-600 font-mono mt-1">${email.email}</p>
+                        </div>
+                        <button onclick="copyToClipboard('${email.email}')" class="text-gray-400 hover:text-gray-600" title="E-Mail kopieren">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    ${email.password ? `
+                        <div class="mt-3 pt-3 border-t border-blue-200">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="text-sm text-gray-600">Passwort:</span>
+                                    <span id="pw-${email.email.replace('@', '-at-')}" class="ml-2 font-mono text-gray-800">••••••••</span>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button onclick="togglePassword('${email.email.replace('@', '-at-')}', '${email.password}')" class="text-sm text-blue-600 hover:text-blue-800">
+                                        Zeigen
+                                    </button>
+                                    <button onclick="copyToClipboard('${email.password}')" class="text-sm text-gray-500 hover:text-gray-700">
+                                        Kopieren
+                                    </button>
+                                </div>
+                            </div>
+                            ${email.passwordUpdatedAt ? `
+                                <p class="text-xs text-gray-400 mt-1">Geändert: ${new Date(email.passwordUpdatedAt).toLocaleDateString('de-CH')}</p>
+                            ` : ''}
+                        </div>
+                    ` : `
+                        <div class="mt-3 pt-3 border-t border-blue-200">
+                            <p class="text-sm text-gray-500">Kein Passwort gespeichert. Setzen Sie ein neues Passwort, um es hier anzuzeigen.</p>
+                        </div>
+                    `}
+
+                    <div class="mt-3 pt-3 border-t border-blue-200 text-sm text-gray-500">
+                        <p><strong>Server:</strong> ${email.server}</p>
+                        <p><strong>IMAP:</strong> ${email.imapPort} (SSL) | <strong>SMTP:</strong> ${email.smtpPort} (STARTTLS)</p>
+                    </div>
+
+                    <div class="mt-3 flex space-x-3">
+                        <button onclick="changeFunctionEmailPassword('${email.email}')" class="text-sm px-3 py-1 bg-fire-500 text-white rounded hover:bg-fire-600">
+                            Passwort ändern
+                        </button>
+                        <a href="${email.webmail}" target="_blank" class="text-sm px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                            Webmail öffnen
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderNextcloudFolders(folders) {
+            const container = document.getElementById('nextcloud-folders-list');
+            const noFolders = document.getElementById('no-nextcloud-folders');
+
+            if (folders.length === 0) {
+                container.innerHTML = '';
+                noFolders.classList.remove('hidden');
+                return;
+            }
+
+            noFolders.classList.add('hidden');
+
+            container.innerHTML = folders.map(folder => `
+                <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div class="flex items-center">
+                        <svg class="w-6 h-6 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800">${folder.name}</p>
+                            <p class="text-xs text-gray-500">Gruppen: ${folder.groups.join(', ')}</p>
+                        </div>
+                    </div>
+                    <a href="https://nextcloud.fwv-raura.ch/apps/files/?dir=/__groupfolders/${folder.id}" target="_blank"
+                       class="text-blue-600 hover:text-blue-800 text-sm flex items-center">
+                        Öffnen
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                        </svg>
+                    </a>
+                </div>
+            `).join('');
+        }
+
+        function renderSystemAccesses(accesses) {
+            const container = document.getElementById('system-accesses-list');
+
+            container.innerHTML = accesses.map(access => `
+                <div class="flex items-center justify-between p-2">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span class="text-gray-800">${access.system}</span>
+                        <span class="text-gray-500 text-sm ml-2">(${access.access})</span>
+                    </div>
+                    <a href="${access.url}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                        Öffnen
+                    </a>
+                </div>
+            `).join('');
+        }
+
+        function togglePassword(elementId, password) {
+            const element = document.getElementById('pw-' + elementId);
+            if (element.textContent === '••••••••') {
+                element.textContent = password;
+            } else {
+                element.textContent = '••••••••';
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show brief notification
+                const notification = document.createElement('div');
+                notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+                notification.textContent = 'Kopiert!';
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+            }).catch(err => {
+                console.error('Copy failed:', err);
+            });
+        }
+
+        async function changeFunctionEmailPassword(email) {
+            const newPassword = prompt('Neues Passwort eingeben (mindestens 8 Zeichen):');
+            if (!newPassword || newPassword.length < 8) {
+                if (newPassword !== null) {
+                    alert('Das Passwort muss mindestens 8 Zeichen lang sein.');
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/members/me/function-email-password`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ password: newPassword, email: email })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Passwortänderung fehlgeschlagen');
+                }
+
+                alert('Passwort erfolgreich geändert!');
+                accessesLoaded = false;
+                loadAccesses();
+
+            } catch (error) {
+                console.error('Password change error:', error);
+                alert('Fehler: ' + error.message);
+            }
+        }
+
         // Tab switching
         function switchTab(tab) {
             currentTab = tab;
@@ -804,6 +1078,7 @@
             document.getElementById('profile-section').classList.add('hidden');
             document.getElementById('notifications-section').classList.add('hidden');
             document.getElementById('events-section').classList.add('hidden');
+            document.getElementById('accesses-section').classList.add('hidden');
 
             // Show selected section
             if (tab === 'profile') {
@@ -820,6 +1095,11 @@
                 document.getElementById('tab-events').classList.remove('border-transparent', 'text-gray-600');
                 document.getElementById('events-section').classList.remove('hidden');
                 loadMyEvents();
+            } else if (tab === 'accesses') {
+                document.getElementById('tab-accesses').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('tab-accesses').classList.remove('border-transparent', 'text-gray-600');
+                document.getElementById('accesses-section').classList.remove('hidden');
+                if (!accessesLoaded) loadAccesses();
             }
         }
 
@@ -895,6 +1175,7 @@
         document.getElementById('tab-profile').addEventListener('click', () => switchTab('profile'));
         document.getElementById('tab-notifications').addEventListener('click', () => switchTab('notifications'));
         document.getElementById('tab-events').addEventListener('click', () => switchTab('events'));
+        document.getElementById('tab-accesses').addEventListener('click', () => switchTab('accesses'));
 
         document.getElementById('logout-btn').addEventListener('click', () => {
             localStorage.removeItem('auth_token');
