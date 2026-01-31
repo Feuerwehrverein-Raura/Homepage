@@ -56,7 +56,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/funktionen`))
+      - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/funktionen`) || PathPrefix(`/uploads`) || PathPrefix(`/member-registrations`))
       - traefik.http.routers.api-members.entrypoints=https
       - traefik.http.routers.api-members.tls=true
       - traefik.http.routers.api-members.tls.certresolver=letsencrypt
@@ -84,7 +84,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.api-events.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/events`) || PathPrefix(`/shifts`) || PathPrefix(`/calendar`) || PathPrefix(`/registrations`) || PathPrefix(`/arbeitsplan`) || PathPrefix(`/event-groups`) || PathPrefix(`/reminders`))
+      - traefik.http.routers.api-events.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/events`) || PathPrefix(`/shifts`) || PathPrefix(`/calendar`) || PathPrefix(`/registrations`) || PathPrefix(`/arbeitsplan`) || PathPrefix(`/event-groups`) || PathPrefix(`/reminders`) || PathPrefix(`/teilnehmerliste`))
       - traefik.http.routers.api-events.entrypoints=https
       - traefik.http.routers.api-events.tls=true
       - traefik.http.routers.api-events.tls.certresolver=letsencrypt
@@ -115,7 +115,7 @@ services:
       - traefik.http.routers.api-accounting.tls.certresolver=letsencrypt
       - traefik.http.services.api-accounting.loadbalancer.server.port=3000
 
-  # Versand API (Email, Pingen, SMS)
+  # Versand API (Email, Pingen, SMS, PDF-Templates)
   api-dispatch:
     build: ./backend-dispatch
     container_name: fwv-api-dispatch
@@ -137,6 +137,7 @@ services:
       EVENTS_API_URL: http://api-events:3000
       MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}
       MAILCOW_API_KEY: ${MAILCOW_API_KEY}
+      AUTHENTIK_URL: https://auth.fwv-raura.ch
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,11 +146,26 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.api-dispatch.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/email`) || PathPrefix(`/pingen`) || PathPrefix(`/sms`) || PathPrefix(`/templates`) || PathPrefix(`/letters`) || PathPrefix(`/contact`) || PathPrefix(`/newsletter`) || PathPrefix(`/dispatch-log`) || PathPrefix(`/mailcow`))
+      # Main dispatch routes
+      - traefik.http.routers.api-dispatch.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/email`) || PathPrefix(`/pingen`) || PathPrefix(`/templates`) || PathPrefix(`/contact`) || PathPrefix(`/newsletter`) || PathPrefix(`/dispatch-log`) || PathPrefix(`/dispatch`) || PathPrefix(`/mailcow`) || PathPrefix(`/pdf-templates`) || PathPrefix(`/organisation-settings`) || PathPrefix(`/health`))
       - traefik.http.routers.api-dispatch.entrypoints=https
       - traefik.http.routers.api-dispatch.tls=true
       - traefik.http.routers.api-dispatch.tls.certresolver=letsencrypt
       - traefik.http.services.api-dispatch.loadbalancer.server.port=3000
+      # Higher priority route for /invoices/generate (dispatch handles PDF generation)
+      - traefik.http.routers.api-dispatch-invoices.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/invoices/generate`)
+      - traefik.http.routers.api-dispatch-invoices.entrypoints=https
+      - traefik.http.routers.api-dispatch-invoices.tls=true
+      - traefik.http.routers.api-dispatch-invoices.tls.certresolver=letsencrypt
+      - traefik.http.routers.api-dispatch-invoices.service=api-dispatch
+      - traefik.http.routers.api-dispatch-invoices.priority=200
+      # Higher priority route for /arbeitsplan/pdf (dispatch handles PDF generation)
+      - traefik.http.routers.api-dispatch-arbeitsplan.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/arbeitsplan/pdf`)
+      - traefik.http.routers.api-dispatch-arbeitsplan.entrypoints=https
+      - traefik.http.routers.api-dispatch-arbeitsplan.tls=true
+      - traefik.http.routers.api-dispatch-arbeitsplan.tls.certresolver=letsencrypt
+      - traefik.http.routers.api-dispatch-arbeitsplan.service=api-dispatch
+      - traefik.http.routers.api-dispatch-arbeitsplan.priority=200
 
   # ============================================
   # FRONTENDS
