@@ -1,3 +1,10 @@
+## [1.110.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.0...v1.110.1) (2026-01-31)
+
+
+### Bug Fixes
+
+* **dispatch:** add missing jsonwebtoken dependency ([7512b46](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7512b4647bc3a6c2b32b04e92f9cb2a512c7038c))
+
 # [1.110.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.109.1...v1.110.0) (2026-01-30)
 
 
