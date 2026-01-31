@@ -814,31 +814,23 @@ function PingenOverlay({ country, designerRef }) {
 
       const containerRect = currentContainer.getBoundingClientRect()
 
-      // pdfme rendert die PDF-Seite als weisses Paper-Element
-      // Es liegt NICHT am oberen Rand des Containers (dort ist Toolbar/Lineal)
+      // pdfme rendert die PDF-Seite - suche nach A4-proportionalem Element
       let candidates = []
 
       const allElements = currentContainer.querySelectorAll('div')
       for (const el of allElements) {
         const rect = el.getBoundingClientRect()
 
-        // Position relativ zum Container
-        const relTop = rect.top - containerRect.top
-        const relLeft = rect.left - containerRect.left
-
-        // WICHTIG: Element muss etwas vom oberen Rand entfernt sein
-        // (Die PDF-Seite beginnt nicht bei y=0, dort ist das Lineal/Toolbar)
-        if (relTop < 50) continue
-
         // Mindestgrösse prüfen
         if (rect.width < 200 || rect.height < 280) continue
 
-        // Maximalgrösse - nicht grösser als 90% des Containers
-        if (rect.width > containerRect.width * 0.9) continue
-
         // A4 hat Verhältnis 210:297 = 0.707
         const ratio = rect.width / rect.height
-        if (ratio < 0.65 || ratio > 0.75) continue
+        if (ratio < 0.6 || ratio > 0.8) continue
+
+        // Position relativ zum Container
+        const relTop = rect.top - containerRect.top
+        const relLeft = rect.left - containerRect.left
 
         const style = window.getComputedStyle(el)
         const bgColor = style.backgroundColor
@@ -850,43 +842,53 @@ function PingenOverlay({ country, designerRef }) {
         // A4-Verhältnis-Genauigkeit (max 10 Punkte)
         score += (1 - Math.abs(ratio - 0.707)) * 10
 
-        // Weisser Hintergrund (10 Punkte) - wichtig!
+        // Weisser Hintergrund (5 Punkte)
         if (bgColor.includes('255, 255, 255') || bgColor === 'white') {
-          score += 10
-        }
-
-        // Box-Shadow vorhanden = Paper-Effekt (5 Punkte)
-        if (boxShadow && boxShadow !== 'none') {
           score += 5
         }
 
-        // Element sollte etwas vom Rand entfernt sein (zentriert)
-        if (relLeft > 30) {
+        // Box-Shadow vorhanden = Paper-Effekt (8 Punkte) - sehr wichtig!
+        if (boxShadow && boxShadow !== 'none') {
+          score += 8
+        }
+
+        // Nicht am oberen Rand (3 Punkte) - weniger wichtig, aber bonus
+        if (relTop > 20) {
           score += 3
         }
 
-        candidates.push({ el, rect, score, relTop, relLeft })
+        // Nicht die volle Container-Breite (2 Punkte)
+        if (rect.width < containerRect.width * 0.95) {
+          score += 2
+        }
+
+        candidates.push({ el, rect, score, relTop, relLeft, ratio, bgColor: bgColor.substring(0, 30), boxShadow: boxShadow?.substring(0, 20) })
       }
 
       // Sortiere nach Score (höchster zuerst)
       candidates.sort((a, b) => b.score - a.score)
 
-      // Debug: Log candidates
-      if (candidates.length > 0) {
-        console.log('Pingen Overlay - Best candidate:', candidates[0])
-      }
+      // Debug: Log all candidates
+      console.log('Pingen Overlay - All candidates:', candidates.slice(0, 5).map(c => ({
+        score: c.score,
+        relTop: Math.round(c.relTop),
+        size: `${Math.round(c.rect.width)}x${Math.round(c.rect.height)}`,
+        ratio: c.ratio.toFixed(3),
+        bg: c.bgColor,
+        shadow: c.boxShadow
+      })))
 
       // Wähle das beste Element
       let pageElement = candidates[0]?.el
 
-      // Fallback: Canvas suchen (falls vorhanden und nicht am oberen Rand)
+      // Fallback: Canvas suchen
       if (!pageElement) {
         const canvas = currentContainer.querySelector('canvas')
         if (canvas) {
           const rect = canvas.getBoundingClientRect()
-          const relTop = rect.top - containerRect.top
-          if (rect.width > 200 && rect.height > 280 && relTop > 50) {
+          if (rect.width > 200 && rect.height > 280) {
             pageElement = canvas
+            console.log('Pingen Overlay - Using canvas fallback')
           }
         }
       }
@@ -900,8 +902,15 @@ function PingenOverlay({ country, designerRef }) {
           width: rect.width,
           height: rect.height,
         })
+        console.log('Pingen Overlay - Page found at:', {
+          left: rect.left - containerRect.left,
+          top: rect.top - containerRect.top,
+          width: rect.width,
+          height: rect.height
+        })
       } else {
-        console.log('Pingen Overlay - No page element found')
+        console.log('Pingen Overlay - No page element found!')
+        setPageRect(null)
       }
     }
 
