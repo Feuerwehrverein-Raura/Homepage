@@ -1,3 +1,10 @@
+## [1.110.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.1...v1.110.2) (2026-01-31)
+
+
+### Bug Fixes
+
+* **dispatch:** add missing jwks-rsa dependency ([4036acd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4036acd6c27ec2fc84fa26193bf9f9837a1dac43))
+
 ## [1.110.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.0...v1.110.1) (2026-01-31)
 
 
