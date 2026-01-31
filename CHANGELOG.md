@@ -1,3 +1,10 @@
+## [1.110.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.2...v1.110.3) (2026-01-31)
+
+
+### Bug Fixes
+
+* **traefik:** complete API routing configuration ([f15f367](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f15f367cc894acb1fcc295680704cd461feff96c))
+
 ## [1.110.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.1...v1.110.2) (2026-01-31)
 
 
