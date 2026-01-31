@@ -1,3 +1,10 @@
+# [1.111.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.3...v1.111.0) (2026-01-31)
+
+
+### Features
+
+* **members:** add Zugänge tab with function emails, Nextcloud folders, and system accesses ([0c07acc](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0c07acc5c7a9abee4bb608789811821f683b7fc7))
+
 ## [1.110.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.2...v1.110.3) (2026-01-31)
 
 
