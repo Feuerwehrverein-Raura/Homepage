@@ -17,6 +17,7 @@
     "@pdfme/common": "^4.0.0",
     "@pdfme/schemas": "^4.0.0",
     "swissqrbill": "^4.0.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
   }
 }
