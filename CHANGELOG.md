@@ -1,3 +1,10 @@
+# [1.113.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.112.0...v1.113.0) (2026-01-31)
+
+
+### Features
+
+* **fasnacht:** add 2026 menu items and QR-accessible menu page ([2700661](https://github.com/Feuerwehrverein-Raura/Homepage/commit/270066195b258c8bef1dcf979630e523ecaa7f9f))
+
 # [1.112.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.111.0...v1.112.0) (2026-01-31)
 
 
