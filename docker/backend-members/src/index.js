@@ -3913,10 +3913,39 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
             });
         }
 
+        // 4. Get events where user is organizer
+        const EVENTS_API = process.env.EVENTS_API_URL || 'http://api-events:3000';
+        let organizerEvents = [];
+        try {
+            const eventsResult = await pool.query(`
+                SELECT id, title, start_date, end_date, organizer_name, organizer_email,
+                       event_email, event_access_expires
+                FROM events
+                WHERE organizer_email = $1
+                  AND (end_date >= CURRENT_DATE OR end_date IS NULL)
+                ORDER BY start_date ASC
+            `, [req.user.email]);
+
+            organizerEvents = eventsResult.rows.map(event => ({
+                id: event.id,
+                title: event.title,
+                startDate: event.start_date,
+                endDate: event.end_date,
+                organizerName: event.organizer_name,
+                hasEventAccess: !!event.event_email,
+                eventEmail: event.event_email,
+                accessExpires: event.event_access_expires,
+                dashboardUrl: `https://fwv-raura.ch/event-dashboard.html?id=${event.id}`
+            }));
+        } catch (err) {
+            console.error('Error fetching organizer events:', err.message);
+        }
+
         res.json({
             functionEmails,
             nextcloudFolders,
-            systemAccesses
+            systemAccesses,
+            organizerEvents
         });
 
     } catch (error) {
