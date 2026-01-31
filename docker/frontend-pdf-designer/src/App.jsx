@@ -906,24 +906,25 @@ function PingenOverlay({ country, designerRef }) {
   if (!pageRect) return null
 
   // A4 Dimensionen: 210mm x 297mm
-  // Umrechnung mm zu Pixel basierend auf aktueller Seitengrösse
-  const mmToPixel = (mm) => (mm / 210) * pageRect.width
+  // Separate Umrechnung für X (Breite) und Y (Höhe)
+  const mmToPixelX = (mm) => (mm / 210) * pageRect.width
+  const mmToPixelY = (mm) => (mm / 297) * pageRect.height
 
   // Schweizer Standard (SN 010130) - Fenster RECHTS
   // Adressfeld: x=118mm, y=54mm, 85x31mm (netto Schreibfeld)
-  // Frankierzone: oben rechts
+  // Frankierzone: oben rechts (ca. 74x52mm für A-Post)
   const chZones = {
-    // Frankierzone (Briefmarke/Stempel) - oben rechts
-    franking: { x: 120, y: 0, w: 90, h: 50 },
-    // Adressfeld - rechts, ab 45mm von oben
+    // Frankierzone (Briefmarke/Stempel) - oben rechts, endet bei 200mm (10mm Rand)
+    franking: { x: 126, y: 0, w: 74, h: 52 },
+    // Adressfeld - rechts, ab 54mm von oben
     address: { x: 118, y: 54, w: 85, h: 31 },
   }
 
   // Deutscher Standard (DIN 5008) - Fenster LINKS
   // Adressfeld: x=20mm, y=45mm, 85x45mm
   const deZones = {
-    // Frankierzone - oben rechts (auch bei DE)
-    franking: { x: 0, y: 0, w: 90, h: 50 },
+    // Frankierzone - oben rechts
+    franking: { x: 126, y: 0, w: 74, h: 52 },
     // Adressfeld - links
     address: { x: 20, y: 45, w: 85, h: 45 },
   }
@@ -945,10 +946,10 @@ function PingenOverlay({ country, designerRef }) {
       <div
         className={`absolute border-2 border-dashed border-orange-500`}
         style={{
-          left: mmToPixel(zones.franking.x),
-          top: mmToPixel(zones.franking.y),
-          width: mmToPixel(zones.franking.w),
-          height: mmToPixel(zones.franking.h),
+          left: mmToPixelX(zones.franking.x),
+          top: mmToPixelY(zones.franking.y),
+          width: mmToPixelX(zones.franking.w),
+          height: mmToPixelY(zones.franking.h),
           backgroundColor: 'rgba(255, 165, 0, 0.15)',
         }}
       >
@@ -961,10 +962,10 @@ function PingenOverlay({ country, designerRef }) {
       <div
         className={`absolute border-2 border-dashed border-${color}-500`}
         style={{
-          left: mmToPixel(zones.address.x),
-          top: mmToPixel(zones.address.y),
-          width: mmToPixel(zones.address.w),
-          height: mmToPixel(zones.address.h),
+          left: mmToPixelX(zones.address.x),
+          top: mmToPixelY(zones.address.y),
+          width: mmToPixelX(zones.address.w),
+          height: mmToPixelY(zones.address.h),
           backgroundColor: color === 'red' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
           borderColor: color === 'red' ? '#ef4444' : '#3b82f6',
         }}
