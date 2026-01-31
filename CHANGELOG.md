@@ -1,3 +1,10 @@
+## [1.114.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.0...v1.114.1) (2026-01-31)
+
+
+### Bug Fixes
+
+* **pdf-designer:** improve Pingen overlay positioning ([9e038f1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9e038f113ec8ad98c1423938a96f6adf0f94b3b7))
+
 # [1.114.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.113.2...v1.114.0) (2026-01-31)
 
 
