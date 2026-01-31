@@ -1,3 +1,10 @@
+# [1.114.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.113.2...v1.114.0) (2026-01-31)
+
+
+### Features
+
+* **docker:** add version info to all frontend containers ([bd65022](https://github.com/Feuerwehrverein-Raura/Homepage/commit/bd650225b365b76f403248c6dc7473289c1d0523))
+
 ## [1.113.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.113.1...v1.113.2) (2026-01-31)
 
 
