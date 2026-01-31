@@ -1,3 +1,10 @@
+# [1.112.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.111.0...v1.112.0) (2026-01-31)
+
+
+### Features
+
+* **members:** add organizer events to Zugänge tab ([586ac5f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/586ac5ff6b9e2407cfa35e16e9c4a2ab7141d7e5))
+
 # [1.111.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.110.3...v1.111.0) (2026-01-31)
 
 
