@@ -799,6 +799,202 @@ const getSampleInputs = (category) => {
 // Plugin configuration
 const plugins = { text, image, ...barcodes }
 
+// Pingen Address Zone Overlay Component
+// Legt sich direkt über das PDF im Editor
+function PingenOverlay({ country, designerRef }) {
+  const [pageRect, setPageRect] = useState(null)
+
+  useEffect(() => {
+    if (!designerRef.current) return
+
+    const findAndTrackPage = () => {
+      const container = designerRef.current
+
+      // pdfme rendert die PDF-Seite in verschiedenen Elementen
+      // Wir suchen nach dem weissen Rechteck das die A4-Seite darstellt
+      // Das ist typischerweise ein div mit weissem Hintergrund und A4-Proportionen
+
+      // Methode 1: Suche nach dem Paper/Canvas Element
+      let pageElement = null
+
+      // pdfme v4 verwendet ein Paper-ähnliches Element
+      const allDivs = container.querySelectorAll('div')
+      for (const div of allDivs) {
+        const style = window.getComputedStyle(div)
+        const rect = div.getBoundingClientRect()
+
+        // A4 hat Verhältnis 210:297 = 0.707
+        // Prüfe ob das Element A4-proportional ist und weiss
+        if (rect.width > 100 && rect.height > 100) {
+          const ratio = rect.width / rect.height
+          const isA4Ratio = ratio > 0.65 && ratio < 0.75 // A4 Toleranz
+
+          const bgColor = style.backgroundColor
+          const isWhite = bgColor === 'rgb(255, 255, 255)' ||
+                         bgColor === 'white' ||
+                         bgColor === '#ffffff' ||
+                         bgColor === '#fff'
+
+          if (isA4Ratio && isWhite) {
+            pageElement = div
+            break
+          }
+        }
+      }
+
+      // Methode 2: Suche nach Canvas wenn kein div gefunden
+      if (!pageElement) {
+        const canvas = container.querySelector('canvas')
+        if (canvas) {
+          pageElement = canvas
+        }
+      }
+
+      if (pageElement) {
+        const rect = pageElement.getBoundingClientRect()
+        const containerRect = container.getBoundingClientRect()
+
+        setPageRect({
+          left: rect.left - containerRect.left,
+          top: rect.top - containerRect.top,
+          width: rect.width,
+          height: rect.height,
+        })
+      }
+    }
+
+    // Initial check mit Verzögerung (pdfme braucht Zeit zum Rendern)
+    const timer = setTimeout(findAndTrackPage, 800)
+
+    // Wiederhole die Suche falls das Element noch nicht gefunden wurde
+    const retryTimer = setInterval(() => {
+      if (!pageRect) findAndTrackPage()
+    }, 1000)
+
+    // Beobachte Änderungen (Zoom, Resize)
+    const observer = new MutationObserver(() => {
+      setTimeout(findAndTrackPage, 100)
+    })
+    observer.observe(designerRef.current, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class', 'transform']
+    })
+
+    // Resize handler
+    const resizeObserver = new ResizeObserver(() => {
+      setTimeout(findAndTrackPage, 100)
+    })
+    resizeObserver.observe(designerRef.current)
+
+    // Scroll handler für den Designer-Bereich
+    const handleScroll = () => findAndTrackPage()
+    container.addEventListener('scroll', handleScroll, true)
+
+    return () => {
+      clearTimeout(timer)
+      clearInterval(retryTimer)
+      observer.disconnect()
+      resizeObserver.disconnect()
+      container.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [designerRef, pageRect])
+
+  if (!pageRect) return null
+
+  // A4 Dimensionen: 210mm x 297mm
+  // Umrechnung mm zu Pixel basierend auf aktueller Seitengrösse
+  const mmToPixel = (mm) => (mm / 210) * pageRect.width
+
+  // Schweizer Standard (SN 010130) - Fenster RECHTS
+  // Adressfeld: x=118mm, y=54mm, 85x31mm (netto Schreibfeld)
+  // Frankierzone: oben rechts
+  const chZones = {
+    // Frankierzone (Briefmarke/Stempel) - oben rechts
+    franking: { x: 120, y: 0, w: 90, h: 50 },
+    // Adressfeld - rechts, ab 45mm von oben
+    address: { x: 118, y: 54, w: 85, h: 31 },
+  }
+
+  // Deutscher Standard (DIN 5008) - Fenster LINKS
+  // Adressfeld: x=20mm, y=45mm, 85x45mm
+  const deZones = {
+    // Frankierzone - oben rechts (auch bei DE)
+    franking: { x: 0, y: 0, w: 90, h: 50 },
+    // Adressfeld - links
+    address: { x: 20, y: 45, w: 85, h: 45 },
+  }
+
+  const zones = country === 'ch' ? chZones : deZones
+  const color = country === 'ch' ? 'red' : 'blue'
+
+  return (
+    <div
+      className="absolute pointer-events-none z-40"
+      style={{
+        left: pageRect.left,
+        top: pageRect.top,
+        width: pageRect.width,
+        height: pageRect.height,
+      }}
+    >
+      {/* Frankierzone */}
+      <div
+        className={`absolute border-2 border-dashed border-orange-500`}
+        style={{
+          left: mmToPixel(zones.franking.x),
+          top: mmToPixel(zones.franking.y),
+          width: mmToPixel(zones.franking.w),
+          height: mmToPixel(zones.franking.h),
+          backgroundColor: 'rgba(255, 165, 0, 0.15)',
+        }}
+      >
+        <span className="text-xs text-orange-600 bg-white px-1 rounded absolute top-0 left-0 font-medium">
+          Frankierzone
+        </span>
+      </div>
+
+      {/* Adressfeld */}
+      <div
+        className={`absolute border-2 border-dashed border-${color}-500`}
+        style={{
+          left: mmToPixel(zones.address.x),
+          top: mmToPixel(zones.address.y),
+          width: mmToPixel(zones.address.w),
+          height: mmToPixel(zones.address.h),
+          backgroundColor: color === 'red' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+          borderColor: color === 'red' ? '#ef4444' : '#3b82f6',
+        }}
+      >
+        <span
+          className="text-xs bg-white px-1 rounded absolute top-0 left-0 font-medium"
+          style={{ color: color === 'red' ? '#ef4444' : '#3b82f6' }}
+        >
+          {country === 'ch' ? '🇨🇭' : '🇩🇪'} Adressfeld ({zones.address.w}×{zones.address.h}mm)
+        </span>
+        <span
+          className="text-xs bg-white px-1 rounded absolute bottom-0 right-0"
+          style={{ color: color === 'red' ? '#ef4444' : '#3b82f6' }}
+        >
+          x={zones.address.x}mm y={zones.address.y}mm
+        </span>
+      </div>
+
+      {/* Info-Badge */}
+      <div
+        className="absolute bottom-2 left-2 bg-white rounded shadow px-2 py-1 text-xs pointer-events-auto"
+        style={{ borderLeft: `3px solid ${color === 'red' ? '#ef4444' : '#3b82f6'}` }}
+      >
+        <strong>{country === 'ch' ? '🇨🇭 Swiss Post' : '🇩🇪 DIN 5008'}</strong>
+        <span className="text-gray-500 ml-2">
+          Fenster {country === 'ch' ? 'RECHTS' : 'LINKS'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const designerRef = useRef(null)
   const designerInstance = useRef(null)
@@ -1462,158 +1658,9 @@ function App() {
             style={{ minHeight: '100%' }}
           />
 
-          {/* Pingen Address Zone Overlay - als separates Panel rechts */}
+          {/* Pingen Address Zone Overlay - direkt über dem PDF */}
           {showAddressOverlay && (
-            <div
-              className="absolute right-4 top-4 bg-white rounded-lg shadow-lg p-4 pointer-events-none z-50"
-              style={{ width: '280px' }}
-            >
-              <div className="text-sm font-bold mb-3 text-gray-700 pointer-events-auto">
-                📬 {showAddressOverlay === 'ch' ? 'Schweizer' : 'Deutscher'} Briefstandard
-              </div>
-
-              {/* Miniatur A4-Seite mit Zonen */}
-              <div
-                className="relative bg-white border-2 border-gray-300 mx-auto"
-                style={{
-                  width: '180px',   // A4 proportional mini
-                  height: '255px',  // A4 proportional (297/210 ratio)
-                }}
-              >
-                {/* Swiss Post - Right Window */}
-                {showAddressOverlay === 'ch' && (
-                  <>
-                    {/* Absender links oben */}
-                    <div
-                      className="absolute bg-gray-200 text-xs flex items-center justify-center"
-                      style={{
-                        left: '10%',
-                        top: '5%',
-                        width: '35%',
-                        height: '10%',
-                      }}
-                    >
-                      Absender
-                    </div>
-
-                    {/* Frankierzone (rechts oben) */}
-                    <div
-                      className="absolute border-2 border-dashed border-orange-500 bg-orange-100"
-                      style={{
-                        right: '3%',
-                        top: '13%',
-                        width: '43%',       // ~90mm von 210mm
-                        height: '16%',      // ~47mm von 297mm
-                      }}
-                    >
-                      <span className="text-xs text-orange-600 p-1">Frankierung</span>
-                    </div>
-
-                    {/* Adressfeld (rechts, im Fenster) */}
-                    <div
-                      className="absolute border-2 border-dashed border-red-500 bg-red-100"
-                      style={{
-                        right: '5%',
-                        top: '18%',
-                        width: '40%',       // ~85mm von 210mm
-                        height: '11%',      // ~32mm von 297mm
-                      }}
-                    >
-                      <span className="text-xs text-red-600 p-1">Adresse</span>
-                    </div>
-
-                    {/* Inhalt-Bereich */}
-                    <div
-                      className="absolute bg-gray-100 border border-gray-300"
-                      style={{
-                        left: '10%',
-                        top: '33%',
-                        width: '80%',
-                        height: '50%',
-                      }}
-                    >
-                      <span className="text-xs text-gray-500 p-1">Inhalt</span>
-                    </div>
-                  </>
-                )}
-
-                {/* German Post - Left Window */}
-                {showAddressOverlay === 'de' && (
-                  <>
-                    {/* Absender rechts oben */}
-                    <div
-                      className="absolute bg-gray-200 text-xs flex items-center justify-center"
-                      style={{
-                        right: '5%',
-                        top: '5%',
-                        width: '35%',
-                        height: '10%',
-                      }}
-                    >
-                      Absender
-                    </div>
-
-                    {/* Frankierzone (LINKS oben) */}
-                    <div
-                      className="absolute border-2 border-dashed border-orange-500 bg-orange-100"
-                      style={{
-                        left: '3%',
-                        top: '13%',
-                        width: '43%',
-                        height: '16%',
-                      }}
-                    >
-                      <span className="text-xs text-orange-600 p-1">Frankierung</span>
-                    </div>
-
-                    {/* Adressfeld (links, im Fenster) */}
-                    <div
-                      className="absolute border-2 border-dashed border-blue-500 bg-blue-100"
-                      style={{
-                        left: '5%',
-                        top: '18%',
-                        width: '40%',
-                        height: '11%',
-                      }}
-                    >
-                      <span className="text-xs text-blue-600 p-1">Adresse</span>
-                    </div>
-
-                    {/* Inhalt-Bereich */}
-                    <div
-                      className="absolute bg-gray-100 border border-gray-300"
-                      style={{
-                        left: '10%',
-                        top: '33%',
-                        width: '80%',
-                        height: '50%',
-                      }}
-                    >
-                      <span className="text-xs text-gray-500 p-1">Inhalt</span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Positionsangaben */}
-              <div className="mt-3 text-xs text-gray-600 space-y-1">
-                {showAddressOverlay === 'ch' ? (
-                  <>
-                    <p><strong>🇨🇭 Swiss Post (SN 010130)</strong></p>
-                    <p>Adresse: x=118mm, y=54mm</p>
-                    <p>Grösse: 85×31mm</p>
-                    <p className="text-gray-400 mt-1">Fenster: RECHTS</p>
-                  </>
-                ) : (
-                  <>
-                    <p><strong>🇩🇪 DIN 5008</strong></p>
-                    <p>Adresse: x=20mm, y=50mm</p>
-                    <p>Grösse: 85×45mm</p>
-                    <p className="text-gray-400 mt-1">Fenster: LINKS</p>
-                  </>
-                )}
-              </div>
-            </div>
+            <PingenOverlay country={showAddressOverlay} designerRef={designerRef} />
           )}
         </div>
       </div>
