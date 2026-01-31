@@ -1,3 +1,10 @@
+## [1.114.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.4...v1.114.5) (2026-01-31)
+
+
+### Bug Fixes
+
+* **pdf-designer:** loosen page detection criteria and add debug logging ([03d9d7a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/03d9d7ad353fe5493acac13b300a9af16b1da334))
+
 ## [1.114.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.3...v1.114.4) (2026-01-31)
 
 
