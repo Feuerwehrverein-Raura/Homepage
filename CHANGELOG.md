@@ -1,3 +1,10 @@
+## [1.114.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.2...v1.114.3) (2026-01-31)
+
+
+### Bug Fixes
+
+* **pdf-designer:** correct Pingen overlay mm-to-pixel conversion ([22a5bb9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/22a5bb9e4a12e7245481044994784254c4054b19))
+
 ## [1.114.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.1...v1.114.2) (2026-01-31)
 
 
