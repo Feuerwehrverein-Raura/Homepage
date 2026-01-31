@@ -2772,6 +2772,10 @@
                 }
 
                 localStorage.setItem('vorstand_token', data.token);
+                // Set cookie for cross-subdomain auth (pdf.fwv-raura.ch, etc.)
+                const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString(); // 7 days
+                document.cookie = `vorstand_token=${data.token}; domain=.fwv-raura.ch; path=/; expires=${expires}; secure; samesite=lax`;
+
                 authToken = data.token;
                 currentUser = data.user;
                 document.getElementById('user-info').textContent = currentUser.name;
@@ -2784,7 +2788,9 @@
                 const urlParams = new URLSearchParams(window.location.search);
                 const redirectUrl = urlParams.get('redirect');
                 if (redirectUrl && redirectUrl.startsWith('https://') && redirectUrl.includes('fwv-raura.ch')) {
-                    window.location.href = redirectUrl;
+                    // Add token to URL as backup for cross-domain auth
+                    const separator = redirectUrl.includes('?') ? '&' : '?';
+                    window.location.href = `${redirectUrl}${separator}token=${data.token}`;
                     return;
                 }
 

@@ -824,12 +824,26 @@ function App() {
   // Check authentication
   useEffect(() => {
     let token = localStorage.getItem('vorstand_token')
+
+    // Check URL parameter (from redirect)
+    if (!token) {
+      const urlParams = new URLSearchParams(window.location.search)
+      token = urlParams.get('token')
+      if (token) {
+        localStorage.setItem('vorstand_token', token)
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
+    }
+
+    // Check cookie (cross-subdomain)
     if (!token) {
       token = getCookie('vorstand_token')
       if (token) {
         localStorage.setItem('vorstand_token', token)
       }
     }
+
     if (token) {
       fetch(`${API_BASE}/auth/vorstand/me`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -849,7 +863,12 @@ function App() {
           }
           setLoading(false)
         })
-        .catch(() => setLoading(false))
+        .catch(() => {
+          // Token invalid/expired - clear it
+          localStorage.removeItem('vorstand_token')
+          document.cookie = 'vorstand_token=; domain=.fwv-raura.ch; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+          setLoading(false)
+        })
     } else {
       setLoading(false)
     }
