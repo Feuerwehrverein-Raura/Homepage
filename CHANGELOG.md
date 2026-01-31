@@ -1,3 +1,10 @@
+## [1.114.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.1...v1.114.2) (2026-01-31)
+
+
+### Bug Fixes
+
+* **pdf-designer:** fix undefined container reference in PingenOverlay ([119fb78](https://github.com/Feuerwehrverein-Raura/Homepage/commit/119fb78137bf61537c53ec1d9580e89aa4c0945b))
+
 ## [1.114.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.0...v1.114.1) (2026-01-31)
 
 
