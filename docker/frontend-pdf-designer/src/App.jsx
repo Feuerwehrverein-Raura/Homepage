@@ -805,10 +805,12 @@ function PingenOverlay({ country, designerRef }) {
   const [pageRect, setPageRect] = useState(null)
 
   useEffect(() => {
-    if (!designerRef.current) return
+    const container = designerRef.current
+    if (!container) return
 
     const findAndTrackPage = () => {
-      const container = designerRef.current
+      const currentContainer = designerRef.current
+      if (!currentContainer) return
 
       // pdfme rendert die PDF-Seite in verschiedenen Elementen
       // Wir suchen nach dem weissen Rechteck das die A4-Seite darstellt
@@ -818,7 +820,7 @@ function PingenOverlay({ country, designerRef }) {
       let pageElement = null
 
       // pdfme v4 verwendet ein Paper-ähnliches Element
-      const allDivs = container.querySelectorAll('div')
+      const allDivs = currentContainer.querySelectorAll('div')
       for (const div of allDivs) {
         const style = window.getComputedStyle(div)
         const rect = div.getBoundingClientRect()
@@ -844,7 +846,7 @@ function PingenOverlay({ country, designerRef }) {
 
       // Methode 2: Suche nach Canvas wenn kein div gefunden
       if (!pageElement) {
-        const canvas = container.querySelector('canvas')
+        const canvas = currentContainer.querySelector('canvas')
         if (canvas) {
           pageElement = canvas
         }
@@ -852,7 +854,7 @@ function PingenOverlay({ country, designerRef }) {
 
       if (pageElement) {
         const rect = pageElement.getBoundingClientRect()
-        const containerRect = container.getBoundingClientRect()
+        const containerRect = currentContainer.getBoundingClientRect()
 
         setPageRect({
           left: rect.left - containerRect.left,
@@ -875,7 +877,7 @@ function PingenOverlay({ country, designerRef }) {
     const observer = new MutationObserver(() => {
       setTimeout(findAndTrackPage, 100)
     })
-    observer.observe(designerRef.current, {
+    observer.observe(container, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -886,7 +888,7 @@ function PingenOverlay({ country, designerRef }) {
     const resizeObserver = new ResizeObserver(() => {
       setTimeout(findAndTrackPage, 100)
     })
-    resizeObserver.observe(designerRef.current)
+    resizeObserver.observe(container)
 
     // Scroll handler für den Designer-Bereich
     const handleScroll = () => findAndTrackPage()
