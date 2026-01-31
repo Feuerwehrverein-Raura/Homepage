@@ -7,41 +7,52 @@ import { BLANK_PDF } from '@pdfme/common'
 const API_BASE = 'https://api.fwv-raura.ch'
 
 // Default A4 Brief Template
+// WICHTIG: Swiss Post Standard (SN 010130) - Adressfeld RECHTS für C5/C6 Fensterkuvert
 const getDefaultTemplate = () => ({
   basePdf: BLANK_PDF,
   schemas: [
     {
-      // Absender oben rechts
+      // Absender oben links
       absender: {
         type: 'text',
-        position: { x: 120, y: 15 },
+        position: { x: 25, y: 15 },
         width: 75,
         height: 25,
         fontSize: 9,
         lineHeight: 1.2,
       },
-      // Empfänger Adresse
+      // Absender-Rückadresse (kleine Schrift über Adressfeld)
+      absender_zeile: {
+        type: 'text',
+        position: { x: 118, y: 48 },
+        width: 85,
+        height: 5,
+        fontSize: 7,
+        fontColor: '#666666',
+      },
+      // Empfänger-Adresse (Swiss Post Position: RECHTS im Sichtfenster)
+      // SN 010130: x=118mm, y=54mm, 85×31mm (Adresszone)
       empfaenger: {
         type: 'text',
-        position: { x: 25, y: 50 },
-        width: 80,
-        height: 30,
+        position: { x: 118, y: 54 },
+        width: 85,
+        height: 31,
         fontSize: 11,
         lineHeight: 1.3,
       },
-      // Ort und Datum
+      // Ort und Datum (rechts, unter Adressbereich)
       ort_datum: {
         type: 'text',
-        position: { x: 120, y: 85 },
-        width: 70,
+        position: { x: 118, y: 92 },
+        width: 85,
         height: 8,
         fontSize: 10,
         alignment: 'right',
       },
-      // Betreff
+      // Betreff (unterhalb Adressbereich)
       betreff: {
         type: 'text',
-        position: { x: 25, y: 100 },
+        position: { x: 25, y: 105 },
         width: 160,
         height: 10,
         fontSize: 12,
@@ -50,7 +61,7 @@ const getDefaultTemplate = () => ({
       // Anrede
       anrede: {
         type: 'text',
-        position: { x: 25, y: 115 },
+        position: { x: 25, y: 120 },
         width: 160,
         height: 8,
         fontSize: 11,
@@ -58,9 +69,9 @@ const getDefaultTemplate = () => ({
       // Inhalt
       inhalt: {
         type: 'text',
-        position: { x: 25, y: 128 },
+        position: { x: 25, y: 133 },
         width: 160,
-        height: 100,
+        height: 95,
         fontSize: 11,
         lineHeight: 1.4,
       },
@@ -88,39 +99,49 @@ const getDefaultTemplate = () => ({
 })
 
 // Rechnungs-Template mit QR-Bereich
+// WICHTIG: Swiss Post Standard (SN 010130) - Adressfeld RECHTS für C5/C6 Fensterkuvert
 const getInvoiceTemplate = () => ({
   basePdf: BLANK_PDF,
   schemas: [
     {
-      // Logo
+      // Logo oben links
       logo: {
         type: 'image',
         position: { x: 25, y: 10 },
         width: 35,
         height: 18,
       },
-      // Absender
+      // Absender oben links (unter Logo)
       absender: {
         type: 'text',
-        position: { x: 120, y: 15 },
+        position: { x: 25, y: 30 },
         width: 75,
-        height: 25,
+        height: 18,
         fontSize: 9,
         lineHeight: 1.2,
       },
-      // Empfänger
+      // Absender-Rückadresse (kleine Schrift über Adressfeld)
+      absender_zeile: {
+        type: 'text',
+        position: { x: 118, y: 48 },
+        width: 85,
+        height: 5,
+        fontSize: 7,
+        fontColor: '#666666',
+      },
+      // Empfänger-Adresse (Swiss Post Position: RECHTS im Sichtfenster)
       empfaenger: {
         type: 'text',
-        position: { x: 25, y: 50 },
-        width: 80,
-        height: 30,
+        position: { x: 118, y: 54 },
+        width: 85,
+        height: 31,
         fontSize: 11,
         lineHeight: 1.3,
       },
-      // Titel
+      // Titel - unterhalb Adressbereich
       titel: {
         type: 'text',
-        position: { x: 25, y: 90 },
+        position: { x: 25, y: 95 },
         width: 160,
         height: 10,
         fontSize: 14,
@@ -129,7 +150,7 @@ const getInvoiceTemplate = () => ({
       // Rechnungsnummer & Datum
       rechnung_info: {
         type: 'text',
-        position: { x: 25, y: 105 },
+        position: { x: 25, y: 108 },
         width: 160,
         height: 15,
         fontSize: 10,
@@ -138,16 +159,16 @@ const getInvoiceTemplate = () => ({
       // Rechnungstext
       text: {
         type: 'text',
-        position: { x: 25, y: 125 },
+        position: { x: 25, y: 128 },
         width: 160,
-        height: 50,
+        height: 45,
         fontSize: 11,
         lineHeight: 1.4,
       },
       // Betrag gross
       betrag: {
         type: 'text',
-        position: { x: 130, y: 180 },
+        position: { x: 130, y: 175 },
         width: 55,
         height: 12,
         fontSize: 16,
@@ -157,14 +178,14 @@ const getInvoiceTemplate = () => ({
       // QR-Code Bereich (wird vom Backend mit swissqrbill gefüllt)
       qr_code: {
         type: 'image',
-        position: { x: 25, y: 200 },
+        position: { x: 25, y: 195 },
         width: 46,
         height: 46,
       },
       // Zahlungsinformationen
       zahlungsinfo: {
         type: 'text',
-        position: { x: 80, y: 200 },
+        position: { x: 80, y: 195 },
         width: 105,
         height: 45,
         fontSize: 9,
@@ -298,41 +319,51 @@ const getLayoutTemplate = () => ({
 })
 
 // Mitgliederbeitrag-Template (Rechnung mit QR-Bill für Mitgliederbeiträge)
+// WICHTIG: Swiss Post Standard (SN 010130) - Adressfeld RECHTS für C5/C6 Fensterkuvert
 const getMitgliederbeitragTemplate = () => ({
   basePdf: BLANK_PDF,
   schemas: [
     {
-      // Absender oben rechts
+      // Absender-Rückadresse (kleine Schrift über Adressfeld)
+      absender_zeile: {
+        type: 'text',
+        position: { x: 118, y: 48 },
+        width: 85,
+        height: 5,
+        fontSize: 7,
+        fontColor: '#666666',
+      },
+      // Empfänger-Adresse (Swiss Post Position: RECHTS im Sichtfenster)
+      // SN 010130: x=118mm, y=54mm, 85.5×31.5mm (Adresszone)
+      empfaenger: {
+        type: 'text',
+        position: { x: 118, y: 54 },
+        width: 85,
+        height: 31,
+        fontSize: 11,
+        lineHeight: 1.3,
+      },
+      // Absender-Details oben links
       absender_name: {
         type: 'text',
-        position: { x: 118, y: 15 },
+        position: { x: 25, y: 15 },
         width: 75,
         height: 6,
         fontSize: 10,
-        alignment: 'left',
+        fontWeight: 'bold',
       },
       absender_adresse: {
         type: 'text',
-        position: { x: 118, y: 21 },
+        position: { x: 25, y: 21 },
         width: 75,
         height: 12,
         fontSize: 10,
         lineHeight: 1.2,
-        alignment: 'left',
       },
-      // Empfänger
-      empfaenger: {
-        type: 'text',
-        position: { x: 25, y: 50 },
-        width: 85,
-        height: 28,
-        fontSize: 11,
-        lineHeight: 1.3,
-      },
-      // Titel (z.B. "Mitgliederbeitrag 2026")
+      // Titel (z.B. "Mitgliederbeitrag 2026") - unterhalb Adressbereich
       titel: {
         type: 'text',
-        position: { x: 25, y: 85 },
+        position: { x: 25, y: 95 },
         width: 160,
         height: 10,
         fontSize: 14,
@@ -341,7 +372,7 @@ const getMitgliederbeitragTemplate = () => ({
       // Rechnungsnummer
       rechnungsnummer: {
         type: 'text',
-        position: { x: 25, y: 97 },
+        position: { x: 25, y: 107 },
         width: 80,
         height: 6,
         fontSize: 10,
@@ -349,7 +380,7 @@ const getMitgliederbeitragTemplate = () => ({
       // Datum
       datum: {
         type: 'text',
-        position: { x: 25, y: 103 },
+        position: { x: 25, y: 113 },
         width: 80,
         height: 6,
         fontSize: 10,
@@ -357,7 +388,7 @@ const getMitgliederbeitragTemplate = () => ({
       // Rechnungstext
       text: {
         type: 'text',
-        position: { x: 25, y: 118 },
+        position: { x: 25, y: 125 },
         width: 160,
         height: 35,
         fontSize: 11,
@@ -366,17 +397,17 @@ const getMitgliederbeitragTemplate = () => ({
       // Betrag (gross, rechts)
       betrag: {
         type: 'text',
-        position: { x: 118, y: 158 },
+        position: { x: 118, y: 165 },
         width: 70,
         height: 10,
         fontSize: 14,
         fontWeight: 'bold',
         alignment: 'right',
       },
-      // Footer
+      // Footer (über QR-Bill - QR-Bill beginnt bei y=192mm)
       footer: {
         type: 'text',
-        position: { x: 50, y: 185 },
+        position: { x: 50, y: 182 },
         width: 110,
         height: 6,
         fontSize: 8,
@@ -556,32 +587,42 @@ const getTelefonlisteTemplate = () => ({
 })
 
 // Mahnbrief-Template
+// WICHTIG: Swiss Post Standard (SN 010130) - Adressfeld RECHTS für C5/C6 Fensterkuvert
 const getMahnbriefTemplate = () => ({
   basePdf: BLANK_PDF,
   schemas: [
     {
-      // Absender oben rechts
+      // Absender oben links
       absender: {
         type: 'text',
-        position: { x: 118, y: 15 },
+        position: { x: 25, y: 15 },
         width: 75,
         height: 18,
         fontSize: 10,
         lineHeight: 1.2,
       },
-      // Empfänger
+      // Absender-Rückadresse (kleine Schrift über Adressfeld)
+      absender_zeile: {
+        type: 'text',
+        position: { x: 118, y: 48 },
+        width: 85,
+        height: 5,
+        fontSize: 7,
+        fontColor: '#666666',
+      },
+      // Empfänger-Adresse (Swiss Post Position: RECHTS im Sichtfenster)
       empfaenger: {
         type: 'text',
-        position: { x: 25, y: 50 },
+        position: { x: 118, y: 54 },
         width: 85,
-        height: 28,
+        height: 31,
         fontSize: 11,
         lineHeight: 1.3,
       },
-      // Mahnstufe (rot, rechts)
+      // Mahnstufe (rot, rechts) - unterhalb Adressbereich
       mahnstufe: {
         type: 'text',
-        position: { x: 150, y: 85 },
+        position: { x: 150, y: 95 },
         width: 40,
         height: 8,
         fontSize: 12,
@@ -589,10 +630,10 @@ const getMahnbriefTemplate = () => ({
         alignment: 'right',
         fontColor: '#dc2626',
       },
-      // Titel
+      // Titel - unterhalb Adressbereich
       titel: {
         type: 'text',
-        position: { x: 25, y: 85 },
+        position: { x: 25, y: 95 },
         width: 120,
         height: 10,
         fontSize: 14,
@@ -601,7 +642,7 @@ const getMahnbriefTemplate = () => ({
       // Rechnungsreferenz
       referenz: {
         type: 'text',
-        position: { x: 25, y: 97 },
+        position: { x: 25, y: 107 },
         width: 160,
         height: 10,
         fontSize: 10,
@@ -610,7 +651,7 @@ const getMahnbriefTemplate = () => ({
       // Mahntext
       text: {
         type: 'text',
-        position: { x: 25, y: 115 },
+        position: { x: 25, y: 125 },
         width: 160,
         height: 50,
         fontSize: 11,
@@ -619,7 +660,7 @@ const getMahnbriefTemplate = () => ({
       // Offener Betrag (gross)
       offener_betrag: {
         type: 'text',
-        position: { x: 118, y: 170 },
+        position: { x: 118, y: 180 },
         width: 70,
         height: 10,
         fontSize: 14,
@@ -629,7 +670,7 @@ const getMahnbriefTemplate = () => ({
       // Frist
       frist: {
         type: 'text',
-        position: { x: 25, y: 185 },
+        position: { x: 25, y: 195 },
         width: 160,
         height: 8,
         fontSize: 11,
@@ -639,7 +680,7 @@ const getMahnbriefTemplate = () => ({
       // Gruss
       gruss: {
         type: 'text',
-        position: { x: 25, y: 205 },
+        position: { x: 25, y: 215 },
         width: 160,
         height: 25,
         fontSize: 11,
@@ -679,6 +720,7 @@ const getSampleInputs = (category) => {
     return [{
       logo: '',
       absender: 'Feuerwehrverein Raura\nMusterstrasse 1\n6017 Ruswil',
+      absender_zeile: 'FWV Raura · Musterstrasse 1 · 6017 Ruswil',
       empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
       titel: 'Mitgliederbeitrag 2026',
       rechnung_info: 'Rechnungsnummer: 2026-001\nDatum: 30.01.2026',
@@ -693,6 +735,7 @@ const getSampleInputs = (category) => {
     return [{
       absender_name: 'Feuerwehrverein Raura',
       absender_adresse: 'Musterstrasse 1\n6017 Ruswil',
+      absender_zeile: 'FWV Raura · Musterstrasse 1 · 6017 Ruswil',
       empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
       titel: 'Mitgliederbeitrag 2026',
       rechnungsnummer: 'Rechnungsnummer: RF26-000001',
@@ -727,6 +770,7 @@ const getSampleInputs = (category) => {
   if (category === 'mahnbrief') {
     return [{
       absender: 'Feuerwehrverein Raura\nMusterstrasse 1\n6017 Ruswil',
+      absender_zeile: 'FWV Raura · Musterstrasse 1 · 6017 Ruswil',
       empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
       mahnstufe: '2. Mahnung',
       titel: 'Zahlungserinnerung',
@@ -741,6 +785,7 @@ const getSampleInputs = (category) => {
   // Default: Brief
   return [{
     absender: 'Feuerwehrverein Raura\nMusterstrasse 1\n6017 Ruswil',
+    absender_zeile: 'FWV Raura · Musterstrasse 1 · 6017 Ruswil',
     empfaenger: 'Max Mustermann\nBeispielweg 42\n6000 Luzern',
     ort_datum: 'Ruswil, 30. Januar 2026',
     betreff: 'Einladung zur Generalversammlung',
@@ -1251,6 +1296,7 @@ function App() {
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="grid grid-cols-2 gap-1">
                   <span>absender</span>
+                  <span>absender_zeile</span>
                   <span>empfaenger</span>
                   <span>ort_datum</span>
                   <span>betreff</span>
@@ -1260,7 +1306,7 @@ function App() {
                   <span>fusszeile</span>
                 </div>
                 <p className="mt-2 text-gray-400">
-                  Diese Felder werden beim Versand automatisch mit Mitgliederdaten gefüllt.
+                  Adresse rechts positioniert für Schweizer Fensterkuvert (SN 010130).
                 </p>
               </div>
             )}
@@ -1270,6 +1316,7 @@ function App() {
                 <div className="grid grid-cols-2 gap-1">
                   <span>logo</span>
                   <span>absender</span>
+                  <span>absender_zeile</span>
                   <span>empfaenger</span>
                   <span>titel</span>
                   <span>rechnung_info</span>
@@ -1280,7 +1327,7 @@ function App() {
                   <span>fusszeile</span>
                 </div>
                 <p className="mt-2 text-gray-400">
-                  QR-Code wird automatisch mit swissqrbill generiert.
+                  Adresse rechts (CH Fenster). QR-Code mit swissqrbill.
                 </p>
               </div>
             )}
@@ -1290,6 +1337,7 @@ function App() {
                 <div className="grid grid-cols-2 gap-1">
                   <span>absender_name</span>
                   <span>absender_adresse</span>
+                  <span>absender_zeile</span>
                   <span>empfaenger</span>
                   <span>titel</span>
                   <span>rechnungsnummer</span>
@@ -1299,7 +1347,7 @@ function App() {
                   <span>footer</span>
                 </div>
                 <p className="mt-2 text-gray-400">
-                  Swiss QR-Bill wird automatisch unten angehängt (105mm Bereich).
+                  Adresse rechts (CH Fenster). QR-Bill unten (105mm).
                 </p>
               </div>
             )}
@@ -1342,6 +1390,7 @@ function App() {
               <div className="text-xs text-gray-500 space-y-1">
                 <div className="grid grid-cols-2 gap-1">
                   <span>absender</span>
+                  <span>absender_zeile</span>
                   <span>empfaenger</span>
                   <span>mahnstufe</span>
                   <span>titel</span>
@@ -1353,7 +1402,7 @@ function App() {
                   <span>footer</span>
                 </div>
                 <p className="mt-2 text-gray-400">
-                  Mahnstufe wird rot hervorgehoben.
+                  Adresse rechts (CH Fenster). Mahnstufe rot.
                 </p>
               </div>
             )}
@@ -1393,108 +1442,157 @@ function App() {
             style={{ minHeight: '100%' }}
           />
 
-          {/* Pingen Address Zone Overlay */}
+          {/* Pingen Address Zone Overlay - als separates Panel rechts */}
           {showAddressOverlay && (
             <div
-              className="absolute pointer-events-none"
-              style={{
-                // Position the overlay to match the A4 preview in pdfme
-                // pdfme shows A4 at roughly 595px width (at 72dpi)
-                // We need to calculate based on the visible area
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: '595px',  // A4 width at 72dpi
-                height: '842px', // A4 height at 72dpi
-                maxWidth: '100%',
-                maxHeight: '100%',
-              }}
+              className="absolute right-4 top-4 bg-white rounded-lg shadow-lg p-4 pointer-events-none z-50"
+              style={{ width: '280px' }}
             >
-              {/* Swiss Post - Pingen Right Window */}
-              {/* Franking: 116mm from left, 40mm from top, 89.5×47.5mm */}
-              {/* Address: 118mm from left, 60mm from top, 85.5×25.5mm */}
-              {showAddressOverlay === 'ch' && (
-                <>
-                  {/* Frankierzone (rechts oben) */}
-                  <div
-                    className="absolute border-2 border-dashed border-orange-500 bg-orange-100 bg-opacity-30"
-                    style={{
-                      left: '329px',     // 116mm = 329px at 72dpi
-                      top: '113px',      // 40mm = 113px
-                      width: '254px',    // 89.5mm = 254px
-                      height: '135px',   // 47.5mm = 135px
-                    }}
-                  >
-                    <span className="absolute top-1 left-1 text-xs font-bold text-orange-600 bg-white px-1 rounded">
-                      Frankierzone
-                    </span>
-                    <span className="absolute bottom-1 right-1 text-xs text-orange-500">
-                      89.5×47.5mm
-                    </span>
-                  </div>
+              <div className="text-sm font-bold mb-3 text-gray-700 pointer-events-auto">
+                📬 {showAddressOverlay === 'ch' ? 'Schweizer' : 'Deutscher'} Briefstandard
+              </div>
 
-                  {/* Adressfeld (rechts, unter Frankierzone) */}
-                  <div
-                    className="absolute border-2 border-dashed border-red-500 bg-red-100 bg-opacity-30"
-                    style={{
-                      left: '335px',     // 118mm = 335px
-                      top: '170px',      // 60mm = 170px
-                      width: '242px',    // 85.5mm = 242px
-                      height: '72px',    // 25.5mm = 72px
-                    }}
-                  >
-                    <span className="absolute top-1 left-1 text-xs font-bold text-red-600 bg-white px-1 rounded">
-                      🇨🇭 Adressfeld
-                    </span>
-                    <span className="absolute bottom-1 right-1 text-xs text-red-500">
-                      85.5×25.5mm
-                    </span>
-                  </div>
-                </>
-              )}
+              {/* Miniatur A4-Seite mit Zonen */}
+              <div
+                className="relative bg-white border-2 border-gray-300 mx-auto"
+                style={{
+                  width: '180px',   // A4 proportional mini
+                  height: '255px',  // A4 proportional (297/210 ratio)
+                }}
+              >
+                {/* Swiss Post - Right Window */}
+                {showAddressOverlay === 'ch' && (
+                  <>
+                    {/* Absender links oben */}
+                    <div
+                      className="absolute bg-gray-200 text-xs flex items-center justify-center"
+                      style={{
+                        left: '10%',
+                        top: '5%',
+                        width: '35%',
+                        height: '10%',
+                      }}
+                    >
+                      Absender
+                    </div>
 
-              {/* German Post - Pingen Left Window */}
-              {/* Franking: 20mm from left, 40mm from top, 89.5×47.5mm */}
-              {/* Address: 22mm from left, 60mm from top, 85.5×25.5mm */}
-              {showAddressOverlay === 'de' && (
-                <>
-                  {/* Frankierzone (LINKS oben - über Adressfeld!) */}
-                  <div
-                    className="absolute border-2 border-dashed border-orange-500 bg-orange-100 bg-opacity-30"
-                    style={{
-                      left: '57px',      // 20mm = 57px at 72dpi
-                      top: '113px',      // 40mm = 113px
-                      width: '254px',    // 89.5mm = 254px
-                      height: '135px',   // 47.5mm = 135px
-                    }}
-                  >
-                    <span className="absolute top-1 left-1 text-xs font-bold text-orange-600 bg-white px-1 rounded">
-                      Frankierzone
-                    </span>
-                    <span className="absolute bottom-1 right-1 text-xs text-orange-500">
-                      89.5×47.5mm
-                    </span>
-                  </div>
+                    {/* Frankierzone (rechts oben) */}
+                    <div
+                      className="absolute border-2 border-dashed border-orange-500 bg-orange-100"
+                      style={{
+                        right: '3%',
+                        top: '13%',
+                        width: '43%',       // ~90mm von 210mm
+                        height: '16%',      // ~47mm von 297mm
+                      }}
+                    >
+                      <span className="text-xs text-orange-600 p-1">Frankierung</span>
+                    </div>
 
-                  {/* Adressfeld (links, unter Frankierzone) */}
-                  <div
-                    className="absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-30"
-                    style={{
-                      left: '62px',      // 22mm = 62px
-                      top: '170px',      // 60mm = 170px
-                      width: '242px',    // 85.5mm = 242px
-                      height: '72px',    // 25.5mm = 72px
-                    }}
-                  >
-                    <span className="absolute top-1 left-1 text-xs font-bold text-blue-600 bg-white px-1 rounded">
-                      🇩🇪 Adressfeld
-                    </span>
-                    <span className="absolute bottom-1 right-1 text-xs text-blue-500">
-                      85.5×25.5mm
-                    </span>
-                  </div>
-                </>
-              )}
+                    {/* Adressfeld (rechts, im Fenster) */}
+                    <div
+                      className="absolute border-2 border-dashed border-red-500 bg-red-100"
+                      style={{
+                        right: '5%',
+                        top: '18%',
+                        width: '40%',       // ~85mm von 210mm
+                        height: '11%',      // ~32mm von 297mm
+                      }}
+                    >
+                      <span className="text-xs text-red-600 p-1">Adresse</span>
+                    </div>
+
+                    {/* Inhalt-Bereich */}
+                    <div
+                      className="absolute bg-gray-100 border border-gray-300"
+                      style={{
+                        left: '10%',
+                        top: '33%',
+                        width: '80%',
+                        height: '50%',
+                      }}
+                    >
+                      <span className="text-xs text-gray-500 p-1">Inhalt</span>
+                    </div>
+                  </>
+                )}
+
+                {/* German Post - Left Window */}
+                {showAddressOverlay === 'de' && (
+                  <>
+                    {/* Absender rechts oben */}
+                    <div
+                      className="absolute bg-gray-200 text-xs flex items-center justify-center"
+                      style={{
+                        right: '5%',
+                        top: '5%',
+                        width: '35%',
+                        height: '10%',
+                      }}
+                    >
+                      Absender
+                    </div>
+
+                    {/* Frankierzone (LINKS oben) */}
+                    <div
+                      className="absolute border-2 border-dashed border-orange-500 bg-orange-100"
+                      style={{
+                        left: '3%',
+                        top: '13%',
+                        width: '43%',
+                        height: '16%',
+                      }}
+                    >
+                      <span className="text-xs text-orange-600 p-1">Frankierung</span>
+                    </div>
+
+                    {/* Adressfeld (links, im Fenster) */}
+                    <div
+                      className="absolute border-2 border-dashed border-blue-500 bg-blue-100"
+                      style={{
+                        left: '5%',
+                        top: '18%',
+                        width: '40%',
+                        height: '11%',
+                      }}
+                    >
+                      <span className="text-xs text-blue-600 p-1">Adresse</span>
+                    </div>
+
+                    {/* Inhalt-Bereich */}
+                    <div
+                      className="absolute bg-gray-100 border border-gray-300"
+                      style={{
+                        left: '10%',
+                        top: '33%',
+                        width: '80%',
+                        height: '50%',
+                      }}
+                    >
+                      <span className="text-xs text-gray-500 p-1">Inhalt</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Positionsangaben */}
+              <div className="mt-3 text-xs text-gray-600 space-y-1">
+                {showAddressOverlay === 'ch' ? (
+                  <>
+                    <p><strong>🇨🇭 Swiss Post (SN 010130)</strong></p>
+                    <p>Adresse: x=118mm, y=54mm</p>
+                    <p>Grösse: 85×31mm</p>
+                    <p className="text-gray-400 mt-1">Fenster: RECHTS</p>
+                  </>
+                ) : (
+                  <>
+                    <p><strong>🇩🇪 DIN 5008</strong></p>
+                    <p>Adresse: x=20mm, y=50mm</p>
+                    <p>Grösse: 85×45mm</p>
+                    <p className="text-gray-400 mt-1">Fenster: LINKS</p>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
