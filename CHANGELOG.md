@@ -1,3 +1,11 @@
+## [1.114.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.3...v1.114.4) (2026-01-31)
+
+
+### Bug Fixes
+
+* **pdf-designer:** exclude top-positioned elements from page detection ([7f682f3](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7f682f32d8b316e8f848527c8ae970b6c92f46c8))
+* **pdf-designer:** improve Pingen overlay page detection algorithm ([98437b7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/98437b7b1693893cb492e5d7bd7cd2b222b332a6))
+
 ## [1.114.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.2...v1.114.3) (2026-01-31)
 
 
