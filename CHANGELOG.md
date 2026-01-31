@@ -1,3 +1,10 @@
+## [1.113.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.113.0...v1.113.1) (2026-01-31)
+
+
+### Bug Fixes
+
+* **pdf-designer:** correct address field position for Swiss Post standard (SN 010130) ([d07e088](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d07e08899ba865cdf9083a60a9f564acc08335f6))
+
 # [1.113.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.112.0...v1.113.0) (2026-01-31)
 
 
