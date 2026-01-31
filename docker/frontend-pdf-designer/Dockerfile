@@ -1,6 +1,8 @@
 # Build stage
 FROM node:20-alpine as build
 
+ARG VERSION=0.0.0
+
 WORKDIR /app
 
 # Copy package files
@@ -12,8 +14,12 @@ RUN npm install
 # Copy source files
 COPY . .
 
-# Build the app
+# Build with version info
+ENV VITE_APP_VERSION=${VERSION}
 RUN npm run build
+
+# Create version.json for easy access
+RUN echo "{\"version\":\"${VERSION}\",\"service\":\"frontend-pdf-designer\",\"buildTime\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > /app/dist/version.json
 
 # Production stage
 FROM nginx:alpine

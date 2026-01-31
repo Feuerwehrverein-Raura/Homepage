@@ -1128,6 +1128,7 @@ function App() {
               className="h-8"
             />
             <h1 className="text-xl font-bold text-gray-800">PDF-Designer</h1>
+            <span className="text-xs text-gray-400 ml-2">v{import.meta.env.VITE_APP_VERSION || 'dev'}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-600">
