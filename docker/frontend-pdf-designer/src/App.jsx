@@ -812,45 +812,72 @@ function PingenOverlay({ country, designerRef }) {
       const currentContainer = designerRef.current
       if (!currentContainer) return
 
-      // pdfme rendert die PDF-Seite in verschiedenen Elementen
-      // Wir suchen nach dem weissen Rechteck das die A4-Seite darstellt
-      // Das ist typischerweise ein div mit weissem Hintergrund und A4-Proportionen
-
-      // Methode 1: Suche nach dem Paper/Canvas Element
+      // pdfme rendert die PDF-Seite in verschiedenen Strukturen
+      // Wir suchen nach dem Element das die A4-Seite darstellt
       let pageElement = null
+      let bestMatch = null
+      let bestScore = 0
 
-      // pdfme v4 verwendet ein Paper-ähnliches Element
-      const allDivs = currentContainer.querySelectorAll('div')
-      for (const div of allDivs) {
-        const style = window.getComputedStyle(div)
-        const rect = div.getBoundingClientRect()
+      // Durchsuche alle Elemente
+      const allElements = currentContainer.querySelectorAll('div, canvas')
+      for (const el of allElements) {
+        const rect = el.getBoundingClientRect()
+
+        // Mindestgrösse prüfen
+        if (rect.width < 200 || rect.height < 200) continue
 
         // A4 hat Verhältnis 210:297 = 0.707
-        // Prüfe ob das Element A4-proportional ist und weiss
-        if (rect.width > 100 && rect.height > 100) {
-          const ratio = rect.width / rect.height
-          const isA4Ratio = ratio > 0.65 && ratio < 0.75 // A4 Toleranz
+        const ratio = rect.width / rect.height
+        const isA4Ratio = ratio > 0.6 && ratio < 0.8
 
-          const bgColor = style.backgroundColor
-          const isWhite = bgColor === 'rgb(255, 255, 255)' ||
-                         bgColor === 'white' ||
-                         bgColor === '#ffffff' ||
-                         bgColor === '#fff'
+        if (!isA4Ratio) continue
 
-          if (isA4Ratio && isWhite) {
-            pageElement = div
-            break
+        // Score basierend auf Grösse und wie nah am A4-Verhältnis
+        const ratioScore = 1 - Math.abs(ratio - 0.707)
+        const sizeScore = rect.width * rect.height / 1000000 // Grössere Elemente bevorzugen
+        const score = ratioScore * 10 + sizeScore
+
+        // Prüfe auch den Hintergrund
+        const style = window.getComputedStyle(el)
+        const bgColor = style.backgroundColor
+
+        // Weisser oder heller Hintergrund gibt Bonuspunkte
+        if (bgColor.includes('255, 255, 255') || bgColor === 'white' || bgColor === 'rgba(0, 0, 0, 0)') {
+          if (score > bestScore) {
+            bestScore = score
+            bestMatch = el
           }
         }
       }
 
-      // Methode 2: Suche nach Canvas wenn kein div gefunden
-      if (!pageElement) {
+      // Fallback: Suche nach Canvas
+      if (!bestMatch) {
         const canvas = currentContainer.querySelector('canvas')
         if (canvas) {
-          pageElement = canvas
+          const rect = canvas.getBoundingClientRect()
+          if (rect.width > 200 && rect.height > 200) {
+            bestMatch = canvas
+          }
         }
       }
+
+      // Zweiter Fallback: Grösstes A4-proportionales Element
+      if (!bestMatch) {
+        for (const el of allElements) {
+          const rect = el.getBoundingClientRect()
+          if (rect.width < 200 || rect.height < 200) continue
+          const ratio = rect.width / rect.height
+          if (ratio > 0.6 && ratio < 0.8) {
+            const score = rect.width * rect.height
+            if (score > bestScore) {
+              bestScore = score
+              bestMatch = el
+            }
+          }
+        }
+      }
+
+      pageElement = bestMatch
 
       if (pageElement) {
         const rect = pageElement.getBoundingClientRect()
@@ -866,16 +893,14 @@ function PingenOverlay({ country, designerRef }) {
     }
 
     // Initial check mit Verzögerung (pdfme braucht Zeit zum Rendern)
-    const timer = setTimeout(findAndTrackPage, 800)
+    const timer = setTimeout(findAndTrackPage, 500)
 
-    // Wiederhole die Suche falls das Element noch nicht gefunden wurde
-    const retryTimer = setInterval(() => {
-      if (!pageRect) findAndTrackPage()
-    }, 1000)
+    // Wiederhole regelmässig um Updates zu erfassen
+    const retryTimer = setInterval(findAndTrackPage, 2000)
 
     // Beobachte Änderungen (Zoom, Resize)
     const observer = new MutationObserver(() => {
-      setTimeout(findAndTrackPage, 100)
+      setTimeout(findAndTrackPage, 200)
     })
     observer.observe(container, {
       childList: true,
@@ -886,12 +911,12 @@ function PingenOverlay({ country, designerRef }) {
 
     // Resize handler
     const resizeObserver = new ResizeObserver(() => {
-      setTimeout(findAndTrackPage, 100)
+      setTimeout(findAndTrackPage, 200)
     })
     resizeObserver.observe(container)
 
     // Scroll handler für den Designer-Bereich
-    const handleScroll = () => findAndTrackPage()
+    const handleScroll = () => setTimeout(findAndTrackPage, 100)
     container.addEventListener('scroll', handleScroll, true)
 
     return () => {
@@ -901,7 +926,7 @@ function PingenOverlay({ country, designerRef }) {
       resizeObserver.disconnect()
       container.removeEventListener('scroll', handleScroll, true)
     }
-  }, [designerRef, pageRect])
+  }, [designerRef])
 
   if (!pageRect) return null
 
