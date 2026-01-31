@@ -812,76 +812,87 @@ function PingenOverlay({ country, designerRef }) {
       const currentContainer = designerRef.current
       if (!currentContainer) return
 
-      // pdfme rendert die PDF-Seite in verschiedenen Strukturen
-      // Wir suchen nach dem Element das die A4-Seite darstellt
-      let pageElement = null
-      let bestMatch = null
-      let bestScore = 0
+      const containerRect = currentContainer.getBoundingClientRect()
 
-      // Durchsuche alle Elemente
-      const allElements = currentContainer.querySelectorAll('div, canvas')
+      // pdfme rendert die PDF-Seite als weisses Paper-Element
+      // Es liegt NICHT am oberen Rand des Containers (dort ist Toolbar/Lineal)
+      let candidates = []
+
+      const allElements = currentContainer.querySelectorAll('div')
       for (const el of allElements) {
         const rect = el.getBoundingClientRect()
 
+        // Position relativ zum Container
+        const relTop = rect.top - containerRect.top
+        const relLeft = rect.left - containerRect.left
+
+        // WICHTIG: Element muss etwas vom oberen Rand entfernt sein
+        // (Die PDF-Seite beginnt nicht bei y=0, dort ist das Lineal/Toolbar)
+        if (relTop < 50) continue
+
         // Mindestgrösse prüfen
-        if (rect.width < 200 || rect.height < 200) continue
+        if (rect.width < 200 || rect.height < 280) continue
+
+        // Maximalgrösse - nicht grösser als 90% des Containers
+        if (rect.width > containerRect.width * 0.9) continue
 
         // A4 hat Verhältnis 210:297 = 0.707
         const ratio = rect.width / rect.height
-        const isA4Ratio = ratio > 0.6 && ratio < 0.8
+        if (ratio < 0.65 || ratio > 0.75) continue
 
-        if (!isA4Ratio) continue
-
-        // Score basierend auf Grösse und wie nah am A4-Verhältnis
-        const ratioScore = 1 - Math.abs(ratio - 0.707)
-        const sizeScore = rect.width * rect.height / 1000000 // Grössere Elemente bevorzugen
-        const score = ratioScore * 10 + sizeScore
-
-        // Prüfe auch den Hintergrund
         const style = window.getComputedStyle(el)
         const bgColor = style.backgroundColor
+        const boxShadow = style.boxShadow
 
-        // Weisser oder heller Hintergrund gibt Bonuspunkte
-        if (bgColor.includes('255, 255, 255') || bgColor === 'white' || bgColor === 'rgba(0, 0, 0, 0)') {
-          if (score > bestScore) {
-            bestScore = score
-            bestMatch = el
-          }
+        // Punkte vergeben
+        let score = 0
+
+        // A4-Verhältnis-Genauigkeit (max 10 Punkte)
+        score += (1 - Math.abs(ratio - 0.707)) * 10
+
+        // Weisser Hintergrund (10 Punkte) - wichtig!
+        if (bgColor.includes('255, 255, 255') || bgColor === 'white') {
+          score += 10
         }
+
+        // Box-Shadow vorhanden = Paper-Effekt (5 Punkte)
+        if (boxShadow && boxShadow !== 'none') {
+          score += 5
+        }
+
+        // Element sollte etwas vom Rand entfernt sein (zentriert)
+        if (relLeft > 30) {
+          score += 3
+        }
+
+        candidates.push({ el, rect, score, relTop, relLeft })
       }
 
-      // Fallback: Suche nach Canvas
-      if (!bestMatch) {
+      // Sortiere nach Score (höchster zuerst)
+      candidates.sort((a, b) => b.score - a.score)
+
+      // Debug: Log candidates
+      if (candidates.length > 0) {
+        console.log('Pingen Overlay - Best candidate:', candidates[0])
+      }
+
+      // Wähle das beste Element
+      let pageElement = candidates[0]?.el
+
+      // Fallback: Canvas suchen (falls vorhanden und nicht am oberen Rand)
+      if (!pageElement) {
         const canvas = currentContainer.querySelector('canvas')
         if (canvas) {
           const rect = canvas.getBoundingClientRect()
-          if (rect.width > 200 && rect.height > 200) {
-            bestMatch = canvas
+          const relTop = rect.top - containerRect.top
+          if (rect.width > 200 && rect.height > 280 && relTop > 50) {
+            pageElement = canvas
           }
         }
       }
-
-      // Zweiter Fallback: Grösstes A4-proportionales Element
-      if (!bestMatch) {
-        for (const el of allElements) {
-          const rect = el.getBoundingClientRect()
-          if (rect.width < 200 || rect.height < 200) continue
-          const ratio = rect.width / rect.height
-          if (ratio > 0.6 && ratio < 0.8) {
-            const score = rect.width * rect.height
-            if (score > bestScore) {
-              bestScore = score
-              bestMatch = el
-            }
-          }
-        }
-      }
-
-      pageElement = bestMatch
 
       if (pageElement) {
         const rect = pageElement.getBoundingClientRect()
-        const containerRect = currentContainer.getBoundingClientRect()
 
         setPageRect({
           left: rect.left - containerRect.left,
@@ -889,6 +900,8 @@ function PingenOverlay({ country, designerRef }) {
           width: rect.width,
           height: rect.height,
         })
+      } else {
+        console.log('Pingen Overlay - No page element found')
       }
     }
 
