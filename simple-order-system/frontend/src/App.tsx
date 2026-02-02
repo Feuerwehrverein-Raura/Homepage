@@ -554,12 +554,16 @@ function App() {
     return unpaidItems.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
   };
 
-  // Calculate total for selected items
+  // Calculate total for selected items (unit-based selection with "itemId-unitIndex" keys)
   const getSelectedItemsTotal = (order: OpenOrder): number => {
     if (!order.items) return 0;
-    return order.items
-      .filter(item => selectedItemIds.includes(item.id))
-      .reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+    let total = 0;
+    selectedItemIds.forEach(key => {
+      const [itemId] = (key as unknown as string).split('-');
+      const item = order.items?.find(i => i.id === parseInt(itemId));
+      if (item) total += parseFloat(item.price);
+    });
+    return total;
   };
 
   // Process split payment
@@ -602,18 +606,31 @@ function App() {
         });
         message = `Teilzahlung: CHF ${amount.toFixed(2)}`;
       } else {
-        // Pay selected items
+        // Pay selected items (unit-based) - use split-payment with calculated amount
         if (selectedItemIds.length === 0) {
           alert('Bitte mindestens einen Artikel auswählen');
           return;
         }
         amount = getSelectedItemsTotal(splitPaymentOrder);
-        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/pay-items`, {
+
+        // Create description with item counts
+        const itemCounts: { [name: string]: number } = {};
+        selectedItemIds.forEach(key => {
+          const [itemId] = (key as unknown as string).split('-');
+          const item = splitPaymentOrder.items?.find(i => i.id === parseInt(itemId));
+          if (item) {
+            itemCounts[item.item_name] = (itemCounts[item.item_name] || 0) + 1;
+          }
+        });
+        const itemDesc = Object.entries(itemCounts).map(([name, count]) => `${count}x ${name}`).join(', ');
+
+        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/split-payment`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            item_ids: selectedItemIds,
+            amount,
             payment_method: splitPaymentMethod,
+            description: itemDesc
           }),
         });
         message = `${selectedItemIds.length} Artikel bezahlt`;
@@ -1637,35 +1654,58 @@ function App() {
               {splitPaymentMode === 'items' && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Artikel auswählen
+                    Artikel auswählen (einzeln anklicken)
                   </label>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {splitPaymentOrder.items?.filter(item => !item.paid).map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => toggleItemSelection(item.id)}
-                        className={`w-full text-left p-3 rounded-lg border-2 transition ${
-                          selectedItemIds.includes(item.id)
-                            ? 'bg-green-100 border-green-500'
-                            : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="font-medium">
-                            {selectedItemIds.includes(item.id) ? '✓ ' : ''}{item.quantity}x {item.item_name}
-                          </span>
-                          <span className="font-bold">
-                            CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
+                    {/* Expand items by quantity so each unit can be selected individually */}
+                    {splitPaymentOrder.items?.filter(item => !item.paid).flatMap(item => {
+                      // Create array of individual units for this item
+                      return Array.from({ length: item.quantity }, (_, idx) => {
+                        const unitKey = `${item.id}-${idx}`;
+                        const isSelected = selectedItemIds.includes(unitKey as any);
+                        return (
+                          <button
+                            key={unitKey}
+                            onClick={() => {
+                              setSelectedItemIds(prev =>
+                                prev.includes(unitKey as any)
+                                  ? prev.filter(id => id !== unitKey)
+                                  : [...prev, unitKey as any]
+                              );
+                            }}
+                            className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                              isSelected
+                                ? 'bg-green-100 border-green-500'
+                                : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">
+                                {isSelected ? '✓ ' : ''}1x {item.item_name}
+                              </span>
+                              <span className="font-bold">
+                                CHF {parseFloat(item.price).toFixed(2)}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      });
+                    })}
                   </div>
                   {selectedItemIds.length > 0 && (
                     <div className="mt-3 p-3 bg-green-50 rounded-lg text-center">
-                      <span className="text-sm text-green-700">Ausgewählt: </span>
+                      <span className="text-sm text-green-700">Ausgewählt: {selectedItemIds.length} Artikel = </span>
                       <span className="font-bold text-green-700">
-                        CHF {getSelectedItemsTotal(splitPaymentOrder).toFixed(2)}
+                        CHF {(() => {
+                          // Calculate total from selected unit keys
+                          let total = 0;
+                          selectedItemIds.forEach(key => {
+                            const [itemId] = (key as string).split('-');
+                            const item = splitPaymentOrder.items?.find(i => i.id === parseInt(itemId));
+                            if (item) total += parseFloat(item.price);
+                          });
+                          return total.toFixed(2);
+                        })()}
                       </span>
                     </div>
                   )}
