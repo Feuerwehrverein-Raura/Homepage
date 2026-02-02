@@ -1,3 +1,10 @@
+# [1.115.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.5...v1.115.0) (2026-02-02)
+
+
+### Features
+
+* **kitchen-display:** add native Android app for Android 7+ ([54a3fb9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/54a3fb961aa8b422b772f62b28d3eaaec78b64d8))
+
 ## [1.114.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.4...v1.114.5) (2026-01-31)
 
 
