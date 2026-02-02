@@ -111,8 +111,9 @@
                 const kdsRelease = releases.find(r => r.tag_name.startsWith('kds-v'));
 
                 if (kdsRelease) {
-                    // Find debug APK
-                    const apk = kdsRelease.assets.find(a => a.name.includes('debug') && a.name.endsWith('.apk'));
+                    // Prefer release APK, fall back to debug
+                    const apk = kdsRelease.assets.find(a => a.name.includes('release') && a.name.endsWith('.apk'))
+                             || kdsRelease.assets.find(a => a.name.includes('debug') && a.name.endsWith('.apk'));
 
                     if (apk) {
                         const version = kdsRelease.tag_name.replace('kds-v', '');

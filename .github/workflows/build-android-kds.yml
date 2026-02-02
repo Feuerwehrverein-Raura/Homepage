@@ -59,10 +59,46 @@ jobs:
         working-directory: simple-order-system/kitchen-display-android
         run: gradle assembleDebug --stacktrace
 
+      - name: Setup signing keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_PASSWORD" ]; then
+            # Generate keystore for signing
+            keytool -genkey -v -keystore keystore.jks -alias kds -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEYSTORE_PASSWORD" \
+              -dname "CN=FWV Raura Kitchen Display, OU=IT, O=Feuerwehrverein Raura, L=Raura, ST=Solothurn, C=CH"
+            echo "SIGNING_ENABLED=true" >> $GITHUB_ENV
+            echo "Keystore generated for signing"
+          else
+            echo "No KEYSTORE_PASSWORD secret - skipping signing setup"
+          fi
+
       - name: Build Release APK
         working-directory: simple-order-system/kitchen-display-android
         run: gradle assembleRelease --stacktrace
-        continue-on-error: true
+
+      - name: Sign Release APK
+        if: env.SIGNING_ENABLED == 'true'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          UNSIGNED_APK=$(find simple-order-system/kitchen-display-android -name "*release*.apk" -type f | head -1)
+          if [ -n "$UNSIGNED_APK" ]; then
+            echo "Signing APK: $UNSIGNED_APK"
+            # Align the APK
+            zipalign -v -p 4 "$UNSIGNED_APK" release-aligned.apk
+            # Sign the APK
+            apksigner sign --ks keystore.jks \
+              --ks-pass "pass:$KEYSTORE_PASSWORD" \
+              --ks-key-alias kds \
+              --key-pass "pass:$KEYSTORE_PASSWORD" \
+              --out release-signed.apk release-aligned.apk
+            # Replace unsigned with signed
+            mv release-signed.apk "$UNSIGNED_APK"
+            echo "APK signed successfully"
+          fi
 
       - name: List APK outputs
         run: |

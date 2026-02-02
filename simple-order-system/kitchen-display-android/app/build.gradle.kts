@@ -12,8 +12,8 @@ android {
         applicationId = "ch.fwvraura.kitchendisplay"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.7"
+        versionCode = 4
+        versionName = "0.8"
     }
 
     buildTypes {

@@ -72,9 +72,13 @@ class UpdateChecker(private val context: Context) {
             Log.d(TAG, "Current: $currentVersion, Latest: $latestVersion")
 
             if (isNewerVersion(latestVersion, currentVersion)) {
+                // Prefer release APK, fall back to debug
                 val apkUrl = release.assets
-                    .firstOrNull { it.name.contains("debug") && it.name.endsWith(".apk") }
+                    .firstOrNull { it.name.contains("release") && it.name.endsWith(".apk") }
                     ?.downloadUrl
+                    ?: release.assets
+                        .firstOrNull { it.name.contains("debug") && it.name.endsWith(".apk") }
+                        ?.downloadUrl
 
                 UpdateResult.UpdateAvailable(
                     currentVersion = currentVersion,
