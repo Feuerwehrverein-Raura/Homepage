@@ -1,3 +1,10 @@
+## [1.121.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.2...v1.121.3) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** use persistent keystore from secrets ([6cc7cf1](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6cc7cf149f786bdcc55448a0281cae624c8dae0c))
+
 ## [1.121.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.1...v1.121.2) (2026-02-02)
 
 
