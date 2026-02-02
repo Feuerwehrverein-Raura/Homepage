@@ -560,57 +560,50 @@ function OrderCard({
   const uncompletedCount = filteredItems.filter(i => !i.completed).length;
 
   return (
-    <div className={`bg-gray-800 rounded-lg p-6 shadow-xl border-4 ${
-      isUrgent ? 'border-red-500' : 'border-gray-700'
+    <div className={`bg-gray-800 rounded-3xl shadow-xl border-4 overflow-hidden ${
+      isUrgent ? 'border-red-500' : 'border-fwv-red'
     }`}>
-      {/* Header */}
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <div className={`text-3xl font-bold ${order.table_number === 0 ? 'text-yellow-400' : 'text-fwv-red'}`}>
-            {order.table_number === 0 ? `Bestellung #${order.id}` : `Tisch ${order.table_number}`}
-          </div>
-          <div className={`text-sm font-semibold ${
-            isUrgent ? 'text-red-400' : 'text-gray-400'
-          }`}>
-            vor {time}
-          </div>
+      {/* Header - matching Android style */}
+      <div className="flex justify-between items-center p-6 bg-gray-700">
+        <div className="text-4xl font-bold text-white">
+          {order.table_number === 0 ? 'Theke' : `Tisch ${order.table_number}`}
         </div>
-        {order.table_number !== 0 && (
-          <div className="text-sm text-gray-500">
-            #{order.id}
-          </div>
-        )}
+        <div className={`text-3xl font-semibold flex items-center gap-2 ${
+          isUrgent ? 'text-red-400' : 'text-gray-400'
+        }`}>
+          🕐 {time}
+        </div>
       </div>
 
       {/* Items - clickable to mark individual items as complete */}
-      <div className="space-y-3 mb-6">
+      <div className="p-6 space-y-3">
         {filteredItems.map(item => (
           <div
             key={item.id}
             onClick={() => !item.completed && onItemComplete([item.id])}
-            className={`rounded p-3 transition cursor-pointer ${
+            className={`rounded-xl p-4 transition cursor-pointer ${
               item.completed
-                ? 'bg-green-900 border-2 border-green-600 opacity-60'
+                ? 'bg-green-900/50'
                 : 'bg-gray-700 hover:bg-gray-600 active:bg-green-800'
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <span className={`text-2xl font-bold mr-3 ${item.completed ? 'text-green-400' : 'text-yellow-400'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center flex-1">
+                <span className={`text-4xl font-bold w-20 text-center ${item.completed ? 'text-green-400' : 'text-yellow-400'}`}>
                   {item.completed ? '✓' : `${item.quantity}×`}
                 </span>
-                <span className={`text-xl font-semibold ${item.completed ? 'line-through text-gray-400' : ''}`}>
+                <span className={`text-3xl ml-4 ${item.completed ? 'line-through text-gray-500' : 'text-white'}`}>
                   {item.item_name || '(Unbekannter Artikel)'}
                 </span>
               </div>
-              <div className={`text-sm px-3 py-1 rounded font-medium ${
-                item.printer_station === 'bar' ? 'bg-blue-600' : 'bg-orange-600'
+              <div className={`text-2xl px-4 py-2 rounded-lg font-medium ${
+                item.printer_station === 'bar' ? 'bg-violet-500' : 'bg-orange-500'
               }`}>
                 {item.printer_station === 'bar' ? 'Bar' : 'Küche'}
               </div>
             </div>
             {item.notes && !item.completed && (
-              <div className={`mt-2 p-3 rounded-lg border-2 ${
+              <div className={`mt-3 ml-20 p-4 rounded-xl border-2 ${
                 item.notes.toLowerCase().includes('allergi') ||
                 item.notes.toLowerCase().includes('laktose') ||
                 item.notes.toLowerCase().includes('gluten') ||
@@ -619,14 +612,7 @@ function OrderCard({
                   ? 'bg-red-900 border-red-500 text-red-100'
                   : 'bg-yellow-900 border-yellow-500 text-yellow-100'
               }`}>
-                <span className="text-lg font-bold">
-                  {item.notes.toLowerCase().includes('allergi') ||
-                   item.notes.toLowerCase().includes('laktose') ||
-                   item.notes.toLowerCase().includes('gluten') ||
-                   item.notes.toLowerCase().includes('nuss') ||
-                   item.notes.toLowerCase().includes('vegan')
-                    ? '⚠️ '
-                    : '📝 '}
+                <span className="text-2xl font-bold italic">
                   {item.notes}
                 </span>
               </div>
@@ -635,13 +621,17 @@ function OrderCard({
         ))}
       </div>
 
+      {/* Complete Button */}
+      <div className="p-6 pt-0">
+
       {/* Complete Button - completes order and removes from list */}
       <button
         onClick={onComplete}
-        className="w-full font-bold py-3 rounded-lg transition text-lg bg-green-600 hover:bg-green-700 text-white"
+        className="w-full font-bold py-4 rounded-xl transition text-3xl bg-green-500 hover:bg-green-600 text-white"
       >
-        {uncompletedCount > 0 ? `✓ Erledigt (${uncompletedCount})` : '✓ Erledigt'}
+        {uncompletedCount > 0 ? `Erledigt (${uncompletedCount})` : 'Erledigt'}
       </button>
+      </div>
     </div>
   );
 }
