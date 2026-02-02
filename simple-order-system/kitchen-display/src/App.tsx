@@ -596,15 +596,17 @@ function OrderCard({
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <span className={`text-2xl font-bold mr-2 ${item.completed ? 'text-green-400' : 'text-yellow-400'}`}>
+                <span className={`text-2xl font-bold mr-3 ${item.completed ? 'text-green-400' : 'text-yellow-400'}`}>
                   {item.completed ? '✓' : `${item.quantity}×`}
                 </span>
                 <span className={`text-xl font-semibold ${item.completed ? 'line-through text-gray-400' : ''}`}>
-                  {item.completed ? '' : `${item.quantity}× `}{item.item_name || '(Unbekannter Artikel)'}
+                  {item.item_name || '(Unbekannter Artikel)'}
                 </span>
               </div>
-              <div className="text-xs bg-gray-600 px-2 py-1 rounded">
-                {item.printer_station}
+              <div className={`text-sm px-3 py-1 rounded font-medium ${
+                item.printer_station === 'bar' ? 'bg-blue-600' : 'bg-orange-600'
+              }`}>
+                {item.printer_station === 'bar' ? 'Bar' : 'Küche'}
               </div>
             </div>
             {item.notes && !item.completed && (
