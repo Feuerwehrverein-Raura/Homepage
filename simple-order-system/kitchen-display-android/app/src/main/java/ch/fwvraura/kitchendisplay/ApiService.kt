@@ -72,4 +72,26 @@ class ApiService(private val serverUrl: String) {
             Result.failure(e)
         }
     }
+
+    suspend fun completeItems(orderId: Int, itemIds: List<Int>): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            val json = gson.toJson(mapOf("item_ids" to itemIds))
+            val request = Request.Builder()
+                .url("$baseUrl/orders/$orderId/items/complete")
+                .patch(json.toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = client.newCall(request).execute()
+
+            if (!response.isSuccessful) {
+                return@withContext Result.failure(Exception("HTTP ${response.code}"))
+            }
+
+            Log.d(TAG, "Items $itemIds in order $orderId marked as complete")
+            Result.success(true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to complete items in order $orderId", e)
+            Result.failure(e)
+        }
+    }
 }

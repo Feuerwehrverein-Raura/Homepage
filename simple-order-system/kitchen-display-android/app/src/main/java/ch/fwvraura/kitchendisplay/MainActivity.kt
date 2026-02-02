@@ -4,21 +4,24 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.SoundPool
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import ch.fwvraura.kitchendisplay.models.Order
+import ch.fwvraura.kitchendisplay.models.OrderItem
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import kotlinx.coroutines.*
-import android.widget.ImageButton
-import android.widget.TextView
 
 class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
 
@@ -30,6 +33,9 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private lateinit var btnBar: MaterialButton
     private lateinit var btnKitchen: MaterialButton
     private lateinit var btnSettings: ImageButton
+    private lateinit var btnClean: MaterialButton
+    private lateinit var cleaningOverlay: FrameLayout
+    private lateinit var cleaningTimer: TextView
 
     private lateinit var adapter: OrderAdapter
     private var webSocketManager: WebSocketManager? = null
@@ -49,6 +55,8 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private val updateHandler = Handler(Looper.getMainLooper())
     private val updateCheckInterval = 2 * 60 * 60 * 1000L // Check every 2 hours
 
+    private var cleaningCountDown: CountDownTimer? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -61,6 +69,7 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         loadSettings()
         setupRecyclerView()
         setupStationToggle()
+        setupCleaningMode()
         startTimerUpdates()
 
         updateChecker = UpdateChecker(this)
@@ -76,6 +85,9 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         btnBar = findViewById(R.id.btnBar)
         btnKitchen = findViewById(R.id.btnKitchen)
         btnSettings = findViewById(R.id.btnSettings)
+        btnClean = findViewById(R.id.btnClean)
+        cleaningOverlay = findViewById(R.id.cleaningOverlay)
+        cleaningTimer = findViewById(R.id.cleaningTimer)
 
         btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
@@ -135,7 +147,9 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private fun setupRecyclerView() {
         adapter = OrderAdapter(
             currentStation = { currentStation },
-            onCompleteClick = { order -> completeOrder(order) }
+            onCompleteClick = { order -> completeOrder(order) },
+            onItemClick = { order, item -> completeItem(order, item) },
+            onCompleteAllItems = { order, items -> completeAllItems(order, items) }
         )
 
         // Calculate span count based on screen width
@@ -164,6 +178,29 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
                 updateOrdersList()
             }
         }
+    }
+
+    private fun setupCleaningMode() {
+        btnClean.setOnClickListener {
+            startCleaningMode()
+        }
+    }
+
+    private fun startCleaningMode() {
+        cleaningOverlay.visibility = View.VISIBLE
+        cleaningTimer.text = "30"
+
+        cleaningCountDown?.cancel()
+        cleaningCountDown = object : CountDownTimer(30000, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val seconds = (millisUntilFinished / 1000).toInt()
+                cleaningTimer.text = seconds.toString()
+            }
+
+            override fun onFinish() {
+                cleaningOverlay.visibility = View.GONE
+            }
+        }.start()
     }
 
     private fun startTimerUpdates() {
@@ -212,6 +249,7 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         mainScope.cancel()
         timerHandler.removeCallbacksAndMessages(null)
         updateHandler.removeCallbacksAndMessages(null)
+        cleaningCountDown?.cancel()
         soundPool?.release()
     }
 
@@ -232,6 +270,26 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         mainScope.launch {
             apiService?.completeOrder(order.id)?.onSuccess {
                 orders.removeAll { it.id == order.id }
+                updateOrdersList()
+            }
+        }
+    }
+
+    private fun completeItem(order: Order, item: OrderItem) {
+        mainScope.launch {
+            apiService?.completeItems(order.id, listOf(item.id))?.onSuccess {
+                // Update local state
+                item.completed = true
+                updateOrdersList()
+            }
+        }
+    }
+
+    private fun completeAllItems(order: Order, items: List<OrderItem>) {
+        mainScope.launch {
+            apiService?.completeItems(order.id, items.map { it.id })?.onSuccess {
+                // Update local state
+                items.forEach { it.completed = true }
                 updateOrdersList()
             }
         }

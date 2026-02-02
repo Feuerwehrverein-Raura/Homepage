@@ -1,6 +1,6 @@
 package ch.fwvraura.kitchendisplay
 
-import android.graphics.Color
+import android.graphics.Paint
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,7 +16,9 @@ import com.google.android.material.card.MaterialCardView
 
 class OrderAdapter(
     private val currentStation: () -> String,
-    private val onCompleteClick: (Order) -> Unit
+    private val onCompleteClick: (Order) -> Unit,
+    private val onItemClick: (Order, OrderItem) -> Unit,
+    private val onCompleteAllItems: (Order, List<OrderItem>) -> Unit
 ) : RecyclerView.Adapter<OrderAdapter.OrderViewHolder>() {
 
     private var orders = listOf<Order>()
@@ -60,6 +62,9 @@ class OrderAdapter(
         private val colorWarning = ContextCompat.getColor(itemView.context, R.color.warning)
         private val colorTextPrimary = ContextCompat.getColor(itemView.context, R.color.text_primary)
         private val colorAccent = ContextCompat.getColor(itemView.context, R.color.accent)
+        private val colorCompleted = ContextCompat.getColor(itemView.context, R.color.completed)
+        private val colorCompletedBg = ContextCompat.getColor(itemView.context, R.color.completed_background)
+        private val colorTextMuted = ContextCompat.getColor(itemView.context, R.color.text_muted)
 
         fun bind(order: Order) {
             val station = currentStation()
@@ -75,53 +80,92 @@ class OrderAdapter(
             val minutes = order.getMinutesElapsed()
             orderTime.text = "${minutes} min"
 
-            // Card border color based on urgency
-            card.strokeColor = if (order.isUrgent()) colorUrgent else colorPrimary
+            // Get filtered items
+            val items = order.getItemsForStation(station)
+            val completedCount = items.count { it.completed }
+            val allCompleted = completedCount == items.size
+            val uncompletedItems = items.filter { !it.completed }
+
+            // Card border color based on urgency or completion
+            card.strokeColor = when {
+                allCompleted -> colorCompleted
+                order.isUrgent() -> colorUrgent
+                else -> colorPrimary
+            }
 
             // Items
             itemsContainer.removeAllViews()
-            val items = order.getItemsForStation(station)
             for (item in items) {
-                addItemView(item)
+                addItemView(order, item)
             }
 
-            // Complete button
-            btnComplete.setOnClickListener {
-                onCompleteClick(order)
+            // Complete button - changes based on state
+            if (allCompleted) {
+                btnComplete.text = "Bestellung abschliessen"
+                btnComplete.setBackgroundColor(colorBar)
+                btnComplete.setOnClickListener {
+                    onCompleteClick(order)
+                }
+            } else {
+                btnComplete.text = "Alle erledigt (${uncompletedItems.size})"
+                btnComplete.setBackgroundColor(colorCompleted)
+                btnComplete.setOnClickListener {
+                    onCompleteAllItems(order, uncompletedItems)
+                }
             }
         }
 
-        private fun addItemView(item: OrderItem) {
+        private fun addItemView(order: Order, item: OrderItem) {
             val itemView = LayoutInflater.from(itemsContainer.context)
                 .inflate(R.layout.item_order_item, itemsContainer, false)
 
+            val itemContainer: LinearLayout = itemView.findViewById(R.id.itemContainer)
             val quantity: TextView = itemView.findViewById(R.id.quantity)
             val itemName: TextView = itemView.findViewById(R.id.itemName)
             val stationBadge: TextView = itemView.findViewById(R.id.stationBadge)
             val notes: TextView = itemView.findViewById(R.id.notes)
 
-            quantity.text = "${item.quantity}x"
-            quantity.setTextColor(colorAccent)
+            if (item.completed) {
+                // Completed item styling
+                itemContainer.setBackgroundColor(colorCompletedBg)
+                quantity.text = "✓"
+                quantity.setTextColor(colorCompleted)
+                itemName.text = item.itemName
+                itemName.setTextColor(colorTextMuted)
+                itemName.paintFlags = itemName.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
+                notes.visibility = View.GONE
+                // No click listener for completed items
+            } else {
+                // Active item styling
+                itemContainer.setBackgroundResource(R.drawable.item_clickable_background)
+                quantity.text = "${item.quantity}x"
+                quantity.setTextColor(colorAccent)
+                itemName.text = item.itemName
+                itemName.setTextColor(colorTextPrimary)
+                itemName.paintFlags = itemName.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
 
-            itemName.text = item.itemName
-            itemName.setTextColor(colorTextPrimary)
+                // Click to complete
+                itemContainer.setOnClickListener {
+                    onItemClick(order, item)
+                }
+
+                // Notes
+                if (!item.notes.isNullOrBlank()) {
+                    notes.visibility = View.VISIBLE
+                    notes.text = item.notes
+                    if (item.hasAllergyWarning()) {
+                        notes.setTextColor(colorUrgent)
+                    } else {
+                        notes.setTextColor(colorWarning)
+                    }
+                } else {
+                    notes.visibility = View.GONE
+                }
+            }
 
             // Station badge
             stationBadge.text = if (item.isBar) "Bar" else "Küche"
             stationBadge.setBackgroundColor(if (item.isBar) colorBar else colorKitchen)
-
-            // Notes
-            if (!item.notes.isNullOrBlank()) {
-                notes.visibility = View.VISIBLE
-                notes.text = item.notes
-                if (item.hasAllergyWarning()) {
-                    notes.setTextColor(colorUrgent)
-                } else {
-                    notes.setTextColor(colorWarning)
-                }
-            } else {
-                notes.visibility = View.GONE
-            }
 
             itemsContainer.addView(itemView)
         }

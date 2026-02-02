@@ -16,4 +16,7 @@
     <color name="divider">#4B5563</color>
     <color name="bar_station">#8B5CF6</color>
     <color name="kitchen_station">#F97316</color>
+    <color name="completed">#22C55E</color>
+    <color name="completed_background">#14532D</color>
+    <color name="cleaning_blue">#3B82F6</color>
 </resources>

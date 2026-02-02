@@ -10,7 +10,10 @@ data class OrderItem(
     val price: Double,
     val notes: String?,
     @SerializedName("printer_station")
-    val printerStation: String
+    val printerStation: String,
+    var completed: Boolean = false,
+    @SerializedName("completed_at")
+    val completedAt: String? = null
 ) {
     val isBar: Boolean get() = printerStation == "bar"
     val isKitchen: Boolean get() = printerStation == "kitchen"

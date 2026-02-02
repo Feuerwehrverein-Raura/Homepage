@@ -19,4 +19,8 @@
     <string name="minutes_ago">%d min</string>
     <string name="connection_category">Verbindung</string>
     <string name="notifications_category">Benachrichtigungen</string>
+    <string name="clean">Putzen</string>
+    <string name="cleaning_title">Bildschirm putzen</string>
+    <string name="cleaning_subtitle">Touch-Eingaben deaktiviert</string>
+    <string name="seconds_remaining">Sekunden verbleibend</string>
 </resources>
