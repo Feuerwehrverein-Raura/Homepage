@@ -267,7 +267,11 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/orders`);
       const data = await res.json();
-      setOrders(data);
+      // Filter to only show pending and paid orders (exclude completed)
+      const activeOrders = data.filter((order: Order) =>
+        order.status === 'pending' || order.status === 'paid' || !order.status
+      );
+      setOrders(activeOrders);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     }
