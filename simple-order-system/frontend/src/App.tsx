@@ -103,6 +103,8 @@ interface OrderItem {
   price: string;
   paid?: boolean;
   paid_at?: string;
+  completed?: boolean;
+  completed_at?: string;
 }
 
 interface OpenOrder {
@@ -976,13 +978,16 @@ function App() {
 
                       <div className="p-3 max-h-48 overflow-y-auto">
                         {tableOrders.map(order => {
-                          const isKitchenConfirmed = order.status === 'completed';
+                          const completedItems = order.items?.filter(i => i.completed) || [];
+                          const totalItems = order.items?.length || 0;
                           return (
                           <div key={order.id} className="mb-2 pb-2 border-b last:border-0">
                             <div className="text-xs text-gray-500 mb-1 flex items-center gap-2">
                               <span>#{order.id} - {new Date(order.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}</span>
-                              {isKitchenConfirmed && (
-                                <span className="bg-green-600 text-white px-1.5 py-0.5 rounded text-xs">✓ Küche</span>
+                              {completedItems.length > 0 && (
+                                <span className="bg-green-600 text-white px-1.5 py-0.5 rounded text-xs">
+                                  ✓ {completedItems.length}/{totalItems}
+                                </span>
                               )}
                             </div>
                             {order.items?.map(item => (
@@ -991,14 +996,17 @@ function App() {
                                 className={`text-sm flex justify-between items-center rounded px-2 py-1 mb-1 ${
                                   item.paid
                                     ? 'bg-green-100 text-green-700 line-through'
-                                    : isKitchenConfirmed
+                                    : item.completed
                                       ? 'bg-yellow-100 text-yellow-800 font-medium'
                                       : 'bg-red-100 text-red-800 font-medium'
                                 }`}
                               >
-                                <span className="flex-1">{item.quantity}x {item.item_name}</span>
+                                <span className="flex-1">
+                                  {item.completed && !item.paid && '✓ '}
+                                  {item.quantity}x {item.item_name}
+                                </span>
                                 <span className="mr-2">CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
-                                {!item.paid && !isKitchenConfirmed && (
+                                {!item.paid && !item.completed && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

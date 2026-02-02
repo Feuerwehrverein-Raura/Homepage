@@ -59,6 +59,8 @@ interface OrderItem {
   quantity: number;
   notes: string;
   printer_station: string;
+  completed?: boolean;
+  completed_at?: string;
 }
 
 interface Order {
@@ -350,6 +352,31 @@ function App() {
     }
   };
 
+  // Mark individual items as completed
+  const completeItems = async (orderId: number, itemIds: number[]) => {
+    try {
+      const res = await fetch(`${API_URL}/orders/${orderId}/items/complete`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_ids: itemIds }),
+      });
+      if (res.ok) {
+        // Update local state
+        setOrders(prev => prev.map(order => {
+          if (order.id !== orderId) return order;
+          return {
+            ...order,
+            items: order.items.map(item =>
+              itemIds.includes(item.id) ? { ...item, completed: true } : item
+            )
+          };
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to complete items:', error);
+    }
+  };
+
   const filterOrders = (order: Order) => {
     if (station === 'all') return true;
     return order.items.some(item => item.printer_station === station);
@@ -454,6 +481,7 @@ function App() {
                 order={order}
                 station={station}
                 onComplete={() => completeOrder(order.id)}
+                onItemComplete={(itemIds) => completeItems(order.id, itemIds)}
               />
             ))}
           </div>
@@ -484,28 +512,30 @@ function App() {
   );
 }
 
-function OrderCard({ 
-  order, 
+function OrderCard({
+  order,
   station,
-  onComplete 
-}: { 
-  order: Order; 
+  onComplete,
+  onItemComplete
+}: {
+  order: Order;
   station: string;
   onComplete: () => void;
+  onItemComplete: (itemIds: number[]) => void;
 }) {
   const timeAgo = (dateString: string) => {
     const now = new Date();
     const created = new Date(dateString);
     const diffMs = now.getTime() - created.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'Jetzt';
     if (diffMins === 1) return '1 Min';
     return `${diffMins} Min`;
   };
 
-  const filteredItems = station === 'all' 
-    ? order.items 
+  const filteredItems = station === 'all'
+    ? order.items
     : order.items.filter(item => item.printer_station === station);
 
   if (filteredItems.length === 0) return null;
@@ -513,9 +543,13 @@ function OrderCard({
   const time = timeAgo(order.created_at);
   const isUrgent = new Date().getTime() - new Date(order.created_at).getTime() > 10 * 60 * 1000;
 
+  const completedCount = filteredItems.filter(i => i.completed).length;
+  const allCompleted = completedCount === filteredItems.length;
+  const uncompletedItems = filteredItems.filter(i => !i.completed);
+
   return (
     <div className={`bg-gray-800 rounded-lg p-6 shadow-xl border-4 ${
-      isUrgent ? 'border-red-500' : 'border-gray-700'
+      allCompleted ? 'border-green-500' : isUrgent ? 'border-red-500' : 'border-gray-700'
     }`}>
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
@@ -527,6 +561,11 @@ function OrderCard({
             isUrgent ? 'text-red-400' : 'text-gray-400'
           }`}>
             vor {time}
+            {completedCount > 0 && (
+              <span className="ml-2 text-green-400">
+                ({completedCount}/{filteredItems.length} erledigt)
+              </span>
+            )}
           </div>
         </div>
         {order.table_number !== 0 && (
@@ -536,24 +575,32 @@ function OrderCard({
         )}
       </div>
 
-      {/* Items */}
+      {/* Items - clickable to mark individual items as complete */}
       <div className="space-y-3 mb-6">
         {filteredItems.map(item => (
-          <div key={item.id} className="bg-gray-700 rounded p-3">
+          <div
+            key={item.id}
+            onClick={() => !item.completed && onItemComplete([item.id])}
+            className={`rounded p-3 transition cursor-pointer ${
+              item.completed
+                ? 'bg-green-900 border-2 border-green-600 opacity-60'
+                : 'bg-gray-700 hover:bg-gray-600 active:bg-green-800'
+            }`}
+          >
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <span className="text-2xl font-bold text-yellow-400 mr-2">
-                  {item.quantity}×
+                <span className={`text-2xl font-bold mr-2 ${item.completed ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {item.completed ? '✓' : `${item.quantity}×`}
                 </span>
-                <span className="text-xl font-semibold">
-                  {item.item_name || '(Unbekannter Artikel)'}
+                <span className={`text-xl font-semibold ${item.completed ? 'line-through text-gray-400' : ''}`}>
+                  {item.completed ? '' : `${item.quantity}× `}{item.item_name || '(Unbekannter Artikel)'}
                 </span>
               </div>
               <div className="text-xs bg-gray-600 px-2 py-1 rounded">
                 {item.printer_station}
               </div>
             </div>
-            {item.notes && (
+            {item.notes && !item.completed && (
               <div className={`mt-2 p-3 rounded-lg border-2 ${
                 item.notes.toLowerCase().includes('allergi') ||
                 item.notes.toLowerCase().includes('laktose') ||
@@ -579,12 +626,22 @@ function OrderCard({
         ))}
       </div>
 
-      {/* Complete Button */}
+      {/* Complete Button - marks all remaining as done, or closes order if all done */}
       <button
-        onClick={onComplete}
-        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition text-lg"
+        onClick={() => {
+          if (allCompleted) {
+            onComplete();
+          } else {
+            onItemComplete(uncompletedItems.map(i => i.id));
+          }
+        }}
+        className={`w-full font-bold py-3 rounded-lg transition text-lg ${
+          allCompleted
+            ? 'bg-blue-600 hover:bg-blue-700 text-white'
+            : 'bg-green-600 hover:bg-green-700 text-white'
+        }`}
       >
-        ✓ Erledigt
+        {allCompleted ? '📤 Bestellung abschliessen' : `✓ Alle erledigt (${uncompletedItems.length})`}
       </button>
     </div>
   );

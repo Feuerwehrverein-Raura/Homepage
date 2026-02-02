@@ -185,6 +185,10 @@ async function initDB() {
   await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`);
   await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS payment_id INTEGER REFERENCES order_payments(id)`);
 
+  // Add completed status to order_items for kitchen confirmation (separate from paid)
+  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT false`);
+  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+
   console.log('Database initialized');
 }
 
@@ -580,7 +584,9 @@ app.get('/api/orders', checkIpWhitelist, async (req, res) => {
             'notes', oi.notes,
             'printer_station', oi.printer_station,
             'paid', COALESCE(oi.paid, false),
-            'paid_at', oi.paid_at
+            'paid_at', oi.paid_at,
+            'completed', COALESCE(oi.completed, false),
+            'completed_at', oi.completed_at
           )
         ) FILTER (WHERE oi.id IS NOT NULL) as items,
         COALESCE((SELECT SUM(op.amount) FROM order_payments op WHERE op.order_id = o.id), 0) as paid_amount
@@ -813,29 +819,12 @@ app.patch('/api/orders/:id/complete', checkIpWhitelist, async (req, res) => {
 // Cancel/Stornieren individual order item
 // Note: Items can only be cancelled if:
 // 1. They are not already paid
-// 2. The order has not been confirmed by kitchen (status != 'completed')
+// 2. They are not already completed by kitchen
 app.delete('/api/orders/:orderId/items/:itemId', checkIpWhitelist, async (req, res) => {
   try {
     const { orderId, itemId } = req.params;
 
-    // Check order status first - if kitchen has confirmed, items cannot be cancelled individually
-    const orderResult = await pool.query(
-      'SELECT status FROM orders WHERE id = $1',
-      [orderId]
-    );
-
-    if (orderResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Bestellung nicht gefunden' });
-    }
-
-    const orderStatus = orderResult.rows[0].status;
-    if (orderStatus === 'completed') {
-      return res.status(400).json({
-        error: 'Küche hat bereits bestätigt - einzelne Artikel können nicht mehr storniert werden. Gesamte Bestellung muss storniert werden.'
-      });
-    }
-
-    // Check if item exists and is not paid
+    // Check if item exists
     const itemResult = await pool.query(
       'SELECT * FROM order_items WHERE id = $1 AND order_id = $2',
       [itemId, orderId]
@@ -846,6 +835,15 @@ app.delete('/api/orders/:orderId/items/:itemId', checkIpWhitelist, async (req, r
     }
 
     const item = itemResult.rows[0];
+
+    // Check if item is completed by kitchen - cannot cancel
+    if (item.completed) {
+      return res.status(400).json({
+        error: 'Küche hat diesen Artikel bereits bestätigt - kann nicht mehr storniert werden.'
+      });
+    }
+
+    // Check if item is paid - cannot cancel
     if (item.paid) {
       return res.status(400).json({ error: 'Bereits bezahlte Artikel können nicht storniert werden' });
     }
@@ -882,6 +880,44 @@ app.delete('/api/orders/:orderId/items/:itemId', checkIpWhitelist, async (req, r
   } catch (error) {
     console.error('Error cancelling item:', error);
     res.status(500).json({ error: 'Fehler beim Stornieren' });
+  }
+});
+
+// Mark individual order item(s) as completed by kitchen
+app.patch('/api/orders/:orderId/items/complete', checkIpWhitelist, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { item_ids } = req.body; // Array of item IDs to mark as completed
+
+    if (!item_ids || !Array.isArray(item_ids) || item_ids.length === 0) {
+      return res.status(400).json({ error: 'Keine Artikel angegeben' });
+    }
+
+    // Mark items as completed
+    await pool.query(
+      `UPDATE order_items
+       SET completed = true, completed_at = NOW()
+       WHERE order_id = $1 AND id = ANY($2)`,
+      [orderId, item_ids]
+    );
+
+    // Check if all items in order are now completed - if so, mark order as completed
+    const uncompletedResult = await pool.query(
+      `SELECT COUNT(*) as count FROM order_items
+       WHERE order_id = $1 AND (completed = false OR completed IS NULL)`,
+      [orderId]
+    );
+
+    if (parseInt(uncompletedResult.rows[0].count) === 0) {
+      await pool.query('UPDATE orders SET status = $1 WHERE id = $2', ['completed', orderId]);
+    }
+
+    broadcast({ type: 'items_completed', order_id: orderId, item_ids });
+
+    res.json({ success: true, message: 'Artikel als erledigt markiert' });
+  } catch (error) {
+    console.error('Error completing items:', error);
+    res.status(500).json({ error: 'Fehler beim Markieren als erledigt' });
   }
 });
 
