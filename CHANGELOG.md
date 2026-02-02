@@ -1,3 +1,10 @@
+# [1.122.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.3...v1.122.0) (2026-02-02)
+
+
+### Features
+
+* **kds:** add red header with logo matching website design ([c9ce119](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c9ce119edd94079e6a57708e1811281b487f5d1b))
+
 ## [1.121.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.2...v1.121.3) (2026-02-02)
 
 
