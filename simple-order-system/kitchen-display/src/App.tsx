@@ -543,13 +543,11 @@ function OrderCard({
   const time = timeAgo(order.created_at);
   const isUrgent = new Date().getTime() - new Date(order.created_at).getTime() > 10 * 60 * 1000;
 
-  const completedCount = filteredItems.filter(i => i.completed).length;
-  const allCompleted = completedCount === filteredItems.length;
-  const uncompletedItems = filteredItems.filter(i => !i.completed);
+  const uncompletedCount = filteredItems.filter(i => !i.completed).length;
 
   return (
     <div className={`bg-gray-800 rounded-lg p-6 shadow-xl border-4 ${
-      allCompleted ? 'border-green-500' : isUrgent ? 'border-red-500' : 'border-gray-700'
+      isUrgent ? 'border-red-500' : 'border-gray-700'
     }`}>
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
@@ -561,11 +559,6 @@ function OrderCard({
             isUrgent ? 'text-red-400' : 'text-gray-400'
           }`}>
             vor {time}
-            {completedCount > 0 && (
-              <span className="ml-2 text-green-400">
-                ({completedCount}/{filteredItems.length} erledigt)
-              </span>
-            )}
           </div>
         </div>
         {order.table_number !== 0 && (
@@ -626,22 +619,12 @@ function OrderCard({
         ))}
       </div>
 
-      {/* Complete Button - marks all remaining as done, or closes order if all done */}
+      {/* Complete Button - completes order and removes from list */}
       <button
-        onClick={() => {
-          if (allCompleted) {
-            onComplete();
-          } else {
-            onItemComplete(uncompletedItems.map(i => i.id));
-          }
-        }}
-        className={`w-full font-bold py-3 rounded-lg transition text-lg ${
-          allCompleted
-            ? 'bg-blue-600 hover:bg-blue-700 text-white'
-            : 'bg-green-600 hover:bg-green-700 text-white'
-        }`}
+        onClick={onComplete}
+        className="w-full font-bold py-3 rounded-lg transition text-lg bg-green-600 hover:bg-green-700 text-white"
       >
-        {allCompleted ? '📤 Bestellung abschliessen' : `✓ Alle erledigt (${uncompletedItems.length})`}
+        {uncompletedCount > 0 ? `✓ Erledigt (${uncompletedCount})` : '✓ Erledigt'}
       </button>
     </div>
   );
