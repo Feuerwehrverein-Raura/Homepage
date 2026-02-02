@@ -1,3 +1,11 @@
+# [1.128.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.127.0...v1.128.0) (2026-02-02)
+
+
+### Features
+
+* **kitchen-display:** add 'Putzen' button for screen cleaning mode ([4c97a52](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4c97a52d5ad8dba131b13d191c16136e8223141f))
+* **order-system:** add individual item selection for split payment ([efc3db0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/efc3db073416925c383c8888d029d1fb8411cf03))
+
 # [1.127.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.126.0...v1.127.0) (2026-02-02)
 
 
