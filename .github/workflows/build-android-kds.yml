@@ -1,17 +1,15 @@
 name: Build Android Kitchen Display
 
 on:
+  # Releases: tag pushes (no path filter needed)
   push:
-    paths:
-      - 'simple-order-system/kitchen-display-android/**'
-      - '.github/workflows/build-android-kds.yml'
-    branches:
-      - main
     tags:
       - 'kds-v*'
+  # Dev builds: only on KDS file changes
   pull_request:
     paths:
       - 'simple-order-system/kitchen-display-android/**'
+  # Manual trigger for releases
   workflow_dispatch:
     inputs:
       create_release:
