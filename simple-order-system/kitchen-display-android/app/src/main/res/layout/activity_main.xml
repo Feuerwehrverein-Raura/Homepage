@@ -44,31 +44,29 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             app:singleSelection="true"
-            app:selectionRequired="true">
+            app:selectionRequired="true"
+            app:checkedButton="@id/btnAll">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAll"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/StationToggleButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/station_all"
-                android:textColor="@color/text_primary" />
+                android:text="@string/station_all" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnBar"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/StationToggleButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/station_bar"
-                android:textColor="@color/text_primary" />
+                android:text="@string/station_bar" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnKitchen"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                style="@style/StationToggleButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/station_kitchen"
-                android:textColor="@color/text_primary" />
+                android:text="@string/station_kitchen" />
 
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
