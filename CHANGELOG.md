@@ -1,3 +1,10 @@
+## [1.133.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.2...v1.133.3) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** fix item click not working ([22f37da](https://github.com/Feuerwehrverein-Raura/Homepage/commit/22f37da983592ca48a723182e18d9fbd6bdaccc6))
+
 ## [1.133.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.1...v1.133.2) (2026-02-02)
 
 
