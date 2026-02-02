@@ -1,3 +1,10 @@
+# [1.121.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.120.0...v1.121.0) (2026-02-02)
+
+
+### Features
+
+* **kds:** update color scheme to match website fire theme ([481a590](https://github.com/Feuerwehrverein-Raura/Homepage/commit/481a590febf62484af9c84bc23a29d7141b98557)), closes [#3B82F6](https://github.com/Feuerwehrverein-Raura/Homepage/issues/3B82F6) [#dc2626](https://github.com/Feuerwehrverein-Raura/Homepage/issues/dc2626)
+
 # [1.120.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.119.1...v1.120.0) (2026-02-02)
 
 
