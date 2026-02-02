@@ -1,3 +1,10 @@
+# [1.131.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.130.0...v1.131.0) (2026-02-02)
+
+
+### Features
+
+* **order-system:** add TWINT payment option with QR code ([df5fe87](https://github.com/Feuerwehrverein-Raura/Homepage/commit/df5fe87f81aea402f04763dc1c48b905291caf71))
+
 # [1.130.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.129.0...v1.130.0) (2026-02-02)
 
 
