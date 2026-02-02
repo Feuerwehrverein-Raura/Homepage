@@ -1,3 +1,10 @@
+## [1.125.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.1...v1.125.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* **members-api:** improve error handling in /me/accesses endpoint ([0c0bba8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0c0bba8f9843bbecc4538798f2aabeb7ffd2db97))
+
 ## [1.125.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.0...v1.125.1) (2026-02-02)
 
 
