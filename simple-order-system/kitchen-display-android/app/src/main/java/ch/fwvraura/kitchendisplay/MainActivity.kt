@@ -45,6 +45,9 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private var notificationSoundId: Int = 0
     private var soundEnabled = true
 
+    private lateinit var updateChecker: UpdateChecker
+    private var updateChecked = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -58,6 +61,8 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         setupRecyclerView()
         setupStationToggle()
         startTimerUpdates()
+
+        updateChecker = UpdateChecker(this)
     }
 
     private fun initViews() {
@@ -173,6 +178,21 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         loadSettings()
         webSocketManager?.connect()
         fetchOrders()
+        checkForUpdates()
+    }
+
+    private fun checkForUpdates() {
+        if (updateChecked) return
+        updateChecked = true
+
+        mainScope.launch {
+            when (val result = updateChecker.checkForUpdate()) {
+                is UpdateChecker.UpdateResult.UpdateAvailable -> {
+                    updateChecker.showUpdateDialog(result)
+                }
+                else -> { /* No update or error - ignore */ }
+            }
+        }
     }
 
     override fun onPause() {
