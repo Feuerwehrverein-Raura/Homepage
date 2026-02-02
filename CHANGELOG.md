@@ -1,3 +1,10 @@
+# [1.133.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.132.1...v1.133.0) (2026-02-02)
+
+
+### Features
+
+* **kds-android:** add item completion and cleaning mode ([3fb9344](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3fb93442eaa88b2781f9f7d542674eaea739dd6e))
+
 ## [1.132.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.132.0...v1.132.1) (2026-02-02)
 
 
