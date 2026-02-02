@@ -83,8 +83,6 @@
     }
     </script>
     <script src="scripts/config.js"></script>
-    <!-- Cloudflare Turnstile Anti-Spam -->
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body class="font-sans bg-gray-50">
     <!-- Navigation -->
@@ -565,15 +563,11 @@
                             <!-- Hidden timestamp for spam detection -->
                             <input type="hidden" id="contact-timestamp" name="_timestamp">
 
-                            <!-- Cloudflare Turnstile Widget -->
-                            <div class="cf-turnstile" data-sitekey="0x4AAAAAAA-placeholder" data-theme="dark" data-callback="onTurnstileSuccess" id="turnstile-widget"></div>
-
                             <!-- Submit Button -->
                             <div class="pt-4">
-                                <button type="submit" id="contact-submit-btn" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                <button type="submit" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition duration-300 shadow-lg">
                                     <span id="submit-text">Nachricht senden</span>
                                 </button>
-                                <p id="turnstile-hint" class="text-fire-200 text-xs mt-2 text-center">Bitte bestätigen Sie, dass Sie kein Roboter sind</p>
                             </div>
                         </form>
                     </div>
@@ -694,16 +688,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     btn.textContent = 'Anmelden';
                 }
             });
-        }
-
-        // Turnstile callback - enable submit button when verified
-        function onTurnstileSuccess(token) {
-            const submitBtn = document.getElementById('contact-submit-btn');
-            const hint = document.getElementById('turnstile-hint');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                if (hint) hint.classList.add('hidden');
-            }
         }
 
         function initializeContactForm() {
