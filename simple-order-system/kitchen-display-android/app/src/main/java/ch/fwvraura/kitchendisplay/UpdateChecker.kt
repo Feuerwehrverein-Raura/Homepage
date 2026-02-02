@@ -18,7 +18,8 @@ class UpdateChecker(private val context: Context) {
     companion object {
         private const val TAG = "UpdateChecker"
         // Fetch all releases and filter for KDS releases (tagged as kds-v*)
-        private const val RELEASES_URL = "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases?per_page=20"
+        // Need per_page=100 because KDS releases are buried among main releases
+        private const val RELEASES_URL = "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases?per_page=100"
         private const val DOWNLOAD_PAGE = "https://feuerwehrverein-raura.github.io/Homepage/kds/"
     }
 

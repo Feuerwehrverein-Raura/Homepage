@@ -104,7 +104,8 @@
             const versionText = document.getElementById('versionText');
 
             try {
-                const response = await fetch('https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases');
+                // Need per_page=100 to get KDS releases which are buried among main releases
+                const response = await fetch('https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases?per_page=100');
                 const releases = await response.json();
 
                 // Find latest KDS release
