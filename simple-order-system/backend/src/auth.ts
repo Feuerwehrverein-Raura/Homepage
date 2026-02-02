@@ -15,6 +15,59 @@ const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fwv2026';
 const JWT_SECRET = process.env.JWT_SECRET || 'local-order-system-secret';
 
+// Rate limiting for failed login attempts
+const MAX_FAILED_ATTEMPTS = 3;
+const BLOCK_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface FailedAttempt {
+  count: number;
+  blockedUntil?: number;
+}
+
+const failedAttempts = new Map<string, FailedAttempt>();
+
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ips = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',');
+    return ips[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
+
+function isIpBlocked(ip: string): { blocked: boolean; remainingMinutes?: number } {
+  const attempt = failedAttempts.get(ip);
+  if (!attempt || !attempt.blockedUntil) {
+    return { blocked: false };
+  }
+
+  const now = Date.now();
+  if (now < attempt.blockedUntil) {
+    const remainingMinutes = Math.ceil((attempt.blockedUntil - now) / 60000);
+    return { blocked: true, remainingMinutes };
+  }
+
+  // Block expired, reset
+  failedAttempts.delete(ip);
+  return { blocked: false };
+}
+
+function recordFailedAttempt(ip: string): void {
+  const attempt = failedAttempts.get(ip) || { count: 0 };
+  attempt.count++;
+
+  if (attempt.count >= MAX_FAILED_ATTEMPTS) {
+    attempt.blockedUntil = Date.now() + BLOCK_DURATION_MS;
+    console.log(`IP ${ip} blocked for 24 hours after ${attempt.count} failed login attempts`);
+  }
+
+  failedAttempts.set(ip, attempt);
+}
+
+function clearFailedAttempts(ip: string): void {
+  failedAttempts.delete(ip);
+}
+
 // JWKS client to get public keys from Authentik (only used in online mode with RS256)
 const client = LOCAL_MODE ? null : jwksClient({
   jwksUri: `${AUTHENTIK_URL}/application/o/order-system/jwks/`,
@@ -89,13 +142,40 @@ export interface AuthenticatedRequest extends Request {
 
 /**
  * Local mode login - returns JWT token for simple password auth
+ * Includes rate limiting: blocks IP for 24h after 3 failed attempts
  */
 export function localLogin(req: Request, res: Response) {
+  const ip = getClientIp(req);
   const { password } = req.body;
 
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'Invalid password' });
+  // Check if IP is blocked
+  const blockStatus = isIpBlocked(ip);
+  if (blockStatus.blocked) {
+    const hours = Math.floor((blockStatus.remainingMinutes || 0) / 60);
+    const minutes = (blockStatus.remainingMinutes || 0) % 60;
+    return res.status(429).json({
+      error: `IP gesperrt nach zu vielen fehlgeschlagenen Versuchen. Entsperrt in ${hours}h ${minutes}min.`
+    });
   }
+
+  if (password !== ADMIN_PASSWORD) {
+    recordFailedAttempt(ip);
+    const attempt = failedAttempts.get(ip);
+    const remaining = MAX_FAILED_ATTEMPTS - (attempt?.count || 0);
+
+    if (remaining > 0) {
+      return res.status(401).json({
+        error: `Falsches Passwort. Noch ${remaining} Versuche übrig.`
+      });
+    } else {
+      return res.status(429).json({
+        error: 'IP für 24 Stunden gesperrt nach zu vielen fehlgeschlagenen Versuchen.'
+      });
+    }
+  }
+
+  // Successful login - clear failed attempts
+  clearFailedAttempts(ip);
 
   const token = jwt.sign(
     {
@@ -226,4 +306,36 @@ export function getAuthMode() {
     local: LOCAL_MODE,
     authentikUrl: LOCAL_MODE ? null : AUTHENTIK_URL
   };
+}
+
+/**
+ * Get all blocked IPs (for admin)
+ */
+export function getBlockedIps(): Array<{ ip: string; blockedUntil: Date; attempts: number }> {
+  const blocked: Array<{ ip: string; blockedUntil: Date; attempts: number }> = [];
+  const now = Date.now();
+
+  failedAttempts.forEach((attempt, ip) => {
+    if (attempt.blockedUntil && attempt.blockedUntil > now) {
+      blocked.push({
+        ip,
+        blockedUntil: new Date(attempt.blockedUntil),
+        attempts: attempt.count
+      });
+    }
+  });
+
+  return blocked;
+}
+
+/**
+ * Unblock an IP (for admin)
+ */
+export function unblockIp(ip: string): boolean {
+  if (failedAttempts.has(ip)) {
+    failedAttempts.delete(ip);
+    console.log(`IP ${ip} manually unblocked by admin`);
+    return true;
+  }
+  return false;
 }

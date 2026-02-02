@@ -6,7 +6,7 @@ import pg from 'pg';
 import multer from 'multer';
 import PaymentService from './payments.js';
 import SumUpTerminal from './terminal.js';
-import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
+import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp } from './auth.js';
 
 // Nextcloud configuration
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'https://nextcloud.fwv-raura.ch';
@@ -43,6 +43,21 @@ app.get('/api/auth/mode', (req, res) => {
 });
 
 app.post('/api/auth/login', localLogin);
+
+// Blocked IPs management (admin only)
+app.get('/api/auth/blocked-ips', authenticateToken, (req: AuthenticatedRequest, res) => {
+  res.json(getBlockedIps());
+});
+
+app.delete('/api/auth/blocked-ips/:ip', authenticateToken, (req: AuthenticatedRequest, res) => {
+  const ip = req.params.ip;
+  const success = unblockIp(ip);
+  if (success) {
+    res.json({ message: `IP ${ip} entsperrt` });
+  } else {
+    res.status(404).json({ error: 'IP nicht gefunden oder nicht gesperrt' });
+  }
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
