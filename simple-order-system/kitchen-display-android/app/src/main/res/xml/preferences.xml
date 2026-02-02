@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/connection_category"
+        app:iconSpaceReserved="false">
+
+        <EditTextPreference
+            android:key="server_url"
+            android:title="@string/server_url"
+            android:summary="@string/server_url_summary"
+            android:defaultValue="@string/default_server_url"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/notifications_category"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="sound_enabled"
+            android:title="@string/sound_enabled"
+            android:summary="@string/sound_enabled_summary"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

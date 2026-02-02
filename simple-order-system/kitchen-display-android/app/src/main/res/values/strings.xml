@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kitchen Display</string>
+    <string name="settings">Einstellungen</string>
+    <string name="server_url">Server URL</string>
+    <string name="server_url_summary">WebSocket und API Server</string>
+    <string name="default_server_url">https://order.fwv-raura.ch</string>
+    <string name="sound_enabled">Ton aktiviert</string>
+    <string name="sound_enabled_summary">Benachrichtigungston bei neuer Bestellung</string>
+    <string name="station_all">Alle</string>
+    <string name="station_bar">Bar</string>
+    <string name="station_kitchen">Küche</string>
+    <string name="table">Tisch</string>
+    <string name="mark_complete">Erledigt</string>
+    <string name="connecting">Verbinde...</string>
+    <string name="connected">Verbunden</string>
+    <string name="disconnected">Getrennt</string>
+    <string name="no_orders">Keine offenen Bestellungen</string>
+    <string name="minutes_ago">%d min</string>
+    <string name="connection_category">Verbindung</string>
+    <string name="notifications_category">Benachrichtigungen</string>
+</resources>
