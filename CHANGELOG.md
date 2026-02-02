@@ -1,3 +1,10 @@
+# [1.132.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.131.0...v1.132.0) (2026-02-02)
+
+
+### Features
+
+* **order-system:** add Nextcloud upload for TWINT QR code ([8a982a5](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8a982a52dfd520cf3a7a104ba90cdd4ae09bce6a))
+
 # [1.131.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.130.0...v1.131.0) (2026-02-02)
 
 
