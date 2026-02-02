@@ -1,3 +1,10 @@
+## [1.121.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.1...v1.121.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** remove old mipmap XML files causing build failure ([23e30ef](https://github.com/Feuerwehrverein-Raura/Homepage/commit/23e30ef03415ce7187c47d9b44b2286a3d4cc313))
+
 ## [1.121.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.0...v1.121.1) (2026-02-02)
 
 
