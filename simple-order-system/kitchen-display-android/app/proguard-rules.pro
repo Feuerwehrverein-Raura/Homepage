@@ -12,6 +12,15 @@
 -keep class ch.fwvraura.kitchendisplay.UpdateChecker$GitHubRelease { *; }
 -keep class ch.fwvraura.kitchendisplay.UpdateChecker$Asset { *; }
 
-# Keep Gson TypeToken
+# Keep Gson TypeToken and related
 -keep class com.google.gson.reflect.TypeToken { *; }
 -keep class * extends com.google.gson.reflect.TypeToken
+
+# Keep all Gson annotations
+-keepclassmembers,allowobfuscation class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+# Prevent R8 from stripping generic type info
+-keepattributes EnclosingMethod
+-keepattributes InnerClasses

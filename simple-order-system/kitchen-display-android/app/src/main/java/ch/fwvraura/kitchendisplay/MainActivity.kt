@@ -46,7 +46,8 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private var soundEnabled = true
 
     private lateinit var updateChecker: UpdateChecker
-    private var updateChecked = false
+    private val updateHandler = Handler(Looper.getMainLooper())
+    private val updateCheckInterval = 2 * 60 * 60 * 1000L // Check every 2 hours
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +64,7 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         startTimerUpdates()
 
         updateChecker = UpdateChecker(this)
+        startPeriodicUpdateCheck()
     }
 
     private fun initViews() {
@@ -178,13 +180,9 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         loadSettings()
         webSocketManager?.connect()
         fetchOrders()
-        checkForUpdates()
     }
 
     private fun checkForUpdates() {
-        if (updateChecked) return
-        updateChecked = true
-
         mainScope.launch {
             when (val result = updateChecker.checkForUpdate()) {
                 is UpdateChecker.UpdateResult.UpdateAvailable -> {
@@ -193,6 +191,15 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
                 else -> { /* No update or error - ignore */ }
             }
         }
+    }
+
+    private fun startPeriodicUpdateCheck() {
+        updateHandler.post(object : Runnable {
+            override fun run() {
+                checkForUpdates()
+                updateHandler.postDelayed(this, updateCheckInterval)
+            }
+        })
     }
 
     override fun onPause() {
@@ -204,6 +211,7 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         super.onDestroy()
         mainScope.cancel()
         timerHandler.removeCallbacksAndMessages(null)
+        updateHandler.removeCallbacksAndMessages(null)
         soundPool?.release()
     }
 
