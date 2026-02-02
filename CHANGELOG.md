@@ -1,3 +1,10 @@
+## [1.133.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.3...v1.133.4) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** fix strikethrough and station filter bugs ([cdaedfd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cdaedfd33e89ec2123fb77a39cd94b3ea39176b2))
+
 ## [1.133.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.2...v1.133.3) (2026-02-02)
 
 
