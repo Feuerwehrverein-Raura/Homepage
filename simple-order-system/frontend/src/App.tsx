@@ -123,7 +123,8 @@ function App() {
   const [tableNumber, setTableNumber] = useState<string>('');
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OpenOrder | null>(null);
-  const [view, setView] = useState<'order' | 'inventory' | 'history' | 'settings'>('order');
+  const [view, setView] = useState<'order' | 'tables' | 'inventory' | 'history' | 'settings'>('order');
+  const [allOpenOrders, setAllOpenOrders] = useState<OpenOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
   const [user, setUser] = useState<User | null>(null);
@@ -132,7 +133,7 @@ function App() {
   const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges', printer_station: 'bar' });
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
-  const [pendingOrder, setPendingOrder] = useState<{ id: number; total: number } | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<{ id: number; total: number; tableNumber?: number } | null>(null);
   const [cashPayment, setCashPayment] = useState<{ orderId: number; total: number; received: string } | null>(null);
   const [cardPayment, setCardPayment] = useState<{ orderId: number; total: number } | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -366,6 +367,26 @@ function App() {
       setSelectedOrder(null);
     }
   }, [tableNumber, orderType]);
+
+  // Fetch all open orders for tables view
+  const fetchAllOpenOrders = async () => {
+    try {
+      const res = await fetch(`${API_URL}/orders`);
+      const data = await res.json();
+      // Filter only table orders (table_number > 0)
+      const tableOrders = data.filter((o: any) => o.table_number > 0);
+      setAllOpenOrders(tableOrders);
+    } catch (error) {
+      console.error('Failed to fetch all orders:', error);
+      setAllOpenOrders([]);
+    }
+  };
+
+  useEffect(() => {
+    if (view === 'tables') {
+      fetchAllOpenOrders();
+    }
+  }, [view]);
 
   useEffect(() => {
     if (view === 'history' && user) {
@@ -719,8 +740,9 @@ function App() {
 
         const order = await orderRes.json();
 
-        // Show payment modal
-        setPendingOrder({ id: order.id, total });
+        // Show payment modal (include table number for "pay later" option)
+        const currentTableNum = orderType === 'tisch' ? parseInt(tableNumber) : undefined;
+        setPendingOrder({ id: order.id, total, tableNumber: currentTableNum });
         setCart([]);
         if (orderType === 'tisch') {
           setTableNumber('');
@@ -824,6 +846,14 @@ function App() {
             >
               🛒 Kasse
             </button>
+            <button
+              onClick={() => setView('tables')}
+              className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                view === 'tables' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+              }`}
+            >
+              🪑 Tische {allOpenOrders.length > 0 && `(${new Set(allOpenOrders.map(o => o.table_number)).size})`}
+            </button>
             {user && (
               <>
                 <button
@@ -862,6 +892,97 @@ function App() {
         <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token} />
       ) : showInventoryView ? (
         <InventoryView items={items} onUpdate={fetchItems} token={token} />
+      ) : view === 'tables' ? (
+        /* Tables View */
+        <div className="max-w-7xl mx-auto p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Offene Tische</h2>
+              <button
+                onClick={fetchAllOpenOrders}
+                className="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded text-sm"
+              >
+                🔄 Aktualisieren
+              </button>
+            </div>
+
+            {allOpenOrders.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                Keine offenen Tischbestellungen
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Group by table number */}
+                {[...new Set(allOpenOrders.map(o => o.table_number))].sort((a, b) => a - b).map(tableNum => {
+                  const tableOrders = allOpenOrders.filter(o => o.table_number === tableNum);
+                  const totalAmount = tableOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+                  const allItems = tableOrders.flatMap(o => o.items || []);
+                  const paidItems = allItems.filter(i => i.paid);
+                  const unpaidItems = allItems.filter(i => !i.paid);
+                  const unpaidAmount = unpaidItems.reduce((sum, i) => sum + parseFloat(i.price) * i.quantity, 0);
+
+                  return (
+                    <div key={tableNum} className="border-2 border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-fwv-red text-white p-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-2xl font-bold">Tisch {tableNum}</span>
+                          <span className="text-lg font-semibold">
+                            CHF {unpaidAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        {paidItems.length > 0 && (
+                          <div className="text-sm opacity-80 mt-1">
+                            ({paidItems.length} Artikel bereits bezahlt)
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="p-3 max-h-48 overflow-y-auto">
+                        {tableOrders.map(order => (
+                          <div key={order.id} className="mb-2 pb-2 border-b last:border-0">
+                            <div className="text-xs text-gray-500 mb-1">
+                              #{order.id} - {new Date(order.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            {order.items?.map(item => (
+                              <div
+                                key={item.id}
+                                className={`text-sm flex justify-between ${item.paid ? 'text-green-600 line-through' : ''}`}
+                              >
+                                <span>{item.quantity}x {item.item_name}</span>
+                                <span>CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+
+                      {unpaidAmount > 0 && (
+                        <div className="p-3 bg-gray-50 border-t">
+                          <button
+                            onClick={() => {
+                              // Open split payment for first order of this table
+                              const firstOrder = tableOrders[0];
+                              // Combine all items from all orders for this table
+                              const combinedOrder: OpenOrder = {
+                                ...firstOrder,
+                                items: allItems,
+                                total: totalAmount.toString()
+                              };
+                              openSplitPayment(combinedOrder);
+                            }}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold text-lg touch-manipulation"
+                          >
+                            💳 Bezahlen
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         <div className="max-w-7xl mx-auto p-2 sm:p-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1153,12 +1274,33 @@ function App() {
       {pendingOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
-            <h2 className="text-2xl font-bold text-center mb-2">Bestellung #{pendingOrder.id}</h2>
+            <h2 className="text-2xl font-bold text-center mb-2">
+              {pendingOrder.tableNumber ? `Tisch ${pendingOrder.tableNumber}` : `Bestellung #${pendingOrder.id}`}
+            </h2>
             <p className="text-3xl font-bold text-center text-green-600 mb-6">
               CHF {pendingOrder.total.toFixed(2)}
             </p>
 
             <div className="space-y-3">
+              {/* Pay Later option for table orders */}
+              {pendingOrder.tableNumber && (
+                <button
+                  onClick={() => {
+                    setOrderConfirmation({
+                      orderId: pendingOrder.id,
+                      orderType: 'tisch',
+                      tableNumber: pendingOrder.tableNumber,
+                      total: pendingOrder.total,
+                      message: 'Bestellung gesendet - Bezahlung später'
+                    });
+                    setPendingOrder(null);
+                  }}
+                  className="w-full bg-yellow-500 hover:bg-yellow-600 active:bg-yellow-700 text-yellow-900 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 touch-manipulation"
+                >
+                  🪑 Später bezahlen (Tisch offen lassen)
+                </button>
+              )}
+
               <button
                 onClick={() => handlePayment('sumup')}
                 disabled={loading}
