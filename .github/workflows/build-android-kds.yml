@@ -84,6 +84,9 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
+          # Add build-tools to PATH
+          export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
+
           UNSIGNED_APK=$(find simple-order-system/kitchen-display-android -name "*release*.apk" -type f | head -1)
           if [ -n "$UNSIGNED_APK" ]; then
             echo "Signing APK: $UNSIGNED_APK"
