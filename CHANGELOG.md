@@ -1,3 +1,10 @@
+## [1.121.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.0...v1.121.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** remove conflicting vector drawable ([080b804](https://github.com/Feuerwehrverein-Raura/Homepage/commit/080b8043081dcafbcda1a1733b48dd20c8b7feee))
+
 # [1.121.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.120.0...v1.121.0) (2026-02-02)
 
 
