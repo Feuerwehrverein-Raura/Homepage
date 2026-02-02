@@ -219,7 +219,10 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         mainScope.launch {
             apiService?.fetchOrders()?.onSuccess { fetchedOrders ->
                 orders.clear()
-                orders.addAll(fetchedOrders.filter { it.status == "pending" || it.status == null })
+                // Include pending, paid, and null status (server returns pending + paid)
+                orders.addAll(fetchedOrders.filter {
+                    it.status == "pending" || it.status == "paid" || it.status == null
+                })
                 updateOrdersList()
             }
         }
