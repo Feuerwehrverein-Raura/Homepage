@@ -1,3 +1,10 @@
+## [1.115.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.1...v1.115.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* **ci:** force Gradle 8.4 for Android build compatibility ([82fbb73](https://github.com/Feuerwehrverein-Raura/Homepage/commit/82fbb7363ddfd65c03fec75f58470f883ed8a488))
+
 ## [1.115.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.0...v1.115.1) (2026-02-02)
 
 
