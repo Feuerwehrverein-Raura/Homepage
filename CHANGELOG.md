@@ -1,3 +1,10 @@
+## [1.133.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.5...v1.133.6) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds:** hide orders when all station items are completed ([37ef98c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/37ef98c0c9f89e45ec916092e190860ed6f76eae))
+
 ## [1.133.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.4...v1.133.5) (2026-02-02)
 
 
