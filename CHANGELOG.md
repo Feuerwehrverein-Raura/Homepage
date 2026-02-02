@@ -1,3 +1,10 @@
+## [1.115.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.2...v1.115.3) (2026-02-02)
+
+
+### Bug Fixes
+
+* **ci:** correct workflow syntax - separate setup-gradle and run steps ([010028f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/010028f76727b88f5ef40fb32df4e901cfc1b9ca))
+
 ## [1.115.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.1...v1.115.2) (2026-02-02)
 
 
