@@ -1,3 +1,15 @@
+# [1.123.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.122.1...v1.123.0) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** add ProGuard rules for UpdateChecker data classes ([03fcb17](https://github.com/Feuerwehrverein-Raura/Homepage/commit/03fcb17f1f17392995340c3e6af1cb261aa33ec1))
+
+
+### Features
+
+* **kds-android:** add periodic update check and improve ProGuard rules ([48feca8](https://github.com/Feuerwehrverein-Raura/Homepage/commit/48feca8523bc17490f71f3f7619bc6f6aca3e535))
+
 ## [1.122.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.122.0...v1.122.1) (2026-02-02)
 
 
