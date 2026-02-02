@@ -1,3 +1,10 @@
+## [1.135.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.2...v1.135.3) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kitchen-display:** filter out completed orders ([8deba22](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8deba22fe8e6cc39dc0e9b634770d353c55977e4))
+
 ## [1.135.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.1...v1.135.2) (2026-02-02)
 
 
