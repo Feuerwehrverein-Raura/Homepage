@@ -1,3 +1,10 @@
+# [1.135.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.134.0...v1.135.0) (2026-02-02)
+
+
+### Features
+
+* **backend:** add audit logging for API requests ([da95b7b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/da95b7bb656fc41926b2edc1085c5307d71836d5))
+
 # [1.134.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.6...v1.134.0) (2026-02-02)
 
 
