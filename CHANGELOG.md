@@ -1,3 +1,10 @@
+## [1.118.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.118.0...v1.118.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kitchen-display:** fix elapsed time calculation with UTC timezone ([597c8a9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/597c8a9bed9f8272dccbb19c52cfbc5c1bcd3fa5))
+
 # [1.118.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.117.0...v1.118.0) (2026-02-02)
 
 
