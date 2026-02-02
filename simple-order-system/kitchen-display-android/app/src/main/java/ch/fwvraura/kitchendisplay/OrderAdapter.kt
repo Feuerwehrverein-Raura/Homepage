@@ -108,7 +108,8 @@ class OrderAdapter(
             val itemView = LayoutInflater.from(itemsContainer.context)
                 .inflate(R.layout.item_order_item, itemsContainer, false)
 
-            val itemContainer: LinearLayout = itemView.findViewById(R.id.itemContainer)
+            // itemView IS the itemContainer (root element)
+            val itemContainer = itemView as LinearLayout
             val quantity: TextView = itemView.findViewById(R.id.quantity)
             val itemName: TextView = itemView.findViewById(R.id.itemName)
             val stationBadge: TextView = itemView.findViewById(R.id.stationBadge)
@@ -117,16 +118,17 @@ class OrderAdapter(
             if (item.completed) {
                 // Completed item styling
                 itemContainer.setBackgroundColor(colorCompletedBg)
+                itemContainer.isClickable = false
                 quantity.text = "✓"
                 quantity.setTextColor(colorCompleted)
                 itemName.text = item.itemName
                 itemName.setTextColor(colorTextMuted)
                 itemName.paintFlags = itemName.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
                 notes.visibility = View.GONE
-                // No click listener for completed items
             } else {
                 // Active item styling
                 itemContainer.setBackgroundResource(R.drawable.item_clickable_background)
+                itemContainer.isClickable = true
                 quantity.text = "${item.quantity}x"
                 quantity.setTextColor(colorAccent)
                 itemName.text = item.itemName
