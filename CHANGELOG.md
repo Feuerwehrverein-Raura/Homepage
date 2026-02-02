@@ -1,3 +1,10 @@
+## [1.125.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.0...v1.125.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **contact:** remove Turnstile captcha, keep other anti-spam measures ([ed468cc](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ed468cce97008e7e558b5761096436d5a583939a))
+
 # [1.125.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.124.0...v1.125.0) (2026-02-02)
 
 
