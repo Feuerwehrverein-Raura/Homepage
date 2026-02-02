@@ -1,3 +1,10 @@
+## [1.123.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.2...v1.123.3) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kitchen-display:** remove black background from logo ([339b0e9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/339b0e94eb8e2b685cf92132de0c6b36090cf8b8))
+
 ## [1.123.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.1...v1.123.2) (2026-02-02)
 
 
