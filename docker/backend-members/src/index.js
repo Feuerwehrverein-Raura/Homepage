@@ -3638,7 +3638,10 @@ const FUNCTION_EMAIL_MAP = {
     'Beisitzer': 'beisitzer@fwv-raura.ch',
     'Beisitzerin': 'beisitzer@fwv-raura.ch',
     'Materialwart': 'materialwart@fwv-raura.ch',
-    'Admin': 'admin@fwv-raura.ch'
+    'Admin': 'admin@fwv-raura.ch',
+    'Social Media': 'social-media@fwv-raura.ch',
+    'Social-Media': 'social-media@fwv-raura.ch',
+    'SocialMedia': 'social-media@fwv-raura.ch'
 };
 
 // Change function email password (self-service)
