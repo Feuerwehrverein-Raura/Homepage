@@ -568,6 +568,7 @@ app.delete('/api/items/:id', authenticateToken, async (req: AuthenticatedRequest
 // Protected by IP whitelist
 app.get('/api/orders', checkIpWhitelist, async (req, res) => {
   try {
+    // Include 'completed' status for table orders (kitchen confirmed but not yet fully paid)
     const result = await pool.query(`
       SELECT o.*,
         json_agg(
@@ -585,7 +586,7 @@ app.get('/api/orders', checkIpWhitelist, async (req, res) => {
         COALESCE((SELECT SUM(op.amount) FROM order_payments op WHERE op.order_id = o.id), 0) as paid_amount
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
-      WHERE o.status IN ('pending', 'paid')
+      WHERE o.status IN ('pending', 'paid', 'completed')
       GROUP BY o.id
       ORDER BY o.created_at DESC
     `);
@@ -806,6 +807,81 @@ app.patch('/api/orders/:id/complete', checkIpWhitelist, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Cancel/Stornieren individual order item
+// Note: Items can only be cancelled if:
+// 1. They are not already paid
+// 2. The order has not been confirmed by kitchen (status != 'completed')
+app.delete('/api/orders/:orderId/items/:itemId', checkIpWhitelist, async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+
+    // Check order status first - if kitchen has confirmed, items cannot be cancelled individually
+    const orderResult = await pool.query(
+      'SELECT status FROM orders WHERE id = $1',
+      [orderId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Bestellung nicht gefunden' });
+    }
+
+    const orderStatus = orderResult.rows[0].status;
+    if (orderStatus === 'completed') {
+      return res.status(400).json({
+        error: 'Küche hat bereits bestätigt - einzelne Artikel können nicht mehr storniert werden. Gesamte Bestellung muss storniert werden.'
+      });
+    }
+
+    // Check if item exists and is not paid
+    const itemResult = await pool.query(
+      'SELECT * FROM order_items WHERE id = $1 AND order_id = $2',
+      [itemId, orderId]
+    );
+
+    if (itemResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Artikel nicht gefunden' });
+    }
+
+    const item = itemResult.rows[0];
+    if (item.paid) {
+      return res.status(400).json({ error: 'Bereits bezahlte Artikel können nicht storniert werden' });
+    }
+
+    // Delete the item
+    await pool.query('DELETE FROM order_items WHERE id = $1', [itemId]);
+
+    // Update order total
+    const totalResult = await pool.query(
+      'SELECT COALESCE(SUM(price * quantity), 0) as new_total FROM order_items WHERE order_id = $1',
+      [orderId]
+    );
+    const newTotal = totalResult.rows[0].new_total;
+
+    await pool.query('UPDATE orders SET total = $1 WHERE id = $2', [newTotal, orderId]);
+
+    // Check if order has no more items - if so, mark as cancelled
+    const remainingItems = await pool.query(
+      'SELECT COUNT(*) as count FROM order_items WHERE order_id = $1',
+      [orderId]
+    );
+
+    if (parseInt(remainingItems.rows[0].count) === 0) {
+      await pool.query('UPDATE orders SET status = $1 WHERE id = $2', ['cancelled', orderId]);
+      broadcast({ type: 'order_completed', order_id: orderId }); // Remove from display
+    } else {
+      broadcast({ type: 'order_updated', order_id: orderId, total: newTotal });
+    }
+
+    // Queue for cloud sync
+    queueOrderSync(parseInt(orderId), 'update');
+
+    res.json({ success: true, message: 'Artikel storniert', new_total: newTotal });
+  } catch (error) {
+    console.error('Error cancelling item:', error);
+    res.status(500).json({ error: 'Fehler beim Stornieren' });
   }
 });
 

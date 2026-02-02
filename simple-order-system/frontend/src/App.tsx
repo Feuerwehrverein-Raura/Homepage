@@ -110,6 +110,7 @@ interface OpenOrder {
   table_number: number;
   total: string;
   created_at: string;
+  status: 'pending' | 'paid' | 'completed';
   items: OrderItem[];
   paid_amount?: string;
 }
@@ -379,6 +380,25 @@ function App() {
     } catch (error) {
       console.error('Failed to fetch all orders:', error);
       setAllOpenOrders([]);
+    }
+  };
+
+  // Cancel/Stornieren individual order item
+  const cancelOrderItem = async (orderId: number, itemId: number) => {
+    try {
+      const res = await fetch(`${API_URL}/orders/${orderId}/items/${itemId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        // Refresh the table orders
+        fetchAllOpenOrders();
+      } else {
+        const error = await res.json();
+        alert(error.error || 'Fehler beim Stornieren');
+      }
+    } catch (error) {
+      console.error('Failed to cancel item:', error);
+      alert('Fehler beim Stornieren des Artikels');
     }
   };
 
@@ -955,22 +975,47 @@ function App() {
                       </div>
 
                       <div className="p-3 max-h-48 overflow-y-auto">
-                        {tableOrders.map(order => (
+                        {tableOrders.map(order => {
+                          const isKitchenConfirmed = order.status === 'completed';
+                          return (
                           <div key={order.id} className="mb-2 pb-2 border-b last:border-0">
-                            <div className="text-xs text-gray-500 mb-1">
-                              #{order.id} - {new Date(order.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}
+                            <div className="text-xs text-gray-500 mb-1 flex items-center gap-2">
+                              <span>#{order.id} - {new Date(order.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}</span>
+                              {isKitchenConfirmed && (
+                                <span className="bg-green-600 text-white px-1.5 py-0.5 rounded text-xs">✓ Küche</span>
+                              )}
                             </div>
                             {order.items?.map(item => (
                               <div
                                 key={item.id}
-                                className={`text-sm flex justify-between ${item.paid ? 'text-green-600 line-through' : ''}`}
+                                className={`text-sm flex justify-between items-center rounded px-2 py-1 mb-1 ${
+                                  item.paid
+                                    ? 'bg-green-100 text-green-700 line-through'
+                                    : isKitchenConfirmed
+                                      ? 'bg-yellow-100 text-yellow-800 font-medium'
+                                      : 'bg-red-100 text-red-800 font-medium'
+                                }`}
                               >
-                                <span>{item.quantity}x {item.item_name}</span>
-                                <span>CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                                <span className="flex-1">{item.quantity}x {item.item_name}</span>
+                                <span className="mr-2">CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                                {!item.paid && !isKitchenConfirmed && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm(`"${item.quantity}x ${item.item_name}" wirklich stornieren?`)) {
+                                        cancelOrderItem(order.id, item.id);
+                                      }
+                                    }}
+                                    className="text-red-600 hover:text-red-800 hover:bg-red-200 rounded p-1 text-xs font-bold"
+                                    title="Artikel stornieren"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       {unpaidAmount > 0 && (
