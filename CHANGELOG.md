@@ -1,3 +1,10 @@
+## [1.115.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.0...v1.115.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **ci:** use gradle/actions/setup-gradle for Android build ([a66576e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a66576e521602caaacbacff5331db9904562e9a3))
+
 # [1.115.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.114.5...v1.115.0) (2026-02-02)
 
 
