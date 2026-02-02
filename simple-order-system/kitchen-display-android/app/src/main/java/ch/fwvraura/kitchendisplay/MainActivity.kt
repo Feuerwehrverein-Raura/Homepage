@@ -289,6 +289,8 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
             .sortedBy { it.id }
 
         adapter.submitList(filteredOrders)
+        // Force rebind because DiffUtil may not detect in-place item.completed changes
+        adapter.notifyDataSetChanged()
 
         emptyState.visibility = if (filteredOrders.isEmpty()) View.VISIBLE else View.GONE
         recyclerView.visibility = if (filteredOrders.isEmpty()) View.GONE else View.VISIBLE

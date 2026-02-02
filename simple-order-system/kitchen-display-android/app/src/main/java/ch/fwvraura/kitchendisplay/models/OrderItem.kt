@@ -10,13 +10,13 @@ data class OrderItem(
     val price: Double,
     val notes: String?,
     @SerializedName("printer_station")
-    val printerStation: String,
+    val printerStation: String = "bar",
     var completed: Boolean = false,
     @SerializedName("completed_at")
     val completedAt: String? = null
 ) {
-    val isBar: Boolean get() = printerStation == "bar"
-    val isKitchen: Boolean get() = printerStation == "kitchen"
+    val isBar: Boolean get() = printerStation.equals("bar", ignoreCase = true)
+    val isKitchen: Boolean get() = printerStation.equals("kitchen", ignoreCase = true)
 
     fun hasAllergyWarning(): Boolean {
         val notesLower = notes?.lowercase() ?: return false

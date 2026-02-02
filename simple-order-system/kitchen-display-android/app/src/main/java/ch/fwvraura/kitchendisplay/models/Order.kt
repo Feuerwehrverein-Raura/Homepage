@@ -39,11 +39,11 @@ data class Order(
 
     fun hasItemsForStation(station: String): Boolean {
         if (station == "all") return true
-        return items.any { it.printerStation == station }
+        return items.any { it.printerStation.equals(station, ignoreCase = true) }
     }
 
     fun getItemsForStation(station: String): List<OrderItem> {
         if (station == "all") return items
-        return items.filter { it.printerStation == station }
+        return items.filter { it.printerStation.equals(station, ignoreCase = true) }
     }
 }
