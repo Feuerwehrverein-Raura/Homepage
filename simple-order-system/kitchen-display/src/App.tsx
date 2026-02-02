@@ -168,8 +168,33 @@ function App() {
   const [station, setStation] = useState<string>('all');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [cleaningMode, setCleaningMode] = useState(false);
+  const [cleaningTimer, setCleaningTimer] = useState(30);
   const wsRef = useRef<WebSocket | null>(null);
   const playNotificationRef = useRef<(order: Order) => void>(() => {});
+
+  // Start cleaning mode - 30 seconds of no touch response
+  const startCleaning = useCallback(() => {
+    setCleaningMode(true);
+    setCleaningTimer(30);
+  }, []);
+
+  // Cleaning mode countdown timer
+  useEffect(() => {
+    if (!cleaningMode) return;
+
+    if (cleaningTimer <= 0) {
+      setCleaningMode(false);
+      setCleaningTimer(30);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCleaningTimer(prev => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [cleaningMode, cleaningTimer]);
 
   // Enable sound - must be triggered by user interaction
   const enableSound = useCallback(async () => {
@@ -379,6 +404,15 @@ function App() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* Putzen Button */}
+            <button
+              onClick={startCleaning}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold flex items-center gap-2"
+            >
+              <span>🧽</span>
+              <span>Putzen</span>
+            </button>
+
             {!soundEnabled ? (
               <button
                 onClick={requestNotificationPermission}
@@ -415,16 +449,37 @@ function App() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredOrders.map(order => (
-              <OrderCard 
-                key={order.id} 
-                order={order} 
+              <OrderCard
+                key={order.id}
+                order={order}
                 station={station}
-                onComplete={() => completeOrder(order.id)} 
+                onComplete={() => completeOrder(order.id)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Cleaning Mode Overlay - blocks all touch inputs */}
+      {cleaningMode && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-90 flex flex-col items-center justify-center z-50"
+          style={{ touchAction: 'none' }}
+          onTouchStart={(e) => e.preventDefault()}
+          onTouchMove={(e) => e.preventDefault()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="text-white text-center">
+            <div className="text-6xl mb-8">🧽</div>
+            <h2 className="text-4xl font-bold mb-4">Bildschirm putzen</h2>
+            <p className="text-2xl text-gray-300 mb-8">Touch-Eingaben deaktiviert</p>
+            <div className="text-9xl font-bold text-blue-400 tabular-nums">
+              {cleaningTimer}
+            </div>
+            <p className="text-xl text-gray-400 mt-4">Sekunden verbleibend</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
