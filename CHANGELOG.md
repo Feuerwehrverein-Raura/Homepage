@@ -1,3 +1,10 @@
+## [1.115.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.3...v1.115.4) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kitchen-display:** use simple shape icons for Android 7 compatibility ([f88138e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f88138e9029b993fdbf09a4c283e1c1d57038457))
+
 ## [1.115.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.2...v1.115.3) (2026-02-02)
 
 
