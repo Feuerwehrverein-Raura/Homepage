@@ -1,3 +1,10 @@
+## [1.133.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.4...v1.133.5) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds:** complete only station items when filter is active ([13216df](https://github.com/Feuerwehrverein-Raura/Homepage/commit/13216df842054d7f54244598dae552f0a013f3d0))
+
 ## [1.133.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.3...v1.133.4) (2026-02-02)
 
 
