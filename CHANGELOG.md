@@ -1,3 +1,10 @@
+## [1.132.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.132.0...v1.132.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds:** increase GitHub API page size to find KDS releases ([b244e07](https://github.com/Feuerwehrverein-Raura/Homepage/commit/b244e07d380729b1e989c075f25effb320ca5fd4))
+
 # [1.132.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.131.0...v1.132.0) (2026-02-02)
 
 
