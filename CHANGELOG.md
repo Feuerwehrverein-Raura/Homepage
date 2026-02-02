@@ -1,3 +1,10 @@
+## [1.119.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.119.0...v1.119.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** add build-tools to PATH for APK signing ([1469ac6](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1469ac6664933539cb1376f415ea6e8967c42937))
+
 # [1.119.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.118.1...v1.119.0) (2026-02-02)
 
 
