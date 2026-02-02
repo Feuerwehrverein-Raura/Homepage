@@ -3463,11 +3463,13 @@ app.post('/reminders/send-whatsapp', requireApiKey, async (req, res) => {
         const results = [];
 
         for (const shift of shiftsResult.rows) {
-            // Angemeldete Helfer für diese Schicht abrufen
+            // Angemeldete Helfer für diese Schicht abrufen (inkl. Handynummer)
             const helpersResult = await pool.query(`
                 SELECT
+                    r.member_id,
                     m.vorname,
                     m.nachname,
+                    m.mobile,
                     r.guest_name
                 FROM registrations r
                 LEFT JOIN members m ON r.member_id = m.id
@@ -3495,7 +3497,12 @@ app.post('/reminders/send-whatsapp', requireApiKey, async (req, res) => {
             const startTime = shift.start_time?.substring(0, 5) || '?';
             const endTime = shift.end_time?.substring(0, 5) || '?';
 
-            const message = `⏰ *Schicht-Erinnerung: ${shift.event_title}*
+            // Persönliche Nachricht für Einzelpersonen
+            const personalMessage = `⏰ *Schicht-Erinnerung: ${shift.event_title}*
+
+Hallo {vorname}!
+
+Du bist für folgende Schicht eingeteilt:
 
 📋 ${shift.shift_name}
 📅 ${dateFormatted}
@@ -3503,51 +3510,54 @@ app.post('/reminders/send-whatsapp', requireApiKey, async (req, res) => {
 ${shift.bereich ? `🏷️ ${shift.bereich}` : ''}
 ${shift.event_location ? `📍 ${shift.event_location}` : ''}
 
-👥 *Angemeldete Helfer (${helpers.length}):*
-${helpers.map(h => `• ${h}`).join('\n')}
+Bitte erscheine pünktlich. Bei Verhinderung melde dich bitte rechtzeitig.
 
 👉 https://fwv-raura.ch/events.html?event=${shift.event_slug || shift.event_id}`;
 
-            // WhatsApp an alle Vorstandsmitglieder senden (jeder mit eigener Config)
+            // Empfänger-Liste für Direktnachrichten erstellen
+            const recipients = helpersResult.rows
+                .filter(h => h.mobile) // Nur Mitglieder mit Handynummer
+                .map(h => ({
+                    member_id: h.member_id,
+                    vorname: h.vorname || h.guest_name?.split(' ')[0] || 'Helfer',
+                    nachname: h.nachname || '',
+                    mobile: h.mobile,
+                    name: h.vorname ? `${h.vorname} ${h.nachname}` : h.guest_name
+                }));
+
+            // Über jeden Vorstandsmitglied-Bot senden (jeder an seine Empfänger)
             const shiftResults = [];
-            for (const member of vorstandMembers) {
+            for (const sender of vorstandMembers) {
                 try {
-                    const response = await axios.post(`${DISPATCH_API}/whatsapp/notify/shift-reminder`, {
-                        shift: {
-                            id: shift.shift_id,
-                            name: shift.shift_name,
-                            date: shift.shift_date,
-                            start_time: shift.start_time,
-                            end_time: shift.end_time,
-                            bereich: shift.bereich
-                        },
-                        event: {
-                            id: shift.event_id,
-                            title: shift.event_title,
-                            slug: shift.event_slug,
-                            location: shift.event_location
-                        },
-                        members: helpersResult.rows.map(h => ({
-                            vorname: h.vorname || h.guest_name?.split(' ')[0] || '',
-                            nachname: h.nachname || h.guest_name?.split(' ').slice(1).join(' ') || ''
-                        })),
-                        member_id: member.id,
-                        custom_message: message
+                    // An alle Empfänger senden (Dispatch entscheidet ob Gruppe oder Einzeln)
+                    const response = await axios.post(`${DISPATCH_API}/whatsapp/send-to-recipients`, {
+                        sender_member_id: sender.id,
+                        recipients: recipients,
+                        message: personalMessage,
+                        notification_type: 'shift_reminder',
+                        reference_type: 'shift',
+                        reference_id: shift.shift_id
                     }, {
                         headers: { 'X-API-Key': process.env.API_KEY }
                     });
 
-                    if (response.data.sent) {
-                        totalSent++;
-                        shiftResults.push({ member: `${member.vorname} ${member.nachname}`, status: 'sent' });
-                        logInfo('WhatsApp shift reminder sent', {
+                    if (response.data.sent > 0 || response.data.mode === 'group') {
+                        totalSent += response.data.sent || (response.data.sent === true ? 1 : 0);
+                        shiftResults.push({
+                            sender: `${sender.vorname} ${sender.nachname}`,
+                            mode: response.data.mode,
+                            sent: response.data.sent,
+                            status: 'sent'
+                        });
+                        logInfo('WhatsApp shift reminders sent', {
                             shiftId: shift.shift_id,
-                            memberId: member.id,
-                            memberName: `${member.vorname} ${member.nachname}`
+                            senderId: sender.id,
+                            mode: response.data.mode,
+                            sent: response.data.sent
                         });
                     } else {
                         shiftResults.push({
-                            member: `${member.vorname} ${member.nachname}`,
+                            sender: `${sender.vorname} ${sender.nachname}`,
                             status: 'skipped',
                             reason: response.data.reason
                         });
@@ -3555,13 +3565,13 @@ ${helpers.map(h => `• ${h}`).join('\n')}
 
                 } catch (err) {
                     shiftResults.push({
-                        member: `${member.vorname} ${member.nachname}`,
+                        sender: `${sender.vorname} ${sender.nachname}`,
                         status: 'failed',
                         error: err.message
                     });
                     logError('Failed to send WhatsApp shift reminder', {
                         shiftId: shift.shift_id,
-                        memberId: member.id,
+                        senderId: sender.id,
                         error: err.message
                     });
                 }

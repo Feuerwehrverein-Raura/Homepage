@@ -4037,6 +4037,91 @@ app.post('/invoices/generate-bulk', authenticateAny, async (req, res) => {
 // Cache für Matrix-Clients pro Member
 const matrixClientCache = new Map();
 
+// Helper: Handynummer zu Matrix WhatsApp User-ID konvertieren
+// z.B. "+41 79 123 45 67" → "@whatsapp_41791234567:matrix.example.ch"
+function phoneToMatrixUserId(phoneNumber, bridgeDomain) {
+    if (!phoneNumber || !bridgeDomain) return null;
+
+    // Nummer normalisieren: nur Ziffern behalten, führende 0 durch Ländercode ersetzen
+    let normalized = phoneNumber.replace(/[^0-9+]/g, '');
+
+    // Schweizer Nummern: 0791234567 → 41791234567
+    if (normalized.startsWith('0') && !normalized.startsWith('00')) {
+        normalized = '41' + normalized.substring(1);
+    }
+    // +41... → 41...
+    if (normalized.startsWith('+')) {
+        normalized = normalized.substring(1);
+    }
+    // 0041... → 41...
+    if (normalized.startsWith('00')) {
+        normalized = normalized.substring(2);
+    }
+
+    if (normalized.length < 10) return null;
+
+    return `@whatsapp_${normalized}:${bridgeDomain}`;
+}
+
+// Helper: Direkte Nachricht an WhatsApp-User senden (via Matrix Bridge)
+async function sendDirectWhatsAppMessage(senderMemberId, recipientPhone, message, htmlMessage = null) {
+    const clientData = await getMatrixClientForMember(senderMemberId);
+    if (!clientData) {
+        return { sent: false, reason: 'no_sender_config' };
+    }
+
+    const { client, config } = clientData;
+
+    if (!config.whatsapp_bridge_domain) {
+        return { sent: false, reason: 'no_bridge_domain' };
+    }
+
+    const recipientUserId = phoneToMatrixUserId(recipientPhone, config.whatsapp_bridge_domain);
+    if (!recipientUserId) {
+        return { sent: false, reason: 'invalid_phone', phone: recipientPhone };
+    }
+
+    try {
+        // Direktnachricht-Raum mit dem Empfänger erstellen/finden
+        // Bei mautrix-whatsapp wird automatisch ein DM-Raum erstellt
+        const dmRoom = await client.createRoom({
+            is_direct: true,
+            invite: [recipientUserId],
+            preset: 'trusted_private_chat'
+        });
+
+        const roomId = dmRoom.room_id;
+
+        // Nachricht senden
+        const content = {
+            msgtype: 'm.text',
+            body: message
+        };
+
+        if (htmlMessage) {
+            content.format = 'org.matrix.custom.html';
+            content.formatted_body = htmlMessage;
+        }
+
+        const result = await client.sendEvent(roomId, 'm.room.message', content);
+
+        return {
+            sent: true,
+            eventId: result.event_id,
+            roomId,
+            recipientUserId
+        };
+
+    } catch (error) {
+        logError('Failed to send direct WhatsApp message', {
+            recipientPhone,
+            recipientUserId,
+            error: error.message
+        });
+        return { sent: false, reason: 'send_error', error: error.message };
+    }
+}
+
 // Helper: Matrix-Client für ein Mitglied erstellen
 async function getMatrixClientForMember(memberId) {
     // Cache prüfen
@@ -4496,7 +4581,7 @@ app.get('/whatsapp/notifications', authenticateAny, async (req, res) => {
     }
 });
 
-// POST /whatsapp/send/:memberId - Direkte Nachricht senden
+// POST /whatsapp/send/:memberId - Direkte Nachricht senden (an Gruppe)
 app.post('/whatsapp/send/:memberId', authenticateAny, async (req, res) => {
     try {
         const { memberId } = req.params;
@@ -4518,6 +4603,113 @@ app.post('/whatsapp/send/:memberId', authenticateAny, async (req, res) => {
         res.json({ success: true, ...result });
     } catch (error) {
         logError('Failed to send WhatsApp message', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /whatsapp/send-to-recipients - Nachrichten an mehrere Empfänger senden (Direktnachrichten)
+// Verwendet die Bot-Config des Senders, sendet an Empfänger basierend auf deren Handynummer
+app.post('/whatsapp/send-to-recipients', requireApiKey, async (req, res) => {
+    try {
+        const { sender_member_id, recipients, message, html_message, notification_type = 'shift_reminder', reference_type, reference_id } = req.body;
+
+        if (!sender_member_id) {
+            return res.status(400).json({ error: 'sender_member_id ist erforderlich' });
+        }
+
+        if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+            return res.status(400).json({ error: 'recipients Array ist erforderlich' });
+        }
+
+        if (!message) {
+            return res.status(400).json({ error: 'message ist erforderlich' });
+        }
+
+        // Sender-Config prüfen
+        const configResult = await pool.query(
+            "SELECT * FROM member_matrix_config WHERE member_id = $1 AND enabled = true",
+            [sender_member_id]
+        );
+
+        if (configResult.rows.length === 0) {
+            return res.json({ success: true, sent: 0, reason: 'no_sender_config' });
+        }
+
+        const config = configResult.rows[0];
+
+        if (!config.send_to_individuals) {
+            // Fallback: An Gruppe senden statt Einzelpersonen
+            logInfo('send_to_individuals not enabled, sending to default room', { sender_member_id });
+            const result = await sendWhatsAppNotificationForMember(
+                sender_member_id,
+                notification_type,
+                reference_type || 'bulk',
+                reference_id || Date.now(),
+                message,
+                html_message
+            );
+            return res.json({ success: true, mode: 'group', ...result });
+        }
+
+        if (!config.whatsapp_bridge_domain) {
+            return res.status(400).json({ error: 'whatsapp_bridge_domain nicht konfiguriert' });
+        }
+
+        // An jeden Empfänger senden
+        const results = [];
+        let sentCount = 0;
+
+        for (const recipient of recipients) {
+            const phone = recipient.mobile || recipient.phone;
+            const name = recipient.name || `${recipient.vorname || ''} ${recipient.nachname || ''}`.trim();
+
+            if (!phone) {
+                results.push({ name, status: 'skipped', reason: 'no_phone' });
+                continue;
+            }
+
+            // Personalisierte Nachricht (optional)
+            const personalMessage = message.replace('{name}', name).replace('{vorname}', recipient.vorname || name);
+
+            const result = await sendDirectWhatsAppMessage(
+                sender_member_id,
+                phone,
+                personalMessage,
+                html_message?.replace('{name}', name).replace('{vorname}', recipient.vorname || name)
+            );
+
+            if (result.sent) {
+                sentCount++;
+                results.push({ name, phone, status: 'sent', eventId: result.eventId });
+
+                // Log speichern
+                await pool.query(
+                    `INSERT INTO whatsapp_notifications
+                     (member_id, room_id, notification_type, reference_type, reference_id, message_content, matrix_event_id, status, sent_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, 'sent', CURRENT_TIMESTAMP)`,
+                    [recipient.member_id || null, result.roomId, notification_type, reference_type, reference_id, personalMessage, result.eventId]
+                );
+            } else {
+                results.push({ name, phone, status: 'failed', reason: result.reason, error: result.error });
+            }
+        }
+
+        logInfo('Bulk WhatsApp messages sent', {
+            sender: sender_member_id,
+            total: recipients.length,
+            sent: sentCount
+        });
+
+        res.json({
+            success: true,
+            mode: 'individual',
+            total: recipients.length,
+            sent: sentCount,
+            results
+        });
+
+    } catch (error) {
+        logError('Failed to send bulk WhatsApp messages', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });

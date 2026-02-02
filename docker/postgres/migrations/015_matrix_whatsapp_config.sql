@@ -8,7 +8,10 @@ CREATE TABLE IF NOT EXISTS member_matrix_config (
     homeserver_url VARCHAR(500) NOT NULL,  -- z.B. https://matrix.org
     access_token TEXT NOT NULL,            -- Bot/User Access Token
     user_id VARCHAR(255) NOT NULL,         -- z.B. @bot:matrix.org
-    default_room_id VARCHAR(500),          -- Standard-Raum für Benachrichtigungen (WhatsApp-Gruppe via Bridge)
+    default_room_id VARCHAR(500),          -- Standard-Raum für Gruppen-Benachrichtigungen
+    -- WhatsApp Bridge Konfiguration für Direktnachrichten
+    whatsapp_bridge_domain VARCHAR(255),   -- z.B. matrix.example.ch (für @whatsapp_xxx:domain)
+    send_to_individuals BOOLEAN DEFAULT false, -- true = an Einzelpersonen senden statt Gruppe
     enabled BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
