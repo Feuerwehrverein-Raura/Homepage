@@ -1,3 +1,10 @@
+# [1.118.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.117.0...v1.118.0) (2026-02-02)
+
+
+### Features
+
+* **kds-page:** make download page dynamic ([f43c58d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f43c58d4b886f6823d14f4df9662489b079cc959))
+
 # [1.117.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.116.0...v1.117.0) (2026-02-02)
 
 
