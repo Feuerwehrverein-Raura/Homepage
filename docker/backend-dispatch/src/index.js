@@ -4418,7 +4418,7 @@ app.post('/whatsapp/notify/event', requireApiKey, async (req, res) => {
 // POST /whatsapp/notify/shift-reminder - Schicht-Erinnerung senden
 app.post('/whatsapp/notify/shift-reminder', requireApiKey, async (req, res) => {
     try {
-        const { shift, event, members, member_id } = req.body;
+        const { shift, event, members, member_id, custom_message } = req.body;
 
         if (!shift || !shift.id || !event) {
             return res.status(400).json({ error: 'shift und event sind erforderlich' });
@@ -4429,7 +4429,16 @@ app.post('/whatsapp/notify/shift-reminder', requireApiKey, async (req, res) => {
             return res.json({ success: true, sent: false, reason: 'no_member_id' });
         }
 
-        const { message, htmlMessage } = formatShiftReminderMessage(shift, event, members || []);
+        // Custom message verwenden falls vorhanden, sonst Standard-Formatierung
+        let message, htmlMessage;
+        if (custom_message) {
+            message = custom_message;
+            htmlMessage = custom_message.replace(/\n/g, '<br>').replace(/\*/g, '');
+        } else {
+            const formatted = formatShiftReminderMessage(shift, event, members || []);
+            message = formatted.message;
+            htmlMessage = formatted.htmlMessage;
+        }
 
         const result = await sendWhatsAppNotificationForMember(
             member_id,

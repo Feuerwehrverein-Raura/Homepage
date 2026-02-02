@@ -3379,6 +3379,181 @@ Feuerwehrverein Raura
     }
 });
 
+// WhatsApp-Schichterinnerungen via Matrix (Aktuar-Config)
+// mode=evening (18:00): Schichten morgen vor 12:00
+// mode=morning (09:00): Schichten heute nach 12:00
+app.post('/reminders/send-whatsapp', requireApiKey, async (req, res) => {
+    try {
+        const { mode } = req.body; // 'evening' oder 'morning'
+
+        if (!mode || !['evening', 'morning'].includes(mode)) {
+            return res.status(400).json({ error: "mode muss 'evening' oder 'morning' sein" });
+        }
+
+        // Datum und Zeitfilter bestimmen
+        let targetDate, timeFilter, timeDescription;
+        if (mode === 'evening') {
+            // 18:00 Uhr: Schichten MORGEN vor 12:00
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            targetDate = tomorrow.toISOString().split('T')[0];
+            timeFilter = "< '12:00'";
+            timeDescription = 'morgen früh';
+        } else {
+            // 09:00 Uhr: Schichten HEUTE nach 12:00
+            targetDate = new Date().toISOString().split('T')[0];
+            timeFilter = ">= '12:00'";
+            timeDescription = 'heute Nachmittag/Abend';
+        }
+
+        logInfo('Sending WhatsApp shift reminders', { mode, targetDate, timeFilter });
+
+        // Aktuar's Member-ID ermitteln (für Matrix-Config)
+        const aktuarResult = await pool.query(`
+            SELECT m.id FROM members m
+            WHERE m.email = 'aktuar@fwv-raura.ch'
+            OR m.funktion ILIKE '%aktuar%'
+            LIMIT 1
+        `);
+
+        if (aktuarResult.rows.length === 0) {
+            logWarn('Aktuar not found, skipping WhatsApp reminders');
+            return res.json({ success: true, sent: 0, reason: 'aktuar_not_found' });
+        }
+
+        const aktuarMemberId = aktuarResult.rows[0].id;
+
+        // Schichten für den Zielzeitraum abrufen
+        const shiftsResult = await pool.query(`
+            SELECT
+                s.id as shift_id,
+                s.name as shift_name,
+                s.date as shift_date,
+                s.start_time,
+                s.end_time,
+                s.bereich,
+                e.id as event_id,
+                e.title as event_title,
+                e.slug as event_slug,
+                e.location as event_location
+            FROM shifts s
+            JOIN events e ON s.event_id = e.id
+            WHERE s.date = $1
+            AND s.start_time ${timeFilter}
+            AND e.status != 'cancelled'
+            ORDER BY s.start_time
+        `, [targetDate]);
+
+        if (shiftsResult.rows.length === 0) {
+            logInfo('No shifts found for WhatsApp reminder', { mode, targetDate });
+            return res.json({
+                success: true,
+                sent: 0,
+                message: `Keine Schichten ${timeDescription}`
+            });
+        }
+
+        let totalSent = 0;
+        const results = [];
+
+        for (const shift of shiftsResult.rows) {
+            // Angemeldete Helfer für diese Schicht abrufen
+            const helpersResult = await pool.query(`
+                SELECT
+                    m.vorname,
+                    m.nachname,
+                    r.guest_name
+                FROM registrations r
+                LEFT JOIN members m ON r.member_id = m.id
+                WHERE $1 = ANY(r.shift_ids)
+                AND r.status IN ('approved', 'confirmed')
+            `, [shift.shift_id]);
+
+            const helpers = helpersResult.rows.map(h =>
+                h.vorname ? `${h.vorname} ${h.nachname}` : h.guest_name
+            ).filter(Boolean);
+
+            if (helpers.length === 0) {
+                results.push({ shift: shift.shift_name, status: 'skipped', reason: 'no_helpers' });
+                continue;
+            }
+
+            // Nachricht formatieren
+            const dateObj = new Date(shift.shift_date + 'T12:00:00');
+            const dateFormatted = dateObj.toLocaleDateString('de-CH', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long'
+            });
+
+            const startTime = shift.start_time?.substring(0, 5) || '?';
+            const endTime = shift.end_time?.substring(0, 5) || '?';
+
+            const message = `⏰ *Schicht-Erinnerung: ${shift.event_title}*
+
+📋 ${shift.shift_name}
+📅 ${dateFormatted}
+🕐 ${startTime} - ${endTime} Uhr
+${shift.bereich ? `🏷️ ${shift.bereich}` : ''}
+${shift.event_location ? `📍 ${shift.event_location}` : ''}
+
+👥 *Angemeldete Helfer (${helpers.length}):*
+${helpers.map(h => `• ${h}`).join('\n')}
+
+👉 https://fwv-raura.ch/events.html?event=${shift.event_slug || shift.event_id}`;
+
+            // WhatsApp senden via Dispatch API
+            try {
+                await axios.post(`${DISPATCH_API}/whatsapp/notify/shift-reminder`, {
+                    shift: {
+                        id: shift.shift_id,
+                        name: shift.shift_name,
+                        date: shift.shift_date,
+                        start_time: shift.start_time,
+                        end_time: shift.end_time,
+                        bereich: shift.bereich
+                    },
+                    event: {
+                        id: shift.event_id,
+                        title: shift.event_title,
+                        slug: shift.event_slug,
+                        location: shift.event_location
+                    },
+                    members: helpersResult.rows.map(h => ({
+                        vorname: h.vorname || h.guest_name?.split(' ')[0] || '',
+                        nachname: h.nachname || h.guest_name?.split(' ').slice(1).join(' ') || ''
+                    })),
+                    member_id: aktuarMemberId,
+                    custom_message: message
+                }, {
+                    headers: { 'X-API-Key': process.env.API_KEY }
+                });
+
+                totalSent++;
+                results.push({ shift: shift.shift_name, status: 'sent', helpers: helpers.length });
+                logInfo('WhatsApp shift reminder sent', { shiftId: shift.shift_id, helpers: helpers.length });
+
+            } catch (err) {
+                results.push({ shift: shift.shift_name, status: 'failed', error: err.message });
+                logError('Failed to send WhatsApp shift reminder', { shiftId: shift.shift_id, error: err.message });
+            }
+        }
+
+        res.json({
+            success: true,
+            mode,
+            date: targetDate,
+            shifts_found: shiftsResult.rows.length,
+            sent: totalSent,
+            results
+        });
+
+    } catch (error) {
+        logError('Error sending WhatsApp reminders', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Manual endpoint to preview reminders that would be sent (Vorstand only)
 app.get('/reminders/preview', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
