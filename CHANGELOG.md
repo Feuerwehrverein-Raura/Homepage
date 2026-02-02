@@ -1,3 +1,10 @@
+## [1.123.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.3...v1.123.4) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** update logo with transparent background ([d07d954](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d07d9545ccddecbe4529dd2eea078839659f5caf))
+
 ## [1.123.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.2...v1.123.3) (2026-02-02)
 
 
