@@ -1,3 +1,10 @@
+# [1.119.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.118.1...v1.119.0) (2026-02-02)
+
+
+### Features
+
+* **kds-android:** add release APK signing support ([90d9475](https://github.com/Feuerwehrverein-Raura/Homepage/commit/90d947589e0370760753dc8717795561118410e6))
+
 ## [1.118.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.118.0...v1.118.1) (2026-02-02)
 
 
