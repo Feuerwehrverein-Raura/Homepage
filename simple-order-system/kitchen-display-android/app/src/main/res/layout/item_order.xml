@@ -4,11 +4,11 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="8dp"
+    android:layout_margin="16dp"
     app:cardBackgroundColor="@color/surface_dark"
-    app:cardCornerRadius="12dp"
+    app:cardCornerRadius="24dp"
     app:strokeColor="@color/primary"
-    app:strokeWidth="2dp">
+    app:strokeWidth="4dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -21,7 +21,7 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:padding="12dp"
+            android:padding="24dp"
             android:background="@color/surface_elevated">
 
             <TextView
@@ -30,7 +30,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:textColor="@color/text_primary"
-                android:textSize="20sp"
+                android:textSize="40sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -38,9 +38,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/text_secondary"
-                android:textSize="16sp"
+                android:textSize="32sp"
                 android:drawableStart="@drawable/ic_clock"
-                android:drawablePadding="4dp" />
+                android:drawablePadding="8dp" />
 
         </LinearLayout>
 
@@ -50,7 +50,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="12dp" />
+            android:padding="24dp" />
 
         <!-- Complete Button -->
         <com.google.android.material.button.MaterialButton
@@ -58,9 +58,10 @@
             style="@style/CompleteButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="12dp"
+            android:layout_margin="24dp"
+            android:paddingVertical="16dp"
             android:text="@string/mark_complete"
-            android:textSize="16sp" />
+            android:textSize="32sp" />
 
     </LinearLayout>
 

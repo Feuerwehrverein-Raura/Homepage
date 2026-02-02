@@ -135,9 +135,8 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         val displayMetrics = resources.displayMetrics
         val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
         val spanCount = when {
-            screenWidthDp >= 1200 -> 4
-            screenWidthDp >= 900 -> 3
-            screenWidthDp >= 600 -> 2
+            screenWidthDp >= 1200 -> 2
+            screenWidthDp >= 600 -> 1
             else -> 1
         }
 
