@@ -1,3 +1,10 @@
+## [1.135.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.3...v1.135.4) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kitchen-display:** add WebSocket handlers for order_updated and items_completed ([f912652](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f9126522a4470261b177e6b97cc714152a13f8c3))
+
 ## [1.135.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.2...v1.135.3) (2026-02-02)
 
 
