@@ -3379,9 +3379,10 @@ Feuerwehrverein Raura
     }
 });
 
-// WhatsApp-Schichterinnerungen via Matrix (Aktuar-Config)
+// WhatsApp-Schichterinnerungen via Matrix (Aktuar & Kassier)
 // mode=evening (18:00): Schichten morgen vor 12:00
 // mode=morning (09:00): Schichten heute nach 12:00
+// Sendet an alle Vorstandsmitglieder (Aktuar, Kassier) die eine Matrix-Config haben
 app.post('/reminders/send-whatsapp', requireApiKey, async (req, res) => {
     try {
         const { mode } = req.body; // 'evening' oder 'morning'
@@ -3408,20 +3409,25 @@ app.post('/reminders/send-whatsapp', requireApiKey, async (req, res) => {
 
         logInfo('Sending WhatsApp shift reminders', { mode, targetDate, timeFilter });
 
-        // Aktuar's Member-ID ermitteln (für Matrix-Config)
-        const aktuarResult = await pool.query(`
-            SELECT m.id FROM members m
-            WHERE m.email = 'aktuar@fwv-raura.ch'
+        // Aktuar und Kassier Member-IDs ermitteln (für Matrix-Config)
+        const vorstandResult = await pool.query(`
+            SELECT m.id, m.vorname, m.nachname, m.funktion FROM members m
+            WHERE m.email IN ('aktuar@fwv-raura.ch', 'kassier@fwv-raura.ch')
             OR m.funktion ILIKE '%aktuar%'
-            LIMIT 1
+            OR m.funktion ILIKE '%kassier%'
         `);
 
-        if (aktuarResult.rows.length === 0) {
-            logWarn('Aktuar not found, skipping WhatsApp reminders');
-            return res.json({ success: true, sent: 0, reason: 'aktuar_not_found' });
+        // Duplikate entfernen (falls jemand über Email UND Funktion gefunden wird)
+        const vorstandMembers = [...new Map(vorstandResult.rows.map(m => [m.id, m])).values()];
+
+        if (vorstandMembers.length === 0) {
+            logWarn('No Vorstand members found for WhatsApp reminders');
+            return res.json({ success: true, sent: 0, reason: 'no_vorstand_found' });
         }
 
-        const aktuarMemberId = aktuarResult.rows[0].id;
+        logInfo('Found Vorstand members for WhatsApp', {
+            members: vorstandMembers.map(m => ({ id: m.id, name: `${m.vorname} ${m.nachname}`, funktion: m.funktion }))
+        });
 
         // Schichten für den Zielzeitraum abrufen
         const shiftsResult = await pool.query(`
@@ -3502,41 +3508,70 @@ ${helpers.map(h => `• ${h}`).join('\n')}
 
 👉 https://fwv-raura.ch/events.html?event=${shift.event_slug || shift.event_id}`;
 
-            // WhatsApp senden via Dispatch API
-            try {
-                await axios.post(`${DISPATCH_API}/whatsapp/notify/shift-reminder`, {
-                    shift: {
-                        id: shift.shift_id,
-                        name: shift.shift_name,
-                        date: shift.shift_date,
-                        start_time: shift.start_time,
-                        end_time: shift.end_time,
-                        bereich: shift.bereich
-                    },
-                    event: {
-                        id: shift.event_id,
-                        title: shift.event_title,
-                        slug: shift.event_slug,
-                        location: shift.event_location
-                    },
-                    members: helpersResult.rows.map(h => ({
-                        vorname: h.vorname || h.guest_name?.split(' ')[0] || '',
-                        nachname: h.nachname || h.guest_name?.split(' ').slice(1).join(' ') || ''
-                    })),
-                    member_id: aktuarMemberId,
-                    custom_message: message
-                }, {
-                    headers: { 'X-API-Key': process.env.API_KEY }
-                });
+            // WhatsApp an alle Vorstandsmitglieder senden (jeder mit eigener Config)
+            const shiftResults = [];
+            for (const member of vorstandMembers) {
+                try {
+                    const response = await axios.post(`${DISPATCH_API}/whatsapp/notify/shift-reminder`, {
+                        shift: {
+                            id: shift.shift_id,
+                            name: shift.shift_name,
+                            date: shift.shift_date,
+                            start_time: shift.start_time,
+                            end_time: shift.end_time,
+                            bereich: shift.bereich
+                        },
+                        event: {
+                            id: shift.event_id,
+                            title: shift.event_title,
+                            slug: shift.event_slug,
+                            location: shift.event_location
+                        },
+                        members: helpersResult.rows.map(h => ({
+                            vorname: h.vorname || h.guest_name?.split(' ')[0] || '',
+                            nachname: h.nachname || h.guest_name?.split(' ').slice(1).join(' ') || ''
+                        })),
+                        member_id: member.id,
+                        custom_message: message
+                    }, {
+                        headers: { 'X-API-Key': process.env.API_KEY }
+                    });
 
-                totalSent++;
-                results.push({ shift: shift.shift_name, status: 'sent', helpers: helpers.length });
-                logInfo('WhatsApp shift reminder sent', { shiftId: shift.shift_id, helpers: helpers.length });
+                    if (response.data.sent) {
+                        totalSent++;
+                        shiftResults.push({ member: `${member.vorname} ${member.nachname}`, status: 'sent' });
+                        logInfo('WhatsApp shift reminder sent', {
+                            shiftId: shift.shift_id,
+                            memberId: member.id,
+                            memberName: `${member.vorname} ${member.nachname}`
+                        });
+                    } else {
+                        shiftResults.push({
+                            member: `${member.vorname} ${member.nachname}`,
+                            status: 'skipped',
+                            reason: response.data.reason
+                        });
+                    }
 
-            } catch (err) {
-                results.push({ shift: shift.shift_name, status: 'failed', error: err.message });
-                logError('Failed to send WhatsApp shift reminder', { shiftId: shift.shift_id, error: err.message });
+                } catch (err) {
+                    shiftResults.push({
+                        member: `${member.vorname} ${member.nachname}`,
+                        status: 'failed',
+                        error: err.message
+                    });
+                    logError('Failed to send WhatsApp shift reminder', {
+                        shiftId: shift.shift_id,
+                        memberId: member.id,
+                        error: err.message
+                    });
+                }
             }
+
+            results.push({
+                shift: shift.shift_name,
+                helpers: helpers.length,
+                notifications: shiftResults
+            });
         }
 
         res.json({
@@ -3544,7 +3579,8 @@ ${helpers.map(h => `• ${h}`).join('\n')}
             mode,
             date: targetDate,
             shifts_found: shiftsResult.rows.length,
-            sent: totalSent,
+            messages_sent: totalSent,
+            vorstand_members: vorstandMembers.length,
             results
         });
 
