@@ -16,9 +16,8 @@ import com.google.android.material.card.MaterialCardView
 
 class OrderAdapter(
     private val currentStation: () -> String,
-    private val onCompleteClick: (Order) -> Unit,
-    private val onItemClick: (Order, OrderItem) -> Unit,
-    private val onCompleteAllItems: (Order, List<OrderItem>) -> Unit
+    private val onCompleteOrder: (Order) -> Unit,
+    private val onItemClick: (Order, OrderItem) -> Unit
 ) : RecyclerView.Adapter<OrderAdapter.OrderViewHolder>() {
 
     private var orders = listOf<Order>()
@@ -82,16 +81,10 @@ class OrderAdapter(
 
             // Get filtered items
             val items = order.getItemsForStation(station)
-            val completedCount = items.count { it.completed }
-            val allCompleted = completedCount == items.size
-            val uncompletedItems = items.filter { !it.completed }
+            val uncompletedCount = items.count { !it.completed }
 
-            // Card border color based on urgency or completion
-            card.strokeColor = when {
-                allCompleted -> colorCompleted
-                order.isUrgent() -> colorUrgent
-                else -> colorPrimary
-            }
+            // Card border color based on urgency
+            card.strokeColor = if (order.isUrgent()) colorUrgent else colorPrimary
 
             // Items
             itemsContainer.removeAllViews()
@@ -99,19 +92,15 @@ class OrderAdapter(
                 addItemView(order, item)
             }
 
-            // Complete button - changes based on state
-            if (allCompleted) {
-                btnComplete.text = "Bestellung abschliessen"
-                btnComplete.setBackgroundColor(colorBar)
-                btnComplete.setOnClickListener {
-                    onCompleteClick(order)
-                }
+            // Complete button - marks all items as done and closes order
+            btnComplete.text = if (uncompletedCount > 0) {
+                "Erledigt (${uncompletedCount})"
             } else {
-                btnComplete.text = "Alle erledigt (${uncompletedItems.size})"
-                btnComplete.setBackgroundColor(colorCompleted)
-                btnComplete.setOnClickListener {
-                    onCompleteAllItems(order, uncompletedItems)
-                }
+                "Erledigt"
+            }
+            btnComplete.setBackgroundColor(colorCompleted)
+            btnComplete.setOnClickListener {
+                onCompleteOrder(order)
             }
         }
 
@@ -144,7 +133,7 @@ class OrderAdapter(
                 itemName.setTextColor(colorTextPrimary)
                 itemName.paintFlags = itemName.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
 
-                // Click to complete
+                // Click to complete individual item
                 itemContainer.setOnClickListener {
                     onItemClick(order, item)
                 }

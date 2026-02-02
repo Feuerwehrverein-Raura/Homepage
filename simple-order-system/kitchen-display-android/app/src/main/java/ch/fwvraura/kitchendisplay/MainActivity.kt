@@ -147,9 +147,8 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private fun setupRecyclerView() {
         adapter = OrderAdapter(
             currentStation = { currentStation },
-            onCompleteClick = { order -> completeOrder(order) },
-            onItemClick = { order, item -> completeItem(order, item) },
-            onCompleteAllItems = { order, items -> completeAllItems(order, items) }
+            onCompleteOrder = { order -> completeOrder(order) },
+            onItemClick = { order, item -> completeItem(order, item) }
         )
 
         // Calculate span count based on screen width
@@ -280,16 +279,6 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
             apiService?.completeItems(order.id, listOf(item.id))?.onSuccess {
                 // Update local state
                 item.completed = true
-                updateOrdersList()
-            }
-        }
-    }
-
-    private fun completeAllItems(order: Order, items: List<OrderItem>) {
-        mainScope.launch {
-            apiService?.completeItems(order.id, items.map { it.id })?.onSuccess {
-                // Update local state
-                items.forEach { it.completed = true }
                 updateOrdersList()
             }
         }
