@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kitchen Display - Download</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #111827;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #3B82F6;
+        }
+        .subtitle {
+            color: #9CA3AF;
+            margin-bottom: 30px;
+        }
+        .download-btn {
+            display: block;
+            background: #3B82F6;
+            color: #fff;
+            text-decoration: none;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .download-btn:active {
+            background: #2563EB;
+        }
+        .download-btn .version {
+            font-size: 14px;
+            font-weight: normal;
+            opacity: 0.8;
+        }
+        .info {
+            background: #1F2937;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #9CA3AF;
+        }
+        .info h3 {
+            color: #fff;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .info ol {
+            margin-left: 20px;
+        }
+        .info li {
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kitchen Display</h1>
+        <p class="subtitle">FWV Raura - Android App</p>
+
+        <a href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/kds-v0.5/kitchen-display-0.5-debug.apk"
+           class="download-btn">
+            APK herunterladen
+            <div class="version">Version 0.5</div>
+        </a>
+
+        <div class="info">
+            <h3>Installation</h3>
+            <ol>
+                <li>APK herunterladen</li>
+                <li>In Einstellungen "Unbekannte Quellen" erlauben</li>
+                <li>APK öffnen und installieren</li>
+                <li>App starten</li>
+            </ol>
+        </div>
+
+        <div class="info">
+            <h3>Einstellungen</h3>
+            <p>Nach dem Start auf das Zahnrad-Symbol tippen und die Server-URL eingeben:</p>
+            <p style="color: #3B82F6; margin-top: 10px;">https://order.fwv-raura.ch</p>
+        </div>
+    </div>
+</body>
+</html>
