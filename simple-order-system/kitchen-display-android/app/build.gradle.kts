@@ -1,3 +1,4 @@
+// Kitchen Display Android App - FWV Raura
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
