@@ -1,3 +1,10 @@
+# [1.116.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.5...v1.116.0) (2026-02-02)
+
+
+### Features
+
+* add simple KDS download page for mobile devices ([d3cd80e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d3cd80edf638b62d69126ca516fea5443e39884e))
+
 ## [1.115.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.4...v1.115.5) (2026-02-02)
 
 
