@@ -156,6 +156,10 @@ function App() {
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
   const [splitPaymentMethod, setSplitPaymentMethod] = useState<'cash' | 'card'>('cash');
 
+  // TWINT payment states
+  const [twintQrUrl, setTwintQrUrl] = useState<string | null>(null);
+  const [twintPayment, setTwintPayment] = useState<{ orderId: number; total: number } | null>(null);
+
   // PWA Install prompt
   useEffect(() => {
     if (window.matchMedia('(display-mode: standalone)').matches) {
@@ -202,10 +206,23 @@ function App() {
     }
   }, []);
 
-  // Fetch items on mount (no auth required for viewing)
+  // Fetch items and TWINT QR on mount (no auth required for viewing)
   useEffect(() => {
     fetchItems();
+    fetchTwintQr();
   }, []);
+
+  const fetchTwintQr = async () => {
+    try {
+      const res = await fetch(`${API_URL}/twint-qr`);
+      if (res.ok) {
+        const data = await res.json();
+        setTwintQrUrl(data.url);
+      }
+    } catch (error) {
+      console.error('Failed to fetch TWINT QR:', error);
+    }
+  };
 
   const handleOAuthCallback = async (code: string) => {
     setAuthLoading(true);
@@ -1386,6 +1403,21 @@ function App() {
               >
                 💵 Barzahlung
               </button>
+
+              {/* TWINT option - only show if QR code is configured */}
+              {twintQrUrl && (
+                <button
+                  onClick={() => {
+                    setTwintPayment({ orderId: pendingOrder.id, total: pendingOrder.total });
+                    setPendingOrder(null);
+                  }}
+                  disabled={loading}
+                  className="w-full bg-black hover:bg-gray-800 active:bg-gray-900 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 touch-manipulation disabled:bg-gray-400"
+                >
+                  <img src="https://www.twint.ch/content/uploads/2021/05/twint-logo-quer-weiss.png" alt="TWINT" className="h-6" />
+                  TWINT
+                </button>
+              )}
             </div>
 
             <button
@@ -1394,6 +1426,63 @@ function App() {
             >
               Abbrechen
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* TWINT Payment Modal */}
+      {twintPayment && twintQrUrl && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <h2 className="text-2xl font-bold text-center mb-2">TWINT Zahlung</h2>
+            <p className="text-sm text-gray-600 text-center mb-2">Bestellung #{twintPayment.orderId}</p>
+            <p className="text-3xl font-bold text-center text-green-600 mb-4">
+              CHF {twintPayment.total.toFixed(2)}
+            </p>
+
+            <div className="bg-gray-50 rounded-xl p-4 mb-4">
+              <p className="text-center text-sm text-gray-600 mb-3">
+                Scannen Sie den QR-Code mit der TWINT App:
+              </p>
+              <img
+                src={twintQrUrl}
+                alt="TWINT QR Code"
+                className="w-48 h-48 mx-auto border-2 border-gray-200 rounded-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={async () => {
+                  // Mark as paid with TWINT
+                  try {
+                    await fetch(`${API_URL}/orders/${twintPayment.orderId}/status`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ status: 'paid', payment_method: 'twint' }),
+                    });
+                    setOrderConfirmation({
+                      orderId: twintPayment.orderId,
+                      orderType: 'bar',
+                      total: twintPayment.total,
+                      message: 'TWINT Zahlung erhalten'
+                    });
+                    setTwintPayment(null);
+                  } catch (error) {
+                    alert('Fehler beim Abschliessen der Zahlung');
+                  }
+                }}
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-lg"
+              >
+                ✓ Zahlung erhalten
+              </button>
+              <button
+                onClick={() => setTwintPayment(null)}
+                className="w-full text-gray-500 hover:text-gray-700 py-2 text-sm"
+              >
+                Abbrechen
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2166,6 +2255,7 @@ function SettingsView({ token }: { token: string | null }) {
     printer_bar_port: '9100',
     printer_kitchen_ip: '',
     printer_kitchen_port: '9100',
+    twint_qr_url: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2346,6 +2436,48 @@ function SettingsView({ token }: { token: string | null }) {
 
           <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
             <p><strong>Hinweis:</strong> Die Epson TM-T20III Drucker müssen im selben Netzwerk sein und auf Port 9100 (Standard) erreichbar sein.</p>
+          </div>
+        </div>
+
+        {/* TWINT/RaiseNow QR Code Settings */}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            💳 TWINT Zahlung (RaiseNow)
+          </h3>
+
+          <div className="border rounded-lg p-4">
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">QR-Code Bild-URL</label>
+                <input
+                  type="text"
+                  placeholder="https://example.com/twint-qr.png"
+                  value={settings.twint_qr_url || ''}
+                  onChange={(e) => setSettings({ ...settings, twint_qr_url: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  URL zum TWINT QR-Code Bild von RaiseNow. Wird beim Bezahlen als Zahlungsoption angezeigt.
+                </p>
+              </div>
+              {settings.twint_qr_url && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-2">Vorschau:</p>
+                  <img
+                    src={settings.twint_qr_url}
+                    alt="TWINT QR Code"
+                    className="max-w-[200px] mx-auto border rounded"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <p><strong>Tipp:</strong> Den QR-Code kannst du im RaiseNow Dashboard generieren und als Bild herunterladen/verlinken.</p>
           </div>
         </div>
 

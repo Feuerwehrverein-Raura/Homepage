@@ -471,6 +471,16 @@ app.get('/api/items', checkIpWhitelist, async (req, res) => {
   }
 });
 
+// Public endpoint to get TWINT QR code URL (for payment modal)
+app.get('/api/twint-qr', checkIpWhitelist, async (req, res) => {
+  try {
+    const qrUrl = await getSetting('twint_qr_url');
+    res.json({ url: qrUrl || null });
+  } catch (error) {
+    res.json({ url: null });
+  }
+});
+
 // Admin routes for items - require authentication (creates in inventory system)
 app.post('/api/items', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
