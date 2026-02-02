@@ -1,3 +1,10 @@
+# [1.127.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.126.0...v1.127.0) (2026-02-02)
+
+
+### Features
+
+* **order-system:** add 'Pay Later' option and Tables tab ([cad1c2d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cad1c2d844b73f92d5fe374bff1c3e16dc288b1c))
+
 # [1.126.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.4...v1.126.0) (2026-02-02)
 
 
