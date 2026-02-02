@@ -1,3 +1,10 @@
+## [1.123.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.1...v1.123.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* **ci:** simplify KDS workflow triggers for tag releases ([d10a0af](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d10a0af682c43eab45474bb216dcf7c9e56be04f))
+
 ## [1.123.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.0...v1.123.1) (2026-02-02)
 
 
