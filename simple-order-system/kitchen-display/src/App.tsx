@@ -392,8 +392,8 @@ function App() {
   };
 
   const filterOrders = (order: Order) => {
-    if (station === 'all') return true;
-    return order.items.some(item => item.printer_station === station);
+    if (station === 'all') return order.items.some(item => !item.completed);
+    return order.items.some(item => item.printer_station === station && !item.completed);
   };
 
   const filteredOrders = orders.filter(filterOrders);

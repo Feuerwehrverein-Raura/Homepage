@@ -38,8 +38,8 @@ data class Order(
     fun isUrgent(): Boolean = getMinutesElapsed() > 10
 
     fun hasItemsForStation(station: String): Boolean {
-        if (station == "all") return true
-        return items.any { it.printerStation.equals(station, ignoreCase = true) }
+        if (station == "all") return items.any { !it.completed }
+        return items.any { it.printerStation.equals(station, ignoreCase = true) && !it.completed }
     }
 
     fun getItemsForStation(station: String): List<OrderItem> {
