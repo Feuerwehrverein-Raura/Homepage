@@ -1,3 +1,10 @@
+## [1.115.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.4...v1.115.5) (2026-02-02)
+
+
+### Bug Fixes
+
+* **ci:** add write permissions for GitHub Release creation ([5006107](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5006107dea63e751bc8ac111d2591c5fbbc5526e))
+
 ## [1.115.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.3...v1.115.4) (2026-02-02)
 
 
