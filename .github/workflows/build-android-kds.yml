@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'simple-order-system/kitchen-display-android/**'
+      - '.github/workflows/build-android-kds.yml'
     branches:
       - main
     tags:
@@ -38,41 +39,64 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept SDK Licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install required SDK components
+        run: |
+          sdkmanager "build-tools;34.0.0" "platforms;android-34"
+
       - name: Build Debug APK
         working-directory: simple-order-system/kitchen-display-android
-        run: gradle assembleDebug
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.4'
+          arguments: assembleDebug --stacktrace
 
       - name: Build Release APK
         working-directory: simple-order-system/kitchen-display-android
-        run: gradle assembleRelease
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.4'
+          arguments: assembleRelease --stacktrace
+        continue-on-error: true
+
+      - name: List APK outputs
+        run: |
+          echo "=== APK Files Found ==="
+          find simple-order-system/kitchen-display-android -name "*.apk" -type f || echo "No APK files found"
 
       - name: Rename APKs
         run: |
           VERSION="${{ inputs.version || '1.0.0' }}"
-          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/app-debug.apk \
-             simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/kitchen-display-${VERSION}-debug.apk
-          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/release/app-release-unsigned.apk \
-             simple-order-system/kitchen-display-android/app/build/outputs/apk/release/kitchen-display-${VERSION}-release.apk
+          DEBUG_APK=$(find simple-order-system/kitchen-display-android -name "*debug*.apk" -type f | head -1)
+          RELEASE_APK=$(find simple-order-system/kitchen-display-android -name "*release*.apk" -type f | head -1)
+          if [ -n "$DEBUG_APK" ]; then
+            cp "$DEBUG_APK" "kitchen-display-${VERSION}-debug.apk"
+          fi
+          if [ -n "$RELEASE_APK" ]; then
+            cp "$RELEASE_APK" "kitchen-display-${VERSION}-release.apk"
+          fi
+          ls -la *.apk || echo "No APK files in root"
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: kitchen-display-debug
-          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
+          path: kitchen-display-*-debug.apk
           retention-days: 30
+          if-no-files-found: warn
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: kitchen-display-release
-          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+          path: kitchen-display-*-release.apk
           retention-days: 30
+          if-no-files-found: ignore
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/kds-v') || inputs.create_release == true
@@ -99,7 +123,7 @@ jobs:
             - Audio-Benachrichtigungen
             - Automatischer Reconnect
           files: |
-            simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
-            simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+            kitchen-display-*-debug.apk
+            kitchen-display-*-release.apk
           draft: false
           prerelease: false
