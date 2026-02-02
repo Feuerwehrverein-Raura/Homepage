@@ -1,3 +1,10 @@
+# [1.120.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.119.1...v1.120.0) (2026-02-02)
+
+
+### Features
+
+* **kds:** add custom kitchen logo ([6897917](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6897917010021854ec1c5cbade94148d25d04052))
+
 ## [1.119.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.119.0...v1.119.1) (2026-02-02)
 
 
