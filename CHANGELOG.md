@@ -1,3 +1,10 @@
+## [1.123.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.0...v1.123.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** include paid status in order filter ([6af5eae](https://github.com/Feuerwehrverein-Raura/Homepage/commit/6af5eaec7495f80131def225b8dfa072c3aa8b46))
+
 # [1.123.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.122.1...v1.123.0) (2026-02-02)
 
 
