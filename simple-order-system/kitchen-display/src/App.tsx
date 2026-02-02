@@ -67,6 +67,7 @@ interface Order {
   id: number;
   table_number: number;
   created_at: string;
+  status?: string;
   items: OrderItem[];
 }
 
@@ -172,6 +173,7 @@ function App() {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [cleaningMode, setCleaningMode] = useState(false);
   const [cleaningTimer, setCleaningTimer] = useState(30);
+  const [wsConnected, setWsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const playNotificationRef = useRef<(order: Order) => void>(() => {});
 
@@ -282,17 +284,39 @@ function App() {
 
     ws.onopen = () => {
       console.log('WebSocket connected');
+      setWsConnected(true);
     };
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('WebSocket message:', data.type, data);
 
       if (data.type === 'new_order') {
-        setOrders(prev => [data.order, ...prev]);
+        setOrders(prev => {
+          // Avoid duplicates
+          if (prev.some(o => o.id === data.order.id)) {
+            return prev;
+          }
+          return [data.order, ...prev];
+        });
         // Play sound and show notification - use ref to get latest callback
         playNotificationRef.current(data.order);
       } else if (data.type === 'order_completed') {
         setOrders(prev => prev.filter(o => o.id !== data.order_id));
+      } else if (data.type === 'order_updated') {
+        // Refetch orders to get updated data
+        fetchOrders();
+      } else if (data.type === 'items_completed') {
+        // Update items as completed locally
+        setOrders(prev => prev.map(order => {
+          if (order.id !== data.order_id) return order;
+          return {
+            ...order,
+            items: order.items.map(item =>
+              data.item_ids.includes(item.id) ? { ...item, completed: true } : item
+            )
+          };
+        }));
       }
     };
 
@@ -302,6 +326,7 @@ function App() {
 
     ws.onclose = () => {
       console.log('WebSocket disconnected, reconnecting...');
+      setWsConnected(false);
       setTimeout(connectWebSocket, 3000);
     };
 
@@ -478,8 +503,14 @@ function App() {
                 )}
               </div>
             )}
-            <div className="text-xl font-bold">
-              {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}
+            <div className="flex items-center gap-4">
+              <span className={`text-sm flex items-center gap-1 ${wsConnected ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-red-400 animate-pulse'}`}></span>
+                {wsConnected ? 'Live' : 'Verbinde...'}
+              </span>
+              <span className="text-xl font-bold">
+                {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}
+              </span>
             </div>
           </div>
         </div>
