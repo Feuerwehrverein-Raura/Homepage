@@ -1,3 +1,10 @@
+# [1.129.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.128.0...v1.129.0) (2026-02-02)
+
+
+### Features
+
+* **order-system:** add item cancellation and visual status in table view ([1ef9fd0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/1ef9fd0dab22f711e3399677014683d3bd9c35a5))
+
 # [1.128.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.127.0...v1.128.0) (2026-02-02)
 
 
