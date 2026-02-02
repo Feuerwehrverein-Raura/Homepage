@@ -1,3 +1,11 @@
+# [1.117.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.116.0...v1.117.0) (2026-02-02)
+
+
+### Features
+
+* **kitchen-display:** add auto-update check and bump to v0.6 ([5cf9996](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5cf9996d04967d780691fcd2657340334981e430))
+* **kitchen-display:** double the size of order cards ([4436584](https://github.com/Feuerwehrverein-Raura/Homepage/commit/44365842cf015da934af08ffe20b84e2a2714775))
+
 # [1.116.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.115.5...v1.116.0) (2026-02-02)
 
 
