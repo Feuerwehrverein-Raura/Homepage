@@ -1,3 +1,10 @@
+## [1.125.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.2...v1.125.3) (2026-02-02)
+
+
+### Bug Fixes
+
+* **members-api:** add Social Media to FUNCTION_EMAIL_MAP ([bf56501](https://github.com/Feuerwehrverein-Raura/Homepage/commit/bf56501c10d0f23fe71ed21152e8a4fdd397cdb2))
+
 ## [1.125.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.1...v1.125.2) (2026-02-02)
 
 
