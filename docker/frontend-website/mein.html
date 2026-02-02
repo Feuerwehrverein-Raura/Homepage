@@ -895,9 +895,72 @@
 
             } catch (error) {
                 console.error('Error loading accesses:', error);
+                accessesLoaded = true;
+
+                // Show fallback content based on member's function
+                renderFunctionEmailsFromProfile();
+                renderNextcloudFolders([]);
+                renderOrganizerEvents([]);
+                renderDefaultSystemAccesses();
             } finally {
                 document.getElementById('accesses-loading').classList.add('hidden');
             }
+        }
+
+        // Render function emails from profile data (fallback)
+        function renderFunctionEmailsFromProfile() {
+            if (!memberData || !memberData.funktion) {
+                document.getElementById('no-function-emails').classList.remove('hidden');
+                return;
+            }
+
+            const funktionen = memberData.funktion.split(',').map(f => f.trim()).filter(f => f);
+            const emails = [];
+
+            for (const func of funktionen) {
+                const email = FUNCTION_EMAIL_MAP[func];
+                if (email) {
+                    emails.push({
+                        function: func,
+                        email: email,
+                        server: 'mail.fwv-raura.ch',
+                        imapPort: 993,
+                        smtpPort: 587,
+                        webmail: 'https://mail.fwv-raura.ch'
+                    });
+                }
+            }
+
+            renderFunctionEmails(emails);
+        }
+
+        // Render default system accesses (fallback)
+        function renderDefaultSystemAccesses() {
+            const funktion = memberData?.funktion || '';
+            const funktionen = funktion.split(',').map(f => f.trim()).filter(f => f);
+
+            const isVorstand = funktionen.some(f =>
+                ['Präsident', 'Praesident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer', 'Beisitzerin'].includes(f)
+            );
+            const isKassier = funktionen.includes('Kassier');
+            const isAdmin = funktionen.includes('Admin');
+
+            const accesses = [
+                { system: 'Website', url: 'https://fwv-raura.ch', access: 'Mitglied' },
+                { system: 'Nextcloud', url: 'https://nextcloud.fwv-raura.ch', access: 'Mitglied' }
+            ];
+
+            if (isVorstand) {
+                accesses.push({ system: 'Vorstand-Portal', url: 'https://fwv-raura.ch/vorstand.html', access: 'Vorstand' });
+            }
+            if (isKassier) {
+                accesses.push({ system: 'Kassensystem', url: 'https://kasse.fwv-raura.ch', access: 'Kassier' });
+            }
+            if (isAdmin) {
+                accesses.push({ system: 'Admin-Panel', url: 'https://fwv-raura.ch/admin.html', access: 'Admin' });
+            }
+
+            renderSystemAccesses(accesses);
         }
 
         function renderFunctionEmails(emails) {

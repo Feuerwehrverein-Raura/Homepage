@@ -3801,55 +3801,70 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
 
         // 1. Get function emails with passwords
         const functionEmails = [];
-        for (const func of funktionen) {
-            const email = FUNCTION_EMAIL_MAP[func];
-            if (email) {
-                // Get stored password
-                const pwResult = await pool.query(
-                    'SELECT encrypted_password, updated_at FROM shared_mailbox_passwords WHERE email = $1',
-                    [email]
-                );
+        try {
+            for (const func of funktionen) {
+                const email = FUNCTION_EMAIL_MAP[func];
+                if (email) {
+                    // Get stored password
+                    let password = null;
+                    let passwordUpdatedAt = null;
+                    try {
+                        const pwResult = await pool.query(
+                            'SELECT encrypted_password, updated_at FROM shared_mailbox_passwords WHERE email = $1',
+                            [email]
+                        );
+                        if (pwResult.rows.length > 0 && pwResult.rows[0].encrypted_password) {
+                            password = decryptPassword(pwResult.rows[0].encrypted_password);
+                            passwordUpdatedAt = pwResult.rows[0].updated_at;
+                        }
+                    } catch (pwErr) {
+                        console.error(`Error getting password for ${email}:`, pwErr.message);
+                    }
 
-                let password = null;
-                let passwordUpdatedAt = null;
-                if (pwResult.rows.length > 0) {
-                    password = decryptPassword(pwResult.rows[0].encrypted_password);
-                    passwordUpdatedAt = pwResult.rows[0].updated_at;
+                    functionEmails.push({
+                        function: func,
+                        email: email,
+                        password: password,
+                        passwordUpdatedAt: passwordUpdatedAt,
+                        server: 'mail.fwv-raura.ch',
+                        imapPort: 993,
+                        smtpPort: 587,
+                        webmail: 'https://mail.fwv-raura.ch'
+                    });
                 }
-
-                functionEmails.push({
-                    function: func,
-                    email: email,
-                    password: password,
-                    passwordUpdatedAt: passwordUpdatedAt,
-                    server: 'mail.fwv-raura.ch',
-                    imapPort: 993,
-                    smtpPort: 587,
-                    webmail: 'https://mail.fwv-raura.ch'
-                });
             }
+        } catch (emailErr) {
+            console.error('Error loading function emails:', emailErr.message);
         }
 
         // 2. Get Nextcloud group folders
         let nextcloudFolders = [];
-        if (member.authentik_user_id) {
-            // Determine user's Nextcloud groups based on Authentik groups
-            const userAuthentikGroups = [];
+        try {
+            if (member.authentik_user_id) {
+                // Determine user's Nextcloud groups based on Authentik groups
+                const userAuthentikGroups = [];
 
-            // Check each managed group
-            for (const [authentikGroup, nextcloudGroup] of Object.entries(AUTHENTIK_TO_NEXTCLOUD_GROUP)) {
-                const isInGroup = await isUserInAuthentikGroup(member.authentik_user_id, authentikGroup);
-                if (isInGroup) {
-                    userAuthentikGroups.push(nextcloudGroup);
+                // Check each managed group
+                for (const [authentikGroup, nextcloudGroup] of Object.entries(AUTHENTIK_TO_NEXTCLOUD_GROUP)) {
+                    try {
+                        const isInGroup = await isUserInAuthentikGroup(member.authentik_user_id, authentikGroup);
+                        if (isInGroup) {
+                            userAuthentikGroups.push(nextcloudGroup);
+                        }
+                    } catch (groupErr) {
+                        console.error(`Error checking group ${authentikGroup}:`, groupErr.message);
+                    }
                 }
-            }
 
-            // Always add 'mitglieder' as all authenticated members should have it
-            if (!userAuthentikGroups.includes('mitglieder')) {
-                userAuthentikGroups.push('mitglieder');
-            }
+                // Always add 'mitglieder' as all authenticated members should have it
+                if (!userAuthentikGroups.includes('mitglieder')) {
+                    userAuthentikGroups.push('mitglieder');
+                }
 
-            nextcloudFolders = await getNextcloudGroupFolders(userAuthentikGroups);
+                nextcloudFolders = await getNextcloudGroupFolders(userAuthentikGroups);
+            }
+        } catch (ncErr) {
+            console.error('Error loading Nextcloud folders:', ncErr.message);
         }
 
         // 3. Determine system accesses
@@ -3914,29 +3929,52 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
         }
 
         // 4. Get events where user is organizer
-        const EVENTS_API = process.env.EVENTS_API_URL || 'http://api-events:3000';
         let organizerEvents = [];
         try {
-            const eventsResult = await pool.query(`
-                SELECT id, title, start_date, end_date, organizer_name, organizer_email,
-                       event_email, event_access_expires
-                FROM events
-                WHERE organizer_email = $1
-                  AND (end_date >= CURRENT_DATE OR end_date IS NULL)
-                ORDER BY start_date ASC
-            `, [req.user.email]);
+            // First check if events table exists and has the needed columns
+            const tableCheck = await pool.query(`
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'events'
+                AND column_name IN ('id', 'title', 'start_date', 'end_date', 'organizer_email')
+            `);
 
-            organizerEvents = eventsResult.rows.map(event => ({
-                id: event.id,
-                title: event.title,
-                startDate: event.start_date,
-                endDate: event.end_date,
-                organizerName: event.organizer_name,
-                hasEventAccess: !!event.event_email,
-                eventEmail: event.event_email,
-                accessExpires: event.event_access_expires,
-                dashboardUrl: `https://fwv-raura.ch/event-dashboard.html?id=${event.id}`
-            }));
+            if (tableCheck.rows.length >= 4) {
+                // Check if optional columns exist
+                const optionalCols = await pool.query(`
+                    SELECT column_name FROM information_schema.columns
+                    WHERE table_name = 'events'
+                    AND column_name IN ('event_email', 'event_access_expires', 'organizer_name')
+                `);
+                const hasEventEmail = optionalCols.rows.some(r => r.column_name === 'event_email');
+                const hasAccessExpires = optionalCols.rows.some(r => r.column_name === 'event_access_expires');
+                const hasOrganizerName = optionalCols.rows.some(r => r.column_name === 'organizer_name');
+
+                // Build dynamic query based on available columns
+                const selectCols = ['id', 'title', 'start_date', 'end_date', 'organizer_email'];
+                if (hasOrganizerName) selectCols.push('organizer_name');
+                if (hasEventEmail) selectCols.push('event_email');
+                if (hasAccessExpires) selectCols.push('event_access_expires');
+
+                const eventsResult = await pool.query(`
+                    SELECT ${selectCols.join(', ')}
+                    FROM events
+                    WHERE organizer_email = $1
+                      AND (end_date >= CURRENT_DATE OR end_date IS NULL)
+                    ORDER BY start_date ASC
+                `, [req.user.email]);
+
+                organizerEvents = eventsResult.rows.map(event => ({
+                    id: event.id,
+                    title: event.title,
+                    startDate: event.start_date,
+                    endDate: event.end_date,
+                    organizerName: event.organizer_name || null,
+                    hasEventAccess: hasEventEmail ? !!event.event_email : false,
+                    eventEmail: hasEventEmail ? event.event_email : null,
+                    accessExpires: hasAccessExpires ? event.event_access_expires : null,
+                    dashboardUrl: `https://fwv-raura.ch/event-dashboard.html?id=${event.id}`
+                }));
+            }
         } catch (err) {
             console.error('Error fetching organizer events:', err.message);
         }
