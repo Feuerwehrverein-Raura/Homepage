@@ -1,3 +1,10 @@
+## [1.122.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.122.0...v1.122.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** fix update checker to find KDS releases ([147ee57](https://github.com/Feuerwehrverein-Raura/Homepage/commit/147ee57959a52668879f6c7e8608f1a7b20566a7))
+
 # [1.122.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.121.3...v1.122.0) (2026-02-02)
 
 
