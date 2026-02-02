@@ -3743,7 +3743,7 @@ async function getNextcloudGroupFolders(userGroups) {
 
     try {
         const response = await fetch(
-            `${NEXTCLOUD_URL}/ocs/v2.php/apps/groupfolders/folders`,
+            `${NEXTCLOUD_URL}/index.php/apps/groupfolders/folders`,
             {
                 headers: {
                     'Authorization': `Basic ${Buffer.from(`${NEXTCLOUD_USER}:${NEXTCLOUD_PASSWORD}`).toString('base64')}`,
@@ -3762,19 +3762,35 @@ async function getNextcloudGroupFolders(userGroups) {
         const folders = data.ocs?.data || {};
 
         // Convert object to array and filter by user groups
+        // The API returns groups as hash IDs, but we have group names like "vorstand"
+        // So we need to use group_details to get the display names
         return Object.values(folders)
             .filter(folder => {
-                const folderGroups = Object.keys(folder.groups || {});
-                return folderGroups.some(g => userGroups.includes(g));
+                const groupDetails = folder.group_details || {};
+                // Get display names of all groups that have access to this folder
+                const folderGroupNames = Object.values(groupDetails)
+                    .map(g => g.displayName?.toLowerCase())
+                    .filter(Boolean);
+                // Check if any of the user's groups match
+                return userGroups.some(ug =>
+                    folderGroupNames.includes(ug.toLowerCase()) ||
+                    folderGroupNames.some(fg => fg.includes(ug.toLowerCase()))
+                );
             })
-            .map(folder => ({
-                id: folder.id,
-                name: folder.mount_point,
-                quota: folder.quota,
-                size: folder.size,
-                groups: Object.keys(folder.groups || {}),
-                acl: folder.acl
-            }));
+            .map(folder => {
+                const groupDetails = folder.group_details || {};
+                const groupNames = Object.values(groupDetails)
+                    .map(g => g.displayName)
+                    .filter(Boolean);
+                return {
+                    id: folder.id,
+                    name: folder.mount_point,
+                    quota: folder.quota,
+                    size: folder.size,
+                    groups: groupNames,
+                    acl: folder.acl
+                };
+            });
     } catch (error) {
         console.error('Nextcloud GroupFolders fetch error:', error.message);
         return [];
