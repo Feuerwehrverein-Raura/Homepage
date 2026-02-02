@@ -1,3 +1,10 @@
+## [1.133.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.1...v1.133.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kitchen-display:** simplify order completion flow ([426835f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/426835fcb9439d6bc3faf40a1fb306d517c02f35))
+
 ## [1.133.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.0...v1.133.1) (2026-02-02)
 
 
