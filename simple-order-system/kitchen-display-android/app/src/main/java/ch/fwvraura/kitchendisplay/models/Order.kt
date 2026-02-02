@@ -16,11 +16,17 @@ data class Order(
     val createdAt: String,
     val items: List<OrderItem>
 ) {
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+    companion object {
+        private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
+    }
 
     fun getMinutesElapsed(): Int {
         return try {
-            val orderTime = dateFormat.parse(createdAt.substringBefore('.'))
+            val orderTime = synchronized(dateFormat) {
+                dateFormat.parse(createdAt.substringBefore('.'))
+            }
             val now = Date()
             val diffMillis = now.time - (orderTime?.time ?: now.time)
             (diffMillis / 60000).toInt()
