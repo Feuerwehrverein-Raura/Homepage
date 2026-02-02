@@ -14,6 +14,7 @@ const { SwissQRBill, SwissQRCode } = require('swissqrbill/pdf');
 const { generate } = require('@pdfme/generator');
 const { text, image, barcodes } = require('@pdfme/schemas');
 const { BLANK_PDF } = require('@pdfme/common');
+const sdk = require('matrix-js-sdk');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -4025,6 +4026,489 @@ app.post('/invoices/generate-bulk', authenticateAny, async (req, res) => {
 
     } catch (error) {
         logError('Failed to generate bulk QR invoices', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ===========================================
+// MATRIX / WHATSAPP INTEGRATION (Benutzerspezifisch)
+// ===========================================
+
+// Cache für Matrix-Clients pro Member
+const matrixClientCache = new Map();
+
+// Helper: Matrix-Client für ein Mitglied erstellen
+async function getMatrixClientForMember(memberId) {
+    // Cache prüfen
+    if (matrixClientCache.has(memberId)) {
+        return matrixClientCache.get(memberId);
+    }
+
+    try {
+        const configResult = await pool.query(
+            "SELECT * FROM member_matrix_config WHERE member_id = $1 AND enabled = true",
+            [memberId]
+        );
+
+        if (configResult.rows.length === 0) {
+            logInfo('No Matrix configuration for member', { memberId });
+            return null;
+        }
+
+        const config = configResult.rows[0];
+
+        const client = sdk.createClient({
+            baseUrl: config.homeserver_url,
+            accessToken: config.access_token,
+            userId: config.user_id
+        });
+
+        // In Cache speichern (mit TTL von 5 Minuten)
+        matrixClientCache.set(memberId, { client, config });
+        setTimeout(() => matrixClientCache.delete(memberId), 5 * 60 * 1000);
+
+        logInfo('Matrix client initialized for member', { memberId, userId: config.user_id });
+        return { client, config };
+    } catch (error) {
+        logError('Failed to initialize Matrix client for member', { memberId, error: error.message });
+        return null;
+    }
+}
+
+// Helper: Nachricht an Matrix-Raum senden (mit Member-spezifischem Client)
+async function sendMatrixMessageForMember(memberId, roomId, message, htmlMessage = null) {
+    const clientData = await getMatrixClientForMember(memberId);
+    if (!clientData) {
+        return null; // Keine Konfiguration = keine Nachricht (kein Fehler)
+    }
+
+    const { client } = clientData;
+
+    const content = {
+        msgtype: 'm.text',
+        body: message
+    };
+
+    if (htmlMessage) {
+        content.format = 'org.matrix.custom.html';
+        content.formatted_body = htmlMessage;
+    }
+
+    const result = await client.sendEvent(roomId, 'm.room.message', content);
+    return result.event_id;
+}
+
+// Helper: WhatsApp-Benachrichtigung für Member senden
+async function sendWhatsAppNotificationForMember(memberId, notificationType, referenceType, referenceId, message, htmlMessage = null) {
+    try {
+        // Member-Konfiguration abrufen
+        const configResult = await pool.query(
+            "SELECT * FROM member_matrix_config WHERE member_id = $1 AND enabled = true",
+            [memberId]
+        );
+
+        if (configResult.rows.length === 0) {
+            logInfo('No Matrix config for member, skipping notification', { memberId, notificationType });
+            return { sent: false, reason: 'no_config' };
+        }
+
+        const config = configResult.rows[0];
+
+        if (!config.default_room_id) {
+            logInfo('No default room configured for member', { memberId });
+            return { sent: false, reason: 'no_room' };
+        }
+
+        // Duplikat-Prüfung
+        const duplicateCheck = await pool.query(
+            `SELECT id FROM whatsapp_notifications
+             WHERE notification_type = $1 AND reference_type = $2 AND reference_id = $3
+             AND member_id = $4 AND status = 'sent'`,
+            [notificationType, referenceType, referenceId, memberId]
+        );
+
+        if (duplicateCheck.rows.length > 0) {
+            logInfo('Duplicate notification skipped', { memberId, notificationType, referenceId });
+            return { sent: false, reason: 'duplicate' };
+        }
+
+        // Benachrichtigung in DB loggen
+        const notificationResult = await pool.query(
+            `INSERT INTO whatsapp_notifications
+             (member_id, room_id, notification_type, reference_type, reference_id, message_content, status)
+             VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+             RETURNING id`,
+            [memberId, config.default_room_id, notificationType, referenceType, referenceId, message]
+        );
+        const notificationId = notificationResult.rows[0].id;
+
+        try {
+            const eventId = await sendMatrixMessageForMember(memberId, config.default_room_id, message, htmlMessage);
+
+            if (eventId) {
+                // Erfolg loggen
+                await pool.query(
+                    `UPDATE whatsapp_notifications
+                     SET status = 'sent', matrix_event_id = $1, sent_at = CURRENT_TIMESTAMP
+                     WHERE id = $2`,
+                    [eventId, notificationId]
+                );
+
+                logInfo('WhatsApp notification sent', { memberId, notificationType, referenceId, eventId });
+                return { sent: true, eventId };
+            } else {
+                await pool.query(
+                    `UPDATE whatsapp_notifications SET status = 'skipped' WHERE id = $1`,
+                    [notificationId]
+                );
+                return { sent: false, reason: 'no_client' };
+            }
+
+        } catch (sendError) {
+            // Fehler loggen
+            await pool.query(
+                `UPDATE whatsapp_notifications
+                 SET status = 'failed', error_message = $1
+                 WHERE id = $2`,
+                [sendError.message, notificationId]
+            );
+
+            logError('Failed to send WhatsApp notification', { memberId, error: sendError.message });
+            return { sent: false, reason: 'error', error: sendError.message };
+        }
+
+    } catch (error) {
+        logError('WhatsApp notification error', { memberId, error: error.message });
+        throw error;
+    }
+}
+
+// Helper: Event-Nachricht formatieren
+function formatEventMessage(event, messageType = 'created') {
+    const dateStr = event.start_date ? new Date(event.start_date + 'T12:00:00').toLocaleDateString('de-CH', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    }) : 'Datum noch offen';
+
+    const timeStr = event.start_time ? ` um ${event.start_time} Uhr` : '';
+    const locationStr = event.location ? `\n📍 ${event.location}` : '';
+
+    let emoji, title;
+    switch (messageType) {
+        case 'created':
+            emoji = '🎉';
+            title = 'Neuer Anlass';
+            break;
+        case 'updated':
+            emoji = '📝';
+            title = 'Anlass aktualisiert';
+            break;
+        case 'reminder':
+            emoji = '⏰';
+            title = 'Erinnerung';
+            break;
+        case 'cancelled':
+            emoji = '❌';
+            title = 'Anlass abgesagt';
+            break;
+        default:
+            emoji = '📢';
+            title = 'Anlass';
+    }
+
+    const message = `${emoji} *${title}: ${event.title}*
+
+📅 ${dateStr}${timeStr}${locationStr}
+${event.description ? `\n${event.description.substring(0, 200)}${event.description.length > 200 ? '...' : ''}` : ''}
+
+👉 Mehr Infos: https://fwv-raura.ch/events/${event.slug || event.id}`;
+
+    const htmlMessage = `<b>${emoji} ${title}: ${event.title}</b><br><br>📅 ${dateStr}${timeStr}${locationStr ? `<br>${locationStr}` : ''}<br>${event.description ? `<br>${event.description.substring(0, 200)}${event.description.length > 200 ? '...' : ''}` : ''}<br><br>👉 <a href="https://fwv-raura.ch/events/${event.slug || event.id}">Mehr Infos</a>`;
+
+    return { message, htmlMessage };
+}
+
+// Helper: Schicht-Erinnerung formatieren
+function formatShiftReminderMessage(shift, event, members) {
+    const dateStr = shift.date ? new Date(shift.date + 'T12:00:00').toLocaleDateString('de-CH', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+    }) : 'Datum offen';
+
+    const timeStr = shift.start_time && shift.end_time
+        ? `${shift.start_time} - ${shift.end_time}`
+        : (shift.start_time || 'Zeit noch offen');
+
+    const memberList = members.map(m => `• ${m.vorname} ${m.nachname}`).join('\n');
+
+    const message = `⏰ *Schicht-Erinnerung: ${event.title}*
+
+📋 ${shift.name}
+📅 ${dateStr}
+🕐 ${timeStr}
+${shift.bereich ? `🏷️ Bereich: ${shift.bereich}` : ''}
+
+👥 Angemeldete Helfer:
+${memberList || '(noch keine Anmeldungen)'}`;
+
+    return { message, htmlMessage: message.replace(/\n/g, '<br>').replace(/\*/g, '') };
+}
+
+// ===========================================
+// WHATSAPP API ENDPOINTS (Benutzerspezifisch)
+// ===========================================
+
+// GET /whatsapp/config/:memberId - Matrix-Konfiguration eines Mitglieds abrufen
+app.get('/whatsapp/config/:memberId', authenticateAny, async (req, res) => {
+    try {
+        const { memberId } = req.params;
+        const result = await pool.query(
+            `SELECT id, member_id, homeserver_url, user_id, default_room_id, enabled, created_at, updated_at
+             FROM member_matrix_config WHERE member_id = $1`,
+            [memberId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.json(null);
+        }
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        logError('Failed to get Matrix config', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /whatsapp/config/:memberId - Matrix-Konfiguration für Mitglied speichern
+app.post('/whatsapp/config/:memberId', authenticateAny, async (req, res) => {
+    try {
+        const { memberId } = req.params;
+        const { homeserver_url, access_token, user_id, default_room_id, enabled = true } = req.body;
+
+        if (!homeserver_url || !access_token || !user_id) {
+            return res.status(400).json({ error: 'homeserver_url, access_token und user_id sind erforderlich' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO member_matrix_config (member_id, homeserver_url, access_token, user_id, default_room_id, enabled)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (member_id) DO UPDATE SET
+                homeserver_url = EXCLUDED.homeserver_url,
+                access_token = EXCLUDED.access_token,
+                user_id = EXCLUDED.user_id,
+                default_room_id = EXCLUDED.default_room_id,
+                enabled = EXCLUDED.enabled,
+                updated_at = CURRENT_TIMESTAMP
+             RETURNING id, member_id, homeserver_url, user_id, default_room_id, enabled`,
+            [memberId, homeserver_url, access_token, user_id, default_room_id, enabled]
+        );
+
+        // Cache zurücksetzen
+        matrixClientCache.delete(parseInt(memberId));
+
+        logInfo('Matrix config saved for member', { memberId, user_id });
+        res.json(result.rows[0]);
+    } catch (error) {
+        logError('Failed to save Matrix config', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE /whatsapp/config/:memberId - Matrix-Konfiguration löschen
+app.delete('/whatsapp/config/:memberId', authenticateAny, async (req, res) => {
+    try {
+        const { memberId } = req.params;
+
+        const result = await pool.query(
+            "DELETE FROM member_matrix_config WHERE member_id = $1 RETURNING member_id",
+            [memberId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Keine Konfiguration gefunden' });
+        }
+
+        // Cache zurücksetzen
+        matrixClientCache.delete(parseInt(memberId));
+
+        logInfo('Matrix config deleted for member', { memberId });
+        res.json({ success: true });
+    } catch (error) {
+        logError('Failed to delete Matrix config', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /whatsapp/test/:memberId - Test-Nachricht für Mitglied senden
+app.post('/whatsapp/test/:memberId', authenticateAny, async (req, res) => {
+    try {
+        const { memberId } = req.params;
+        const { message } = req.body;
+
+        if (!message) {
+            return res.status(400).json({ error: 'message ist erforderlich' });
+        }
+
+        const configResult = await pool.query(
+            "SELECT * FROM member_matrix_config WHERE member_id = $1 AND enabled = true",
+            [memberId]
+        );
+
+        if (configResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Keine Matrix-Konfiguration für dieses Mitglied' });
+        }
+
+        const config = configResult.rows[0];
+
+        if (!config.default_room_id) {
+            return res.status(400).json({ error: 'Kein Standard-Raum konfiguriert' });
+        }
+
+        const eventId = await sendMatrixMessageForMember(memberId, config.default_room_id, message);
+
+        if (eventId) {
+            logInfo('Test message sent', { memberId, eventId });
+            res.json({ success: true, eventId });
+        } else {
+            res.status(500).json({ error: 'Nachricht konnte nicht gesendet werden' });
+        }
+    } catch (error) {
+        logError('Failed to send test message', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /whatsapp/notify/event - Event-Benachrichtigung senden (mit member_id)
+app.post('/whatsapp/notify/event', requireApiKey, async (req, res) => {
+    try {
+        const { event, type = 'created', member_id } = req.body;
+
+        if (!event || !event.id) {
+            return res.status(400).json({ error: 'event mit id ist erforderlich' });
+        }
+
+        if (!member_id) {
+            logInfo('No member_id provided, skipping WhatsApp notification', { eventId: event.id });
+            return res.json({ success: true, sent: false, reason: 'no_member_id' });
+        }
+
+        const notificationType = `event_${type}`;
+        const { message, htmlMessage } = formatEventMessage(event, type);
+
+        const result = await sendWhatsAppNotificationForMember(
+            member_id,
+            notificationType,
+            'event',
+            event.id,
+            message,
+            htmlMessage
+        );
+
+        logInfo('Event notification processed', { eventId: event.id, type, memberId: member_id, ...result });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        logError('Failed to send event notification', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /whatsapp/notify/shift-reminder - Schicht-Erinnerung senden
+app.post('/whatsapp/notify/shift-reminder', requireApiKey, async (req, res) => {
+    try {
+        const { shift, event, members, member_id } = req.body;
+
+        if (!shift || !shift.id || !event) {
+            return res.status(400).json({ error: 'shift und event sind erforderlich' });
+        }
+
+        if (!member_id) {
+            logInfo('No member_id provided, skipping WhatsApp notification', { shiftId: shift.id });
+            return res.json({ success: true, sent: false, reason: 'no_member_id' });
+        }
+
+        const { message, htmlMessage } = formatShiftReminderMessage(shift, event, members || []);
+
+        const result = await sendWhatsAppNotificationForMember(
+            member_id,
+            'shift_reminder',
+            'shift',
+            shift.id,
+            message,
+            htmlMessage
+        );
+
+        logInfo('Shift reminder processed', { shiftId: shift.id, memberId: member_id, ...result });
+        res.json({ success: true, ...result });
+    } catch (error) {
+        logError('Failed to send shift reminder', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET /whatsapp/notifications - Benachrichtigungs-Log abrufen
+app.get('/whatsapp/notifications', authenticateAny, async (req, res) => {
+    try {
+        const { limit = 50, offset = 0, status, type, member_id } = req.query;
+
+        let query = `
+            SELECT n.*, m.vorname, m.nachname
+            FROM whatsapp_notifications n
+            LEFT JOIN members m ON n.member_id = m.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (status) {
+            params.push(status);
+            query += ` AND n.status = $${params.length}`;
+        }
+
+        if (type) {
+            params.push(type);
+            query += ` AND n.notification_type = $${params.length}`;
+        }
+
+        if (member_id) {
+            params.push(member_id);
+            query += ` AND n.member_id = $${params.length}`;
+        }
+
+        query += ` ORDER BY n.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
+
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (error) {
+        logError('Failed to get WhatsApp notifications', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST /whatsapp/send/:memberId - Direkte Nachricht senden
+app.post('/whatsapp/send/:memberId', authenticateAny, async (req, res) => {
+    try {
+        const { memberId } = req.params;
+        const { message, html_message, notification_type = 'manual' } = req.body;
+
+        if (!message) {
+            return res.status(400).json({ error: 'message ist erforderlich' });
+        }
+
+        const result = await sendWhatsAppNotificationForMember(
+            memberId,
+            notification_type,
+            'manual',
+            Date.now(),
+            message,
+            html_message
+        );
+
+        res.json({ success: true, ...result });
+    } catch (error) {
+        logError('Failed to send WhatsApp message', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });

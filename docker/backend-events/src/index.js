@@ -767,6 +767,31 @@ Feuerwehrverein Raura
             }
         }
 
+        // WhatsApp-Benachrichtigung senden (wenn Status = published und User hat Matrix-Konfiguration)
+        if (newEvent.status === 'published' && req.user?.email) {
+            try {
+                // Member-ID des eingeloggten Users ermitteln
+                const memberResult = await pool.query(
+                    "SELECT id FROM members WHERE email = $1",
+                    [req.user.email]
+                );
+
+                if (memberResult.rows.length > 0) {
+                    const memberId = memberResult.rows[0].id;
+                    await axios.post(`${DISPATCH_API}/whatsapp/notify/event`, {
+                        event: newEvent,
+                        type: 'created',
+                        member_id: memberId
+                    }, {
+                        headers: { 'X-API-Key': process.env.API_KEY }
+                    });
+                    logInfo('WhatsApp notification sent for new event', { eventId: newEvent.id, memberId });
+                }
+            } catch (waErr) {
+                logWarn('Failed to send WhatsApp notification', { error: waErr.message, eventId: newEvent.id });
+            }
+        }
+
         res.status(201).json(newEvent);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -804,13 +829,44 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
         values.push(id);
 
+        // Alten Status abrufen für WhatsApp-Benachrichtigung
+        const oldEventResult = await pool.query('SELECT status FROM events WHERE id = $1', [id]);
+        const oldStatus = oldEventResult.rows[0]?.status;
+
         const result = await pool.query(`
             UPDATE events SET ${setClause}, updated_at = NOW()
             WHERE id = $${values.length}
             RETURNING *
         `, values);
 
-        res.json(result.rows[0]);
+        const updatedEvent = result.rows[0];
+
+        // WhatsApp-Benachrichtigung wenn Event neu auf "published" gesetzt wird
+        if (updatedEvent.status === 'published' && oldStatus !== 'published' && req.user?.email) {
+            try {
+                // Member-ID des eingeloggten Users ermitteln
+                const memberResult = await pool.query(
+                    "SELECT id FROM members WHERE email = $1",
+                    [req.user.email]
+                );
+
+                if (memberResult.rows.length > 0) {
+                    const memberId = memberResult.rows[0].id;
+                    await axios.post(`${DISPATCH_API}/whatsapp/notify/event`, {
+                        event: updatedEvent,
+                        type: 'created',
+                        member_id: memberId
+                    }, {
+                        headers: { 'X-API-Key': process.env.API_KEY }
+                    });
+                    logInfo('WhatsApp notification sent for published event', { eventId: updatedEvent.id, memberId });
+                }
+            } catch (waErr) {
+                logWarn('Failed to send WhatsApp notification', { error: waErr.message, eventId: updatedEvent.id });
+            }
+        }
+
+        res.json(updatedEvent);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
