@@ -1,3 +1,10 @@
+# [1.124.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.4...v1.124.0) (2026-02-02)
+
+
+### Features
+
+* **kds-android:** improve station toggle visibility ([458968d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/458968d31ba1576ee7ac140f1c0c5166dcd2d506))
+
 ## [1.123.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.3...v1.123.4) (2026-02-02)
 
 
