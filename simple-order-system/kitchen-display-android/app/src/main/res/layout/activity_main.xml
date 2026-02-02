@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="@color/background_dark">
 
-    <!-- Header -->
+    <!-- Header - Red like website -->
     <LinearLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
@@ -14,8 +14,28 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:padding="16dp"
-        android:background="@color/surface_dark"
+        android:background="@color/primary"
         app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Logo -->
+        <ImageView
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@mipmap/ic_launcher"
+            android:background="@drawable/logo_background"
+            android:padding="4dp"
+            android:contentDescription="@string/app_name" />
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="24dp"
+            android:text="@string/app_name"
+            android:textColor="@color/text_primary"
+            android:textSize="24sp"
+            android:textStyle="bold" />
 
         <!-- Station Filter Tabs -->
         <com.google.android.material.button.MaterialButtonToggleGroup
@@ -71,7 +91,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_settings"
             android:contentDescription="@string/settings"
-            app:tint="@color/text_secondary" />
+            app:tint="@color/text_primary" />
 
     </LinearLayout>
 
