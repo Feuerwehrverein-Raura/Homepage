@@ -1,3 +1,10 @@
+## [1.135.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.1...v1.135.2) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kitchen-display:** match web design with Android app ([a372dca](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a372dca4670d4f5ee209ee3ce9baf463694d792b)), closes [#8B5CF6](https://github.com/Feuerwehrverein-Raura/Homepage/issues/8B5CF6) [#F97316](https://github.com/Feuerwehrverein-Raura/Homepage/issues/F97316)
+
 ## [1.135.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.0...v1.135.1) (2026-02-02)
 
 
