@@ -46,6 +46,10 @@
             font-weight: normal;
             opacity: 0.8;
         }
+        .download-btn.loading {
+            background: #4B5563;
+            pointer-events: none;
+        }
         .info {
             background: #1F2937;
             padding: 15px;
@@ -72,10 +76,9 @@
         <h1>Kitchen Display</h1>
         <p class="subtitle">FWV Raura - Android App</p>
 
-        <a href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/kds-v0.6/kitchen-display-0.6-debug.apk"
-           class="download-btn">
-            APK herunterladen
-            <div class="version">Version 0.6</div>
+        <a id="downloadBtn" href="#" class="download-btn loading">
+            Laden...
+            <div class="version" id="versionText"></div>
         </a>
 
         <div class="info">
@@ -94,5 +97,46 @@
             <p style="color: #3B82F6; margin-top: 10px;">https://order.fwv-raura.ch</p>
         </div>
     </div>
+
+    <script>
+        async function loadLatestRelease() {
+            const btn = document.getElementById('downloadBtn');
+            const versionText = document.getElementById('versionText');
+
+            try {
+                const response = await fetch('https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases');
+                const releases = await response.json();
+
+                // Find latest KDS release
+                const kdsRelease = releases.find(r => r.tag_name.startsWith('kds-v'));
+
+                if (kdsRelease) {
+                    // Find debug APK
+                    const apk = kdsRelease.assets.find(a => a.name.includes('debug') && a.name.endsWith('.apk'));
+
+                    if (apk) {
+                        const version = kdsRelease.tag_name.replace('kds-v', '');
+                        btn.href = apk.browser_download_url;
+                        btn.innerHTML = 'APK herunterladen<div class="version">Version ' + version + '</div>';
+                        btn.classList.remove('loading');
+                    } else {
+                        showError('Keine APK gefunden');
+                    }
+                } else {
+                    showError('Kein Release gefunden');
+                }
+            } catch (e) {
+                showError('Fehler beim Laden');
+            }
+        }
+
+        function showError(msg) {
+            const btn = document.getElementById('downloadBtn');
+            btn.innerHTML = msg;
+            btn.href = 'https://github.com/Feuerwehrverein-Raura/Homepage/releases';
+        }
+
+        loadLatestRelease();
+    </script>
 </body>
 </html>
