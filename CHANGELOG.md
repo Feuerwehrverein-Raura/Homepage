@@ -1,3 +1,10 @@
+## [1.125.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.3...v1.125.4) (2026-02-02)
+
+
+### Bug Fixes
+
+* **members-api:** fix Nextcloud GroupFolders API endpoint and group matching ([8956166](https://github.com/Feuerwehrverein-Raura/Homepage/commit/89561667d3b7fef5dd8e5dcaba38cffd44bdc700))
+
 ## [1.125.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.2...v1.125.3) (2026-02-02)
 
 
