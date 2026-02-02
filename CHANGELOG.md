@@ -1,3 +1,10 @@
+## [1.133.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.0...v1.133.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **kds-android:** simplify order completion flow ([7216ac9](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7216ac99c32abd483fcd2bbfdf0896b5fce3bab6))
+
 # [1.133.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.132.1...v1.133.0) (2026-02-02)
 
 
