@@ -83,6 +83,8 @@
     }
     </script>
     <script src="scripts/config.js"></script>
+    <!-- Cloudflare Turnstile Anti-Spam -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body class="font-sans bg-gray-50">
     <!-- Navigation -->
@@ -555,11 +557,23 @@
                                 </div>
                             </div>
                             
+                            <!-- Honeypot (Anti-Spam, hidden from humans) -->
+                            <div style="position: absolute; left: -9999px;" aria-hidden="true">
+                                <input type="text" name="_honeypot" id="contact-honeypot" tabindex="-1" autocomplete="off">
+                            </div>
+
+                            <!-- Hidden timestamp for spam detection -->
+                            <input type="hidden" id="contact-timestamp" name="_timestamp">
+
+                            <!-- Cloudflare Turnstile Widget -->
+                            <div class="cf-turnstile" data-sitekey="0x4AAAAAAA-placeholder" data-theme="dark" data-callback="onTurnstileSuccess" id="turnstile-widget"></div>
+
                             <!-- Submit Button -->
                             <div class="pt-4">
-                                <button type="submit" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition duration-300 shadow-lg">
+                                <button type="submit" id="contact-submit-btn" class="w-full bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                                     <span id="submit-text">Nachricht senden</span>
                                 </button>
+                                <p id="turnstile-hint" class="text-fire-200 text-xs mt-2 text-center">Bitte bestätigen Sie, dass Sie kein Roboter sind</p>
                             </div>
                         </form>
                     </div>
@@ -682,13 +696,29 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // Turnstile callback - enable submit button when verified
+        function onTurnstileSuccess(token) {
+            const submitBtn = document.getElementById('contact-submit-btn');
+            const hint = document.getElementById('turnstile-hint');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                if (hint) hint.classList.add('hidden');
+            }
+        }
+
         function initializeContactForm() {
             const contactForm = document.getElementById('contact-form');
             const subjectSelect = document.getElementById('contact-subject');
             const correspondenceMethodRadios = document.querySelectorAll('input[name="correspondence-method"]');
             const correspondenceAddressRadios = document.querySelectorAll('input[name="correspondence-address"]');
             const otherAddressInput = document.getElementById('other-address');
-            
+
+            // Set timestamp for spam detection
+            const timestampField = document.getElementById('contact-timestamp');
+            if (timestampField) {
+                timestampField.value = Date.now().toString();
+            }
+
             if (contactForm && subjectSelect) {
                 // Betreff-Änderung
                 subjectSelect.addEventListener('change', function() {
@@ -778,6 +808,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Get Turnstile response token
+            const turnstileResponse = document.querySelector('input[name="cf-turnstile-response"]');
+            const turnstileToken = turnstileResponse ? turnstileResponse.value : null;
+
             // Button deaktivieren während des Sendens
             const submitButton = document.querySelector('#contact-form button[type="submit"]');
             const originalText = submitButton.innerHTML;
@@ -810,6 +844,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     type: 'contact'
                 };
             }
+
+            // Add anti-spam fields
+            payload._honeypot = document.getElementById('contact-honeypot')?.value || '';
+            payload._timestamp = document.getElementById('contact-timestamp')?.value || '';
+            payload._turnstile = turnstileToken;
 
             try {
                 const response = await fetch('https://api.fwv-raura.ch/contact', {
