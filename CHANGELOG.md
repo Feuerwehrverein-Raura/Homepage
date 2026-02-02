@@ -1,3 +1,10 @@
+# [1.125.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.124.0...v1.125.0) (2026-02-02)
+
+
+### Features
+
+* **contact:** add comprehensive anti-spam protection ([1579577](https://github.com/Feuerwehrverein-Raura/Homepage/commit/15795775001852435c0f8151e1694fbfe0699d72))
+
 # [1.124.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.123.4...v1.124.0) (2026-02-02)
 
 
