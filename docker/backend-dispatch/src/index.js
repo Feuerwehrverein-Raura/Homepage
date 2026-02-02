@@ -4223,9 +4223,9 @@ function formatEventMessage(event, messageType = 'created') {
 📅 ${dateStr}${timeStr}${locationStr}
 ${event.description ? `\n${event.description.substring(0, 200)}${event.description.length > 200 ? '...' : ''}` : ''}
 
-👉 Mehr Infos: https://fwv-raura.ch/events/${event.slug || event.id}`;
+👉 Mehr Infos: https://fwv-raura.ch/events.html?event=${event.slug || event.id}`;
 
-    const htmlMessage = `<b>${emoji} ${title}: ${event.title}</b><br><br>📅 ${dateStr}${timeStr}${locationStr ? `<br>${locationStr}` : ''}<br>${event.description ? `<br>${event.description.substring(0, 200)}${event.description.length > 200 ? '...' : ''}` : ''}<br><br>👉 <a href="https://fwv-raura.ch/events/${event.slug || event.id}">Mehr Infos</a>`;
+    const htmlMessage = `<b>${emoji} ${title}: ${event.title}</b><br><br>📅 ${dateStr}${timeStr}${locationStr ? `<br>${locationStr}` : ''}<br>${event.description ? `<br>${event.description.substring(0, 200)}${event.description.length > 200 ? '...' : ''}` : ''}<br><br>👉 <a href="https://fwv-raura.ch/events.html?event=${event.slug || event.id}">Mehr Infos</a>`;
 
     return { message, htmlMessage };
 }
