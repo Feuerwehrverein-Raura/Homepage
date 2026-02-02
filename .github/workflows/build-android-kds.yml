@@ -6,10 +6,23 @@ on:
       - 'simple-order-system/kitchen-display-android/**'
     branches:
       - main
+    tags:
+      - 'kds-v*'
   pull_request:
     paths:
       - 'simple-order-system/kitchen-display-android/**'
-  workflow_dispatch:  # Manueller Trigger
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release'
+        required: false
+        default: false
+        type: boolean
+      version:
+        description: 'Version number (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+        type: string
 
 jobs:
   build:
@@ -25,29 +38,68 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Grant execute permission for gradlew
-        run: |
-          cd simple-order-system/kitchen-display-android
-          chmod +x gradlew || echo "No gradlew yet"
-
-      - name: Generate Gradle Wrapper
-        run: |
-          cd simple-order-system/kitchen-display-android
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.4
-          fi
-
       - name: Build Debug APK
-        run: |
-          cd simple-order-system/kitchen-display-android
-          ./gradlew assembleDebug
+        working-directory: simple-order-system/kitchen-display-android
+        run: gradle assembleDebug
 
-      - name: Upload APK
+      - name: Build Release APK
+        working-directory: simple-order-system/kitchen-display-android
+        run: gradle assembleRelease
+
+      - name: Rename APKs
+        run: |
+          VERSION="${{ inputs.version || '1.0.0' }}"
+          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/app-debug.apk \
+             simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/kitchen-display-${VERSION}-debug.apk
+          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/release/app-release-unsigned.apk \
+             simple-order-system/kitchen-display-android/app/build/outputs/apk/release/kitchen-display-${VERSION}-release.apk
+
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: kitchen-display-apk
-          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/app-debug.apk
+          name: kitchen-display-debug
+          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kitchen-display-release
+          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/kds-v') || inputs.create_release == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || format('kds-v{0}', inputs.version) }}
+          name: Kitchen Display Android ${{ inputs.version || github.ref_name }}
+          body: |
+            ## Kitchen Display Android App
+
+            Native Android App für das Kitchen Display System.
+
+            **Kompatibilität:** Android 7.0+ (API 24)
+
+            ### Installation
+            1. APK auf das Android-Gerät übertragen
+            2. "Unbekannte Quellen" in den Einstellungen erlauben
+            3. APK installieren
+            4. App starten und Server-URL in den Einstellungen konfigurieren
+
+            ### Features
+            - Echtzeit-Bestellungen via WebSocket
+            - Station-Filter (Alle/Bar/Küche)
+            - Audio-Benachrichtigungen
+            - Automatischer Reconnect
+          files: |
+            simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
+            simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+          draft: false
+          prerelease: false
