@@ -1,3 +1,10 @@
+# [1.130.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.129.0...v1.130.0) (2026-02-02)
+
+
+### Features
+
+* **order-system:** separate paid and completed states for order items ([dfeae16](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dfeae16cc68a006b7e19118f4c61f8b2f5b93320))
+
 # [1.129.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.128.0...v1.129.0) (2026-02-02)
 
 
