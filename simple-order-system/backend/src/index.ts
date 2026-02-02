@@ -3,9 +3,29 @@ import cors from 'cors';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import pg from 'pg';
+import multer from 'multer';
 import PaymentService from './payments.js';
 import SumUpTerminal from './terminal.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
+
+// Nextcloud configuration
+const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'https://nextcloud.fwv-raura.ch';
+const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER || 'fwv-system';
+const NEXTCLOUD_PASSWORD = process.env.NEXTCLOUD_PASSWORD || '';
+const NEXTCLOUD_UPLOAD_FOLDER = '/Verein/TWINT';
+
+// Multer for file uploads (memory storage)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only images allowed'));
+    }
+  }
+});
 
 const app = express();
 const server = createServer(app);
@@ -1521,6 +1541,90 @@ app.post('/api/settings/test-printer', authenticateToken, async (req: Authentica
   } catch (error: any) {
     console.error('Test printer error:', error);
     res.status(500).json({ error: `Drucker nicht erreichbar: ${error.message}` });
+  }
+});
+
+// Upload TWINT QR code to Nextcloud
+app.post('/api/settings/upload-twint-qr', authenticateToken, upload.single('qrcode'), async (req: AuthenticatedRequest, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Keine Datei hochgeladen' });
+    }
+
+    if (!NEXTCLOUD_PASSWORD) {
+      return res.status(500).json({ error: 'Nextcloud nicht konfiguriert' });
+    }
+
+    const filename = `twint-qr-${Date.now()}.${req.file.mimetype.split('/')[1] || 'png'}`;
+    const uploadPath = `${NEXTCLOUD_UPLOAD_FOLDER}/${filename}`;
+    const webdavUrl = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USER}${uploadPath}`;
+
+    // Ensure folder exists (create if not)
+    const folderUrl = `${NEXTCLOUD_URL}/remote.php/dav/files/${NEXTCLOUD_USER}${NEXTCLOUD_UPLOAD_FOLDER}`;
+    await fetch(folderUrl, {
+      method: 'MKCOL',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${NEXTCLOUD_USER}:${NEXTCLOUD_PASSWORD}`).toString('base64')}`
+      }
+    }).catch(() => {}); // Ignore if folder exists
+
+    // Upload file via WebDAV
+    const uploadResponse = await fetch(webdavUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${NEXTCLOUD_USER}:${NEXTCLOUD_PASSWORD}`).toString('base64')}`,
+        'Content-Type': req.file.mimetype
+      },
+      body: req.file.buffer
+    });
+
+    if (!uploadResponse.ok && uploadResponse.status !== 201 && uploadResponse.status !== 204) {
+      console.error('Nextcloud upload failed:', uploadResponse.status, await uploadResponse.text());
+      return res.status(500).json({ error: 'Upload zu Nextcloud fehlgeschlagen' });
+    }
+
+    // Create public share
+    const shareResponse = await fetch(`${NEXTCLOUD_URL}/ocs/v2.php/apps/files_sharing/api/v1/shares`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${NEXTCLOUD_USER}:${NEXTCLOUD_PASSWORD}`).toString('base64')}`,
+        'OCS-APIRequest': 'true',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        path: uploadPath,
+        shareType: '3', // Public link
+        permissions: '1' // Read only
+      })
+    });
+
+    if (!shareResponse.ok) {
+      console.error('Share creation failed:', shareResponse.status);
+      return res.status(500).json({ error: 'Öffentlicher Link konnte nicht erstellt werden' });
+    }
+
+    const shareData = await shareResponse.json();
+    const shareUrl = shareData.ocs?.data?.url;
+
+    if (!shareUrl) {
+      return res.status(500).json({ error: 'Share URL nicht gefunden' });
+    }
+
+    // Direct download URL for the image
+    const directUrl = `${shareUrl}/download`;
+
+    // Save to settings
+    await setSetting('twint_qr_url', directUrl);
+
+    res.json({
+      success: true,
+      url: directUrl,
+      message: 'QR-Code erfolgreich hochgeladen'
+    });
+
+  } catch (error: any) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: `Upload fehlgeschlagen: ${error.message}` });
   }
 });
 

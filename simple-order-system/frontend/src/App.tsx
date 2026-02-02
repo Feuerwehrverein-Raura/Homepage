@@ -2446,9 +2446,54 @@ function SettingsView({ token }: { token: string | null }) {
           </h3>
 
           <div className="border rounded-lg p-4">
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* File Upload */}
               <div>
-                <label className="block text-sm text-gray-600 mb-1">QR-Code Bild-URL</label>
+                <label className="block text-sm text-gray-600 mb-2">QR-Code Bild hochladen</label>
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      const formData = new FormData();
+                      formData.append('qrcode', file);
+
+                      try {
+                        setSaving(true);
+                        const res = await fetch(`${API_URL}/settings/upload-twint-qr`, {
+                          method: 'POST',
+                          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                          body: formData,
+                        });
+
+                        const result = await res.json();
+                        if (res.ok && result.url) {
+                          setSettings(prev => ({ ...prev, twint_qr_url: result.url }));
+                          alert('QR-Code erfolgreich hochgeladen!');
+                        } else {
+                          alert(result.error || 'Upload fehlgeschlagen');
+                        }
+                      } catch (error) {
+                        alert('Upload fehlgeschlagen');
+                      } finally {
+                        setSaving(false);
+                        e.target.value = ''; // Reset file input
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Bild wird automatisch zu Nextcloud hochgeladen und verlinkt.
+                </p>
+              </div>
+
+              {/* Or manual URL */}
+              <div className="border-t pt-4">
+                <label className="block text-sm text-gray-600 mb-1">Oder URL manuell eingeben:</label>
                 <input
                   type="text"
                   placeholder="https://example.com/twint-qr.png"
@@ -2456,10 +2501,9 @@ function SettingsView({ token }: { token: string | null }) {
                   onChange={(e) => setSettings({ ...settings, twint_qr_url: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  URL zum TWINT QR-Code Bild von RaiseNow. Wird beim Bezahlen als Zahlungsoption angezeigt.
-                </p>
               </div>
+
+              {/* Preview */}
               {settings.twint_qr_url && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600 mb-2">Vorschau:</p>
@@ -2477,7 +2521,7 @@ function SettingsView({ token }: { token: string | null }) {
           </div>
 
           <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-            <p><strong>Tipp:</strong> Den QR-Code kannst du im RaiseNow Dashboard generieren und als Bild herunterladen/verlinken.</p>
+            <p><strong>Tipp:</strong> Den QR-Code kannst du im RaiseNow Dashboard generieren und hier hochladen.</p>
           </div>
         </div>
 
