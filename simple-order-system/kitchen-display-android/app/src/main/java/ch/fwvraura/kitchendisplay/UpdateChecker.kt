@@ -11,12 +11,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import com.google.gson.reflect.TypeToken
 import java.util.concurrent.TimeUnit
 
 class UpdateChecker(private val context: Context) {
     companion object {
         private const val TAG = "UpdateChecker"
-        private const val RELEASES_URL = "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases/latest"
+        // Fetch all releases and filter for KDS releases (tagged as kds-v*)
+        private const val RELEASES_URL = "https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases?per_page=20"
         private const val DOWNLOAD_PAGE = "https://feuerwehrverein-raura.github.io/Homepage/kds/"
     }
 
@@ -58,25 +60,30 @@ class UpdateChecker(private val context: Context) {
 
             val body = response.body?.string() ?: return@withContext UpdateResult.Error("Empty response")
 
-            // Check if it's a KDS release
-            if (!body.contains("kds-v")) {
+            // Parse as array of releases
+            val listType = object : TypeToken<List<GitHubRelease>>() {}.type
+            val releases: List<GitHubRelease> = gson.fromJson(body, listType)
+
+            // Find the first (most recent) KDS release
+            val kdsRelease = releases.firstOrNull { it.tagName.startsWith("kds-v") }
+
+            if (kdsRelease == null) {
+                Log.d(TAG, "No KDS release found in ${releases.size} releases")
                 return@withContext UpdateResult.NoUpdate
             }
 
-            val release = gson.fromJson(body, GitHubRelease::class.java)
-
-            // Extract version from tag (kds-v0.5 -> 0.5)
-            val latestVersion = release.tagName.removePrefix("kds-v")
+            // Extract version from tag (kds-v1.2 -> 1.2)
+            val latestVersion = kdsRelease.tagName.removePrefix("kds-v")
             val currentVersion = getCurrentVersion()
 
-            Log.d(TAG, "Current: $currentVersion, Latest: $latestVersion")
+            Log.d(TAG, "Current: $currentVersion, Latest KDS: $latestVersion (tag: ${kdsRelease.tagName})")
 
             if (isNewerVersion(latestVersion, currentVersion)) {
                 // Prefer release APK, fall back to debug
-                val apkUrl = release.assets
+                val apkUrl = kdsRelease.assets
                     .firstOrNull { it.name.contains("release") && it.name.endsWith(".apk") }
                     ?.downloadUrl
-                    ?: release.assets
+                    ?: kdsRelease.assets
                         .firstOrNull { it.name.contains("debug") && it.name.endsWith(".apk") }
                         ?.downloadUrl
 
@@ -84,7 +91,7 @@ class UpdateChecker(private val context: Context) {
                     currentVersion = currentVersion,
                     newVersion = latestVersion,
                     downloadUrl = apkUrl ?: DOWNLOAD_PAGE,
-                    releaseName = release.name
+                    releaseName = kdsRelease.name
                 )
             } else {
                 UpdateResult.NoUpdate
