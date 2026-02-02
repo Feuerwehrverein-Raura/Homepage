@@ -343,10 +343,24 @@ function App() {
 
   const completeOrder = async (orderId: number) => {
     try {
-      await fetch(`${API_URL}/orders/${orderId}/complete`, {
-        method: 'PATCH',
-      });
-      setOrders(orders.filter(o => o.id !== orderId));
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      if (station === 'all') {
+        // Complete entire order when viewing all stations
+        await fetch(`${API_URL}/orders/${orderId}/complete`, {
+          method: 'PATCH',
+        });
+        setOrders(orders.filter(o => o.id !== orderId));
+      } else {
+        // Only complete items for current station
+        const stationItems = order.items
+          .filter(item => item.printer_station === station && !item.completed);
+        if (stationItems.length > 0) {
+          const itemIds = stationItems.map(item => item.id);
+          await completeItems(orderId, itemIds);
+        }
+      }
     } catch (error) {
       console.error('Failed to complete order:', error);
     }

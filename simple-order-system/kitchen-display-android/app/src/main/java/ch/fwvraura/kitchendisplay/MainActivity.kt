@@ -267,9 +267,24 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
 
     private fun completeOrder(order: Order) {
         mainScope.launch {
-            apiService?.completeOrder(order.id)?.onSuccess {
-                orders.removeAll { it.id == order.id }
-                updateOrdersList()
+            if (currentStation == "all") {
+                // Complete entire order when viewing all stations
+                apiService?.completeOrder(order.id)?.onSuccess {
+                    orders.removeAll { it.id == order.id }
+                    updateOrdersList()
+                }
+            } else {
+                // Only complete items for current station
+                val stationItems = order.getItemsForStation(currentStation)
+                    .filter { !it.completed }
+                if (stationItems.isNotEmpty()) {
+                    val itemIds = stationItems.map { it.id }
+                    apiService?.completeItems(order.id, itemIds)?.onSuccess {
+                        // Update local state
+                        stationItems.forEach { it.completed = true }
+                        updateOrdersList()
+                    }
+                }
             }
         }
     }
