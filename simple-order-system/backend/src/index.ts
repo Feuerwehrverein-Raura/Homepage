@@ -37,6 +37,48 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
+// Helper to get client IP
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ips = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',');
+    return ips[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
+
+// Audit logging middleware - logs all API requests
+app.use('/api', (req: AuthenticatedRequest, res, next) => {
+  const startTime = Date.now();
+  const ip = getClientIp(req);
+  const method = req.method;
+  const path = req.originalUrl;
+
+  // Capture response status after request completes
+  res.on('finish', async () => {
+    const duration = Date.now() - startTime;
+    const statusCode = res.statusCode;
+
+    // Skip logging for high-frequency/noisy endpoints
+    if (path === '/api/health' || path.startsWith('/api/orders') && method === 'GET') {
+      return;
+    }
+
+    try {
+      await pool.query(
+        `INSERT INTO audit_log (ip, method, path, status_code, user_id, user_email, duration_ms)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [ip, method, path, statusCode, req.user?.id || null, req.user?.email || null, duration]
+      );
+    } catch (err) {
+      // Silently fail - don't break the app if audit logging fails
+      console.error('Audit log error:', err);
+    }
+  });
+
+  next();
+});
+
 // Auth routes
 app.get('/api/auth/mode', (req, res) => {
   res.json(getAuthMode());
@@ -56,6 +98,69 @@ app.delete('/api/auth/blocked-ips/:ip', authenticateToken, (req: AuthenticatedRe
     res.json({ message: `IP ${ip} entsperrt` });
   } else {
     res.status(404).json({ error: 'IP nicht gefunden oder nicht gesperrt' });
+  }
+});
+
+// Audit log viewing (admin only)
+app.get('/api/audit-log', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 100, 1000);
+    const offset = parseInt(req.query.offset as string) || 0;
+    const ip = req.query.ip as string;
+    const method = req.query.method as string;
+    const path = req.query.path as string;
+
+    let query = 'SELECT * FROM audit_log WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (ip) {
+      query += ` AND ip = $${paramIndex++}`;
+      params.push(ip);
+    }
+    if (method) {
+      query += ` AND method = $${paramIndex++}`;
+      params.push(method.toUpperCase());
+    }
+    if (path) {
+      query += ` AND path LIKE $${paramIndex++}`;
+      params.push(`%${path}%`);
+    }
+
+    query += ` ORDER BY timestamp DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(limit, offset);
+
+    const result = await pool.query(query, params);
+
+    // Also get total count for pagination
+    let countQuery = 'SELECT COUNT(*) FROM audit_log WHERE 1=1';
+    const countParams: any[] = [];
+    paramIndex = 1;
+
+    if (ip) {
+      countQuery += ` AND ip = $${paramIndex++}`;
+      countParams.push(ip);
+    }
+    if (method) {
+      countQuery += ` AND method = $${paramIndex++}`;
+      countParams.push(method.toUpperCase());
+    }
+    if (path) {
+      countQuery += ` AND path LIKE $${paramIndex++}`;
+      countParams.push(`%${path}%`);
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
+
+    res.json({
+      logs: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit,
+      offset
+    });
+  } catch (error) {
+    console.error('Error fetching audit log:', error);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
@@ -223,6 +328,26 @@ async function initDB() {
   // Add completed status to order_items for kitchen confirmation (separate from paid)
   await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT false`);
   await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP`);
+
+  // Audit log for tracking API access
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id SERIAL PRIMARY KEY,
+      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      ip VARCHAR(45) NOT NULL,
+      method VARCHAR(10) NOT NULL,
+      path VARCHAR(500) NOT NULL,
+      status_code INTEGER,
+      user_id VARCHAR(100),
+      user_email VARCHAR(255),
+      duration_ms INTEGER,
+      error TEXT
+    )
+  `);
+
+  // Create index for faster queries on audit_log
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_ip ON audit_log(ip)`);
 
   console.log('Database initialized');
 }
