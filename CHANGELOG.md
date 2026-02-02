@@ -1,3 +1,10 @@
+# [1.134.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.6...v1.134.0) (2026-02-02)
+
+
+### Features
+
+* **backend:** add IP blocking after 3 failed login attempts ([0be9e37](https://github.com/Feuerwehrverein-Raura/Homepage/commit/0be9e37371bf5ff851c29d500fe31f4b2c9c6978))
+
 ## [1.133.6](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.133.5...v1.133.6) (2026-02-02)
 
 
