@@ -1,3 +1,10 @@
+# [1.126.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.4...v1.126.0) (2026-02-02)
+
+
+### Features
+
+* **order-system:** add split payment and per-item payment ([5122fb6](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5122fb6b1ed05c444bf26d37bdee11e320e2506a))
+
 ## [1.125.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.125.3...v1.125.4) (2026-02-02)
 
 
