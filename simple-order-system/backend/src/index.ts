@@ -164,6 +164,27 @@ async function initDB() {
   await pool.query(`ALTER TABLE ip_whitelist ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP`);
   await pool.query(`ALTER TABLE ip_whitelist ADD COLUMN IF NOT EXISTS is_permanent BOOLEAN DEFAULT false`);
 
+  // ============================================
+  // SPLIT PAYMENT & PER-ITEM PAYMENT SUPPORT
+  // ============================================
+
+  // Track partial payments for an order (split bills)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS order_payments (
+      id SERIAL PRIMARY KEY,
+      order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+      amount DECIMAL(10, 2) NOT NULL,
+      payment_method VARCHAR(50) NOT NULL,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Add paid status to order_items for per-item payment tracking
+  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS paid BOOLEAN DEFAULT false`);
+  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`);
+  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS payment_id INTEGER REFERENCES order_payments(id)`);
+
   console.log('Database initialized');
 }
 
@@ -556,9 +577,12 @@ app.get('/api/orders', checkIpWhitelist, async (req, res) => {
             'quantity', oi.quantity,
             'price', oi.price,
             'notes', oi.notes,
-            'printer_station', oi.printer_station
+            'printer_station', oi.printer_station,
+            'paid', COALESCE(oi.paid, false),
+            'paid_at', oi.paid_at
           )
-        ) FILTER (WHERE oi.id IS NOT NULL) as items
+        ) FILTER (WHERE oi.id IS NOT NULL) as items,
+        COALESCE((SELECT SUM(op.amount) FROM order_payments op WHERE op.order_id = o.id), 0) as paid_amount
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE o.status IN ('pending', 'paid')
@@ -659,9 +683,12 @@ app.get('/api/orders/open/:tableNumber', checkIpWhitelist, async (req, res) => {
             'quantity', oi.quantity,
             'price', oi.price,
             'notes', oi.notes,
-            'printer_station', oi.printer_station
+            'printer_station', oi.printer_station,
+            'paid', COALESCE(oi.paid, false),
+            'paid_at', oi.paid_at
           )
-        ) FILTER (WHERE oi.id IS NOT NULL) as items
+        ) FILTER (WHERE oi.id IS NOT NULL) as items,
+        COALESCE((SELECT SUM(op.amount) FROM order_payments op WHERE op.order_id = o.id), 0) as paid_amount
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE o.status IN ('pending', 'paid') AND o.table_number = $1
@@ -848,6 +875,301 @@ app.get('/api/orders/history', async (req, res) => {
     query += ` LIMIT $${params.length}`;
 
     const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ============================================
+// SPLIT PAYMENT & PER-ITEM PAYMENT ENDPOINTS
+// ============================================
+
+// Get order details with payment status per item
+app.get('/api/orders/:id/details', checkIpWhitelist, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get order with items and their paid status
+    const orderResult = await pool.query(`
+      SELECT o.*,
+        json_agg(
+          json_build_object(
+            'id', oi.id,
+            'item_name', oi.item_name,
+            'quantity', oi.quantity,
+            'price', oi.price,
+            'notes', oi.notes,
+            'printer_station', oi.printer_station,
+            'paid', COALESCE(oi.paid, false),
+            'paid_at', oi.paid_at,
+            'payment_id', oi.payment_id
+          )
+        ) FILTER (WHERE oi.id IS NOT NULL) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `, [id]);
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Bestellung nicht gefunden' });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Get all partial payments for this order
+    const paymentsResult = await pool.query(`
+      SELECT * FROM order_payments WHERE order_id = $1 ORDER BY created_at DESC
+    `, [id]);
+
+    // Calculate totals
+    const items = order.items || [];
+    const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+    const paidAmount = items.filter((item: any) => item.paid).reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+    const unpaidAmount = totalAmount - paidAmount;
+
+    res.json({
+      ...order,
+      payments: paymentsResult.rows,
+      total_amount: totalAmount,
+      paid_amount: paidAmount,
+      unpaid_amount: unpaidAmount,
+      fully_paid: unpaidAmount <= 0
+    });
+  } catch (error) {
+    console.error('Order details error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get unpaid items for an order
+app.get('/api/orders/:id/unpaid-items', checkIpWhitelist, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT id, item_name, quantity, price, notes, printer_station
+      FROM order_items
+      WHERE order_id = $1 AND (paid = false OR paid IS NULL)
+      ORDER BY id
+    `, [id]);
+
+    const items = result.rows;
+    const totalUnpaid = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+
+    res.json({
+      items,
+      total_unpaid: totalUnpaid
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Pay specific items (mark items as paid)
+app.post('/api/orders/:id/pay-items', checkIpWhitelist, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { item_ids, payment_method, description } = req.body;
+
+    if (!item_ids || !Array.isArray(item_ids) || item_ids.length === 0) {
+      return res.status(400).json({ error: 'item_ids muss ein Array mit mindestens einem Artikel sein' });
+    }
+
+    // Verify items belong to this order and are not already paid
+    const itemsCheck = await client.query(`
+      SELECT id, item_name, quantity, price, paid
+      FROM order_items
+      WHERE order_id = $1 AND id = ANY($2)
+    `, [id, item_ids]);
+
+    if (itemsCheck.rows.length !== item_ids.length) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Einige Artikel gehören nicht zu dieser Bestellung' });
+    }
+
+    const alreadyPaid = itemsCheck.rows.filter((item: any) => item.paid);
+    if (alreadyPaid.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Einige Artikel wurden bereits bezahlt',
+        already_paid: alreadyPaid.map((item: any) => item.item_name)
+      });
+    }
+
+    // Calculate payment amount
+    const paymentAmount = itemsCheck.rows.reduce((sum: number, item: any) =>
+      sum + (item.price * item.quantity), 0);
+
+    // Create payment record
+    const paymentResult = await client.query(`
+      INSERT INTO order_payments (order_id, amount, payment_method, description)
+      VALUES ($1, $2, $3, $4) RETURNING *
+    `, [id, paymentAmount, payment_method || 'cash', description || null]);
+
+    const payment = paymentResult.rows[0];
+
+    // Mark items as paid
+    await client.query(`
+      UPDATE order_items
+      SET paid = true, paid_at = NOW(), payment_id = $1
+      WHERE id = ANY($2)
+    `, [payment.id, item_ids]);
+
+    // Check if all items are now paid
+    const unpaidCheck = await client.query(`
+      SELECT COUNT(*) as unpaid_count FROM order_items
+      WHERE order_id = $1 AND (paid = false OR paid IS NULL)
+    `, [id]);
+
+    const allPaid = parseInt(unpaidCheck.rows[0].unpaid_count) === 0;
+
+    // If all items paid, update order status
+    if (allPaid) {
+      await client.query(`
+        UPDATE orders SET status = 'paid', payment_method = $2 WHERE id = $1
+      `, [id, payment_method || 'split']);
+    }
+
+    await client.query('COMMIT');
+
+    // Broadcast update
+    broadcast({
+      type: 'order_updated',
+      order_id: id,
+      payment: payment,
+      all_paid: allPaid
+    });
+
+    // Queue for cloud sync
+    queueOrderSync(parseInt(id), 'update');
+
+    res.json({
+      success: true,
+      payment: payment,
+      paid_items: itemsCheck.rows.map((item: any) => item.item_name),
+      all_paid: allPaid
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Pay items error:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    client.release();
+  }
+});
+
+// Split payment - pay a specific amount (not tied to specific items)
+app.post('/api/orders/:id/split-payment', checkIpWhitelist, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { id } = req.params;
+    const { amount, payment_method, description } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Betrag muss grösser als 0 sein' });
+    }
+
+    // Get order and calculate remaining amount
+    const orderResult = await client.query(`
+      SELECT o.id, o.total, o.status,
+        COALESCE(SUM(op.amount), 0) as already_paid
+      FROM orders o
+      LEFT JOIN order_payments op ON o.id = op.order_id
+      WHERE o.id = $1
+      GROUP BY o.id
+    `, [id]);
+
+    if (orderResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Bestellung nicht gefunden' });
+    }
+
+    const order = orderResult.rows[0];
+    const remaining = parseFloat(order.total) - parseFloat(order.already_paid);
+
+    if (amount > remaining + 0.01) { // Small tolerance for rounding
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: 'Betrag übersteigt den offenen Betrag',
+        remaining: remaining.toFixed(2)
+      });
+    }
+
+    // Create payment record
+    const paymentResult = await client.query(`
+      INSERT INTO order_payments (order_id, amount, payment_method, description)
+      VALUES ($1, $2, $3, $4) RETURNING *
+    `, [id, amount, payment_method || 'cash', description || null]);
+
+    const payment = paymentResult.rows[0];
+
+    // Check if order is fully paid
+    const newRemaining = remaining - amount;
+    const allPaid = newRemaining <= 0.01;
+
+    if (allPaid) {
+      await client.query(`
+        UPDATE orders SET status = 'paid', payment_method = 'split' WHERE id = $1
+      `, [id]);
+    }
+
+    await client.query('COMMIT');
+
+    // Broadcast update
+    broadcast({
+      type: 'order_updated',
+      order_id: id,
+      payment: payment,
+      all_paid: allPaid
+    });
+
+    // Queue for cloud sync
+    queueOrderSync(parseInt(id), 'update');
+
+    res.json({
+      success: true,
+      payment: payment,
+      remaining: Math.max(0, newRemaining).toFixed(2),
+      all_paid: allPaid
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Split payment error:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    client.release();
+  }
+});
+
+// Get all payments for an order (split payments)
+app.get('/api/orders/:id/payments', checkIpWhitelist, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT op.*,
+        json_agg(
+          json_build_object(
+            'id', oi.id,
+            'item_name', oi.item_name,
+            'quantity', oi.quantity,
+            'price', oi.price
+          )
+        ) FILTER (WHERE oi.id IS NOT NULL) as paid_items
+      FROM order_payments op
+      LEFT JOIN order_items oi ON oi.payment_id = op.id
+      WHERE op.order_id = $1
+      GROUP BY op.id
+      ORDER BY op.created_at DESC
+    `, [id]);
+
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: 'Database error' });

@@ -96,12 +96,22 @@ interface User {
   groups: string[];
 }
 
+interface OrderItem {
+  id: number;
+  item_name: string;
+  quantity: number;
+  price: string;
+  paid?: boolean;
+  paid_at?: string;
+}
+
 interface OpenOrder {
   id: number;
   table_number: number;
   total: string;
   created_at: string;
-  items: { item_name: string; quantity: number; price: string }[];
+  items: OrderItem[];
+  paid_amount?: string;
 }
 
 type OrderType = 'bar' | 'tisch';
@@ -134,6 +144,13 @@ function App() {
     total: number;
     message?: string;
   } | null>(null);
+
+  // Split payment states
+  const [splitPaymentOrder, setSplitPaymentOrder] = useState<OpenOrder | null>(null);
+  const [splitPaymentMode, setSplitPaymentMode] = useState<'full' | 'split' | 'items'>('full');
+  const [splitAmount, setSplitAmount] = useState<string>('');
+  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+  const [splitPaymentMethod, setSplitPaymentMethod] = useState<'cash' | 'card'>('cash');
 
   // PWA Install prompt
   useEffect(() => {
@@ -490,6 +507,132 @@ function App() {
     }
 
     setCashPayment(null);
+  };
+
+  // Open split payment modal for an order
+  const openSplitPayment = (order: OpenOrder) => {
+    setSplitPaymentOrder(order);
+    setSplitPaymentMode('full');
+    setSplitAmount('');
+    setSelectedItemIds([]);
+    setSplitPaymentMethod('cash');
+  };
+
+  // Close split payment modal
+  const closeSplitPayment = () => {
+    setSplitPaymentOrder(null);
+    setSplitPaymentMode('full');
+    setSplitAmount('');
+    setSelectedItemIds([]);
+  };
+
+  // Calculate unpaid total for an order
+  const getUnpaidTotal = (order: OpenOrder): number => {
+    if (!order.items) return parseFloat(order.total);
+    const unpaidItems = order.items.filter(item => !item.paid);
+    return unpaidItems.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+  };
+
+  // Calculate total for selected items
+  const getSelectedItemsTotal = (order: OpenOrder): number => {
+    if (!order.items) return 0;
+    return order.items
+      .filter(item => selectedItemIds.includes(item.id))
+      .reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+  };
+
+  // Process split payment
+  const processSplitPayment = async () => {
+    if (!splitPaymentOrder) return;
+
+    try {
+      let response;
+      let amount: number;
+      let message: string;
+
+      if (splitPaymentMode === 'full') {
+        // Pay full remaining amount
+        amount = getUnpaidTotal(splitPaymentOrder);
+        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/split-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount,
+            payment_method: splitPaymentMethod,
+            description: 'Vollständige Bezahlung'
+          }),
+        });
+        message = 'Vollständig bezahlt';
+      } else if (splitPaymentMode === 'split') {
+        // Pay custom amount
+        amount = parseFloat(splitAmount) || 0;
+        if (amount <= 0) {
+          alert('Bitte einen gültigen Betrag eingeben');
+          return;
+        }
+        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/split-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount,
+            payment_method: splitPaymentMethod,
+            description: `Teilzahlung CHF ${amount.toFixed(2)}`
+          }),
+        });
+        message = `Teilzahlung: CHF ${amount.toFixed(2)}`;
+      } else {
+        // Pay selected items
+        if (selectedItemIds.length === 0) {
+          alert('Bitte mindestens einen Artikel auswählen');
+          return;
+        }
+        amount = getSelectedItemsTotal(splitPaymentOrder);
+        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/pay-items`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            item_ids: selectedItemIds,
+            payment_method: splitPaymentMethod,
+          }),
+        });
+        message = `${selectedItemIds.length} Artikel bezahlt`;
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(`Fehler: ${error.error || 'Zahlung fehlgeschlagen'}`);
+        return;
+      }
+
+      const result = await response.json();
+
+      setOrderConfirmation({
+        orderId: splitPaymentOrder.id,
+        orderType: 'tisch',
+        tableNumber: splitPaymentOrder.table_number,
+        total: amount,
+        message: result.all_paid ? `${message} - Bestellung abgeschlossen` : message
+      });
+
+      closeSplitPayment();
+
+      // Refresh open orders
+      if (tableNumber) {
+        fetchOpenOrders(tableNumber);
+      }
+    } catch (error) {
+      console.error('Split payment error:', error);
+      alert('Fehler bei der Bezahlung');
+    }
+  };
+
+  // Toggle item selection for per-item payment
+  const toggleItemSelection = (itemId: number) => {
+    setSelectedItemIds(prev =>
+      prev.includes(itemId)
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
   };
 
   const getTableNumber = (): number => {
@@ -864,27 +1007,58 @@ function App() {
                       Offene Bestellungen für Tisch {tableNumber}
                     </label>
                     <div className="space-y-2">
-                      {openOrders.map(order => (
-                        <button
-                          key={order.id}
-                          onClick={() => setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
-                          className={`w-full text-left p-2 rounded-lg transition ${
-                            selectedOrder?.id === order.id
-                              ? 'bg-yellow-400 text-yellow-900'
-                              : 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800'
-                          }`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold">#{order.id}</span>
-                            <span className="font-bold">CHF {parseFloat(order.total).toFixed(2)}</span>
+                      {openOrders.map(order => {
+                        const unpaidTotal = getUnpaidTotal(order);
+                        const totalAmount = parseFloat(order.total);
+                        const hasPaidItems = order.items?.some(i => i.paid);
+                        return (
+                          <div key={order.id} className="bg-yellow-100 rounded-lg overflow-hidden">
+                            <button
+                              onClick={() => setSelectedOrder(selectedOrder?.id === order.id ? null : order)}
+                              className={`w-full text-left p-2 transition ${
+                                selectedOrder?.id === order.id
+                                  ? 'bg-yellow-400 text-yellow-900'
+                                  : 'hover:bg-yellow-200 text-yellow-800'
+                              }`}
+                            >
+                              <div className="flex justify-between items-center">
+                                <span className="font-semibold">#{order.id}</span>
+                                <div className="text-right">
+                                  {hasPaidItems && (
+                                    <div className="text-xs text-green-700 line-through">
+                                      CHF {totalAmount.toFixed(2)}
+                                    </div>
+                                  )}
+                                  <span className="font-bold">
+                                    {hasPaidItems ? `Offen: CHF ${unpaidTotal.toFixed(2)}` : `CHF ${totalAmount.toFixed(2)}`}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-xs mt-1">
+                                {order.items && order.items[0]?.item_name
+                                  ? order.items.map(i => (
+                                      <span key={i.id} className={i.paid ? 'line-through text-green-700' : ''}>
+                                        {i.quantity}x {i.item_name}
+                                        {i.paid && ' ✓'}
+                                      </span>
+                                    )).reduce((prev, curr, idx) => idx === 0 ? [curr] : [...prev, ', ', curr], [] as any)
+                                  : 'Keine Artikel'}
+                              </div>
+                            </button>
+                            {unpaidTotal > 0 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openSplitPayment(order);
+                                }}
+                                className="w-full py-2 bg-green-600 hover:bg-green-700 text-white font-semibold text-sm transition touch-manipulation"
+                              >
+                                💳 Bezahlen
+                              </button>
+                            )}
                           </div>
-                          <div className="text-xs mt-1">
-                            {order.items && order.items[0]?.item_name
-                              ? order.items.map(i => `${i.quantity}x ${i.item_name}`).join(', ')
-                              : 'Keine Artikel'}
-                          </div>
-                        </button>
-                      ))}
+                        );
+                      })}
                     </div>
                     {selectedOrder && (
                       <p className="text-xs text-yellow-700 mt-2">
@@ -1219,6 +1393,195 @@ function App() {
             >
               Abbrechen
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Split Payment Modal */}
+      {splitPaymentOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-center mb-2">💳 Bezahlen</h2>
+              <p className="text-sm text-gray-600 text-center mb-1">
+                Tisch {splitPaymentOrder.table_number} - Bestellung #{splitPaymentOrder.id}
+              </p>
+              <p className="text-lg font-bold text-center text-fwv-red mb-4">
+                Offen: CHF {getUnpaidTotal(splitPaymentOrder).toFixed(2)}
+              </p>
+
+              {/* Payment Mode Tabs */}
+              <div className="grid grid-cols-3 gap-1 mb-4 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => { setSplitPaymentMode('full'); setSelectedItemIds([]); setSplitAmount(''); }}
+                  className={`py-2 px-2 rounded-md text-sm font-medium transition ${
+                    splitPaymentMode === 'full'
+                      ? 'bg-white shadow text-fwv-red'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Alles
+                </button>
+                <button
+                  onClick={() => { setSplitPaymentMode('split'); setSelectedItemIds([]); }}
+                  className={`py-2 px-2 rounded-md text-sm font-medium transition ${
+                    splitPaymentMode === 'split'
+                      ? 'bg-white shadow text-fwv-red'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Betrag
+                </button>
+                <button
+                  onClick={() => { setSplitPaymentMode('items'); setSplitAmount(''); }}
+                  className={`py-2 px-2 rounded-md text-sm font-medium transition ${
+                    splitPaymentMode === 'items'
+                      ? 'bg-white shadow text-fwv-red'
+                      : 'text-gray-600 hover:text-gray-800'
+                  }`}
+                >
+                  Artikel
+                </button>
+              </div>
+
+              {/* Full Payment Mode */}
+              {splitPaymentMode === 'full' && (
+                <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 mb-4 text-center">
+                  <div className="text-sm text-green-700 mb-1">Gesamtbetrag bezahlen</div>
+                  <div className="text-4xl font-bold text-green-700">
+                    CHF {getUnpaidTotal(splitPaymentOrder).toFixed(2)}
+                  </div>
+                </div>
+              )}
+
+              {/* Split Amount Mode */}
+              {splitPaymentMode === 'split' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Betrag eingeben (max. CHF {getUnpaidTotal(splitPaymentOrder).toFixed(2)})
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.05"
+                    min="0.05"
+                    max={getUnpaidTotal(splitPaymentOrder)}
+                    value={splitAmount}
+                    onChange={(e) => setSplitAmount(e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-2xl font-bold text-center focus:border-fwv-red focus:outline-none"
+                    placeholder="0.00"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    {[10, 20, 50].map(amount => (
+                      <button
+                        key={amount}
+                        onClick={() => setSplitAmount(Math.min(amount, getUnpaidTotal(splitPaymentOrder)).toFixed(2))}
+                        className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium"
+                      >
+                        {amount}.-
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setSplitAmount((getUnpaidTotal(splitPaymentOrder) / 2).toFixed(2))}
+                      className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium"
+                    >
+                      ½
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Per-Item Mode */}
+              {splitPaymentMode === 'items' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Artikel auswählen
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {splitPaymentOrder.items?.filter(item => !item.paid).map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => toggleItemSelection(item.id)}
+                        className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                          selectedItemIds.includes(item.id)
+                            ? 'bg-green-100 border-green-500'
+                            : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium">
+                            {selectedItemIds.includes(item.id) ? '✓ ' : ''}{item.quantity}x {item.item_name}
+                          </span>
+                          <span className="font-bold">
+                            CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedItemIds.length > 0 && (
+                    <div className="mt-3 p-3 bg-green-50 rounded-lg text-center">
+                      <span className="text-sm text-green-700">Ausgewählt: </span>
+                      <span className="font-bold text-green-700">
+                        CHF {getSelectedItemsTotal(splitPaymentOrder).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Payment Method Selection */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Zahlungsart
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setSplitPaymentMethod('cash')}
+                    className={`py-3 rounded-lg font-semibold transition ${
+                      splitPaymentMethod === 'cash'
+                        ? 'bg-fwv-red text-white'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    💵 Bar
+                  </button>
+                  <button
+                    onClick={() => setSplitPaymentMethod('card')}
+                    className={`py-3 rounded-lg font-semibold transition ${
+                      splitPaymentMethod === 'card'
+                        ? 'bg-fwv-red text-white'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    💳 Karte
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Button */}
+              <button
+                onClick={processSplitPayment}
+                disabled={
+                  (splitPaymentMode === 'split' && (!splitAmount || parseFloat(splitAmount) <= 0)) ||
+                  (splitPaymentMode === 'items' && selectedItemIds.length === 0)
+                }
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-lg touch-manipulation"
+              >
+                {splitPaymentMode === 'full' && `CHF ${getUnpaidTotal(splitPaymentOrder).toFixed(2)} bezahlen`}
+                {splitPaymentMode === 'split' && splitAmount && `CHF ${parseFloat(splitAmount).toFixed(2)} bezahlen`}
+                {splitPaymentMode === 'split' && !splitAmount && 'Betrag eingeben'}
+                {splitPaymentMode === 'items' && selectedItemIds.length > 0 && `CHF ${getSelectedItemsTotal(splitPaymentOrder).toFixed(2)} bezahlen`}
+                {splitPaymentMode === 'items' && selectedItemIds.length === 0 && 'Artikel auswählen'}
+              </button>
+
+              <button
+                onClick={closeSplitPayment}
+                className="w-full mt-3 text-gray-500 hover:text-gray-700 py-2 text-sm"
+              >
+                Abbrechen
+              </button>
+            </div>
           </div>
         </div>
       )}
