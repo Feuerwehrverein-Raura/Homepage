@@ -23,7 +23,7 @@
     </style>
 
     <style name="CompleteButton" parent="Widget.MaterialComponents.Button">
-        <item name="backgroundTint">@color/accent</item>
+        <item name="backgroundTint">@color/success</item>
         <item name="android:textColor">@color/text_primary</item>
     </style>
 </resources>

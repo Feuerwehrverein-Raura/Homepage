@@ -347,7 +347,7 @@ function App() {
               onClick={() => setStation('all')}
               className={`px-4 py-2 rounded font-semibold ${
                 station === 'all' 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-fwv-red text-white' 
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
@@ -357,7 +357,7 @@ function App() {
               onClick={() => setStation('bar')}
               className={`px-4 py-2 rounded font-semibold ${
                 station === 'bar' 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-fwv-red text-white' 
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
@@ -367,7 +367,7 @@ function App() {
               onClick={() => setStation('kitchen')}
               className={`px-4 py-2 rounded font-semibold ${
                 station === 'kitchen' 
-                  ? 'bg-blue-600 text-white' 
+                  ? 'bg-fwv-red text-white' 
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
@@ -462,7 +462,7 @@ function OrderCard({
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div>
-          <div className={`text-3xl font-bold ${order.table_number === 0 ? 'text-yellow-400' : 'text-blue-400'}`}>
+          <div className={`text-3xl font-bold ${order.table_number === 0 ? 'text-yellow-400' : 'text-fwv-red'}`}>
             {order.table_number === 0 ? `Bestellung #${order.id}` : `Tisch ${order.table_number}`}
           </div>
           <div className={`text-sm font-semibold ${
