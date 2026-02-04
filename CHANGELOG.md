@@ -1,3 +1,10 @@
+## [1.135.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.4...v1.135.5) (2026-02-04)
+
+
+### Bug Fixes
+
+* **routing:** remove /arbeitsplan from dispatch router ([acc74b6](https://github.com/Feuerwehrverein-Raura/Homepage/commit/acc74b6d5c41be46c9ccd2f8ff97570a77e34de5))
+
 ## [1.135.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.3...v1.135.4) (2026-02-02)
 
 
