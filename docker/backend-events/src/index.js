@@ -521,11 +521,11 @@ app.get('/events', async (req, res) => {
                     registrations: {
                         approved: approved.map(r => ({
                             id: r.id,
-                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                            name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt')
                         })),
                         pending: pending.map(r => ({
                             id: r.id,
-                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
+                            name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt')
                         })),
                         approvedCount: approved.length,
                         pendingCount: pending.length,
@@ -654,13 +654,13 @@ app.get('/events/:id', async (req, res) => {
             directRegistrations: {
                 approved: directApproved.map(r => ({
                     id: r.id,
-                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                    name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt'),
                     email: r.guest_email,
                     notes: r.notes
                 })),
                 pending: directPending.map(r => ({
                     id: r.id,
-                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                    name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt'),
                     email: r.guest_email,
                     notes: r.notes
                 })),
