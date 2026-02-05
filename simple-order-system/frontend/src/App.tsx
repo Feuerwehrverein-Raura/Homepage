@@ -237,7 +237,7 @@ function App() {
     localStorage.removeItem('order_token');
     setToken(null);
     setUser(null);
-    window.location.href = `${AUTHENTIK_URL}/if/flow/default-invalidation-flow/?next=${encodeURIComponent('https://fwv-raura.ch/')}`;
+    window.location.href = `${AUTHENTIK_URL}/if/flow/default-invalidation-flow/`;
   };
 
   const fetchItems = async () => {
