@@ -159,6 +159,46 @@
     <string name="notification_registration">Neuer Mitgliedschaftsantrag</string>
     <string name="notification_multiple">%1$d neue Änderungen</string>
 
+    <!-- Dispatch -->
+    <string name="dispatch_tab_send">Senden</string>
+    <string name="dispatch_tab_templates">Vorlagen</string>
+    <string name="dispatch_tab_post">Post</string>
+    <string name="dispatch_tab_log">Verlauf</string>
+    <string name="dispatch_send">Senden</string>
+    <string name="dispatch_preview">Vorschau</string>
+    <string name="dispatch_send_mode">Versandart</string>
+    <string name="dispatch_mode_smart">Automatisch</string>
+    <string name="dispatch_mode_email">Nur E-Mail</string>
+    <string name="dispatch_mode_post">Nur Post</string>
+    <string name="dispatch_recipients">Empfänger</string>
+    <string name="dispatch_template">Vorlage</string>
+    <string name="dispatch_subject">Betreff</string>
+    <string name="dispatch_body">Nachricht</string>
+    <string name="dispatch_pdf_upload">PDF-Anhang</string>
+    <string name="dispatch_no_pdf">Kein PDF ausgewählt</string>
+    <string name="dispatch_select_pdf">PDF wählen</string>
+    <string name="dispatch_select_member">Mitglied wählen</string>
+    <string name="dispatch_send_letter">Brief senden</string>
+    <string name="dispatch_staging_mode">Staging-Modus</string>
+    <string name="dispatch_staging_hint">Testmodus — keine echten Briefe</string>
+    <string name="dispatch_staging_active">Staging aktiv — kein echter Versand</string>
+    <string name="dispatch_pingen_balance">Pingen Guthaben</string>
+    <string name="dispatch_letter_history">Brief-Historie</string>
+    <string name="dispatch_check_status">Status prüfen</string>
+    <string name="dispatch_no_letters">Noch keine Briefe versendet</string>
+    <string name="dispatch_no_templates">Keine Vorlagen vorhanden</string>
+    <string name="dispatch_templates_web_hint">Vorlagen können im Web-Portal erstellt werden</string>
+    <string name="dispatch_no_log">Kein Versand-Protokoll vorhanden</string>
+    <string name="dispatch_filter_all">Alle</string>
+    <string name="dispatch_filter_email">E-Mail</string>
+    <string name="dispatch_filter_post">Post</string>
+    <string name="dispatch_stat_total">Gesamt</string>
+    <string name="dispatch_stat_sent">Gesendet</string>
+    <string name="dispatch_stat_pending">Offen</string>
+    <string name="dispatch_stat_failed">Fehler</string>
+    <string name="dispatch_stat_30days">30 Tage</string>
+    <string name="dispatch_stat_7days">7 Tage</string>
+
     <!-- Update -->
     <string name="update_available">Update verfügbar</string>
     <string name="update_message">Version %1$s ist verfügbar. Jetzt herunterladen?</string>

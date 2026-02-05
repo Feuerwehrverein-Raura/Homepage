@@ -8,6 +8,9 @@
 -keep class ch.fwvraura.vorstand.data.model.** { *; }
 -keepclassmembers class ch.fwvraura.vorstand.data.model.** { *; }
 
+# UpdateChecker (Gson-serialisierte innere Klassen)
+-keep class ch.fwvraura.vorstand.util.UpdateChecker$* { *; }
+
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**

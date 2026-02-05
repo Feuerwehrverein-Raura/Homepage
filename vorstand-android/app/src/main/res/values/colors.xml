@@ -45,6 +45,11 @@
     <color name="login_text">#FFFFFF</color>
     <color name="login_hint">#9CA3AF</color>
 
+    <!-- Pingen Status Badge Colors -->
+    <color name="pingen_sent">#10B981</color>
+    <color name="pingen_pending">#F59E0B</color>
+    <color name="pingen_failed">#EF4444</color>
+
     <!-- Event Status Badge Colors -->
     <color name="event_planned">#3B82F6</color>
     <color name="event_planned_bg">#DBEAFE</color>

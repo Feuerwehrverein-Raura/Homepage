@@ -108,4 +108,10 @@ object ApiModule {
      * Wird lazy erstellt — erst beim ersten Zugriff wird das Retrofit-Interface generiert.
      */
     val auditApi: AuditApi by lazy { retrofit!!.create(AuditApi::class.java) }
+
+    /**
+     * API-Interface fuer Dispatch (Nachrichtenversand per E-Mail und Briefpost).
+     * Wird lazy erstellt — erst beim ersten Zugriff wird das Retrofit-Interface generiert.
+     */
+    val dispatchApi: DispatchApi by lazy { retrofit!!.create(DispatchApi::class.java) }
 }
