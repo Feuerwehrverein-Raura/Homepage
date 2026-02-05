@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apps - Feuerwehrverein Raura Kaiseraugst</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="font-sans bg-gray-50">
+
+    <!-- Navigation -->
+    <nav class="bg-fire-700 text-white shadow-lg fixed top-0 w-full z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <img src="images/logo.png" alt="FWV Raura Logo" class="h-10 w-10">
+                    <span class="text-xl font-bold">FWV Raura</span>
+                </div>
+
+                <!-- Desktop Links -->
+                <div class="hidden lg:flex items-center space-x-4">
+                    <a href="./index.html" class="hover:text-fire-200 transition-colors">Home</a>
+                    <a href="./index.html#about" class="hover:text-fire-200 transition-colors">Über uns</a>
+                    <a href="./index.html#events" class="hover:text-fire-200 transition-colors">Termine</a>
+                    <a href="./calendar.html" class="hover:text-fire-200 transition-colors">Kalender</a>
+                    <a href="./index.html#statuten" class="hover:text-fire-200 transition-colors">Statuten</a>
+                    <a href="./events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                    <a href="./mein.html" class="hover:text-fire-200 transition-colors">Mitglieder</a>
+                    <a href="./vorstand.html" class="hover:text-fire-200 transition-colors">Vorstand</a>
+                    <a href="./apps.html" class="text-fire-200 font-semibold">
+                        <svg class="inline-block w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        Apps
+                    </a>
+                    <a href="./index.html#contact" class="hover:text-fire-200 transition-colors">Kontakt</a>
+                </div>
+
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-btn" class="lg:hidden focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden lg:hidden bg-fire-800">
+            <div class="px-4 py-3 space-y-2">
+                <a href="./index.html" class="block py-2 hover:text-fire-200 transition-colors">Home</a>
+                <a href="./index.html#about" class="block py-2 hover:text-fire-200 transition-colors">Über uns</a>
+                <a href="./index.html#events" class="block py-2 hover:text-fire-200 transition-colors">Termine</a>
+                <a href="./calendar.html" class="block py-2 hover:text-fire-200 transition-colors">Kalender</a>
+                <a href="./index.html#statuten" class="block py-2 hover:text-fire-200 transition-colors">Statuten</a>
+                <a href="./events.html" class="block py-2 hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                <a href="./mein.html" class="block py-2 hover:text-fire-200 transition-colors">Mitglieder</a>
+                <a href="./vorstand.html" class="block py-2 hover:text-fire-200 transition-colors">Vorstand</a>
+                <a href="./apps.html" class="block py-2 text-fire-200 font-semibold">Apps</a>
+                <a href="./index.html#contact" class="block py-2 hover:text-fire-200 transition-colors">Kontakt</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-br from-fire-600 to-fire-800 text-white py-20 mt-16">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <div class="w-24 h-24 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center mx-auto mb-8">
+                <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+            <h1 class="text-5xl font-bold mb-4">Unsere Apps</h1>
+            <p class="text-xl text-fire-100 max-w-2xl mx-auto mb-8">Digitale Werkzeuge für den Feuerwehrverein – von der Vereinsverwaltung bis zur Lagerbewirtschaftung.</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="#android-apps" class="bg-white text-fire-700 px-8 py-3 rounded-xl font-semibold hover:bg-fire-50 transition-colors shadow-md">Android Apps</a>
+                <a href="#web-apps" class="border-2 border-white text-white px-8 py-3 rounded-xl font-semibold hover:bg-white hover:text-fire-700 transition-colors">Web Apps</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Android Apps Section -->
+    <section id="android-apps" class="bg-white py-16">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 mb-3">Android Apps</h2>
+                <div class="w-24 h-1 bg-fire-500 mx-auto mb-4"></div>
+                <p class="text-gray-600 max-w-2xl mx-auto">Native Android-Anwendungen für den Vereinsbetrieb. Direkt als APK herunterladen und installieren.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+
+                <!-- Card: Vorstand -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/vorstand.png" alt="Vorstand App" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Vorstand</h3>
+                            <p class="text-gray-500 text-sm">Vereinsverwaltung</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Android 8+
+                                </span>
+                                <span id="vorstand-version" class="text-gray-400 text-xs">Lade...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Verwaltungs-App für den Vereinsvorstand. Mitglieder und Events verwalten, Anmeldungen prüfen und Audit-Protokolle einsehen.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Mitgliederverwaltung
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Event-Verwaltung mit Schichten
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Anmeldungen verwalten
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Audit-Protokoll
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Auto-Update
+                            </li>
+                        </ul>
+                        <a id="vorstand-download" href="#" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            APK herunterladen
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Card: Küchenanzeige (KDS) -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/kds.png" alt="Küchenanzeige App" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Küchenanzeige</h3>
+                            <p class="text-gray-500 text-sm">Bestellanzeige für Küche & Bar</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Android 7+
+                                </span>
+                                <span id="kds-version" class="text-gray-400 text-xs">Lade...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Echtzeit-Bestellanzeige für die Küche und Bar bei Veranstaltungen. Zeigt eingehende Bestellungen mit Audio-Benachrichtigung.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Echtzeit-Bestellungen via WebSocket
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Stationsfilter (Bar/Küche/Alle)
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Audio-Benachrichtigungen
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Bildschirm bleibt an
+                            </li>
+                        </ul>
+                        <a id="kds-download" href="#" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            APK herunterladen
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Web Apps Section -->
+    <section id="web-apps" class="bg-gray-50 py-16">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 mb-3">Web Apps</h2>
+                <div class="w-24 h-1 bg-fire-500 mx-auto mb-4"></div>
+                <p class="text-gray-600 max-w-2xl mx-auto">Progressive Web Apps – direkt im Browser nutzbar, auf jedem Gerät. Kein Download erforderlich.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+
+                <!-- Card: Bestellsystem -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/kasse.png" alt="Bestellsystem" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Bestellsystem</h3>
+                            <p class="text-gray-500 text-sm">Kasse & Bestellverwaltung</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Web App
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Bestell- und Kassensystem für Veranstaltungen. Bestellungen aufnehmen, verwalten und in Echtzeit an die Küche senden.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Bestellverwaltung
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Kassenfunktion
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Echtzeit-Updates
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Offline-fähig
+                            </li>
+                        </ul>
+                        <a href="https://order.fwv-raura.ch" target="_blank" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                            Öffnen
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Card: Küchenanzeige Web -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/kueche.png" alt="Küchenanzeige Web" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Küchenanzeige Web</h3>
+                            <p class="text-gray-500 text-sm">Bestellanzeige im Browser</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Web App
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Browser-basierte Küchenanzeige als Alternative zur Android-App. Optimiert für Tablet-Displays mit dunklem Design.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Echtzeit-Bestellanzeige
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Dunkles Design
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                WebSocket-Verbindung
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Vollbild-Modus
+                            </li>
+                        </ul>
+                        <a href="https://order.fwv-raura.ch" target="_blank" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                            Öffnen
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Card: Registrierung -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/registrierung.png" alt="Registrierung" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Registrierung</h3>
+                            <p class="text-gray-500 text-sm">Zugang freischalten</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Web App
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Mitglieder-Registrierung für das Bestellsystem. Zugang aktivieren und Berechtigung erhalten.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Mitglieder-Registrierung
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Zugangs-Aktivierung
+                            </li>
+                        </ul>
+                        <a href="https://order.fwv-raura.ch/register" target="_blank" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                            Öffnen
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Card: Lagerverwaltung -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/inventar.png" alt="Lagerverwaltung" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Lagerverwaltung</h3>
+                            <p class="text-gray-500 text-sm">Inventar & Barcode-Scanner</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Web App
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Inventarsystem mit integriertem Barcode-Scanner. Artikel erfassen, Lagerbestände verwalten und bei niedrigem Bestand warnen.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Barcode-Scanning (Kamera & USB)
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Kategorien & Lagerorte
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Bestandsverwaltung
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Warnungen bei niedrigem Bestand
+                            </li>
+                        </ul>
+                        <a href="https://inventar.fwv-raura.ch" target="_blank" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                            Öffnen
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section class="bg-white py-16">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 mb-3">APK Installation</h2>
+                <div class="w-24 h-1 bg-fire-500 mx-auto mb-4"></div>
+                <p class="text-gray-600 max-w-2xl mx-auto">So installierst du Android Apps ausserhalb des Play Stores</p>
+            </div>
+
+            <div class="max-w-3xl mx-auto">
+                <div class="space-y-8">
+                    <!-- Step 1 -->
+                    <div class="flex items-start space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">1</div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">APK herunterladen</h3>
+                            <p class="text-gray-600">Tippe auf «APK herunterladen» bei der gewünschten App.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="flex items-start space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">2</div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">Installation erlauben</h3>
+                            <p class="text-gray-600">Öffne Einstellungen → Sicherheit → «Unbekannte Quellen» aktivieren (oder erlaube es für deinen Browser).</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="flex items-start space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">3</div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">APK öffnen</h3>
+                            <p class="text-gray-600">Öffne die heruntergeladene Datei aus den Benachrichtigungen oder dem Downloads-Ordner.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="flex items-start space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">4</div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-800">Installieren</h3>
+                            <p class="text-gray-600">Tippe auf «Installieren» und öffne die App nach Abschluss.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tip Box -->
+                <div class="mt-10 bg-fire-50 border border-fire-200 rounded-lg p-4">
+                    <p class="text-gray-700"><strong>Tipp:</strong> Die Vorstand-App verfügt über eine Auto-Update-Funktion. Nach der Erstinstallation werden Updates automatisch erkannt und installiert.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Logo & Description -->
+                <div>
+                    <div class="flex items-center space-x-3 mb-4">
+                        <img src="images/logo.png" alt="FWV Raura Logo" class="h-10 w-10">
+                        <span class="text-xl font-bold">FWV Raura</span>
+                    </div>
+                    <p class="text-gray-400">Der Feuerwehrverein Raura Kaiseraugst – Tradition, Kameradschaft und Engagement für die Gemeinschaft.</p>
+                </div>
+
+                <!-- Quick Links -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Schnelllinks</h3>
+                    <ul class="space-y-2">
+                        <li><a href="./index.html" class="text-gray-400 hover:text-white transition-colors">Home</a></li>
+                        <li><a href="./index.html#events" class="text-gray-400 hover:text-white transition-colors">Termine</a></li>
+                        <li><a href="./events.html" class="text-gray-400 hover:text-white transition-colors">Veranstaltungen</a></li>
+                        <li><a href="./calendar.html" class="text-gray-400 hover:text-white transition-colors">Kalender</a></li>
+                        <li><a href="./apps.html" class="text-gray-400 hover:text-white transition-colors">Apps</a></li>
+                        <li><a href="./index.html#contact" class="text-gray-400 hover:text-white transition-colors">Kontakt</a></li>
+                    </ul>
+                </div>
+
+                <!-- Contact -->
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Kontakt</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li>Feuerwehrverein Raura</li>
+                        <li>Kaiseraugst</li>
+                        <li><a href="mailto:info@fwv-raura.ch" class="hover:text-white transition-colors">info@fwv-raura.ch</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2026 Feuerwehrverein Raura Kaiseraugst</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        // Load latest GitHub releases for Android apps
+        async function loadLatestRelease(appPrefix) {
+            const downloadBtn = document.getElementById(`${appPrefix}-download`);
+            const versionSpan = document.getElementById(`${appPrefix}-version`);
+
+            try {
+                const response = await fetch(
+                    'https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases'
+                );
+                const releases = await response.json();
+                const appRelease = releases.find(r => r.tag_name.startsWith(`${appPrefix}-v`));
+
+                if (appRelease) {
+                    const apkAsset = appRelease.assets.find(a => a.name.endsWith('.apk'));
+                    if (apkAsset) {
+                        downloadBtn.href = apkAsset.browser_download_url;
+                    } else {
+                        downloadBtn.href = appRelease.html_url;
+                    }
+                    const version = appRelease.tag_name.replace(`${appPrefix}-v`, 'v');
+                    versionSpan.textContent = version;
+                }
+            } catch (error) {
+                // Fallback URLs
+                const fallbacks = {
+                    'vorstand': 'https://github.com/Feuerwehrverein-Raura/Homepage/releases',
+                    'kds': 'https://github.com/Feuerwehrverein-Raura/Homepage/releases'
+                };
+                downloadBtn.href = fallbacks[appPrefix] || '#';
+                versionSpan.textContent = '';
+            }
+        }
+
+        loadLatestRelease('vorstand');
+        loadLatestRelease('kds');
+    </script>
+
+</body>
+</html>
