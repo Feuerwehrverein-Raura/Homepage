@@ -199,6 +199,48 @@
     <string name="dispatch_stat_30days">30 Tage</string>
     <string name="dispatch_stat_7days">7 Tage</string>
 
+    <!-- Mailcow -->
+    <string name="mailcow_title">E-Mail Verwaltung</string>
+    <string name="mailcow_tab_mailboxes">Postfächer</string>
+    <string name="mailcow_tab_aliases">Aliase</string>
+    <string name="mailcow_tab_storage">Speicher</string>
+    <string name="mailcow_tab_distribution">Verteiler</string>
+    <string name="mailcow_add_mailbox">Neue Mailbox</string>
+    <string name="mailcow_edit_mailbox">Mailbox bearbeiten</string>
+    <string name="mailcow_delete_mailbox">Mailbox löschen</string>
+    <string name="mailcow_delete_mailbox_confirm">Soll diese Mailbox wirklich gelöscht werden?\n\nAlle E-Mails gehen verloren!</string>
+    <string name="mailcow_local_part">Benutzername</string>
+    <string name="mailcow_name">Anzeigename</string>
+    <string name="mailcow_password">Passwort</string>
+    <string name="mailcow_password_hint">Mindestens 8 Zeichen</string>
+    <string name="mailcow_password_edit_hint">Leer lassen um nicht zu ändern</string>
+    <string name="mailcow_quota_mb">Speicherplatz (MB)</string>
+    <string name="mailcow_active">Aktiv</string>
+    <string name="mailcow_inactive">Inaktiv</string>
+    <string name="mailcow_add_alias">Neuer Alias</string>
+    <string name="mailcow_edit_alias">Alias bearbeiten</string>
+    <string name="mailcow_delete_alias">Alias löschen</string>
+    <string name="mailcow_delete_alias_confirm">Soll dieser Alias wirklich gelöscht werden?</string>
+    <string name="mailcow_alias_address">Alias-Adresse</string>
+    <string name="mailcow_alias_goto">Zieladresse(n)</string>
+    <string name="mailcow_alias_goto_hint">Komma-getrennt für mehrere Empfänger</string>
+    <string name="mailcow_no_mailboxes">Keine Postfächer vorhanden</string>
+    <string name="mailcow_no_aliases">Keine Aliase vorhanden</string>
+    <string name="mailcow_mailbox_created">Mailbox erstellt</string>
+    <string name="mailcow_mailbox_updated">Mailbox aktualisiert</string>
+    <string name="mailcow_mailbox_deleted">Mailbox gelöscht</string>
+    <string name="mailcow_alias_created">Alias erstellt</string>
+    <string name="mailcow_alias_updated">Alias aktualisiert</string>
+    <string name="mailcow_alias_deleted">Alias gelöscht</string>
+    <string name="mailcow_quota_usage">%1$s / %2$s</string>
+    <string name="mailcow_zustellung_count">%1$d Mitglieder mit E-Mail-Zustellung</string>
+    <string name="mailcow_copy_emails">E-Mails kopieren</string>
+    <string name="mailcow_emails_copied">%1$d E-Mail-Adressen kopiert</string>
+    <string name="mailcow_sync_alias">Alias synchronisieren</string>
+    <string name="mailcow_sync_hint">Aktualisiert mitglieder@fwv-raura.ch</string>
+    <string name="mailcow_domain_suffix">\@fwv-raura.ch</string>
+    <string name="mailcow_no_zustellung">Keine Mitglieder mit E-Mail-Zustellung</string>
+
     <!-- Update -->
     <string name="update_available">Update verfügbar</string>
     <string name="update_message">Version %1$s ist verfügbar. Jetzt herunterladen?</string>

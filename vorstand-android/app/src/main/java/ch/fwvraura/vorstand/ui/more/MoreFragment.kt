@@ -5,7 +5,9 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.navigation.fragment.findNavController
 import ch.fwvraura.vorstand.MainActivity
+import ch.fwvraura.vorstand.R
 import ch.fwvraura.vorstand.VorstandApp
 import ch.fwvraura.vorstand.databinding.FragmentMoreBinding
 
@@ -56,6 +58,11 @@ class MoreFragment : Fragment() {
         // Der TokenManager wird ueber die globale VorstandApp-Instanz abgerufen
         val tokenManager = VorstandApp.instance.tokenManager
         binding.versionText.append("\n${tokenManager.userEmail ?: ""}")
+
+        // E-Mail-Verwaltung (Mailcow)
+        binding.cardEmail.setOnClickListener {
+            findNavController().navigate(R.id.action_more_to_mailcow)
+        }
 
         // Logout-Button: ruft die logout()-Methode der MainActivity auf,
         // die den Token loescht und zum Login-Screen zuruecknavigiert

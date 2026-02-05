@@ -73,7 +73,7 @@
             app:argType="string" />
     </fragment>
 
-    <!-- Dispatch (Phase 2 placeholder) -->
+    <!-- Dispatch -->
     <fragment
         android:id="@+id/nav_dispatch"
         android:name="ch.fwvraura.vorstand.ui.dispatch.DispatchFragment"
@@ -106,6 +106,16 @@
     <fragment
         android:id="@+id/nav_more"
         android:name="ch.fwvraura.vorstand.ui.more.MoreFragment"
-        android:label="@string/nav_more" />
+        android:label="@string/nav_more">
+        <action
+            android:id="@+id/action_more_to_mailcow"
+            app:destination="@id/mailcowFragment" />
+    </fragment>
+
+    <!-- Mailcow (E-Mail Verwaltung) -->
+    <fragment
+        android:id="@+id/mailcowFragment"
+        android:name="ch.fwvraura.vorstand.ui.mailcow.MailcowFragment"
+        android:label="@string/mailcow_title" />
 
 </navigation>
