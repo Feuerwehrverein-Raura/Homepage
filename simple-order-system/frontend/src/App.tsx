@@ -237,8 +237,8 @@ function App() {
     localStorage.removeItem('order_token');
     setToken(null);
     setUser(null);
-    // Use OIDC end-session endpoint to properly invalidate Authentik session
-    window.location.href = `${AUTHENTIK_URL}/application/o/order-system/end-session/?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`;
+    // Invalidate Authentik session via OIDC end-session (no redirect URI to avoid re-login loop)
+    window.location.href = `${AUTHENTIK_URL}/application/o/order-system/end-session/`;
   };
 
   const fetchItems = async () => {

@@ -366,6 +366,8 @@ function App() {
     localStorage.removeItem('inventory_token');
     setToken(null);
     setUser(null);
+    // Invalidate Authentik session via OIDC end-session
+    window.location.href = `${AUTHENTIK_URL}/application/o/inventory-system/end-session/`;
   };
 
   const fetchItems = async () => {

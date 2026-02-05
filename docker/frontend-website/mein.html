@@ -1322,7 +1322,8 @@
 
         document.getElementById('logout-btn').addEventListener('click', () => {
             localStorage.removeItem('auth_token');
-            window.location.href = '/';
+            // Invalidate Authentik session via OIDC end-session
+            window.location.href = `${AUTHENTIK_URL}/application/o/fwv-members/end-session/`;
         });
 
         // Photo upload event listeners
