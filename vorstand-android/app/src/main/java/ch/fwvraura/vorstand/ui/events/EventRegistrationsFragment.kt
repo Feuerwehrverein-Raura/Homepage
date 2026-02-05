@@ -68,12 +68,14 @@ class EventRegistrationsFragment : Fragment() {
             val recycler = shiftView.findViewById<RecyclerView>(R.id.registrationsRecycler)
 
             title.text = shift.name
-            val registered = shift.registrations?.size ?: 0
+            val regs = shift.registrations
+            val registered = regs?.approvedCount ?: regs?.approved?.size ?: 0
             val needed = shift.needed ?: 0
             info.text = "$registered / $needed | ${DateUtils.formatDate(shift.date)} ${shift.startTime ?: ""}-${shift.endTime ?: ""}"
 
+            val allRegistrations = (regs?.approved ?: emptyList()) + (regs?.pending ?: emptyList())
             recycler.layoutManager = LinearLayoutManager(requireContext())
-            recycler.adapter = ShiftRegistrationsAdapter(shift.registrations ?: emptyList())
+            recycler.adapter = ShiftRegistrationsAdapter(allRegistrations)
 
             binding.shiftsContainer.addView(shiftView)
         }
