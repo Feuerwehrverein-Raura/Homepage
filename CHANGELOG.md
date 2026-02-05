@@ -3,6 +3,22 @@
 
 ### Bug Fixes
 
+* **apps:** add Auto-Update feature to KDS card and update tip text ([5982d78](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5982d784b211404f47f173d5c988b8b29edb005c))
+* **order-system:** logout also ends Authentik session ([720454b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/720454b8b07bed2eea473bbb30a207b4bf7e7b16))
+* **order-system:** redirect to main website after Authentik logout ([21f81dd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/21f81dd017f3d584dcf42a19e264fa9ee638f5a5))
+* **order-system:** use Authentik invalidation flow for proper logout ([8a15284](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8a152841604b8ddaefef9ff8e9466f7680c5f4ab))
+
+
+### Features
+
+* **order-system:** use Authentik OIDC for Kasse and Kitchen web auth ([dd39f1c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd39f1ccc4d1b91903a599535952133425bada75))
+* use dedicated Authentik order-system provider with 24h tokens ([e83b937](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e83b937ccf31de8f87ef35bc3587b259623d1e18))
+
+# [1.145.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.144.0...v1.145.0) (2026-02-05)
+
+
+### Bug Fixes
+
 * **order-system:** logout also ends Authentik session ([720454b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/720454b8b07bed2eea473bbb30a207b4bf7e7b16))
 * **order-system:** redirect to main website after Authentik logout ([21f81dd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/21f81dd017f3d584dcf42a19e264fa9ee638f5a5))
 * **order-system:** use Authentik invalidation flow for proper logout ([8a15284](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8a152841604b8ddaefef9ff8e9466f7680c5f4ab))
