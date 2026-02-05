@@ -1316,6 +1316,9 @@ app.post('/auth/callback', async (req, res) => {
         if (client_type === 'vorstand') {
             clientId = process.env.AUTHENTIK_CLIENT_ID_VORSTAND;
             clientSecret = process.env.AUTHENTIK_CLIENT_SECRET_VORSTAND;
+        } else if (client_type === 'order') {
+            clientId = process.env.AUTHENTIK_CLIENT_ID_ORDER;
+            clientSecret = process.env.AUTHENTIK_CLIENT_SECRET_ORDER;
         } else {
             // Default to members credentials
             clientId = process.env.AUTHENTIK_CLIENT_ID;
