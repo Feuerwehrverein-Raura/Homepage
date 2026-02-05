@@ -12,6 +12,32 @@
 * **order-system:** remove ?next= param from Authentik logout ([dd21c82](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd21c822d1dc79438d0c3103c60f8479e7be7294))
 * **order-system:** use Authentik invalidation flow for proper logout ([8a15284](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8a152841604b8ddaefef9ff8e9466f7680c5f4ab))
 * **order-system:** use prompt=login for reliable logout ([9faaf28](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9faaf28d1d33cddf6883f564e602c804aab273b2))
+* **vorstand-app:** audit field mapping, context safety, minSdk 30 ([54f546a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/54f546ab5cfe52e62e3f9fa1dbc8d0ead93e662b))
+* **vorstand-app:** update versionName to 1.2.0 and versionCode to 2 ([beb5a9a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/beb5a9a50dbbcd87939fcf8b58c0063c57f60568))
+* **vorstand-app:** use correct DB column name 'foto' instead of 'photo_url' ([657407c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/657407cce22a58246d940c8f7eb679a700f7afa1))
+
+
+### Features
+
+* **order-system:** use Authentik OIDC for Kasse and Kitchen web auth ([dd39f1c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd39f1ccc4d1b91903a599535952133425bada75))
+* use dedicated Authentik order-system provider with 24h tokens ([e83b937](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e83b937ccf31de8f87ef35bc3587b259623d1e18))
+* **vorstand-app:** add photo upload/delete to member detail ([c4e700b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c4e700bc2ae83c9de2935ac937656032a304ee39))
+* **vorstand-app:** derive version from git tag automatically ([2a2b5ae](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2a2b5ae106b49fae2070e3f8067d9cce49fc43df))
+
+# [1.145.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.144.0...v1.145.0) (2026-02-05)
+
+
+### Bug Fixes
+
+* **apps:** add Auto-Update feature to KDS card and update tip text ([5982d78](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5982d784b211404f47f173d5c988b8b29edb005c))
+* **apps:** kitchen web link pointed to order.fwv-raura.ch ([2e2a0cb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2e2a0cba7f77812699d4712ef530877831e1e461))
+* **apps:** registration link now points to mein.html ([6144311](https://github.com/Feuerwehrverein-Raura/Homepage/commit/61443110779f51474c2893f2163b858968366a87))
+* **auth:** use OIDC end-session endpoint for proper Authentik logout ([3834178](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3834178c5a10990d6a967d4db2f1574a85cd3bc3))
+* **order-system:** logout also ends Authentik session ([720454b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/720454b8b07bed2eea473bbb30a207b4bf7e7b16))
+* **order-system:** redirect to main website after Authentik logout ([21f81dd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/21f81dd017f3d584dcf42a19e264fa9ee638f5a5))
+* **order-system:** remove ?next= param from Authentik logout ([dd21c82](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd21c822d1dc79438d0c3103c60f8479e7be7294))
+* **order-system:** use Authentik invalidation flow for proper logout ([8a15284](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8a152841604b8ddaefef9ff8e9466f7680c5f4ab))
+* **order-system:** use prompt=login for reliable logout ([9faaf28](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9faaf28d1d33cddf6883f564e602c804aab273b2))
 * **vorstand-app:** update versionName to 1.2.0 and versionCode to 2 ([beb5a9a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/beb5a9a50dbbcd87939fcf8b58c0063c57f60568))
 
 
