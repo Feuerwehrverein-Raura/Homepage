@@ -1,3 +1,10 @@
+## [1.137.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.3...v1.137.4) (2026-02-05)
+
+
+### Bug Fixes
+
+* **vorstand-android:** fix events JSON parsing and navigation overlap ([d420506](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d42050654a702ebf2a1d657540b9fb5af002f332))
+
 ## [1.137.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.2...v1.137.3) (2026-02-05)
 
 
