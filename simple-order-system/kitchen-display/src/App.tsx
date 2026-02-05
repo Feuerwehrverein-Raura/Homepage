@@ -219,7 +219,7 @@ function App() {
   const logout = () => {
     localStorage.removeItem('kitchen_token');
     setSessionToken(null);
-    window.location.href = `${AUTHENTIK_URL}/if/flow/default-invalidation-flow/`;
+    window.location.href = `${AUTHENTIK_URL}/if/flow/default-invalidation-flow/?next=${encodeURIComponent('https://fwv-raura.ch/')}`;
   };
 
   // Start cleaning mode - 30 seconds of no touch response
