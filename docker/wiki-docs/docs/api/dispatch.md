@@ -4,18 +4,50 @@ sidebar_position: 5
 
 # Dispatch API
 
-Die Dispatch API wird intern fuer E-Mail-Versand, Brief-Erstellung und Post-Versand verwendet.
+Base URL: `https://api.fwv-raura.ch`
 
-:::note Interner Service
-Dieser Service ist nicht oeffentlich erreichbar und wird nur von anderen APIs und dem Vorstand-Dashboard verwendet.
-:::
+Die Dispatch API verwaltet E-Mail-Versand, Briefversand (Pingen), Newsletter, Kontaktformular, Mailcow-Integration, PDF-Vorlagen und Organisations-Einstellungen.
 
-## E-Mail
+## E-Mail-Vorlagen
 
-### E-Mail versenden
+### Vorlagen abrufen
+```http
+GET /templates
+Authorization: Bearer <token>
+```
+
+### Vorlage erstellen
+```http
+POST /templates
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Einladung GV",
+  "subject": "Einladung zur Generalversammlung",
+  "html": "<p>Liebe Mitglieder...</p>",
+  "text": "Liebe Mitglieder..."
+}
+```
+
+### Vorlage bearbeiten
+```http
+PUT /templates/:id
+Authorization: Bearer <token>
+```
+
+### Vorlage löschen
+```http
+DELETE /templates/:id
+Authorization: Bearer <token>
+```
+
+## E-Mail-Versand
+
+### Einzelne E-Mail versenden
 ```http
 POST /email/send
-X-API-Key: <internal-api-key>
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -26,22 +58,167 @@ Content-Type: application/json
 }
 ```
 
-### Dispatch Log abrufen
+### Massen-E-Mail versenden
 ```http
-GET /dispatch-log?type=email&status=sent&limit=100
+POST /email/bulk
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "member_ids": ["<uuid>", "<uuid>"],
+  "subject": "Rundschreiben",
+  "html": "<p>Liebe Mitglieder...</p>",
+  "template_id": 1
+}
+```
+
+### Intelligenter Versand
+```http
+POST /dispatch/smart
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "member_ids": ["<uuid>"],
+  "subject": "Einladung",
+  "html": "<p>...</p>"
+}
+```
+
+Versendet automatisch per E-Mail oder Brief, je nach Zustellungspräferenz des Mitglieds.
+
+## Kontaktformular
+
+### Kontaktformular absenden
+```http
+POST /contact
+Content-Type: application/json
+
+{
+  "name": "Max Muster",
+  "email": "max@example.com",
+  "message": "Nachricht..."
+}
+```
+
+Sendet eine Bestätigungs-E-Mail an den Absender.
+
+### Kontaktanfrage bestätigen
+```http
+GET /contact/confirm/:token
+```
+
+Bestätigt die Kontaktanfrage per Token (Double-Opt-In).
+
+## Newsletter
+
+### Newsletter abonnieren
+```http
+POST /newsletter/subscribe
+Content-Type: application/json
+
+{
+  "email": "max@example.com"
+}
+```
+
+### Abo bestätigen
+```http
+GET /newsletter/confirm?token=xxx
+```
+
+### Newsletter abbestellen
+```http
+POST /newsletter/unsubscribe
+Content-Type: application/json
+
+{
+  "email": "max@example.com"
+}
+```
+
+## Mailcow-Integration
+
+Verwaltung von E-Mail-Postfächern und Aliases über die Mailcow-API.
+
+### Postfächer abrufen
+```http
+GET /mailcow/mailboxes
 Authorization: Bearer <token>
 ```
 
-Parameter:
-- `type` - Filter nach Typ (email, pingen)
-- `status` - Filter nach Status
-- `member_id` - Filter nach Mitglied
-- `event_id` - Filter nach Event
-- `limit` - Anzahl Ergebnisse (Standard: 100)
+### Einzelnes Postfach
+```http
+GET /mailcow/mailboxes/:email
+Authorization: Bearer <token>
+```
+
+### Postfach erstellen
+```http
+POST /mailcow/mailboxes
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "local_part": "neues-postfach",
+  "name": "Neues Postfach",
+  "password": "xxx",
+  "quota": 1024
+}
+```
+
+### Postfach bearbeiten
+```http
+PUT /mailcow/mailboxes/:email
+Authorization: Bearer <token>
+```
+
+### Postfach löschen
+```http
+DELETE /mailcow/mailboxes/:email
+Authorization: Bearer <token>
+```
+
+### Aliases abrufen
+```http
+GET /mailcow/aliases
+Authorization: Bearer <token>
+```
+
+### Alias erstellen
+```http
+POST /mailcow/aliases
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "address": "alias@fwv-raura.ch",
+  "goto": "ziel@fwv-raura.ch"
+}
+```
+
+### Alias bearbeiten/löschen
+```http
+PUT /mailcow/aliases/:id
+DELETE /mailcow/aliases/:id
+Authorization: Bearer <token>
+```
+
+### Domain-Info
+```http
+GET /mailcow/domain
+Authorization: Bearer <token>
+```
+
+### Speicherplatz-Status
+```http
+GET /mailcow/quota
+Authorization: Bearer <token>
+```
 
 ## Post-Versand (Pingen)
 
-### Konto-Informationen abrufen
+### Konto-Informationen
 ```http
 GET /pingen/account?staging=false
 Authorization: Bearer <token>
@@ -57,7 +234,7 @@ Response:
 }
 ```
 
-### Statistiken abrufen
+### Statistiken
 ```http
 GET /pingen/stats
 Authorization: Bearer <token>
@@ -81,7 +258,7 @@ GET /pingen/letters?event_id=<uuid>&member_id=<uuid>&limit=50
 Authorization: Bearer <token>
 ```
 
-### Brief-Status abrufen
+### Brief-Status
 ```http
 GET /pingen/letters/:letterId/status?staging=false
 Authorization: Bearer <token>
@@ -95,6 +272,19 @@ Response:
   "price": 125,
   "pages": 2,
   "sentAt": "2026-01-21T10:00:00Z"
+}
+```
+
+### Brief versenden
+```http
+POST /pingen/send
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "member_id": "<uuid>",
+  "pdf_base64": "<base64-encoded-pdf>",
+  "staging": false
 }
 ```
 
@@ -129,7 +319,7 @@ Content-Type: application/json
 }
 ```
 
-### Mitglieder mit Post-Zustellung abrufen
+### Mitglieder mit Post-Zustellung
 ```http
 GET /pingen/post-members
 Authorization: Bearer <token>
@@ -144,7 +334,6 @@ Response:
       "id": "<uuid>",
       "name": "Max Muster",
       "address": "Musterstrasse 1, 4303 Kaiseraugst",
-      "email": "max@example.com",
       "strasse": "Musterstrasse 1",
       "plz": "4303",
       "ort": "Kaiseraugst"
@@ -185,7 +374,7 @@ Response:
 }
 ```
 
-## Webhooks
+## Webhooks (Pingen)
 
 ### Registrierte Webhooks abrufen
 ```http
@@ -205,7 +394,7 @@ Content-Type: application/json
 }
 ```
 
-### Webhook loeschen
+### Webhook löschen
 ```http
 DELETE /pingen/webhooks/:id?staging=false
 Authorization: Bearer <token>
@@ -222,45 +411,126 @@ Content-Type: application/json
 }
 ```
 
-Dieser Endpoint empfaengt automatische Status-Updates von Pingen und aktualisiert den Status in der Datenbank.
+Empfängt automatische Status-Updates von Pingen und aktualisiert den Status in der Datenbank.
 
-## Mailcow Integration
+## PDF-Vorlagen
 
-### Postfaecher abrufen
+Verwaltung von PDF-Vorlagen für Briefe, Rechnungen und andere Dokumente. Die Vorlagen werden im [PDF-Designer](https://pdf.fwv-raura.ch) visuell bearbeitet.
+
+### Alle Vorlagen
 ```http
-GET /mailcow/mailboxes
+GET /pdf-templates
 Authorization: Bearer <token>
 ```
 
-### Alias erstellen
+### Vorlage abrufen
 ```http
-POST /mailcow/alias
+GET /pdf-templates/:id
+Authorization: Bearer <token>
+```
+
+### Vorlage erstellen
+```http
+POST /pdf-templates
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "address": "alias@fwv-raura.ch",
-  "goto": "ziel@fwv-raura.ch"
+  "name": "Rechnung Standard",
+  "category": "rechnung",
+  "layout": { ... }
 }
 ```
 
-### Alias loeschen
+### Vorlage bearbeiten
 ```http
-DELETE /mailcow/alias/:id
+PUT /pdf-templates/:id
 Authorization: Bearer <token>
 ```
 
-### Quota abrufen
+### Vorlage löschen
 ```http
-GET /mailcow/quota
+DELETE /pdf-templates/:id
 Authorization: Bearer <token>
 ```
+
+### Aktives PDF-Layout
+```http
+GET /pdf-templates/layout/active
+Authorization: Bearer <token>
+```
+
+Gibt das aktuell aktive Layout (z.B. Briefkopf) zurück.
+
+## Rechnungen
+
+### Rechnung mit QR-Code generieren
+```http
+POST /invoices/generate-qr
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "member_id": "<uuid>",
+  "amount": 50.00,
+  "description": "Jahresbeitrag 2026"
+}
+```
+
+Generiert eine Swiss QR-Bill (Einzahlungsschein) als PDF.
+
+### Massen-Rechnungen generieren
+```http
+POST /invoices/generate-bulk
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "member_ids": ["<uuid>", "<uuid>"],
+  "amount": 50.00,
+  "description": "Jahresbeitrag 2026"
+}
+```
+
+## Organisations-Einstellungen
+
+### Einstellungen abrufen
+```http
+GET /organisation-settings
+Authorization: Bearer <token>
+```
+
+### Einstellung aktualisieren
+```http
+PUT /organisation-settings/:key
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "value": "Neuer Wert"
+}
+```
+
+## Versand-Protokoll
+
+### Versand-Historie
+```http
+GET /dispatch-log?type=email&status=sent&limit=100
+Authorization: Bearer <token>
+```
+
+**Query Parameter:**
+- `type` - Filter nach Typ (email, pingen)
+- `status` - Filter nach Status (sent, pending, failed)
+- `member_id` - Filter nach Mitglied
+- `event_id` - Filter nach Event
+- `limit` - Anzahl Ergebnisse (Standard: 100)
 
 ## Staging-Modus
 
-Alle Pingen-Endpoints unterstuetzen einen `staging` Parameter:
+Alle Pingen-Endpoints unterstützen einen `staging` Parameter:
 
-- `staging=false` (Standard): Briefe werden tatsaechlich versendet und Kosten entstehen
+- `staging=false` (Standard): Briefe werden tatsächlich versendet und Kosten entstehen
 - `staging=true`: Briefe werden nur in der Testumgebung verarbeitet, keine echten Kosten
 
-Im Vorstand-Dashboard kann der Staging-Modus ueber einen Toggle aktiviert werden.
+Im Vorstand-Dashboard kann der Staging-Modus über einen Toggle aktiviert werden. Die Umgebungsvariable `PINGEN_STAGING` setzt den Standard-Wert.
