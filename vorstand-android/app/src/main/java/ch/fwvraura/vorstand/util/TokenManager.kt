@@ -53,6 +53,12 @@ class TokenManager(context: Context) {
             prefs.edit().putString(KEY_NAME, value).commit()
         }
 
+    var lastAuditCheck: String?
+        get() = prefs.getString(KEY_LAST_AUDIT_CHECK, null)
+        set(value) {
+            prefs.edit().putString(KEY_LAST_AUDIT_CHECK, value).commit()
+        }
+
     val isLoggedIn: Boolean
         get() = !token.isNullOrEmpty()
 
@@ -65,5 +71,6 @@ class TokenManager(context: Context) {
         private const val KEY_EMAIL = "user_email"
         private const val KEY_ROLE = "user_role"
         private const val KEY_NAME = "user_name"
+        private const val KEY_LAST_AUDIT_CHECK = "last_audit_check"
     }
 }

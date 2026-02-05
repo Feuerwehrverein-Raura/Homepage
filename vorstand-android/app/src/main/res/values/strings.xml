@@ -150,6 +150,15 @@
     <string name="photo_delete_success">Foto entfernt</string>
     <string name="photo_delete_error">Fehler beim Entfernen</string>
 
+    <!-- Notifications -->
+    <string name="notification_channel_audit">Vorstand Benachrichtigungen</string>
+    <string name="notification_audit_title">Neue Aktivität</string>
+    <string name="notification_member_created">Neues Mitglied: %1$s</string>
+    <string name="notification_member_deleted">Mitglied gelöscht: %1$s</string>
+    <string name="notification_member_updated">Mitglied aktualisiert: %1$s</string>
+    <string name="notification_registration">Neuer Mitgliedschaftsantrag</string>
+    <string name="notification_multiple">%1$d neue Änderungen</string>
+
     <!-- Update -->
     <string name="update_available">Update verfügbar</string>
     <string name="update_message">Version %1$s ist verfügbar. Jetzt herunterladen?</string>

@@ -10,6 +10,7 @@ interface AuditApi {
     @GET("audit")
     suspend fun getAuditLog(
         @Query("action") action: String? = null,
-        @Query("limit") limit: Int? = 100
+        @Query("limit") limit: Int? = 100,
+        @Query("since") since: String? = null
     ): Response<List<AuditEntry>>
 }

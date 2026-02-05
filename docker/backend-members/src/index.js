@@ -2619,7 +2619,7 @@ app.get('/members/:id/roles', authenticateAny, async (req, res) => {
 // Get audit log (Vorstand only)
 app.get('/audit', authenticateVorstand, async (req, res) => {
     try {
-        const { limit = 100, offset = 0, action, email } = req.query;
+        const { limit = 100, offset = 0, action, email, since } = req.query;
 
         let query = 'SELECT * FROM audit_log WHERE 1=1';
         const params = [];
@@ -2634,6 +2634,11 @@ app.get('/audit', authenticateVorstand, async (req, res) => {
             query += ` AND email ILIKE $${params.length}`;
         }
 
+        if (since) {
+            params.push(since);
+            query += ` AND created_at > $${params.length}`;
+        }
+
         query += ' ORDER BY created_at DESC';
 
         params.push(parseInt(limit));
@@ -2644,8 +2649,10 @@ app.get('/audit', authenticateVorstand, async (req, res) => {
 
         const result = await pool.query(query, params);
 
-        // Log that someone viewed the audit log
-        await logAudit(pool, 'AUDIT_VIEW', null, req.user.email, getClientIp(req), { filters: { action, email } });
+        // Log that someone viewed the audit log (skip for background polls)
+        if (!since) {
+            await logAudit(pool, 'AUDIT_VIEW', null, req.user.email, getClientIp(req), { filters: { action, email } });
+        }
 
         res.json(result.rows);
     } catch (error) {
