@@ -1,3 +1,10 @@
+## [1.139.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.139.0...v1.139.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* **backend-events:** use guest_name over member name for registrations ([27268ba](https://github.com/Feuerwehrverein-Raura/Homepage/commit/27268ba5c6e29500d22a2bb12e925e2eb866984e))
+
 # [1.139.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.138.1...v1.139.0) (2026-02-05)
 
 
