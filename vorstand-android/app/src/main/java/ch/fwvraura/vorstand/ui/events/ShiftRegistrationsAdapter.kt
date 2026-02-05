@@ -8,11 +8,13 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import ch.fwvraura.vorstand.data.model.EventRegistration
 import ch.fwvraura.vorstand.databinding.ItemShiftRegistrationBinding
+import com.google.android.material.button.MaterialButton
 
 class ShiftRegistrationsAdapter(
     private val registrations: List<EventRegistration>,
     private val onApprove: (EventRegistration) -> Unit = {},
-    private val onReject: (EventRegistration) -> Unit = {}
+    private val onReject: (EventRegistration) -> Unit = {},
+    private val onEdit: (EventRegistration) -> Unit = {}
 ) : RecyclerView.Adapter<ShiftRegistrationsAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -43,10 +45,22 @@ class ShiftRegistrationsAdapter(
             }
         )
 
-        holder.btnApprove.visibility = if (isPending) View.VISIBLE else View.GONE
-        holder.btnReject.visibility = if (isPending) View.VISIBLE else View.GONE
+        // Edit button: visible for all registrations
+        holder.btnEdit.visibility = View.VISIBLE
+        holder.btnEdit.setOnClickListener { onEdit(reg) }
 
+        // Approve button: only for pending
+        holder.btnApprove.visibility = if (isPending) View.VISIBLE else View.GONE
         holder.btnApprove.setOnClickListener { onApprove(reg) }
+
+        // Reject/Remove button: visible for both pending and approved
+        holder.btnReject.visibility = if (isPending || isApproved) View.VISIBLE else View.GONE
+        if (isApproved) {
+            // For approved: show as remove button (red X)
+            holder.btnReject.text = "\u2717"
+        } else {
+            holder.btnReject.text = "\u2717"
+        }
         holder.btnReject.setOnClickListener { onReject(reg) }
     }
 
@@ -55,7 +69,8 @@ class ShiftRegistrationsAdapter(
     class ViewHolder(binding: ItemShiftRegistrationBinding) : RecyclerView.ViewHolder(binding.root) {
         val name: TextView = binding.regName
         val status: TextView = binding.regStatus
-        val btnApprove: View = binding.btnApprove
-        val btnReject: View = binding.btnReject
+        val btnEdit: MaterialButton = binding.btnEdit
+        val btnApprove: MaterialButton = binding.btnApprove
+        val btnReject: MaterialButton = binding.btnReject
     }
 }

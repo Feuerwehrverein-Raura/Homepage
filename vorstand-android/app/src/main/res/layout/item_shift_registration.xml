@@ -21,7 +21,24 @@
         android:layout_height="wrap_content"
         android:textColor="@color/text_secondary"
         android:textSize="12sp"
-        android:paddingEnd="8dp" />
+        android:paddingEnd="4dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnEdit"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        android:padding="0dp"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:text="\u270E"
+        android:textColor="@color/on_primary"
+        android:textSize="14sp"
+        android:backgroundTint="@color/info"
+        android:layout_marginEnd="4dp"
+        android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnApprove"

@@ -26,6 +26,7 @@ import ch.fwvraura.vorstand.util.DateUtils
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.launch
 
 class EventRegistrationsFragment : Fragment() {
@@ -91,7 +92,8 @@ class EventRegistrationsFragment : Fragment() {
             recycler.adapter = ShiftRegistrationsAdapter(
                 registrations = allRegistrations,
                 onApprove = { reg -> approveRegistration(reg.id) },
-                onReject = { reg -> rejectRegistration(reg.id) }
+                onReject = { reg -> confirmRemoveOrReject(reg) },
+                onEdit = { reg -> showEditRegistrationDialog(reg) }
             )
 
             btnAddPerson.setOnClickListener { showAddPersonDialog(shift) }
@@ -120,8 +122,9 @@ class EventRegistrationsFragment : Fragment() {
             val itemView = layoutInflater.inflate(R.layout.item_shift_registration, binding.directRegistrationsContainer, false)
             val name = itemView.findViewById<TextView>(R.id.regName)
             val status = itemView.findViewById<TextView>(R.id.regStatus)
-            val btnApprove = itemView.findViewById<View>(R.id.btnApprove)
-            val btnReject = itemView.findViewById<View>(R.id.btnReject)
+            val btnEdit = itemView.findViewById<MaterialButton>(R.id.btnEdit)
+            val btnApprove = itemView.findViewById<MaterialButton>(R.id.btnApprove)
+            val btnReject = itemView.findViewById<MaterialButton>(R.id.btnReject)
 
             name.text = reg.displayName
 
@@ -142,14 +145,36 @@ class EventRegistrationsFragment : Fragment() {
                 }
             )
 
-            btnApprove.visibility = if (isPending) View.VISIBLE else View.GONE
-            btnReject.visibility = if (isPending) View.VISIBLE else View.GONE
+            // Edit button: visible for all
+            btnEdit.visibility = View.VISIBLE
+            btnEdit.setOnClickListener { showEditRegistrationDialog(reg) }
 
+            // Approve button: only for pending
+            btnApprove.visibility = if (isPending) View.VISIBLE else View.GONE
             btnApprove.setOnClickListener { approveRegistration(reg.id) }
-            btnReject.setOnClickListener { rejectRegistration(reg.id) }
+
+            // Reject/Remove: visible for pending and approved
+            btnReject.visibility = if (isPending || isApproved) View.VISIBLE else View.GONE
+            btnReject.setOnClickListener { confirmRemoveOrReject(reg) }
 
             binding.directRegistrationsContainer.addView(itemView)
         }
+    }
+
+    private fun confirmRemoveOrReject(reg: EventRegistration) {
+        val isApproved = reg.status == "approved"
+        val title = if (isApproved) "Person entfernen" else "Anmeldung ablehnen"
+        val message = if (isApproved)
+            "Möchtest du \"${reg.displayName}\" wirklich entfernen?"
+        else
+            "Möchtest du die Anmeldung von \"${reg.displayName}\" wirklich ablehnen?"
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton("Ja") { _, _ -> rejectRegistration(reg.id, isApproved) }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     private fun approveRegistration(registrationId: String) {
@@ -168,18 +193,75 @@ class EventRegistrationsFragment : Fragment() {
         }
     }
 
-    private fun rejectRegistration(registrationId: String) {
+    private fun rejectRegistration(registrationId: String, wasApproved: Boolean = false) {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = ApiModule.eventsApi.rejectRegistration(registrationId)
                 if (response.isSuccessful) {
-                    Toast.makeText(requireContext(), "Anmeldung abgelehnt", Toast.LENGTH_SHORT).show()
+                    val msg = if (wasApproved) "Person entfernt" else "Anmeldung abgelehnt"
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
                     loadEvent()
                 } else {
-                    Toast.makeText(requireContext(), "Fehler beim Ablehnen", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "Fehler", Toast.LENGTH_SHORT).show()
                 }
             } catch (_: Exception) {
-                Toast.makeText(requireContext(), "Fehler beim Ablehnen", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Fehler", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showEditRegistrationDialog(reg: EventRegistration) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_edit_registration, null)
+        val editName = dialogView.findViewById<TextInputEditText>(R.id.editName)
+        val editEmail = dialogView.findViewById<TextInputEditText>(R.id.editEmail)
+        val editPhone = dialogView.findViewById<TextInputEditText>(R.id.editPhone)
+
+        // Pre-fill with existing data
+        editName.setText(reg.displayName)
+        editEmail.setText(reg.guestEmail ?: "")
+        editPhone.setText(reg.phone ?: "")
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Anmeldung bearbeiten")
+            .setView(dialogView)
+            .setPositiveButton("Speichern", null)
+            .setNegativeButton("Abbrechen", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val name = editName.text?.toString()?.trim() ?: ""
+                if (name.isEmpty()) {
+                    Toast.makeText(requireContext(), "Bitte einen Namen eingeben", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val body = mutableMapOf<String, Any>("guest_name" to name)
+                val email = editEmail.text?.toString()?.trim() ?: ""
+                if (email.isNotEmpty()) body["guest_email"] = email
+                val phone = editPhone.text?.toString()?.trim() ?: ""
+                if (phone.isNotEmpty()) body["phone"] = phone
+
+                updateRegistration(reg.id, body, dialog)
+            }
+        }
+
+        dialog.show()
+    }
+
+    private fun updateRegistration(id: String, body: Map<String, Any>, dialog: androidx.appcompat.app.AlertDialog) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.eventsApi.updateRegistration(id, body)
+                if (response.isSuccessful) {
+                    Toast.makeText(requireContext(), "Anmeldung aktualisiert", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                    loadEvent()
+                } else {
+                    Toast.makeText(requireContext(), "Fehler beim Aktualisieren", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "Fehler beim Aktualisieren", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -187,19 +269,16 @@ class EventRegistrationsFragment : Fragment() {
     private fun showAddPersonDialog(shift: Shift) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_add_person, null)
         val toggleGroup = dialogView.findViewById<MaterialButtonToggleGroup>(R.id.toggleGroup)
-        val btnMitglied = dialogView.findViewById<MaterialButton>(R.id.btnMitglied)
-        val btnGast = dialogView.findViewById<MaterialButton>(R.id.btnGast)
         val memberSection = dialogView.findViewById<LinearLayout>(R.id.memberSection)
         val guestSection = dialogView.findViewById<LinearLayout>(R.id.guestSection)
         val memberDropdown = dialogView.findViewById<AutoCompleteTextView>(R.id.memberDropdown)
-        val guestName = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.guestName)
-        val guestEmail = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.guestEmail)
-        val guestPhone = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.guestPhone)
+        val guestName = dialogView.findViewById<TextInputEditText>(R.id.guestName)
+        val guestEmail = dialogView.findViewById<TextInputEditText>(R.id.guestEmail)
+        val guestPhone = dialogView.findViewById<TextInputEditText>(R.id.guestPhone)
 
         var members: List<Member> = emptyList()
         var selectedMember: Member? = null
 
-        // Default: Mitglied tab selected
         toggleGroup.check(R.id.btnMitglied)
 
         toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -217,7 +296,6 @@ class EventRegistrationsFragment : Fragment() {
             }
         }
 
-        // Load members for dropdown
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = ApiModule.membersApi.getMembers()
