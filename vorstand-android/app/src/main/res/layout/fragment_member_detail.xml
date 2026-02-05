@@ -37,13 +37,29 @@
                 android:gravity="center_horizontal"
                 android:paddingVertical="16dp">
 
-                <ImageView
-                    android:id="@+id/memberPhoto"
+                <FrameLayout
+                    android:id="@+id/photoContainer"
                     android:layout_width="96dp"
-                    android:layout_height="96dp"
-                    android:background="@drawable/circle_background"
-                    android:scaleType="centerCrop"
-                    android:contentDescription="Foto" />
+                    android:layout_height="96dp">
+
+                    <ImageView
+                        android:id="@+id/memberPhoto"
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
+                        android:background="@drawable/circle_background"
+                        android:scaleType="centerCrop"
+                        android:contentDescription="Foto" />
+
+                    <ImageView
+                        android:id="@+id/photoEditIcon"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="bottom|end"
+                        android:src="@drawable/ic_camera"
+                        android:background="@drawable/circle_background_primary"
+                        android:padding="4dp"
+                        android:contentDescription="@string/photo_change" />
+                </FrameLayout>
 
                 <TextView
                     android:id="@+id/memberName"
