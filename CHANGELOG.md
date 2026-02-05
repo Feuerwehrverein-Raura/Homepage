@@ -1,3 +1,10 @@
+# [1.143.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.142.0...v1.143.0) (2026-02-05)
+
+
+### Features
+
+* **order-system:** add KDS login, fix JWT validation, remove Authentik forward auth ([7b11a21](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7b11a215a59660cff1483107a99556042ced162f))
+
 # [1.142.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.141.0...v1.142.0) (2026-02-05)
 
 
