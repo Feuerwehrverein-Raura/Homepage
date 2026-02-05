@@ -84,7 +84,9 @@ class EventRegistrationsFragment : Fragment() {
             val needed = shift.needed ?: 0
             info.text = "$registered / $needed | ${DateUtils.formatDate(shift.date)} ${shift.startTime ?: ""}-${shift.endTime ?: ""}"
 
-            val allRegistrations = (regs?.approved ?: emptyList()) + (regs?.pending ?: emptyList())
+            val allRegistrations =
+                (regs?.approved ?: emptyList()).map { it.copy(status = it.status ?: "approved") } +
+                (regs?.pending ?: emptyList()).map { it.copy(status = it.status ?: "pending") }
             recycler.layoutManager = LinearLayoutManager(requireContext())
             recycler.adapter = ShiftRegistrationsAdapter(
                 registrations = allRegistrations,
@@ -100,7 +102,9 @@ class EventRegistrationsFragment : Fragment() {
 
     private fun displayDirectRegistrations(event: Event) {
         val direct = event.directRegistrations
-        val allDirect = (direct?.approved ?: emptyList()) + (direct?.pending ?: emptyList())
+        val allDirect =
+            (direct?.approved ?: emptyList()).map { it.copy(status = it.status ?: "approved") } +
+            (direct?.pending ?: emptyList()).map { it.copy(status = it.status ?: "pending") }
 
         if (allDirect.isEmpty()) {
             binding.directRegistrationsHeader.visibility = View.GONE
