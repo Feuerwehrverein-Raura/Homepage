@@ -1,3 +1,10 @@
+# [1.139.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.138.1...v1.139.0) (2026-02-05)
+
+
+### Features
+
+* **vorstand-android:** add registration edit/delete functionality ([3f7ffd7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3f7ffd7757b72c608c859696365289316fca256a))
+
 ## [1.138.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.138.0...v1.138.1) (2026-02-05)
 
 
