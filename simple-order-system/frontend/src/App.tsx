@@ -52,6 +52,9 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
 
 // Environment variables
 const API_URL = import.meta.env.VITE_API_URL || '/api';
+const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
+const AUTH_CLIENT_ID = 'fwv-members';
+const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
 
 interface Item {
   id: number;
@@ -109,9 +112,6 @@ function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
   const [user, setUser] = useState<User | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
   const [showCustomItem, setShowCustomItem] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges', printer_station: 'bar' });
   const [historyData, setHistoryData] = useState<any[]>([]);
@@ -174,16 +174,30 @@ function App() {
     }
   };
 
-  // Check session token on mount
+  // Check session token on mount (Authentik OIDC via auth-callback.html)
   useEffect(() => {
-    if (token) {
+    // Check for token in URL (cross-domain redirect from auth-callback.html)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('token')) {
+      const urlToken = urlParams.get('token')!;
+      localStorage.setItem('order_token', urlToken);
+      setToken(urlToken);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    const storedToken = urlParams.has('token') ? urlParams.get('token')! : localStorage.getItem('order_token');
+    if (storedToken) {
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const payload = JSON.parse(atob(storedToken.split('.')[1]));
         if (payload.exp && payload.exp * 1000 < Date.now()) {
           localStorage.removeItem('order_token');
           setToken(null);
         } else {
-          setUser({ name: payload.name || 'Admin', email: payload.email || '', groups: payload.groups || ['admin'] });
+          setUser({
+            name: payload.name || payload.vorname || payload.preferred_username || 'User',
+            email: payload.email || '',
+            groups: payload.groups || ['admin'],
+          });
         }
       } catch {
         localStorage.removeItem('order_token');
@@ -213,34 +227,10 @@ function App() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginPassword.trim()) {
-      setLoginError('Bitte Passwort eingeben');
-      return;
-    }
-    setLoginLoading(true);
-    setLoginError('');
-    try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: loginPassword }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('order_token', data.token);
-        setToken(data.token);
-        const payload = JSON.parse(atob(data.token.split('.')[1]));
-        setUser({ name: payload.name || 'Admin', email: payload.email || '', groups: payload.groups || ['admin'] });
-        setLoginPassword('');
-      } else {
-        setLoginError('Falsches Passwort');
-      }
-    } catch {
-      setLoginError('Verbindungsfehler');
-    }
-    setLoginLoading(false);
+  const redirectToLogin = () => {
+    localStorage.removeItem('order_token');
+    const state = encodeURIComponent(window.location.origin + '/');
+    window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${AUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(AUTH_CALLBACK_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
   };
 
   const logout = () => {
@@ -733,35 +723,12 @@ function App() {
   const showInventoryView = view === 'inventory';
   const showHistoryView = view === 'history';
 
-  // Show login screen if not authenticated
+  // Redirect to Authentik if not authenticated
   if (sessionChecked && !token) {
+    redirectToLogin();
     return (
-      <div className="min-h-screen bg-fwv-red flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8">
-          <div className="text-center mb-6">
-            <img src="/logo.png" alt="FWV Raura" className="h-20 w-20 rounded-full mx-auto mb-4 bg-gray-50 p-1" />
-            <h1 className="text-2xl font-bold text-gray-800">Kasse</h1>
-            <p className="text-gray-500 text-sm mt-1">Bitte einloggen</p>
-          </div>
-          <form onSubmit={handleLogin}>
-            <input
-              type="password"
-              value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)}
-              placeholder="Passwort"
-              autoFocus
-              className="w-full px-4 py-3 rounded-xl border border-gray-300 text-lg focus:outline-none focus:ring-2 focus:ring-fwv-red focus:border-transparent"
-            />
-            {loginError && <p className="text-red-600 text-sm mt-2">{loginError}</p>}
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full mt-4 bg-fwv-red hover:bg-red-700 text-white font-bold py-3 rounded-xl text-lg disabled:opacity-50"
-            >
-              {loginLoading ? 'Anmelden...' : 'Anmelden'}
-            </button>
-          </form>
-        </div>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-gray-500 text-lg">Weiterleitung zur Anmeldung...</div>
       </div>
     );
   }

@@ -88,8 +88,14 @@
                     }
                 }
 
-                // Redirect to intended page
-                window.location.href = redirectTo;
+                // For cross-domain redirects, pass token via URL parameter
+                if (redirectTo.startsWith('http')) {
+                    const url = new URL(redirectTo);
+                    url.searchParams.set('token', accessToken);
+                    window.location.href = url.toString();
+                } else {
+                    window.location.href = redirectTo;
+                }
 
             } catch (error) {
                 console.error('Authentication error:', error);

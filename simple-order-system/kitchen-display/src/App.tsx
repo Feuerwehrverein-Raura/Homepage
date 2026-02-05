@@ -52,6 +52,9 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://order.fwv-raura.ch/api';
 const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch/ws';
+const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
+const AUTH_CLIENT_ID = 'fwv-members';
+const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
 
 interface OrderItem {
   id: number;
@@ -177,18 +180,24 @@ function App() {
   const wsRef = useRef<WebSocket | null>(null);
   const playNotificationRef = useRef<(order: Order) => void>(() => {});
 
-  // Session auth state
+  // Session auth state (Authentik OIDC)
   const [sessionToken, setSessionToken] = useState<string | null>(localStorage.getItem('kitchen_token'));
   const [sessionChecked, setSessionChecked] = useState(false);
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
-  const [loginLoading, setLoginLoading] = useState(false);
 
-  // Check session token on mount
+  // Check session token on mount + handle cross-domain callback
   useEffect(() => {
-    if (sessionToken) {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('token')) {
+      const urlToken = urlParams.get('token')!;
+      localStorage.setItem('kitchen_token', urlToken);
+      setSessionToken(urlToken);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    const storedToken = urlParams.has('token') ? urlParams.get('token')! : localStorage.getItem('kitchen_token');
+    if (storedToken) {
       try {
-        const payload = JSON.parse(atob(sessionToken.split('.')[1]));
+        const payload = JSON.parse(atob(storedToken.split('.')[1]));
         if (payload.exp && payload.exp * 1000 < Date.now()) {
           localStorage.removeItem('kitchen_token');
           setSessionToken(null);
@@ -201,32 +210,10 @@ function App() {
     setSessionChecked(true);
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginPassword.trim()) {
-      setLoginError('Bitte Passwort eingeben');
-      return;
-    }
-    setLoginLoading(true);
-    setLoginError('');
-    try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: loginPassword }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('kitchen_token', data.token);
-        setSessionToken(data.token);
-        setLoginPassword('');
-      } else {
-        setLoginError('Falsches Passwort');
-      }
-    } catch {
-      setLoginError('Verbindungsfehler');
-    }
-    setLoginLoading(false);
+  const redirectToLogin = () => {
+    localStorage.removeItem('kitchen_token');
+    const state = encodeURIComponent(window.location.origin + '/');
+    window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${AUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(AUTH_CALLBACK_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
   };
 
   // Start cleaning mode - 30 seconds of no touch response
@@ -474,35 +461,12 @@ function App() {
 
   const filteredOrders = orders.filter(filterOrders);
 
-  // Show login screen if not authenticated
+  // Redirect to Authentik if not authenticated
   if (sessionChecked && !sessionToken) {
+    redirectToLogin();
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-8 border border-gray-700">
-          <div className="text-center mb-6">
-            <img src="/logo-192.png" alt="FWV Raura" className="h-20 w-20 rounded-full mx-auto mb-4 bg-white p-1" />
-            <h1 className="text-2xl font-bold text-white">Küchenanzeige</h1>
-            <p className="text-gray-400 text-sm mt-1">Bitte einloggen</p>
-          </div>
-          <form onSubmit={handleLogin}>
-            <input
-              type="password"
-              value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)}
-              placeholder="Passwort"
-              autoFocus
-              className="w-full px-4 py-3 rounded-xl border border-gray-600 bg-gray-700 text-white text-lg focus:outline-none focus:ring-2 focus:ring-fwv-red focus:border-transparent placeholder-gray-400"
-            />
-            {loginError && <p className="text-red-400 text-sm mt-2">{loginError}</p>}
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full mt-4 bg-fwv-red hover:bg-red-700 text-white font-bold py-3 rounded-xl text-lg disabled:opacity-50"
-            >
-              {loginLoading ? 'Anmelden...' : 'Anmelden'}
-            </button>
-          </form>
-        </div>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-400 text-lg">Weiterleitung zur Anmeldung...</div>
       </div>
     );
   }
