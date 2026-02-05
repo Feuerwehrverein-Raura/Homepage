@@ -846,12 +846,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = await response.json();
 
                 if (response.ok && result.success) {
-                    alert(subject === 'Mitgliedschaft'
-                        ? 'Vielen Dank für Ihren Beitrittsantrag!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.\n\nAktive Feuerwehr-Mitglieder werden sofort aufgenommen,\nandere Interessierte werden an der nächsten GV bestätigt.'
-                        : 'Vielen Dank für Ihre Nachricht!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.');
+                    if (result.requiresConfirmation) {
+                        alert('Bitte bestätigen Sie Ihre E-Mail-Adresse!\n\nWir haben Ihnen eine E-Mail mit einem Bestätigungslink gesendet.\nKlicken Sie auf den Link, um Ihre Anfrage abzuschliessen.\n\nDer Link ist 1 Stunde gültig.');
+                    } else {
+                        alert(subject === 'Mitgliedschaft'
+                            ? 'Vielen Dank für Ihren Beitrittsantrag!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.'
+                            : 'Vielen Dank für Ihre Nachricht!\n\nSie erhalten in Kürze eine Bestätigung per E-Mail.');
+                    }
                     resetContactForm();
+                } else if (response.status === 429) {
+                    alert('Zu viele Anfragen.\n\nBitte versuchen Sie es in einer Stunde erneut.');
                 } else {
-                    throw new Error(result.message || 'Unbekannter Fehler');
+                    throw new Error(result.error || 'Unbekannter Fehler');
                 }
             } catch (error) {
                 console.error('Fehler beim Senden:', error);

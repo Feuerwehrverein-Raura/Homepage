@@ -13,6 +13,36 @@ const fontkit = require('@pdf-lib/fontkit');
 const { SwissQRBill, SwissQRCode } = require('swissqrbill/pdf');
 const { generate } = require('@pdfme/generator');
 const { text, image, barcodes } = require('@pdfme/schemas');
+const crypto = require('crypto');
+
+// ============================================
+// CONTACT FORM RATE LIMITING (in-memory)
+// ============================================
+const contactRateLimit = new Map(); // IP -> { count, resetAt }
+const CONTACT_RATE_LIMIT = 3; // max requests per window
+const CONTACT_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
+
+function checkContactRateLimit(ip) {
+    const now = Date.now();
+    const entry = contactRateLimit.get(ip);
+    if (!entry || now > entry.resetAt) {
+        contactRateLimit.set(ip, { count: 1, resetAt: now + CONTACT_RATE_WINDOW });
+        return true;
+    }
+    if (entry.count >= CONTACT_RATE_LIMIT) {
+        return false;
+    }
+    entry.count++;
+    return true;
+}
+
+// Cleanup old entries every 30 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of contactRateLimit) {
+        if (now > entry.resetAt) contactRateLimit.delete(ip);
+    }
+}, 30 * 60 * 1000);
 const { BLANK_PDF } = require('@pdfme/common');
 
 const app = express();
@@ -1187,21 +1217,144 @@ app.post('/pingen/send', authenticateAny, async (req, res) => {
 // KONTAKTFORMULAR (ersetzt n8n)
 // ============================================
 
+// Step 1: Submit contact form -> validate spam checks -> send confirmation email
 app.post('/contact', async (req, res) => {
     try {
-        const { name, email, subject, message, type, membership } = req.body;
+        const { name, email, subject, message, type, membership, _honeypot, _timestamp } = req.body;
+        const clientIp = getClientIp(req);
 
+        // --- SPAM PROTECTION ---
+
+        // 1. Honeypot check: should be empty
+        if (_honeypot) {
+            logWarn('Contact spam blocked (honeypot)', { ip: clientIp, email });
+            // Return success to not reveal detection
+            return res.json({ success: true, message: 'Bitte bestätigen Sie Ihre E-Mail-Adresse' });
+        }
+
+        // 2. Timestamp check: form must be filled out for at least 3 seconds
+        if (_timestamp) {
+            const submittedAt = parseInt(_timestamp, 10);
+            const elapsed = Date.now() - submittedAt;
+            if (elapsed < 3000) {
+                logWarn('Contact spam blocked (too fast)', { ip: clientIp, email, elapsed });
+                return res.json({ success: true, message: 'Bitte bestätigen Sie Ihre E-Mail-Adresse' });
+            }
+        }
+
+        // 3. Rate limiting: max 3 submissions per hour per IP
+        if (!checkContactRateLimit(clientIp)) {
+            logWarn('Contact rate limited', { ip: clientIp, email });
+            return res.status(429).json({
+                success: false,
+                error: 'Zu viele Anfragen. Bitte versuchen Sie es in einer Stunde erneut.'
+            });
+        }
+
+        // 4. Basic validation
+        if (!email || !name) {
+            return res.status(400).json({ success: false, error: 'Name und E-Mail sind erforderlich' });
+        }
+
+        // Simple email format check
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ success: false, error: 'Ungültige E-Mail-Adresse' });
+        }
+
+        // --- DOUBLE OPT-IN ---
+
+        // Generate confirmation token
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        // Store pending contact request
+        await pool.query(`
+            INSERT INTO contact_pending (token, payload, ip_address, expires_at)
+            VALUES ($1, $2, $3, $4)
+        `, [token, JSON.stringify(req.body), clientIp, expiresAt]);
+
+        // Clean up expired entries
+        await pool.query('DELETE FROM contact_pending WHERE expires_at < NOW()');
+
+        // Send confirmation email
+        const confirmUrl = `https://api.fwv-raura.ch/contact/confirm/${token}`;
+        const recipientName = type === 'membership' && membership
+            ? `${membership.firstname} ${membership.lastname}`
+            : name;
+
+        await transporter.sendMail({
+            from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+            to: email,
+            subject: 'Bitte bestätigen Sie Ihre Anfrage - FWV Raura',
+            text: `
+Guten Tag ${recipientName},
+
+Bitte bestätigen Sie Ihre Anfrage, indem Sie auf den folgenden Link klicken:
+
+${confirmUrl}
+
+Der Link ist 1 Stunde gültig.
+
+Falls Sie diese Anfrage nicht gesendet haben, können Sie diese E-Mail ignorieren.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+            `.trim()
+        });
+
+        logInfo('Contact confirmation sent', { ip: clientIp, email, type: type || 'contact' });
+
+        res.json({
+            success: true,
+            message: 'Bitte bestätigen Sie Ihre E-Mail-Adresse. Sie haben eine Bestätigungs-E-Mail erhalten.',
+            requiresConfirmation: true
+        });
+    } catch (error) {
+        logError('Contact form error', { error: error.message });
+        res.status(500).json({ success: false, error: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.' });
+    }
+});
+
+// Step 2: Confirm contact request via email link
+app.get('/contact/confirm/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+
+        // Look up pending request
+        const result = await pool.query(`
+            SELECT * FROM contact_pending
+            WHERE token = $1 AND confirmed = false AND expires_at > NOW()
+        `, [token]);
+
+        if (result.rows.length === 0) {
+            return res.send(`
+                <html><head><meta charset="utf-8"><title>Fehler</title>
+                <style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f3f4f6}
+                .card{background:white;padding:2rem;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,0.1);text-align:center;max-width:400px}
+                h2{color:#dc2626}</style></head>
+                <body><div class="card"><h2>Link ungültig oder abgelaufen</h2>
+                <p>Dieser Bestätigungslink ist nicht mehr gültig. Bitte senden Sie Ihre Anfrage erneut.</p>
+                <a href="https://fwv-raura.ch/#contact" style="color:#cc0000">Zurück zur Website</a>
+                </div></body></html>
+            `);
+        }
+
+        const pending = result.rows[0];
+        const payload = pending.payload;
+
+        // Mark as confirmed
+        await pool.query('UPDATE contact_pending SET confirmed = true WHERE id = $1', [pending.id]);
+
+        // --- PROCESS THE ACTUAL CONTACT REQUEST ---
+        const { name, email, subject, message, type, membership } = payload;
         let emailBody = '';
         let emailSubject = '';
 
         if (type === 'membership' && membership) {
-            // Mitgliedschaftsantrag - In Datenbank speichern
-            // Frontend sendet "Ja (aktiv)", "Ehemalige/r", oder "Nein"
+            // Mitgliedschaftsantrag
             const isFirefighterRaurica = membership.firefighterStatus === 'Ja (aktiv)';
             const registrationStatus = isFirefighterRaurica ? 'approved' : 'pending';
 
-            // Registrierung in Datenbank speichern
-            // PLZ/Ort aus "4303 Kaiseraugst" aufteilen
             const cityParts = (membership.city || '').trim().split(' ');
             const plz = cityParts[0] || '';
             const ort = cityParts.slice(1).join(' ') || membership.city || '';
@@ -1213,24 +1366,15 @@ app.post('/contact', async (req, res) => {
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 RETURNING id
             `, [
-                membership.firstname,
-                membership.lastname,
-                membership.street,
-                plz,
-                ort,
-                membership.phone,
-                membership.mobile || null,
-                membership.email,
-                membership.firefighterStatus,
-                membership.correspondenceMethod,
-                membership.correspondenceAddress,
+                membership.firstname, membership.lastname, membership.street,
+                plz, ort, membership.phone, membership.mobile || null,
+                membership.email, membership.firefighterStatus,
+                membership.correspondenceMethod, membership.correspondenceAddress,
                 registrationStatus
             ]);
 
             const registrationId = registrationResult.rows[0].id;
-            let memberId = null;
 
-            // Wenn Feuerwehr Raurica Mitglied -> automatisch genehmigen und Mitglied erstellen
             if (isFirefighterRaurica) {
                 const memberResult = await pool.query(`
                     INSERT INTO members
@@ -1239,25 +1383,17 @@ app.post('/contact', async (req, res) => {
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aktivmitglied', 'feuerwehr_raurica', $9, $10, NOW())
                     RETURNING id
                 `, [
-                    membership.firstname,
-                    membership.lastname,
-                    membership.street,
-                    plz,
-                    ort,
-                    membership.phone,
-                    membership.mobile || null,
-                    membership.email,
-                    membership.correspondenceMethod === 'email',
+                    membership.firstname, membership.lastname, membership.street,
+                    plz, ort, membership.phone, membership.mobile || null,
+                    membership.email, membership.correspondenceMethod === 'email',
                     membership.correspondenceMethod === 'post'
                 ]);
-                memberId = memberResult.rows[0].id;
 
-                // Registrierung mit Mitglied-ID aktualisieren
                 await pool.query(`
                     UPDATE member_registrations
                     SET member_id = $1, processed_at = NOW(), processed_by = 'system'
                     WHERE id = $2
-                `, [memberId, registrationId]);
+                `, [memberResult.rows[0].id, registrationId]);
 
                 emailSubject = `Neues Mitglied: ${membership.firstname} ${membership.lastname} (automatisch aufgenommen)`;
                 emailBody = `
@@ -1281,7 +1417,6 @@ Korrespondenz: ${membership.correspondenceMethod}
 Das Mitglied wurde der Datenbank hinzugefügt.
                 `.trim();
 
-                // Bestätigung an neues Mitglied
                 await transporter.sendMail({
                     from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
                     to: membership.email,
@@ -1300,7 +1435,6 @@ Feuerwehrverein Raura
                     `.trim()
                 });
             } else {
-                // Normale Registrierung - muss vom Aktuar bestätigt werden
                 emailSubject = `Neuer Mitgliedschaftsantrag: ${membership.firstname} ${membership.lastname} (zu prüfen)`;
                 emailBody = `
 NEUER MITGLIEDSCHAFTSANTRAG (ZU PRÜFEN)
@@ -1323,7 +1457,6 @@ Der Antrag muss im Vorstand-Bereich geprüft und genehmigt werden:
 https://fwv-raura.ch/vorstand.html
                 `.trim();
 
-                // Bestätigung an Antragsteller
                 await transporter.sendMail({
                     from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
                     to: membership.email,
@@ -1342,7 +1475,6 @@ Feuerwehrverein Raura
                 });
             }
 
-            // E-Mail an Vorstand
             await transporter.sendMail({
                 from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
                 to: process.env.VORSTAND_EMAIL || 'vorstand@fwv-raura.ch',
@@ -1365,15 +1497,14 @@ Nachricht:
 ${message}
             `.trim();
 
-            // Bestätigung an Absender
             await transporter.sendMail({
                 from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
                 to: email,
-                subject: 'Bestätigung Ihrer Anfrage - FWV Raura',
+                subject: 'Ihre Anfrage wurde bestätigt - FWV Raura',
                 text: `
 Guten Tag ${name},
 
-Vielen Dank für Ihre Nachricht!
+Vielen Dank für die Bestätigung Ihrer Nachricht!
 
 Wir haben Ihre Anfrage erhalten und werden uns baldmöglichst bei Ihnen melden.
 
@@ -1382,7 +1513,6 @@ Feuerwehrverein Raura
                 `.trim()
             });
 
-            // E-Mail an Vorstand
             await transporter.sendMail({
                 from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
                 to: process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch',
@@ -1398,10 +1528,31 @@ Feuerwehrverein Raura
             VALUES ('contact', $1, $2, $3, 'sent', NOW())
         `, [email, emailSubject, emailBody]);
 
-        res.json({ success: true, message: 'Nachricht gesendet' });
+        logInfo('Contact confirmed and processed', { email, type: type || 'contact' });
+
+        // Show success page
+        res.send(`
+            <html><head><meta charset="utf-8"><title>Bestätigt</title>
+            <style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f3f4f6}
+            .card{background:white;padding:2rem;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,0.1);text-align:center;max-width:400px}
+            h2{color:#16a34a}</style></head>
+            <body><div class="card"><h2>Anfrage bestätigt!</h2>
+            <p>Ihre Nachricht wurde erfolgreich übermittelt. Wir werden uns baldmöglichst bei Ihnen melden.</p>
+            <a href="https://fwv-raura.ch" style="color:#cc0000">Zurück zur Website</a>
+            </div></body></html>
+        `);
     } catch (error) {
-        console.error('Contact form error:', error);
-        res.status(500).json({ success: false, error: error.message });
+        logError('Contact confirmation error', { error: error.message, token: req.params.token });
+        res.status(500).send(`
+            <html><head><meta charset="utf-8"><title>Fehler</title>
+            <style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f3f4f6}
+            .card{background:white;padding:2rem;border-radius:1rem;box-shadow:0 4px 6px rgba(0,0,0,0.1);text-align:center;max-width:400px}
+            h2{color:#dc2626}</style></head>
+            <body><div class="card"><h2>Fehler</h2>
+            <p>Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.</p>
+            <a href="https://fwv-raura.ch/#contact" style="color:#cc0000">Zurück zur Website</a>
+            </div></body></html>
+        `);
     }
 });
 
