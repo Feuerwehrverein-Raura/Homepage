@@ -76,7 +76,7 @@ class MemberDetailFragment : Fragment() {
             getString(R.string.photo_choose_gallery),
             getString(R.string.photo_take)
         )
-        if (!member?.photoUrl.isNullOrEmpty()) {
+        if (!member?.foto.isNullOrEmpty()) {
             options.add(getString(R.string.photo_delete))
         }
 
@@ -143,7 +143,7 @@ class MemberDetailFragment : Fragment() {
                 val response = ApiModule.membersApi.deletePhoto(memberId!!)
                 if (response.isSuccessful) {
                     Toast.makeText(context, R.string.photo_delete_success, Toast.LENGTH_SHORT).show()
-                    member = member?.copy(photoUrl = null)
+                    member = member?.copy(foto = null)
                     binding.memberPhoto.setImageDrawable(null)
                     binding.memberPhoto.setBackgroundResource(R.drawable.circle_background)
                 } else {
@@ -173,8 +173,8 @@ class MemberDetailFragment : Fragment() {
         binding.memberFunction.text = m.funktion ?: ""
 
         // Photo
-        if (!m.photoUrl.isNullOrEmpty()) {
-            binding.memberPhoto.load("https://api.fwv-raura.ch${m.photoUrl}") {
+        if (!m.foto.isNullOrEmpty()) {
+            binding.memberPhoto.load("https://api.fwv-raura.ch${m.foto}") {
                 transformations(CircleCropTransformation())
                 memoryCachePolicy(CachePolicy.DISABLED)
             }

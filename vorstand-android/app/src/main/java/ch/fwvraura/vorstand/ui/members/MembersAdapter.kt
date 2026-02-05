@@ -62,8 +62,8 @@ class MembersAdapter(
             }
 
             // Avatar
-            if (!member.photoUrl.isNullOrEmpty()) {
-                binding.memberAvatar.load("https://api.fwv-raura.ch${member.photoUrl}") {
+            if (!member.foto.isNullOrEmpty()) {
+                binding.memberAvatar.load("https://api.fwv-raura.ch${member.foto}") {
                     transformations(CircleCropTransformation())
                     placeholder(R.drawable.circle_background)
                 }

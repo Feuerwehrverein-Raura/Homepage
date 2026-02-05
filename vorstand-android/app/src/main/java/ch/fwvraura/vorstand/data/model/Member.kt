@@ -23,7 +23,7 @@ data class Member(
     @SerializedName("feuerwehr_zugehoerigkeit") val feuerwehrZugehoerigkeit: Boolean? = null,
     @SerializedName("zustellung_email") val zustellungEmail: Boolean? = null,
     @SerializedName("zustellung_post") val zustellungPost: Boolean? = null,
-    @SerializedName("photo_url") val photoUrl: String? = null,
+    val foto: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("updated_at") val updatedAt: String? = null
 ) {
