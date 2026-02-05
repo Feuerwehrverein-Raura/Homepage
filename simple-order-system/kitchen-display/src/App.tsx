@@ -177,6 +177,58 @@ function App() {
   const wsRef = useRef<WebSocket | null>(null);
   const playNotificationRef = useRef<(order: Order) => void>(() => {});
 
+  // Session auth state
+  const [sessionToken, setSessionToken] = useState<string | null>(localStorage.getItem('kitchen_token'));
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Check session token on mount
+  useEffect(() => {
+    if (sessionToken) {
+      try {
+        const payload = JSON.parse(atob(sessionToken.split('.')[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem('kitchen_token');
+          setSessionToken(null);
+        }
+      } catch {
+        localStorage.removeItem('kitchen_token');
+        setSessionToken(null);
+      }
+    }
+    setSessionChecked(true);
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginPassword.trim()) {
+      setLoginError('Bitte Passwort eingeben');
+      return;
+    }
+    setLoginLoading(true);
+    setLoginError('');
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: loginPassword }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('kitchen_token', data.token);
+        setSessionToken(data.token);
+        setLoginPassword('');
+      } else {
+        setLoginError('Falsches Passwort');
+      }
+    } catch {
+      setLoginError('Verbindungsfehler');
+    }
+    setLoginLoading(false);
+  };
+
   // Start cleaning mode - 30 seconds of no touch response
   const startCleaning = useCallback(() => {
     setCleaningMode(true);
@@ -243,6 +295,8 @@ function App() {
   }, [enableSound]);
 
   useEffect(() => {
+    if (!sessionToken) return;
+
     fetchOrders();
     connectWebSocket();
 
@@ -251,19 +305,12 @@ function App() {
       setNotificationsEnabled(true);
     }
 
-    // Check if sound was previously enabled (but still need user interaction to resume)
-    const savedSoundEnabled = localStorage.getItem('kitchenSoundEnabled');
-    if (savedSoundEnabled === 'true') {
-      // We'll show a smaller "resume" button instead of the full enable button
-      // But we can't auto-resume audio - need user interaction
-    }
-
     return () => {
       if (wsRef.current) {
         wsRef.current.close();
       }
     };
-  }, []);
+  }, [sessionToken]);
 
   const fetchOrders = async () => {
     try {
@@ -426,6 +473,48 @@ function App() {
   };
 
   const filteredOrders = orders.filter(filterOrders);
+
+  // Show login screen if not authenticated
+  if (sessionChecked && !sessionToken) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-8 border border-gray-700">
+          <div className="text-center mb-6">
+            <img src="/logo-192.png" alt="FWV Raura" className="h-20 w-20 rounded-full mx-auto mb-4 bg-white p-1" />
+            <h1 className="text-2xl font-bold text-white">Küchenanzeige</h1>
+            <p className="text-gray-400 text-sm mt-1">Bitte einloggen</p>
+          </div>
+          <form onSubmit={handleLogin}>
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              placeholder="Passwort"
+              autoFocus
+              className="w-full px-4 py-3 rounded-xl border border-gray-600 bg-gray-700 text-white text-lg focus:outline-none focus:ring-2 focus:ring-fwv-red focus:border-transparent placeholder-gray-400"
+            />
+            {loginError && <p className="text-red-400 text-sm mt-2">{loginError}</p>}
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full mt-4 bg-fwv-red hover:bg-red-700 text-white font-bold py-3 rounded-xl text-lg disabled:opacity-50"
+            >
+              {loginLoading ? 'Anmelden...' : 'Anmelden'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while checking session
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-400 text-lg">Laden...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">

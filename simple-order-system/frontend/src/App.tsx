@@ -50,31 +50,8 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
   );
 }
 
-// OAuth2 PKCE helper functions
-function generateCodeVerifier(): string {
-  const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
-  return btoa(String.fromCharCode(...array))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return btoa(String.fromCharCode(...new Uint8Array(hash)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-}
-
 // Environment variables
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-const AUTHENTIK_URL = import.meta.env.VITE_AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
-const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID || 'order-system';
-const REDIRECT_URI = window.location.origin + '/auth/callback';
 
 interface Item {
   id: number;
@@ -131,7 +108,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
   const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
   const [showCustomItem, setShowCustomItem] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges', printer_station: 'bar' });
   const [historyData, setHistoryData] = useState<any[]>([]);
@@ -194,23 +174,32 @@ function App() {
     }
   };
 
-  // Check for OAuth callback on mount
+  // Check session token on mount
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-
-    if (code) {
-      handleOAuthCallback(code);
-    } else if (token) {
-      validateToken();
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem('order_token');
+          setToken(null);
+        } else {
+          setUser({ name: payload.name || 'Admin', email: payload.email || '', groups: payload.groups || ['admin'] });
+        }
+      } catch {
+        localStorage.removeItem('order_token');
+        setToken(null);
+      }
     }
+    setSessionChecked(true);
   }, []);
 
-  // Fetch items and TWINT QR on mount (no auth required for viewing)
+  // Fetch items and TWINT QR after login
   useEffect(() => {
-    fetchItems();
-    fetchTwintQr();
-  }, []);
+    if (token) {
+      fetchItems();
+      fetchTwintQr();
+    }
+  }, [token]);
 
   const fetchTwintQr = async () => {
     try {
@@ -224,107 +213,34 @@ function App() {
     }
   };
 
-  const handleOAuthCallback = async (code: string) => {
-    setAuthLoading(true);
-    const verifier = sessionStorage.getItem('code_verifier');
-    if (!verifier) {
-      console.error('No code verifier found');
-      setAuthLoading(false);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginPassword.trim()) {
+      setLoginError('Bitte Passwort eingeben');
       return;
     }
-
+    setLoginLoading(true);
+    setLoginError('');
     try {
-      const response = await fetch(`${AUTHENTIK_URL}/application/o/token/`, {
+      const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: CLIENT_ID,
-          code: code,
-          redirect_uri: REDIRECT_URI,
-          code_verifier: verifier,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: loginPassword }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('order_token', data.access_token);
-        setToken(data.access_token);
-        sessionStorage.removeItem('code_verifier');
-
-        // Parse user info from token
-        const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-        // Build display name from available fields
-        const displayName = payload.name
-          || (payload.given_name && payload.family_name ? `${payload.given_name} ${payload.family_name}` : null)
-          || payload.given_name
-          || payload.preferred_username
-          || 'User';
-        setUser({
-          name: displayName,
-          email: payload.email || '',
-          groups: payload.groups || [],
-        });
-
-        // Clear URL params
-        window.history.replaceState({}, '', window.location.pathname);
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('order_token', data.token);
+        setToken(data.token);
+        const payload = JSON.parse(atob(data.token.split('.')[1]));
+        setUser({ name: payload.name || 'Admin', email: payload.email || '', groups: payload.groups || ['admin'] });
+        setLoginPassword('');
       } else {
-        console.error('Token exchange failed');
-        localStorage.removeItem('order_token');
+        setLoginError('Falsches Passwort');
       }
-    } catch (error) {
-      console.error('OAuth callback error:', error);
+    } catch {
+      setLoginError('Verbindungsfehler');
     }
-    setAuthLoading(false);
-  };
-
-  const validateToken = useCallback(() => {
-    if (!token) return;
-
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        localStorage.removeItem('order_token');
-        setToken(null);
-        setUser(null);
-      } else {
-        // Build display name from available fields
-        const displayName = payload.name
-          || (payload.given_name && payload.family_name ? `${payload.given_name} ${payload.family_name}` : null)
-          || payload.given_name
-          || payload.preferred_username
-          || 'User';
-        setUser({
-          name: displayName,
-          email: payload.email || '',
-          groups: payload.groups || [],
-        });
-      }
-    } catch (error) {
-      console.error('Token validation error:', error);
-      localStorage.removeItem('order_token');
-      setToken(null);
-    }
-  }, [token]);
-
-  const login = async () => {
-    const verifier = generateCodeVerifier();
-    const challenge = await generateCodeChallenge(verifier);
-    sessionStorage.setItem('code_verifier', verifier);
-
-    const params = new URLSearchParams({
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      response_type: 'code',
-      scope: 'openid profile email',
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-    });
-
-    window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?${params}`;
+    setLoginLoading(false);
   };
 
   const logout = () => {
@@ -814,9 +730,50 @@ function App() {
   const total = cart.reduce((sum, item) => sum + (item.customPrice || item.price) * item.quantity, 0);
   const categories = [...new Set(items.map(i => i.category))];
 
-  // Show inventory view only if authenticated
-  const showInventoryView = view === 'inventory' && user;
-  const showHistoryView = view === 'history' && user;
+  const showInventoryView = view === 'inventory';
+  const showHistoryView = view === 'history';
+
+  // Show login screen if not authenticated
+  if (sessionChecked && !token) {
+    return (
+      <div className="min-h-screen bg-fwv-red flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8">
+          <div className="text-center mb-6">
+            <img src="/logo.png" alt="FWV Raura" className="h-20 w-20 rounded-full mx-auto mb-4 bg-gray-50 p-1" />
+            <h1 className="text-2xl font-bold text-gray-800">Kasse</h1>
+            <p className="text-gray-500 text-sm mt-1">Bitte einloggen</p>
+          </div>
+          <form onSubmit={handleLogin}>
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              placeholder="Passwort"
+              autoFocus
+              className="w-full px-4 py-3 rounded-xl border border-gray-300 text-lg focus:outline-none focus:ring-2 focus:ring-fwv-red focus:border-transparent"
+            />
+            {loginError && <p className="text-red-600 text-sm mt-2">{loginError}</p>}
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full mt-4 bg-fwv-red hover:bg-red-700 text-white font-bold py-3 rounded-xl text-lg disabled:opacity-50"
+            >
+              {loginLoading ? 'Anmelden...' : 'Anmelden'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading while checking session
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-gray-500 text-lg">Laden...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -873,22 +830,12 @@ function App() {
                 </button>
               )}
               {user && <span className="text-xs sm:text-sm">Hallo, {user.name}</span>}
-              {user ? (
-                <button
-                  onClick={logout}
-                  className="px-2 py-1 sm:px-4 sm:py-2 rounded bg-red-800 text-xs sm:text-base min-h-[36px] sm:min-h-[40px] touch-manipulation"
-                >
-                  Logout
-                </button>
-              ) : (
-                <button
-                  onClick={login}
-                  disabled={authLoading}
-                  className="px-3 py-1.5 sm:px-4 sm:py-2 rounded bg-red-700 hover:bg-red-800 text-xs sm:text-base min-h-[36px] sm:min-h-[40px] touch-manipulation"
-                >
-                  {authLoading ? '...' : 'Admin Login'}
-                </button>
-              )}
+              <button
+                onClick={logout}
+                className="px-2 py-1 sm:px-4 sm:py-2 rounded bg-red-800 text-xs sm:text-base min-h-[36px] sm:min-h-[40px] touch-manipulation"
+              >
+                Logout
+              </button>
             </div>
           </div>
 
@@ -910,39 +857,35 @@ function App() {
             >
               🪑 Tische {allOpenOrders.length > 0 && `(${new Set(allOpenOrders.map(o => o.table_number)).size})`}
             </button>
-            {user && (
-              <>
-                <button
-                  onClick={() => setView('inventory')}
-                  className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
-                    view === 'inventory' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
-                  }`}
-                >
-                  📦 Artikel
-                </button>
-                <button
-                  onClick={() => setView('history')}
-                  className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
-                    view === 'history' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
-                  }`}
-                >
-                  📊 History
-                </button>
-                <button
-                  onClick={() => setView('settings')}
-                  className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
-                    view === 'settings' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
-                  }`}
-                >
-                  ⚙️ Einstellungen
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => setView('inventory')}
+              className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                view === 'inventory' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+              }`}
+            >
+              📦 Artikel
+            </button>
+            <button
+              onClick={() => setView('history')}
+              className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                view === 'history' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+              }`}
+            >
+              📊 History
+            </button>
+            <button
+              onClick={() => setView('settings')}
+              className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                view === 'settings' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+              }`}
+            >
+              ⚙️ Einstellungen
+            </button>
           </div>
         </div>
       </div>
 
-      {view === 'settings' && user ? (
+      {view === 'settings' ? (
         <SettingsView token={token} />
       ) : showHistoryView ? (
         <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token} />
@@ -1151,7 +1094,6 @@ function App() {
                 {items.length === 0 && (
                   <div className="text-center text-gray-500 py-8">
                     Keine Artikel vorhanden.
-                    {!user && ' Melden Sie sich als Admin an, um Artikel hinzuzufügen.'}
                   </div>
                 )}
               </div>
