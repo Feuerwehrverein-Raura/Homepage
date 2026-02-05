@@ -1,6 +1,19 @@
 # [1.145.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.144.0...v1.145.0) (2026-02-05)
 
 
+### Bug Fixes
+
+* **order-system:** logout also ends Authentik session ([720454b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/720454b8b07bed2eea473bbb30a207b4bf7e7b16))
+
+
+### Features
+
+* **order-system:** use Authentik OIDC for Kasse and Kitchen web auth ([dd39f1c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd39f1ccc4d1b91903a599535952133425bada75))
+* use dedicated Authentik order-system provider with 24h tokens ([e83b937](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e83b937ccf31de8f87ef35bc3587b259623d1e18))
+
+# [1.145.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.144.0...v1.145.0) (2026-02-05)
+
+
 ### Features
 
 * **order-system:** use Authentik OIDC for Kasse and Kitchen web auth ([dd39f1c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd39f1ccc4d1b91903a599535952133425bada75))
