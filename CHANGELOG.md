@@ -1,3 +1,10 @@
+# [1.144.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.143.2...v1.144.0) (2026-02-05)
+
+
+### Features
+
+* **order-system:** add password login to Kasse and Kitchen web frontends ([2ce61a3](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2ce61a3df774bb103fee67ad152a559c464e0c51))
+
 ## [1.143.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.143.1...v1.143.2) (2026-02-05)
 
 
