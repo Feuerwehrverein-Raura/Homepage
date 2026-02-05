@@ -216,6 +216,12 @@ function App() {
     window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${AUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(AUTH_CALLBACK_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
   };
 
+  const logout = () => {
+    localStorage.removeItem('kitchen_token');
+    setSessionToken(null);
+    window.location.href = `${AUTHENTIK_URL}/application/o/${AUTH_CLIENT_ID}/end-session/?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`;
+  };
+
   // Start cleaning mode - 30 seconds of no touch response
   const startCleaning = useCallback(() => {
     setCleaningMode(true);
@@ -534,6 +540,14 @@ function App() {
             >
               <span>🧽</span>
               <span>Putzen</span>
+            </button>
+
+            {/* Logout Button */}
+            <button
+              onClick={logout}
+              className="px-4 py-2 bg-red-800 hover:bg-red-900 rounded-lg font-bold"
+            >
+              Logout
             </button>
 
             {!soundEnabled ? (
