@@ -4,6 +4,28 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Version aus Git-Tag ableiten (vorstand-v1.2.0 → 1.2.0)
+fun getVersionFromTag(): String {
+    return try {
+        val tag = providers.exec {
+            commandLine("git", "describe", "--tags", "--match", "vorstand-v*", "--abbrev=0")
+        }.standardOutput.asText.get().trim()
+        tag.removePrefix("vorstand-v")
+    } catch (_: Exception) {
+        "1.0.0"
+    }
+}
+
+fun getVersionCode(): Int {
+    return try {
+        val version = getVersionFromTag()
+        val parts = version.split(".").map { it.toIntOrNull() ?: 0 }
+        parts.getOrElse(0) { 0 } * 10000 + parts.getOrElse(1) { 0 } * 100 + parts.getOrElse(2) { 0 }
+    } catch (_: Exception) {
+        1
+    }
+}
+
 android {
     namespace = "ch.fwvraura.vorstand"
     compileSdk = 35
@@ -12,8 +34,8 @@ android {
         applicationId = "ch.fwvraura.vorstand"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.2.0"
+        versionCode = getVersionCode()
+        versionName = getVersionFromTag()
     }
 
     buildTypes {
