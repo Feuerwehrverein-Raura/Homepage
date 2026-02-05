@@ -38,16 +38,6 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
-// Helper to get client IP
-function getClientIp(req: express.Request): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (forwarded) {
-    const ips = (typeof forwarded === 'string' ? forwarded : forwarded[0]).split(',');
-    return ips[0].trim();
-  }
-  return req.socket.remoteAddress || 'unknown';
-}
-
 // Audit logging middleware - logs all API requests
 app.use('/api', (req: AuthenticatedRequest, res, next) => {
   const startTime = Date.now();
@@ -1744,7 +1734,7 @@ app.post('/api/settings/upload-twint-qr', authenticateToken, upload.single('qrco
       return res.status(500).json({ error: 'Öffentlicher Link konnte nicht erstellt werden' });
     }
 
-    const shareData = await shareResponse.json();
+    const shareData = await shareResponse.json() as any;
     const shareUrl = shareData.ocs?.data?.url;
 
     if (!shareUrl) {
