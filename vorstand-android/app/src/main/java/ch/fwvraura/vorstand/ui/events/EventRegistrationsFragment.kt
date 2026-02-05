@@ -212,14 +212,42 @@ class EventRegistrationsFragment : Fragment() {
 
     private fun showEditRegistrationDialog(reg: EventRegistration) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_edit_registration, null)
+        val memberDropdown = dialogView.findViewById<AutoCompleteTextView>(R.id.editMemberDropdown)
         val editName = dialogView.findViewById<TextInputEditText>(R.id.editName)
         val editEmail = dialogView.findViewById<TextInputEditText>(R.id.editEmail)
         val editPhone = dialogView.findViewById<TextInputEditText>(R.id.editPhone)
 
         // Pre-fill with existing data
-        editName.setText(reg.displayName)
+        memberDropdown.setText(reg.displayName, false)
+        editName.setText(reg.guestName ?: "")
         editEmail.setText(reg.guestEmail ?: "")
         editPhone.setText(reg.phone ?: "")
+
+        var members: List<Member> = emptyList()
+        var selectedMember: Member? = null
+
+        // Load members for dropdown
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.membersApi.getMembers()
+                if (response.isSuccessful) {
+                    members = response.body() ?: emptyList()
+                    val memberNames = members.map { "${it.vorname} ${it.nachname}" }
+                    val adapter = ArrayAdapter(
+                        requireContext(),
+                        android.R.layout.simple_dropdown_item_1line,
+                        memberNames
+                    )
+                    memberDropdown.setAdapter(adapter)
+                    memberDropdown.setOnItemClickListener { _, _, position, _ ->
+                        selectedMember = members[position]
+                        val m = members[position]
+                        editName.setText("${m.vorname} ${m.nachname}")
+                        if (!m.email.isNullOrEmpty()) editEmail.setText(m.email)
+                    }
+                }
+            } catch (_: Exception) { }
+        }
 
         val dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle("Anmeldung bearbeiten")
@@ -230,17 +258,27 @@ class EventRegistrationsFragment : Fragment() {
 
         dialog.setOnShowListener {
             dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = editName.text?.toString()?.trim() ?: ""
-                if (name.isEmpty()) {
-                    Toast.makeText(requireContext(), "Bitte einen Namen eingeben", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
+                val body = mutableMapOf<String, Any>()
+
+                if (selectedMember != null) {
+                    val m = selectedMember!!
+                    body["member_id"] = m.id
+                    body["guest_name"] = "${m.vorname} ${m.nachname}"
+                    if (!m.email.isNullOrEmpty()) body["guest_email"] = m.email
+                } else {
+                    val name = editName.text?.toString()?.trim() ?: ""
+                    if (name.isNotEmpty()) body["guest_name"] = name
                 }
 
-                val body = mutableMapOf<String, Any>("guest_name" to name)
                 val email = editEmail.text?.toString()?.trim() ?: ""
                 if (email.isNotEmpty()) body["guest_email"] = email
                 val phone = editPhone.text?.toString()?.trim() ?: ""
                 if (phone.isNotEmpty()) body["phone"] = phone
+
+                if (body.isEmpty()) {
+                    Toast.makeText(requireContext(), "Keine Änderungen", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
 
                 updateRegistration(reg.id, body, dialog)
             }

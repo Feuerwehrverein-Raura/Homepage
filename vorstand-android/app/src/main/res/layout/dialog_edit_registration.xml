@@ -7,11 +7,26 @@
     android:padding="24dp">
 
     <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/memberDropdownLayout"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:hint="Mitglied zuweisen">
+
+        <AutoCompleteTextView
+            android:id="@+id/editMemberDropdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="none" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"
-        android:hint="Name">
+        android:hint="Name (Gast)">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/editName"

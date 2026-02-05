@@ -521,11 +521,11 @@ app.get('/events', async (req, res) => {
                     registrations: {
                         approved: approved.map(r => ({
                             id: r.id,
-                            name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt')
+                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
                         })),
                         pending: pending.map(r => ({
                             id: r.id,
-                            name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt')
+                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
                         })),
                         approvedCount: approved.length,
                         pendingCount: pending.length,
@@ -654,13 +654,13 @@ app.get('/events/:id', async (req, res) => {
             directRegistrations: {
                 approved: directApproved.map(r => ({
                     id: r.id,
-                    name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt'),
+                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
                     email: r.guest_email,
                     notes: r.notes
                 })),
                 pending: directPending.map(r => ({
                     id: r.id,
-                    name: r.guest_name || (r.member_id ? `${r.vorname} ${r.nachname}` : 'Unbekannt'),
+                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
                     email: r.guest_email,
                     notes: r.notes
                 })),
@@ -1785,7 +1785,7 @@ app.get('/registrations/alternative-response/:token', async (req, res) => {
 app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { guest_name, guest_email, phone, shift_ids, notes, status } = req.body;
+        const { guest_name, guest_email, phone, shift_ids, notes, status, member_id } = req.body;
 
         const result = await pool.query(`
             UPDATE registrations
@@ -1794,10 +1794,11 @@ app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'),
                 phone = COALESCE($4, phone),
                 shift_ids = COALESCE($5, shift_ids),
                 notes = COALESCE($6, notes),
-                status = COALESCE($7, status)
+                status = COALESCE($7, status),
+                member_id = COALESCE($8, member_id)
             WHERE id = $1
             RETURNING *
-        `, [id, guest_name, guest_email, phone, shift_ids, notes, status]);
+        `, [id, guest_name, guest_email, phone, shift_ids, notes, status, member_id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Registration not found' });
