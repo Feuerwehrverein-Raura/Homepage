@@ -1,3 +1,10 @@
+## [1.143.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.143.0...v1.143.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* **order-system:** bump backend version to trigger rebuild ([ccc3f2c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ccc3f2c84a192dfc20d71af4408fa7b75a44960f))
+
 # [1.143.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.142.0...v1.143.0) (2026-02-05)
 
 
