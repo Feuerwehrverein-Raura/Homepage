@@ -237,8 +237,7 @@ function App() {
     localStorage.removeItem('order_token');
     setToken(null);
     setUser(null);
-    // End Authentik session and redirect back
-    window.location.href = `${AUTHENTIK_URL}/application/o/${AUTH_CLIENT_ID}/end-session/?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`;
+    window.location.href = `${AUTHENTIK_URL}/if/flow/default-invalidation-flow/`;
   };
 
   const fetchItems = async () => {

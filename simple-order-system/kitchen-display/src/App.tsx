@@ -219,7 +219,7 @@ function App() {
   const logout = () => {
     localStorage.removeItem('kitchen_token');
     setSessionToken(null);
-    window.location.href = `${AUTHENTIK_URL}/application/o/${AUTH_CLIENT_ID}/end-session/?post_logout_redirect_uri=${encodeURIComponent(window.location.origin + '/')}`;
+    window.location.href = `${AUTHENTIK_URL}/if/flow/default-invalidation-flow/`;
   };
 
   // Start cleaning mode - 30 seconds of no touch response
