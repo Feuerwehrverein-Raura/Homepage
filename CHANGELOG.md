@@ -1,3 +1,10 @@
+# [1.142.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.141.0...v1.142.0) (2026-02-05)
+
+
+### Features
+
+* **order-system:** protect Kasse and KDS with Authentik forward auth ([4d17506](https://github.com/Feuerwehrverein-Raura/Homepage/commit/4d1750688632c10dd555427433e83a69a63d8f51))
+
 # [1.141.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.140.0...v1.141.0) (2026-02-05)
 
 
