@@ -1,3 +1,10 @@
+# [1.136.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.5...v1.136.0) (2026-02-05)
+
+
+### Features
+
+* **contact:** add spam protection and email confirmation (double opt-in) ([cdc8f9c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cdc8f9c7e3781a2591f798a1487a85f877d82cfa))
+
 ## [1.135.5](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.135.4...v1.135.5) (2026-02-04)
 
 
