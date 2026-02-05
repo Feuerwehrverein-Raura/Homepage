@@ -1,3 +1,10 @@
+## [1.138.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.138.0...v1.138.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* **vorstand-android:** assign registration status from approved/pending arrays ([2dfd377](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2dfd3773a63a8674da057e77c7c1296197b0a602))
+
 # [1.138.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.4...v1.138.0) (2026-02-05)
 
 
