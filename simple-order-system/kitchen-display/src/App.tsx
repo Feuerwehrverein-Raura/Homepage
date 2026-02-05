@@ -219,7 +219,8 @@ function App() {
   const logout = () => {
     localStorage.removeItem('kitchen_token');
     setSessionToken(null);
-    window.location.href = `${AUTHENTIK_URL}/if/flow/default-invalidation-flow/`;
+    const state = encodeURIComponent(window.location.origin + '/');
+    window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${AUTH_CLIENT_ID}&redirect_uri=${encodeURIComponent(AUTH_CALLBACK_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}&prompt=login`;
   };
 
   // Start cleaning mode - 30 seconds of no touch response
