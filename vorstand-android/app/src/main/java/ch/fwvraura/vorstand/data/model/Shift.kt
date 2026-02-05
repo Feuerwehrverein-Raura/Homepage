@@ -3,8 +3,8 @@ package ch.fwvraura.vorstand.data.model
 import com.google.gson.annotations.SerializedName
 
 data class Shift(
-    val id: Int,
-    @SerializedName("event_id") val eventId: Int,
+    val id: String,
+    @SerializedName("event_id") val eventId: String,
     val name: String,
     val description: String? = null,
     val date: String? = null,
@@ -16,7 +16,7 @@ data class Shift(
 )
 
 data class ShiftCreate(
-    @SerializedName("event_id") val eventId: Int? = null,
+    @SerializedName("event_id") val eventId: String? = null,
     val name: String,
     val description: String? = null,
     val date: String? = null,
@@ -27,9 +27,9 @@ data class ShiftCreate(
 )
 
 data class EventRegistration(
-    val id: Int,
-    @SerializedName("shift_id") val shiftId: Int? = null,
-    @SerializedName("member_id") val memberId: Int? = null,
+    val id: String,
+    @SerializedName("shift_id") val shiftId: String? = null,
+    @SerializedName("member_id") val memberId: String? = null,
     @SerializedName("guest_name") val guestName: String? = null,
     @SerializedName("guest_email") val guestEmail: String? = null,
     val phone: String? = null,

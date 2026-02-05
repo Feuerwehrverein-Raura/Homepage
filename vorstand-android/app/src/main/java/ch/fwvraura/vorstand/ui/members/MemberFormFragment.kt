@@ -20,8 +20,8 @@ class MemberFormFragment : Fragment() {
 
     private var _binding: FragmentMemberFormBinding? = null
     private val binding get() = _binding!!
-    private var memberId: Int = -1
-    private val isEdit get() = memberId > 0
+    private var memberId: String? = null
+    private val isEdit get() = memberId != null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -32,7 +32,7 @@ class MemberFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        memberId = arguments?.getInt("memberId", -1) ?: -1
+        memberId = arguments?.getString("memberId")
 
         binding.toolbar.title = if (isEdit) getString(R.string.member_edit) else getString(R.string.member_new)
         binding.toolbar.setNavigationOnClickListener { findNavController().navigateUp() }
@@ -50,7 +50,7 @@ class MemberFormFragment : Fragment() {
     private fun loadMember() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val response = ApiModule.membersApi.getMember(memberId)
+                val response = ApiModule.membersApi.getMember(memberId!!)
                 if (response.isSuccessful) {
                     val m = response.body() ?: return@launch
                     binding.inputAnrede.setText(m.anrede ?: "")
@@ -100,7 +100,7 @@ class MemberFormFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = if (isEdit) {
-                    ApiModule.membersApi.updateMember(memberId, member)
+                    ApiModule.membersApi.updateMember(memberId!!, member)
                 } else {
                     ApiModule.membersApi.createMember(member)
                 }

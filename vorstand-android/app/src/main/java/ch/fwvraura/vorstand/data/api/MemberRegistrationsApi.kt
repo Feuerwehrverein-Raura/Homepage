@@ -18,17 +18,17 @@ interface MemberRegistrationsApi {
     ): Response<List<MemberRegistration>>
 
     @GET("member-registrations/{id}")
-    suspend fun getRegistration(@Path("id") id: Int): Response<MemberRegistration>
+    suspend fun getRegistration(@Path("id") id: String): Response<MemberRegistration>
 
     @POST("member-registrations/{id}/approve")
     suspend fun approve(
-        @Path("id") id: Int,
+        @Path("id") id: String,
         @Body request: ApproveRequest
     ): Response<Unit>
 
     @POST("member-registrations/{id}/reject")
     suspend fun reject(
-        @Path("id") id: Int,
+        @Path("id") id: String,
         @Body request: RejectRequest
     ): Response<Unit>
 }

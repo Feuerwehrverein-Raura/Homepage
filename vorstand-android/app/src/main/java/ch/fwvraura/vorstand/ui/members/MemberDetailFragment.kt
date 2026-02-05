@@ -21,7 +21,7 @@ class MemberDetailFragment : Fragment() {
 
     private var _binding: FragmentMemberDetailBinding? = null
     private val binding get() = _binding!!
-    private var memberId: Int = -1
+    private var memberId: String? = null
     private var member: Member? = null
 
     override fun onCreateView(
@@ -33,11 +33,11 @@ class MemberDetailFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        memberId = arguments?.getInt("memberId", -1) ?: -1
+        memberId = arguments?.getString("memberId")
 
         binding.toolbar.setNavigationOnClickListener { findNavController().navigateUp() }
         binding.btnEdit.setOnClickListener {
-            val bundle = Bundle().apply { putInt("memberId", memberId) }
+            val bundle = Bundle().apply { putString("memberId", memberId) }
             findNavController().navigate(R.id.action_detail_to_form, bundle)
         }
         binding.btnDelete.setOnClickListener { confirmDelete() }
@@ -48,7 +48,7 @@ class MemberDetailFragment : Fragment() {
     private fun loadMember() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val response = ApiModule.membersApi.getMember(memberId)
+                val response = ApiModule.membersApi.getMember(memberId!!)
                 if (response.isSuccessful) {
                     member = response.body()
                     member?.let { displayMember(it) }
@@ -97,7 +97,7 @@ class MemberDetailFragment : Fragment() {
     private fun deleteMember() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val response = ApiModule.membersApi.deleteMember(memberId)
+                val response = ApiModule.membersApi.deleteMember(memberId!!)
                 if (response.isSuccessful) {
                     findNavController().navigateUp()
                 }

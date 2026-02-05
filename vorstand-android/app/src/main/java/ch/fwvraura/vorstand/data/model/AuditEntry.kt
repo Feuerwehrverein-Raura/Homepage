@@ -3,7 +3,7 @@ package ch.fwvraura.vorstand.data.model
 import com.google.gson.annotations.SerializedName
 
 data class AuditEntry(
-    val id: Int? = null,
+    val id: String? = null,
     val action: String,
     val details: Any? = null,
     @SerializedName("new_values") val newValues: Any? = null,

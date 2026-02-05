@@ -19,8 +19,8 @@ class EventFormFragment : Fragment() {
 
     private var _binding: FragmentEventFormBinding? = null
     private val binding get() = _binding!!
-    private var eventId: Int = -1
-    private val isEdit get() = eventId > 0
+    private var eventId: String? = null
+    private val isEdit get() = eventId != null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -31,7 +31,7 @@ class EventFormFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        eventId = arguments?.getInt("eventId", -1) ?: -1
+        eventId = arguments?.getString("eventId")
 
         binding.toolbar.title = if (isEdit) getString(R.string.event_edit) else getString(R.string.event_new)
         binding.toolbar.setNavigationOnClickListener { findNavController().navigateUp() }
@@ -44,7 +44,7 @@ class EventFormFragment : Fragment() {
     private fun loadEvent() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val response = ApiModule.eventsApi.getEvent(eventId)
+                val response = ApiModule.eventsApi.getEvent(eventId!!)
                 if (response.isSuccessful) {
                     val e = response.body() ?: return@launch
                     binding.inputTitle.setText(e.title)
@@ -78,7 +78,7 @@ class EventFormFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             try {
                 val response = if (isEdit) {
-                    ApiModule.eventsApi.updateEvent(eventId, event)
+                    ApiModule.eventsApi.updateEvent(eventId!!, event)
                 } else {
                     ApiModule.eventsApi.createEvent(event)
                 }

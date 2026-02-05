@@ -46,7 +46,7 @@ class MembersListFragment : Fragment() {
 
     private fun setupRecyclerView() {
         adapter = MembersAdapter { member ->
-            val bundle = Bundle().apply { putInt("memberId", member.id) }
+            val bundle = Bundle().apply { putString("memberId", member.id) }
             findNavController().navigate(R.id.action_members_to_detail, bundle)
         }
         binding.membersRecycler.layoutManager = LinearLayoutManager(requireContext())

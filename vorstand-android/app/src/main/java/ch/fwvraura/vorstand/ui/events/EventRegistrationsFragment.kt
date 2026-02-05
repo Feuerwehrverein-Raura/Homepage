@@ -23,7 +23,7 @@ class EventRegistrationsFragment : Fragment() {
 
     private var _binding: FragmentEventRegistrationsBinding? = null
     private val binding get() = _binding!!
-    private var eventId: Int = -1
+    private var eventId: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -34,7 +34,7 @@ class EventRegistrationsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        eventId = arguments?.getInt("eventId", -1) ?: -1
+        eventId = arguments?.getString("eventId")
 
         binding.toolbar.setNavigationOnClickListener { findNavController().navigateUp() }
         binding.swipeRefresh.setOnRefreshListener { loadEvent() }
@@ -46,7 +46,7 @@ class EventRegistrationsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             binding.swipeRefresh.isRefreshing = true
             try {
-                val response = ApiModule.eventsApi.getEvent(eventId)
+                val response = ApiModule.eventsApi.getEvent(eventId!!)
                 if (response.isSuccessful) {
                     val event = response.body() ?: return@launch
                     binding.toolbar.title = event.title

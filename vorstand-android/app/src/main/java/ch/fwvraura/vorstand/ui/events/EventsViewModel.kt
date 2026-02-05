@@ -39,7 +39,7 @@ class EventsViewModel : ViewModel() {
         }
     }
 
-    fun deleteEvent(id: Int, onSuccess: () -> Unit) {
+    fun deleteEvent(id: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
                 val response = ApiModule.eventsApi.deleteEvent(id)

@@ -10,19 +10,19 @@ interface EventsApi {
     suspend fun getEvents(): Response<List<Event>>
 
     @GET("events/{id}")
-    suspend fun getEvent(@Path("id") id: Int): Response<Event>
+    suspend fun getEvent(@Path("id") id: String): Response<Event>
 
     @POST("events")
     suspend fun createEvent(@Body event: EventCreate): Response<Event>
 
     @PUT("events/{id}")
     suspend fun updateEvent(
-        @Path("id") id: Int,
+        @Path("id") id: String,
         @Body event: EventCreate
     ): Response<Event>
 
     @DELETE("events/{id}")
-    suspend fun deleteEvent(@Path("id") id: Int): Response<Unit>
+    suspend fun deleteEvent(@Path("id") id: String): Response<Unit>
 
     // Shifts
     @POST("shifts")
@@ -30,17 +30,17 @@ interface EventsApi {
 
     @PUT("shifts/{id}")
     suspend fun updateShift(
-        @Path("id") id: Int,
+        @Path("id") id: String,
         @Body shift: ShiftCreate
     ): Response<Shift>
 
     @DELETE("shifts/{id}")
-    suspend fun deleteShift(@Path("id") id: Int): Response<Unit>
+    suspend fun deleteShift(@Path("id") id: String): Response<Unit>
 
     // Event Registrations
     @POST("registrations/{id}/approve")
-    suspend fun approveRegistration(@Path("id") id: Int): Response<Unit>
+    suspend fun approveRegistration(@Path("id") id: String): Response<Unit>
 
     @POST("registrations/{id}/reject")
-    suspend fun rejectRegistration(@Path("id") id: Int): Response<Unit>
+    suspend fun rejectRegistration(@Path("id") id: String): Response<Unit>
 }

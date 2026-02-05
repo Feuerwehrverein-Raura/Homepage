@@ -3,7 +3,7 @@ package ch.fwvraura.vorstand.data.model
 import com.google.gson.annotations.SerializedName
 
 data class Event(
-    val id: Int,
+    val id: String,
     val title: String,
     val subtitle: String? = null,
     val slug: String? = null,

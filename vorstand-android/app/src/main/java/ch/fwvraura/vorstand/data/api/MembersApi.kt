@@ -19,27 +19,27 @@ interface MembersApi {
     ): Response<List<Member>>
 
     @GET("members/{id}")
-    suspend fun getMember(@Path("id") id: Int): Response<Member>
+    suspend fun getMember(@Path("id") id: String): Response<Member>
 
     @POST("members")
     suspend fun createMember(@Body member: MemberCreate): Response<Member>
 
     @PUT("members/{id}")
     suspend fun updateMember(
-        @Path("id") id: Int,
+        @Path("id") id: String,
         @Body member: MemberCreate
     ): Response<Member>
 
     @DELETE("members/{id}")
-    suspend fun deleteMember(@Path("id") id: Int): Response<Unit>
+    suspend fun deleteMember(@Path("id") id: String): Response<Unit>
 
     @Multipart
     @POST("members/{id}/photo")
     suspend fun uploadPhoto(
-        @Path("id") id: Int,
+        @Path("id") id: String,
         @Part photo: MultipartBody.Part
     ): Response<Map<String, String>>
 
     @DELETE("members/{id}/photo")
-    suspend fun deletePhoto(@Path("id") id: Int): Response<Unit>
+    suspend fun deletePhoto(@Path("id") id: String): Response<Unit>
 }

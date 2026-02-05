@@ -68,7 +68,7 @@ class MembersViewModel : ViewModel() {
         }
     }
 
-    fun deleteMember(id: Int, onSuccess: () -> Unit) {
+    fun deleteMember(id: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
                 val response = ApiModule.membersApi.deleteMember(id)

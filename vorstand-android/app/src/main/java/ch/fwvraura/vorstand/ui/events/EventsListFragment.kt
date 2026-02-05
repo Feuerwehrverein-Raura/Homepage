@@ -35,11 +35,11 @@ class EventsListFragment : Fragment() {
 
         adapter = EventsAdapter(
             onClick = { event ->
-                val bundle = Bundle().apply { putInt("eventId", event.id) }
+                val bundle = Bundle().apply { putString("eventId", event.id) }
                 findNavController().navigate(R.id.action_events_to_registrations, bundle)
             },
             onEdit = { event ->
-                val bundle = Bundle().apply { putInt("eventId", event.id) }
+                val bundle = Bundle().apply { putString("eventId", event.id) }
                 findNavController().navigate(R.id.action_events_to_form, bundle)
             }
         )

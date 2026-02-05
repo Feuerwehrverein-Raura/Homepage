@@ -3,7 +3,7 @@ package ch.fwvraura.vorstand.data.model
 import com.google.gson.annotations.SerializedName
 
 data class Member(
-    val id: Int,
+    val id: String,
     val vorname: String,
     val nachname: String,
     val email: String? = null,
