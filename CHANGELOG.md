@@ -1,3 +1,10 @@
+# [1.138.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.4...v1.138.0) (2026-02-05)
+
+
+### Features
+
+* **vorstand-android:** implement full event management features ([3bd34e7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3bd34e793ab1be6ca564e36ef4f9ad61d004e918))
+
 ## [1.137.4](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.3...v1.137.4) (2026-02-05)
 
 
