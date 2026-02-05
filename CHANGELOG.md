@@ -1,3 +1,10 @@
+## [1.137.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.1...v1.137.2) (2026-02-05)
+
+
+### Bug Fixes
+
+* **ci:** use pre-installed Android SDK instead of setup-android action ([f3ce46c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f3ce46c1cb35a3eb530c4da455cf96ccbb6d2d75))
+
 ## [1.137.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.0...v1.137.1) (2026-02-05)
 
 
