@@ -35,18 +35,22 @@ Nachrichten per E-Mail und Briefpost direkt aus der App versenden.
 
 ---
 
-## Phase 3: Mailcow — E-Mail-Verwaltung (ausstehend)
+## Phase 3: Mailcow — E-Mail-Verwaltung (abgeschlossen)
 
 Mailcow-Postfächer und Aliases direkt aus der App verwalten.
 
-| Feature | Beschreibung |
-|---------|-------------|
-| Postfach-Übersicht | Alle Postfächer mit Quota-Anzeige |
-| Alias-Verwaltung | Aliases erstellen, bearbeiten, löschen |
-| Verteilerlisten | Verteilerlisten-Mitglieder verwalten |
-| Passwort-Reset | Postfach-Passwörter zurücksetzen |
+| Feature | Status |
+|---------|--------|
+| Postfächer CRUD (mit Quota-Anzeige) | Done |
+| Alias-Verwaltung (CRUD) | Done |
+| Speicher-Übersicht (farbige Fortschrittsbalken) | Done |
+| Zustellliste + Alias-Sync | Done |
 
-**API-Endpoints:** Backend-Proxy zu Mailcow API (kein direkter Zugriff auf Mailcow)
+**Technische Details:**
+- 4-Tab-Layout: Postfächer, Aliase, Speicher, Verteiler
+- Zugang über Mehr > E-Mail
+- Quota-Farben: Grün (<70%), Gelb (70-90%), Rot (>90%)
+- Alias-Sync aktualisiert mitglieder@fwv-raura.ch
 
 ---
 
