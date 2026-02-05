@@ -39,12 +39,80 @@
     <string name="event_registrations">Anmeldungen</string>
     <string name="event_shifts">Schichten</string>
 
+    <!-- Event Form -->
+    <string name="event_category">Kategorie</string>
+    <string name="event_status">Status</string>
+    <string name="event_title_field">Titel *</string>
+    <string name="event_subtitle">Untertitel</string>
+    <string name="event_location">Ort</string>
+    <string name="event_start_date">Startdatum</string>
+    <string name="event_end_date">Enddatum</string>
+    <string name="event_description">Beschreibung</string>
+    <string name="event_registration_deadline">Anmeldefrist</string>
+    <string name="event_max_participants">Max. Teilnehmer</string>
+    <string name="event_cost">Kosten</string>
+    <string name="event_organizer_name">Organisator Name</string>
+    <string name="event_organizer_email">Organisator E-Mail</string>
+    <string name="event_saved">Event gespeichert</string>
+    <string name="event_deleted">Event gelöscht</string>
+    <string name="event_title_required">Titel ist ein Pflichtfeld</string>
+
+    <!-- Event Categories -->
+    <string name="category_dorffest">Dorffest</string>
+    <string name="category_aufbau">Aufbau</string>
+    <string name="category_abbau">Abbau</string>
+    <string name="category_ausflug">Ausflug</string>
+    <string name="category_ausflug_anmeldung">Ausflug mit Anmeldung</string>
+    <string name="category_sonstiges">Sonstiges</string>
+
+    <!-- Event Status -->
+    <string name="status_planned">Geplant</string>
+    <string name="status_confirmed">Bestätigt</string>
+    <string name="status_cancelled">Abgesagt</string>
+    <string name="status_completed">Abgeschlossen</string>
+
+    <!-- Shifts -->
+    <string name="shift_name">Name *</string>
+    <string name="shift_bereich">Bereich</string>
+    <string name="shift_date">Datum</string>
+    <string name="shift_start_time">Startzeit</string>
+    <string name="shift_end_time">Endzeit</string>
+    <string name="shift_needed">Benötigt</string>
+    <string name="shift_description">Beschreibung</string>
+    <string name="shift_add">Schicht hinzufügen</string>
+    <string name="shift_edit">Schicht bearbeiten</string>
+    <string name="shift_delete">Schicht löschen</string>
+    <string name="shift_delete_confirm">Soll diese Schicht wirklich gelöscht werden?</string>
+    <string name="shift_name_required">Schichtname ist ein Pflichtfeld</string>
+
+    <!-- Shift Bereiche -->
+    <string name="bereich_bar">Bar</string>
+    <string name="bereich_kueche">Küche</string>
+    <string name="bereich_service">Service</string>
+    <string name="bereich_aufbau">Aufbau</string>
+    <string name="bereich_abbau">Abbau</string>
+    <string name="bereich_technik">Technik</string>
+    <string name="bereich_sonstiges">Sonstiges</string>
+
     <!-- Registrations -->
     <string name="registrations_title">Mitgliedschafts-Anträge</string>
     <string name="registration_approve">Genehmigen</string>
     <string name="registration_reject">Ablehnen</string>
     <string name="registration_approved">Antrag genehmigt</string>
     <string name="registration_rejected">Antrag abgelehnt</string>
+    <string name="reg_approved">Genehmigt</string>
+    <string name="reg_pending">Ausstehend</string>
+    <string name="reg_add_person">Person hinzufügen</string>
+    <string name="reg_tab_member">Mitglied</string>
+    <string name="reg_tab_guest">Gast</string>
+    <string name="reg_guest_name">Name</string>
+    <string name="reg_guest_email">E-Mail</string>
+    <string name="reg_guest_phone">Telefon</string>
+    <string name="reg_select_member">Mitglied auswählen</string>
+    <string name="reg_approve_success">Anmeldung genehmigt</string>
+    <string name="reg_reject_success">Anmeldung abgelehnt</string>
+    <string name="reg_person_added">Person hinzugefügt</string>
+    <string name="reg_direct_registrations">Direkte Anmeldungen</string>
 
     <!-- Audit -->
     <string name="audit_title">Audit Log</string>

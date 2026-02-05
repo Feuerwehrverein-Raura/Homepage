@@ -43,4 +43,7 @@ interface EventsApi {
 
     @POST("registrations/{id}/reject")
     suspend fun rejectRegistration(@Path("id") id: String): Response<Unit>
+
+    @POST("registrations")
+    suspend fun createRegistration(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Unit>
 }

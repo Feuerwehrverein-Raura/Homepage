@@ -2,6 +2,7 @@
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
@@ -32,6 +33,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="16dp"
+            android:layout_marginEnd="8dp"
             android:textColor="@color/text_primary"
             android:textSize="16sp"
             android:textStyle="bold"
@@ -39,6 +41,22 @@
             android:maxLines="1"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toEndOf="@id/eventDate"
+            app:layout_constraintEnd_toStartOf="@id/eventStatus"
+            app:layout_constraintHorizontal_bias="0" />
+
+        <TextView
+            android:id="@+id/eventStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:textColor="@android:color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="Geplant"
+            tools:visibility="visible"
+            app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
 
         <TextView
@@ -55,6 +73,21 @@
             app:layout_constraintEnd_toEndOf="parent" />
 
         <TextView
+            android:id="@+id/eventCategory"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:visibility="gone"
+            tools:text="Übung"
+            tools:visibility="visible"
+            app:layout_constraintTop_toBottomOf="@id/eventLocation"
+            app:layout_constraintStart_toEndOf="@id/eventDate"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <TextView
             android:id="@+id/eventShifts"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -63,7 +96,9 @@
             android:textColor="@color/text_secondary"
             android:textSize="12sp"
             android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/eventLocation"
+            tools:text="2/10 Anmeldungen | 3 Schichten"
+            tools:visibility="visible"
+            app:layout_constraintTop_toBottomOf="@id/eventCategory"
             app:layout_constraintStart_toEndOf="@id/eventDate"
             app:layout_constraintEnd_toEndOf="parent" />
 

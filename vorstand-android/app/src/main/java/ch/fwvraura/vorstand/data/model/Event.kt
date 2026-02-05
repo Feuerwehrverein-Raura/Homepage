@@ -32,7 +32,7 @@ data class EventCreate(
     val title: String,
     val subtitle: String? = null,
     val category: String? = null,
-    val status: String? = "published",
+    val status: String? = "planned",
     @SerializedName("start_date") val startDate: String? = null,
     @SerializedName("end_date") val endDate: String? = null,
     val location: String? = null,
