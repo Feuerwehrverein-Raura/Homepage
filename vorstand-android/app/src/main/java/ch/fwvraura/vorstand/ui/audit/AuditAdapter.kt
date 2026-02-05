@@ -25,9 +25,9 @@ class AuditAdapter : ListAdapter<AuditEntry, AuditAdapter.ViewHolder>(DiffCallba
         fun bind(entry: AuditEntry) {
             binding.auditAction.text = entry.action
             binding.auditTime.text = DateUtils.formatDateTime(entry.createdAt)
-            binding.auditUser.text = entry.userEmail ?: ""
+            binding.auditUser.text = entry.email ?: ""
 
-            val details = entry.details?.toString()
+            val details = entry.newValues?.toString()
             if (!details.isNullOrBlank() && details != "null") {
                 binding.auditDetails.text = details
                 binding.auditDetails.visibility = View.VISIBLE

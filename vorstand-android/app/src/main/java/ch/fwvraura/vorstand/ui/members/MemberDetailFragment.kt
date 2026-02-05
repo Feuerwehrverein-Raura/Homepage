@@ -118,13 +118,13 @@ class MemberDetailFragment : Fragment() {
 
                 val response = ApiModule.membersApi.uploadPhoto(memberId!!, part)
                 if (response.isSuccessful) {
-                    Toast.makeText(context, R.string.photo_upload_success, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), R.string.photo_upload_success, Toast.LENGTH_SHORT).show()
                     loadMember()
                 } else {
-                    Toast.makeText(context, R.string.photo_upload_error, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), R.string.photo_upload_error, Toast.LENGTH_SHORT).show()
                 }
             } catch (_: Exception) {
-                Toast.makeText(context, R.string.photo_upload_error, Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), R.string.photo_upload_error, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -142,15 +142,15 @@ class MemberDetailFragment : Fragment() {
             try {
                 val response = ApiModule.membersApi.deletePhoto(memberId!!)
                 if (response.isSuccessful) {
-                    Toast.makeText(context, R.string.photo_delete_success, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), R.string.photo_delete_success, Toast.LENGTH_SHORT).show()
                     member = member?.copy(foto = null)
                     binding.memberPhoto.setImageDrawable(null)
                     binding.memberPhoto.setBackgroundResource(R.drawable.circle_background)
                 } else {
-                    Toast.makeText(context, R.string.photo_delete_error, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), R.string.photo_delete_error, Toast.LENGTH_SHORT).show()
                 }
             } catch (_: Exception) {
-                Toast.makeText(context, R.string.photo_delete_error, Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), R.string.photo_delete_error, Toast.LENGTH_SHORT).show()
             }
         }
     }

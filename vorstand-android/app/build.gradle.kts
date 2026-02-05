@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "ch.fwvraura.vorstand"
-        minSdk = 26
+        minSdk = 30
         targetSdk = 35
         versionCode = getVersionCode()
         versionName = getVersionFromTag()
