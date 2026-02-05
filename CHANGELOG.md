@@ -1,3 +1,10 @@
+# [1.141.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.140.0...v1.141.0) (2026-02-05)
+
+
+### Features
+
+* **website:** add apps showcase page and simplify navigation ([8ee91a7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8ee91a77835bf06ab749677dac332c8af9ee9a6b))
+
 # [1.140.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.139.2...v1.140.0) (2026-02-05)
 
 
