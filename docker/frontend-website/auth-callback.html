@@ -53,6 +53,8 @@
                 let clientType = 'members'; // default
                 if (state && state.includes('/vorstand')) {
                     clientType = 'vorstand';
+                } else if (state && (state.includes('order.fwv-raura.ch') || state.includes('kitchen.fwv-raura.ch'))) {
+                    clientType = 'order';
                 }
 
                 // Exchange code for token via our backend

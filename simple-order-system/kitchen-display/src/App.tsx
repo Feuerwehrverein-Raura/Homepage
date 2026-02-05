@@ -53,7 +53,7 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
 const API_URL = import.meta.env.VITE_API_URL || 'https://order.fwv-raura.ch/api';
 const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch/ws';
 const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
-const AUTH_CLIENT_ID = 'fwv-members';
+const AUTH_CLIENT_ID = 'order-system';
 const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
 
 interface OrderItem {

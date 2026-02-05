@@ -53,7 +53,7 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
 // Environment variables
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
-const AUTH_CLIENT_ID = 'fwv-members';
+const AUTH_CLIENT_ID = 'order-system';
 const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
 
 interface Item {
