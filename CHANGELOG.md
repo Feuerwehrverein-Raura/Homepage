@@ -1,3 +1,10 @@
+## [1.143.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.143.1...v1.143.2) (2026-02-05)
+
+
+### Bug Fixes
+
+* **order-system:** fix TypeScript build errors (duplicate function, untyped response) ([63a953a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/63a953a69837c7aff143776f0832cba08377a68b))
+
 ## [1.143.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.143.0...v1.143.1) (2026-02-05)
 
 
