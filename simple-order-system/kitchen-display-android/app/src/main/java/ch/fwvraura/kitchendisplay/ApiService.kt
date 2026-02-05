@@ -12,7 +12,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-class ApiService(private val serverUrl: String) {
+class ApiService(private val serverUrl: String, private val token: String? = null) {
     companion object {
         private const val TAG = "ApiService"
     }
@@ -21,6 +21,11 @@ class ApiService(private val serverUrl: String) {
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    private fun Request.Builder.addAuth(): Request.Builder {
+        token?.let { addHeader("Authorization", "Bearer $it") }
+        return this
+    }
 
     private val gson = Gson()
 
@@ -31,6 +36,7 @@ class ApiService(private val serverUrl: String) {
         try {
             val request = Request.Builder()
                 .url("$baseUrl/orders")
+                .addAuth()
                 .get()
                 .build()
 
@@ -56,6 +62,7 @@ class ApiService(private val serverUrl: String) {
         try {
             val request = Request.Builder()
                 .url("$baseUrl/orders/$orderId/complete")
+                .addAuth()
                 .patch("".toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -78,6 +85,7 @@ class ApiService(private val serverUrl: String) {
             val json = gson.toJson(mapOf("item_ids" to itemIds))
             val request = Request.Builder()
                 .url("$baseUrl/orders/$orderId/items/complete")
+                .addAuth()
                 .patch(json.toRequestBody("application/json".toMediaType()))
                 .build()
 

@@ -13,7 +13,7 @@ const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 const AUTHENTIK_CLIENT_SECRET = process.env.AUTHENTIK_CLIENT_SECRET || '';
 const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fwv2026';
-const JWT_SECRET = process.env.JWT_SECRET || 'local-order-system-secret';
+export const JWT_SECRET = process.env.JWT_SECRET || 'local-order-system-secret';
 
 // Rate limiting for failed login attempts
 const MAX_FAILED_ATTEMPTS = 3;

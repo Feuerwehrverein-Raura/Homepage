@@ -11,7 +11,8 @@ import java.util.concurrent.TimeUnit
 
 class WebSocketManager(
     private val serverUrl: String,
-    private val listener: WebSocketListener
+    private val listener: WebSocketListener,
+    private val token: String? = null
 ) {
     companion object {
         private const val TAG = "WebSocketManager"
@@ -48,9 +49,9 @@ class WebSocketManager(
 
         Log.d(TAG, "Connecting to WebSocket: $wsUrl")
 
-        val request = Request.Builder()
-            .url(wsUrl)
-            .build()
+        val requestBuilder = Request.Builder().url(wsUrl)
+        token?.let { requestBuilder.addHeader("Authorization", "Bearer $it") }
+        val request = requestBuilder.build()
 
         webSocket = client.newWebSocket(request, object : okhttp3.WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {

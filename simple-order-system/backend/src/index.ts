@@ -6,7 +6,8 @@ import pg from 'pg';
 import multer from 'multer';
 import PaymentService from './payments.js';
 import SumUpTerminal from './terminal.js';
-import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp } from './auth.js';
+import jwt from 'jsonwebtoken';
+import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp, JWT_SECRET } from './auth.js';
 
 // Nextcloud configuration
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'https://nextcloud.fwv-raura.ch';
@@ -1824,8 +1825,13 @@ async function checkIpWhitelist(req: any, res: any, next: any) {
     // Check if request has valid auth token (admin bypass)
     const authHeader = req.headers['authorization'];
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      // If auth token present, let the request through (auth middleware will validate)
-      return next();
+      const token = authHeader.split(' ')[1];
+      try {
+        jwt.verify(token, JWT_SECRET);
+        return next();
+      } catch {
+        // Invalid token, fall through to IP whitelist check
+      }
     }
 
     // Check if IP is whitelisted

@@ -19,6 +19,12 @@
     <string name="minutes_ago">%d min</string>
     <string name="connection_category">Verbindung</string>
     <string name="notifications_category">Benachrichtigungen</string>
+    <string name="login_subtitle">Bitte einloggen</string>
+    <string name="password_hint">Passwort</string>
+    <string name="login_button">Anmelden</string>
+    <string name="error_empty_password">Bitte Passwort eingeben</string>
+    <string name="error_wrong_password">Falsches Passwort</string>
+    <string name="error_connection">Verbindungsfehler</string>
     <string name="clean">Putzen</string>
     <string name="cleaning_title">Bildschirm putzen</string>
     <string name="cleaning_subtitle">Touch-Eingaben deaktiviert</string>

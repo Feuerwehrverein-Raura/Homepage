@@ -56,9 +56,13 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private val updateCheckInterval = 2 * 60 * 60 * 1000L // Check every 2 hours
 
     private var cleaningCountDown: CountDownTimer? = null
+    private lateinit var tokenManager: TokenManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        tokenManager = TokenManager(this)
+
         setContentView(R.layout.activity_main)
 
         // Keep screen on
@@ -139,9 +143,11 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
             ?: getString(R.string.default_server_url)
         soundEnabled = prefs.getBoolean("sound_enabled", true)
 
-        // Initialize services with server URL
-        apiService = ApiService(serverUrl)
-        webSocketManager = WebSocketManager(serverUrl, this)
+        val token = tokenManager.getToken()
+
+        // Initialize services with server URL and auth token
+        apiService = ApiService(serverUrl, token)
+        webSocketManager = WebSocketManager(serverUrl, this, token)
     }
 
     private fun setupRecyclerView() {
@@ -213,6 +219,14 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
 
     override fun onResume() {
         super.onResume()
+
+        // Check if still logged in
+        if (!tokenManager.isLoggedIn()) {
+            startActivity(Intent(this, LoginActivity::class.java))
+            finish()
+            return
+        }
+
         loadSettings()
         webSocketManager?.connect()
         fetchOrders()
