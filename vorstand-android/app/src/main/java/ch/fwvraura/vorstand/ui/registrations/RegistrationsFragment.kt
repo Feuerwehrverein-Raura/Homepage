@@ -43,20 +43,36 @@ class RegistrationsFragment : Fragment() {
         binding.registrationsRecycler.adapter = adapter
 
         binding.swipeRefresh.setOnRefreshListener { loadRegistrations() }
+        binding.retryButton.setOnClickListener { loadRegistrations() }
         loadRegistrations()
     }
 
     private fun loadRegistrations() {
         viewLifecycleOwner.lifecycleScope.launch {
             binding.swipeRefresh.isRefreshing = true
+            binding.errorState.visibility = View.GONE
             try {
                 val response = ApiModule.registrationsApi.getRegistrations(status = "pending")
                 if (response.isSuccessful) {
-                    adapter.submitList(response.body() ?: emptyList())
+                    val list = response.body() ?: emptyList()
+                    adapter.submitList(list)
+                    binding.registrationsRecycler.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
+                    binding.emptyState.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                } else {
+                    showError("Fehler beim Laden (${response.code()})")
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
+            }
             binding.swipeRefresh.isRefreshing = false
         }
+    }
+
+    private fun showError(message: String) {
+        binding.errorText.text = message
+        binding.errorState.visibility = View.VISIBLE
+        binding.registrationsRecycler.visibility = View.GONE
+        binding.emptyState.visibility = View.GONE
     }
 
     private fun approveRegistration(reg: MemberRegistration) {
@@ -73,7 +89,9 @@ class RegistrationsFragment : Fragment() {
                             Snackbar.make(binding.root, "Antrag genehmigt", Snackbar.LENGTH_SHORT).show()
                             loadRegistrations()
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: Exception) {
+                        Snackbar.make(binding.root, "Fehler: ${e.message}", Snackbar.LENGTH_SHORT).show()
+                    }
                 }
             }
             .show()
@@ -90,7 +108,9 @@ class RegistrationsFragment : Fragment() {
                             Snackbar.make(binding.root, "Antrag abgelehnt", Snackbar.LENGTH_SHORT).show()
                             loadRegistrations()
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: Exception) {
+                        Snackbar.make(binding.root, "Fehler: ${e.message}", Snackbar.LENGTH_SHORT).show()
+                    }
                 }
             }
             .setNegativeButton("Abbrechen", null)

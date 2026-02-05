@@ -21,6 +21,7 @@ class EventsListFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: EventsViewModel by viewModels()
     private lateinit var adapter: EventsAdapter
+    private var isFirstLoad = true
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -47,6 +48,7 @@ class EventsListFragment : Fragment() {
         binding.eventsRecycler.adapter = adapter
 
         binding.swipeRefresh.setOnRefreshListener { viewModel.loadEvents() }
+        binding.retryButton.setOnClickListener { viewModel.loadEvents() }
 
         binding.fabAddEvent.setOnClickListener {
             findNavController().navigate(R.id.action_events_to_form)
@@ -54,8 +56,42 @@ class EventsListFragment : Fragment() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { viewModel.events.collect { adapter.submitList(it) } }
-                launch { viewModel.isLoading.collect { binding.swipeRefresh.isRefreshing = it } }
+                launch {
+                    viewModel.events.collect { events ->
+                        adapter.submitList(events)
+                        val hasError = viewModel.error.value != null
+                        if (!hasError && !viewModel.isLoading.value) {
+                            binding.eventsRecycler.visibility = if (events.isEmpty()) View.GONE else View.VISIBLE
+                            binding.emptyState.visibility = if (events.isEmpty()) View.VISIBLE else View.GONE
+                            binding.errorState.visibility = View.GONE
+                        }
+                    }
+                }
+                launch {
+                    viewModel.isLoading.collect { loading ->
+                        binding.swipeRefresh.isRefreshing = loading && !isFirstLoad
+                        if (loading && isFirstLoad) {
+                            binding.loadingIndicator.visibility = View.VISIBLE
+                            binding.emptyState.visibility = View.GONE
+                            binding.errorState.visibility = View.GONE
+                        } else if (!loading) {
+                            binding.loadingIndicator.visibility = View.GONE
+                            isFirstLoad = false
+                        }
+                    }
+                }
+                launch {
+                    viewModel.error.collect { error ->
+                        if (error != null && viewModel.events.value.isEmpty()) {
+                            binding.errorText.text = error
+                            binding.errorState.visibility = View.VISIBLE
+                            binding.emptyState.visibility = View.GONE
+                            binding.eventsRecycler.visibility = View.GONE
+                        } else {
+                            binding.errorState.visibility = View.GONE
+                        }
+                    }
+                }
             }
         }
 

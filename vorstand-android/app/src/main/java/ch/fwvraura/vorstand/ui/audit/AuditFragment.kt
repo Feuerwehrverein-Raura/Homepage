@@ -35,20 +35,36 @@ class AuditFragment : Fragment() {
         binding.auditRecycler.adapter = adapter
 
         binding.swipeRefresh.setOnRefreshListener { loadAuditLog() }
+        binding.retryButton.setOnClickListener { loadAuditLog() }
         loadAuditLog()
     }
 
     private fun loadAuditLog() {
         viewLifecycleOwner.lifecycleScope.launch {
             binding.swipeRefresh.isRefreshing = true
+            binding.errorState.visibility = View.GONE
             try {
                 val response = ApiModule.auditApi.getAuditLog(limit = 100)
                 if (response.isSuccessful) {
-                    adapter.submitList(response.body() ?: emptyList())
+                    val list = response.body() ?: emptyList()
+                    adapter.submitList(list)
+                    binding.auditRecycler.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
+                    binding.emptyState.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                } else {
+                    showError("Fehler beim Laden (${response.code()})")
                 }
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
+            }
             binding.swipeRefresh.isRefreshing = false
         }
+    }
+
+    private fun showError(message: String) {
+        binding.errorText.text = message
+        binding.errorState.visibility = View.VISIBLE
+        binding.auditRecycler.visibility = View.GONE
+        binding.emptyState.visibility = View.GONE
     }
 
     override fun onDestroyView() {

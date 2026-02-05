@@ -23,6 +23,7 @@ class MembersListFragment : Fragment() {
     private val binding get() = _binding!!
     private val viewModel: MembersViewModel by viewModels()
     private lateinit var adapter: MembersAdapter
+    private var isFirstLoad = true
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -37,6 +38,7 @@ class MembersListFragment : Fragment() {
         setupSearch()
         setupFilters()
         setupFab()
+        setupRetry()
         observeData()
         viewModel.loadMembers()
         viewModel.loadStats()
@@ -84,20 +86,57 @@ class MembersListFragment : Fragment() {
         }
     }
 
+    private fun setupRetry() {
+        binding.retryButton.setOnClickListener {
+            viewModel.loadMembers()
+            viewModel.loadStats()
+        }
+    }
+
     private fun observeData() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     viewModel.members.collect { members ->
                         adapter.submitList(members)
+                        updateVisibility(members.isEmpty())
                     }
                 }
                 launch {
                     viewModel.isLoading.collect { loading ->
-                        binding.swipeRefresh.isRefreshing = loading
+                        binding.swipeRefresh.isRefreshing = loading && !isFirstLoad
+                        if (loading && isFirstLoad) {
+                            binding.loadingIndicator.visibility = View.VISIBLE
+                            binding.emptyState.visibility = View.GONE
+                            binding.errorState.visibility = View.GONE
+                        } else if (!loading) {
+                            binding.loadingIndicator.visibility = View.GONE
+                            isFirstLoad = false
+                        }
+                    }
+                }
+                launch {
+                    viewModel.error.collect { error ->
+                        if (error != null && viewModel.members.value.isEmpty()) {
+                            binding.errorText.text = error
+                            binding.errorState.visibility = View.VISIBLE
+                            binding.emptyState.visibility = View.GONE
+                            binding.membersRecycler.visibility = View.GONE
+                        } else {
+                            binding.errorState.visibility = View.GONE
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private fun updateVisibility(isEmpty: Boolean) {
+        val hasError = viewModel.error.value != null
+        if (!hasError && !viewModel.isLoading.value) {
+            binding.membersRecycler.visibility = if (isEmpty) View.GONE else View.VISIBLE
+            binding.emptyState.visibility = if (isEmpty) View.VISIBLE else View.GONE
+            binding.errorState.visibility = View.GONE
         }
     }
 
