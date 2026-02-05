@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/nav_members">
+
+    <!-- Members -->
+    <fragment
+        android:id="@+id/nav_members"
+        android:name="ch.fwvraura.vorstand.ui.members.MembersListFragment"
+        android:label="@string/members_title">
+        <action
+            android:id="@+id/action_members_to_detail"
+            app:destination="@id/memberDetailFragment" />
+        <action
+            android:id="@+id/action_members_to_form"
+            app:destination="@id/memberFormFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/memberDetailFragment"
+        android:name="ch.fwvraura.vorstand.ui.members.MemberDetailFragment"
+        android:label="Mitglied">
+        <argument
+            android:name="memberId"
+            app:argType="integer" />
+        <action
+            android:id="@+id/action_detail_to_form"
+            app:destination="@id/memberFormFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/memberFormFragment"
+        android:name="ch.fwvraura.vorstand.ui.members.MemberFormFragment"
+        android:label="@string/member_edit">
+        <argument
+            android:name="memberId"
+            app:argType="integer"
+            android:defaultValue="-1" />
+    </fragment>
+
+    <!-- Events -->
+    <fragment
+        android:id="@+id/nav_events"
+        android:name="ch.fwvraura.vorstand.ui.events.EventsListFragment"
+        android:label="@string/events_title">
+        <action
+            android:id="@+id/action_events_to_form"
+            app:destination="@id/eventFormFragment" />
+        <action
+            android:id="@+id/action_events_to_registrations"
+            app:destination="@id/eventRegistrationsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/eventFormFragment"
+        android:name="ch.fwvraura.vorstand.ui.events.EventFormFragment"
+        android:label="@string/event_edit">
+        <argument
+            android:name="eventId"
+            app:argType="integer"
+            android:defaultValue="-1" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/eventRegistrationsFragment"
+        android:name="ch.fwvraura.vorstand.ui.events.EventRegistrationsFragment"
+        android:label="@string/event_registrations">
+        <argument
+            android:name="eventId"
+            app:argType="integer" />
+    </fragment>
+
+    <!-- Dispatch (Phase 2 placeholder) -->
+    <fragment
+        android:id="@+id/nav_dispatch"
+        android:name="ch.fwvraura.vorstand.ui.dispatch.DispatchFragment"
+        android:label="@string/nav_dispatch" />
+
+    <!-- Admin -->
+    <fragment
+        android:id="@+id/nav_admin"
+        android:name="ch.fwvraura.vorstand.ui.admin.AdminFragment"
+        android:label="@string/nav_admin">
+        <action
+            android:id="@+id/action_admin_to_registrations"
+            app:destination="@id/registrationsFragment" />
+        <action
+            android:id="@+id/action_admin_to_audit"
+            app:destination="@id/auditFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/registrationsFragment"
+        android:name="ch.fwvraura.vorstand.ui.registrations.RegistrationsFragment"
+        android:label="@string/registrations_title" />
+
+    <fragment
+        android:id="@+id/auditFragment"
+        android:name="ch.fwvraura.vorstand.ui.audit.AuditFragment"
+        android:label="@string/audit_title" />
+
+    <!-- More -->
+    <fragment
+        android:id="@+id/nav_more"
+        android:name="ch.fwvraura.vorstand.ui.more.MoreFragment"
+        android:label="@string/nav_more" />
+
+</navigation>

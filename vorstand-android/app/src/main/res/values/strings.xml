@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FWV Vorstand</string>
+
+    <!-- Navigation -->
+    <string name="nav_members">Mitglieder</string>
+    <string name="nav_events">Events</string>
+    <string name="nav_dispatch">Nachricht</string>
+    <string name="nav_admin">Verwaltung</string>
+    <string name="nav_more">Mehr</string>
+
+    <!-- Login -->
+    <string name="login_title">Vorstand Login</string>
+    <string name="login_email">E-Mail</string>
+    <string name="login_password">Passwort</string>
+    <string name="login_button">Anmelden</string>
+    <string name="login_error">Anmeldung fehlgeschlagen</string>
+
+    <!-- Members -->
+    <string name="members_title">Mitglieder</string>
+    <string name="members_search">Suche nach Name oder E-Mail…</string>
+    <string name="members_filter_all">Alle</string>
+    <string name="members_filter_aktiv">Aktiv</string>
+    <string name="members_filter_passiv">Passiv</string>
+    <string name="members_filter_ehren">Ehren</string>
+    <string name="member_new">Neues Mitglied</string>
+    <string name="member_edit">Mitglied bearbeiten</string>
+    <string name="member_delete">Mitglied löschen</string>
+    <string name="member_delete_confirm">Soll dieses Mitglied wirklich gelöscht werden?</string>
+    <string name="member_saved">Mitglied gespeichert</string>
+    <string name="member_deleted">Mitglied gelöscht</string>
+
+    <!-- Events -->
+    <string name="events_title">Events</string>
+    <string name="event_new">Neues Event</string>
+    <string name="event_edit">Event bearbeiten</string>
+    <string name="event_delete">Event löschen</string>
+    <string name="event_delete_confirm">Soll dieses Event wirklich gelöscht werden?</string>
+    <string name="event_registrations">Anmeldungen</string>
+    <string name="event_shifts">Schichten</string>
+
+    <!-- Registrations -->
+    <string name="registrations_title">Mitgliedschafts-Anträge</string>
+    <string name="registration_approve">Genehmigen</string>
+    <string name="registration_reject">Ablehnen</string>
+    <string name="registration_approved">Antrag genehmigt</string>
+    <string name="registration_rejected">Antrag abgelehnt</string>
+
+    <!-- Audit -->
+    <string name="audit_title">Audit Log</string>
+
+    <!-- Common -->
+    <string name="save">Speichern</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="delete">Löschen</string>
+    <string name="close">Schliessen</string>
+    <string name="loading">Wird geladen…</string>
+    <string name="error_network">Netzwerkfehler. Bitte prüfen Sie Ihre Verbindung.</string>
+    <string name="error_general">Ein Fehler ist aufgetreten.</string>
+    <string name="empty_list">Keine Einträge vorhanden</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="yes">Ja</string>
+    <string name="no">Nein</string>
+
+    <!-- Verwaltung -->
+    <string name="admin_registrations">Anträge</string>
+    <string name="admin_audit">Audit Log</string>
+
+    <!-- Mehr -->
+    <string name="more_email">E-Mail</string>
+    <string name="more_pingen">Post</string>
+    <string name="more_whitelist">IP-Whitelist</string>
+    <string name="more_settings">Einstellungen</string>
+
+    <!-- Update -->
+    <string name="update_available">Update verfügbar</string>
+    <string name="update_message">Version %1$s ist verfügbar. Jetzt herunterladen?</string>
+    <string name="update_download">Herunterladen</string>
+    <string name="update_later">Später</string>
+</resources>

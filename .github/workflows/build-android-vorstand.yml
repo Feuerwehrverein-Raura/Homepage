@@ -1,0 +1,157 @@
+name: Build Android Vorstand
+
+on:
+  push:
+    tags:
+      - 'vorstand-v*'
+  pull_request:
+    paths:
+      - 'vorstand-android/**'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release'
+        required: false
+        default: false
+        type: boolean
+      version:
+        description: 'Version number (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept SDK Licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install required SDK components
+        run: sdkmanager "build-tools;35.0.0" "platforms;android-35"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.12'
+
+      - name: Build Debug APK
+        working-directory: vorstand-android
+        run: gradle assembleDebug --stacktrace
+
+      - name: Setup signing keystore
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.VORSTAND_KEYSTORE_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.VORSTAND_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > keystore.jks
+            echo "SIGNING_ENABLED=true" >> $GITHUB_ENV
+          elif [ -n "$KEYSTORE_PASSWORD" ]; then
+            keytool -genkey -v -keystore keystore.jks -alias vorstand -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEYSTORE_PASSWORD" \
+              -dname "CN=FWV Raura Vorstand, OU=IT, O=Feuerwehrverein Raura, L=Raura, ST=Solothurn, C=CH"
+            echo "SIGNING_ENABLED=true" >> $GITHUB_ENV
+          fi
+
+      - name: Build Release APK
+        working-directory: vorstand-android
+        run: gradle assembleRelease --stacktrace
+
+      - name: Sign Release APK
+        if: env.SIGNING_ENABLED == 'true'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.VORSTAND_KEYSTORE_PASSWORD }}
+        run: |
+          export PATH="$ANDROID_HOME/build-tools/34.0.0:$PATH"
+          UNSIGNED_APK=$(find vorstand-android -name "*release*.apk" -type f | head -1)
+          if [ -n "$UNSIGNED_APK" ]; then
+            zipalign -v -p 4 "$UNSIGNED_APK" release-aligned.apk
+            apksigner sign --ks keystore.jks \
+              --ks-pass "pass:$KEYSTORE_PASSWORD" \
+              --ks-key-alias vorstand \
+              --key-pass "pass:$KEYSTORE_PASSWORD" \
+              --out release-signed.apk release-aligned.apk
+            mv release-signed.apk "$UNSIGNED_APK"
+          fi
+
+      - name: Rename APKs
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/vorstand-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#vorstand-v}"
+          else
+            VERSION="${{ inputs.version || '1.0.0' }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          DEBUG_APK=$(find vorstand-android -name "*debug*.apk" -type f | head -1)
+          RELEASE_APK=$(find vorstand-android -name "*release*.apk" -type f | head -1)
+          if [ -n "$DEBUG_APK" ]; then
+            cp "$DEBUG_APK" "vorstand-${VERSION}-debug.apk"
+          fi
+          if [ -n "$RELEASE_APK" ]; then
+            cp "$RELEASE_APK" "vorstand-${VERSION}-release.apk"
+          fi
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vorstand-debug
+          path: vorstand-*-debug.apk
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: vorstand-release
+          path: vorstand-*-release.apk
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/vorstand-v') || inputs.create_release == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || format('vorstand-v{0}', inputs.version) }}
+          name: Vorstand Android ${{ inputs.version || github.ref_name }}
+          body: |
+            ## FWV Vorstand Android App
+
+            Native Android App für die Vorstandsverwaltung des Feuerwehrvereins Raura.
+
+            **Kompatibilität:** Android 8.0+ (API 26)
+
+            ### Installation
+            1. APK auf das Android-Gerät übertragen
+            2. "Unbekannte Quellen" in den Einstellungen erlauben
+            3. APK installieren
+            4. Mit Vorstand-Zugangsdaten anmelden
+
+            ### Features Phase 1
+            - Mitgliederverwaltung (CRUD, Suche, Filter, Foto)
+            - Eventsverwaltung (Erstellen, Bearbeiten, Schichten)
+            - Mitgliedschafts-Anträge (Genehmigen/Ablehnen)
+            - Audit Log
+            - Auto-Update von GitHub
+          files: |
+            vorstand-*-debug.apk
+            vorstand-*-release.apk
+          draft: false
+          prerelease: false
