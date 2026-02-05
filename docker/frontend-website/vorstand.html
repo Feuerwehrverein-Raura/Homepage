@@ -6909,14 +6909,14 @@ ${grussformel}`;
         });
 
         // Logout (both desktop and mobile)
-        document.getElementById('logout-btn').addEventListener('click', () => {
+        function performLogout() {
             localStorage.removeItem('vorstand_token');
+            // Clear cross-subdomain cookie
+            document.cookie = 'vorstand_token=; domain=.fwv-raura.ch; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; secure; samesite=lax';
             window.location.href = '/';
-        });
-        document.getElementById('logout-btn-mobile').addEventListener('click', () => {
-            localStorage.removeItem('vorstand_token');
-            window.location.href = '/';
-        });
+        }
+        document.getElementById('logout-btn').addEventListener('click', performLogout);
+        document.getElementById('logout-btn-mobile').addEventListener('click', performLogout);
 
         // ============================================
         // IP WHITELIST
