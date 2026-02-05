@@ -1,3 +1,10 @@
+## [1.137.3](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.2...v1.137.3) (2026-02-05)
+
+
+### Bug Fixes
+
+* **vorstand-android:** change all entity IDs from Int to String for UUID support ([44611ee](https://github.com/Feuerwehrverein-Raura/Homepage/commit/44611eeefc43ccecbe61bfc29f2300f3f3b72801))
+
 ## [1.137.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.1...v1.137.2) (2026-02-05)
 
 
