@@ -1,3 +1,10 @@
+## [1.137.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.137.0...v1.137.1) (2026-02-05)
+
+
+### Bug Fixes
+
+* **vorstand-android:** add error/empty/loading states and 401 handling ([09a9715](https://github.com/Feuerwehrverein-Raura/Homepage/commit/09a97156585107c1bbbe0e3ea4730cbfb1b6e4a6))
+
 # [1.137.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.136.0...v1.137.0) (2026-02-05)
 
 
