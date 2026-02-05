@@ -1,3 +1,11 @@
+# [1.145.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.144.0...v1.145.0) (2026-02-05)
+
+
+### Features
+
+* **order-system:** use Authentik OIDC for Kasse and Kitchen web auth ([dd39f1c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd39f1ccc4d1b91903a599535952133425bada75))
+* use dedicated Authentik order-system provider with 24h tokens ([ab4d261](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ab4d2613c21138f5f60790f0bcd74877a57d24e7))
+
 # [1.144.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.143.2...v1.144.0) (2026-02-05)
 
 
