@@ -1,13 +1,33 @@
+/**
+ * backup.js - SQLite Datenbank-Backup mit Syncthing-Integration
+ *
+ * Features:
+ * - Atomare Backups mit SQLite .backup Befehl
+ * - Automatische stündliche Backups
+ * - Cleanup alter Backups (>24h)
+ * - Syncthing-kompatibel (fwv-raura-latest.db)
+ *
+ * Konfiguration über Umgebungsvariablen:
+ * - DB_PATH: Pfad zur SQLite-Datenbank
+ * - BACKUP_DIR: Backup-Verzeichnis (z.B. /sync/backups für Syncthing)
+ * - BACKUP_INTERVAL: Intervall in ms (Standard: 1 Stunde)
+ */
 const { exec } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
 
+// Konfiguration aus Umgebungsvariablen
 const DB_PATH = process.env.DB_PATH || '/data/fwv-raura.db';
-const BACKUP_DIR = process.env.BACKUP_DIR || '/sync/backups';
-const BACKUP_INTERVAL = process.env.BACKUP_INTERVAL || 3600000; // 1 hour
+const BACKUP_DIR = process.env.BACKUP_DIR || '/sync/backups';  // Syncthing-Ordner
+const BACKUP_INTERVAL = process.env.BACKUP_INTERVAL || 3600000;  // 1 Stunde
 
 /**
- * Create SQLite backup using .backup command
+ * Erstellt atomares SQLite-Backup
+ *
+ * Verwendet SQLite's .backup Befehl für konsistente Backups
+ * auch während laufender Schreiboperationen.
+ *
+ * @returns {Promise<string>} Pfad zur Backup-Datei
  */
 async function createBackup() {
     try {
@@ -50,7 +70,10 @@ async function createBackup() {
 }
 
 /**
- * Cleanup backups older than 24 hours
+ * Löscht Backups die älter als 24 Stunden sind
+ *
+ * Behält fwv-raura-latest.db (Syncthing-Link)
+ * Löscht nur .db Dateien
  */
 async function cleanupOldBackups() {
     try {
@@ -76,7 +99,13 @@ async function cleanupOldBackups() {
 }
 
 /**
- * Enable WAL mode for better concurrent access
+ * Aktiviert WAL-Modus (Write-Ahead Logging) für SQLite
+ *
+ * WAL ermöglicht bessere Parallelität:
+ * - Lesezugriffe blockieren Schreibzugriffe nicht
+ * - Bessere Performance bei vielen gleichzeitigen Zugriffen
+ *
+ * @param {Object} db - SQLite Datenbank-Instanz
  */
 function enableWAL(db) {
     return new Promise((resolve, reject) => {
@@ -92,7 +121,10 @@ function enableWAL(db) {
 }
 
 /**
- * Start automatic backup interval
+ * Startet automatischen Backup-Scheduler
+ *
+ * Erstellt sofort ein initiales Backup und danach
+ * periodisch nach BACKUP_INTERVAL.
  */
 function startBackupSchedule() {
     console.log(`🕐 Backup schedule started (every ${BACKUP_INTERVAL / 1000}s)`);

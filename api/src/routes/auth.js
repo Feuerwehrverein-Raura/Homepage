@@ -1,6 +1,15 @@
+/**
+ * auth.js - OTP-basierte Authentifizierung
+ *
+ * Endpunkte:
+ * - POST /request-otp: Sendet 6-stelligen Code per E-Mail
+ * - POST /verify-otp: Prüft den eingegebenen Code
+ *
+ * Zweck: login, registration, mutation (Datenänderung)
+ */
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
+const crypto = require('crypto');  // Für sichere OTP-Generierung
 const { runQuery, getOne } = require('../utils/database');
 const { sendEmail } = require('../utils/email');
 
@@ -196,23 +205,32 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 /**
- * Check if user is authorized to access protected areas
- * Checks members and vorstand markdown files for email
+ * Prüft ob eine E-Mail-Adresse zur Anmeldung berechtigt ist
+ *
+ * Durchsucht die Markdown-Dateien in:
+ * - /vorstand/*.md (Vorstandsmitglieder)
+ * - /mitglieder/*.md (Vereinsmitglieder)
+ *
+ * Die E-Mail wird aus dem Front-Matter (YAML-Header) der MD-Dateien gelesen.
+ *
+ * @param {string} email - Die zu prüfende E-Mail-Adresse
+ * @returns {Promise<boolean>} true wenn berechtigt, false sonst
  */
 async function checkIfAuthorizedUser(email) {
     const fs = require('fs').promises;
     const path = require('path');
-    const matter = require('gray-matter');
+    const matter = require('gray-matter');  // Parst YAML Front-Matter aus Markdown
 
     try {
-        // Check vorstand directory
+        // Prüfe Vorstand-Verzeichnis (höhere Berechtigung)
         const vorstandDir = path.join(__dirname, '../../../vorstand');
         try {
             const vorstandFiles = await fs.readdir(vorstandDir);
             for (const file of vorstandFiles) {
                 if (file.endsWith('.md')) {
                     const content = await fs.readFile(path.join(vorstandDir, file), 'utf-8');
-                    const { data } = matter(content);
+                    const { data } = matter(content);  // Extrahiert Front-Matter
+                    // Case-insensitive Vergleich
                     if (data.email && data.email.toLowerCase() === email.toLowerCase()) {
                         return true;
                     }
@@ -222,7 +240,7 @@ async function checkIfAuthorizedUser(email) {
             console.log('Vorstand directory not found or empty');
         }
 
-        // Check mitglieder directory
+        // Prüfe Mitglieder-Verzeichnis
         const mitgliederDir = path.join(__dirname, '../../../mitglieder');
         try {
             const mitgliederFiles = await fs.readdir(mitgliederDir);
@@ -239,10 +257,11 @@ async function checkIfAuthorizedUser(email) {
             console.log('Mitglieder directory not found or empty');
         }
 
+        // E-Mail in keinem Verzeichnis gefunden
         return false;
     } catch (error) {
         console.error('Error checking authorized user:', error);
-        return false;
+        return false;  // Bei Fehler sicherheitshalber ablehnen
     }
 }
 

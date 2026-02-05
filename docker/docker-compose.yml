@@ -1,21 +1,25 @@
+# DEUTSCH: Docker-Compose für ENTWICKLUNG
+# Baut Container lokal aus den Dockerfiles (kein Image-Pull von ghcr.io)
+# Für Produktion siehe: docker-compose.prod.yml
+
 services:
   # ============================================
-  # DATABASE
+  # DEUTSCH: DATENBANK — PostgreSQL 16 (Alpine-Image für kleine Grösse)
   # ============================================
   postgres:
     image: postgres:16-alpine
     container_name: fwv-postgres
-    restart: unless-stopped
+    restart: unless-stopped      # DEUTSCH: Startet automatisch neu (ausser manuell gestoppt)
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-fwv}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-fwv_raura}
+      POSTGRES_USER: ${POSTGRES_USER:-fwv}           # DEUTSCH: DB-Benutzer (Standard: fwv)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}         # DEUTSCH: DB-Passwort (aus .env)
+      POSTGRES_DB: ${POSTGRES_DB:-fwv_raura}          # DEUTSCH: Datenbankname (Standard: fwv_raura)
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./data/postgres:/var/lib/postgresql/data                       # DEUTSCH: Persistenter Datenspeicher
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro    # DEUTSCH: Initiales Schema (nur beim ersten Start)
     networks:
-      - proxy
-    healthcheck:
+      - proxy                    # DEUTSCH: Traefik-Netzwerk für Service-Kommunikation
+    healthcheck:                 # DEUTSCH: Gesundheitsprüfung — alle 10s prüfen ob DB erreichbar
       test:
         - CMD-SHELL
         - pg_isready -U ${POSTGRES_USER:-fwv}
@@ -24,47 +28,51 @@ services:
       retries: 5
 
   # ============================================
-  # BACKENDS (APIs)
+  # DEUTSCH: BACKEND APIs — Werden lokal aus Dockerfiles gebaut
   # ============================================
 
-  # Mitgliederverwaltung API
+  # DEUTSCH: Mitgliederverwaltung API — Verwaltet Mitglieder, Auth, Rollen, Audit, Fotos
+  # Erreichbar unter: api.fwv-raura.ch/members, /auth, /roles, /audit, /vorstand, /uploads, /member-registrations
   api-members:
-    build: ./backend-members
+    build: ./backend-members     # DEUTSCH: Lokaler Build aus backend-members/Dockerfile
     container_name: fwv-api-members
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: ${DATABASE_URL_ENCODED}
-      JWT_SECRET: ${JWT_SECRET}
-      API_KEY: ${API_KEY}
-      AUTHENTIK_URL: https://auth.fwv-raura.ch
-      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID}
+      DATABASE_URL: ${DATABASE_URL_ENCODED}           # DEUTSCH: PostgreSQL Connection-String
+      JWT_SECRET: ${JWT_SECRET}                        # DEUTSCH: Geheimschlüssel für Vorstand-JWT (HS256)
+      API_KEY: ${API_KEY}                              # DEUTSCH: API-Key für interne Service-Aufrufe
+      AUTHENTIK_URL: https://auth.fwv-raura.ch         # DEUTSCH: Authentik Identity Provider
+      AUTHENTIK_CLIENT_ID: ${AUTHENTIK_CLIENT_ID}                      # DEUTSCH: OIDC Client für Mitglieder
       AUTHENTIK_CLIENT_SECRET: ${AUTHENTIK_CLIENT_SECRET}
-      AUTHENTIK_CLIENT_ID_VORSTAND: ${AUTHENTIK_CLIENT_ID_VORSTAND}
+      AUTHENTIK_CLIENT_ID_VORSTAND: ${AUTHENTIK_CLIENT_ID_VORSTAND}    # DEUTSCH: OIDC Client für Vorstand
       AUTHENTIK_CLIENT_SECRET_VORSTAND: ${AUTHENTIK_CLIENT_SECRET_VORSTAND}
-      AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN}
-      # IMAP settings for Vorstand authentication
+      AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN}                      # DEUTSCH: API-Token für Authentik Admin-Operationen
+      # DEUTSCH: IMAP-Einstellungen für Vorstand-Login (E-Mail als Passwort-Prüfung)
       IMAP_HOST: ${IMAP_HOST:-mail.test.juroct.net}
       IMAP_PORT: ${IMAP_PORT:-993}
       VORSTAND_EMAILS: ${VORSTAND_EMAILS:-praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,materialwart@fwv-raura.ch,beisitzer@fwv-raura.ch}
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_healthy   # DEUTSCH: Wartet bis PostgreSQL bereit ist
     networks:
       - proxy
+    # DEUTSCH: Traefik-Labels — konfigurieren das Routing vom Reverse-Proxy zum Container
     labels:
-      - traefik.enable=true
-      - traefik.docker.network=proxy
+      - traefik.enable=true                            # DEUTSCH: Traefik erkennt diesen Container
+      - traefik.docker.network=proxy                   # DEUTSCH: Netzwerk für Traefik-Kommunikation
+      # DEUTSCH: URL-Routing — welche Pfade zu diesem Backend geroutet werden
       - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/funktionen`) || PathPrefix(`/uploads`) || PathPrefix(`/member-registrations`))
-      - traefik.http.routers.api-members.entrypoints=https
-      - traefik.http.routers.api-members.tls=true
-      - traefik.http.routers.api-members.tls.certresolver=letsencrypt
-      - traefik.http.services.api-members.loadbalancer.server.port=3000
+      - traefik.http.routers.api-members.entrypoints=https       # DEUTSCH: Nur HTTPS
+      - traefik.http.routers.api-members.tls=true                # DEUTSCH: TLS aktiviert
+      - traefik.http.routers.api-members.tls.certresolver=letsencrypt  # DEUTSCH: Let's Encrypt Zertifikat
+      - traefik.http.services.api-members.loadbalancer.server.port=3000  # DEUTSCH: Container-Port
 
-  # Events API
+  # DEUTSCH: Events API — Verwaltet Events, Schichten, Kalender, Anmeldungen, Arbeitsplan
+  # Erreichbar unter: api.fwv-raura.ch/events, /shifts, /calendar, /registrations, /arbeitsplan
   api-events:
-    build: ./backend-events
+    build: ./backend-events      # DEUTSCH: Lokaler Build
     container_name: fwv-api-events
     restart: unless-stopped
     environment:
@@ -74,8 +82,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       API_KEY: ${API_KEY}
       AUTHENTIK_URL: https://auth.fwv-raura.ch
-      MEMBERS_API_URL: http://api-members:3000
-      DISPATCH_API_URL: http://api-dispatch:3000
+      MEMBERS_API_URL: http://api-members:3000     # DEUTSCH: Interne URL zum Members-Backend (Docker-Netzwerk)
+      DISPATCH_API_URL: http://api-dispatch:3000   # DEUTSCH: Interne URL zum Dispatch-Backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,9 +98,10 @@ services:
       - traefik.http.routers.api-events.tls.certresolver=letsencrypt
       - traefik.http.services.api-events.loadbalancer.server.port=3000
 
-  # Buchhaltung API
+  # DEUTSCH: Buchhaltung API — Kontenplan, Buchungen, Rechnungen, Finanzberichte
+  # Erreichbar unter: api.fwv-raura.ch/invoices, /payments, /reports, /accounts
   api-accounting:
-    build: ./backend-accounting
+    build: ./backend-accounting   # DEUTSCH: Lokaler Build
     container_name: fwv-api-accounting
     restart: unless-stopped
     environment:
@@ -115,9 +124,10 @@ services:
       - traefik.http.routers.api-accounting.tls.certresolver=letsencrypt
       - traefik.http.services.api-accounting.loadbalancer.server.port=3000
 
-  # Versand API (Email, Pingen, SMS, PDF-Templates)
+  # DEUTSCH: Versand API (Dispatch) — E-Mail, Briefversand via Pingen, PDF-Templates, Newsletter, Kontaktformular
+  # Erreichbar unter: api.fwv-raura.ch/email, /pingen, /templates, /contact, /newsletter, /dispatch-log, /mailcow, /pdf-templates
   api-dispatch:
-    build: ./backend-dispatch
+    build: ./backend-dispatch     # DEUTSCH: Lokaler Build
     container_name: fwv-api-dispatch
     restart: unless-stopped
     environment:
@@ -125,18 +135,18 @@ services:
       PORT: 3000
       DATABASE_URL: ${DATABASE_URL_ENCODED}
       JWT_SECRET: ${JWT_SECRET}
-      SMTP_HOST: ${SMTP_HOST}
+      SMTP_HOST: ${SMTP_HOST}                          # DEUTSCH: Mailserver für E-Mail-Versand
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
-      PINGEN_CLIENT_ID: ${PINGEN_CLIENT_ID}
+      PINGEN_CLIENT_ID: ${PINGEN_CLIENT_ID}              # DEUTSCH: Pingen API — Schweizer Briefversand-Service
       PINGEN_CLIENT_SECRET: ${PINGEN_CLIENT_SECRET}
       PINGEN_ORGANISATION_ID: ${PINGEN_ORGANISATION_ID}
-      PINGEN_STAGING: ${PINGEN_STAGING:-false}
+      PINGEN_STAGING: ${PINGEN_STAGING:-false}            # DEUTSCH: false=Produktion, true=Testmodus
       MEMBERS_API_URL: http://api-members:3000
       EVENTS_API_URL: http://api-events:3000
-      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}
-      MAILCOW_API_KEY: ${MAILCOW_API_KEY}
+      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}   # DEUTSCH: Mailcow E-Mail-Server API
+      MAILCOW_API_KEY: ${MAILCOW_API_KEY}                                # DEUTSCH: Mailcow API-Schlüssel
       AUTHENTIK_URL: https://auth.fwv-raura.ch
     depends_on:
       postgres:
@@ -152,14 +162,14 @@ services:
       - traefik.http.routers.api-dispatch.tls=true
       - traefik.http.routers.api-dispatch.tls.certresolver=letsencrypt
       - traefik.http.services.api-dispatch.loadbalancer.server.port=3000
-      # Higher priority route for /invoices/generate (dispatch handles PDF generation)
+      # DEUTSCH: Höhere Priorität für /invoices/generate — Dispatch (nicht Accounting) generiert PDF-Rechnungen
       - traefik.http.routers.api-dispatch-invoices.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/invoices/generate`)
       - traefik.http.routers.api-dispatch-invoices.entrypoints=https
       - traefik.http.routers.api-dispatch-invoices.tls=true
       - traefik.http.routers.api-dispatch-invoices.tls.certresolver=letsencrypt
       - traefik.http.routers.api-dispatch-invoices.service=api-dispatch
-      - traefik.http.routers.api-dispatch-invoices.priority=200
-      # Higher priority route for /arbeitsplan/pdf (dispatch handles PDF generation)
+      - traefik.http.routers.api-dispatch-invoices.priority=200       # DEUTSCH: Priorität 200 > Standard, fängt /invoices/generate VOR Accounting ab
+      # DEUTSCH: Höhere Priorität für /arbeitsplan/pdf — Dispatch generiert Arbeitsplan-PDFs
       - traefik.http.routers.api-dispatch-arbeitsplan.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/arbeitsplan/pdf`)
       - traefik.http.routers.api-dispatch-arbeitsplan.entrypoints=https
       - traefik.http.routers.api-dispatch-arbeitsplan.tls=true
@@ -168,10 +178,11 @@ services:
       - traefik.http.routers.api-dispatch-arbeitsplan.priority=200
 
   # ============================================
-  # FRONTENDS
+  # DEUTSCH: FRONTENDS — Statische Webseiten in Nginx-Containern
   # ============================================
 
-  # Öffentliche Website
+  # DEUTSCH: Öffentliche Website — Hauptseite, Mitgliederbereich, Vorstand-Dashboard
+  # Erreichbar unter: fwv-raura.ch / www.fwv-raura.ch
   frontend-website:
     build:
       context: ..
@@ -189,6 +200,7 @@ services:
       - traefik.http.routers.website.tls.certresolver=letsencrypt
       - traefik.http.services.website.loadbalancer.server.port=80
 
+# DEUTSCH: Externes Docker-Netzwerk — wird von Traefik verwaltet, alle Services kommunizieren darüber
 networks:
   proxy:
-    external: true
+    external: true   # DEUTSCH: Muss vorher mit "docker network create proxy" erstellt werden

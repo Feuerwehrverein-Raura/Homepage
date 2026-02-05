@@ -1,25 +1,24 @@
--- Migration 013: PDF Template Categories
--- Erweitert das Template-System für spezifische PDF-Typen
+-- DEUTSCH: Migration 013 — PDF-Template Kategorien mit Standard-Templates
+-- DEUTSCH: Erweitert das Template-System um spezifische PDF-Typen mit vorkonfigurierten Layouts
 -- ============================================
 
--- Enum für Template-Kategorien (falls nicht existiert, alte Werte beibehalten)
--- Kategorien:
--- - 'layout'          : Allgemeines Layout (Header, Footer, Farben)
--- - 'mitgliederbeitrag': Rechnung für Mitgliederbeiträge mit QR-Bill
--- - 'arbeitsplan'     : Arbeitsplan-PDF
--- - 'telefonliste'    : Mitglieder-Telefonliste
--- - 'brief'           : Standard-Brief
--- - 'rechnung'        : Generische Rechnung
--- - 'mahnbrief'       : Mahnung
+-- DEUTSCH: Verfügbare Kategorien:
+-- DEUTSCH: - 'layout'           : Allgemeines Layout (Header, Footer, Farben)
+-- DEUTSCH: - 'mitgliederbeitrag': Rechnung für Jahresbeiträge mit Swiss QR-Bill
+-- DEUTSCH: - 'arbeitsplan'      : Arbeitsplan-PDF für Events/Schichten
+-- DEUTSCH: - 'telefonliste'     : Mitglieder-Telefonliste
+-- DEUTSCH: - 'brief'            : Standard-Brief
+-- DEUTSCH: - 'rechnung'         : Generische Rechnung
+-- DEUTSCH: - 'mahnbrief'        : Zahlungserinnerung/Mahnung
 
--- Index für schnellere Kategorie-Abfragen (falls nicht existiert)
+-- DEUTSCH: Kombinations-Index für schnelle Abfragen nach Kategorie + Status
 CREATE INDEX IF NOT EXISTS idx_pdf_templates_category_active
     ON pdf_templates(category, is_active, is_default);
 
--- Default-Templates für jede Kategorie einfügen
--- Diese können im PDF Designer überschrieben werden
+-- DEUTSCH: Standard-Templates für jede Kategorie einfügen
+-- DEUTSCH: Diese können im visuellen PDF-Designer (pdf.fwv-raura.ch) angepasst werden
 
--- 1. Mitgliederbeitrag Template
+-- DEUTSCH: 1. Mitgliederbeitrag — Rechnungs-Layout mit Platzhaltern für QR-Bill
 INSERT INTO pdf_templates (name, slug, category, template_schema, variables, is_default, is_active, description)
 VALUES (
     'Standard Mitgliederbeitrag',
@@ -121,7 +120,7 @@ VALUES (
 )
 ON CONFLICT (slug) DO NOTHING;
 
--- 2. Arbeitsplan Template
+-- DEUTSCH: 2. Arbeitsplan — Übersicht mit Titel, Event-Name und Datum
 INSERT INTO pdf_templates (name, slug, category, template_schema, variables, is_default, is_active, description)
 VALUES (
     'Standard Arbeitsplan',
@@ -167,7 +166,7 @@ VALUES (
 )
 ON CONFLICT (slug) DO NOTHING;
 
--- 3. Telefonliste Template
+-- DEUTSCH: 3. Telefonliste — Kompakte Mitgliederliste mit Kontaktdaten
 INSERT INTO pdf_templates (name, slug, category, template_schema, variables, is_default, is_active, description)
 VALUES (
     'Standard Telefonliste',
@@ -205,7 +204,7 @@ VALUES (
 )
 ON CONFLICT (slug) DO NOTHING;
 
--- 4. Mahnbrief Template
+-- DEUTSCH: 4. Mahnbrief — Zahlungserinnerung mit Mahnstufe und offenem Betrag
 INSERT INTO pdf_templates (name, slug, category, template_schema, variables, is_default, is_active, description)
 VALUES (
     'Standard Mahnung',
@@ -281,5 +280,5 @@ VALUES (
 )
 ON CONFLICT (slug) DO NOTHING;
 
--- Kommentar für Dokumentation
+-- DEUTSCH: Tabellen-Kommentar für Dokumentation in der Datenbank
 COMMENT ON TABLE pdf_templates IS 'PDF-Templates für verschiedene Dokumenttypen. Kategorien: layout, mitgliederbeitrag, arbeitsplan, telefonliste, brief, rechnung, mahnbrief';

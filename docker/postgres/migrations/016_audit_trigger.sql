@@ -1,9 +1,13 @@
--- Automatic audit logging via database trigger
--- Captures all INSERT/UPDATE/DELETE on members table regardless of source (API or direct SQL)
+-- DEUTSCH: Migration 016 — Automatisches Audit-Logging per Datenbank-Trigger
+-- DEUTSCH: Protokolliert ALLE Änderungen an der Mitglieder-Tabelle automatisch,
+-- DEUTSCH: egal ob über die API oder direkt per SQL — kein Code im Backend nötig
+-- DEUTSCH: Erfasst: INSERT (Mitglied erstellt), UPDATE (geändert), DELETE (gelöscht)
 
+-- DEUTSCH: Trigger-Funktion — wird bei jeder Änderung an der members-Tabelle ausgeführt
 CREATE OR REPLACE FUNCTION audit_members_trigger()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- DEUTSCH: Bei INSERT — neues Mitglied erstellt
     IF TG_OP = 'INSERT' THEN
         INSERT INTO audit_log (action, entity_type, entity_id, new_values, email, ip_address)
         VALUES (
@@ -15,8 +19,8 @@ BEGIN
             '127.0.0.1'
         );
         RETURN NEW;
+    -- DEUTSCH: Bei UPDATE — Mitglied geändert (nur wenn sich tatsächlich etwas geändert hat)
     ELSIF TG_OP = 'UPDATE' THEN
-        -- Only log if something actually changed
         IF OLD IS DISTINCT FROM NEW THEN
             INSERT INTO audit_log (action, entity_type, entity_id, old_values, new_values, email, ip_address)
             VALUES (
@@ -30,6 +34,7 @@ BEGIN
             );
         END IF;
         RETURN NEW;
+    -- DEUTSCH: Bei DELETE — Mitglied gelöscht (speichert alle alten Werte)
     ELSIF TG_OP = 'DELETE' THEN
         INSERT INTO audit_log (action, entity_type, entity_id, old_values, email, ip_address)
         VALUES (
@@ -46,10 +51,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Drop existing trigger if any
+-- DEUTSCH: Bestehenden Trigger entfernen (falls vorhanden) bevor er neu erstellt wird
 DROP TRIGGER IF EXISTS audit_members ON members;
 
--- Create trigger (fires AFTER to not interfere with the operation)
+-- DEUTSCH: Trigger erstellen — wird NACH der Operation ausgeführt (AFTER = stört die Operation nicht)
 CREATE TRIGGER audit_members
     AFTER INSERT OR UPDATE OR DELETE ON members
     FOR EACH ROW

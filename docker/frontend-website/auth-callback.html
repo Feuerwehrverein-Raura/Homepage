@@ -1,11 +1,16 @@
+<!-- DEUTSCH: Authentik OIDC Callback-Seite -->
+<!-- DEUTSCH: Diese Seite wird von Authentik nach erfolgreicher Anmeldung aufgerufen. -->
+<!-- DEUTSCH: Sie empfängt den Authorization Code, tauscht ihn gegen ein Token und leitet weiter. -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Authentifizierung - Feuerwehrverein Raura</title>
+    <!-- DEUTSCH: Tailwind CSS wird via CDN geladen fuer das Styling der Lade- und Fehlerseite -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        // DEUTSCH: Tailwind-Konfiguration mit eigenen Feuerwehr-Farben (Rottöne)
         tailwind.config = {
             theme: {
                 extend: {
@@ -22,6 +27,8 @@
     </script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <!-- DEUTSCH: Lade-Spinner und Statusmeldung, die während dem Token-Austausch angezeigt werden -->
+    <!-- DEUTSCH: Wird bei Fehler komplett durch eine Fehlermeldung ersetzt (siehe catch-Block) -->
     <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
         <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-fire-700 mx-auto mb-4"></div>
         <h1 class="text-2xl font-bold text-gray-800 mb-2">Authentifizierung läuft...</h1>
@@ -29,36 +36,50 @@
     </div>
 
     <script>
+        // DEUTSCH: Basis-URL des Members-Backends (Express API auf Hetzner VPS)
         const API_BASE = 'https://api.fwv-raura.ch';
 
+        // DEUTSCH: Hauptfunktion, die den OIDC Callback-Ablauf abwickelt.
+        // DEUTSCH: Ablauf: URL-Parameter lesen -> Client-Typ bestimmen -> Code gegen Token tauschen -> Weiterleiten
         async function handleCallback() {
             try {
-                // Parse URL parameters
+                // DEUTSCH: URL-Parameter auslesen, die Authentik nach dem Login mitgibt
+                // DEUTSCH: code = Authorization Code fuer Token-Austausch
+                // DEUTSCH: state = Ursprungsseite (z.B. /vorstand, order.fwv-raura.ch), wird auch zur Client-Typ-Erkennung genutzt
+                // DEUTSCH: error/error_description = Fehlermeldungen falls Authentik die Anmeldung ablehnt
                 const params = new URLSearchParams(window.location.search);
                 const code = params.get('code');
                 const state = params.get('state');
                 const error = params.get('error');
                 const errorDescription = params.get('error_description');
 
-                // Check for errors
+                // DEUTSCH: Pruefen ob Authentik einen Fehler zurueckgegeben hat (z.B. Benutzer hat abgebrochen)
                 if (error) {
                     throw new Error(errorDescription || error);
                 }
 
+                // DEUTSCH: Ohne Authorization Code kann kein Token-Austausch stattfinden
                 if (!code) {
                     throw new Error('Kein Authorization Code erhalten');
                 }
 
-                // Determine client type from state or URL
-                let clientType = 'members'; // default
+                // DEUTSCH: Client-Typ aus dem state-Parameter bestimmen.
+                // DEUTSCH: Drei moegliche Typen:
+                // DEUTSCH:   - 'members' (Standard) = Mitgliederbereich auf fwv-raura.ch
+                // DEUTSCH:   - 'vorstand' = Vorstandsbereich (erkannt durch /vorstand im state)
+                // DEUTSCH:   - 'order' = Bestellsystem oder Kuechendisplay (erkannt durch order/kitchen Subdomain)
+                // DEUTSCH: Der Client-Typ bestimmt, welches Token das Backend ausstellt (RS256 vs HS256)
+                let clientType = 'members';
                 if (state && state.includes('/vorstand')) {
                     clientType = 'vorstand';
                 } else if (state && (state.includes('order.fwv-raura.ch') || state.includes('kitchen.fwv-raura.ch'))) {
                     clientType = 'order';
                 }
 
-                // Exchange code for token via our backend
-                // The backend will validate the code with Authentik
+                // DEUTSCH: Authorization Code gegen ein Access-Token beim Backend eintauschen.
+                // DEUTSCH: Das Backend (POST /auth/callback) validiert den Code bei Authentik
+                // DEUTSCH: und gibt ein eigenes JWT-Token zurueck.
+                // DEUTSCH: redirect_uri muss exakt der bei Authentik konfigurierten Callback-URL entsprechen.
                 const response = await fetch(`${API_BASE}/auth/callback`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -69,6 +90,8 @@
                     })
                 });
 
+                // DEUTSCH: Fehlerbehandlung falls der Token-Austausch fehlschlaegt
+                // DEUTSCH: (z.B. abgelaufener Code, ungueltige redirect_uri)
                 if (!response.ok) {
                     const data = await response.json();
                     throw new Error(data.error || 'Token exchange failed');
@@ -77,10 +100,12 @@
                 const data = await response.json();
                 const accessToken = data.access_token;
 
-                // Store token
+                // DEUTSCH: Token im localStorage speichern fuer spaetere API-Aufrufe
                 localStorage.setItem('auth_token', accessToken);
 
-                // Determine redirect target
+                // DEUTSCH: Weiterleitungsziel aus dem state-Parameter bestimmen.
+                // DEUTSCH: state enthaelt die URL-encoded Seite, von der der Login gestartet wurde.
+                // DEUTSCH: Standard-Fallback ist die Startseite (/).
                 let redirectTo = '/';
                 if (state) {
                     try {
@@ -90,7 +115,10 @@
                     }
                 }
 
-                // For cross-domain redirects, pass token via URL parameter
+                // DEUTSCH: Cross-Domain-Weiterleitung: Wenn das Ziel eine absolute URL ist
+                // DEUTSCH: (z.B. https://order.fwv-raura.ch), wird das Token als URL-Parameter angehaengt,
+                // DEUTSCH: da localStorage nicht subdomain-uebergreifend geteilt werden kann.
+                // DEUTSCH: Bei Same-Domain-Weiterleitungen (relativer Pfad) reicht der localStorage.
                 if (redirectTo.startsWith('http')) {
                     const url = new URL(redirectTo);
                     url.searchParams.set('token', accessToken);
@@ -102,7 +130,8 @@
             } catch (error) {
                 console.error('Authentication error:', error);
 
-                // Show error
+                // DEUTSCH: Bei Fehler wird der gesamte body-Inhalt durch eine Fehlermeldung ersetzt.
+                // DEUTSCH: Zeigt ein rotes Warnsymbol (SVG), die Fehlermeldung und einen Link zur Startseite.
                 document.body.innerHTML = `
                     <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
                         <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +147,8 @@
             }
         }
 
-        // Run on page load
+        // DEUTSCH: Callback-Funktion sofort beim Laden der Seite ausfuehren,
+        // DEUTSCH: damit der Benutzer nicht manuell etwas tun muss.
         handleCallback();
     </script>
 </body>

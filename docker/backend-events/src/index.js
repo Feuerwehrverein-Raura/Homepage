@@ -1,3 +1,4 @@
+// DEUTSCH: Abhängigkeiten laden - Express-Server, Sicherheit, Datenbank, Kalender, PDF, Auth
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -27,7 +28,9 @@ const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 
 // ===========================================
 // LOGGING UTILITIES
+// DEUTSCH: Strukturiertes JSON-Logging für alle Service-Nachrichten
 // ===========================================
+// DEUTSCH: Generische Log-Funktion mit Zeitstempel, Service-Name und Level
 function log(level, message, data = {}) {
     const timestamp = new Date().toISOString();
     const logEntry = { timestamp, service: SERVICE_NAME, level, message, ...data };
@@ -37,6 +40,7 @@ function logInfo(message, data = {}) { log('INFO', message, data); }
 function logWarn(message, data = {}) { log('WARN', message, data); }
 function logError(message, data = {}) { log('ERROR', message, data); }
 
+// DEUTSCH: Ermittelt die echte Client-IP (berücksichtigt Cloudflare, Proxy-Header)
 function getClientIp(req) {
     if (req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip'];
     const forwardedFor = req.headers['x-forwarded-for'];
@@ -47,6 +51,7 @@ function getClientIp(req) {
 
 // ============================================
 // HELPER FUNCTIONS
+// DEUTSCH: Hilfsfunktionen für Datumsformatierung, Registrierungen und Benachrichtigungen
 // ============================================
 
 // Helper: Datum in deutschem Format
@@ -76,6 +81,7 @@ async function getShiftRegistrations(shiftId) {
 }
 
 // Helper: Benachrichtigungen bei Schicht-Änderungen senden
+// DEUTSCH: Sendet E-Mail an alle Registrierten einer Schicht bei Änderung oder Absage
 async function notifyShiftRegistrations(shift, event, changeType, oldShiftData = null) {
     const registrations = await getShiftRegistrations(shift.id);
 
@@ -177,6 +183,7 @@ Feuerwehrverein Raura
 // Helper: Prüfen ob alle Schichten eines Events besetzt sind und Arbeitsplan versenden
 // options.skipDeadlineCheck = true für manuellen Versand
 // options.skipFilledCheck = true um auch bei nicht voll besetzten Schichten zu senden
+// DEUTSCH: Prüft ob Arbeitsplan-Versand fällig ist (Deadline + alle Schichten besetzt) und versendet per E-Mail
 async function checkAndSendArbeitsplan(eventId, options = {}) {
     try {
         // Event-Daten mit Deadline und Versandstatus abrufen
@@ -437,6 +444,7 @@ Feuerwehrverein Raura`,
     }
 }
 
+// DEUTSCH: Sicherheits-Header, CORS, JSON-Body-Parser und Proxy-Vertrauen konfigurieren
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -444,6 +452,7 @@ app.set('trust proxy', true);
 
 // ===========================================
 // REQUEST LOGGING MIDDLEWARE
+// DEUTSCH: Loggt jede Anfrage (ausser /health) mit Request-ID, Methode, Pfad und Dauer
 // ===========================================
 app.use((req, res, next) => {
     if (req.path === '/health') return next();
@@ -464,14 +473,17 @@ app.use((req, res, next) => {
 });
 
 // Health Check
+// DEUTSCH: Gibt Service-Status und Version zurück (fuer Monitoring/Docker)
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'api-events', version: process.env.APP_VERSION || '0.0.0' });
 });
 
 // ============================================
 // EVENTS
+// DEUTSCH: CRUD-Endpunkte fuer Anlässe/Events inkl. Schichten und Registrierungen
 // ============================================
 
+// DEUTSCH: Alle Events auflisten, optional gefiltert nach upcoming/category, inkl. Schichten und Registrierungen
 app.get('/events', async (req, res) => {
     try {
         const { upcoming, category } = req.query;
@@ -580,6 +592,7 @@ app.get('/events', async (req, res) => {
     }
 });
 
+// DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
 app.get('/events/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -673,6 +686,7 @@ app.get('/events/:id', async (req, res) => {
     }
 });
 
+// DEUTSCH: Neues Event erstellen (nur Vorstand/Admin). Generiert optional Event-Zugang fuer Organisatoren
 app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const {
@@ -773,6 +787,7 @@ Feuerwehrverein Raura
     }
 });
 
+// DEUTSCH: Event aktualisieren (nur Vorstand/Admin). Kann auch Event-Zugang nachträglich erstellen
 app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -816,6 +831,7 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
     }
 });
 
+// DEUTSCH: Event löschen (nur Vorstand/Admin). Löscht auch zugehörige Schichten/Registrierungen (CASCADE)
 app.delete('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -833,9 +849,10 @@ app.delete('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), asy
 
 // ============================================
 // EVENT ORGANIZER LOGIN
+// DEUTSCH: Separates Login-System für externe Event-Organisatoren (nicht Vorstand)
 // ============================================
 
-// Login fuer Event-Organisatoren
+// DEUTSCH: Login fuer Event-Organisatoren mit event-spezifischer E-Mail und Passwort, gibt JWT zurück
 app.post('/events/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -892,7 +909,7 @@ app.post('/events/login', async (req, res) => {
     }
 });
 
-// Event-Daten fuer Organisator abrufen (nur eigenes Event)
+// DEUTSCH: Event-Daten fuer eingeloggten Organisator abrufen (nur sein eigenes Event, inkl. Schichten und Registrierungen)
 app.get('/events/my-event', authenticateEventOrganizer, async (req, res) => {
     try {
         const eventId = req.eventOrganizer.event_id;
@@ -929,7 +946,7 @@ app.get('/events/my-event', authenticateEventOrganizer, async (req, res) => {
     }
 });
 
-// Registrierung genehmigen (Organisator)
+// DEUTSCH: Registrierung genehmigen (Organisator). Sendet Bestätigungs-E-Mail und prüft Arbeitsplan-Versand
 app.post('/events/my-event/registrations/:id/approve', authenticateEventOrganizer, async (req, res) => {
     try {
         const { id } = req.params;
@@ -985,7 +1002,7 @@ app.post('/events/my-event/registrations/:id/approve', authenticateEventOrganize
     }
 });
 
-// Registrierung ablehnen (Organisator)
+// DEUTSCH: Registrierung ablehnen (Organisator). Sendet Ablehnungs-E-Mail mit optionalem Grund
 app.post('/events/my-event/registrations/:id/reject', authenticateEventOrganizer, async (req, res) => {
     try {
         const { id } = req.params;
@@ -1035,7 +1052,7 @@ app.post('/events/my-event/registrations/:id/reject', authenticateEventOrganizer
     }
 });
 
-// Arbeitsplan manuell versenden (Organisator)
+// DEUTSCH: Arbeitsplan manuell versenden (Organisator). Überspringt Deadline- und Besetzungs-Prüfung
 app.post('/events/my-event/send-arbeitsplan', authenticateEventOrganizer, async (req, res) => {
     try {
         const eventId = req.eventOrganizer.event_id;
@@ -1066,7 +1083,7 @@ app.post('/events/my-event/send-arbeitsplan', authenticateEventOrganizer, async 
     }
 });
 
-// Middleware fuer Event-Organisator Authentifizierung
+// DEUTSCH: Middleware: Prüft JWT-Token auf Typ 'event-organizer' und setzt req.eventOrganizer
 function authenticateEventOrganizer(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -1089,8 +1106,10 @@ function authenticateEventOrganizer(req, res, next) {
 
 // ============================================
 // SHIFTS
+// DEUTSCH: CRUD-Endpunkte fuer Schichten (Arbeitsblöcke innerhalb von Events)
 // ============================================
 
+// DEUTSCH: Alle Schichten auflisten, optional gefiltert nach event_id
 app.get('/shifts', async (req, res) => {
     try {
         const { event_id } = req.query;
@@ -1109,6 +1128,7 @@ app.get('/shifts', async (req, res) => {
     }
 });
 
+// DEUTSCH: Neue Schicht erstellen (nur Vorstand/Admin) mit Name, Datum, Zeit und Bereich
 app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { event_id, name, description, date, start_time, end_time, needed, bereich } = req.body;
@@ -1125,6 +1145,7 @@ app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (re
     }
 });
 
+// DEUTSCH: Schicht aktualisieren (nur Vorstand/Admin). Benachrichtigt Registrierte bei relevanten Änderungen
 app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1173,6 +1194,7 @@ app.put('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
     }
 });
 
+// DEUTSCH: Schicht löschen (nur Vorstand/Admin). Benachrichtigt alle Registrierten über Absage
 app.delete('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1206,8 +1228,10 @@ app.delete('/shifts/:id', authenticateAny, requireRole('vorstand', 'admin'), asy
 
 // ============================================
 // REGISTRATIONS
+// DEUTSCH: Verwaltung von Anmeldungen (Helfer/Teilnehmer) für Events und Schichten
 // ============================================
 
+// DEUTSCH: Registrierungen auflisten, gefiltert nach event_id/member_id. Lädt auch Schicht-Details pro Registrierung
 app.get('/registrations', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id, include_guest_email } = req.query;
@@ -1269,6 +1293,7 @@ app.get('/registrations', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Neue Registrierung erstellen (authentifiziert, z.B. via Vorstand-App)
 app.post('/registrations', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id, guest_name, guest_email, shift_ids, notes } = req.body;
@@ -1285,7 +1310,7 @@ app.post('/registrations', authenticateAny, async (req, res) => {
     }
 });
 
-// Öffentliche Registrierung (Website-Formular, ersetzt n8n)
+// DEUTSCH: Öffentliche Registrierung via Website-Formular (kein Login nötig). Erkennt Mitglieder automatisch per E-Mail, sendet Bestätigung an Anmelder und Benachrichtigung an Organisator
 app.post('/registrations/public', async (req, res) => {
     try {
         const {
@@ -1423,9 +1448,10 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
 
 // ============================================
 // REGISTRATION MANAGEMENT (Vorstand)
+// DEUTSCH: Verwaltung von Registrierungen durch den Vorstand (genehmigen, ablehnen, alternative Schicht vorschlagen)
 // ============================================
 
-// Get all registrations with filters (Vorstand only)
+// DEUTSCH: Alle Registrierungen mit Filtern abrufen (nur Vorstand). Inkl. Schicht-Details und geparste Notizen
 app.get('/registrations/manage', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { event_id, status } = req.query;
@@ -1477,7 +1503,7 @@ app.get('/registrations/manage', authenticateAny, requireRole('vorstand', 'admin
     }
 });
 
-// Approve registration
+// DEUTSCH: Registrierung genehmigen (Vorstand). Sendet Bestätigungs-E-Mail und prüft Arbeitsplan-Versand
 app.post('/registrations/:id/approve', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1522,7 +1548,7 @@ app.post('/registrations/:id/approve', authenticateAny, requireRole('vorstand', 
     }
 });
 
-// Reject registration
+// DEUTSCH: Registrierung ablehnen (Vorstand). Sendet Ablehnungs-E-Mail mit optionalem Grund
 app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1561,7 +1587,7 @@ app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', '
     }
 });
 
-// Suggest alternative shift
+// DEUTSCH: Alternative Schicht vorschlagen (Vorstand). Sendet E-Mail mit Link zur neuen Schicht
 app.post('/registrations/:id/suggest-alternative', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1655,7 +1681,7 @@ Feuerwehrverein Raura`;
     }
 });
 
-// Handle alternative response (accept/decline)
+// DEUTSCH: Antwort auf Schicht-Alternativvorschlag verarbeiten (Token-basiert, per Link aus E-Mail). Zeigt HTML-Seite mit Ergebnis
 app.get('/registrations/alternative-response/:token', async (req, res) => {
     try {
         const { token } = req.params;
@@ -1781,7 +1807,7 @@ app.get('/registrations/alternative-response/:token', async (req, res) => {
     }
 });
 
-// Update registration (Vorstand)
+// DEUTSCH: Registrierung bearbeiten (Vorstand). Kann Name, E-Mail, Schichten, Status und Mitglied-Zuordnung ändern
 app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1810,7 +1836,7 @@ app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'),
     }
 });
 
-// Delete registration (Vorstand)
+// DEUTSCH: Registrierung löschen (Vorstand)
 app.delete('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -1828,8 +1854,10 @@ app.delete('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin
 
 // ============================================
 // CALENDAR (ICS)
+// DEUTSCH: iCal-Feed fuer Kalender-Abonnement (Google Calendar, Apple, etc.)
 // ============================================
 
+// DEUTSCH: Generiert ICS-Kalender-Datei mit allen nicht-abgesagten Events
 app.get('/calendar/ics', async (req, res) => {
     try {
         const events = await pool.query('SELECT * FROM events WHERE status != $1 ORDER BY start_date', ['cancelled']);
@@ -1857,8 +1885,10 @@ app.get('/calendar/ics', async (req, res) => {
 
 // ============================================
 // ARBEITSPLAN PDF GENERATION
+// DEUTSCH: PDF-Generierung fuer Arbeitspläne (Schicht-Übersicht mit Helfern, tabellarisch nach Datum/Bereich)
 // ============================================
 
+// DEUTSCH: Generiert Arbeitsplan als PDF. Unterstützt Einzel-Event, Multi-Event und Legacy-Format
 app.post('/arbeitsplan/pdf', async (req, res) => {
     try {
         // Support both old format (eventId, shifts) and new format (event object or events array)
@@ -2081,9 +2111,10 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
 
 // ============================================
 // DIRECT PDF LINKS (GET endpoints)
+// DEUTSCH: GET-Endpunkte für direkten PDF-Download (z.B. Link in E-Mail)
 // ============================================
 
-// Direct Arbeitsplan PDF via GET (for direct linking)
+// DEUTSCH: Arbeitsplan-PDF direkt per GET abrufen (per Event-ID). Lädt Schichten und Registrierungen aus DB
 app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
     try {
         const { id } = req.params;
@@ -2227,7 +2258,7 @@ app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
     }
 });
 
-// Direct Teilnehmerliste PDF via GET
+// DEUTSCH: Teilnehmerliste-PDF direkt per GET abrufen. Zeigt alle Registrierten nach Schicht sortiert
 app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
     try {
         const { id } = req.params;
@@ -2387,8 +2418,10 @@ app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
 
 // ============================================
 // TEILNEHMERLISTE PDF GENERATION
+// DEUTSCH: PDF mit Teilnehmerliste (Name, E-Mail, Status), gruppiert nach Schichten oder als Flachliste
 // ============================================
 
+// DEUTSCH: Teilnehmerliste als PDF generieren (POST mit Daten aus Frontend). Unterstützt Schicht-Gruppierung und Flachliste
 app.post('/teilnehmerliste/pdf', async (req, res) => {
     try {
         const { eventId, eventTitle, participants, shifts } = req.body;
@@ -2616,7 +2649,7 @@ app.post('/teilnehmerliste/pdf', async (req, res) => {
     }
 });
 
-// Arbeitsplan manuell versenden (Vorstand)
+// DEUTSCH: Arbeitsplan manuell per E-Mail/Post versenden (Vorstand). Überspringt alle Prüfungen
 app.post('/events/:id/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const eventId = req.params.id;
@@ -2649,9 +2682,10 @@ app.post('/events/:id/send-arbeitsplan', authenticateAny, requireRole('vorstand'
 
 // ============================================
 // SHIFT REMINDERS (automated notifications)
+// DEUTSCH: Erinnerungs-E-Mails an Helfer vor ihren Schichten
 // ============================================
 
-// Send reminders for upcoming shifts
+// DEUTSCH: Erinnerungen an Helfer senden für Schichten in den nächsten X Tagen (manuell durch Vorstand)
 app.post('/shifts/send-reminders', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { days_ahead = 1 } = req.body;
@@ -2752,7 +2786,7 @@ Feuerwehrverein Raura
     }
 });
 
-// Cron-compatible endpoint (can be called without auth via API key)
+// DEUTSCH: Cron-Job Endpunkt: Sendet automatisch Erinnerungen für morgige Schichten (per API-Key geschützt)
 app.post('/shifts/cron-reminders', requireApiKey, async (req, res) => {
     try {
         // Send reminders for shifts happening tomorrow
@@ -2848,7 +2882,7 @@ Feuerwehrverein Raura
     }
 });
 
-// Helper endpoint to get missing API key for auth middleware
+// DEUTSCH: Middleware: Prüft API-Key im Header (fuer Cron-Jobs und interne Aufrufe)
 function requireApiKey(req, res, next) {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey || apiKey !== process.env.API_KEY) {
@@ -2859,9 +2893,10 @@ function requireApiKey(req, res, next) {
 
 // ============================================
 // EVENT GROUPS (for combined Arbeitsplan)
+// DEUTSCH: Gruppen von Events für kombinierten Arbeitsplan (z.B. mehrtägige Anlässe)
 // ============================================
 
-// Get all event groups
+// DEUTSCH: Alle Event-Gruppen mit ihren zugehörigen Events auflisten
 app.get('/event-groups', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -2886,7 +2921,7 @@ app.get('/event-groups', async (req, res) => {
     }
 });
 
-// Get single event group with full event data
+// DEUTSCH: Einzelne Event-Gruppe mit vollständigen Event-Daten, Schichten und Registrierungen
 app.get('/event-groups/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -2943,7 +2978,7 @@ app.get('/event-groups/:id', async (req, res) => {
     }
 });
 
-// Create event group
+// DEUTSCH: Neue Event-Gruppe erstellen (Vorstand) und optional Events zuweisen
 app.post('/event-groups', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { name, description, eventIds } = req.body;
@@ -2978,7 +3013,7 @@ app.post('/event-groups', authenticateAny, requireRole('vorstand', 'admin'), asy
     }
 });
 
-// Update event group
+// DEUTSCH: Event-Gruppe aktualisieren (Vorstand). Ersetzt bei Bedarf die Event-Zuordnungen komplett
 app.put('/event-groups/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3013,7 +3048,7 @@ app.put('/event-groups/:id', authenticateAny, requireRole('vorstand', 'admin'), 
     }
 });
 
-// Delete event group
+// DEUTSCH: Event-Gruppe löschen (Vorstand)
 app.delete('/event-groups/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3024,7 +3059,7 @@ app.delete('/event-groups/:id', authenticateAny, requireRole('vorstand', 'admin'
     }
 });
 
-// Generate combined Arbeitsplan PDF for a group
+// DEUTSCH: Kombinierten Arbeitsplan-PDF für eine Event-Gruppe generieren (Titelseite + je Event eine Seite)
 app.post('/event-groups/:id/arbeitsplan-pdf', async (req, res) => {
     try {
         const { id } = req.params;
@@ -3169,10 +3204,10 @@ app.post('/event-groups/:id/arbeitsplan-pdf', async (req, res) => {
 
 // ============================================
 // SHIFT REMINDERS
+// DEUTSCH: Tägliche Erinnerungen an Helfer (Tag vor Schicht). Prüft ob Erinnerung bereits gesendet wurde
 // ============================================
 
-// Send reminders for shifts happening tomorrow
-// This endpoint can be called by a cron job daily
+// DEUTSCH: Tägliche Erinnerungen senden für morgige Schichten. Speichert in shift_reminders um Duplikate zu vermeiden
 app.post('/reminders/send-daily', async (req, res) => {
     try {
         // Calculate tomorrow's date
@@ -3324,7 +3359,7 @@ Feuerwehrverein Raura
     }
 });
 
-// Manual endpoint to preview reminders that would be sent (Vorstand only)
+// DEUTSCH: Vorschau: Zeigt an welche Erinnerungen für ein Datum gesendet würden (Vorstand, ohne tatsächlichen Versand)
 app.get('/reminders/preview', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { date } = req.query;
@@ -3395,7 +3430,7 @@ app.get('/reminders/preview', authenticateAny, requireRole('vorstand', 'admin'),
     }
 });
 
-// Manual trigger for sending reminders (Vorstand only)
+// DEUTSCH: Erinnerungen manuell für ein bestimmtes Datum senden (Vorstand). Loggt Aktion im Audit-Log
 app.post('/reminders/send', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { date } = req.body;
@@ -3535,6 +3570,7 @@ Feuerwehrverein Raura
     }
 });
 
+// DEUTSCH: Server starten auf konfiguriertem Port
 app.listen(PORT, () => {
     console.log(`API-Events running on port ${PORT}`);
 });

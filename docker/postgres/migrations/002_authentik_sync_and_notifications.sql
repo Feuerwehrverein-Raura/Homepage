@@ -1,33 +1,35 @@
--- Migration: Authentik Sync und Benachrichtigungseinstellungen
--- Datum: 2026-01-15
--- Beschreibung: Fügt Felder für Authentik-Sync hinzu und erstellt notification_preferences Tabelle
+-- DEUTSCH: Migration 002 — Authentik-Sync und Benachrichtigungseinstellungen
+-- DEUTSCH: Datum: 2026-01-15
+-- DEUTSCH: Zweck: Verknüpft Mitglieder mit ihrem Authentik-Konto (SSO) und
+-- DEUTSCH: erstellt eine Tabelle für individuelle Benachrichtigungseinstellungen pro Mitglied
 
 -- ============================================
--- Erweitere members Tabelle
+-- DEUTSCH: Neue Spalten in der Mitglieder-Tabelle für Authentik-Sync
 -- ============================================
 
--- Füge Authentik Sync Felder hinzu
+-- DEUTSCH: Speichert die Authentik-User-ID und den Zeitpunkt der letzten Synchronisierung
 ALTER TABLE members
-    ADD COLUMN IF NOT EXISTS authentik_user_id VARCHAR(100),
-    ADD COLUMN IF NOT EXISTS authentik_synced_at TIMESTAMP;
+    ADD COLUMN IF NOT EXISTS authentik_user_id VARCHAR(100),  -- DEUTSCH: Authentik-Benutzer-ID (für SSO-Verknüpfung)
+    ADD COLUMN IF NOT EXISTS authentik_synced_at TIMESTAMP;  -- DEUTSCH: Wann zuletzt mit Authentik synchronisiert
 
--- Index für schnelle Authentik-User-Lookups
+-- DEUTSCH: Index für schnelle Suche nach Authentik-User-ID
 CREATE INDEX IF NOT EXISTS idx_members_authentik_user ON members(authentik_user_id);
 
 -- ============================================
--- Notification Preferences Tabelle
+-- DEUTSCH: Benachrichtigungseinstellungen pro Mitglied
+-- DEUTSCH: Jedes Mitglied kann individuell festlegen, welche Benachrichtigungen es erhalten möchte
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS notification_preferences (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     member_id UUID REFERENCES members(id) ON DELETE CASCADE,
 
-    -- Benachrichtigungstyp
-    notification_type VARCHAR(50) NOT NULL, -- 'shift_reminder', 'event_update', 'newsletter', 'general'
+    -- DEUTSCH: Typ der Benachrichtigung (welche Art von Nachricht)
+    notification_type VARCHAR(50) NOT NULL,               -- DEUTSCH: 'shift_reminder', 'event_update', 'newsletter', 'general'
 
-    -- Einstellungen
-    enabled BOOLEAN DEFAULT true,
-    alternative_email VARCHAR(200), -- Optional: Alternative Email für diesen Benachrichtigungstyp
+    -- DEUTSCH: Einstellungen
+    enabled BOOLEAN DEFAULT true,                         -- DEUTSCH: Ist diese Benachrichtigung aktiviert?
+    alternative_email VARCHAR(200),                       -- DEUTSCH: Optional: Andere E-Mail für diesen Typ
 
     -- Meta
     created_at TIMESTAMP DEFAULT NOW(),
@@ -39,10 +41,11 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 CREATE INDEX IF NOT EXISTS idx_notification_prefs_member ON notification_preferences(member_id);
 
 -- ============================================
--- Standard-Benachrichtigungseinstellungen für existierende Mitglieder
+-- DEUTSCH: Standard-Einstellungen für alle bestehenden Mitglieder setzen
+-- DEUTSCH: Alle 4 Benachrichtigungstypen werden auf "aktiviert" gesetzt
 -- ============================================
 
--- Erstelle Standard-Präferenzen für alle Mitglieder mit Email
+-- DEUTSCH: Schicht-Erinnerungen für alle Mitglieder mit E-Mail aktivieren
 INSERT INTO notification_preferences (member_id, notification_type, enabled)
 SELECT id, 'shift_reminder', true
 FROM members

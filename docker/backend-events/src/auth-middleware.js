@@ -1,23 +1,29 @@
 /**
  * Authentik JWT Validation Middleware
  *
- * Validates access tokens from Authentik OIDC
+ * DEUTSCH: Authentifizierungs-Middleware für das Events-Backend.
+ * Validiert Zugangs-Tokens von Authentik OIDC (Mitglieder) und Vorstand IMAP-Tokens.
  */
 
+// DEUTSCH: Bibliothek zum Verifizieren von JSON Web Tokens
 const jwt = require('jsonwebtoken');
+// DEUTSCH: Client zum Abrufen der öffentlichen Schlüssel von Authentik (JWKS-Endpunkt)
 const jwksClient = require('jwks-rsa');
 
+// DEUTSCH: URL des Authentik Identity Providers
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 
-// JWKS client to get public keys from Authentik
+// DEUTSCH: JWKS-Client konfigurieren — holt öffentliche RS256-Schlüssel von Authentik
+// Cache: 10 Min, max 10 Anfragen/Min
 const client = jwksClient({
     jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members/jwks/`,
     cache: true,
-    cacheMaxAge: 600000, // 10 minutes
+    cacheMaxAge: 600000,
     rateLimit: true,
     jwksRequestsPerMinute: 10
 });
 
+// DEUTSCH: Holt den passenden öffentlichen Schlüssel anhand der Key-ID (kid) im Token-Header
 function getKey(header, callback) {
     client.getSigningKey(header.kid, (err, key) => {
         if (err) {
@@ -29,7 +35,8 @@ function getKey(header, callback) {
 }
 
 /**
- * Middleware to verify Authentik JWT token
+ * DEUTSCH: Prüft Authentik JWT-Token (RS256) — für Mitglieder-Authentifizierung.
+ * Speichert Benutzer-Infos (id, email, name, gruppen) in req.user.
  */
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -62,7 +69,8 @@ function authenticateToken(req, res, next) {
 }
 
 /**
- * Middleware to check if user has required role/group
+ * DEUTSCH: Prüft ob der Benutzer eine der geforderten Rollen/Gruppen hat.
+ * Verwendung: requireRole('vorstand', 'admin')
  */
 function requireRole(...roles) {
     return (req, res, next) => {
@@ -82,7 +90,7 @@ function requireRole(...roles) {
 }
 
 /**
- * Middleware to check API key for internal service calls
+ * DEUTSCH: Prüft API-Key im Header — für interne Service-zu-Service-Aufrufe.
  */
 function requireApiKey(req, res, next) {
     const apiKey = req.headers['x-api-key'];
@@ -95,19 +103,19 @@ function requireApiKey(req, res, next) {
 }
 
 /**
- * Combined middleware: accepts either JWT or API key
+ * DEUTSCH: Kombinierte Auth — akzeptiert: 1. API-Key, 2. Vorstand-JWT (HS256), 3. Authentik-JWT (RS256)
  */
 function authenticateAny(req, res, next) {
     const apiKey = req.headers['x-api-key'];
     const authHeader = req.headers['authorization'];
 
-    // First try API key
+    // DEUTSCH: 1. Versuch: Interner API-Key
     if (apiKey && apiKey === process.env.API_KEY) {
         req.user = { id: 'api', name: 'API Service', groups: ['admin'] };
         return next();
     }
 
-    // Then try Vorstand JWT (HS256 with JWT_SECRET)
+    // DEUTSCH: 2. Versuch: Vorstand JWT (HS256 mit JWT_SECRET)
     if (authHeader) {
         const token = authHeader.split(' ')[1];
         if (token) {
@@ -128,16 +136,17 @@ function authenticateAny(req, res, next) {
             }
         }
 
-        // Try Authentik JWT (RS256)
+        // DEUTSCH: 3. Versuch: Authentik JWT (RS256)
         return authenticateToken(req, res, next);
     }
 
     return res.status(401).json({ error: 'Authentication required' });
 }
 
+// DEUTSCH: Exportierte Middleware-Funktionen für das Events-Backend
 module.exports = {
-    authenticateToken,
-    requireRole,
-    requireApiKey,
-    authenticateAny
+    authenticateToken,  // Authentik OIDC (RS256) — Mitglieder
+    requireRole,        // Rollenprüfung
+    requireApiKey,      // API-Key — interne Aufrufe
+    authenticateAny     // Kombiniert: API-Key / Vorstand / Authentik
 };

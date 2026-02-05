@@ -1,12 +1,43 @@
+/**
+ * generate-ics.js - ICS Kalender-Generator für Feuerwehrverein Raura
+ *
+ * Liest alle Event-Markdown-Dateien aus dem events/ Verzeichnis
+ * und generiert eine iCalendar-Datei (.ics) für Kalender-Abonnements.
+ *
+ * Ausgabe: calendar.ics im Wurzelverzeichnis
+ *
+ * Verwendung: node scripts/generate-ics.js
+ *
+ * ICS-Format (RFC 5545):
+ * - VCALENDAR Container mit Metadaten (PRODID, CALSCALE)
+ * - VEVENT pro Termin (UID, DTSTART, DTEND, SUMMARY, etc.)
+ */
 const fs = require('fs');
 const path = require('path');
 const FWV_CONFIG = require('./config.js');
 
+/**
+ * ICSGenerator - Klasse zur Generierung von iCalendar-Dateien
+ *
+ * Workflow:
+ * 1. loadEvents() - Lädt alle .md Dateien aus events/
+ * 2. parseMarkdownEvent() - Extrahiert Frontmatter und Content
+ * 3. generateICS() - Erstellt ICS-String mit allen Events
+ * 4. run() - Hauptmethode, speichert calendar.ics
+ */
 class ICSGenerator {
     constructor() {
-        this.events = [];
+        this.events = [];  // Gesammelte Events aus Markdown-Dateien
     }
 
+    /**
+     * Lädt alle Event-Markdown-Dateien aus dem events/ Verzeichnis
+     *
+     * Überspringt:
+     * - Nicht-Markdown-Dateien
+     * - assignment/arbeitsplan Dateien (Schichtpläne)
+     * - README.md
+     */
     async loadEvents() {
         const eventsDir = path.join(__dirname, '..', 'events');
         
@@ -52,10 +83,30 @@ class ICSGenerator {
         console.log(`\n📊 Total events loaded: ${this.events.length}`);
     }
 
+    /**
+     * Prüft ob ein Date-Objekt gültig ist
+     * @param {Date} date - Zu prüfendes Datum
+     * @returns {boolean} true wenn gültiges Datum
+     */
     isValidDate(date) {
         return date instanceof Date && !isNaN(date.getTime());
     }
 
+    /**
+     * Parst eine Event-Markdown-Datei
+     *
+     * Erwartet YAML-Frontmatter zwischen --- Zeilen:
+     * ---
+     * id: event-2024
+     * title: Vereinsanlass
+     * startDate: 2024-06-15T18:00
+     * endDate: 2024-06-15T22:00
+     * ---
+     *
+     * @param {string} content - Dateiinhalt
+     * @param {string} filename - Dateiname für Fehlermeldungen
+     * @returns {Object|null} Event-Objekt oder null bei Fehlern
+     */
     parseMarkdownEvent(content, filename) {
         try {
             // Parse Frontmatter with different line ending support
@@ -103,6 +154,17 @@ class ICSGenerator {
         }
     }
 
+    /**
+     * Parst einen Datums-String zu einem Date-Objekt
+     *
+     * Unterstützt ISO-8601 Format (YYYY-MM-DDTHH:mm)
+     * Entfernt automatisch Anführungszeichen
+     *
+     * @param {string} dateStr - Datums-String
+     * @param {string} filename - Dateiname für Fehlermeldungen
+     * @param {string} fieldName - Feldname (startDate, endDate, etc.)
+     * @returns {Date|null} Date-Objekt oder null bei ungültigem Format
+     */
     parseDate(dateStr, filename, fieldName) {
         try {
             // Remove quotes if present
@@ -122,6 +184,19 @@ class ICSGenerator {
         }
     }
 
+    /**
+     * Parst YAML-Frontmatter zu einem JavaScript-Objekt
+     *
+     * Unterstützt:
+     * - Einfache key: value Paare
+     * - Booleans (true/false)
+     * - Zahlen
+     * - Arrays in [] oder YAML-Format (- item)
+     *
+     * @param {string} frontmatterStr - YAML-String ohne ---
+     * @param {string} filename - Dateiname für Fehlermeldungen
+     * @returns {Object} Geparstes Objekt
+     */
     parseFrontmatter(frontmatterStr, filename) {
         const result = {};
         const lines = frontmatterStr.split(/\r?\n/).filter(line => line.trim());
@@ -171,6 +246,12 @@ class ICSGenerator {
         return result;
     }
 
+    /**
+     * Konvertiert einen Frontmatter-Wert zum passenden JavaScript-Typ
+     *
+     * @param {string} value - Roher Wert aus Frontmatter
+     * @returns {string|boolean|number|Array} Konvertierter Wert
+     */
     parseValue(value) {
         if (!value) return '';
         
@@ -210,6 +291,16 @@ class ICSGenerator {
         return value;
     }
 
+    /**
+     * Generiert den ICS-Kalender-String
+     *
+     * ICS-Struktur:
+     * - VCALENDAR Header mit Kalender-Metadaten
+     * - VEVENT pro Event mit UID, Datum, Titel, Beschreibung
+     * - VCALENDAR Footer
+     *
+     * @returns {string} Kompletter ICS-Inhalt mit CRLF Zeilenenden
+     */
     generateICS() {
         const now = new Date();
         let ics = [
@@ -262,6 +353,15 @@ class ICSGenerator {
         return ics.join('\r\n');
     }
 
+    /**
+     * Formatiert ein Date-Objekt für ICS (lokale Zeit ohne Zeitzone)
+     *
+     * ICS-Format: YYYYMMDDTHHmmss (z.B. 20240615T180000)
+     *
+     * @param {Date} date - Zu formatierendes Datum
+     * @returns {string} ICS-formatierter Datums-String
+     * @throws {Error} Bei ungültigem Datum
+     */
     formatDateForICS(date) {
         if (!this.isValidDate(date)) {
             throw new Error(`Invalid date object: ${date}`);
@@ -277,6 +377,15 @@ class ICSGenerator {
         return `${year}${month}${day}T${hours}${minutes}${seconds}`;
     }
 
+    /**
+     * Hauptmethode - Führt die komplette ICS-Generierung durch
+     *
+     * 1. Lädt alle Events
+     * 2. Generiert ICS-Inhalt
+     * 3. Speichert calendar.ics
+     *
+     * Bei leerer Event-Liste wird ein leerer Kalender erstellt
+     */
     async run() {
         try {
             console.log('🚀 Starting ICS generation...\n');

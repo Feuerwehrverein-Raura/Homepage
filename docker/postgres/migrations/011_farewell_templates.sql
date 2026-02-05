@@ -1,6 +1,8 @@
--- Add farewell templates for member deletion
+-- DEUTSCH: Migration 011 — Verabschiedungs-Vorlagen für austretende Mitglieder
+-- DEUTSCH: Erstellt 2 Vorlagen: E-Mail-Verabschiedung (informell, Du-Form)
+-- DEUTSCH: und Brief-Verabschiedung (formell, Sie-Form, HTML für PDF/Pingen)
 
--- Farewell Email Template
+-- DEUTSCH: 1. Verabschiedungs-E-Mail (informelle Du-Form)
 INSERT INTO dispatch_templates (id, name, type, subject, body, variables) VALUES
 (
     gen_random_uuid(),
@@ -28,7 +30,7 @@ Aktuar
 Feuerwehrverein Raura Kaiseraugst',
     ARRAY['anrede', 'vorname', 'nachname', 'eintrittsdatum', 'aktuar_name']
 ),
--- Farewell Letter Template (HTML for PDF/Pingen)
+-- DEUTSCH: 2. Verabschiedungs-Brief (formelle Sie-Form, HTML-Layout für PDF/Pingen-Druck)
 (
     gen_random_uuid(),
     'Verabschiedung Mitglied Brief',

@@ -1,7 +1,28 @@
+/**
+ * generate-calendar-pdf.js - HTML-Kalender-Generator für PDF-Export
+ *
+ * Generiert eine druckfertige HTML-Datei mit allen kommenden
+ * Veranstaltungen. Diese HTML wird dann mit Puppeteer zu PDF
+ * konvertiert (siehe calendar.js Route).
+ *
+ * Ausgabe: calendar-events.html im Wurzelverzeichnis
+ *
+ * Verwendung: node scripts/generate-calendar-pdf.js
+ *
+ * Features:
+ * - A4-optimiertes Layout mit FWV-Branding (rot #dc2626)
+ * - Schweizer Datumsformat (dd.MM.yyyy)
+ * - Filtert vergangene Events automatisch
+ */
 const fs = require('fs');
 const path = require('path');
 
-// Parse frontmatter from markdown
+/**
+ * Parst YAML-Frontmatter aus Markdown-Dateien
+ *
+ * @param {string} content - Markdown-Inhalt mit ---Frontmatter---
+ * @returns {Object|null} Geparstes Frontmatter oder null
+ */
 function parseFrontmatter(content) {
     const match = content.match(/^---\n([\s\S]*?)\n---/);
     if (!match) return null;
@@ -28,7 +49,18 @@ function parseFrontmatter(content) {
     return frontmatter;
 }
 
-// Load all events
+/**
+ * Lädt alle Event-Markdown-Dateien und parst sie
+ *
+ * Workflow:
+ * 1. Liest events/ Verzeichnis
+ * 2. Filtert .md Dateien (ohne assignments, README)
+ * 3. Extrahiert Frontmatter mit Datum, Titel, Ort
+ * 4. Sortiert nach Datum aufsteigend
+ * 5. Filtert vergangene Events
+ *
+ * @returns {Array<Object>} Array von Event-Objekten
+ */
 function loadEvents() {
     const eventsDir = path.join(__dirname, '..', 'events');
     const files = fs.readdirSync(eventsDir).filter(f =>
@@ -62,7 +94,22 @@ function loadEvents() {
     return events.filter(e => e.startDate >= now || (e.endDate && e.endDate >= now));
 }
 
-// Generate HTML for PDF
+/**
+ * Generiert druckfertiges HTML für den Kalender
+ *
+ * Layout:
+ * - FWV-Header mit Vereinsname und Datum
+ * - Tabelle mit Datum/Zeit und Veranstaltung
+ * - Footer mit Kontaktdaten und Disclaimer
+ *
+ * Styling:
+ * - @page für A4-Druck optimiert
+ * - FWV-Rot (#dc2626) für Header und Akzente
+ * - Graue Untertitel für Sekundärinfos
+ *
+ * @param {Array<Object>} events - Event-Array aus loadEvents()
+ * @returns {string} Komplettes HTML-Dokument
+ */
 function generateHTML(events) {
     const formatDate = (date) => {
         return date.toLocaleDateString('de-CH', {
@@ -180,7 +227,8 @@ function generateHTML(events) {
     `;
 }
 
-// Main
+// === HAUPTPROGRAMM ===
+// Lädt Events, generiert HTML und speichert Datei
 const events = loadEvents();
 const html = generateHTML(events);
 

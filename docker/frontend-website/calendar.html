@@ -1,11 +1,18 @@
+<!-- DEUTSCH: Kalenderseite des Feuerwehrvereins Raura Kaiseraugst -->
+<!-- DEUTSCH: Zeigt Vereinstermine in einer Monats- oder Listenansicht an -->
+<!-- DEUTSCH: Bietet ICS-Export und Kalender-Abo-Funktionalitaet -->
 <!DOCTYPE html>
 <html lang="de" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kalender - Feuerwehrverein Raura Kaiseraugst</title>
+    <!-- DEUTSCH: Tailwind CSS Framework wird vom CDN geladen -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- DEUTSCH: Benutzerdefinierte Tailwind-Konfiguration mit Feuerwehr-Farbpalette ("fire") -->
     <script>
+        // DEUTSCH: Erweitert das Standard-Farbschema um eine "fire"-Farbpalette (Rot-Toene)
+        // DEUTSCH: Diese Farben werden im gesamten UI fuer Buttons, Hintergruende und Akzente verwendet
         tailwind.config = {
             theme: {
                 extend: {
@@ -27,13 +34,16 @@
             }
         }
     </script>
+    <!-- DEUTSCH: Zentrale Konfigurationsdatei mit API-URLs und Kontaktdaten -->
     <script src="scripts/config.js"></script>
 </head>
 <body class="font-sans antialiased bg-gray-50">
-    <!-- Navigation -->
+    <!-- DEUTSCH: Hauptnavigation - Roter Balken mit Vereinslogo und Seitenlinks -->
+    <!-- DEUTSCH: Die aktuelle Seite (Kalender) ist optisch hervorgehoben (text-fire-200 + font-semibold) -->
     <nav class="bg-fire-700 text-white shadow-lg">
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-4">
+                <!-- DEUTSCH: Vereinslogo und Vereinsname links in der Navigation -->
                 <div class="flex items-center space-x-3">
                     <div class="w-12 h-12 rounded-full overflow-hidden border-2 border-fire-300 shadow-lg bg-white">
                         <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="w-full h-full object-contain p-1">
@@ -43,6 +53,7 @@
                         <p class="text-fire-200 text-sm">Kaiseraugst</p>
                     </div>
                 </div>
+                <!-- DEUTSCH: Navigationslinks zu den drei Hauptseiten -->
                 <div class="flex space-x-6">
                     <a href="index.html" class="hover:text-fire-200 transition-colors">Home</a>
                     <a href="calendar.html" class="text-fire-200 font-semibold">Kalender</a>
@@ -52,16 +63,20 @@
         </div>
     </nav>
 
-    <!-- Header -->
+    <!-- DEUTSCH: Header-Bereich mit Seitentitel und Aktionsbuttons -->
+    <!-- DEUTSCH: Bietet zwei Hauptaktionen: Kalender abonnieren (webcal) und ICS-Datei herunterladen -->
     <section class="bg-gradient-to-r from-fire-600 to-fire-700 text-white py-12">
         <div class="container mx-auto px-4 text-center">
             <h2 class="text-4xl font-bold mb-4">Vereinskalender</h2>
             <p class="text-fire-100 text-lg mb-6">Alle wichtigen Termine auf einen Blick</p>
+            <!-- DEUTSCH: Aktionsbuttons - responsiv: untereinander auf Mobil, nebeneinander auf Desktop -->
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <!-- DEUTSCH: Oeffnet ein Modal mit webcal-Link, manueller URL und ICS-Download-Option -->
                 <button id="subscribe-btn" class="bg-white text-fire-700 px-6 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors flex items-center justify-center space-x-2">
                     <span>📅</span>
                     <span>Kalender abonnieren</span>
                 </button>
+                <!-- DEUTSCH: Laedt die komplette ICS-Datei direkt von der API herunter -->
                 <button id="download-ics-btn" class="border-2 border-white text-white px-6 py-3 rounded-lg font-semibold hover:bg-white hover:text-fire-700 transition-colors flex items-center justify-center space-x-2">
                     <span>⬇️</span>
                     <span>ICS herunterladen</span>
@@ -70,10 +85,12 @@
         </div>
     </section>
 
-    <!-- Calendar Controls -->
+    <!-- DEUTSCH: Kalender-Steuerungsleiste mit Monatsnavigation und Ansichtsumschalter -->
     <section class="bg-white shadow-sm py-4">
         <div class="container mx-auto px-4">
             <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                <!-- DEUTSCH: Monatsnavigation: Pfeil zurueck, aktueller Monat/Jahr, Pfeil vorwaerts -->
+                <!-- DEUTSCH: Der Text in #current-month wird dynamisch per JavaScript gesetzt -->
                 <div class="flex items-center space-x-4">
                     <button id="prev-month" class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                         <span class="text-xl">←</span>
@@ -83,10 +100,12 @@
                         <span class="text-xl">→</span>
                     </button>
                 </div>
+                <!-- DEUTSCH: Rechte Seite: Heute-Button springt zum aktuellen Monat, Dropdown wechselt Ansicht -->
                 <div class="flex space-x-2">
                     <button id="today-btn" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
                         Heute
                     </button>
+                    <!-- DEUTSCH: Umschalter zwischen Kalender-Gitteransicht und chronologischer Listenansicht -->
                     <select id="view-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                         <option value="month">Monatsansicht</option>
                         <option value="list">Listenansicht</option>
@@ -96,11 +115,12 @@
         </div>
     </section>
 
-    <!-- Calendar View -->
+    <!-- DEUTSCH: Monatsansicht - 7-Spalten Kalendergitter (Montag bis Sonntag) -->
+    <!-- DEUTSCH: Diese Sektion wird bei Listenansicht per CSS-Klasse "hidden" ausgeblendet -->
     <section id="calendar-view" class="py-8">
         <div class="container mx-auto px-4">
             <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-                <!-- Calendar Header -->
+                <!-- DEUTSCH: Kopfzeile des Kalenders mit den Wochentagen (Montag bis Sonntag) -->
                 <div class="grid grid-cols-7 bg-gray-100">
                     <div class="p-4 text-center font-semibold text-gray-700">Mo</div>
                     <div class="p-4 text-center font-semibold text-gray-700">Di</div>
@@ -110,7 +130,7 @@
                     <div class="p-4 text-center font-semibold text-gray-700">Sa</div>
                     <div class="p-4 text-center font-semibold text-gray-700">So</div>
                 </div>
-                <!-- Calendar Body -->
+                <!-- DEUTSCH: Kalender-Koerper: 6 Zeilen x 7 Spalten = 42 Tageszellen, per JS generiert -->
                 <div id="calendar-grid" class="grid grid-cols-7 gap-0">
                     <!-- Calendar days will be generated by JavaScript -->
                 </div>
@@ -118,27 +138,35 @@
         </div>
     </section>
 
-    <!-- List View -->
+    <!-- DEUTSCH: Listenansicht - Chronologisch sortierte Event-Karten -->
+    <!-- DEUTSCH: Standardmaessig ausgeblendet ("hidden"), wird per toggleView() eingeblendet -->
     <section id="list-view" class="py-8 hidden">
         <div class="container mx-auto px-4">
+            <!-- DEUTSCH: Container fuer die dynamisch generierten Event-Listeneintraege -->
             <div id="events-list" class="space-y-4">
                 <!-- Event list will be generated by JavaScript -->
             </div>
         </div>
     </section>
 
-    <!-- Event Modal -->
+    <!-- DEUTSCH: Event-Detail-Modal - Wird per Klick auf ein Event geoeffnet -->
+    <!-- DEUTSCH: Zeigt Titel, Untertitel, Beschreibung, Datum, Zeit, Ort, Kategorie, Kontakt, Kosten -->
+    <!-- DEUTSCH: Bietet ICS-Download fuer das einzelne Event und Schliessen-Button -->
     <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div class="p-6">
+                <!-- DEUTSCH: Modal-Kopf mit Event-Titel und X-Schliessen-Button -->
                 <div class="flex justify-between items-start mb-4">
                     <h3 id="modal-title" class="text-xl font-bold text-gray-800"></h3>
                     <button id="close-modal" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
                 </div>
+                <!-- DEUTSCH: Dynamischer Inhalt: Event-Details werden per showEventModal() eingefuegt -->
                 <div id="modal-content" class="space-y-4">
                     <!-- Modal content will be populated by JavaScript -->
                 </div>
+                <!-- DEUTSCH: Aktionsbuttons am Ende des Modals -->
                 <div class="mt-6 flex space-x-3">
+                    <!-- DEUTSCH: Generiert und laedt eine ICS-Datei nur fuer dieses eine Event herunter -->
                     <button id="download-event-ics" class="flex-1 bg-fire-500 text-white px-4 py-2 rounded-lg hover:bg-fire-600 transition-colors">
                         ICS herunterladen
                     </button>
@@ -150,24 +178,31 @@
         </div>
     </div>
 
-    <!-- Loading Indicator -->
+    <!-- DEUTSCH: Ladebildschirm - Wird beim Seitenstart angezeigt und nach dem Laden der Events ausgeblendet -->
+    <!-- DEUTSCH: Ueberlagert die gesamte Seite (fixed, z-40), bis init() abgeschlossen ist -->
     <div id="loading" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-40">
         <div class="text-center">
+            <!-- DEUTSCH: Drehender Kreis als visueller Ladeindikator -->
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-fire-500 mx-auto mb-4"></div>
             <p class="text-gray-600">Lade Veranstaltungen...</p>
         </div>
     </div>
 
     <script>
+        // DEUTSCH: EventCalendar - Hauptklasse fuer die gesamte Kalender-Funktionalitaet
+        // DEUTSCH: Verwaltet Events, Ansichten (Monats-/Listenansicht), Navigation und ICS-Export
         class EventCalendar {
+            // DEUTSCH: Konstruktor initialisiert den Zustand und startet den asynchronen Ladevorgang
             constructor() {
-                this.events = [];
-                this.currentDate = new Date();
-                this.selectedDate = new Date();
-                this.viewMode = 'month';
+                this.events = [];              // DEUTSCH: Array aller geladenen Events
+                this.currentDate = new Date(); // DEUTSCH: Aktuell angezeigter Monat fuer die Navigation
+                this.selectedDate = new Date();// DEUTSCH: Aktuell ausgewaehltes Datum (fuer Modal)
+                this.viewMode = 'month';       // DEUTSCH: Aktive Ansicht: 'month' oder 'list'
                 this.init();
             }
 
+            // DEUTSCH: Asynchrone Initialisierung: Events laden, Listener registrieren, Kalender rendern
+            // DEUTSCH: Blendet am Ende den Ladebildschirm aus
             async init() {
                 console.log('📅 Kalender wird initialisiert...');
                 await this.loadEvents();
@@ -176,6 +211,9 @@
                 document.getElementById('loading').classList.add('hidden');
             }
 
+            // DEUTSCH: Laedt alle Events von der REST-API und transformiert sie ins interne Format
+            // DEUTSCH: API-Endpunkt: https://api.fwv-raura.ch/events
+            // DEUTSCH: Bei Fehler wird ein leeres Array gesetzt, damit der Kalender trotzdem angezeigt wird
             async loadEvents() {
                 try {
                     // Lade Events von der API
@@ -188,7 +226,8 @@
 
                     const apiEvents = await response.json();
 
-                    // Map API format to internal format
+                    // DEUTSCH: Transformiert das API-Format (snake_case) ins interne Format (camelCase)
+                    // DEUTSCH: Setzt Standardwerte fuer fehlende Felder (z.B. 'Kostenlos', 'Sonstiges')
                     this.events = apiEvents.map(e => ({
                         id: e.slug || e.id,
                         title: e.title || 'Unbenanntes Event',
@@ -216,9 +255,12 @@
                 }
             }
 
+            // DEUTSCH: Legacy-Funktion: Parst ein einzelnes Event aus einer Markdown-Datei mit YAML-Frontmatter
+            // DEUTSCH: Wird seit der Umstellung auf die REST-API nicht mehr aktiv genutzt
+            // DEUTSCH: Format: ---\nkey: value\n---\nMarkdown-Beschreibung
             parseMarkdownEvent(content, filename = '') {
                 try {
-                    // Parse Frontmatter
+                    // DEUTSCH: Extrahiert den YAML-Frontmatter-Block zwischen den --- Trennzeichen
                     const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
                     if (!frontmatterMatch) {
                         console.warn(`⚠️ ${filename}: Kein Frontmatter gefunden`);
@@ -227,139 +269,152 @@
 
                     const [, frontmatterStr, markdownContent] = frontmatterMatch;
                     const frontmatter = this.parseFrontmatter(frontmatterStr);
-                    
+
+                    // DEUTSCH: Validiert die Pflichtfelder - ohne diese ist das Event ungueltig
                     if (!frontmatter.id || !frontmatter.title || !frontmatter.startDate || !frontmatter.endDate) {
                         console.warn(`⚠️ ${filename}: Pflichtfelder fehlen`);
                         return null;
                     }
 
+                    // DEUTSCH: Kombiniert Frontmatter-Daten mit der Markdown-Beschreibung
+                    // DEUTSCH: Konvertiert Datumsstrings zu Date-Objekten
                     return {
                         ...frontmatter,
                         description: markdownContent.trim(),
                         startDate: new Date(frontmatter.startDate),
                         endDate: new Date(frontmatter.endDate),
-                        registrationDeadline: frontmatter.registrationDeadline ? 
+                        registrationDeadline: frontmatter.registrationDeadline ?
                             new Date(frontmatter.registrationDeadline) : null,
                         _source: filename
                     };
-                    
+
                 } catch (error) {
                     console.error(`❌ ${filename}: Parse-Fehler:`, error);
                     return null;
                 }
             }
 
+            // DEUTSCH: Legacy-Funktion: Parst YAML-Frontmatter-Strings in ein JavaScript-Objekt
+            // DEUTSCH: Unterstuetzt einfache Key-Value-Paare, Arrays in []-Notation, Booleans
+            // DEUTSCH: und verschachtelte Shift-Arrays (Schichten fuer Veranstaltungen)
             parseFrontmatter(frontmatterStr) {
                 const result = {};
                 const lines = frontmatterStr.split(/\r?\n/);
-                
+
                 let currentKey = null;
                 let currentValue = '';
                 let inArray = false;
-                let inShifts = false;
-                let currentShift = null;
-                let shifts = [];
+                let inShifts = false;    // DEUTSCH: Flag ob wir uns gerade im shifts:-Block befinden
+                let currentShift = null; // DEUTSCH: Aktuell gelesenes Schicht-Objekt
+                let shifts = [];         // DEUTSCH: Gesammelte Schichten
 
                 for (const line of lines) {
                     const trimmedLine = line.trim();
-                    
+
+                    // DEUTSCH: Leere Zeilen und Kommentare (#) ueberspringen
                     if (!trimmedLine || trimmedLine.startsWith('#')) continue;
-                    
-                    // Handle shifts array
+
+                    // DEUTSCH: Erkennung des shifts:-Blocks (Array von Schicht-Objekten)
                     if (trimmedLine === 'shifts:') {
                         inShifts = true;
                         shifts = [];
                         continue;
                     }
-                    
+
+                    // DEUTSCH: Verarbeitung der einzelnen Shift-Eintraege innerhalb des shifts:-Blocks
                     if (inShifts) {
                         if (trimmedLine.startsWith('- id:')) {
-                            // Save previous shift
+                            // DEUTSCH: Neuer Shift beginnt - vorherigen Shift speichern falls vorhanden
                             if (currentShift) {
                                 shifts.push(currentShift);
                             }
-                            // Start new shift
                             currentShift = { id: trimmedLine.replace('- id:', '').trim() };
                         } else if (currentShift && trimmedLine.startsWith('- ')) {
+                            // DEUTSCH: Weitere Eigenschaften des aktuellen Shifts (z.B. name, startTime, endTime)
                             const [key, ...valueParts] = trimmedLine.substring(2).split(':');
                             const value = valueParts.join(':').trim();
                             if (key && value) {
                                 currentShift[key.trim()] = value;
                             }
                         } else if (!trimmedLine.startsWith(' ') && !trimmedLine.startsWith('-') && trimmedLine.includes(':')) {
-                            // End of shifts array
+                            // DEUTSCH: Zeile gehoert nicht mehr zum shifts-Block - Block abschliessen
                             if (currentShift) {
                                 shifts.push(currentShift);
                                 currentShift = null;
                             }
                             inShifts = false;
                             result.shifts = shifts;
-                            
-                            // Process current line as regular frontmatter
+
+                            // DEUTSCH: Diese Zeile als regulaeres Frontmatter-Feld verarbeiten
                             const colonIndex = trimmedLine.indexOf(':');
                             const key = trimmedLine.substring(0, colonIndex).trim();
                             let value = trimmedLine.substring(colonIndex + 1).trim();
-                            
+
+                            // DEUTSCH: Inline-Arrays erkennen: [wert1, wert2, wert3]
                             if (value.startsWith('[') && value.endsWith(']')) {
                                 value = value.slice(1, -1).split(',').map(s => s.trim());
                             }
-                            
+
+                            // DEUTSCH: Boolean-Strings in echte Booleans umwandeln
                             if (value === 'true') value = true;
                             if (value === 'false') value = false;
-                            
+
                             result[key] = value;
                         }
                         continue;
                     }
-                    
-                    // Handle regular frontmatter
+
+                    // DEUTSCH: Regulaere Frontmatter-Zeile: "key: value" parsen
                     const colonIndex = trimmedLine.indexOf(':');
                     if (colonIndex === -1) continue;
-                    
+
                     const key = trimmedLine.substring(0, colonIndex).trim();
                     let value = trimmedLine.substring(colonIndex + 1).trim();
-                    
+
                     if (!key) continue;
-                    
-                    // Handle arrays
+
+                    // DEUTSCH: Inline-Arrays erkennen und in JavaScript-Arrays konvertieren
                     if (value.startsWith('[') && value.endsWith(']')) {
                         value = value.slice(1, -1).split(',').map(s => s.trim());
                     }
-                    
-                    // Handle booleans
+
+                    // DEUTSCH: Boolean-Strings in echte Booleans umwandeln
                     if (value === 'true') value = true;
                     if (value === 'false') value = false;
-                    
+
                     result[key] = value;
                 }
-                
-                // Don't forget the last shift if we were parsing shifts
+
+                // DEUTSCH: Sicherstellung: Letzten Shift speichern falls Datei ohne weitere Felder endet
                 if (inShifts && currentShift) {
                     shifts.push(currentShift);
                     result.shifts = shifts;
                 }
-                
+
                 return result;
             }
 
+            // DEUTSCH: Registriert alle Event-Listener fuer die interaktiven Elemente der Seite
+            // DEUTSCH: Wird einmalig bei der Initialisierung aufgerufen
             setupEventListeners() {
-                // Navigation
+                // DEUTSCH: Monatsnavigation: Vor/Zurueck-Pfeile und Heute-Button
                 document.getElementById('prev-month').addEventListener('click', () => this.previousMonth());
                 document.getElementById('next-month').addEventListener('click', () => this.nextMonth());
                 document.getElementById('today-btn').addEventListener('click', () => this.goToToday());
-                
-                // View mode
+
+                // DEUTSCH: Ansichtsumschalter: Wechselt zwischen Monats- und Listenansicht
                 document.getElementById('view-select').addEventListener('change', (e) => {
                     this.viewMode = e.target.value;
                     this.toggleView();
                 });
 
-                // Buttons
+                // DEUTSCH: Header-Buttons: Kalender abonnieren und ICS herunterladen
                 document.getElementById('subscribe-btn').addEventListener('click', () => this.subscribeCalendar());
                 document.getElementById('download-ics-btn').addEventListener('click', () => this.downloadAllICS());
+                // DEUTSCH: Einzelnes Event als ICS herunterladen (im Modal)
                 document.getElementById('download-event-ics').addEventListener('click', () => this.downloadEventICS());
 
-                // Modal
+                // DEUTSCH: Modal schliessen: X-Button, Schliessen-Button und Klick auf den Hintergrund
                 document.getElementById('close-modal').addEventListener('click', () => this.closeModal());
                 document.getElementById('close-modal-btn').addEventListener('click', () => this.closeModal());
                 document.getElementById('event-modal').addEventListener('click', (e) => {
@@ -367,6 +422,7 @@
                 });
             }
 
+            // DEUTSCH: Zentrale Render-Funktion: Aktualisiert Monatsanzeige und delegiert an die aktive Ansicht
             render() {
                 this.updateMonthDisplay();
                 if (this.viewMode === 'month') {
@@ -376,15 +432,20 @@
                 }
             }
 
+            // DEUTSCH: Aktualisiert die Monats-/Jahresanzeige in der Steuerungsleiste
+            // DEUTSCH: Zeigt den deutschen Monatsnamen und das Jahr an (z.B. "Februar 2026")
             updateMonthDisplay() {
                 const monthNames = [
                     'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
                     'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
                 ];
-                document.getElementById('current-month').textContent = 
+                document.getElementById('current-month').textContent =
                     `${monthNames[this.currentDate.getMonth()]} ${this.currentDate.getFullYear()}`;
             }
 
+            // DEUTSCH: Erzeugt das 6x7 Kalendergitter fuer den aktuellen Monat
+            // DEUTSCH: Berechnet den Startpunkt (Montag der ersten Woche) und erstellt 42 Tageszellen
+            // DEUTSCH: Tage aus dem Vor-/Nachmonat werden ebenfalls angezeigt (ausgegraut)
             renderCalendarGrid() {
                 const grid = document.getElementById('calendar-grid');
                 grid.innerHTML = '';
@@ -393,33 +454,41 @@
                 const month = this.currentDate.getMonth();
                 const firstDay = new Date(year, month, 1);
                 const lastDay = new Date(year, month + 1, 0);
+                // DEUTSCH: Berechnet den Montag der Woche, in der der 1. des Monats liegt
+                // DEUTSCH: (firstDay.getDay() + 6) % 7 konvertiert Sonntag=0 zu Montag=0 basiertem Wochenstart
                 const startDate = new Date(firstDay);
                 startDate.setDate(startDate.getDate() - (firstDay.getDay() + 6) % 7);
 
+                // DEUTSCH: Erzeugt genau 42 Zellen (6 Wochen x 7 Tage) fuer ein vollstaendiges Grid
                 for (let i = 0; i < 42; i++) {
                     const cellDate = new Date(startDate);
                     cellDate.setDate(startDate.getDate() + i);
-                    
+
                     const cell = this.createCalendarCell(cellDate, month);
                     grid.appendChild(cell);
                 }
             }
 
+            // DEUTSCH: Erstellt eine einzelne Tageszelle fuer das Kalendergitter
+            // DEUTSCH: Markiert den heutigen Tag farblich (rot), graut Tage ausserhalb des Monats aus
+            // DEUTSCH: Zeigt Event-Titel als klickbare Pillen an, die das Detail-Modal oeffnen
             createCalendarCell(date, currentMonth) {
                 const cell = document.createElement('div');
                 const isCurrentMonth = date.getMonth() === currentMonth;
                 const isToday = this.isToday(date);
                 const dayEvents = this.getEventsForDate(date);
 
+                // DEUTSCH: Styling: Nicht-aktueller-Monat = grau, Heute = roter Hintergrund/Rand
                 cell.className = `min-h-24 p-2 border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${
                     !isCurrentMonth ? 'bg-gray-100 text-gray-400' : ''
                 } ${isToday ? 'bg-fire-50 border-fire-300' : ''}`;
 
+                // DEUTSCH: Tageszahl oben, darunter Event-Pillen mit abgeschnittenem Titel (truncate)
                 cell.innerHTML = `
                     <div class="font-semibold text-sm mb-1 ${isToday ? 'text-fire-700' : ''}">${date.getDate()}</div>
                     <div class="space-y-1">
                         ${dayEvents.map(event => `
-                            <div class="text-xs p-1 bg-fire-100 text-fire-800 rounded truncate cursor-pointer hover:bg-fire-200 transition-colors" 
+                            <div class="text-xs p-1 bg-fire-100 text-fire-800 rounded truncate cursor-pointer hover:bg-fire-200 transition-colors"
                                  data-event-id="${event.id}">
                                 ${event.title}
                             </div>
@@ -427,7 +496,8 @@
                     </div>
                 `;
 
-                // Add event listeners for events
+                // DEUTSCH: Klick auf eine Event-Pille oeffnet das Detail-Modal
+                // DEUTSCH: stopPropagation verhindert, dass der Klick auch die Tageszelle ausloest
                 cell.querySelectorAll('[data-event-id]').forEach(eventEl => {
                     eventEl.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -439,10 +509,15 @@
                 return cell;
             }
 
+            // DEUTSCH: Erzeugt die Listenansicht: Alle Events chronologisch sortiert als Karten
+            // DEUTSCH: Jede Karte zeigt Titel, Untertitel, Datum, Zeit, Ort und Kategorie-Badge
+            // DEUTSCH: Klick auf eine Karte oeffnet das Detail-Modal
             renderEventsList() {
                 const container = document.getElementById('events-list');
+                // DEUTSCH: Sortiert eine Kopie des Arrays nach Startdatum aufsteigend
                 const sortedEvents = [...this.events].sort((a, b) => a.startDate - b.startDate);
 
+                // DEUTSCH: Generiert HTML-Karten fuer alle Events mittels Template-Literals
                 container.innerHTML = sortedEvents.map(event => `
                     <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" data-event-id="${event.id}">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -455,6 +530,7 @@
                                     <span>📍 ${event.location}</span>
                                 </div>
                             </div>
+                            <!-- DEUTSCH: Kategorie-Badge rechts auf Desktop, unten auf Mobil -->
                             <div class="mt-4 md:mt-0">
                                 <span class="px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
                                     ${event.category || 'Event'}
@@ -464,7 +540,7 @@
                     </div>
                 `).join('');
 
-                // Add event listeners
+                // DEUTSCH: Registriert Klick-Handler fuer jede Event-Karte -> oeffnet Detail-Modal
                 container.querySelectorAll('[data-event-id]').forEach(eventEl => {
                     eventEl.addEventListener('click', () => {
                         const eventId = eventEl.getAttribute('data-event-id');
@@ -473,24 +549,33 @@
                 });
             }
 
+            // DEUTSCH: Gibt alle Events zurueck, die an einem bestimmten Tag stattfinden
+            // DEUTSCH: Beruecksichtigt mehrtaegige Events: Start-Tag, End-Tag und alle Tage dazwischen
             getEventsForDate(date) {
                 return this.events.filter(event => {
                     const eventStart = new Date(event.startDate);
                     const eventEnd = new Date(event.endDate);
-                    
-                    // Event läuft an diesem Tag
-                    return (this.isSameDay(date, eventStart) || 
+
+                    // DEUTSCH: Event wird angezeigt wenn: gleicher Tag wie Start ODER Ende ODER dazwischen
+                    return (this.isSameDay(date, eventStart) ||
                             this.isSameDay(date, eventEnd) ||
                             (date >= eventStart && date <= eventEnd));
                 });
             }
 
+            // DEUTSCH: Zeigt das Detail-Modal fuer ein bestimmtes Event an
+            // DEUTSCH: Sucht das Event anhand der ID, befuellt das Modal mit allen Details
+            // DEUTSCH: und speichert das Event in selectedEvent fuer den ICS-Download
             showEventModal(eventId) {
                 const event = this.events.find(e => e.id === eventId);
                 if (!event) return;
 
+                // DEUTSCH: Merkt sich das ausgewaehlte Event fuer den ICS-Einzeldownload
                 this.selectedEvent = event;
                 document.getElementById('modal-title').textContent = event.title;
+                // DEUTSCH: Befuellt den Modal-Inhalt: Untertitel, erste Zeile der Beschreibung,
+                // DEUTSCH: dann tabellarische Anzeige von Datum, Zeit, Ort, Kategorie, Kontakt
+                // DEUTSCH: Kosten und Anmeldepflicht werden nur angezeigt wenn vorhanden
                 document.getElementById('modal-content').innerHTML = `
                     <div class="space-y-3">
                         ${event.subtitle ? `<p class="text-fire-600 font-medium">${event.subtitle}</p>` : ''}
@@ -531,14 +616,18 @@
                         </div>
                     </div>
                 `;
+                // DEUTSCH: Modal einblenden durch Entfernen der "hidden"-Klasse
                 document.getElementById('event-modal').classList.remove('hidden');
             }
 
+            // DEUTSCH: Schliesst das Event-Detail-Modal und setzt die Auswahl zurueck
             closeModal() {
                 document.getElementById('event-modal').classList.add('hidden');
                 this.selectedEvent = null;
             }
 
+            // DEUTSCH: Wechselt zwischen Monats- und Listenansicht
+            // DEUTSCH: Blendet die jeweilige Sektion ein/aus und rendert den Inhalt neu
             toggleView() {
                 const calendarView = document.getElementById('calendar-view');
                 const listView = document.getElementById('list-view');
@@ -554,27 +643,35 @@
                 }
             }
 
+            // DEUTSCH: Navigiert einen Monat zurueck und rendert den Kalender neu
             previousMonth() {
                 this.currentDate.setMonth(this.currentDate.getMonth() - 1);
                 this.render();
             }
 
+            // DEUTSCH: Navigiert einen Monat vorwaerts und rendert den Kalender neu
             nextMonth() {
                 this.currentDate.setMonth(this.currentDate.getMonth() + 1);
                 this.render();
             }
 
+            // DEUTSCH: Springt zum aktuellen Monat/Datum zurueck und rendert den Kalender neu
             goToToday() {
                 this.currentDate = new Date();
                 this.render();
             }
 
+            // DEUTSCH: Zeigt ein Abo-Modal mit drei Optionen fuer den Kalender-Import:
+            // DEUTSCH: 1. Automatisches webcal:// Protokoll (oeffnet direkt die Kalender-App)
+            // DEUTSCH: 2. Manuelle URL zum Kopieren (fuer Apps die webcal nicht unterstuetzen)
+            // DEUTSCH: 3. Direkter ICS-Datei-Download (fuer manuellen Import)
             subscribeCalendar() {
-                // API-basierte URLs für dynamischen Kalender
+                // DEUTSCH: webcal:// Protokoll wird von den meisten Kalender-Apps automatisch erkannt
                 const webcalUrl = 'webcal://api.fwv-raura.ch/calendar/ics';
+                // DEUTSCH: HTTPS-Variante fuer den direkten Datei-Download
                 const httpsUrl = 'https://api.fwv-raura.ch/calendar/ics';
-                
-                // Erstelle Modal-HTML
+
+                // DEUTSCH: Baut das Abo-Modal als HTML-String zusammen
                 const modalHTML = `
                     <div class="bg-white rounded-lg max-w-2xl w-full mx-4">
                         <div class="bg-gradient-to-r from-fire-500 to-fire-600 text-white p-6 rounded-t-lg">
@@ -634,21 +731,22 @@
                     </div>
                 `;
                 
-                // Erstelle Modal
+                // DEUTSCH: Erstellt das Modal-Element dynamisch und haengt es an den Body an
                 const modal = document.createElement('div');
                 modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
                 modal.innerHTML = modalHTML;
-                
-                // Schließen bei Klick auf Hintergrund
+
+                // DEUTSCH: Klick auf den halbtransparenten Hintergrund schliesst das Modal
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) {
                         modal.remove();
                     }
                 });
-                
+
                 document.body.appendChild(modal);
-                
-                // URL automatisch auswählen für einfaches Kopieren
+
+                // DEUTSCH: Selektiert automatisch die URL im Eingabefeld fuer einfaches Kopieren
+                // DEUTSCH: Timeout noetig, damit das DOM-Element erst vollstaendig gerendert wird
                 setTimeout(() => {
                     const input = document.getElementById('calendar-url-input');
                     if (input) {
@@ -658,17 +756,22 @@
                 }, 100);
             }
 
+            // DEUTSCH: Laedt die komplette ICS-Datei mit allen Events direkt von der API herunter
+            // DEUTSCH: Leitet den Browser per Redirect zur API-URL weiter, die den Download ausloest
             downloadAllICS() {
-                // Download direkt von der API für aktuelle Daten
                 window.location.href = 'https://api.fwv-raura.ch/calendar/ics';
             }
 
+            // DEUTSCH: Generiert und laedt eine ICS-Datei fuer das aktuell im Modal angezeigte Event
+            // DEUTSCH: Wird nur ausgefuehrt wenn ein Event selektiert ist (selectedEvent != null)
             downloadEventICS() {
                 if (!this.selectedEvent) return;
                 const icsData = this.generateICS([this.selectedEvent]);
                 this.downloadICS(icsData, `${this.selectedEvent.id}.ics`);
             }
 
+            // DEUTSCH: Hilfsfunktion: Erzeugt einen Blob aus ICS-Daten und loest den Browser-Download aus
+            // DEUTSCH: Erstellt dynamisch ein unsichtbares <a>-Element, klickt es und raeumt danach auf
             downloadICS(icsData, filename) {
                 const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
                 const url = window.URL.createObjectURL(blob);
@@ -678,11 +781,16 @@
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
+                // DEUTSCH: Object-URL freigeben um Speicherlecks zu vermeiden
                 window.URL.revokeObjectURL(url);
             }
 
+            // DEUTSCH: Generiert einen vollstaendigen ICS-String im iCalendar-Format (RFC 5545)
+            // DEUTSCH: Erstellt VCALENDAR-Header mit Vereinsinformationen und Zeitzone Europe/Zurich
+            // DEUTSCH: Fuer jedes Event wird ein VEVENT-Block mit allen relevanten Feldern erzeugt
             generateICS(events) {
                 const now = new Date();
+                // DEUTSCH: ICS-Header mit Kalender-Metadaten (Name, Beschreibung, Zeitzone)
                 let ics = [
                     'BEGIN:VCALENDAR',
                     'VERSION:2.0',
@@ -694,11 +802,14 @@
                     'X-WR-TIMEZONE:Europe/Zurich'
                 ];
 
+                // DEUTSCH: Fuer jedes Event einen VEVENT-Block mit UID, Zeiten, Titel, Beschreibung etc. erzeugen
                 events.forEach(event => {
+                    // DEUTSCH: Eindeutige UID im Format "event-id@feuerwehrverein-raura.ch"
                     const uid = `${event.id}@feuerwehrverein-raura.ch`;
                     const dtstart = this.formatDateForICS(event.startDate);
                     const dtend = this.formatDateForICS(event.endDate);
                     const dtstamp = this.formatDateForICS(now);
+                    // DEUTSCH: Sonderzeichen in der Beschreibung escapen (ICS-Spezifikation)
                     const description = event.description.replace(/\n/g, '\\n').replace(/,/g, '\\,');
 
                     ics.push(
@@ -718,13 +829,18 @@
                 });
 
                 ics.push('END:VCALENDAR');
+                // DEUTSCH: ICS-Zeilen werden mit CRLF (\r\n) verbunden, wie von RFC 5545 vorgeschrieben
                 return ics.join('\r\n');
             }
 
+            // DEUTSCH: Konvertiert ein Date-Objekt ins ICS-Datumsformat (YYYYMMDDTHHmmSSZ)
+            // DEUTSCH: Entfernt Bindestriche und Doppelpunkte aus dem ISO-String und haengt 'Z' (UTC) an
             formatDateForICS(date) {
                 return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
             }
 
+            // DEUTSCH: Formatiert ein Datum im deutschen Langformat (z.B. "5. Februar 2026")
+            // DEUTSCH: Verwendet die Intl.DateTimeFormat API fuer korrekte Lokalisierung
             formatDate(date) {
                 return new Intl.DateTimeFormat('de-DE', {
                     year: 'numeric',
@@ -733,6 +849,7 @@
                 }).format(date);
             }
 
+            // DEUTSCH: Formatiert eine Uhrzeit im deutschen Format (z.B. "14:30")
             formatTime(date) {
                 return new Intl.DateTimeFormat('de-DE', {
                     hour: '2-digit',
@@ -740,11 +857,14 @@
                 }).format(date);
             }
 
+            // DEUTSCH: Prueft ob ein gegebenes Datum der heutige Tag ist
             isToday(date) {
                 const today = new Date();
                 return this.isSameDay(date, today);
             }
 
+            // DEUTSCH: Vergleicht ob zwei Datumsobjekte den gleichen Kalendertag repraesentieren
+            // DEUTSCH: Vergleicht Tag, Monat und Jahr (ignoriert Uhrzeit)
             isSameDay(date1, date2) {
                 return date1.getDate() === date2.getDate() &&
                        date1.getMonth() === date2.getMonth() &&
@@ -752,7 +872,8 @@
             }
         }
 
-        // Initialize calendar when page loads
+        // DEUTSCH: Einstiegspunkt: Erstellt eine neue EventCalendar-Instanz sobald das DOM geladen ist
+        // DEUTSCH: Der Konstruktor startet automatisch die Initialisierung (Events laden, Kalender rendern)
         document.addEventListener('DOMContentLoaded', () => {
             new EventCalendar();
         });

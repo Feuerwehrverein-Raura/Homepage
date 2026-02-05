@@ -1,9 +1,25 @@
 #!/usr/bin/env node
 
 /**
- * Event Email Sender for Feuerwehrverein Raura
- * Sends beautiful HTML email invitations for new events
- * Uses Mailcow SMTP server
+ * send-event-email.js - E-Mail-Einladungen für Vereinsanlässe
+ *
+ * Versendet HTML-formatierte Einladungs-E-Mails an alle Mitglieder
+ * mit aktivierter E-Mail-Zustellung.
+ *
+ * Verwendung: node scripts/send-event-email.js <event-file.md>
+ *
+ * Workflow:
+ * 1. Parst Event-Markdown-Datei (Frontmatter + Beschreibung)
+ * 2. Lädt Empfänger aus mitglieder_data.json (zustellung-email=true)
+ * 3. Rendert HTML-Template mit Handlebars
+ * 4. Versendet einzeln via Mailcow SMTP
+ *
+ * Umgebungsvariablen:
+ * - SMTP_HOST: Mail-Server (Standard: mail.fwv-raura.ch)
+ * - SMTP_PORT: Port (Standard: 587 STARTTLS)
+ * - SMTP_USER: Benutzername für SMTP-Auth
+ * - SMTP_PASS: Passwort für SMTP-Auth
+ * - FROM_EMAIL: Absender-Adresse (Standard: alle@fwv-raura.ch)
  */
 
 const nodemailer = require('nodemailer');
@@ -19,7 +35,7 @@ const SMTP_PASS = process.env.SMTP_PASS;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'alle@fwv-raura.ch';
 const FROM_NAME = process.env.FROM_NAME || 'Feuerwehrverein Raura Kaiseraugst';
 
-// Parse command line arguments
+// Kommandozeilen-Argumente (erstes Argument = Event-Datei)
 const args = process.argv.slice(2);
 if (args.length === 0) {
     console.error('❌ Usage: node send-event-email.js <event-file.md>');
@@ -29,7 +45,17 @@ if (args.length === 0) {
 const eventFile = args[0];
 
 /**
- * Parse event markdown file
+ * Parst eine Event-Markdown-Datei
+ *
+ * Erwartet Frontmatter zwischen --- Markern mit:
+ * - title, subtitle: Veranstaltungsname
+ * - startDate, endDate: ISO-8601 Datum
+ * - location: Veranstaltungsort
+ * - organizer, email: Kontaktperson
+ * - registrationRequired, registrationDeadline: Anmeldung
+ *
+ * @param {string} filePath - Pfad zur .md Datei
+ * @returns {Object} Event-Objekt mit Frontmatter + description
  */
 function parseEventFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -49,7 +75,11 @@ function parseEventFile(filePath) {
 }
 
 /**
- * Parse YAML frontmatter
+ * Parst YAML-Frontmatter zu einem Objekt
+ * Einfacher Parser für key: value Zeilen
+ *
+ * @param {string} str - YAML-String ohne ---
+ * @returns {Object} Geparstes Objekt
  */
 function parseFrontmatter(str) {
     const result = {};
@@ -71,7 +101,11 @@ function parseFrontmatter(str) {
 }
 
 /**
- * Format date for display
+ * Formatiert Datum für Anzeige (deutsch)
+ * Beispiel: "Samstag, 15. Juni 2024"
+ *
+ * @param {string} dateStr - ISO-8601 Datums-String
+ * @returns {string} Formatiertes Datum
  */
 function formatDate(dateStr) {
     const date = new Date(dateStr);
@@ -84,7 +118,11 @@ function formatDate(dateStr) {
 }
 
 /**
- * Format time for display
+ * Formatiert Uhrzeit für Anzeige
+ * Beispiel: "18:30"
+ *
+ * @param {string} dateStr - ISO-8601 Datums-String
+ * @returns {string} Formatierte Uhrzeit (HH:mm)
  */
 function formatTime(dateStr) {
     const date = new Date(dateStr);
@@ -95,7 +133,17 @@ function formatTime(dateStr) {
 }
 
 /**
- * Convert markdown to simple HTML
+ * Konvertiert einfaches Markdown zu HTML
+ *
+ * Unterstützt:
+ * - Überschriften (# ## ###)
+ * - Fett (**text**)
+ * - Kursiv (*text*)
+ * - Listen (- item)
+ * - Absätze
+ *
+ * @param {string} markdown - Markdown-Text
+ * @returns {string} HTML-String
  */
 function markdownToHtml(markdown) {
     return markdown
@@ -114,7 +162,16 @@ function markdownToHtml(markdown) {
 }
 
 /**
- * Load email recipients from member data or Mailcow distribution list
+ * Lädt E-Mail-Empfänger aus Mitgliederdaten
+ *
+ * Priorität:
+ * 1. mitglieder_data.json - Mitglieder mit zustellung-email=true
+ * 2. EMAIL_RECIPIENTS_TO - Fallback auf Umgebungsvariable
+ *
+ * Filtert nur Aktiv- und Ehrenmitglieder
+ *
+ * @returns {Array<{name: string, email: string}>} Empfänger-Liste
+ * @throws {Error} Wenn keine Empfänger gefunden
  */
 function loadRecipients() {
     // Option 1: Load from mitglieder_data.json
@@ -153,7 +210,13 @@ function loadRecipients() {
 }
 
 /**
- * Render email template
+ * Rendert das E-Mail-Template mit Event-Daten
+ *
+ * Verwendet Handlebars-Template aus .email/template.html
+ * Template enthält FWV-Branding, Event-Details und Anmeldelinks
+ *
+ * @param {Object} event - Event-Objekt mit allen Frontmatter-Feldern
+ * @returns {string} Gerendertes HTML für E-Mail-Body
  */
 function renderEmailTemplate(event) {
     const templatePath = path.join(__dirname, '..', '.email', 'template.html');
@@ -183,7 +246,15 @@ function renderEmailTemplate(event) {
 }
 
 /**
- * Send email
+ * Versendet E-Mails an alle Empfänger
+ *
+ * Verwendet Nodemailer mit SMTP-Transport (Mailcow)
+ * Versendet einzeln (nicht BCC) für personalisierte Zustellung
+ *
+ * @param {Array<{name: string, email: string}>} recipients - Empfänger
+ * @param {string} subject - Betreffzeile
+ * @param {string} htmlContent - HTML-Body
+ * @returns {Array<{email: string, success: boolean, messageId?: string, error?: string}>}
  */
 async function sendEmail(recipients, subject, htmlContent) {
     // Create transporter
@@ -225,7 +296,14 @@ async function sendEmail(recipients, subject, htmlContent) {
 }
 
 /**
- * Main function
+ * Hauptfunktion - Orchestriert den gesamten E-Mail-Versand
+ *
+ * 1. Prüft SMTP-Credentials
+ * 2. Parst Event-Datei
+ * 3. Lädt Empfänger
+ * 4. Rendert Template
+ * 5. Versendet E-Mails
+ * 6. Gibt Zusammenfassung aus
  */
 async function main() {
     try {

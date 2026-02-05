@@ -1,21 +1,48 @@
 #!/usr/bin/env node
 
 /**
- * Sync Mailcow Distribution List from Member Data
- * Updates the Mailcow alias (distribution list) automatically based on mitglieder_data.json
+ * sync-mailcow-distribution-list.js - Mailcow Verteilerlisten-Synchronisation
+ *
+ * Synchronisiert die Mailcow-Verteilerliste (alle@fwv-raura.ch) mit den
+ * Mitgliederdaten aus mitglieder_data.json. Fuegt neue E-Mails hinzu und
+ * entfernt ausgetretene Mitglieder.
+ *
+ * Verwendung: node scripts/sync-mailcow-distribution-list.js
+ *
+ * Umgebungsvariablen:
+ * - MAILCOW_API_URL: Mailcow Server (Standard: https://mail.fwv-raura.ch)
+ * - MAILCOW_API_KEY: API-Schluessel fuer Mailcow Admin-API
+ * - MAILCOW_ALIAS_ADDRESS: Verteilerliste (Standard: alle@fwv-raura.ch)
+ *
+ * Workflow:
+ * 1. Laedt Mitglieder mit zustellung-email=true aus JSON
+ * 2. Holt aktuellen Alias aus Mailcow API
+ * 3. Vergleicht Listen (hinzugefuegt/entfernt)
+ * 4. Aktualisiert Alias nur bei Aenderungen
+ *
+ * Mailcow API Endpoints:
+ * - GET /api/v1/get/alias/all - Liste aller Aliase
+ * - POST /api/v1/edit/alias - Alias aktualisieren
  */
-
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-// Configuration from environment variables
+// Konfiguration aus Umgebungsvariablen
 const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'https://mail.fwv-raura.ch';
 const MAILCOW_API_KEY = process.env.MAILCOW_API_KEY;
 const MAILCOW_ALIAS_ADDRESS = process.env.MAILCOW_ALIAS_ADDRESS || 'alle@fwv-raura.ch';
 
 /**
- * Make API request to Mailcow
+ * Fuehrt einen API-Request an Mailcow aus
+ *
+ * Verwendet X-API-Key Header fuer Authentifizierung.
+ * Alle Requests/Responses als JSON.
+ *
+ * @param {string} method - HTTP-Methode (GET, POST, etc.)
+ * @param {string} endpoint - API-Pfad (z.B. '/api/v1/get/alias/all')
+ * @param {Object} data - Request-Body fuer POST (optional)
+ * @returns {Promise<Object>} Geparste JSON-Response
  */
 function mailcowRequest(method, endpoint, data = null) {
     return new Promise((resolve, reject) => {
@@ -65,7 +92,11 @@ function mailcowRequest(method, endpoint, data = null) {
 }
 
 /**
- * Get current alias configuration
+ * Holt die aktuelle Alias-Konfiguration aus Mailcow
+ *
+ * @param {string} aliasAddress - E-Mail-Adresse des Alias
+ * @returns {Promise<Object>} Alias-Objekt mit id, address, goto (Empfaenger)
+ * @throws {Error} Wenn Alias nicht gefunden
  */
 async function getAlias(aliasAddress) {
     console.log(`🔍 Suche Alias: ${aliasAddress}`);
@@ -82,7 +113,10 @@ async function getAlias(aliasAddress) {
 }
 
 /**
- * Update alias with new goto addresses
+ * Aktualisiert die Alias-Empfaenger in Mailcow
+ *
+ * @param {number} aliasId - Mailcow interne Alias-ID
+ * @param {string[]} gotoAddresses - Array von E-Mail-Adressen
  */
 async function updateAlias(aliasId, gotoAddresses) {
     console.log(`🔄 Aktualisiere Alias...`);
@@ -100,7 +134,12 @@ async function updateAlias(aliasId, gotoAddresses) {
 }
 
 /**
- * Load member data and extract email recipients
+ * Laedt E-Mail-Empfaenger aus Mitgliederdaten
+ *
+ * Filtert: Aktiv/Ehrenmitglieder mit zustellung-email=true
+ * und gueltiger E-Mail-Adresse
+ *
+ * @returns {string[]} Array von E-Mail-Adressen
  */
 function getEmailRecipientsFromMemberData() {
     const memberDataPath = path.join(__dirname, '..', 'mitglieder_data.json');
@@ -126,7 +165,10 @@ function getEmailRecipientsFromMemberData() {
 }
 
 /**
- * Main function
+ * Hauptfunktion - Orchestriert die Synchronisation
+ *
+ * Zeigt Diff zwischen aktueller und neuer Liste an
+ * und aktualisiert nur bei Aenderungen.
  */
 async function main() {
     try {

@@ -1,17 +1,25 @@
+<!-- DEUTSCH: Statische Preisliste / Speisekarte fuer die Fasnacht 2026 -->
+<!-- DEUTSCH: "Zum Rote Schopf" - Bar des Feuerwehrvereins Raura -->
+<!-- DEUTSCH: Mobile-First Design mit eigenem CSS (kein Framework), Dark Mode Support -->
+<!-- DEUTSCH: Alle Preise in CHF inkl. MwSt. -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <!-- DEUTSCH: Viewport fuer Mobile-First: Zoom deaktiviert, damit die Karte wie eine App wirkt -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Preisliste - Fasnacht 2026 - Zum Rote Schopf</title>
     <link rel="icon" type="image/png" href="images/logo.png">
+    <!-- DEUTSCH: Eigenes CSS ohne Framework - optimiert fuer mobile Geraete -->
     <style>
+        /* DEUTSCH: CSS-Reset - einheitliche Darstellung in allen Browsern */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        /* DEUTSCH: Roter Farbverlauf als Hintergrund passend zur Feuerwehr-Identitaet */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
             background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
@@ -19,11 +27,13 @@
             padding: 16px;
         }
 
+        /* DEUTSCH: Hauptcontainer - begrenzt auf 500px Breite fuer optimale Lesbarkeit auf Handys */
         .container {
             max-width: 500px;
             margin: 0 auto;
         }
 
+        /* DEUTSCH: Kopfbereich mit Logo, Bar-Name und Vereinsname in Weiss */
         .header {
             text-align: center;
             color: white;
@@ -47,12 +57,14 @@
             opacity: 0.9;
         }
 
+        /* DEUTSCH: Untertitel mit Anlass und Hinweis auf Selbstbedienung */
         .header .subtitle {
             font-size: 0.9rem;
             opacity: 0.8;
             margin-top: 4px;
         }
 
+        /* DEUTSCH: Karte fuer eine Getraenke-/Essenskategorie mit abgerundeten Ecken und Schatten */
         .menu-card {
             background: white;
             border-radius: 16px;
@@ -61,6 +73,7 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
+        /* DEUTSCH: Roter Farbverlauf als Ueberschrift fuer jede Kategorie (z.B. "Longdrinks", "Bier") */
         .category-header {
             background: linear-gradient(90deg, #cc0000, #ff4444);
             color: white;
@@ -73,6 +86,7 @@
             padding: 8px 0;
         }
 
+        /* DEUTSCH: Einzelner Menueintrag - Flexbox-Layout mit Name links und Preis rechts */
         .menu-item {
             display: flex;
             justify-content: space-between;
@@ -81,6 +95,7 @@
             border-bottom: 1px solid #f0f0f0;
         }
 
+        /* DEUTSCH: Letzter Eintrag ohne Trennlinie */
         .menu-item:last-child {
             border-bottom: none;
         }
@@ -90,12 +105,14 @@
             color: #333;
         }
 
+        /* DEUTSCH: Optionale Zusatzinfo unter dem Produktnamen (z.B. Groesse, Verfuegbarkeit) */
         .item-description {
             font-size: 0.8rem;
             color: #666;
             margin-top: 2px;
         }
 
+        /* DEUTSCH: Preis in Rot hervorgehoben, nowrap verhindert Zeilenumbruch bei "17.00 / 3.50" */
         .item-price {
             font-weight: bold;
             color: #cc0000;
@@ -104,6 +121,7 @@
             margin-left: 10px;
         }
 
+        /* DEUTSCH: Fusszeile mit Vereinsname, Website-Link und MwSt.-Hinweis */
         .footer {
             text-align: center;
             color: white;
@@ -116,13 +134,15 @@
             color: white;
         }
 
-        /* Confetti decoration */
+        /* DEUTSCH: Konfetti-Dekoration fuer Fasnachtsstimmung (CSS-Klasse fuer optionale Elemente) */
         .confetti {
             position: fixed;
             pointer-events: none;
             z-index: -1;
         }
 
+        /* DEUTSCH: Dark Mode - passt Kartenfarben automatisch an, wenn das Geraet im Dunkelmodus ist */
+        /* DEUTSCH: Hintergrund wird dunkelgrau, Text wird weiss, Trennlinien werden dezenter */
         @media (prefers-color-scheme: dark) {
             .menu-card {
                 background: #1a1a1a;
@@ -141,6 +161,7 @@
 </head>
 <body>
     <div class="container">
+        <!-- DEUTSCH: Kopfbereich mit Vereinslogo, Bar-Name und Untertitel -->
         <header class="header">
             <img src="images/logo.png" alt="FWV Raura Logo">
             <h1>Zum Rote Schopf</h1>
@@ -148,7 +169,7 @@
             <p class="subtitle">Fasnacht 2026 - Selbstbedienung</p>
         </header>
 
-        <!-- Shots & Klassiker -->
+        <!-- DEUTSCH: Kategorie 1: Shots und klassische Spirituosen (CHF 5.00 - 7.00) -->
         <div class="menu-card">
             <div class="category-header">Shots & Klassiker</div>
             <div class="menu-items">
@@ -162,7 +183,7 @@
             </div>
         </div>
 
-        <!-- Longdrinks -->
+        <!-- DEUTSCH: Kategorie 2: Longdrinks - alle zum Einheitspreis von CHF 10.00 -->
         <div class="menu-card">
             <div class="category-header">Longdrinks</div>
             <div class="menu-items">
@@ -181,7 +202,7 @@
             </div>
         </div>
 
-        <!-- Wein -->
+        <!-- DEUTSCH: Kategorie 3: Wein - mit Flaschen- und Dezipreisen (Preis-Format: "Flasche / Dezi") -->
         <div class="menu-card">
             <div class="category-header">Wein</div>
             <div class="menu-items">
@@ -198,11 +219,12 @@
                     <span class="item-price">26.00 / 4.00</span>
                 </div>
                 <div class="menu-item"><span class="item-name">Wein gespritzt rot/weiss 2dl</span><span class="item-price">4.00</span></div>
+                <!-- DEUTSCH: Waggis = Basler Fasnachtstraditionsgetraenk (Weisswein mit Schweppes) -->
                 <div class="menu-item"><span class="item-name">Waggis<div class="item-description">Weisswein mit Schweppes, 2dl</div></span><span class="item-price">5.00</span></div>
             </div>
         </div>
 
-        <!-- Mineralwasser & Softdrinks -->
+        <!-- DEUTSCH: Kategorie 4: Alkoholfreie Getraenke - alle 3dl Flaschen zum Einheitspreis CHF 3.00 -->
         <div class="menu-card">
             <div class="category-header">Mineralwasser & Softdrinks</div>
             <div class="menu-items">
@@ -213,7 +235,7 @@
             </div>
         </div>
 
-        <!-- Bier -->
+        <!-- DEUTSCH: Kategorie 5: Bier ab Fass - Offenausschank und alkoholfreie Variante -->
         <div class="menu-card">
             <div class="category-header">Bier ab Fass</div>
             <div class="menu-items">
@@ -223,7 +245,9 @@
             </div>
         </div>
 
-        <!-- Kaffee -->
+        <!-- DEUTSCH: Kategorie 6: Kaffee und Tee - inkl. Schweizer Kaffeespezialitaeten mit Schnaps -->
+        <!-- DEUTSCH: "Kaffee fertig" = Kaffee mit Schnaps, "Kaffee Lutz" = mit Zuger Kirsch, -->
+        <!-- DEUTSCH: "Kaffee Raura" und "Kaffee Mucheli" = lokale Hausspezialitaeten -->
         <div class="menu-card">
             <div class="category-header">Kaffee</div>
             <div class="menu-items">
@@ -236,7 +260,8 @@
             </div>
         </div>
 
-        <!-- Essen -->
+        <!-- DEUTSCH: Kategorie 7: Essen - teilweise tagesabhaengig (Freitag/Samstag) -->
+        <!-- DEUTSCH: Wähen sind immer verfuegbar, Thonbrötli nur Freitag, Spaghetti nur Samstag -->
         <div class="menu-card">
             <div class="category-header">Zum Essen</div>
             <div class="menu-items">
@@ -248,6 +273,7 @@
             </div>
         </div>
 
+        <!-- DEUTSCH: Fusszeile mit Vereinsname, Webseite und gesetzlichem MwSt.-Hinweis -->
         <footer class="footer">
             <p>Feuerwehrverein Raura</p>
             <p><a href="https://fwv-raura.ch">www.fwv-raura.ch</a></p>

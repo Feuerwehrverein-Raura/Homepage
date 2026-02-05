@@ -1,17 +1,28 @@
+/**
+ * mailer.js - E-Mail-Versand via SMTP
+ *
+ * Verwendet Nodemailer für den E-Mail-Versand
+ * SMTP-Konfiguration über Umgebungsvariablen:
+ * - SMTP_HOST: SMTP Server (z.B. mail.example.com)
+ * - SMTP_PORT: Port (Standard: 587 für STARTTLS)
+ * - SMTP_USER: Benutzername/E-Mail
+ * - SMTP_PASSWORD: Passwort
+ */
 const nodemailer = require('nodemailer');
 
-// Create SMTP transporter
+// ========== SMTP TRANSPORTER KONFIGURATION ==========
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT || 587,
-    secure: false, // true for 465, false for other ports
+    port: process.env.SMTP_PORT || 587,     // 587 = STARTTLS, 465 = SSL
+    secure: false,  // true nur für Port 465 (implizites SSL)
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASSWORD
     }
 });
 
-// Verify transporter configuration
+// ========== VERBINDUNGSTEST BEIM START ==========
+// Prüft ob SMTP-Konfiguration korrekt ist
 transporter.verify((error, success) => {
     if (error) {
         console.error('SMTP Configuration Error:', error);
@@ -21,24 +32,26 @@ transporter.verify((error, success) => {
 });
 
 /**
- * Send email
- * @param {Object} options - Email options
- * @param {string} options.from - Sender email
- * @param {string} options.to - Recipient email(s)
- * @param {string} options.subject - Email subject
- * @param {string} options.text - Plain text body
- * @param {string} options.html - HTML body
- * @param {string} options.replyTo - Reply-To email
+ * Sendet eine E-Mail
+ *
+ * @param {Object} options - E-Mail-Optionen
+ * @param {string} [options.from] - Absender (Standard: SMTP_USER)
+ * @param {string} options.to - Empfänger (kommasepariert für mehrere)
+ * @param {string} options.subject - Betreff
+ * @param {string} [options.text] - Plain-Text-Inhalt
+ * @param {string} [options.html] - HTML-Inhalt
+ * @param {string} [options.replyTo] - Antwort-An-Adresse
+ * @returns {Promise<{success: boolean, messageId: string}>}
  */
 async function sendMail(options) {
     try {
         const mailOptions = {
-            from: options.from || process.env.SMTP_USER,
+            from: options.from || process.env.SMTP_USER,  // Standard-Absender
             to: options.to,
             subject: options.subject,
-            text: options.text,
-            html: options.html,
-            replyTo: options.replyTo
+            text: options.text,      // Plain-Text-Fallback
+            html: options.html,      // HTML-Version (bevorzugt)
+            replyTo: options.replyTo // Für Kontaktformulare: Antwort an Absender
         };
 
         const info = await transporter.sendMail(mailOptions);
@@ -46,7 +59,7 @@ async function sendMail(options) {
         return { success: true, messageId: info.messageId };
     } catch (error) {
         console.error('Email send error:', error);
-        throw error;
+        throw error;  // Fehler weiterwerfen für Error-Handling in Routen
     }
 }
 

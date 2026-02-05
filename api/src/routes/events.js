@@ -1,21 +1,40 @@
+/**
+ * events.js - Event-Registrierungen
+ *
+ * Endpunkte:
+ * - POST /register: Anmeldung als Helfer oder Teilnehmer
+ * - GET /registrations/:eventId: Anmeldungen für ein Event
+ * - GET /registrations: Alle Anmeldungen (Vorstand, API-Key geschützt)
+ *
+ * Typen: 'helper' (Helfer) oder 'participant' (Teilnehmer)
+ * Speicherung: SQLite Datenbank
+ */
 const express = require('express');
 const router = express.Router();
 const { sendMail } = require('../utils/mailer');
-const { runQuery, getQuery, allQuery } = require('../utils/database');
+const { runQuery, getQuery, allQuery } = require('../utils/database');  // SQLite-Wrapper
 
 /**
  * POST /api/events/register
- * Handle event registration
+ * Verarbeitet Event-Anmeldungen (Helfer oder Teilnehmer)
+ *
+ * Body:
+ * - eventId: Event-Kennung (Pflicht)
+ * - eventTitle: Anzeigename des Events
+ * - type: 'helper' oder 'participant' (Pflicht)
+ * - name, email: Kontaktdaten (Pflicht)
+ * - phone, participants, notes, shiftIds: Optional
  */
 router.post('/register', async (req, res) => {
     try {
         const { eventId, eventTitle, type, name, email, phone, participants, notes, shiftIds } = req.body;
 
+        // Validierung der Pflichtfelder
         if (!eventId || !name || !email || !type) {
             return res.status(400).json({ error: 'Fehlende Pflichtfelder' });
         }
 
-        // Insert into database
+        // Anmeldung in SQLite speichern
         const result = await runQuery(
             `INSERT INTO event_registrations
             (event_id, event_title, type, name, email, phone, participants, notes, shift_ids)
@@ -23,7 +42,7 @@ router.post('/register', async (req, res) => {
             [eventId, eventTitle, type, name, email, phone || null, participants || 1, notes || null, JSON.stringify(shiftIds || [])]
         );
 
-        // Send confirmation email
+        // Bestätigungs-E-Mail an den Anmelder
         const confirmationText = type === 'helper'
             ? `Vielen Dank für Ihre Anmeldung als Helfer für "${eventTitle}".`
             : `Vielen Dank für Ihre Anmeldung als Teilnehmer für "${eventTitle}".`;
@@ -34,7 +53,7 @@ router.post('/register', async (req, res) => {
             text: `Guten Tag ${name},\n\n${confirmationText}\n\nWir haben Ihre Anmeldung erhalten.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raurachemme`
         });
 
-        // Notify Vorstand
+        // Benachrichtigung an Vorstand (Aktuar)
         await sendMail({
             to: 'aktuar@fwv-raura.ch',
             subject: `Neue Event-Anmeldung: ${eventTitle}`,
@@ -51,11 +70,15 @@ router.post('/register', async (req, res) => {
 
 /**
  * GET /api/events/registrations/:eventId
- * Get registrations for an event
+ * Holt alle Anmeldungen für ein bestimmtes Event
+ *
+ * Öffentlich zugänglich (für Event-Dashboard)
+ * Rückgabe: { registrations: [...] }
  */
 router.get('/registrations/:eventId', async (req, res) => {
     try {
         const { eventId } = req.params;
+        // Alle Anmeldungen für dieses Event, neueste zuerst
         const registrations = await allQuery(
             'SELECT * FROM event_registrations WHERE event_id = ? ORDER BY timestamp DESC',
             [eventId]
@@ -70,16 +93,21 @@ router.get('/registrations/:eventId', async (req, res) => {
 
 /**
  * GET /api/events/registrations
- * Get all registrations (for Vorstand dashboard)
+ * Holt ALLE Anmeldungen (für Vorstand-Dashboard)
+ *
+ * Geschützt durch API-Key (Query-Parameter)
+ * Verwendet für Übersicht aller Event-Anmeldungen
  */
 router.get('/registrations', async (req, res) => {
     try {
         const { apiKey } = req.query;
 
+        // API-Key Authentifizierung
         if (apiKey !== process.env.API_KEY) {
             return res.status(403).json({ error: 'Unauthorized' });
         }
 
+        // Alle Anmeldungen über alle Events
         const registrations = await allQuery(
             'SELECT * FROM event_registrations ORDER BY timestamp DESC'
         );

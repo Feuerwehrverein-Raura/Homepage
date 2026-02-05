@@ -1,5 +1,13 @@
 <!DOCTYPE html>
 <html lang="de">
+<!-- ================================================================
+     VORSTAND DASHBOARD - FWV Raura
+     Komplettes Admin-Portal für den Vorstand des Feuerwehrvereins.
+     Enthält: Mitgliederverwaltung, Events, Audit-Log, Nachrichtenversand (E-Mail/Brief),
+     E-Mail-Verwaltung (Mailcow), Mitgliedschaftsanträge, Pingen-Briefversand,
+     IP-Whitelist, Template-Editor.
+     Authentifizierung via IMAP-basiertem JWT (HS256, 8h Ablauf).
+     ================================================================ -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,7 +79,12 @@
     </script>
 </head>
 <body class="font-sans bg-gray-50">
-    <!-- Login Modal -->
+    <!-- ============================================================
+         LOGIN-MODAL
+         Vollbild-Overlay mit E-Mail/Passwort-Formular.
+         Wird angezeigt wenn kein gültiger JWT-Token vorhanden ist.
+         Authentifizierung gegen IMAP-Server via Backend-API.
+         ============================================================ -->
     <div id="login-modal" class="fixed inset-0 bg-gradient-to-br from-fire-600 to-fire-800 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg max-w-md w-full p-8 shadow-2xl">
             <div class="text-center mb-8">
@@ -107,7 +120,11 @@
         </div>
     </div>
 
-    <!-- Navigation -->
+    <!-- ============================================================
+         NAVIGATION
+         Enthält Logo, Desktop-Navigation (Website, Events, Abmelden)
+         und responsive Mobile-Navigation mit Hamburger-Menü.
+         ============================================================ -->
     <nav class="bg-fire-700 text-white shadow-lg">
         <div class="container mx-auto px-4">
             <div class="flex justify-between items-center py-3 md:py-4">
@@ -144,7 +161,12 @@
         </div>
     </nav>
 
-    <!-- Tabs -->
+    <!-- ============================================================
+         TAB-NAVIGATION
+         Horizontale Tab-Leiste für die Hauptbereiche:
+         Mitglieder | Events | Audit | Nachricht | E-Mail |
+         Anträge (mit Badge) | Post | IP-Whitelist
+         ============================================================ -->
     <section class="bg-white border-b">
         <div class="container mx-auto px-4 overflow-x-auto">
             <div class="flex space-x-4 md:space-x-8 border-b min-w-max">
@@ -177,7 +199,13 @@
         </div>
     </section>
 
-    <!-- Members Section -->
+    <!-- ============================================================
+         MITGLIEDER-BEREICH
+         Übersicht aller Vereinsmitglieder mit Statistiken (Gesamt,
+         Aktiv, Passiv, Ehren), Suchfeld, Statusfilter, CSV-Export
+         (verschiedene Filter) und PDF-Telefonliste.
+         Tabelle zeigt: Name, E-Mail, Telefon, Status, Funktion.
+         ============================================================ -->
     <div id="members-section">
         <!-- Header -->
         <section class="bg-white border-b">
@@ -301,7 +329,15 @@
         </div>
     </section>
 
-    <!-- Member Modal -->
+    <!-- ============================================================
+         MITGLIED-BEARBEITUNGS-MODAL
+         Formular zum Erstellen/Bearbeiten von Mitgliedern.
+         Felder: Profilfoto, Persönliche Daten (Anrede, Name, Geburtstag),
+         Adresse, Kontakt (Telefon, Mobile, E-Mail), Mitgliedschaft
+         (Status, Feuerwehr-Zugehörigkeit, Funktionen als Mehrfachauswahl,
+         Eintrittsdatum), Zustellung (E-Mail/Post), Cloud-Berechtigungen
+         (Nextcloud Admin, Vorstand-Gruppe, Social Media), Bemerkungen.
+         ============================================================ -->
     <div id="member-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="p-6">
@@ -543,7 +579,12 @@
 
     </div> <!-- End Members Section -->
 
-    <!-- Events Section -->
+    <!-- ============================================================
+         EVENTS-BEREICH
+         Verwaltung von Veranstaltungen (Dorffeste, Aufbau, Abbau,
+         Ausflüge). Tabelle mit Titel, Datum, Kategorie, Organisator,
+         Status, Schichten/Personen-Übersicht und Anmeldungsstatus.
+         ============================================================ -->
     <div id="events-section" class="hidden">
         <!-- Header -->
         <section class="bg-white border-b">
@@ -598,7 +639,12 @@
         </section>
     </div>
 
-    <!-- Audit Log Section -->
+    <!-- ============================================================
+         AUDIT-LOG-BEREICH
+         Zeigt alle Änderungen in der Mitgliederverwaltung:
+         Login-Versuche, Mitglieder-/Event-CRUD, Dispatch-Aktionen.
+         Filtert nach Aktionstyp (Login, Member, Event, etc.).
+         ============================================================ -->
     <div id="audit-section" class="hidden">
         <section class="bg-white border-b">
             <div class="container mx-auto px-4 py-6">
@@ -654,7 +700,12 @@
         </section>
     </div>
 
-    <!-- Email Management Section -->
+    <!-- ============================================================
+         E-MAIL-VERWALTUNGS-BEREICH (Mailcow)
+         Verwaltet Mailboxen und Aliase für fwv-raura.ch.
+         Sub-Tabs: Mailboxen | Aliase | Speicherplatz (Quota) |
+         Zustellliste (Mitglieder mit E-Mail-Zustellung + Alias-Sync).
+         ============================================================ -->
     <div id="email-section" class="hidden">
         <section class="bg-white border-b">
             <div class="container mx-auto px-4 py-6">
@@ -909,7 +960,16 @@
         </div>
     </div>
 
-    <!-- Dispatch Section -->
+    <!-- ============================================================
+         NACHRICHT-VERFASSEN-BEREICH (Dispatch)
+         E-Mail oder Brief an Mitglieder senden. Unterstützt:
+         - Versandart: Automatisch/Nur E-Mail/Nur Post
+         - Empfänger: Alle/Gefiltert/Ausgewählt
+         - Templates mit Variablen (Quill Rich-Text-Editor)
+         - Dateianhänge, zeitgesteuerter Versand
+         - Vorschau (E-Mail/Brief), Entwürfe, Versandhistorie
+         - Pingen-Integration für Briefpost
+         ============================================================ -->
     <div id="dispatch-section" class="hidden">
         <section class="bg-white border-b">
             <div class="container mx-auto px-4 py-6">
@@ -1187,7 +1247,12 @@
         </section>
     </div>
 
-    <!-- Registrations Section -->
+    <!-- ============================================================
+         MITGLIEDSCHAFTSANTRÄGE-BEREICH
+         Neue Anträge prüfen und genehmigen/ablehnen.
+         Filter: Ausstehend/Genehmigt/Abgelehnt/Alle.
+         Zeigt: Name, E-Mail, Feuerwehr-Status, Datum, Status.
+         ============================================================ -->
     <div id="registrations-section" class="hidden">
         <section class="bg-white border-b">
             <div class="container mx-auto px-4 py-6">
@@ -1242,7 +1307,14 @@
         </section>
     </div>
 
-    <!-- Pingen Section -->
+    <!-- ============================================================
+         POST-VERSAND-BEREICH (Pingen)
+         Briefversand per Post über Pingen-API. Zeigt:
+         - Guthaben, Statistiken (gesendet, in Bearbeitung, fehlgeschlagen)
+         - Staging-Modus für Tests
+         - Briefe-Tabelle mit Status und Event-Filter
+         - Webhook-Konfiguration für automatische Status-Updates
+         ============================================================ -->
     <div id="pingen-section" class="hidden">
         <section class="bg-white border-b">
             <div class="container mx-auto px-4 py-6">
@@ -1364,7 +1436,13 @@
         </section>
     </div>
 
-    <!-- IP Whitelist Section -->
+    <!-- ============================================================
+         IP-WHITELIST-BEREICH
+         Verwaltet zugelassene IP-Adressen für Kasse und Kitchen Display.
+         - Toggle zum Aktivieren/Deaktivieren des Schutzes
+         - Selbst-Registrierung via register.fwv-raura.ch (Authentik OIDC)
+         - Tabelle: IP, Gerätename, Ersteller, Gültigkeitsdauer
+         ============================================================ -->
     <div id="whitelist-section" class="hidden">
         <section class="bg-white border-b">
             <div class="container mx-auto px-4 py-6">
@@ -1685,7 +1763,15 @@
         </div>
     </div>
 
-    <!-- Event Modal (simplified) -->
+    <!-- ============================================================
+         EVENT-BEARBEITUNGS-MODAL
+         Formular zum Erstellen/Bearbeiten von Events.
+         Felder: Titel, Untertitel, Slug, Kategorie, Status, Datum,
+         Ort, Organisator (Name/E-Mail + optionaler Zugang),
+         Beschreibung, Teilnehmer-Anmeldung (Deadline, Max, Kosten),
+         Helfer-Schichten (dynamisch hinzufügbar mit Bereich, Name,
+         Datum, Zeit, Anzahl + Springer-Generator).
+         ============================================================ -->
     <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div class="p-6">
@@ -2018,7 +2104,14 @@
         </div>
     </div>
 
-    <!-- Template Editor Modal -->
+    <!-- ============================================================
+         TEMPLATE-EDITOR-MODAL (Vollbild)
+         Editor für E-Mail/Brief-Templates mit Quill Rich-Text-Editor.
+         Layout: Links Template-Liste (gruppiert + einzeln),
+         Mitte: Editor mit Meta-Feldern (Name, Typ, Betreff, Bezug),
+         Rechts: Variablen-Sidebar (Mitglied, Event, Finanzen, Schicht,
+         Geburtstag) + Vorschau (E-Mail/Brief mit CH/DE-Format).
+         ============================================================ -->
     <div id="template-editor-modal" class="fixed inset-0 bg-black/50 z-50 hidden">
         <div class="h-full w-full bg-white flex flex-col">
             <!-- Modal Header -->
@@ -2232,6 +2325,7 @@
     <div id="toast-container" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
     <script>
+        // API-Basis-URLs für Backend-Aufrufe (Members, Events, Dispatch etc.)
         const API_BASE = 'https://api.fwv-raura.ch';
         const DISPATCH_API = 'https://api.fwv-raura.ch';
 
@@ -2239,6 +2333,7 @@
         // ZENTRALE KONSTANTEN (Single Source of Truth)
         // ============================================
 
+        // Verfügbare Schicht-Bereiche für Events (Dropdown-Optionen)
         const SHIFT_TYPES = [
             { value: 'Allgemein', label: 'Allgemein' },
             { value: 'Kueche', label: 'Küche' },
@@ -2251,13 +2346,15 @@
             { value: 'Abbau', label: 'Abbau' }
         ];
 
+        // Mitgliederstatus-Typen mit Farbcodierung für Badges
         const MEMBER_STATUS_TYPES = [
             { value: 'Aktivmitglied', label: 'Aktivmitglied', color: 'bg-green-100 text-green-800' },
             { value: 'Passivmitglied', label: 'Passivmitglied', color: 'bg-blue-100 text-blue-800' },
             { value: 'Ehrenmitglied', label: 'Ehrenmitglied', color: 'bg-yellow-100 text-yellow-800' }
         ];
 
-        // Helper to safely escape strings for use in template literals and onclick handlers
+        // Hilfsfunktion: Escaped Strings sicher für onclick-Handler und Template-Literals
+        // Verhindert XSS und Syntax-Fehler bei dynamisch generierten HTML-Attributen
         function escapeForOnclick(str) {
             if (!str) return '';
             return String(str)
@@ -2269,7 +2366,9 @@
 
         const VORSTAND_ROLES = ['Präsident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer'];
 
-        // Toast notification function
+        // Zeigt eine temporäre Benachrichtigung (Toast) unten rechts an.
+        // Typen: 'success' (grün), 'error' (rot), 'warning' (gelb), 'info' (blau).
+        // Verschwindet automatisch nach 3 Sekunden mit Slide-Animation.
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -2302,10 +2401,12 @@
         // TEMPLATE EDITOR (Quill)
         // ============================================
 
-        let templateEditor = null;
-        let currentEditingTemplate = null;
-        let editorTemplates = [];
+        // Template-Editor Zustandsvariablen
+        let templateEditor = null;           // Quill-Editor-Instanz für Templates
+        let currentEditingTemplate = null;   // Aktuell bearbeitetes Template (oder null für neu)
+        let editorTemplates = [];            // Alle geladenen Templates vom Server
 
+        // Beispieldaten für die Template-Vorschau (werden als Platzhalter-Werte angezeigt)
         const sampleMemberData = {
             // Mitglieder-Daten
             anrede: 'Herr',
@@ -2340,6 +2441,7 @@
             mitgliedsjahre: '16'
         };
 
+        // Öffnet den Template-Editor als Vollbild-Modal und lädt Templates
         function openTemplateEditor() {
             document.getElementById('template-editor-modal').classList.remove('hidden');
             loadEditorTemplates();
@@ -2352,6 +2454,8 @@
             document.getElementById('template-editor-modal').classList.add('hidden');
         }
 
+        // Initialisiert den Quill Rich-Text-Editor für den Template-Editor
+        // mit Toolbar (Überschriften, Formatierung, Farben, Listen, Links, Bilder)
         function initQuillEditor() {
             templateEditor = new Quill('#template-editor-quill', {
                 theme: 'snow',
@@ -2380,6 +2484,7 @@
             createNewTemplate();
         }
 
+        // Lädt alle Templates vom Server und rendert die Template-Liste
         async function loadEditorTemplates() {
             try {
                 const response = await fetch(`${API_BASE}/templates`, {
@@ -2392,6 +2497,9 @@
             }
         }
 
+        // Rendert die Template-Liste in der Sidebar des Editors.
+        // Gruppiert Templates nach Basisname (z.B. event_einladung_email, _brief_ch, _brief_de)
+        // und zeigt einzelne Templates separat an.
         function renderTemplateList() {
             const container = document.getElementById('template-list-container');
 
@@ -2493,6 +2601,8 @@
             updateTemplatePreview();
         }
 
+        // Erstellt eine Template-Gruppe mit 3 Varianten: E-Mail, Brief CH, Brief DE.
+        // Fragt den Basisnamen ab und erstellt automatisch alle 3 Templates.
         async function createTemplateGroup() {
             const baseName = prompt('Name der Template-Gruppe (z.B. "event_einladung"):');
             if (!baseName || !baseName.trim()) return;
@@ -2522,6 +2632,8 @@
             }
         }
 
+        // Speichert das aktuelle Template (neu erstellen oder bestehendes aktualisieren).
+        // Extrahiert automatisch verwendete Variablen aus dem Editor-Inhalt.
         async function saveCurrentTemplate() {
             const name = document.getElementById('template-edit-name').value.trim();
             const type = document.getElementById('template-edit-type').value;
@@ -2610,6 +2722,9 @@
             else if (name) showToast('Ungültiger Name (nur Buchstaben, Zahlen, _)', 'error');
         }
 
+        // Aktualisiert die Vorschau im Template-Editor.
+        // Ersetzt Platzhalter mit Beispieldaten und markiert sie farbig.
+        // Bekannte Variablen: gelb hinterlegt, unbekannte: rot hinterlegt.
         function updateTemplatePreview() {
             if (!templateEditor) return;
             let html = templateEditor.root.innerHTML;
@@ -2655,7 +2770,7 @@
                 : '<div class="p-2 text-blue-400 text-center text-xs">DE Adressfeld<br>(links, DIN)</div>';
         }
 
-        // Helper: Generate <option> tags from SHIFT_TYPES
+        // Hilfsfunktion: Generiert <option>-Tags aus SHIFT_TYPES für Dropdowns
         function generateShiftTypeOptions(selectedValue = 'Allgemein') {
             return SHIFT_TYPES.map(t =>
                 `<option value="${t.value}" ${selectedValue === t.value ? 'selected' : ''}>${t.label}</option>`
@@ -2668,19 +2783,21 @@
             return found ? found.color : 'bg-gray-100 text-gray-800';
         }
 
-        let members = [];
-        let events = [];
-        let auditLog = [];
-        let authToken = null;
-        let currentUser = null;
-        let currentTab = 'members';
-        let currentEventForRegistrations = null;
+        // Globale Zustandsvariablen für die gesamte Anwendung
+        let members = [];                          // Alle geladenen Mitglieder
+        let events = [];                           // Alle geladenen Events
+        let auditLog = [];                         // Audit-Log-Einträge
+        let authToken = null;                      // JWT-Token für API-Authentifizierung
+        let currentUser = null;                    // Eingeloggter Benutzer (Name, E-Mail)
+        let currentTab = 'members';                // Aktuell aktiver Tab
+        let currentEventForRegistrations = null;   // Event für Anmeldungs-Modal
 
         // ============================================
         // AUTHENTICATION
         // ============================================
 
-        // Helper to get cookie value
+        // Hilfsfunktion: Liest einen Cookie-Wert anhand des Namens.
+        // Wird für Cross-Subdomain-Auth verwendet (vorstand_token Cookie).
         function getCookie(name) {
             const value = `; ${document.cookie}`;
             const parts = value.split(`; ${name}=`);
@@ -2688,6 +2805,9 @@
             return null;
         }
 
+        // Prüft ob ein gültiger JWT-Token vorhanden ist (localStorage oder Cookie).
+        // Verifiziert den Token gegen /auth/vorstand/me und zeigt ggf. Login-Modal.
+        // Unterstützt Redirect-Parameter für Cross-Subdomain-Navigation.
         async function checkAuth() {
             // Check localStorage first, then cookie (for cross-subdomain auth)
             let token = localStorage.getItem('vorstand_token');
@@ -2745,6 +2865,9 @@
             document.getElementById('login-modal').classList.add('hidden');
         }
 
+        // Verarbeitet das Login-Formular: Sendet E-Mail/Passwort an die API,
+        // speichert JWT-Token in localStorage + Cookie (Cross-Subdomain),
+        // und lädt anschliessend Statistiken und Mitglieder.
         async function handleLogin(e) {
             e.preventDefault();
 
@@ -2812,6 +2935,8 @@
         // MEMBERS
         // ============================================
 
+        // Lädt Mitglieder-Statistiken (Gesamt, Aktiv, Passiv, Ehren) vom Server
+        // und aktualisiert die Statistik-Karten im Members-Bereich.
         async function loadStats() {
             try {
                 const response = await fetch(`${API_BASE}/members/stats/overview`, {
@@ -2828,6 +2953,8 @@
             }
         }
 
+        // Lädt die Mitgliederliste vom Server mit optionalen Filtern (Suche, Status).
+        // Zeigt Loading-State während dem Laden und rendert die Tabelle.
         async function loadMembers(filters = {}) {
             try {
                 document.getElementById('loading-state').classList.remove('hidden');
@@ -2856,6 +2983,8 @@
             }
         }
 
+        // Rendert die Mitgliedertabelle im DOM mit Name, E-Mail, Telefon,
+        // Status-Badge und Bearbeiten-Button für jedes Mitglied.
         function renderMembers() {
             const tbody = document.getElementById('members-tbody');
 
@@ -2910,6 +3039,8 @@
             document.getElementById('member-modal').classList.remove('hidden');
         }
 
+        // Lädt ein Mitglied vom Server und füllt das Bearbeitungs-Modal.
+        // Setzt alle Formularfelder, Foto-Vorschau und Cloud-Berechtigungen.
         async function editMember(id) {
             try {
                 const response = await fetch(`${API_BASE}/members/${id}`, {
@@ -2967,7 +3098,8 @@
             }
         }
 
-        // Load cloud permissions for a member
+        // Lädt Cloud-Berechtigungen eines Mitglieds (Nextcloud Admin,
+        // Vorstand-Gruppe, Social Media-Gruppe) und zeigt den Status an.
         async function loadCloudPermissions(memberId) {
             const section = document.getElementById('cloud-permissions-section');
             const statusEl = document.getElementById('cloud-permissions-status');
@@ -3030,7 +3162,9 @@
             }
         }
 
-        // Sync cloud permissions based on functions
+        // Synchronisiert Cloud-Berechtigungen basierend auf den Funktionen:
+        // Admin → Nextcloud Admin, Vorstand-Rollen → Vorstand-Gruppe,
+        // Social Media → Social Media-Gruppe. Wird nach Mitglied-Speichern aufgerufen.
         async function syncCloudPermissions(memberId, funktionen) {
             const funktionenList = funktionen.split(',').map(f => f.trim());
 
@@ -3124,6 +3258,9 @@
             });
         });
 
+        // Speichert ein Mitglied (neu erstellen oder aktualisieren).
+        // Validiert Funktionen, sammelt alle Formularfelder,
+        // sendet an API und synchronisiert Cloud-Berechtigungen im Hintergrund.
         async function saveMember(e) {
             e.preventDefault();
 
@@ -3216,7 +3353,8 @@
             }
         }
 
-        // Photo upload handling
+        // Lädt ein Profilfoto für ein Mitglied hoch (max. 5MB, JPG/PNG/GIF).
+        // Sendet als FormData an /members/{id}/photo und aktualisiert die Vorschau.
         async function uploadMemberPhoto(file) {
             const memberId = document.getElementById('member-id').value;
             if (!memberId) {
@@ -3268,6 +3406,9 @@
             }
         }
 
+        // Exportiert Mitglieder als CSV-Datei mit verschiedenen Filtern:
+        // 'all' = Alle, 'aktiv' = Nur Aktive, 'post' = Post-Zustellung, 'email' = E-Mail-Zustellung.
+        // Verwendet Semikolon als Trenner und UTF-8 BOM für Excel-Kompatibilität.
         function exportCSV(filter = 'all') {
             // CSV-Escape-Funktion fuer Felder mit Kommas oder Anfuehrungszeichen
             const escapeCSV = (value) => {
@@ -3343,6 +3484,7 @@
         // EVENTS
         // ============================================
 
+        // Lädt alle Events vom Server und rendert die Event-Tabelle.
         async function loadEvents() {
             try {
                 document.getElementById('events-loading-state').classList.remove('hidden');
@@ -3362,6 +3504,7 @@
             }
         }
 
+        // Rendert die Event-Tabelle mit Titel, Datum, Kategorie, Organisator, Status-Badge, Schichten-Übersicht und Anmeldungsstatus.
         function renderEvents() {
             const tbody = document.getElementById('events-tbody');
 
@@ -3467,6 +3610,7 @@
             return classes[status] || 'bg-gray-100 text-gray-800';
         }
 
+        // Generiert eine Einladung für ein Event via Template und öffnet den Dispatch-Bereich.
         async function generateEventInvitation(eventId) {
             try {
                 // Load event data
@@ -3811,6 +3955,7 @@ ${grussformel}`;
             return localDate.toISOString().slice(0, 16);
         }
 
+        // Speichert ein Event (neu erstellen oder aktualisieren). Sammelt alle Formularfelder inkl. Schichten, Teilnehmer-Einstellungen und Organisator-Zugang.
         async function saveEvent(e) {
             e.preventDefault();
 
@@ -3871,6 +4016,7 @@ ${grussformel}`;
             }
         }
 
+        // Speichert die Schichten eines Events separat über die API.
         async function saveEventShifts(eventId, shifts) {
             // Get existing shifts to compare
             const existingResponse = await fetch(`${API_BASE}/events/${eventId}`, {
@@ -3959,6 +4105,7 @@ ${grussformel}`;
         // EVENT REGISTRATIONS MODAL
         // ============================================
 
+        // Öffnet das Anmeldungs-Modal für ein Event und lädt die aktuellen Anmeldungen.
         function openEventRegistrations(eventId) {
             const event = events.find(e => e.id === eventId);
             if (!event) return;
@@ -3970,11 +4117,13 @@ ${grussformel}`;
             document.getElementById('event-registrations-modal').classList.remove('hidden');
         }
 
+        // Schliesst das Event-Anmeldungs-Modal.
         function closeEventRegistrationsModal() {
             document.getElementById('event-registrations-modal').classList.add('hidden');
             currentEventForRegistrations = null;
         }
 
+        // Rendert die Anmeldungen eines Events, gruppiert nach Schichten. Zeigt je Schicht: Bereich, Name, Zeitraum, Auslastung und eine Tabelle der angemeldeten Personen mit Status-Badges.
         function renderEventRegistrations() {
             const event = currentEventForRegistrations;
             if (!event || !event.shifts) return;
@@ -4148,6 +4297,7 @@ ${grussformel}`;
             container.innerHTML = html;
         }
 
+        // Genehmigt eine Event-Anmeldung und aktualisiert die Anzeige.
         async function approveEventRegistration(regId) {
             try {
                 const response = await fetch(`${API_BASE}/registrations/${regId}/approve`, {
@@ -4163,6 +4313,7 @@ ${grussformel}`;
             }
         }
 
+        // Lehnt eine Event-Anmeldung ab (mit Bestätigung) und aktualisiert die Anzeige.
         async function rejectEventRegistration(regId) {
             if (!confirm('Anmeldung wirklich ablehnen/entfernen?')) return;
             try {
@@ -4187,6 +4338,7 @@ ${grussformel}`;
         // EDIT REGISTRATION
         // ============================================
 
+        // Öffnet das Modal zum Bearbeiten einer bestehenden Anmeldung (Name, E-Mail, Telefon).
         function openEditRegistrationModal(regId, name, email, phone) {
             document.getElementById('edit-reg-id').value = regId;
             document.getElementById('edit-reg-name').value = name || '';
@@ -4195,10 +4347,12 @@ ${grussformel}`;
             document.getElementById('edit-registration-modal').classList.remove('hidden');
         }
 
+        // Schliesst das Anmeldungs-Bearbeitungs-Modal.
         function closeEditRegistrationModal() {
             document.getElementById('edit-registration-modal').classList.add('hidden');
         }
 
+        // Speichert die bearbeitete Anmeldung und aktualisiert die Anzeige.
         async function saveRegistrationEdit() {
             const id = document.getElementById('edit-reg-id').value;
             const guest_name = document.getElementById('edit-reg-name').value.trim();
@@ -4235,6 +4389,7 @@ ${grussformel}`;
         // ADD PERSON TO SHIFT
         // ============================================
 
+        // Öffnet das Modal zum Hinzufügen einer Person zu einer Schicht. Unterstützt manuelle Eingabe und Mitglieder-Suche.
         function openAddPersonModal(shiftId, shiftDisplayName) {
             document.getElementById('add-person-shift-id').value = shiftId;
             document.getElementById('add-person-shift-info').textContent = `Schicht: ${shiftDisplayName}`;
@@ -4262,10 +4417,12 @@ ${grussformel}`;
             document.getElementById('add-person-modal').classList.remove('hidden');
         }
 
+        // Schliesst das Person-Hinzufügen-Modal.
         function closeAddPersonModal() {
             document.getElementById('add-person-modal').classList.add('hidden');
         }
 
+        // Wechselt zwischen Manuell eingeben und Mitglied suchen im Person-Hinzufügen-Modal.
         function switchAddPersonTab(mode) {
             document.getElementById('add-person-mode').value = mode;
             if (mode === 'member') {
@@ -4285,6 +4442,7 @@ ${grussformel}`;
             }
         }
 
+        // Speichert eine manuell oder per Mitglieder-Suche hinzugefügte Person zu einer Schicht.
         async function saveAddPerson() {
             const shiftId = document.getElementById('add-person-shift-id').value;
             const mode = document.getElementById('add-person-mode').value;
@@ -4350,6 +4508,7 @@ ${grussformel}`;
         // ADD SHIFT
         // ============================================
 
+        // Öffnet das Modal zum Hinzufügen einer neuen Schicht zu einem Event.
         function openAddShiftModal() {
             const event = currentEventForRegistrations;
             if (!event) return;
@@ -4368,10 +4527,12 @@ ${grussformel}`;
             document.getElementById('add-shift-modal').classList.remove('hidden');
         }
 
+        // Schliesst das Schicht-Hinzufügen-Modal.
         function closeAddShiftModal() {
             document.getElementById('add-shift-modal').classList.add('hidden');
         }
 
+        // Erstellt eine neue Schicht für ein Event über die API.
         async function saveNewShift() {
             const event_id = document.getElementById('add-shift-event-id').value;
             const name = document.getElementById('add-shift-name').value.trim();
@@ -4412,6 +4573,7 @@ ${grussformel}`;
         // ALTERNATIVE SCHICHT VORSCHLAGEN
         // ============================================
 
+        // Öffnet das Modal zum Vorschlagen einer alternativen Schicht für eine Anmeldung.
         function openSuggestAlternativeModal(regId, personName, personEmail, currentShiftJson) {
             const event = currentEventForRegistrations;
             if (!event || !event.shifts) return;
@@ -4469,10 +4631,12 @@ ${grussformel}`;
             document.getElementById('suggest-alternative-modal').classList.remove('hidden');
         }
 
+        // Schliesst das Alternative-Vorschlagen-Modal.
         function closeSuggestAlternativeModal() {
             document.getElementById('suggest-alternative-modal').classList.add('hidden');
         }
 
+        // Sendet einen alternativen Schicht-Vorschlag per E-Mail an den Angemeldeten.
         async function sendAlternativeSuggestion() {
             const regId = document.getElementById('suggest-alt-registration-id').value;
             const email = document.getElementById('suggest-alt-email').value;
@@ -4525,6 +4689,7 @@ ${grussformel}`;
             }
         }
 
+        // Lädt die Teilnehmerliste eines Events als PDF herunter.
         async function downloadTeilnehmerliste() {
             try {
                 const event = currentEventForRegistrations;
@@ -4624,6 +4789,7 @@ ${grussformel}`;
         // AUDIT LOG
         // ============================================
 
+        // Lädt den Audit-Log vom Server mit optionalen Filtern (Aktionstyp, Suche, Limit).
         async function loadAuditLog(filters = {}) {
             try {
                 document.getElementById('audit-loading-state').classList.remove('hidden');
@@ -4644,6 +4810,7 @@ ${grussformel}`;
             }
         }
 
+        // Formatiert die Details eines Audit-Eintrags als farbcodierten HTML-String je nach Aktionstyp (Login, Member, Event, Dispatch etc.).
         function formatAuditDetails(entry) {
             const action = entry.action;
             const details = entry.details || {};
@@ -4734,6 +4901,7 @@ ${grussformel}`;
             return '-';
         }
 
+        // Rendert die Audit-Log-Tabelle mit Zeitstempel, Benutzer, Aktion, Details und IP-Adresse.
         function renderAuditLog() {
             const tbody = document.getElementById('audit-tbody');
 
@@ -4774,6 +4942,7 @@ ${grussformel}`;
             }).join('');
         }
 
+        // Gibt das deutsche Label für einen Audit-Aktionstyp zurück.
         function getAuditActionLabel(action) {
             const labels = {
                 'LOGIN_SUCCESS': 'Anmeldung',
@@ -4795,6 +4964,7 @@ ${grussformel}`;
             return labels[action] || action;
         }
 
+        // Gibt die CSS-Klassen (Farbe) für einen Audit-Aktionstyp zurück.
         function getAuditActionClass(action) {
             if (action.includes('FAILED') || action.includes('ERROR')) return 'bg-red-100 text-red-800';
             if (action.includes('DELETE')) return 'bg-orange-100 text-orange-800';
@@ -4816,7 +4986,7 @@ ${grussformel}`;
         let dispatchAttachments = [];
         let dispatchDrafts = [];
 
-        // Initialize Quill Rich Text Editor
+        // Initialisiert den Quill Rich-Text-Editor für den Dispatch-Bereich (E-Mail/Brief-Versand) mit Toolbar, Platzhalter-Dropdown, Anhänge und zeitgesteuertem Versand.
         function initQuillEditor() {
             if (quillEditor) return;
 
@@ -4840,7 +5010,7 @@ ${grussformel}`;
             });
         }
 
-        // Toggle between Rich Text and Plain Text mode
+        // Wechselt zwischen Rich-Text-Editor (WYSIWYG) und Quelltext-Modus.
         function toggleEditorMode() {
             isPlainTextMode = !isPlainTextMode;
             const btn = document.getElementById('toggle-editor-mode');
@@ -4868,7 +5038,7 @@ ${grussformel}`;
             }
         }
 
-        // Get message content (works for both modes)
+        // Gibt den aktuellen Inhalt des Dispatch-Editors zurück (HTML + Plaintext).
         function getDispatchContent() {
             if (isPlainTextMode) {
                 return {
@@ -4883,7 +5053,7 @@ ${grussformel}`;
             return { html: null, text: '' };
         }
 
-        // Set message content (works for both modes)
+        // Setzt den Inhalt des Dispatch-Editors (HTML oder Plaintext je nach Modus).
         function setDispatchContent(html, text) {
             if (isPlainTextMode) {
                 document.getElementById('dispatch-body-plain').value = text || '';
@@ -4898,7 +5068,7 @@ ${grussformel}`;
             }
         }
 
-        // Convert HTML to plain text for letters
+        // Konvertiert HTML in Plaintext (entfernt Tags, wandelt Zeilenumbrüche um).
         function htmlToPlainText(html) {
             const temp = document.createElement('div');
             temp.innerHTML = html;
@@ -4927,7 +5097,7 @@ ${grussformel}`;
             return text.trim();
         }
 
-        // Placeholder dropdown
+        // Richtet das Platzhalter-Dropdown ein: Mitglied-, Event- und Schicht-Variablen zum Einfügen in den Editor.
         function setupPlaceholderDropdown() {
             const btn = document.getElementById('insert-placeholder-btn');
             const dropdown = document.getElementById('placeholder-dropdown');
@@ -4960,7 +5130,7 @@ ${grussformel}`;
             document.addEventListener('click', () => dropdown.classList.add('hidden'));
         }
 
-        // File attachments handling
+        // Richtet die Dateianhang-Funktionalität ein (Drag&Drop + Dateiauswahl, max. 10MB).
         function setupAttachments() {
             const input = document.getElementById('dispatch-attachments');
             const list = document.getElementById('attachment-list');
@@ -4978,6 +5148,7 @@ ${grussformel}`;
             });
         }
 
+        // Rendert die Liste der angehängten Dateien mit Grösse und Entfernen-Button.
         function renderAttachmentList() {
             const list = document.getElementById('attachment-list');
             if (dispatchAttachments.length === 0) {
@@ -4993,12 +5164,13 @@ ${grussformel}`;
             `).join('');
         }
 
+        // Entfernt einen Anhang aus der Liste.
         function removeAttachment(index) {
             dispatchAttachments.splice(index, 1);
             renderAttachmentList();
         }
 
-        // Scheduled sending
+        // Richtet die zeitgesteuerte Versand-Funktion ein (Datum/Uhrzeit-Picker).
         function setupScheduledSending() {
             const checkbox = document.getElementById('dispatch-scheduled');
             const options = document.getElementById('dispatch-schedule-options');
@@ -5016,7 +5188,7 @@ ${grussformel}`;
             });
         }
 
-        // Update recipient counts (email vs post)
+        // Aktualisiert die Empfänger-Anzahl nach Versandart (E-Mail, Post, Alle).
         function updateRecipientCounts() {
             const recipients = getFilteredRecipients();
             const deliveryMethod = document.querySelector('input[name="delivery-method"]:checked').value;
@@ -5058,11 +5230,13 @@ ${grussformel}`;
             }
         }
 
+        // Aktualisiert die Pingen-Kostenschätzung basierend auf der Empfängeranzahl.
         function updatePingenCostEstimate() {
             // Trigger recipient count update which handles Pingen costs
             updateRecipientCounts();
         }
 
+        // Gibt die gefilterten Empfänger basierend auf Versandart und Empfänger-Auswahl zurück.
         function getFilteredRecipients() {
             const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
 
@@ -5085,7 +5259,7 @@ ${grussformel}`;
             return [];
         }
 
-        // Preview functions
+        // Zeigt die E-Mail-Vorschau an: Betreff, Empfänger-Liste und formatierter HTML-Inhalt.
         function showEmailPreview() {
             const subject = document.getElementById('dispatch-subject').value;
             const content = getDispatchContent();
@@ -5119,6 +5293,7 @@ ${grussformel}`;
             `;
         }
 
+        // Zeigt die Brief-Vorschau an im A4-Format mit Adressfeld (CH/DE) und Inhalt.
         function showLetterPreview() {
             const content = getDispatchContent();
 
@@ -5152,6 +5327,7 @@ ${grussformel}`;
             `;
         }
 
+        // Ersetzt Platzhalter im Text mit den tatsächlichen Mitgliederdaten.
         function replacePlaceholders(text, member) {
             if (!text) return '';
             return text
@@ -5164,7 +5340,7 @@ ${grussformel}`;
                 .replace(/\{\{email\}\}/g, member.email || '');
         }
 
-        // Draft functions
+        // Speichert den aktuellen Dispatch-Entwurf im localStorage.
         async function saveDraft() {
             const subject = document.getElementById('dispatch-subject').value;
             const content = getDispatchContent();
@@ -5197,6 +5373,7 @@ ${grussformel}`;
             loadDrafts();
         }
 
+        // Lädt gespeicherte Entwürfe aus dem localStorage und zeigt sie an.
         function loadDrafts() {
             dispatchDrafts = JSON.parse(localStorage.getItem('dispatchDrafts') || '[]');
             const container = document.getElementById('drafts-list');
@@ -5220,6 +5397,7 @@ ${grussformel}`;
             `).join('');
         }
 
+        // Lädt einen gespeicherten Entwurf in den Editor.
         function loadDraft(index) {
             const draft = dispatchDrafts[index];
             if (!draft) return;
@@ -5245,6 +5423,7 @@ ${grussformel}`;
             alert('Entwurf geladen');
         }
 
+        // Löscht einen Entwurf aus dem localStorage.
         function deleteDraft(index) {
             if (!confirm('Entwurf wirklich löschen?')) return;
             dispatchDrafts.splice(index, 1);
@@ -5252,13 +5431,14 @@ ${grussformel}`;
             loadDrafts();
         }
 
-        // Scheduled messages
+        // Lädt geplante (zeitgesteuerte) Nachrichten vom Server.
         function loadScheduledMessages() {
             // For now, just show placeholder - would need backend support
             const container = document.getElementById('scheduled-list');
             container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">Keine geplanten Nachrichten</p>';
         }
 
+        // Lädt Dispatch-Templates vom Server für das Template-Dropdown.
         async function loadDispatchTemplates() {
             try {
                 const response = await fetch(`${API_BASE}/templates`, {
@@ -5282,6 +5462,7 @@ ${grussformel}`;
             }
         }
 
+        // Callback wenn ein Template ausgewählt wird: Lädt Betreff und Inhalt in den Editor.
         function onTemplateSelected() {
             const templateId = document.getElementById('dispatch-template').value;
             const variablesContainer = document.getElementById('dispatch-variables');
@@ -5321,6 +5502,7 @@ ${grussformel}`;
             }
         }
 
+        // Aktualisiert die angezeigte Empfängeranzahl basierend auf dem Versandtyp-Filter.
         function updateRecipientCount() {
             const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
             let count = 0;
@@ -5345,6 +5527,7 @@ ${grussformel}`;
             document.getElementById('dispatch-recipient-count').textContent = count;
         }
 
+        // Sendet die Nachricht (E-Mail und/oder Brief) an die ausgewählten Empfänger. Unterstützt zeitgesteuerten Versand und Dateianhänge.
         async function sendDispatch() {
             const deliveryMethod = document.querySelector('input[name="delivery-method"]:checked').value;
             const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
@@ -5495,6 +5678,7 @@ ${grussformel}`;
             }
         }
 
+        // Lädt die Versandhistorie und zeigt sie in der Dispatch-Sektion an.
         async function loadDispatchHistory() {
             try {
                 const response = await fetch(`${API_BASE}/dispatch-log?limit=50`, {
@@ -5534,6 +5718,7 @@ ${grussformel}`;
 
         let registrations = [];
 
+        // Laedt die Anzahl offener Mitgliedschaftsantraege und aktualisiert den Badge im Tab.
         async function loadRegistrationCount() {
             try {
                 const response = await fetch(`${API_BASE}/member-registrations/count/pending`, {
@@ -5554,6 +5739,7 @@ ${grussformel}`;
             }
         }
 
+        // Laedt alle Mitgliedschaftsantraege vom Server mit optionalem Statusfilter.
         async function loadRegistrations() {
             try {
                 document.getElementById('registrations-loading').classList.remove('hidden');
@@ -5576,6 +5762,7 @@ ${grussformel}`;
             }
         }
 
+        // Rendert die Antraege-Tabelle mit Name, E-Mail, Feuerwehr-Status, Datum und Status-Badge.
         function renderRegistrations() {
             const tbody = document.getElementById('registrations-tbody');
 
@@ -5634,6 +5821,7 @@ ${grussformel}`;
             }).join('');
         }
 
+        // Laedt und zeigt die Details eines einzelnen Mitgliedschaftsantrags im Modal an.
         async function viewRegistration(id) {
             try {
                 const response = await fetch(`${API_BASE}/member-registrations/${id}`, {
@@ -5694,6 +5882,7 @@ ${grussformel}`;
             }
         }
 
+        // Genehmigt einen Mitgliedschaftsantrag: Erstellt das Mitglied und aktualisiert die Liste.
         async function approveRegistration() {
             const id = document.getElementById('registration-id').value;
             const memberStatus = document.getElementById('reg-member-status').value;
@@ -5721,6 +5910,7 @@ ${grussformel}`;
             }
         }
 
+        // Lehnt einen Mitgliedschaftsantrag ab (mit optionalem Grund) und aktualisiert die Liste.
         async function rejectRegistration() {
             const id = document.getElementById('registration-id').value;
             const reason = prompt('Grund für die Ablehnung (optional):');
@@ -5752,6 +5942,7 @@ ${grussformel}`;
         // TAB SWITCHING
         // ============================================
 
+        // Wechselt den aktiven Tab und laedt die entsprechenden Daten. Tabs: members, events, audit, dispatch, email, registrations, pingen, whitelist.
         function switchTab(tab) {
             currentTab = tab;
 
@@ -5812,6 +6003,8 @@ ${grussformel}`;
         // ============================================
         // EVENT LISTENERS
         // ============================================
+
+        // Event-Listener-Registrierung: Tab-Klicks, Suche, Filter, Login-Formular, Mitglieder-Modal, Event-Modal, CSV-Export, und weitere UI-Interaktionen.
 
         // Tabs
         document.getElementById('tab-members').addEventListener('click', () => switchTab('members'));
@@ -6000,6 +6193,7 @@ ${grussformel}`;
         document.getElementById('select-all-recipients').addEventListener('click', selectAllRecipients);
         document.getElementById('deselect-all-recipients').addEventListener('click', deselectAllRecipients);
 
+        // Wechselt den E-Mail-Sub-Tab (mailboxes, aliases, quota, zustellung).
         function switchEmailTab(tab) {
             document.querySelectorAll('.email-tab-btn').forEach(btn => {
                 btn.classList.remove('border-fire-500', 'text-fire-600');
@@ -6029,6 +6223,7 @@ ${grussformel}`;
             }
         }
 
+        // Laedt alle Mailboxen von der Mailcow-API und rendert die Tabelle.
         async function loadMailboxes() {
             document.getElementById('mailboxes-loading').classList.remove('hidden');
             try {
@@ -6059,6 +6254,7 @@ ${grussformel}`;
             document.getElementById('mailboxes-loading').classList.add('hidden');
         }
 
+        // Laedt alle E-Mail-Aliase von der Mailcow-API und rendert die Tabelle.
         async function loadAliases() {
             document.getElementById('aliases-loading').classList.remove('hidden');
             try {
@@ -6088,6 +6284,7 @@ ${grussformel}`;
             document.getElementById('aliases-loading').classList.add('hidden');
         }
 
+        // Laedt die Speicherplatz-Informationen (Quota) aller Mailboxen.
         async function loadQuota() {
             document.getElementById('quota-loading').classList.remove('hidden');
             try {
@@ -6114,6 +6311,7 @@ ${grussformel}`;
         }
 
         // Zustellung Email List Functions
+        // Laedt die Zustellliste: Mitglieder mit E-Mail-Zustellung und deren E-Mail-Adressen.
         async function loadZustellungEmails() {
             try {
                 const response = await fetch(`${API_BASE}/members/emails/zustellung`, {
@@ -6144,6 +6342,7 @@ ${grussformel}`;
             }
         }
 
+        // Kopiert alle Zustellungs-E-Mail-Adressen in die Zwischenablage.
         function copyZustellungEmails() {
             const emails = document.getElementById('zustellung-emails').value;
             if (!emails) {
@@ -6160,6 +6359,7 @@ ${grussformel}`;
             });
         }
 
+        // Synchronisiert den mitglieder@fwv-raura.ch Alias mit den E-Mail-Adressen aller Mitglieder mit E-Mail-Zustellung.
         async function syncMitgliederAlias() {
             const btn = document.getElementById('sync-alias-btn');
             const statusEl = document.getElementById('alias-status');
@@ -6192,6 +6392,7 @@ ${grussformel}`;
             btn.textContent = '↻ Alias synchronisieren';
         }
 
+        // Oeffnet das Modal zum Erstellen einer neuen Mailbox.
         function openNewMailboxModal() {
             document.getElementById('mailbox-modal-title').textContent = 'Neue Mailbox';
             document.getElementById('mailbox-edit-email').value = '';
@@ -6206,6 +6407,7 @@ ${grussformel}`;
             document.getElementById('mailbox-modal').classList.remove('hidden');
         }
 
+        // Oeffnet das Modal zum Bearbeiten einer bestehenden Mailbox.
         async function editMailbox(email) {
             const response = await fetch(`${API_BASE}/mailcow/mailboxes/${email}`, {
                 headers: { 'Authorization': `Bearer ${authToken}` }
@@ -6225,6 +6427,7 @@ ${grussformel}`;
             document.getElementById('mailbox-modal').classList.remove('hidden');
         }
 
+        // Speichert eine neue oder bearbeitete Mailbox ueber die Mailcow-API.
         async function saveMailbox(e) {
             e.preventDefault();
             const editEmail = document.getElementById('mailbox-edit-email').value;
@@ -6261,6 +6464,7 @@ ${grussformel}`;
             }
         }
 
+        // Loescht eine Mailbox nach Bestaetigung.
         async function deleteMailbox(email) {
             if (!confirm(`Mailbox ${email} wirklich loeschen? Alle E-Mails gehen verloren!`)) return;
             try {
@@ -6274,6 +6478,7 @@ ${grussformel}`;
             }
         }
 
+        // Oeffnet das Modal zum Erstellen eines neuen E-Mail-Alias.
         function openNewAliasModal() {
             document.getElementById('alias-modal-title').textContent = 'Neuer Alias';
             document.getElementById('alias-edit-id').value = '';
@@ -6284,6 +6489,7 @@ ${grussformel}`;
             document.getElementById('alias-modal').classList.remove('hidden');
         }
 
+        // Oeffnet das Modal zum Bearbeiten eines bestehenden E-Mail-Alias.
         function editAlias(id, address, goto, active) {
             document.getElementById('alias-modal-title').textContent = 'Alias bearbeiten';
             document.getElementById('alias-edit-id').value = id;
@@ -6294,6 +6500,7 @@ ${grussformel}`;
             document.getElementById('alias-modal').classList.remove('hidden');
         }
 
+        // Speichert einen neuen oder bearbeiteten E-Mail-Alias.
         async function saveAlias(e) {
             e.preventDefault();
             const editId = document.getElementById('alias-edit-id').value;
@@ -6326,6 +6533,7 @@ ${grussformel}`;
             }
         }
 
+        // Loescht einen E-Mail-Alias nach Bestaetigung.
         async function deleteAlias(id) {
             if (!confirm('Alias wirklich loeschen?')) return;
             try {
@@ -6343,10 +6551,12 @@ ${grussformel}`;
         // PINGEN FUNCTIONS
         // ============================================
 
+        // Prueft ob der Pingen-Staging-Modus aktiv ist (Test-Modus).
         function isPingenStaging() {
             return document.getElementById('pingen-staging-toggle')?.checked || false;
         }
 
+        // Laedt alle Pingen-Daten parallel: Konto, Statistiken, Briefe, Event-Filter.
         async function loadPingenData() {
             await Promise.all([
                 loadPingenAccount(),
@@ -6357,6 +6567,7 @@ ${grussformel}`;
             ]);
         }
 
+        // Laedt Pingen-Kontoinformationen (Guthaben, Staging-Status).
         async function loadPingenAccount() {
             try {
                 const staging = isPingenStaging();
@@ -6380,6 +6591,7 @@ ${grussformel}`;
             }
         }
 
+        // Laedt Pingen-Statistiken (gesendet, in Bearbeitung, fehlgeschlagen).
         async function loadPingenStats() {
             try {
                 const response = await fetch(`${DISPATCH_API}/pingen/stats`, {
@@ -6397,6 +6609,7 @@ ${grussformel}`;
             }
         }
 
+        // Laedt die Briefe-Tabelle von Pingen mit Status und Event-Zuordnung.
         async function loadPingenLetters() {
             document.getElementById('pingen-loading').classList.remove('hidden');
             document.getElementById('pingen-empty').classList.add('hidden');
@@ -6482,6 +6695,7 @@ ${grussformel}`;
             }
         }
 
+        // Laedt die Event-Filterliste fuer die Pingen-Briefe-Ansicht.
         async function loadPingenEventFilter() {
             try {
                 const response = await fetch(`${API_BASE}/events`, {
@@ -6507,6 +6721,7 @@ ${grussformel}`;
             }
         }
 
+        // Prueft den aktuellen Status eines Pingen-Briefs.
         async function checkPingenStatus(letterId) {
             try {
                 const response = await fetch(`${DISPATCH_API}/pingen/letters/${letterId}/status`, {
@@ -6524,6 +6739,7 @@ ${grussformel}`;
             }
         }
 
+        // Oeffnet das Modal zum manuellen Versand eines Pingen-Briefs mit Mitglieder-Dropdown.
         async function openPingenModal() {
             // Load members for dropdown
             try {
@@ -6579,6 +6795,7 @@ ${grussformel}`;
             document.getElementById('pingen-modal').classList.remove('hidden');
         }
 
+        // Zeigt die Adresse des ausgewaehlten Mitglieds im Pingen-Modal an.
         function showPingenMemberAddress() {
             const select = document.getElementById('pingen-member');
             const selectedOption = select.options[select.selectedIndex];
@@ -6594,6 +6811,7 @@ ${grussformel}`;
             }
         }
 
+        // Sendet einen Brief ueber die Pingen-API an das ausgewaehlte Mitglied.
         async function sendPingenLetter(e) {
             e.preventDefault();
 
@@ -6646,6 +6864,7 @@ ${grussformel}`;
             }
         }
 
+        // Laedt die konfigurierten Pingen-Webhooks und zeigt sie an.
         async function loadPingenWebhooks() {
             const container = document.getElementById('webhooks-list');
             const staging = isPingenStaging();
@@ -6686,6 +6905,7 @@ ${grussformel}`;
             }
         }
 
+        // Registriert einen neuen Pingen-Webhook fuer automatische Status-Updates.
         async function registerPingenWebhook() {
             const staging = isPingenStaging();
             const modeText = staging ? ' (STAGING)' : '';
@@ -6717,6 +6937,7 @@ ${grussformel}`;
             }
         }
 
+        // Loescht einen Pingen-Webhook.
         async function deletePingenWebhook(webhookId) {
             if (!confirm('Webhook wirklich löschen?')) {
                 return;
@@ -6747,6 +6968,7 @@ ${grussformel}`;
 
         let bulkPdfRecipients = [];
 
+        // Oeffnet das Modal fuer den Massen-PDF-Versand: Laedt Template-Liste und Empfaenger.
         async function openBulkPdfModal() {
             document.getElementById('bulk-pdf-form').reset();
             document.getElementById('bulk-pdf-recipients').innerHTML = '<div class="text-center text-gray-500 py-4">Lade Empfänger...</div>';
@@ -6777,6 +6999,7 @@ ${grussformel}`;
             document.getElementById('bulk-pdf-modal').classList.remove('hidden');
         }
 
+        // Rendert die Empfaengerliste im Massen-PDF-Modal mit Checkboxen.
         function renderBulkPdfRecipients() {
             const container = document.getElementById('bulk-pdf-recipients');
             container.innerHTML = bulkPdfRecipients.map(m => `
@@ -6791,21 +7014,25 @@ ${grussformel}`;
             `).join('');
         }
 
+        // Waehlt alle Empfaenger im Massen-PDF-Modal aus.
         function selectAllRecipients() {
             document.querySelectorAll('.bulk-pdf-checkbox').forEach(cb => cb.checked = true);
             updateBulkPdfCount();
         }
 
+        // Waehlt alle Empfaenger im Massen-PDF-Modal ab.
         function deselectAllRecipients() {
             document.querySelectorAll('.bulk-pdf-checkbox').forEach(cb => cb.checked = false);
             updateBulkPdfCount();
         }
 
+        // Aktualisiert die Anzahl ausgewaehlter Empfaenger.
         function updateBulkPdfCount() {
             const selected = document.querySelectorAll('.bulk-pdf-checkbox:checked').length;
             document.getElementById('bulk-pdf-selected-count').textContent = selected;
         }
 
+        // Sendet Massen-PDFs an alle ausgewaehlten Empfaenger ueber die Pingen-API.
         async function sendBulkPdf(e) {
             e.preventDefault();
 
@@ -6889,6 +7116,7 @@ ${grussformel}`;
             }
         }
 
+        // Konvertiert eine Datei in Base64-String (fuer Pingen-Upload).
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -6909,6 +7137,7 @@ ${grussformel}`;
         });
 
         // Logout (both desktop and mobile)
+        // Meldet den Benutzer ab: Entfernt JWT-Token aus localStorage und Cookie, leitet zur Login-Seite weiter.
         function performLogout() {
             localStorage.removeItem('vorstand_token');
             // Clear cross-subdomain cookie
@@ -6924,6 +7153,7 @@ ${grussformel}`;
 
         const ORDER_API = 'https://order.fwv-raura.ch/api';
 
+        // Laedt die IP-Whitelist vom Order-API und rendert die Tabelle mit IP, Geraetename, Ersteller und Toggle.
         async function loadWhitelist() {
             document.getElementById('whitelist-loading').classList.remove('hidden');
             document.getElementById('whitelist-empty').classList.add('hidden');
@@ -6984,6 +7214,7 @@ ${grussformel}`;
             }
         }
 
+        // Loescht einen IP-Whitelist-Eintrag nach Bestaetigung.
         async function deleteWhitelistEntry(id) {
             if (!confirm('Diese IP-Adresse wirklich aus der Whitelist entfernen?')) return;
 
@@ -7001,6 +7232,7 @@ ${grussformel}`;
             }
         }
 
+        // Fuegt einen neuen IP-Whitelist-Eintrag hinzu (IP + Geraetename).
         async function addWhitelistEntry(e) {
             e.preventDefault();
             const ip = document.getElementById('whitelist-ip').value;
@@ -7071,6 +7303,7 @@ ${grussformel}`;
         // INITIALIZE
         // ============================================
 
+        // Initialisierungs-IIFE: Prueft Authentifizierung und laedt initiale Daten (Statistiken, Mitglieder, Antraege-Anzahl).
         (async () => {
             if (await checkAuth()) {
                 await loadStats();

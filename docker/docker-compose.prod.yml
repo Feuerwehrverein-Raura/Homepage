@@ -1,10 +1,11 @@
-# Production docker-compose mit Images aus GitHub Container Registry
-# Watchtower aktualisiert Container automatisch bei neuen Images
-# Traefik + Authentik laufen bereits auf dem Server
+# DEUTSCH: Docker-Compose für PRODUKTION (Hetzner VPS)
+# Unterschied zu docker-compose.yml: Zieht fertige Images von GitHub Container Registry (ghcr.io)
+# statt lokal zu bauen. Watchtower aktualisiert Container automatisch bei neuen Images.
+# Voraussetzung: Traefik + Authentik laufen bereits auf dem Server.
 
 services:
   # ============================================
-  # DATABASE
+  # DEUTSCH: DATENBANK — PostgreSQL 16
   # ============================================
   postgres:
     image: postgres:16-alpine
@@ -27,15 +28,16 @@ services:
       timeout: 5s
       retries: 5
     labels:
-      - com.centurylinklabs.watchtower.enable=false
+      - com.centurylinklabs.watchtower.enable=false    # DEUTSCH: DB-Container NICHT automatisch updaten (Datenverlust-Risiko!)
 
   # ============================================
-  # BACKENDS (APIs) - Images from ghcr.io
+  # DEUTSCH: BACKEND APIs — Fertige Images von GitHub Container Registry
+  # CI/CD Pipeline baut Images bei Push auf main, Watchtower zieht sie automatisch
   # ============================================
 
-  # Mitgliederverwaltung API
+  # DEUTSCH: Mitgliederverwaltung API — Members, Auth, Rollen, Audit, Fotos
   api-members:
-    image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-members:latest
+    image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-members:latest   # DEUTSCH: Image von ghcr.io (nicht lokal gebaut)
     container_name: fwv-api-members
     restart: unless-stopped
     environment:
@@ -55,16 +57,16 @@ services:
       IMAP_HOST: ${IMAP_HOST:-mail.test.juroct.net}
       IMAP_PORT: ${IMAP_PORT:-993}
       VORSTAND_EMAILS: ${VORSTAND_EMAILS:-praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,materialwart@fwv-raura.ch,beisitzer@fwv-raura.ch}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fwv-raura.ch}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fwv-raura.ch}     # DEUTSCH: Admin-E-Mail für Systembenachrichtigungen
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     volumes:
-      - ./data/uploads:/app/uploads
+      - ./data/uploads:/app/uploads    # DEUTSCH: Persistenter Speicher für hochgeladene Mitglieder-Fotos
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - proxy
-    healthcheck:
+    healthcheck:                 # DEUTSCH: Docker prüft alle 30s ob der Service antwortet
       test: [CMD, wget, -q, --spider, http://localhost:3000/health]
       interval: 30s
       timeout: 10s
@@ -72,14 +74,15 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
+      # DEUTSCH: Traefik routet diese Pfade zum Members-Backend
       - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/uploads`) || PathPrefix(`/member-registrations`) || PathPrefix(`/funktionen`))
       - traefik.http.routers.api-members.entrypoints=https
       - traefik.http.routers.api-members.tls=true
       - traefik.http.routers.api-members.tls.certresolver=letsencrypt
       - traefik.http.services.api-members.loadbalancer.server.port=3000
-      - com.centurylinklabs.watchtower.enable=true
+      - com.centurylinklabs.watchtower.enable=true     # DEUTSCH: Watchtower darf diesen Container automatisch updaten
 
-  # Events API
+  # DEUTSCH: Events API — Events, Schichten, Kalender, Anmeldungen, Arbeitsplan
   api-events:
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-events:latest
     container_name: fwv-api-events
@@ -111,7 +114,7 @@ services:
       - traefik.http.services.api-events.loadbalancer.server.port=3000
       - com.centurylinklabs.watchtower.enable=true
 
-  # Buchhaltung API
+  # DEUTSCH: Buchhaltung API — Kontenplan, Buchungen, Rechnungen, Berichte
   api-accounting:
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-accounting:latest
     container_name: fwv-api-accounting
@@ -142,7 +145,7 @@ services:
       - traefik.http.services.api-accounting.loadbalancer.server.port=3000
       - com.centurylinklabs.watchtower.enable=true
 
-  # Versand API (Email, Pingen, SMS)
+  # DEUTSCH: Versand API (Dispatch) — E-Mail, Briefversand (Pingen), PDF-Templates, Newsletter, Kontakt
   api-dispatch:
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-api-dispatch:latest
     container_name: fwv-api-dispatch
@@ -185,10 +188,10 @@ services:
       - com.centurylinklabs.watchtower.enable=true
 
   # ============================================
-  # FRONTENDS
+  # DEUTSCH: FRONTENDS — Weboberflächen
   # ============================================
 
-  # Oeffentliche Website
+  # DEUTSCH: Öffentliche Website — fwv-raura.ch (Hauptseite, Vorstand-Dashboard, Mitgliederbereich)
   frontend-website:
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-frontend:latest
     container_name: fwv-frontend-website
@@ -205,7 +208,8 @@ services:
       - traefik.http.services.website.loadbalancer.server.port=80
       - com.centurylinklabs.watchtower.enable=true
 
-  # PDF-Designer (pdfme)
+  # DEUTSCH: PDF-Designer — Visueller Editor für PDF-Vorlagen (Briefe, Rechnungen etc.)
+  # Erreichbar unter: pdf.fwv-raura.ch
   pdf-designer:
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-pdf-designer:latest
     container_name: fwv-pdf-designer
@@ -222,7 +226,8 @@ services:
       - traefik.http.services.pdf-designer.loadbalancer.server.port=80
       - com.centurylinklabs.watchtower.enable=true
 
-  # Wiki / Dokumentation
+  # DEUTSCH: Wiki / Dokumentation — Interne Vereinsdokumentation mit Docusaurus
+  # Erreichbar unter: wiki.fwv-raura.ch
   wiki:
     image: ghcr.io/feuerwehrverein-raura/fwv-raura-wiki:latest
     container_name: fwv-wiki
@@ -239,6 +244,7 @@ services:
       - traefik.http.services.wiki.loadbalancer.server.port=80
       - com.centurylinklabs.watchtower.enable=true
 
+# DEUTSCH: Externes Docker-Netzwerk — wird von Traefik verwaltet
 networks:
   proxy:
-    external: true
+    external: true   # DEUTSCH: Muss vorher existieren (docker network create proxy)

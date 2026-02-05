@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mein Portal - Feuerwehrverein Raura</title>
+    <!-- DEUTSCH: Tailwind CSS wird ueber CDN geladen fuer Utility-First-Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierten Feuerwehr-Rot-Farben (fire-50 bis fire-800) -->
     <script>
+        // DEUTSCH: Erweitert die Standard-Tailwind-Farbpalette um die "fire"-Farbabstufungen
         tailwind.config = {
             theme: {
                 extend: {
@@ -28,25 +31,29 @@
     </script>
 </head>
 <body class="bg-gray-50">
-    <!-- Navigation -->
+    <!-- DEUTSCH: Obere Navigationsleiste mit Benutzername, Links zur Website/Events und Abmelde-Button -->
     <nav class="bg-fire-700 text-white shadow-lg">
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-16">
                 <h1 class="text-xl font-bold">Mein Portal</h1>
                 <div class="flex space-x-4 items-center">
+                    <!-- DEUTSCH: Benutzername wird nach Authentifizierung dynamisch eingesetzt -->
                     <span id="user-name" class="text-sm">Laden...</span>
                     <a href="index.html" class="hover:text-fire-200 transition-colors">Website</a>
                     <a href="events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                    <!-- DEUTSCH: Logout loescht Token und leitet zur Authentik End-Session-URL weiter -->
                     <button id="logout-btn" class="hover:text-fire-200 transition-colors">Abmelden</button>
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- Tabs -->
+    <!-- DEUTSCH: Tab-Navigation mit 4 Bereichen: Profil, Benachrichtigungen, Events, Zugaenge.
+         Der aktive Tab erhaelt eine rote Unterstreichung (border-fire-500). -->
     <section class="bg-white border-b">
         <div class="container mx-auto px-4">
             <div class="flex space-x-8 border-b">
+                <!-- DEUTSCH: Profil-Tab ist standardmaessig aktiv (border-fire-500 gesetzt) -->
                 <button id="tab-profile" class="tab-btn py-4 px-2 font-semibold border-b-2 border-fire-500 text-fire-600">
                     Mein Profil
                 </button>
@@ -63,7 +70,8 @@
         </div>
     </section>
 
-    <!-- Profile Section -->
+    <!-- DEUTSCH: Profil-Sektion - Hauptbereich mit Profilfoto, Stammdaten, Kontaktdaten, Adresse und Bankverbindung.
+         Stammdaten sind nur lesbar (readonly), Kontakt/Adresse/Bank sind editierbar. -->
     <div id="profile-section">
         <section class="py-8">
             <div class="container mx-auto px-4">
@@ -72,18 +80,23 @@
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">Persönliche Daten</h2>
 
                         <form id="profile-form" class="space-y-6">
-                            <!-- Profilfoto -->
+                            <!-- DEUTSCH: Profilfoto-Bereich mit Vorschau (runder Avatar), Upload-Button und Loeschen-Button.
+                                 Das versteckte File-Input wird per Klick auf den Button ausgeloest.
+                                 Maximale Dateigroesse: 5MB, erlaubte Formate: JPG/PNG/GIF. -->
                             <div>
                                 <h3 class="font-semibold text-gray-700 mb-3">Profilfoto</h3>
                                 <div class="flex items-center space-x-4">
+                                    <!-- DEUTSCH: Runde Vorschau des aktuellen Profilfotos (oder Fragezeichen-Platzhalter) -->
                                     <div id="my-photo-preview" class="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
                                         <span class="text-gray-400 text-3xl">?</span>
                                     </div>
                                     <div class="flex-1">
+                                        <!-- DEUTSCH: Verstecktes File-Input, wird durch den Upload-Button getriggert -->
                                         <input type="file" id="my-photo-upload" accept="image/*" class="hidden">
                                         <button type="button" id="my-photo-upload-btn" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
                                             Foto hochladen
                                         </button>
+                                        <!-- DEUTSCH: Loeschen-Button ist standardmaessig versteckt, erscheint nur wenn ein Foto existiert -->
                                         <button type="button" id="my-photo-delete-btn" class="ml-2 px-4 py-2 text-red-600 hover:text-red-800 hidden">
                                             Foto entfernen
                                         </button>
@@ -92,7 +105,8 @@
                                 </div>
                             </div>
 
-                            <!-- Persönliche Daten (read-only) -->
+                            <!-- DEUTSCH: Stammdaten (Vorname, Nachname, Funktion, Status) - readonly-Felder,
+                                 werden vom Vorstand gepflegt und koennen vom Mitglied nicht geaendert werden -->
                             <div>
                                 <h3 class="font-semibold text-gray-700 mb-3">Stammdaten</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -115,7 +129,7 @@
                                 </div>
                             </div>
 
-                            <!-- Kontaktdaten (editable) -->
+                            <!-- DEUTSCH: Kontaktdaten (Telefon, Mobile, E-Mail) - vom Mitglied selbst editierbar -->
                             <div>
                                 <h3 class="font-semibold text-gray-700 mb-3">Kontaktdaten</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -134,7 +148,7 @@
                                 </div>
                             </div>
 
-                            <!-- Adresse (editable) -->
+                            <!-- DEUTSCH: Adresse (Strasse, PLZ, Ort) - vom Mitglied selbst editierbar -->
                             <div>
                                 <h3 class="font-semibold text-gray-700 mb-3">Adresse</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -153,7 +167,7 @@
                                 </div>
                             </div>
 
-                            <!-- Bankdaten (editable) -->
+                            <!-- DEUTSCH: Bankverbindung (IBAN) - vom Mitglied selbst editierbar, wird fuer Rueckerstattungen benoetigt -->
                             <div>
                                 <h3 class="font-semibold text-gray-700 mb-3">Bankverbindung</h3>
                                 <div>
@@ -162,7 +176,7 @@
                                 </div>
                             </div>
 
-                            <!-- Buttons -->
+                            <!-- DEUTSCH: Speichern-Button sendet das Formular ab (PUT /members/me) -->
                             <div class="flex justify-end pt-4 border-t">
                                 <button type="submit" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
                                     Speichern
@@ -171,16 +185,19 @@
                         </form>
                     </div>
 
-                    <!-- Funktions-E-Mail Sektion (nur sichtbar wenn Funktion vorhanden) -->
+                    <!-- DEUTSCH: Funktions-E-Mail-Sektion - nur sichtbar wenn das Mitglied eine Vorstandsfunktion hat.
+                         Zeigt fuer jede Funktion (z.B. Praesident, Aktuar) die zugehoerige E-Mail-Adresse,
+                         Mailserver-Zugangsdaten (IMAP/SMTP) und eine Passwort-Aendern-Moeglichkeit. -->
                     <div id="function-email-section" class="bg-white rounded-lg shadow p-6 mt-6 hidden">
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">Funktions-E-Mails</h2>
 
-                        <!-- Container für mehrere Funktions-Emails mit Zugangsdaten -->
+                        <!-- DEUTSCH: Container fuer die dynamisch erzeugten Funktions-E-Mail-Karten.
+                             Fuer jede Funktion wird eine Karte mit E-Mail, Passwort-Aendern-Formular generiert. -->
                         <div id="function-emails-container" class="space-y-6">
-                            <!-- Wird dynamisch gefüllt -->
+                            <!-- DEUTSCH: Wird dynamisch durch showFunctionEmailSection() befuellt -->
                         </div>
 
-                        <!-- Allgemeine Infos -->
+                        <!-- DEUTSCH: Allgemeine Mailserver-Informationen fuer E-Mail-Client-Konfiguration -->
                         <div class="mt-6 pt-6 border-t">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div>
@@ -216,7 +233,9 @@
         </section>
     </div>
 
-    <!-- Notifications Section -->
+    <!-- DEUTSCH: Benachrichtigungen-Sektion - Hier kann das Mitglied 4 Benachrichtigungstypen
+         (Schicht-Erinnerungen, Event-Updates, Newsletter, Allgemein) ein-/ausschalten
+         und optional eine alternative E-Mail-Adresse pro Typ angeben. -->
     <div id="notifications-section" class="hidden">
         <section class="py-8">
             <div class="container mx-auto px-4">
@@ -225,10 +244,11 @@
                         <h2 class="text-2xl font-bold text-gray-800 mb-4">Benachrichtigungseinstellungen</h2>
                         <p class="text-gray-600 mb-6">Verwalten Sie Ihre E-Mail-Benachrichtigungen. Sie können für jeden Typ eine alternative E-Mail-Adresse angeben.</p>
 
+                        <!-- DEUTSCH: Wird durch renderNotifications() mit Toggle-Schaltern und E-Mail-Feldern befuellt -->
                         <div id="notifications-list" class="space-y-6">
-                            <!-- Will be populated by JavaScript -->
                         </div>
 
+                        <!-- DEUTSCH: Speichert alle Benachrichtigungs-Praeferenzen via PUT /members/me/notifications -->
                         <div class="flex justify-end pt-6 border-t mt-6">
                             <button id="save-notifications-btn" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
                                 Einstellungen speichern
@@ -240,7 +260,8 @@
         </section>
     </div>
 
-    <!-- Events Section -->
+    <!-- DEUTSCH: Events-Sektion - Zeigt alle Veranstaltungen an, fuer die das Mitglied registriert ist.
+         Pro Event werden Titel, Status (offen/bestaetigt/abgelehnt), Schichten und Anmeldedatum angezeigt. -->
     <div id="events-section" class="hidden">
         <section class="py-8">
             <div class="container mx-auto px-4">
@@ -248,17 +269,17 @@
                     <div class="bg-white rounded-lg shadow p-6">
                         <h2 class="text-2xl font-bold text-gray-800 mb-6">Meine Veranstaltungen</h2>
 
+                        <!-- DEUTSCH: Wird durch renderMyEvents() mit den Event-Registrierungen des Mitglieds befuellt -->
                         <div id="my-events-list" class="space-y-4">
-                            <!-- Will be populated by JavaScript -->
                         </div>
 
-                        <!-- Loading State -->
+                        <!-- DEUTSCH: Lade-Animation (Spinner) waehrend API-Aufruf laeuft -->
                         <div id="events-loading" class="text-center py-8">
                             <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
                             <p class="mt-4 text-gray-600">Lade Events...</p>
                         </div>
 
-                        <!-- Empty State -->
+                        <!-- DEUTSCH: Leerer Zustand wenn keine Registrierungen vorhanden sind -->
                         <div id="events-empty" class="text-center py-8 hidden">
                             <p class="text-gray-600">Sie sind für keine Veranstaltungen angemeldet.</p>
                         </div>
@@ -268,13 +289,17 @@
         </section>
     </div>
 
-    <!-- Accesses Section -->
+    <!-- DEUTSCH: Zugaenge-Sektion - Zeigt alle dem Mitglied zugewiesenen Zugaenge:
+         1. Funktions-E-Mails mit Server-Infos und Passwort-Verwaltung
+         2. Nextcloud Gruppenordner mit Direktlinks
+         3. Events als Organisator mit Dashboard-Zugang
+         4. System-Zugaenge (Website, Nextcloud, Vorstand-Portal, etc.) -->
     <div id="accesses-section" class="hidden">
         <section class="py-8">
             <div class="container mx-auto px-4">
                 <div class="max-w-4xl mx-auto space-y-6">
 
-                    <!-- Function Emails -->
+                    <!-- DEUTSCH: Funktions-E-Mails mit IMAP/SMTP-Infos, Passwort und Webmail-Link -->
                     <div class="bg-white rounded-lg shadow p-6">
                         <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                             <svg class="w-6 h-6 mr-2 text-fire-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,7 +315,7 @@
                         </div>
                     </div>
 
-                    <!-- Nextcloud Folders -->
+                    <!-- DEUTSCH: Nextcloud Gruppenordner - Zeigt Ordner auf die das Mitglied Zugriff hat -->
                     <div class="bg-white rounded-lg shadow p-6">
                         <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                             <svg class="w-6 h-6 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -306,7 +331,8 @@
                         </div>
                     </div>
 
-                    <!-- Organizer Events -->
+                    <!-- DEUTSCH: Organisator-Events - Nur sichtbar wenn das Mitglied als Organisator fuer Events eingetragen ist.
+                         Zeigt Event-Dashboard-Links und optionale Event-Zugangsdaten. -->
                     <div id="organizer-events-section" class="bg-white rounded-lg shadow p-6 hidden">
                         <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                             <svg class="w-6 h-6 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -319,7 +345,8 @@
                         </div>
                     </div>
 
-                    <!-- System Accesses -->
+                    <!-- DEUTSCH: System-Zugaenge - Liste aller Systeme auf die das Mitglied Zugriff hat,
+                         abhaengig von seiner Funktion (Mitglied, Vorstand, Kassier, Admin) -->
                     <div class="bg-white rounded-lg shadow p-6">
                         <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                             <svg class="w-6 h-6 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,7 +359,7 @@
                         </div>
                     </div>
 
-                    <!-- Loading State -->
+                    <!-- DEUTSCH: Lade-Animation fuer den Zugaenge-Tab waehrend API-Aufruf -->
                     <div id="accesses-loading" class="text-center py-8">
                         <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-fire-500"></div>
                         <p class="mt-4 text-gray-600">Lade Zugänge...</p>
@@ -344,18 +371,33 @@
     </div>
 
     <script>
+        // ============================================
+        // DEUTSCH: GLOBALE KONSTANTEN UND VARIABLEN
+        // ============================================
+
+        // DEUTSCH: Basis-URL fuer alle API-Aufrufe zum Members-Backend
         const API_BASE = 'https://api.fwv-raura.ch';
+        // DEUTSCH: URL der Authentik-Instanz fuer OIDC-Authentifizierung
         const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
+        // DEUTSCH: OAuth2 Client-ID fuer die Mitglieder-Anwendung (in Authentik konfiguriert)
         const CLIENT_ID = 'fwv-members';
+        // DEUTSCH: Callback-URL nach erfolgreichem Authentik-Login (auth-callback.html tauscht Code gegen Token)
         const REDIRECT_URI = window.location.origin + '/auth-callback.html';
 
+        // DEUTSCH: Aktueller JWT-Token (RS256, von Authentik ausgestellt)
         let authToken = null;
+        // DEUTSCH: Aktuell aktiver Tab (profile/notifications/events/accesses)
         let currentTab = 'profile';
+        // DEUTSCH: Zwischengespeicherte Mitgliederdaten vom /members/me Endpunkt
         let memberData = null;
+        // DEUTSCH: Zwischengespeicherte Benachrichtigungs-Praeferenzen
         let notifications = [];
+        // DEUTSCH: Flag ob der Zugaenge-Tab bereits geladen wurde (verhindert doppeltes Laden)
         let accessesLoaded = false;
 
-        // Mapping von Funktionen zu E-Mail-Adressen
+        // DEUTSCH: Zuordnung von Vereins-Funktionen zu den entsprechenden E-Mail-Adressen.
+        // Beide Schreibweisen (Praesident/Praesident) werden unterstuetzt.
+        // Beisitzer und Beisitzerin teilen sich dieselbe E-Mail-Adresse.
         const FUNCTION_EMAIL_MAP = {
             'Präsident': 'praesident@fwv-raura.ch',
             'Praesident': 'praesident@fwv-raura.ch',
@@ -368,32 +410,43 @@
             'Social Media': 'social-media@fwv-raura.ch'
         };
 
-        // Redirect to Authentik login
+        // ============================================
+        // DEUTSCH: AUTHENTIFIZIERUNG (Authentik OIDC)
+        // ============================================
+
+        // DEUTSCH: Leitet den Benutzer zur Authentik OIDC Login-Seite weiter.
+        // Der aktuelle Pfad wird als "state" mitgegeben, damit nach dem Login
+        // zur urspruenglichen Seite zurueckgeleitet werden kann.
         function redirectToLogin() {
             localStorage.removeItem('auth_token');
             const state = encodeURIComponent(window.location.pathname);
             window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=openid%20profile%20email&state=${state}`;
         }
 
-        // Check authentication
+        // DEUTSCH: Prueft ob der Benutzer authentifiziert ist.
+        // 1. Schaut ob ein Token als URL-Parameter vorhanden ist (kommt vom auth-callback.html nach OIDC-Login)
+        // 2. Falls nicht, liest den Token aus dem localStorage
+        // 3. Validiert den Token durch einen API-Aufruf an /members/me
+        // 4. Bei ungueltigem Token wird zum Login weitergeleitet
         async function checkAuth() {
-            // Check for token in URL (from callback)
+            // DEUTSCH: Token aus URL-Parameter lesen (nach OIDC-Callback) und in localStorage speichern
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('token')) {
                 authToken = urlParams.get('token');
                 localStorage.setItem('auth_token', authToken);
-                // Remove token from URL
+                // DEUTSCH: Token aus der URL entfernen, damit er nicht in der Browser-History bleibt
                 window.history.replaceState({}, document.title, window.location.pathname);
             } else {
                 authToken = localStorage.getItem('auth_token');
             }
 
+            // DEUTSCH: Ohne Token direkt zum Login weiterleiten
             if (!authToken) {
                 redirectToLogin();
                 return false;
             }
 
-            // Validate token by making a test API call
+            // DEUTSCH: Token-Validierung durch API-Aufruf - gleichzeitig werden die Mitgliederdaten geladen
             try {
                 const response = await fetch(`${API_BASE}/members/me`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
@@ -406,7 +459,7 @@
                 }
 
                 if (response.ok) {
-                    // Token is valid, store the member data
+                    // DEUTSCH: Token gueltig - Mitgliederdaten zwischenspeichern und Benutzername in der Navigation anzeigen
                     memberData = await response.json();
                     document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
                     return true;
@@ -420,10 +473,16 @@
             return true;
         }
 
-        // Load member profile
+        // ============================================
+        // DEUTSCH: PROFIL LADEN UND ANZEIGEN
+        // ============================================
+
+        // DEUTSCH: Laedt die Profildaten des eingeloggten Mitglieds und befuellt das Formular.
+        // Falls memberData bereits durch checkAuth() geladen wurde, wird kein erneuter API-Aufruf gemacht.
+        // Befuellt alle Formularfelder, zeigt das Profilfoto an und prueft ob Funktions-E-Mails angezeigt werden muessen.
         async function loadProfile() {
             try {
-                // If memberData wasn't loaded in checkAuth, load it now
+                // DEUTSCH: Nur API aufrufen wenn memberData noch nicht vorhanden (Fallback-Fall)
                 if (!memberData) {
                     const response = await fetch(`${API_BASE}/members/me`, {
                         headers: { 'Authorization': `Bearer ${authToken}` }
@@ -440,7 +499,7 @@
                     document.getElementById('user-name').textContent = `${memberData.vorname} ${memberData.nachname}`;
                 }
 
-                // Populate form
+                // DEUTSCH: Alle Formularfelder mit den Mitgliederdaten befuellen
                 document.getElementById('profile-vorname').value = memberData.vorname || '';
                 document.getElementById('profile-nachname').value = memberData.nachname || '';
                 document.getElementById('profile-funktion').value = memberData.funktion || '-';
@@ -453,7 +512,7 @@
                 document.getElementById('profile-ort').value = memberData.ort || '';
                 document.getElementById('profile-iban').value = memberData.iban || '';
 
-                // Load photo
+                // DEUTSCH: Profilfoto anzeigen oder Platzhalter setzen, Loeschen-Button entsprechend ein-/ausblenden
                 if (memberData.foto) {
                     document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${memberData.foto}" class="w-full h-full object-cover">`;
                     document.getElementById('my-photo-delete-btn').classList.remove('hidden');
@@ -462,7 +521,7 @@
                     document.getElementById('my-photo-delete-btn').classList.add('hidden');
                 }
 
-                // Show function email section if member has a function
+                // DEUTSCH: Funktions-E-Mail-Sektion einblenden falls Mitglied eine Vorstandsfunktion hat
                 showFunctionEmailSection(memberData.funktion);
 
             } catch (error) {
@@ -471,17 +530,20 @@
             }
         }
 
-        // Show function email section if member has function(s) with email
+        // DEUTSCH: Zeigt die Funktions-E-Mail-Sektion im Profil-Tab an.
+        // Parst das Funktionsfeld (kann kommagetrennt mehrere Funktionen enthalten, z.B. "Präsident, Admin")
+        // und erzeugt fuer jede Funktion mit zugehoeriger E-Mail eine eigene Karte mit Passwort-Aendern-Formular.
         function showFunctionEmailSection(funktion) {
             const section = document.getElementById('function-email-section');
             const container = document.getElementById('function-emails-container');
 
+            // DEUTSCH: Keine Funktion vorhanden - Sektion verstecken
             if (!funktion) {
                 section.classList.add('hidden');
                 return;
             }
 
-            // Parse multiple functions (comma-separated)
+            // DEUTSCH: Kommagetrennte Funktionen aufteilen und zu E-Mail-Eintraegen zuordnen
             const funktionen = funktion.split(',').map(f => f.trim()).filter(f => f);
             const emailEntries = [];
 
@@ -491,12 +553,14 @@
                 }
             });
 
+            // DEUTSCH: Keine passende E-Mail gefunden - Sektion verstecken
             if (emailEntries.length === 0) {
                 section.classList.add('hidden');
                 return;
             }
 
-            // Build HTML for each function email with its own credentials and password change
+            // DEUTSCH: Fuer jede Funktions-E-Mail eine Karte mit E-Mail-Anzeige, Kopieren-Button
+            // und Passwort-Aendern-Formular (2 Felder: Neues Passwort + Bestätigung) generieren
             container.innerHTML = emailEntries.map((entry, index) => `
                 <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div class="flex items-start space-x-3">
@@ -531,11 +595,16 @@
             section.classList.remove('hidden');
         }
 
-        // Copy text to clipboard
+        // ============================================
+        // DEUTSCH: HILFSFUNKTIONEN (Profil-Tab)
+        // ============================================
+
+        // DEUTSCH: Kopiert den uebergebenen Text in die Zwischenablage (Profil-Tab Version mit Button-Feedback).
+        // Zeigt fuer 1 Sekunde ein gruenes Haekchen im Button an, dann wird der urspruengliche Inhalt wiederhergestellt.
         function copyToClipboard(text, btn) {
             const originalHTML = btn.innerHTML;
             navigator.clipboard.writeText(text).then(() => {
-                // Show brief feedback
+                // DEUTSCH: Visuelles Feedback: Haekchen statt Icon fuer 1 Sekunde
                 btn.innerHTML = '<span class="text-green-600">✓</span>';
                 setTimeout(() => {
                     btn.innerHTML = originalHTML;
@@ -546,11 +615,15 @@
             });
         }
 
-        // Change function email password for a specific email account
+        // DEUTSCH: Aendert das Passwort einer Funktions-E-Mail (Profil-Tab Version mit Formularfeldern).
+        // Validiert Mindestlaenge (8 Zeichen) und Uebereinstimmung beider Passwort-Felder.
+        // Sendet das neue Passwort an PUT /members/me/function-email-password.
+        // Das Backend prueft ob das Mitglied tatsaechlich Zugriff auf diese E-Mail-Adresse hat.
         async function changeFunctionEmailPassword(email, index) {
             const password = document.getElementById(`password-${index}`).value;
             const confirmPassword = document.getElementById(`password-confirm-${index}`).value;
 
+            // DEUTSCH: Validierung: Mindestens 8 Zeichen und Passwort-Bestaetigung muss uebereinstimmen
             if (!password || password.length < 8) {
                 alert('Das Passwort muss mindestens 8 Zeichen lang sein.');
                 return;
@@ -561,13 +634,14 @@
                 return;
             }
 
+            // DEUTSCH: Button waehrend der Verarbeitung deaktivieren und Text aendern
             const btn = event.currentTarget;
             const originalText = btn.textContent;
             btn.disabled = true;
             btn.textContent = 'Wird geändert...';
 
             try {
-                // Use secure members API endpoint that validates function ownership
+                // DEUTSCH: API-Aufruf zum Aendern des Mailcow-Passworts ueber das Members-Backend
                 const response = await fetch(`${API_BASE}/members/me/function-email-password`, {
                     method: 'PUT',
                     headers: {
@@ -583,6 +657,7 @@
                 }
 
                 alert(`Passwort für ${email} erfolgreich geändert!`);
+                // DEUTSCH: Passwort-Felder nach Erfolg leeren
                 document.getElementById(`password-${index}`).value = '';
                 document.getElementById(`password-confirm-${index}`).value = '';
 
@@ -590,16 +665,21 @@
                 console.error('Error changing password:', error);
                 alert('Fehler beim Ändern des Passworts: ' + error.message);
             } finally {
+                // DEUTSCH: Button wieder aktivieren und Originaltext wiederherstellen
                 btn.disabled = false;
                 btn.textContent = originalText;
             }
         }
 
-        // Save profile
+        // DEUTSCH: Speichert die editierbaren Profildaten (Kontakt, Adresse, IBAN) via PUT /members/me.
+        // Nur die editierbaren Felder werden gesendet - Stammdaten (Vorname, Nachname, Funktion, Status)
+        // werden nicht mitgeschickt und koennen nur vom Vorstand geaendert werden.
+        // Nach erfolgreichem Speichern wird das Profil neu geladen um die Anzeige zu aktualisieren.
         async function saveProfile(e) {
             e.preventDefault();
 
             try {
+                // DEUTSCH: Nur editierbare Felder sammeln (keine readonly-Stammdaten)
                 const data = {
                     telefon: document.getElementById('profile-telefon').value,
                     mobile: document.getElementById('profile-mobile').value,
@@ -628,6 +708,7 @@
                 }
 
                 alert('Profil erfolgreich gespeichert!');
+                // DEUTSCH: Profil neu laden um sicherzustellen dass die Anzeige aktuell ist
                 await loadProfile();
 
             } catch (error) {
@@ -636,7 +717,12 @@
             }
         }
 
-        // Load notification preferences
+        // ============================================
+        // DEUTSCH: BENACHRICHTIGUNGEN (Tab 2)
+        // ============================================
+
+        // DEUTSCH: Laedt die Benachrichtigungs-Praeferenzen des Mitglieds von GET /members/me/notifications.
+        // Bei Fehler oder 404 werden Standard-Einstellungen (alle aktiviert) angezeigt.
         async function loadNotifications() {
             try {
                 const response = await fetch(`${API_BASE}/members/me/notifications`, {
@@ -654,15 +740,18 @@
 
             } catch (error) {
                 console.error('Error loading notifications:', error);
-                // Show defaults even if API fails
+                // DEUTSCH: Bei API-Fehler Standardwerte anzeigen damit die Seite trotzdem funktioniert
                 notifications = [];
                 renderNotifications();
             }
         }
 
-        // Render notification preferences
+        // DEUTSCH: Rendert die 4 Benachrichtigungstypen als Karten mit Toggle-Schalter und alternativer E-Mail.
+        // Jeder Typ hat einen deutschen Titel und eine Beschreibung.
+        // Falls keine bestehenden Praeferenzen vorhanden sind, werden alle Typen standardmaessig als aktiviert angezeigt.
         function renderNotifications() {
             const container = document.getElementById('notifications-list');
+            // DEUTSCH: Deutsche Bezeichnungen fuer die Benachrichtigungstypen
             const notificationLabels = {
                 'shift_reminder': 'Schicht-Erinnerungen',
                 'event_update': 'Event-Updates',
@@ -670,6 +759,7 @@
                 'general': 'Allgemeine Benachrichtigungen'
             };
 
+            // DEUTSCH: Beschreibungen fuer die Benachrichtigungstypen
             const notificationDescriptions = {
                 'shift_reminder': 'Erinnerungen für anstehende Schichten',
                 'event_update': 'Benachrichtigungen über Event-Änderungen',
@@ -677,10 +767,10 @@
                 'general': 'Allgemeine Vereinsmitteilungen'
             };
 
-            // Default notification types if none exist
+            // DEUTSCH: Standard-Benachrichtigungstypen falls noch keine Praeferenzen gespeichert wurden
             const defaultTypes = ['shift_reminder', 'event_update', 'newsletter', 'general'];
 
-            // Use existing notifications or create defaults
+            // DEUTSCH: Bestehende Praeferenzen verwenden oder Standardwerte (alle aktiviert) erzeugen
             let displayNotifications = notifications;
             if (!notifications || notifications.length === 0) {
                 displayNotifications = defaultTypes.map(type => ({
@@ -690,6 +780,8 @@
                 }));
             }
 
+            // DEUTSCH: Fuer jeden Benachrichtigungstyp eine Karte mit Tailwind-Toggle-Schalter
+            // und optionalem Feld fuer alternative E-Mail-Adresse rendern
             container.innerHTML = displayNotifications.map(notif => `
                 <div class="border border-gray-200 rounded-lg p-4" data-notification-type="${notif.notification_type}">
                     <div class="flex items-center justify-between mb-3">
@@ -712,9 +804,12 @@
             `).join('');
         }
 
-        // Save notification preferences
+        // DEUTSCH: Speichert alle Benachrichtigungs-Praeferenzen gesammelt via PUT /members/me/notifications.
+        // Liest den aktuellen Zustand aller Toggle-Schalter und alternativen E-Mail-Felder aus dem DOM.
+        // Nach erfolgreichem Speichern werden die Einstellungen neu geladen.
         async function saveNotifications() {
             try {
+                // DEUTSCH: Alle Benachrichtigungs-Karten aus dem DOM lesen und Praeferenzen zusammenstellen
                 const notifElements = document.querySelectorAll('#notifications-list > div');
                 const preferences = Array.from(notifElements).map(el => {
                     return {
@@ -742,6 +837,7 @@
                 }
 
                 alert('Benachrichtigungseinstellungen gespeichert!');
+                // DEUTSCH: Neu laden um gespeicherte Werte vom Server zu bestaetigen
                 await loadNotifications();
 
             } catch (error) {
@@ -750,14 +846,20 @@
             }
         }
 
-        // Load my events
+        // ============================================
+        // DEUTSCH: MEINE EVENTS (Tab 3)
+        // ============================================
+
+        // DEUTSCH: Laedt alle Event-Registrierungen des eingeloggten Mitglieds von GET /registrations.
+        // Filtert nach der Mitglieder-ID und inkludiert Gast-E-Mail-Informationen.
+        // Zeigt waehrend des Ladens einen Spinner an, danach die Events oder den Leer-Zustand.
         async function loadMyEvents() {
             try {
                 document.getElementById('events-loading').classList.remove('hidden');
                 document.getElementById('events-empty').classList.add('hidden');
                 document.getElementById('my-events-list').innerHTML = '';
 
-                // Check if memberData is loaded
+                // DEUTSCH: Sicherheitspruefung: memberData muss geladen sein bevor Registrierungen abgefragt werden
                 if (!memberData || !memberData.id) {
                     console.log('memberData not yet loaded, showing empty state');
                     document.getElementById('events-loading').classList.add('hidden');
@@ -765,12 +867,13 @@
                     return;
                 }
 
+                // DEUTSCH: Registrierungen fuer dieses Mitglied laden (member_id als Query-Parameter)
                 const response = await fetch(`${API_BASE}/registrations?member_id=${memberData.id}&include_guest_email=true`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
                 if (!response.ok) {
-                    // If 404 or other error, show empty state instead of error
+                    // DEUTSCH: Bei Fehler leeren Zustand anzeigen statt Fehlermeldung
                     console.log('No registrations found or API error');
                     document.getElementById('events-empty').classList.remove('hidden');
                     return;
@@ -781,14 +884,16 @@
 
             } catch (error) {
                 console.error('Error loading events:', error);
-                // Show empty state instead of error message
                 document.getElementById('events-empty').classList.remove('hidden');
             } finally {
+                // DEUTSCH: Spinner immer ausblenden, egal ob Erfolg oder Fehler
                 document.getElementById('events-loading').classList.add('hidden');
             }
         }
 
-        // Render my events
+        // DEUTSCH: Rendert die Event-Registrierungen des Mitglieds als Karten.
+        // Pro Registrierung: Event-Titel, Status-Badge (farbcodiert), zugewiesene Schichten
+        // (mit Datum, Uhrzeit, Bereich) und Anmeldedatum im Schweizer Format (dd.MM.yyyy).
         function renderMyEvents(registrations) {
             const container = document.getElementById('my-events-list');
 
@@ -801,7 +906,7 @@
             document.getElementById('events-empty').classList.add('hidden');
 
             container.innerHTML = registrations.map(reg => {
-                // Schichten formatieren
+                // DEUTSCH: Schichten als Sub-Liste formatieren (Name, Datum, Uhrzeit, Bereich)
                 let shiftsHtml = '';
                 if (reg.shifts && reg.shifts.length > 0) {
                     shiftsHtml = `
@@ -824,7 +929,7 @@
                         </div>
                     `;
                 } else if (!reg.shift_ids || reg.shift_ids.length === 0) {
-                    // Teilnehmer-Registrierung (ohne Schichten)
+                    // DEUTSCH: Einfache Teilnehmer-Anmeldung ohne zugewiesene Schichten
                     shiftsHtml = `
                         <p class="text-sm text-gray-500 mt-2">Teilnehmer-Anmeldung</p>
                     `;
@@ -847,6 +952,8 @@
             }).join('');
         }
 
+        // DEUTSCH: Gibt die Tailwind-CSS-Klassen fuer das Status-Badge zurueck.
+        // Gelb = offen, Gruen = bestaetigt, Rot = abgelehnt/abgesagt.
         function getStatusClass(status) {
             const classes = {
                 'pending': 'bg-yellow-100 text-yellow-800',
@@ -858,6 +965,7 @@
             return classes[status] || 'bg-gray-100 text-gray-800';
         }
 
+        // DEUTSCH: Uebersetzt den englischen Status-Wert in einen deutschen Anzeigetext
         function getStatusLabel(status) {
             const labels = {
                 'pending': 'Offen',
@@ -870,9 +978,12 @@
         }
 
         // ============================================
-        // ACCESSES (ZUGÄNGE) FUNCTIONS
+        // DEUTSCH: ZUGAENGE (Tab 4) - Alle Zugriffe des Mitglieds
         // ============================================
 
+        // DEUTSCH: Laedt alle Zugaenge des Mitglieds von GET /members/me/accesses.
+        // Die API liefert 4 Bereiche: Funktions-E-Mails, Nextcloud-Ordner, Organisator-Events, System-Zugaenge.
+        // Bei API-Fehler werden Fallback-Daten basierend auf den Profildaten des Mitglieds angezeigt.
         async function loadAccesses() {
             try {
                 document.getElementById('accesses-loading').classList.remove('hidden');
@@ -888,6 +999,7 @@
                 const data = await response.json();
                 accessesLoaded = true;
 
+                // DEUTSCH: Alle 4 Bereiche rendern mit den Daten aus der API
                 renderFunctionEmails(data.functionEmails || []);
                 renderNextcloudFolders(data.nextcloudFolders || []);
                 renderOrganizerEvents(data.organizerEvents || []);
@@ -897,7 +1009,7 @@
                 console.error('Error loading accesses:', error);
                 accessesLoaded = true;
 
-                // Show fallback content based on member's function
+                // DEUTSCH: Fallback: Zugaenge aus den lokalen Profildaten ableiten statt leere Seite zu zeigen
                 renderFunctionEmailsFromProfile();
                 renderNextcloudFolders([]);
                 renderOrganizerEvents([]);
@@ -907,7 +1019,8 @@
             }
         }
 
-        // Render function emails from profile data (fallback)
+        // DEUTSCH: Fallback-Funktion: Erzeugt Funktions-E-Mail-Eintraege aus den lokalen Profildaten
+        // wenn die /accesses API nicht erreichbar ist. Nutzt FUNCTION_EMAIL_MAP zur Zuordnung.
         function renderFunctionEmailsFromProfile() {
             if (!memberData || !memberData.funktion) {
                 document.getElementById('no-function-emails').classList.remove('hidden');
@@ -934,22 +1047,28 @@
             renderFunctionEmails(emails);
         }
 
-        // Render default system accesses (fallback)
+        // DEUTSCH: Fallback-Funktion: Generiert System-Zugaenge basierend auf der Funktion des Mitglieds
+        // wenn die /accesses API nicht erreichbar ist.
+        // Basis-Zugaenge (Website, Nextcloud) erhaelt jedes Mitglied.
+        // Zusaetzliche Zugaenge je nach Rolle: Vorstand-Portal, Kassensystem, Admin-Panel.
         function renderDefaultSystemAccesses() {
             const funktion = memberData?.funktion || '';
             const funktionen = funktion.split(',').map(f => f.trim()).filter(f => f);
 
+            // DEUTSCH: Pruefen ob das Mitglied eine Vorstandsfunktion hat
             const isVorstand = funktionen.some(f =>
                 ['Präsident', 'Praesident', 'Aktuar', 'Kassier', 'Materialwart', 'Beisitzer', 'Beisitzerin'].includes(f)
             );
             const isKassier = funktionen.includes('Kassier');
             const isAdmin = funktionen.includes('Admin');
 
+            // DEUTSCH: Basis-Zugaenge die jedes Mitglied hat
             const accesses = [
                 { system: 'Website', url: 'https://fwv-raura.ch', access: 'Mitglied' },
                 { system: 'Nextcloud', url: 'https://nextcloud.fwv-raura.ch', access: 'Mitglied' }
             ];
 
+            // DEUTSCH: Rollenbasierte Zusatz-Zugaenge hinzufuegen
             if (isVorstand) {
                 accesses.push({ system: 'Vorstand-Portal', url: 'https://fwv-raura.ch/vorstand.html', access: 'Vorstand' });
             }
@@ -963,6 +1082,13 @@
             renderSystemAccesses(accesses);
         }
 
+        // ============================================
+        // DEUTSCH: RENDER-FUNKTIONEN FUER DEN ZUGAENGE-TAB
+        // ============================================
+
+        // DEUTSCH: Rendert die Funktions-E-Mails im Zugaenge-Tab als detaillierte Karten.
+        // Jede Karte zeigt: Funktion, E-Mail, optionales Passwort (mit Anzeigen/Kopieren),
+        // Mailserver-Infos (IMAP/SMTP Ports), Passwort-Aendern-Button und Webmail-Link.
         function renderFunctionEmails(emails) {
             const container = document.getElementById('function-emails-list');
             const noEmails = document.getElementById('no-function-emails');
@@ -1032,6 +1158,8 @@
             `).join('');
         }
 
+        // DEUTSCH: Rendert die Nextcloud-Gruppenordner als klickbare Listeneintraege.
+        // Jeder Eintrag zeigt den Ordnernamen, die zugehoerigen Gruppen und einen Direktlink zu Nextcloud.
         function renderNextcloudFolders(folders) {
             const container = document.getElementById('nextcloud-folders-list');
             const noFolders = document.getElementById('no-nextcloud-folders');
@@ -1066,6 +1194,8 @@
             `).join('');
         }
 
+        // DEUTSCH: Rendert die System-Zugaenge als einfache Liste mit System-Name, Zugangsstufe und Oeffnen-Link.
+        // Jeder Eintrag hat ein gruenes Haekchen-Icon, den Systemnamen und die Berechtigung in Klammern.
         function renderSystemAccesses(accesses) {
             const container = document.getElementById('system-accesses-list');
 
@@ -1085,6 +1215,10 @@
             `).join('');
         }
 
+        // DEUTSCH: Rendert Events bei denen das Mitglied als Organisator eingetragen ist.
+        // Zeigt pro Event: Titel, Datum, "Organisator"-Badge, optionale Event-Zugangsdaten
+        // (E-Mail + Ablaufdatum) sowie Links zum Event-Dashboard und zur oeffentlichen Event-Seite.
+        // Sektion wird komplett versteckt wenn das Mitglied kein Organisator ist.
         function renderOrganizerEvents(events) {
             const section = document.getElementById('organizer-events-section');
             const container = document.getElementById('organizer-events-list');
@@ -1151,6 +1285,12 @@
             }).join('');
         }
 
+        // ============================================
+        // DEUTSCH: HILFSFUNKTIONEN FUER DEN ZUGAENGE-TAB
+        // ============================================
+
+        // DEUTSCH: Schaltet die Passwort-Sichtbarkeit um (zwischen Klartext und Punkten).
+        // Wird bei den Funktions-E-Mail-Karten im Zugaenge-Tab verwendet.
         function togglePassword(elementId, password) {
             const element = document.getElementById('pw-' + elementId);
             if (element.textContent === '••••••••') {
@@ -1160,9 +1300,12 @@
             }
         }
 
+        // DEUTSCH: Kopiert Text in die Zwischenablage (Zugaenge-Tab Version).
+        // Zeigt eine Toast-Benachrichtigung "Kopiert!" unten rechts fuer 2 Sekunden an.
+        // Diese Version hat keinen Button-Parameter und erzeugt stattdessen ein temporaeres DOM-Element.
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                // Show brief notification
+                // DEUTSCH: Temporaere Toast-Benachrichtigung erzeugen und nach 2 Sekunden entfernen
                 const notification = document.createElement('div');
                 notification.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
                 notification.textContent = 'Kopiert!';
@@ -1173,6 +1316,9 @@
             });
         }
 
+        // DEUTSCH: Aendert das Passwort einer Funktions-E-Mail (Zugaenge-Tab Version mit Prompt-Dialog).
+        // Im Gegensatz zur Profil-Tab-Version wird hier ein einfacher Prompt statt Formularfelder verwendet.
+        // Nach Erfolg werden die Zugaenge neu geladen um das aktualisierte Passwort anzuzeigen.
         async function changeFunctionEmailPassword(email) {
             const newPassword = prompt('Neues Passwort eingeben (mindestens 8 Zeichen):');
             if (!newPassword || newPassword.length < 8) {
@@ -1207,23 +1353,33 @@
             }
         }
 
-        // Tab switching
+        // ============================================
+        // DEUTSCH: TAB-NAVIGATION
+        // ============================================
+
+        // DEUTSCH: Wechselt zwischen den 4 Tabs (profile, notifications, events, accesses).
+        // 1. Setzt alle Tab-Buttons auf inaktiv zurueck (graue Schrift, transparenter Rand)
+        // 2. Versteckt alle Sektionen
+        // 3. Aktiviert den gewaehlten Tab visuell (rote Unterstreichung)
+        // 4. Zeigt die entsprechende Sektion an
+        // 5. Laedt bei Bedarf Daten nach (Lazy Loading): Benachrichtigungen und Zugaenge
+        //    werden erst beim ersten Tab-Wechsel geladen, Events werden jedes Mal neu geladen
         function switchTab(tab) {
             currentTab = tab;
 
-            // Update tab buttons
+            // DEUTSCH: Alle Tab-Buttons auf inaktiv zuruecksetzen
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('border-fire-500', 'text-fire-600');
                 btn.classList.add('border-transparent', 'text-gray-600');
             });
 
-            // Hide all sections
+            // DEUTSCH: Alle Sektionen verstecken
             document.getElementById('profile-section').classList.add('hidden');
             document.getElementById('notifications-section').classList.add('hidden');
             document.getElementById('events-section').classList.add('hidden');
             document.getElementById('accesses-section').classList.add('hidden');
 
-            // Show selected section
+            // DEUTSCH: Gewaehlte Sektion anzeigen und Tab-Button aktivieren
             if (tab === 'profile') {
                 document.getElementById('tab-profile').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('tab-profile').classList.remove('border-transparent', 'text-gray-600');
@@ -1232,21 +1388,30 @@
                 document.getElementById('tab-notifications').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('tab-notifications').classList.remove('border-transparent', 'text-gray-600');
                 document.getElementById('notifications-section').classList.remove('hidden');
+                // DEUTSCH: Benachrichtigungen nur beim ersten Mal laden (Lazy Loading)
                 if (notifications.length === 0) loadNotifications();
             } else if (tab === 'events') {
                 document.getElementById('tab-events').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('tab-events').classList.remove('border-transparent', 'text-gray-600');
                 document.getElementById('events-section').classList.remove('hidden');
+                // DEUTSCH: Events bei jedem Tab-Wechsel neu laden (koennten sich geaendert haben)
                 loadMyEvents();
             } else if (tab === 'accesses') {
                 document.getElementById('tab-accesses').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('tab-accesses').classList.remove('border-transparent', 'text-gray-600');
                 document.getElementById('accesses-section').classList.remove('hidden');
+                // DEUTSCH: Zugaenge nur beim ersten Mal laden (Lazy Loading mit accessesLoaded-Flag)
                 if (!accessesLoaded) loadAccesses();
             }
         }
 
-        // Upload my photo
+        // ============================================
+        // DEUTSCH: PROFILFOTO HOCHLADEN UND LOESCHEN
+        // ============================================
+
+        // DEUTSCH: Laedt ein Profilfoto per FormData-Upload an POST /members/me/photo hoch.
+        // Nach erfolgreichem Upload wird die Vorschau aktualisiert und der Loeschen-Button eingeblendet.
+        // Der Content-Type Header wird NICHT gesetzt - der Browser setzt ihn automatisch mit Boundary fuer FormData.
         async function uploadMyPhoto(file) {
             try {
                 const formData = new FormData();
@@ -1265,10 +1430,11 @@
                     throw new Error(errorData.error || 'Upload fehlgeschlagen');
                 }
 
+                // DEUTSCH: Server gibt den Pfad zum gespeicherten Foto zurueck
                 const data = await response.json();
                 memberData.foto = data.foto;
 
-                // Update preview
+                // DEUTSCH: Vorschau aktualisieren und Loeschen-Button einblenden
                 document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${data.foto}" class="w-full h-full object-cover">`;
                 document.getElementById('my-photo-delete-btn').classList.remove('hidden');
 
@@ -1279,7 +1445,8 @@
             }
         }
 
-        // Delete my photo
+        // DEUTSCH: Loescht das Profilfoto per DELETE /members/me/photo.
+        // Zeigt eine Bestaetigungsabfrage und setzt nach Erfolg die Vorschau auf den Platzhalter zurueck.
         async function deleteMyPhoto() {
             if (!confirm('Möchten Sie Ihr Profilfoto wirklich entfernen?')) {
                 return;
@@ -1300,7 +1467,7 @@
 
                 memberData.foto = null;
 
-                // Update preview
+                // DEUTSCH: Vorschau auf Platzhalter zuruecksetzen und Loeschen-Button verstecken
                 document.getElementById('my-photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
                 document.getElementById('my-photo-delete-btn').classList.add('hidden');
 
@@ -1311,26 +1478,34 @@
             }
         }
 
-        // Event listeners
+        // ============================================
+        // DEUTSCH: EVENT-LISTENER REGISTRIERUNG
+        // ============================================
+
+        // DEUTSCH: Profil-Formular: Beim Absenden (Submit) wird saveProfile() aufgerufen
         document.getElementById('profile-form').addEventListener('submit', saveProfile);
+        // DEUTSCH: Benachrichtigungs-Speichern-Button
         document.getElementById('save-notifications-btn').addEventListener('click', saveNotifications);
 
+        // DEUTSCH: Tab-Wechsel-Buttons
         document.getElementById('tab-profile').addEventListener('click', () => switchTab('profile'));
         document.getElementById('tab-notifications').addEventListener('click', () => switchTab('notifications'));
         document.getElementById('tab-events').addEventListener('click', () => switchTab('events'));
         document.getElementById('tab-accesses').addEventListener('click', () => switchTab('accesses'));
 
+        // DEUTSCH: Logout: Token aus localStorage entfernen und Authentik-Session beenden.
+        // Die Weiterleitung zur end-session-URL invalidiert die Authentik-Session (Single Sign-Out).
         document.getElementById('logout-btn').addEventListener('click', () => {
             localStorage.removeItem('auth_token');
-            // Invalidate Authentik session via OIDC end-session
             window.location.href = `${AUTHENTIK_URL}/application/o/fwv-members/end-session/`;
         });
 
-        // Photo upload event listeners
+        // DEUTSCH: Foto-Upload: Klick auf den "Foto hochladen"-Button oeffnet den versteckten File-Input
         document.getElementById('my-photo-upload-btn').addEventListener('click', () => {
             document.getElementById('my-photo-upload').click();
         });
 
+        // DEUTSCH: Wenn eine Datei im File-Input ausgewaehlt wird: Groessenvalidierung (max 5MB) und Upload
         document.getElementById('my-photo-upload').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -1342,9 +1517,16 @@
             }
         });
 
+        // DEUTSCH: Foto-Loeschen-Button
         document.getElementById('my-photo-delete-btn').addEventListener('click', deleteMyPhoto);
 
-        // Initialize
+        // ============================================
+        // DEUTSCH: INITIALISIERUNG
+        // ============================================
+
+        // DEUTSCH: Sofortige Ausfuehrung beim Laden der Seite:
+        // 1. Authentifizierung pruefen (Token validieren oder zum Login weiterleiten)
+        // 2. Bei Erfolg das Profil laden und im Formular anzeigen
         (async () => {
             if (await checkAuth()) {
                 await loadProfile();

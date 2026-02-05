@@ -1,11 +1,17 @@
 <!DOCTYPE html>
+<!-- DEUTSCH: Apps-Uebersichtsseite des Feuerwehrvereins Raura Kaiseraugst -->
+<!-- DEUTSCH: Zeigt alle verfuegbaren Android- und Web-Apps mit Download-Links und Beschreibungen -->
 <html lang="de" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apps - Feuerwehrverein Raura Kaiseraugst</title>
+    <!-- DEUTSCH: Tailwind CSS wird ueber CDN geladen (kein lokaler Build noetig) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- DEUTSCH: Benutzerdefinierte Tailwind-Konfiguration mit Vereinsfarben (Orange-Toene als "fire"-Palette) -->
     <script>
+        // DEUTSCH: Tailwind-Konfiguration: Erweitert die Standardfarben um die "fire"-Farbpalette
+        // DEUTSCH: Diese Orange-Toene werden durchgehend fuer Buttons, Hintergruende und Akzente verwendet
         tailwind.config = {
             theme: {
                 extend: {
@@ -30,17 +36,17 @@
 </head>
 <body class="font-sans bg-gray-50">
 
-    <!-- Navigation -->
+    <!-- DEUTSCH: Hauptnavigation - fixiert am oberen Bildschirmrand (z-50 = immer sichtbar ueber anderem Inhalt) -->
     <nav class="bg-fire-700 text-white shadow-lg fixed top-0 w-full z-50">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between items-center h-16">
-                <!-- Logo -->
+                <!-- DEUTSCH: Vereinslogo und Name als Startseiten-Link -->
                 <div class="flex items-center space-x-3">
                     <img src="images/logo.png" alt="FWV Raura Logo" class="h-10 w-10">
                     <span class="text-xl font-bold">FWV Raura</span>
                 </div>
 
-                <!-- Desktop Links -->
+                <!-- DEUTSCH: Desktop-Navigation - nur auf grossen Bildschirmen sichtbar (lg:flex), auf kleinen versteckt -->
                 <div class="hidden lg:flex items-center space-x-4">
                     <a href="./index.html" class="hover:text-fire-200 transition-colors">Home</a>
                     <a href="./index.html#about" class="hover:text-fire-200 transition-colors">Über uns</a>
@@ -50,6 +56,7 @@
                     <a href="./events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
                     <a href="./mein.html" class="hover:text-fire-200 transition-colors">Mitglieder</a>
                     <a href="./vorstand.html" class="hover:text-fire-200 transition-colors">Vorstand</a>
+                    <!-- DEUTSCH: Aktiver Menuepunkt "Apps" - hervorgehoben durch hellere Farbe (text-fire-200) und Fettschrift -->
                     <a href="./apps.html" class="text-fire-200 font-semibold">
                         <svg class="inline-block w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
@@ -59,7 +66,8 @@
                     <a href="./index.html#contact" class="hover:text-fire-200 transition-colors">Kontakt</a>
                 </div>
 
-                <!-- Mobile Menu Button -->
+                <!-- DEUTSCH: Hamburger-Menu-Button - nur auf kleinen Bildschirmen sichtbar (lg:hidden) -->
+                <!-- DEUTSCH: Oeffnet/schliesst das mobile Navigationsmenue per JavaScript -->
                 <button id="mobile-menu-btn" class="lg:hidden focus:outline-none">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
@@ -68,7 +76,8 @@
             </div>
         </div>
 
-        <!-- Mobile Menu -->
+        <!-- DEUTSCH: Mobiles Navigationsmenue - standardmaessig versteckt (hidden), wird per JS ein-/ausgeblendet -->
+        <!-- DEUTSCH: Enthaelt dieselben Links wie die Desktop-Navigation, aber vertikal angeordnet -->
         <div id="mobile-menu" class="hidden lg:hidden bg-fire-800">
             <div class="px-4 py-3 space-y-2">
                 <a href="./index.html" class="block py-2 hover:text-fire-200 transition-colors">Home</a>
@@ -85,9 +94,11 @@
         </div>
     </nav>
 
-    <!-- Hero Section -->
+    <!-- DEUTSCH: Hero Section - Grosser Einstiegsbereich mit Farbverlauf und Smartphone-Icon -->
+    <!-- DEUTSCH: mt-16 kompensiert die fixierte Navigation (h-16), damit der Inhalt nicht verdeckt wird -->
     <section class="bg-gradient-to-br from-fire-600 to-fire-800 text-white py-20 mt-16">
         <div class="max-w-7xl mx-auto px-4 text-center">
+            <!-- DEUTSCH: Smartphone-Icon in halbtransparentem Kasten als visuelles Element -->
             <div class="w-24 h-24 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center mx-auto mb-8">
                 <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
@@ -95,6 +106,7 @@
             </div>
             <h1 class="text-5xl font-bold mb-4">Unsere Apps</h1>
             <p class="text-xl text-fire-100 max-w-2xl mx-auto mb-8">Digitale Werkzeuge für den Feuerwehrverein – von der Vereinsverwaltung bis zur Lagerbewirtschaftung.</p>
+            <!-- DEUTSCH: Schnellnavigation zu den beiden Hauptkategorien (Anker-Links zu Sektionen weiter unten) -->
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
                 <a href="#android-apps" class="bg-white text-fire-700 px-8 py-3 rounded-xl font-semibold hover:bg-fire-50 transition-colors shadow-md">Android Apps</a>
                 <a href="#web-apps" class="border-2 border-white text-white px-8 py-3 rounded-xl font-semibold hover:bg-white hover:text-fire-700 transition-colors">Web Apps</a>
@@ -102,19 +114,24 @@
         </div>
     </section>
 
-    <!-- Android Apps Section -->
+    <!-- DEUTSCH: Android Apps Sektion - Zeigt die nativen Android-Anwendungen mit APK-Download -->
+    <!-- DEUTSCH: Anker-ID "android-apps" wird von der Hero-Section und Navigation verlinkt -->
     <section id="android-apps" class="bg-white py-16">
         <div class="max-w-7xl mx-auto px-4">
+            <!-- DEUTSCH: Sektions-Ueberschrift mit dekorativer oranger Linie darunter -->
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-800 mb-3">Android Apps</h2>
                 <div class="w-24 h-1 bg-fire-500 mx-auto mb-4"></div>
                 <p class="text-gray-600 max-w-2xl mx-auto">Native Android-Anwendungen für den Vereinsbetrieb. Direkt als APK herunterladen und installieren.</p>
             </div>
 
+            <!-- DEUTSCH: Responsive 2-Spalten-Grid fuer die App-Karten (1 Spalte auf Mobil, 2 ab md-Breakpoint) -->
             <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
 
-                <!-- Card: Vorstand -->
+                <!-- DEUTSCH: Vorstand-App Karte - Vereinsverwaltungs-App fuer den Vereinsvorstand -->
+                <!-- DEUTSCH: Hover-Effekt: Schatten vergroessern und Karte leicht nach oben verschieben -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <!-- DEUTSCH: Karten-Header mit App-Icon, Name und Versionsinfo -->
                     <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
                         <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
                             <img src="images/apps/vorstand.png" alt="Vorstand App" class="w-full h-full object-contain">
@@ -126,12 +143,15 @@
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     Android 8+
                                 </span>
+                                <!-- DEUTSCH: Versionsnummer wird dynamisch per JavaScript aus GitHub Releases geladen -->
                                 <span id="vorstand-version" class="text-gray-400 text-xs">Lade...</span>
                             </div>
                         </div>
                     </div>
+                    <!-- DEUTSCH: Karten-Body mit Funktionsliste und Download-Button -->
                     <div class="p-6">
                         <p class="text-gray-600 mb-4">Verwaltungs-App für den Vereinsvorstand. Mitglieder und Events verwalten, Anmeldungen prüfen und Audit-Protokolle einsehen.</p>
+                        <!-- DEUTSCH: Feature-Liste der Vorstand-App mit Haekchen-Icons -->
                         <ul class="space-y-2 mb-6">
                             <li class="flex items-center text-sm text-gray-600">
                                 <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -164,6 +184,7 @@
                                 Auto-Update
                             </li>
                         </ul>
+                        <!-- DEUTSCH: Download-Button - href wird per JavaScript mit der neuesten APK-URL aus GitHub Releases befuellt -->
                         <a id="vorstand-download" href="#" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
                             <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -173,8 +194,9 @@
                     </div>
                 </div>
 
-                <!-- Card: Küchenanzeige (KDS) -->
+                <!-- DEUTSCH: Kuechenanzeige (KDS) App Karte - Echtzeit-Bestellanzeige fuer Kueche und Bar -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <!-- DEUTSCH: Karten-Header mit App-Icon, Name und Versionsinfo -->
                     <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
                         <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
                             <img src="images/apps/kds.png" alt="Küchenanzeige App" class="w-full h-full object-contain">
@@ -186,12 +208,15 @@
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     Android 7+
                                 </span>
+                                <!-- DEUTSCH: Versionsnummer wird dynamisch per JavaScript aus GitHub Releases geladen -->
                                 <span id="kds-version" class="text-gray-400 text-xs">Lade...</span>
                             </div>
                         </div>
                     </div>
+                    <!-- DEUTSCH: Karten-Body mit Funktionsliste und Download-Button -->
                     <div class="p-6">
                         <p class="text-gray-600 mb-4">Echtzeit-Bestellanzeige für die Küche und Bar bei Veranstaltungen. Zeigt eingehende Bestellungen mit Audio-Benachrichtigung.</p>
+                        <!-- DEUTSCH: Feature-Liste der KDS-App mit Haekchen-Icons -->
                         <ul class="space-y-2 mb-6">
                             <li class="flex items-center text-sm text-gray-600">
                                 <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,6 +249,7 @@
                                 Auto-Update
                             </li>
                         </ul>
+                        <!-- DEUTSCH: Download-Button - href wird per JavaScript mit der neuesten KDS-APK-URL aus GitHub Releases befuellt -->
                         <a id="kds-download" href="#" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
                             <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -237,18 +263,21 @@
         </div>
     </section>
 
-    <!-- Web Apps Section -->
+    <!-- DEUTSCH: Web Apps Sektion - Zeigt die browser-basierten Anwendungen (kein Download noetig) -->
+    <!-- DEUTSCH: Grauer Hintergrund (bg-gray-50) zur visuellen Abgrenzung von der Android-Sektion -->
     <section id="web-apps" class="bg-gray-50 py-16">
         <div class="max-w-7xl mx-auto px-4">
+            <!-- DEUTSCH: Sektions-Ueberschrift mit dekorativer oranger Linie darunter -->
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-800 mb-3">Web Apps</h2>
                 <div class="w-24 h-1 bg-fire-500 mx-auto mb-4"></div>
                 <p class="text-gray-600 max-w-2xl mx-auto">Progressive Web Apps – direkt im Browser nutzbar, auf jedem Gerät. Kein Download erforderlich.</p>
             </div>
 
+            <!-- DEUTSCH: Responsive 2-Spalten-Grid fuer die Web-App-Karten -->
             <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
 
-                <!-- Card: Bestellsystem -->
+                <!-- DEUTSCH: Bestellsystem-Karte - Kasse und Bestellverwaltung fuer Veranstaltungen (order.fwv-raura.ch) -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                     <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
                         <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
@@ -301,7 +330,7 @@
                     </div>
                 </div>
 
-                <!-- Card: Küchenanzeige Web -->
+                <!-- DEUTSCH: Kuechenanzeige Web-Karte - Browser-basierte Alternative zur Android KDS-App (kitchen.fwv-raura.ch) -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                     <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
                         <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
@@ -354,7 +383,7 @@
                     </div>
                 </div>
 
-                <!-- Card: Registrierung -->
+                <!-- DEUTSCH: Registrierungs-Karte - Mitglieder-Zugangsaktivierung fuer das Bestellsystem (fwv-raura.ch/mein.html) -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                     <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
                         <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
@@ -395,7 +424,7 @@
                     </div>
                 </div>
 
-                <!-- Card: Lagerverwaltung -->
+                <!-- DEUTSCH: Lagerverwaltungs-Karte - Inventarsystem mit Barcode-Scanner (inventar.fwv-raura.ch) -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                     <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
                         <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
@@ -452,7 +481,8 @@
         </div>
     </section>
 
-    <!-- Installation Section -->
+    <!-- DEUTSCH: Installations-Anleitung Sektion - Schritt-fuer-Schritt-Anleitung zur APK-Installation -->
+    <!-- DEUTSCH: Erklaert Nutzern, wie man Android-Apps ausserhalb des Play Stores installiert -->
     <section class="bg-white py-16">
         <div class="max-w-7xl mx-auto px-4">
             <div class="text-center mb-12">
@@ -461,9 +491,10 @@
                 <p class="text-gray-600 max-w-2xl mx-auto">So installierst du Android Apps ausserhalb des Play Stores</p>
             </div>
 
+            <!-- DEUTSCH: 4-Schritte-Anleitung mit nummerierten Kreisen und Beschreibungen -->
             <div class="max-w-3xl mx-auto">
                 <div class="space-y-8">
-                    <!-- Step 1 -->
+                    <!-- DEUTSCH: Schritt 1: APK-Datei von dieser Seite herunterladen -->
                     <div class="flex items-start space-x-4">
                         <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">1</div>
                         <div>
@@ -472,7 +503,7 @@
                         </div>
                     </div>
 
-                    <!-- Step 2 -->
+                    <!-- DEUTSCH: Schritt 2: Sicherheitseinstellung fuer unbekannte Quellen aktivieren -->
                     <div class="flex items-start space-x-4">
                         <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">2</div>
                         <div>
@@ -481,7 +512,7 @@
                         </div>
                     </div>
 
-                    <!-- Step 3 -->
+                    <!-- DEUTSCH: Schritt 3: Heruntergeladene APK-Datei oeffnen -->
                     <div class="flex items-start space-x-4">
                         <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">3</div>
                         <div>
@@ -490,7 +521,7 @@
                         </div>
                     </div>
 
-                    <!-- Step 4 -->
+                    <!-- DEUTSCH: Schritt 4: Installation bestaetigen und App starten -->
                     <div class="flex items-start space-x-4">
                         <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">4</div>
                         <div>
@@ -500,7 +531,8 @@
                     </div>
                 </div>
 
-                <!-- Tip Box -->
+                <!-- DEUTSCH: Hinweisbox - Informiert ueber die Auto-Update-Funktion der Android-Apps -->
+                <!-- DEUTSCH: Nach Erstinstallation pruefen die Apps selbststaendig auf neue GitHub Releases -->
                 <div class="mt-10 bg-fire-50 border border-fire-200 rounded-lg p-4">
                     <p class="text-gray-700"><strong>Tipp:</strong> Die Vorstand- und Küchenanzeige-App verfügen über eine Auto-Update-Funktion. Nach der Erstinstallation werden Updates automatisch erkannt und installiert.</p>
                 </div>
@@ -508,11 +540,12 @@
         </div>
     </section>
 
-    <!-- Footer -->
+    <!-- DEUTSCH: Fusszeile - 3-Spalten-Layout mit Logo/Beschreibung, Schnelllinks und Kontaktdaten -->
     <footer class="bg-gray-800 text-white py-12">
         <div class="max-w-7xl mx-auto px-4">
+            <!-- DEUTSCH: Responsive 3-Spalten-Grid (1 Spalte auf Mobil, 3 ab md-Breakpoint) -->
             <div class="grid md:grid-cols-3 gap-8">
-                <!-- Logo & Description -->
+                <!-- DEUTSCH: Spalte 1: Vereinslogo mit Kurzbeschreibung -->
                 <div>
                     <div class="flex items-center space-x-3 mb-4">
                         <img src="images/logo.png" alt="FWV Raura Logo" class="h-10 w-10">
@@ -521,7 +554,7 @@
                     <p class="text-gray-400">Der Feuerwehrverein Raura Kaiseraugst – Tradition, Kameradschaft und Engagement für die Gemeinschaft.</p>
                 </div>
 
-                <!-- Quick Links -->
+                <!-- DEUTSCH: Spalte 2: Schnelllinks zu den wichtigsten Seiten -->
                 <div>
                     <h3 class="text-lg font-semibold mb-4">Schnelllinks</h3>
                     <ul class="space-y-2">
@@ -534,7 +567,7 @@
                     </ul>
                 </div>
 
-                <!-- Contact -->
+                <!-- DEUTSCH: Spalte 3: Kontaktinformationen des Vereins -->
                 <div>
                     <h3 class="text-lg font-semibold mb-4">Kontakt</h3>
                     <ul class="space-y-2 text-gray-400">
@@ -545,25 +578,31 @@
                 </div>
             </div>
 
+            <!-- DEUTSCH: Copyright-Zeile am unteren Rand des Footers -->
             <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
                 <p>&copy; 2026 Feuerwehrverein Raura Kaiseraugst</p>
             </div>
         </div>
     </footer>
 
+    <!-- DEUTSCH: JavaScript fuer Mobile-Navigation und dynamisches Laden der APK-Download-Links -->
     <script>
-        // Mobile menu toggle
+        // DEUTSCH: Mobile-Menu-Toggle - Blendet das mobile Navigationsmenue ein/aus beim Klick auf den Hamburger-Button
         document.getElementById('mobile-menu-btn').addEventListener('click', function() {
             document.getElementById('mobile-menu').classList.toggle('hidden');
         });
 
-        // Load latest GitHub releases for Android apps
+        // DEUTSCH: Laedt die neueste GitHub-Release-Version fuer eine bestimmte Android-App
+        // DEUTSCH: Parameter appPrefix: "vorstand" oder "kds" - bestimmt den Tag-Prefix zum Filtern (z.B. "vorstand-v1.0.0")
+        // DEUTSCH: Setzt den APK-Download-Link und die Versionsnummer im jeweiligen App-Karten-Element
         async function loadLatestRelease(appPrefix) {
+            // DEUTSCH: Referenzen auf den Download-Button und das Versions-Label der jeweiligen App-Karte
             const downloadBtn = document.getElementById(`${appPrefix}-download`);
             const versionSpan = document.getElementById(`${appPrefix}-version`);
 
             try {
-                // Fetch up to 100 releases per page, paginate if needed
+                // DEUTSCH: Paginierte Abfrage der GitHub Releases API (max. 100 pro Seite, bis zu 5 Seiten = 500 Releases)
+                // DEUTSCH: Noetig, weil beide Apps (vorstand + kds) Releases im selben Repository teilen
                 let appRelease = null;
                 let page = 1;
                 while (!appRelease && page <= 5) {
@@ -571,33 +610,41 @@
                         `https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases?per_page=100&page=${page}`
                     );
                     const releases = await response.json();
+                    // DEUTSCH: Abbruch wenn keine weiteren Releases vorhanden
                     if (!releases.length) break;
+                    // DEUTSCH: Sucht das erste Release, dessen Tag mit dem App-Prefix beginnt (z.B. "vorstand-v1.2.3")
                     appRelease = releases.find(r => r.tag_name.startsWith(`${appPrefix}-v`));
                     page++;
                 }
 
                 if (appRelease) {
+                    // DEUTSCH: Sucht das APK-Asset im Release - bevorzugt "-release.apk", alternativ jede ".apk"-Datei
                     const apkAsset = appRelease.assets.find(a => a.name.endsWith('-release.apk'))
                         || appRelease.assets.find(a => a.name.endsWith('.apk'));
                     if (apkAsset) {
+                        // DEUTSCH: Direkter APK-Download-Link vom GitHub Release Asset
                         downloadBtn.href = apkAsset.browser_download_url;
                     } else {
+                        // DEUTSCH: Fallback: Link zur Release-Seite wenn kein APK-Asset gefunden wurde
                         downloadBtn.href = appRelease.html_url;
                     }
+                    // DEUTSCH: Extrahiert die Versionsnummer aus dem Tag (z.B. "vorstand-v1.2.3" wird zu "v1.2.3")
                     const version = appRelease.tag_name.replace(`${appPrefix}-v`, 'v');
                     versionSpan.textContent = version;
                 }
             } catch (error) {
-                // Fallback URLs
+                // DEUTSCH: Fehlerbehandlung - bei API-Fehler (z.B. Rate-Limit) wird auf die allgemeine Releases-Seite verlinkt
                 const fallbacks = {
                     'vorstand': 'https://github.com/Feuerwehrverein-Raura/Homepage/releases',
                     'kds': 'https://github.com/Feuerwehrverein-Raura/Homepage/releases'
                 };
                 downloadBtn.href = fallbacks[appPrefix] || '#';
+                // DEUTSCH: Versionsnummer wird geleert, da sie nicht ermittelt werden konnte
                 versionSpan.textContent = '';
             }
         }
 
+        // DEUTSCH: Beim Seitenaufruf beide Release-Versionen parallel laden
         loadLatestRelease('vorstand');
         loadLatestRelease('kds');
     </script>

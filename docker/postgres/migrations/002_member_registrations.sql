@@ -1,5 +1,6 @@
--- Migration: Add member_registrations table
--- Run this on production if the table doesn't exist
+-- DEUTSCH: Migration 002 — Mitglieder-Anträge Tabelle erstellen
+-- DEUTSCH: Erstellt die Tabelle für neue Mitgliedschaftsanfragen (falls noch nicht vorhanden)
+-- DEUTSCH: Antragsteller füllen ein Formular auf der Website aus, der Vorstand genehmigt/lehnt ab
 
 CREATE TABLE IF NOT EXISTS member_registrations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -36,5 +37,5 @@ CREATE TABLE IF NOT EXISTS member_registrations (
 CREATE INDEX IF NOT EXISTS idx_registrations_status ON member_registrations(status);
 CREATE INDEX IF NOT EXISTS idx_registrations_email ON member_registrations(email);
 
--- Verify
+-- DEUTSCH: Bestätigungsabfrage — zeigt Erfolgsmeldung nach dem Erstellen
 SELECT 'member_registrations table created successfully' AS result;

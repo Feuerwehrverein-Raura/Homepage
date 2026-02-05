@@ -1,4 +1,6 @@
--- Add default dispatch templates
+-- DEUTSCH: Migration 005 — Standard-Versandvorlagen einfügen
+-- DEUTSCH: Erstellt 5 Vorlagen: Event-Einladung (E-Mail), Mitgliederbeitrag (Brief mit QR-Rechnung),
+-- DEUTSCH: Willkommen neues Mitglied (E-Mail), Datenänderung bestätigt (E-Mail), Registrierung abgelehnt (E-Mail)
 
 INSERT INTO dispatch_templates (id, name, type, subject, body, variables) VALUES
 (

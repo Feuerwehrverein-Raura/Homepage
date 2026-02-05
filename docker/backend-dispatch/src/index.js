@@ -1,3 +1,5 @@
+// DEUTSCH: Backend-Service fuer den Versand von E-Mails, Briefen (Pingen), PDF-Generierung und Kontaktformulare
+// DEUTSCH: Imports: Express-Server, Sicherheit, Datenbank, E-Mail, PDF, Pingen-Briefversand, Schweizer QR-Rechnung
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -17,11 +19,13 @@ const crypto = require('crypto');
 
 // ============================================
 // CONTACT FORM RATE LIMITING (in-memory)
+// DEUTSCH: Schutz gegen Spam im Kontaktformular - max. 3 Anfragen pro Stunde pro IP
 // ============================================
 const contactRateLimit = new Map(); // IP -> { count, resetAt }
 const CONTACT_RATE_LIMIT = 3; // max requests per window
 const CONTACT_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
 
+// DEUTSCH: Prueft ob eine IP-Adresse das Rate-Limit ueberschritten hat (true = erlaubt, false = blockiert)
 function checkContactRateLimit(ip) {
     const now = Date.now();
     const entry = contactRateLimit.get(ip);
@@ -36,7 +40,7 @@ function checkContactRateLimit(ip) {
     return true;
 }
 
-// Cleanup old entries every 30 minutes
+// DEUTSCH: Aufraeumen abgelaufener Rate-Limit-Eintraege alle 30 Minuten
 setInterval(() => {
     const now = Date.now();
     for (const [ip, entry] of contactRateLimit) {
@@ -45,6 +49,7 @@ setInterval(() => {
 }, 30 * 60 * 1000);
 const { BLANK_PDF } = require('@pdfme/common');
 
+// DEUTSCH: Express-App, Port, Service-Name und PostgreSQL-Verbindungspool initialisieren
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SERVICE_NAME = 'api-dispatch';
@@ -52,7 +57,9 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // ===========================================
 // LOGGING UTILITIES
+// DEUTSCH: Strukturiertes JSON-Logging mit Zeitstempel und Service-Name
 // ===========================================
+// DEUTSCH: Erstellt einen strukturierten Log-Eintrag als JSON (fuer Docker/Monitoring)
 function log(level, message, data = {}) {
     const timestamp = new Date().toISOString();
     const logEntry = { timestamp, service: SERVICE_NAME, level, message, ...data };
@@ -62,7 +69,7 @@ function logInfo(message, data = {}) { log('INFO', message, data); }
 function logWarn(message, data = {}) { log('WARN', message, data); }
 function logError(message, data = {}) { log('ERROR', message, data); }
 
-// Helper to get real client IP from proxy headers
+// DEUTSCH: Ermittelt die echte Client-IP aus Proxy-Headern (Cloudflare, Traefik, etc.)
 function getClientIp(req) {
     if (req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip'];
     const forwardedFor = req.headers['x-forwarded-for'];
@@ -71,7 +78,7 @@ function getClientIp(req) {
     return req.ip;
 }
 
-// SMTP Transport
+// DEUTSCH: SMTP-Transporter fuer E-Mail-Versand (Mailcow/SMTP-Server)
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
@@ -82,17 +89,17 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Pingen Config
+// DEUTSCH: Pingen-Konfiguration - API fuer physischen Briefversand (Druck+Porto)
 const PINGEN_IDENTITY = 'https://identity.pingen.com';
 const PINGEN_API_PRODUCTION = 'https://api.pingen.com';
 const PINGEN_API_STAGING = 'https://api-staging.pingen.com';
 
-// Helper: Pingen API URL basierend auf staging Parameter
+// DEUTSCH: Gibt die Pingen-API-URL zurueck (Staging zum Testen oder Produktion)
 function getPingenApi(staging = false) {
     return staging ? PINGEN_API_STAGING : PINGEN_API_PRODUCTION;
 }
 
-// Helper: Pingen Organisation-ID basierend auf staging Parameter
+// DEUTSCH: Gibt die Pingen-Organisations-ID zurueck (Staging oder Produktion)
 function getPingenOrgId(staging = false) {
     if (staging && process.env.PINGEN_STAGING_ORGANISATION_ID) {
         return process.env.PINGEN_STAGING_ORGANISATION_ID;
@@ -100,7 +107,7 @@ function getPingenOrgId(staging = false) {
     return process.env.PINGEN_ORGANISATION_ID;
 }
 
-// Helper: Strasse und Hausnummer trennen
+// DEUTSCH: Trennt Strasse und Hausnummer fuer die Pingen-API
 // z.B. "Musterstrasse 12" -> { street: "Musterstrasse", number: "12" }
 // z.B. "Hauptstr. 5a" -> { street: "Hauptstr.", number: "5a" }
 function parseStreetAndNumber(fullStreet) {
@@ -152,7 +159,7 @@ function formatAddressForCoverPage(name, street, number, zip, city) {
     return `${name}\n${streetLine}\n${zip} ${city}`;
 }
 
-// Helper: Send Pingen cost notification to Kassier
+// DEUTSCH: Sendet eine Kostenbenachrichtigung an den Kassier nach jedem Pingen-Briefversand
 // Pingen Preise (Stand 2024): Economy ~CHF 1.00, Priority ~CHF 1.50 (inkl. Porto)
 async function sendPingenCostNotification(recipientName, letterId, isStaging = false) {
     try {
@@ -184,7 +191,7 @@ async function sendPingenCostNotification(recipientName, letterId, isStaging = f
     }
 }
 
-// Helper: Send bulk Pingen cost notification to Kassier
+// DEUTSCH: Sendet eine Sammel-Kostenbenachrichtigung an den Kassier nach Massenversand
 async function sendPingenBulkCostNotification(count, successList, isStaging = false) {
     try {
         const kassierResult = await pool.query(
@@ -218,11 +225,11 @@ async function sendPingenBulkCostNotification(count, successList, isStaging = fa
     }
 }
 
-// Cache für heruntergeladene Schriftart
+// DEUTSCH: Cache fuer die heruntergeladene Schriftart (Inter) - wird nur einmal geladen
 let cachedFontBytes = null;
 
-// Helper: Schriftart laden (eingebettet, nicht nur referenziert)
-// Verwendet Inter Font von Google Fonts (OFL Lizenz)
+// DEUTSCH: Laedt die Inter-Schriftart fuer PDF-Einbettung (von Google Fonts, OFL-Lizenz)
+// Wird lokal in /tmp gecacht fuer Neustarts
 async function getEmbeddableFont() {
     if (cachedFontBytes) {
         return cachedFontBytes;
@@ -256,10 +263,8 @@ async function getEmbeddableFont() {
     }
 }
 
-// Helper: Adresse direkt ins PDF schreiben (Schweizer Briefformat, Adresse rechts)
-// Position: Fensterbereich rechts oben auf der ersten Seite
-// Verwendet eingebettete Schriftart für Pingen-Kompatibilität
-// Erkennt das Land anhand der Adresse (CH oder DE)
+// DEUTSCH: Erkennt das Land anhand der Postleitzahl in der Adresse
+// CH = 4-stellige PLZ, DE = 5-stellige PLZ (fuer korrekte Adressfenster-Position)
 function detectCountryFromAddress(address) {
     // Suche nach PLZ-Muster
     // Schweiz: 4-stellige PLZ (z.B. "8000 Zürich" oder "CH-8000 Zürich")
@@ -282,6 +287,8 @@ function detectCountryFromAddress(address) {
     return 'CH';
 }
 
+// DEUTSCH: Schreibt Absender- und Empfaengeradresse direkt ins PDF
+// CH: Adressfenster rechts (Schweizer Briefstandard), DE: Adressfenster links (DIN 5008)
 async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null) {
     console.log('[addAddressToPdf] Starting PDF address embedding...');
     console.log(`[addAddressToPdf] Input PDF size: ${pdfBuffer.length} bytes`);
@@ -388,8 +395,8 @@ async function addAddressToPdf(pdfBuffer, recipientAddress, senderAddress = null
     return { pdfBytes: savedPdf, country };
 }
 
-// Helper: Warten bis Brief die initiale Verarbeitung abgeschlossen hat
-// (Status ist nicht mehr "validating" - kann "valid", "action_required", etc. sein)
+// DEUTSCH: Wartet bis Pingen die initiale Brief-Verarbeitung abgeschlossen hat (max. 10 Versuche)
+// Polling alle 2 Sek. bis Status nicht mehr "validating" ist
 async function waitForLetterProcessing(letterId, token, staging = false) {
     const PINGEN_API = getPingenApi(staging);
     const maxAttempts = 10;
@@ -429,8 +436,8 @@ async function waitForLetterProcessing(letterId, token, staging = false) {
     return { ready: false, status: 'timeout' };
 }
 
-// Helper: Warten bis Brief validiert ist (max 30 Sekunden)
-// Pingen braucht Zeit um das PDF zu verarbeiten bevor create-cover-page möglich ist
+// DEUTSCH: Wartet bis der Brief bei Pingen validiert ist (max. 30 Sek., 10 Versuche a 3 Sek.)
+// Gibt Erfolg zurueck bei "valid" oder "action_required" (manuelle Aktion noetig)
 async function waitForLetterValidation(letterId, token, staging = false) {
     const PINGEN_API = getPingenApi(staging);
     const maxAttempts = 10;
@@ -489,8 +496,8 @@ async function waitForLetterValidation(letterId, token, staging = false) {
     return { success: false, status: 'timeout', reason: 'Validation timeout' };
 }
 
-// Helper: Brief-Status prüfen (NICHT mehr löschen bei action_required)
-// Briefe bleiben in Pingen für manuelle Bearbeitung
+// DEUTSCH: Prueft den endgueltigen Brief-Status bei Pingen nach dem Versand
+// Briefe mit "action_required" bleiben in Pingen fuer manuelle Bearbeitung
 async function checkAndDeleteIfActionRequired(letterId, token, staging = false) {
     const PINGEN_API = getPingenApi(staging);
 
@@ -526,13 +533,13 @@ async function checkAndDeleteIfActionRequired(letterId, token, staging = false) 
     }
 }
 
-// Nextcloud WebDAV für Datei-Speicherung
+// DEUTSCH: Nextcloud-Konfiguration fuer Datei-Upload via WebDAV (z.B. Arbeitsplaene speichern)
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL;
 const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER;
 const NEXTCLOUD_PASSWORD = process.env.NEXTCLOUD_PASSWORD;
 const NEXTCLOUD_FOLDER = process.env.NEXTCLOUD_FOLDER || '/FWV-Dokumente';
 
-// Helper: Datei zu Nextcloud hochladen
+// DEUTSCH: Laedt eine Datei per WebDAV in die Nextcloud hoch (erstellt Ordner falls noetig)
 async function uploadToNextcloud(filename, buffer, subfolder = '') {
     if (!NEXTCLOUD_URL || !NEXTCLOUD_USER) {
         console.log('Nextcloud nicht konfiguriert, Datei wird nicht hochgeladen');
@@ -568,7 +575,7 @@ async function uploadToNextcloud(filename, buffer, subfolder = '') {
     }
 }
 
-// CORS vor Helmet konfigurieren - allow all fwv-raura.ch subdomains
+// DEUTSCH: CORS-Konfiguration - erlaubt alle fwv-raura.ch Subdomains und localhost fuer Entwicklung
 app.use(cors({
     origin: function (origin, callback) {
         // Allow requests with no origin (mobile apps, curl, etc.)
@@ -586,16 +593,18 @@ app.use(cors({
 app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
-app.use(express.json({ limit: '50mb' })); // Erhöht für PDF-Uploads
+// DEUTSCH: JSON-Body-Parser mit erhoehtem Limit (50 MB) fuer PDF-Uploads
+app.use(express.json({ limit: '50mb' }));
 
 // Trust proxy for correct client IP
 app.set('trust proxy', true);
 
 // ===========================================
 // REQUEST LOGGING MIDDLEWARE
+// DEUTSCH: Protokolliert jede Anfrage mit Request-ID, Methode, Pfad, IP und Antwortzeit
 // ===========================================
 app.use((req, res, next) => {
-    if (req.path === '/health') return next();
+    if (req.path === '/health') return next(); // DEUTSCH: Health-Check nicht loggen
 
     const startTime = Date.now();
     const requestId = Math.random().toString(36).substring(7);
@@ -623,14 +632,17 @@ app.use((req, res, next) => {
     next();
 });
 
+// DEUTSCH: Health-Check-Endpunkt fuer Docker/Traefik - gibt Service-Status und Version zurueck
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'api-dispatch', version: process.env.APP_VERSION || '0.0.0' });
 });
 
 // ============================================
 // TEMPLATES
+// DEUTSCH: CRUD-Endpunkte fuer Versand-Vorlagen (E-Mail/Brief-Templates mit Variablen)
 // ============================================
 
+// DEUTSCH: Alle Templates abrufen, optional nach Typ filtern (email, brief_ch, brief_de)
 app.get('/templates', authenticateAny, async (req, res) => {
     try {
         const { type } = req.query;
@@ -647,6 +659,7 @@ app.get('/templates', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Neues Template erstellen (Name, Typ, Betreff, Inhalt, Variablen)
 app.post('/templates', authenticateAny, async (req, res) => {
     try {
         const { name, type, subject, body, variables } = req.body;
@@ -660,6 +673,7 @@ app.post('/templates', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Bestehendes Template aktualisieren (nach ID)
 app.put('/templates/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -678,6 +692,7 @@ app.put('/templates/:id', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Template loeschen (nach ID)
 app.delete('/templates/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -693,8 +708,10 @@ app.delete('/templates/:id', authenticateAny, async (req, res) => {
 
 // ============================================
 // EMAIL
+// DEUTSCH: E-Mail-Versand mit Template-Unterstuetzung und Variablen-Ersetzung
 // ============================================
 
+// DEUTSCH: Einzelne E-Mail senden - optional mit Template und Variablen (z.B. {{vorname}})
 app.post('/email/send', authenticateAny, async (req, res) => {
     console.log('[EMAIL] /email/send called with:', { to: req.body.to, cc: req.body.cc, template_id: req.body.template_id, member_id: req.body.member_id });
     try {
@@ -758,6 +775,7 @@ app.post('/email/send', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Massen-E-Mail an mehrere Mitglieder senden (nur an jene mit E-Mail-Zustellung)
 app.post('/email/bulk', authenticateAny, async (req, res) => {
     console.log('[EMAIL BULK] /email/bulk called with:', { member_ids: req.body.member_ids, template_id: req.body.template_id });
     try {
@@ -806,8 +824,11 @@ app.post('/email/bulk', authenticateAny, async (req, res) => {
 
 // ============================================
 // SMART DISPATCH (Auto-select email/brief_ch/brief_de)
+// DEUTSCH: Intelligenter Versand - waehlt automatisch E-Mail oder Brief (CH/DE) pro Mitglied
 // ============================================
 
+// DEUTSCH: Automatischer Versand an mehrere Mitglieder - waehlt Kanal basierend auf Zustellpraeferenz
+// E-Mail wenn zustellung_email=true, sonst Brief via Pingen (CH oder DE je nach PLZ)
 app.post('/dispatch/smart', authenticateAny, async (req, res) => {
     console.log('[SMART DISPATCH] Starting smart dispatch...');
     try {
@@ -946,8 +967,11 @@ app.post('/dispatch/smart', authenticateAny, async (req, res) => {
 
 // ============================================
 // PINGEN (Post)
+// DEUTSCH: Physischer Briefversand ueber Pingen-API (PDF hochladen, drucken, versenden)
 // ============================================
 
+// DEUTSCH: Einzelnen Brief via Pingen versenden - HTML wird zu PDF konvertiert, Adresse eingebettet
+// Ablauf: HTML->PDF (Puppeteer) -> Adresse einbetten -> Upload -> Brief erstellen -> Versand
 app.post('/pingen/send', authenticateAny, async (req, res) => {
     try {
         const { html, recipient, member_id, event_id, staging = false, use_cover_page = false, template_id } = req.body;
@@ -1215,9 +1239,11 @@ app.post('/pingen/send', authenticateAny, async (req, res) => {
 
 // ============================================
 // KONTAKTFORMULAR (ersetzt n8n)
+// DEUTSCH: Oeffentliches Kontaktformular und Mitgliedschaftsantraege mit Double-Opt-In
 // ============================================
 
-// Step 1: Submit contact form -> validate spam checks -> send confirmation email
+// DEUTSCH: Schritt 1 - Kontaktformular absenden: Spam-Schutz (Honeypot, Zeitpruefung, Rate-Limit),
+// dann Bestaetigungs-E-Mail senden (Double Opt-In). Kein Auth noetig (oeffentlich).
 app.post('/contact', async (req, res) => {
     try {
         const { name, email, subject, message, type, membership, _honeypot, _timestamp } = req.body;
@@ -1315,7 +1341,10 @@ Feuerwehrverein Raura
     }
 });
 
-// Step 2: Confirm contact request via email link
+// DEUTSCH: Schritt 2 - Bestaetigung per Klick auf den Link in der E-Mail
+// Verarbeitet Kontaktanfrage oder Mitgliedschaftsantrag, sendet Benachrichtigungen
+// Bei aktiven Feuerwehr-Mitgliedern: automatische Aufnahme als Aktivmitglied
+// Bei anderen: Antrag zur manuellen Pruefung durch den Vorstand
 app.get('/contact/confirm/:token', async (req, res) => {
     try {
         const { token } = req.params;
@@ -1558,9 +1587,10 @@ Feuerwehrverein Raura
 
 // ============================================
 // MEMBER REGISTRATIONS (Mitglieder-Anträge)
+// DEUTSCH: Verwaltung von Mitgliedschaftsantraegen (Genehmigen/Ablehnen durch Vorstand)
 // ============================================
 
-// Anzahl der ausstehenden Registrierungen
+// DEUTSCH: Anzahl offener Mitgliedschaftsantraege abrufen (fuer Badge im UI)
 app.get('/member-registrations/count/pending', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
@@ -1573,7 +1603,7 @@ app.get('/member-registrations/count/pending', authenticateAny, async (req, res)
     }
 });
 
-// Alle Registrierungen abrufen
+// DEUTSCH: Alle Registrierungen abrufen, optional nach Status filtern (pending/approved/rejected)
 app.get('/member-registrations', authenticateAny, async (req, res) => {
     try {
         const { status } = req.query;
@@ -1600,7 +1630,7 @@ app.get('/member-registrations', authenticateAny, async (req, res) => {
     }
 });
 
-// Einzelne Registrierung abrufen
+// DEUTSCH: Einzelne Registrierung nach ID abrufen (Detail-Ansicht)
 app.get('/member-registrations/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -1623,7 +1653,7 @@ app.get('/member-registrations/:id', authenticateAny, async (req, res) => {
     }
 });
 
-// Registrierung genehmigen
+// DEUTSCH: Mitgliedschaftsantrag genehmigen - erstellt Mitglied in DB und sendet Willkommens-E-Mail
 app.post('/member-registrations/:id/approve', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -1699,7 +1729,7 @@ Feuerwehrverein Raura
     }
 });
 
-// Registrierung ablehnen
+// DEUTSCH: Mitgliedschaftsantrag ablehnen - setzt Status auf 'rejected' und sendet Ablehnungs-E-Mail
 app.post('/member-registrations/:id/reject', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -1755,8 +1785,10 @@ Feuerwehrverein Raura
 
 // ============================================
 // NEWSLETTER (ersetzt n8n)
+// DEUTSCH: Newsletter-An-/Abmeldung mit Double-Opt-In (oeffentliche Endpunkte)
 // ============================================
 
+// DEUTSCH: Newsletter-Anmeldung - speichert E-Mail und sendet Bestaetigungslink
 app.post('/newsletter/subscribe', async (req, res) => {
     try {
         const { email } = req.body;
@@ -1812,6 +1844,7 @@ Feuerwehrverein Raura
     }
 });
 
+// DEUTSCH: Newsletter-Anmeldung bestaetigen (per Token aus der Bestaetigungs-E-Mail)
 app.get('/newsletter/confirm', async (req, res) => {
     try {
         const { token } = req.query;
@@ -1831,6 +1864,7 @@ app.get('/newsletter/confirm', async (req, res) => {
     }
 });
 
+// DEUTSCH: Newsletter abmelden (per E-Mail oder Token)
 app.post('/newsletter/unsubscribe', async (req, res) => {
     try {
         const { email, token } = req.body;
@@ -1857,13 +1891,15 @@ app.post('/newsletter/unsubscribe', async (req, res) => {
 
 // ============================================
 // MAILCOW MANAGEMENT
+// DEUTSCH: Verwaltung von E-Mail-Postfaechern und Aliases ueber die Mailcow-API
 // ============================================
 
+// DEUTSCH: Mailcow-Konfiguration (Self-Hosted E-Mail-Server)
 const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'https://mail.test.juroct.net';
 const MAILCOW_API_KEY = process.env.MAILCOW_API_KEY;
 const MAILCOW_DOMAIN = 'fwv-raura.ch';
 
-// Helper für Mailcow API Aufrufe
+// DEUTSCH: Wrapper fuer Mailcow-API-Aufrufe mit API-Key-Authentifizierung
 async function mailcowApi(method, endpoint, data = null) {
     const config = {
         method,
@@ -1877,7 +1913,7 @@ async function mailcowApi(method, endpoint, data = null) {
     return axios(config);
 }
 
-// Alle Mailboxen abrufen
+// DEUTSCH: Alle Mailboxen der Domain fwv-raura.ch abrufen
 app.get('/mailcow/mailboxes', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/mailbox/all');
@@ -1892,7 +1928,7 @@ app.get('/mailcow/mailboxes', authenticateAny, async (req, res) => {
     }
 });
 
-// Einzelne Mailbox abrufen
+// DEUTSCH: Einzelne Mailbox nach E-Mail-Adresse abrufen
 app.get('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', `/get/mailbox/${req.params.email}`);
@@ -1902,7 +1938,7 @@ app.get('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     }
 });
 
-// Mailbox erstellen
+// DEUTSCH: Neue Mailbox erstellen (Benutzername, Name, Passwort, Quota)
 app.post('/mailcow/mailboxes', authenticateAny, async (req, res) => {
     try {
         const { local_part, name, password, quota = 1024, active = 1 } = req.body;
@@ -1927,7 +1963,7 @@ app.post('/mailcow/mailboxes', authenticateAny, async (req, res) => {
     }
 });
 
-// Mailbox aktualisieren
+// DEUTSCH: Mailbox aktualisieren (Name, Quota, Passwort, Aktiv-Status)
 app.put('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     try {
         const { name, quota, active, password } = req.body;
@@ -1952,7 +1988,7 @@ app.put('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     }
 });
 
-// Mailbox löschen
+// DEUTSCH: Mailbox loeschen (nach E-Mail-Adresse)
 app.delete('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('POST', '/delete/mailbox', [req.params.email]);
@@ -1962,7 +1998,7 @@ app.delete('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
     }
 });
 
-// Alle Aliase abrufen
+// DEUTSCH: Alle E-Mail-Aliase der Domain abrufen (z.B. info@ -> vorstand@)
 app.get('/mailcow/aliases', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/alias/all');
@@ -1976,7 +2012,7 @@ app.get('/mailcow/aliases', authenticateAny, async (req, res) => {
     }
 });
 
-// Alias erstellen
+// DEUTSCH: Neuen E-Mail-Alias erstellen (Weiterleitungsadresse)
 app.post('/mailcow/aliases', authenticateAny, async (req, res) => {
     try {
         const { address, goto, active = 1 } = req.body;
@@ -1997,7 +2033,7 @@ app.post('/mailcow/aliases', authenticateAny, async (req, res) => {
     }
 });
 
-// Alias aktualisieren
+// DEUTSCH: Alias aktualisieren (Zieladresse oder Aktiv-Status aendern)
 app.put('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
     try {
         const { goto, active } = req.body;
@@ -2016,7 +2052,7 @@ app.put('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
     }
 });
 
-// Alias löschen
+// DEUTSCH: Alias loeschen (nach ID)
 app.delete('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('POST', '/delete/alias', [req.params.id]);
@@ -2026,7 +2062,7 @@ app.delete('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
     }
 });
 
-// Domain-Informationen
+// DEUTSCH: Domain-Informationen abrufen (Speicherplatz, Anzahl Mailboxen, etc.)
 app.get('/mailcow/domain', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', `/get/domain/${MAILCOW_DOMAIN}`);
@@ -2036,7 +2072,7 @@ app.get('/mailcow/domain', authenticateAny, async (req, res) => {
     }
 });
 
-// Quota-Nutzung aller Mailboxen
+// DEUTSCH: Speicherplatz-Nutzung aller Mailboxen abrufen (Quota in Prozent)
 app.get('/mailcow/quota', authenticateAny, async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/mailbox/all');
@@ -2058,8 +2094,10 @@ app.get('/mailcow/quota', authenticateAny, async (req, res) => {
 
 // ============================================
 // ARBEITSPLAN PDF GENERATION
+// DEUTSCH: Generiert PDF-Arbeitsplaene fuer Anlaesse (Schichten, Bereiche, Helfer)
 // ============================================
 
+// DEUTSCH: Standard-Layout-Einstellungen fuer Arbeitsplan-PDFs
 // Default layout settings for Arbeitsplan
 const defaultLayoutSettings = {
     primaryColor: '#cc0000',
@@ -2068,6 +2106,8 @@ const defaultLayoutSettings = {
     footerText: 'Feuerwehrverein Raura | www.fwv-raura.ch | info@fwv-raura.ch'
 };
 
+// DEUTSCH: Arbeitsplan als PDF generieren - benoetigt Event mit Schichten und optional Logo
+// Konvertiert HTML-Template via Puppeteer zu PDF und laedt es optional in Nextcloud hoch
 app.post('/arbeitsplan/pdf', authenticateAny, async (req, res) => {
     try {
         const { event, logoBase64 } = req.body;
@@ -2131,6 +2171,8 @@ app.post('/arbeitsplan/pdf', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Generiert das HTML fuer den Arbeitsplan - Tabelle mit Schichten pro Tag/Bereich
+// Sonderschichten (Aufbau, Abbau, Kochen) werden ohne Tabelle dargestellt
 function generateArbeitsplanHTML(event, logoBase64, layoutSettings = {}) {
     const shifts = event.shifts || [];
     const orgName = layoutSettings.organisationName || 'Feuerwehrverein Raura, Kaiseraugst';
@@ -2450,8 +2492,10 @@ function generateArbeitsplanHTML(event, logoBase64, layoutSettings = {}) {
 
 // ============================================
 // DISPATCH LOG
+// DEUTSCH: Protokoll aller versendeten E-Mails und Briefe (filterbar nach Typ, Status, Mitglied)
 // ============================================
 
+// DEUTSCH: Versand-Protokoll abrufen - filterbar nach Typ (email/pingen), Status, Mitglied, Event
 app.get('/dispatch-log', authenticateAny, async (req, res) => {
     try {
         const { type, status, member_id, event_id, limit = 100 } = req.query;
@@ -2486,9 +2530,10 @@ app.get('/dispatch-log', authenticateAny, async (req, res) => {
 
 // ============================================
 // PINGEN MANAGEMENT
+// DEUTSCH: Verwaltung und Ueberwachung von Pingen-Briefen (Status, Kosten, Statistiken)
 // ============================================
 
-// Alle Pingen-Briefe abrufen
+// DEUTSCH: Alle versendeten Pingen-Briefe mit Mitglied- und Event-Infos abrufen
 app.get('/pingen/letters', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id, limit = 50 } = req.query;
@@ -2520,7 +2565,7 @@ app.get('/pingen/letters', authenticateAny, async (req, res) => {
     }
 });
 
-// Pingen Brief-Status von API abrufen
+// DEUTSCH: Aktuellen Brief-Status direkt von der Pingen-API abrufen und in DB aktualisieren
 app.get('/pingen/letters/:letterId/status', authenticateAny, async (req, res) => {
     try {
         const { letterId } = req.params;
@@ -2581,7 +2626,7 @@ app.get('/pingen/letters/:letterId/status', authenticateAny, async (req, res) =>
     }
 });
 
-// Pingen Guthaben/Info abrufen
+// DEUTSCH: Pingen-Konto-Informationen abrufen (Guthaben, Waehrung, Organisation)
 app.get('/pingen/account', authenticateAny, async (req, res) => {
     try {
         const staging = req.query.staging === 'true';
@@ -2621,7 +2666,7 @@ app.get('/pingen/account', authenticateAny, async (req, res) => {
     }
 });
 
-// Pingen Statistiken
+// DEUTSCH: Pingen-Versandstatistiken abrufen (Anzahl gesendet, ausstehend, fehlgeschlagen, letzte 7/30 Tage)
 app.get('/pingen/stats', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
@@ -2642,7 +2687,7 @@ app.get('/pingen/stats', authenticateAny, async (req, res) => {
     }
 });
 
-// Mitglieder mit Post-Zustellung abrufen
+// DEUTSCH: Liste aller Mitglieder mit Post-Zustellung und gueltiger Adresse abrufen
 app.get('/pingen/post-members', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
@@ -2672,7 +2717,8 @@ app.get('/pingen/post-members', authenticateAny, async (req, res) => {
     }
 });
 
-// Massen-PDF an alle Post-Empfänger senden
+// DEUTSCH: Massen-PDF-Versand per Post an alle oder ausgewaehlte Mitglieder (in 5er-Batches)
+// Jedes PDF bekommt die individuelle Empfaengeradresse eingebettet
 app.post('/pingen/send-bulk-pdf', authenticateAny, async (req, res) => {
     try {
         const { pdf_base64, subject, member_ids, staging = false, use_cover_page = false } = req.body;
@@ -2869,7 +2915,7 @@ app.post('/pingen/send-bulk-pdf', authenticateAny, async (req, res) => {
     }
 });
 
-// Brief manuell senden
+// DEUTSCH: Einzelnen Brief manuell erstellen und via Pingen versenden (mit Betreff und Inhalt)
 app.post('/pingen/send-manual', authenticateAny, async (req, res) => {
     try {
         const { member_id, event_id, subject, body, staging = false, use_cover_page = false } = req.body;
@@ -2951,7 +2997,7 @@ app.post('/pingen/send-manual', authenticateAny, async (req, res) => {
     }
 });
 
-// Arbeitsplan per Post senden
+// DEUTSCH: Arbeitsplan-PDF per Post an ein einzelnes Mitglied via Pingen versenden
 app.post('/pingen/send-arbeitsplan', authenticateAny, async (req, res) => {
     try {
         const { event_id, member_id, pdf_base64, staging = false, use_cover_page = false } = req.body;
@@ -3195,10 +3241,11 @@ app.post('/pingen/send-arbeitsplan', authenticateAny, async (req, res) => {
 
 // ============================================
 // PINGEN WEBHOOKS
+// DEUTSCH: Empfaengt Status-Updates von Pingen wenn sich der Brief-Status aendert
 // ============================================
 
-// Webhook-Endpoint für Pingen Status-Updates
-// Pingen sendet POST-Requests an diesen Endpoint wenn sich der Brief-Status ändert
+// DEUTSCH: Webhook-Empfaenger fuer Pingen - aktualisiert Brief-Status in DB
+// Bei "action_required" wird der Brief automatisch geloescht. Kein Auth (oeffentlich).
 app.post('/pingen/webhook', async (req, res) => {
     try {
         const { data, meta } = req.body;
@@ -3293,7 +3340,7 @@ app.post('/pingen/webhook', async (req, res) => {
     }
 });
 
-// Webhook registrieren/verwalten
+// DEUTSCH: Pingen-Webhook bei Pingen registrieren (damit Pingen Status-Updates hierher sendet)
 app.post('/pingen/webhooks/register', authenticateAny, async (req, res) => {
     try {
         const { webhook_url, staging = false } = req.body;
@@ -3343,7 +3390,7 @@ app.post('/pingen/webhooks/register', authenticateAny, async (req, res) => {
     }
 });
 
-// Registrierte Webhooks abrufen
+// DEUTSCH: Alle bei Pingen registrierten Webhooks abrufen
 app.get('/pingen/webhooks', authenticateAny, async (req, res) => {
     try {
         const staging = req.query.staging === 'true';
@@ -3376,7 +3423,7 @@ app.get('/pingen/webhooks', authenticateAny, async (req, res) => {
     }
 });
 
-// Webhook löschen
+// DEUTSCH: Einen registrierten Pingen-Webhook loeschen (nach ID)
 app.delete('/pingen/webhooks/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -3410,7 +3457,8 @@ app.delete('/pingen/webhooks/:id', authenticateAny, async (req, res) => {
     }
 });
 
-// Helper: An Pingen senden
+// DEUTSCH: Hilfsfunktion fuer den kompletten Pingen-Versandprozess
+// HTML -> PDF -> Adresse einbetten -> Upload -> Brief erstellen -> Validieren -> Versenden -> Loggen
 async function sendToPingen(html, member, memberId, eventId, staging = false, useCoverPage = false) {
     const PINGEN_API = getPingenApi(staging);
 
@@ -3621,9 +3669,10 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
 
 // ============================================
 // PDF TEMPLATES API (pdfme)
+// DEUTSCH: CRUD fuer PDF-Vorlagen (Layout, Arbeitsplan, Mitgliederbeitrag) mit pdfme-Schema
 // ============================================
 
-// Get all PDF templates
+// DEUTSCH: Alle aktiven PDF-Templates abrufen (ohne Schema-Details fuer Uebersicht)
 app.get('/pdf-templates', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
@@ -3639,7 +3688,7 @@ app.get('/pdf-templates', authenticateAny, async (req, res) => {
     }
 });
 
-// Get single PDF template
+// DEUTSCH: Einzelnes PDF-Template nach ID abrufen (inkl. vollstaendigem Schema)
 app.get('/pdf-templates/:id', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
@@ -3656,7 +3705,7 @@ app.get('/pdf-templates/:id', authenticateAny, async (req, res) => {
     }
 });
 
-// Create PDF template
+// DEUTSCH: Neues PDF-Template erstellen (Name, Slug, Kategorie, Schema, Basis-PDF)
 app.post('/pdf-templates', authenticateAny, async (req, res) => {
     try {
         const { name, slug, description, category, template_schema, base_pdf, variables } = req.body;
@@ -3682,7 +3731,7 @@ app.post('/pdf-templates', authenticateAny, async (req, res) => {
     }
 });
 
-// Update PDF template
+// DEUTSCH: PDF-Template aktualisieren (alle Felder optional, COALESCE behaelt bestehende Werte)
 app.put('/pdf-templates/:id', authenticateAny, async (req, res) => {
     try {
         const { name, slug, description, category, template_schema, base_pdf, variables, is_default } = req.body;
@@ -3714,7 +3763,7 @@ app.put('/pdf-templates/:id', authenticateAny, async (req, res) => {
     }
 });
 
-// Delete PDF template
+// DEUTSCH: PDF-Template loeschen (nach ID)
 app.delete('/pdf-templates/:id', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
@@ -3734,7 +3783,8 @@ app.delete('/pdf-templates/:id', authenticateAny, async (req, res) => {
     }
 });
 
-// Get active layout template (for dynamic PDFs)
+// DEUTSCH: Aktives Layout-Template abrufen (fuer dynamische PDFs wie Arbeitsplan, Rechnungen)
+// Gibt Standard-Layout zurueck falls kein Template konfiguriert ist
 app.get('/pdf-templates/layout/active', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(
@@ -3802,9 +3852,10 @@ app.get('/pdf-templates/layout/active', authenticateAny, async (req, res) => {
 
 // ============================================
 // ORGANISATION SETTINGS API
+// DEUTSCH: Vereins-Einstellungen (Name, Adresse, IBAN, etc.) als Key-Value-Store
 // ============================================
 
-// Get all settings
+// DEUTSCH: Alle Vereins-Einstellungen als Key-Value-Objekt abrufen
 app.get('/organisation-settings', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value, value_json, description FROM organisation_settings');
@@ -3819,7 +3870,7 @@ app.get('/organisation-settings', authenticateAny, async (req, res) => {
     }
 });
 
-// Update setting
+// DEUTSCH: Vereins-Einstellung erstellen oder aktualisieren (Upsert per Key)
 app.put('/organisation-settings/:key', authenticateAny, async (req, res) => {
     try {
         const { value, value_json } = req.body;
@@ -3844,8 +3895,10 @@ app.put('/organisation-settings/:key', authenticateAny, async (req, res) => {
 
 // ============================================
 // INVOICE GENERATION WITH SWISS QR-BILL
+// DEUTSCH: Rechnungsgenerierung mit Schweizer QR-Einzahlungsschein (QR-Bill)
 // ============================================
 
+// DEUTSCH: Standard-Layout fuer Mitgliederbeitrags-Rechnungen (Positionen in PDF-Points)
 // Default Mitgliederbeitrag Layout Settings (positions in points, A4 = 595.28 x 841.89)
 const defaultMitgliederbeitragLayout = {
     absender: { x: 400, y: 50, size: 10, lineHeight: 12 },
@@ -3865,7 +3918,8 @@ const defaultMitgliederbeitragLayout = {
 // Helper to convert mm to points (for template positions)
 const mmToPoints = (mm) => mm * 2.83465;
 
-// Generate QR invoice for a member
+// DEUTSCH: QR-Rechnung fuer ein Mitglied generieren (PDF mit Schweizer QR-Einzahlungsschein)
+// Laedt Layout aus PDF-Template, Kontodaten aus Org-Settings, Mitglied aus DB
 app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
     try {
         const {
@@ -4128,7 +4182,7 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
     }
 });
 
-// Bulk generate QR invoices for all members
+// DEUTSCH: Massen-Rechnungsgenerierung fuer alle Mitglieder (optional nach Status filtern)
 app.post('/invoices/generate-bulk', authenticateAny, async (req, res) => {
     try {
         const {
@@ -4180,6 +4234,7 @@ app.post('/invoices/generate-bulk', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 app.listen(PORT, () => {
     console.log(`API-Dispatch running on port ${PORT}`);
 });

@@ -1,7 +1,9 @@
--- Migration 012: PDF Templates (pdfme) and Organisation Settings
+-- DEUTSCH: Migration 012 — PDF-Templates und Vereinseinstellungen
+-- DEUTSCH: Erstellt Tabellen für den pdfme-Layout-Editor und konfigurierbare Vereinsdaten
+-- DEUTSCH: Hinweis: Diese Tabellen existieren auch in init.sql — IF NOT EXISTS verhindert Duplikate
 -- ============================================
 
--- PDF Templates für pdfme Layout-Editor
+-- DEUTSCH: PDF-Vorlagen für den visuellen PDF-Editor (pdfme)
 CREATE TABLE IF NOT EXISTS pdf_templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
@@ -33,7 +35,7 @@ CREATE TABLE IF NOT EXISTS pdf_templates (
 CREATE INDEX IF NOT EXISTS idx_pdf_templates_slug ON pdf_templates(slug);
 CREATE INDEX IF NOT EXISTS idx_pdf_templates_category ON pdf_templates(category);
 
--- Organisation Settings (für Logo, Farben, Bankdaten etc.)
+-- DEUTSCH: Vereinseinstellungen (Logo, Farben, Bankdaten, Kontaktinfos etc.)
 CREATE TABLE IF NOT EXISTS organisation_settings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     key VARCHAR(100) UNIQUE NOT NULL,
@@ -43,7 +45,7 @@ CREATE TABLE IF NOT EXISTS organisation_settings (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Default Organisation Settings einfügen (nur wenn nicht existiert)
+-- DEUTSCH: Standard-Vereinseinstellungen einfügen (nur wenn Tabelle noch leer ist)
 INSERT INTO organisation_settings (key, value, description)
 SELECT * FROM (VALUES
     ('org_name', 'Feuerwehrverein Raura', 'Name der Organisation'),

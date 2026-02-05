@@ -1,6 +1,31 @@
+/**
+ * html-to-pdf.js - Konvertiert calendar-events.html zu PDF
+ *
+ * Einfaches Script zur PDF-Generierung mit Puppeteer (Headless Chrome).
+ * Wird typischerweise nach generate-calendar-pdf.js ausgefuehrt,
+ * das die HTML-Datei erstellt.
+ *
+ * Verwendung: node scripts/html-to-pdf.js
+ *
+ * Ein-/Ausgabe:
+ * - Input: calendar-events.html (im Wurzelverzeichnis)
+ * - Output: calendar-events.pdf (im Wurzelverzeichnis)
+ *
+ * PDF-Einstellungen:
+ * - A4-Format
+ * - 2cm Rand auf allen Seiten
+ * - Hintergrunddruck aktiviert (CSS backgrounds)
+ */
 const puppeteer = require('puppeteer');
 const path = require('path');
 
+/**
+ * Generiert die PDF-Datei
+ *
+ * Startet Headless Chrome, laedt die HTML-Datei,
+ * wartet bis alle Ressourcen geladen sind und
+ * exportiert als PDF.
+ */
 async function generatePDF() {
     const browser = await puppeteer.launch({
         headless: 'new',
@@ -34,7 +59,8 @@ async function generatePDF() {
     console.log(`PDF generated: ${pdfPath}`);
 }
 
+// Hauptprogramm: PDF generieren, bei Fehler mit Exit-Code 1 beenden
 generatePDF().catch(error => {
-    console.error('Error generating PDF:', error);
+    console.error('Fehler bei PDF-Generierung:', error);
     process.exit(1);
 });

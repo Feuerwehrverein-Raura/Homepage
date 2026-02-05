@@ -1,8 +1,28 @@
 #!/usr/bin/env node
 
 /**
- * Event Letter Sender via Pingen API
- * Sends beautiful PDF letters via Swiss Post for members who prefer postal mail
+ * send-event-letter.js - Briefversand für Vereinsanlässe via Pingen
+ *
+ * Versendet druckfertige Einladungsbriefe per Post an Mitglieder
+ * ohne E-Mail-Zustellung. Verwendet die Pingen API für den
+ * Schweizer Postversand (A-Post/B-Post).
+ *
+ * Verwendung: node scripts/send-event-letter.js <event-file.md>
+ *
+ * Workflow:
+ * 1. Parst Event-Markdown-Datei
+ * 2. Lädt Empfänger aus mitglieder_data.json (zustellung-post=true)
+ * 3. Generiert personalisierte HTML-Briefe
+ * 4. Sendet über Pingen API an Schweizer Post
+ *
+ * Umgebungsvariablen:
+ * - PINGEN_API_KEY: API-Schlüssel für Pingen
+ * - PINGEN_STAGING: 'true' für Testumgebung (keine echten Briefe)
+ *
+ * Brief-Layout:
+ * - A4-Format mit Schweizer Brief-Normen
+ * - FWV-Branding (Rot #dc2626)
+ * - Adressfenster-kompatibel
  */
 
 const https = require('https');
@@ -23,7 +43,11 @@ if (args.length === 0) {
 const eventFile = args[0];
 
 /**
- * Parse event markdown file
+ * Parst eine Event-Markdown-Datei
+ * (Identisch zu send-event-email.js)
+ *
+ * @param {string} filePath - Pfad zur .md Datei
+ * @returns {Object} Event-Objekt mit Frontmatter + description
  */
 function parseEventFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -43,7 +67,9 @@ function parseEventFile(filePath) {
 }
 
 /**
- * Parse YAML frontmatter
+ * Parst YAML-Frontmatter zu einem Objekt
+ * @param {string} str - YAML-String ohne ---
+ * @returns {Object} Geparstes Objekt
  */
 function parseFrontmatter(str) {
     const result = {};
@@ -65,7 +91,11 @@ function parseFrontmatter(str) {
 }
 
 /**
- * Format date for display
+ * Formatiert Datum für Schweizer Anzeige
+ * Beispiel: "Samstag, 15. Juni 2024"
+ *
+ * @param {string} dateStr - ISO-8601 Datums-String
+ * @returns {string} Formatiertes Datum (de-CH Locale)
  */
 function formatDate(dateStr) {
     const date = new Date(dateStr);
@@ -78,7 +108,9 @@ function formatDate(dateStr) {
 }
 
 /**
- * Format time for display
+ * Formatiert Uhrzeit für Anzeige (Schweizer Format)
+ * @param {string} dateStr - ISO-8601 Datums-String
+ * @returns {string} Formatierte Uhrzeit (HH:mm)
  */
 function formatTime(dateStr) {
     const date = new Date(dateStr);
@@ -89,7 +121,15 @@ function formatTime(dateStr) {
 }
 
 /**
- * Load letter recipients from member data
+ * Lädt Brief-Empfänger aus Mitgliederdaten
+ *
+ * Filtert Mitglieder mit:
+ * - Status = Aktivmitglied oder Ehrenmitglied
+ * - zustellung-post = true
+ * - Vollständige Adresse (Strasse, PLZ, Ort)
+ *
+ * @returns {Array<{name: string, address: Object}>} Empfänger mit Adressen
+ * @throws {Error} Wenn mitglieder_data.json nicht gefunden
  */
 function loadRecipients() {
     // Load from mitglieder_data.json
@@ -123,7 +163,18 @@ function loadRecipients() {
 }
 
 /**
- * Generate PDF content for letter using LaTeX/HTML
+ * Generiert druckfertiges HTML für einen Einladungsbrief
+ *
+ * Layout nach Schweizer Brief-Normen:
+ * - Absender oben links (klein)
+ * - Empfänger im Adressfenster-Bereich
+ * - Datum rechtsbündig
+ * - Event-Details in grauer Box
+ * - Fusszeile mit Kontaktdaten
+ *
+ * @param {Object} event - Event-Objekt mit Frontmatter
+ * @param {Object} recipient - Empfänger mit name und address
+ * @returns {string} Komplettes HTML-Dokument für Pingen
  */
 function generateLetterHTML(event, recipient) {
     const today = new Date().toLocaleDateString('de-CH');
@@ -287,7 +338,13 @@ function generateLetterHTML(event, recipient) {
 }
 
 /**
- * Convert HTML to PDF using external service (e.g., wkhtmltopdf or similar)
+ * Speichert HTML temporär für Pingen-Upload
+ *
+ * Pingen konvertiert HTML serverseitig zu PDF
+ * (wkhtmltopdf oder ähnlich)
+ *
+ * @param {string} html - HTML-Inhalt des Briefs
+ * @returns {Promise<string>} Pfad zur temporären HTML-Datei
  */
 async function htmlToPdf(html) {
     // For production, you'd use a PDF generation library
@@ -299,7 +356,16 @@ async function htmlToPdf(html) {
 }
 
 /**
- * Send letter via Pingen API
+ * Sendet einen Brief über die Pingen API
+ *
+ * Pingen API v2:
+ * - Multipart Form-Data Upload
+ * - Empfänger-Adresse als Formfelder
+ * - Versandgeschwindigkeit: priority (A-Post) oder economy (B-Post)
+ *
+ * @param {string} pdfPath - Pfad zur HTML/PDF-Datei
+ * @param {Object} recipient - Empfänger mit name und address
+ * @returns {Promise<Object>} Pingen API Response mit Brief-ID
  */
 async function sendLetterViaPingen(pdfPath, recipient) {
     return new Promise((resolve, reject) => {
@@ -386,7 +452,13 @@ async function sendLetterViaPingen(pdfPath, recipient) {
 }
 
 /**
- * Main function
+ * Hauptfunktion - Orchestriert den Brief-Versand
+ *
+ * 1. Prüft PINGEN_API_KEY
+ * 2. Parst Event-Datei
+ * 3. Lädt Empfänger mit Post-Zustellung
+ * 4. Generiert und sendet Briefe einzeln
+ * 5. Gibt Zusammenfassung aus (1-2 Werktage Zustellung)
  */
 async function main() {
     try {

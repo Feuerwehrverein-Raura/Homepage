@@ -1,15 +1,52 @@
+/**
+ * pdf-generator.js - PDF-Generator fuer Arbeitsplaene und Event-Uebersichten
+ *
+ * Generiert professionelle PDF-Dokumente fuer:
+ * 1. Einzelne Arbeitsplaene (Schichtplan pro Event)
+ * 2. Event-Uebersichten (alle Events mit Statistiken)
+ *
+ * Features:
+ * - Statistik-Dashboard (besetzte/offene Schichten)
+ * - Kritische Bereiche hervorgehoben (rot)
+ * - FWV-Branding (Rot #d32f2f)
+ * - Kontaktdaten und Springer-System
+ * - Header/Footer mit Seitenzahlen
+ *
+ * Verwendung:
+ *   const generator = new PDFGenerator();
+ *   await generator.initialize();
+ *   await generator.generateShiftPlanPDF(event, assignments, markdown);
+ *   await generator.close();
+ *
+ * Ausgabe-Verzeichnis: pdfs/ im Wurzelverzeichnis
+ */
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const FWV_CONFIG = require('./config.js');
 
+/**
+ * PDFGenerator-Klasse fuer Arbeitsplan-PDFs
+ *
+ * Verwaltet eine Puppeteer-Browser-Instanz fuer effiziente
+ * Batch-Generierung mehrerer PDFs.
+ */
 class PDFGenerator {
+    /**
+     * Konstruktor - Setzt Pfade fuer Ausgabe und Logo
+     */
     constructor() {
-        this.browser = null;
-        this.outputDir = path.join(__dirname, '..', 'pdfs');
+        this.browser = null;                                    // Puppeteer Browser-Instanz
+        this.outputDir = path.join(__dirname, '..', 'pdfs');   // Ausgabeverzeichnis
         this.logoPath = path.join(__dirname, '..', 'images', 'logo.png');
     }
 
+    /**
+     * Initialisiert den PDF-Generator
+     *
+     * Muss VOR generateShiftPlanPDF/generateOverviewPDF aufgerufen werden.
+     * Erstellt Output-Verzeichnis und startet Headless Chrome.
+     */
     async initialize() {
         // Ensure output directory exists
         if (!fs.existsSync(this.outputDir)) {
@@ -23,6 +60,20 @@ class PDFGenerator {
         });
     }
 
+    /**
+     * Generiert PDF fuer einen einzelnen Arbeitsplan/Schichtplan
+     *
+     * Enthaelt:
+     * - Statistik-Dashboard mit Besetzungsgrad
+     * - Kritische Schichten (0 Anmeldungen)
+     * - Schicht-Tabellen nach Kategorien
+     * - Kontakt- und Springer-Informationen
+     *
+     * @param {Object} event - Event-Objekt mit id, title, shifts, etc.
+     * @param {Array} assignments - Array von Schicht-Zuweisungen
+     * @param {string} markdownContent - Optionaler Markdown-Inhalt
+     * @returns {Promise<string>} Pfad zur generierten PDF
+     */
     async generateShiftPlanPDF(event, assignments, markdownContent) {
         if (!this.browser) {
             throw new Error('PDF Generator not initialized. Call initialize() first.');
@@ -70,6 +121,18 @@ class PDFGenerator {
         }
     }
 
+    /**
+     * Generiert PDF mit Uebersicht aller Events
+     *
+     * Zeigt fuer jedes Event:
+     * - Titel, Datum, Ort
+     * - Besetzungsstatistik
+     * - Kritische Bereiche
+     *
+     * @param {Array} events - Array von Event-Objekten
+     * @param {Object} allAssignments - Map von eventId zu assignments[]
+     * @returns {Promise<string>} Pfad zur generierten PDF
+     */
     async generateOverviewPDF(events, allAssignments) {
         if (!this.browser) {
             throw new Error('PDF Generator not initialized. Call initialize() first.');
@@ -113,6 +176,10 @@ class PDFGenerator {
         }
     }
 
+    /**
+     * Erstellt HTML-Inhalt fuer einen Arbeitsplan
+     * (interner Helfer fuer generateShiftPlanPDF)
+     */
     createHTMLContent(event, assignments, markdownContent) {
         const stats = this.calculateStats(event, assignments);
         const criticalShifts = this.findCriticalShifts(event, assignments);
@@ -203,6 +270,10 @@ class PDFGenerator {
 </html>`;
     }
 
+    /**
+     * Erstellt HTML-Inhalt fuer die Event-Uebersicht
+     * (interner Helfer fuer generateOverviewPDF)
+     */
     createOverviewHTML(events, allAssignments) {
         return `
 <!DOCTYPE html>
@@ -240,6 +311,13 @@ class PDFGenerator {
 </html>`;
     }
 
+    /**
+     * Erstellt HTML-Sektion fuer ein einzelnes Event in der Uebersicht
+     *
+     * @param {Object} event - Event-Objekt
+     * @param {Array} assignments - Zuweisungen fuer dieses Event
+     * @returns {string} HTML-String fuer die Event-Sektion
+     */
     generateEventOverviewSection(event, assignments) {
         const stats = this.calculateStats(event, assignments);
         const criticalShifts = this.findCriticalShifts(event, assignments);
@@ -275,6 +353,16 @@ class PDFGenerator {
         </section>`;
     }
 
+    /**
+     * Generiert alle Schicht-Sektionen gruppiert nach Kategorie
+     *
+     * Kategorien: aufbau, samstag, sonntag, abbau, sonstige
+     * Jede Kategorie erhaelt eigenen Titel und Tabelle
+     *
+     * @param {Object} event - Event mit shifts-Array
+     * @param {Array} assignments - Alle Schicht-Zuweisungen
+     * @returns {string} HTML-String aller Schicht-Sektionen
+     */
     generateShiftSections(event, assignments) {
         const shiftsByCategory = this.groupShiftsByCategory(event.shifts);
         let sections = '';
@@ -302,6 +390,17 @@ class PDFGenerator {
         return sections;
     }
 
+    /**
+     * Waehlt Tabellen-Typ basierend auf Kategorie
+     *
+     * Samstag/Sonntag: Zeitslot-gruppierte Tabelle (komplexer)
+     * Andere: Einfache Schicht-Tabelle
+     *
+     * @param {Array} shifts - Schichten dieser Kategorie
+     * @param {Array} assignments - Zuweisungen
+     * @param {string} category - Kategorie-Name
+     * @returns {string} HTML-Tabelle
+     */
     generateShiftTable(shifts, assignments, category) {
         if (category === 'samstag' || category === 'sonntag') {
             return this.generateDailyShiftTable(shifts, assignments);
@@ -309,6 +408,17 @@ class PDFGenerator {
         return this.generateSimpleShiftTable(shifts, assignments);
     }
 
+    /**
+     * Generiert Tabelle fuer Tagesschichten (Samstag/Sonntag)
+     *
+     * Gruppiert Schichten nach Zeitslot (z.B. 10:00-14:00)
+     * und zeigt Bar/Kueche/Kasse nebeneinander.
+     * Status-Farben: gruen=besetzt, orange=teilweise, rot=kritisch
+     *
+     * @param {Array} shifts - Schichten eines Tages
+     * @param {Array} assignments - Zuweisungen
+     * @returns {string} HTML mit Zeitslot-gruppierten Tabellen
+     */
     generateDailyShiftTable(shifts, assignments) {
         const timeSlots = new Map();
 
@@ -392,6 +502,15 @@ class PDFGenerator {
         return html;
     }
 
+    /**
+     * Generiert einfache Schicht-Tabelle (Aufbau/Abbau/Sonstige)
+     *
+     * Eine Zeile pro Schicht mit: Name, Zeit, Benoetigt, Zugewiesen, Status, Helfer
+     *
+     * @param {Array} shifts - Schichten
+     * @param {Array} assignments - Zuweisungen
+     * @returns {string} HTML-Tabelle
+     */
     generateSimpleShiftTable(shifts, assignments) {
         let html = `
         <table class="shift-table">
@@ -446,6 +565,15 @@ class PDFGenerator {
         return html;
     }
 
+    /**
+     * Generiert Warnungs-Sektion fuer kritische Schichten
+     *
+     * Zeigt alle Schichten mit 0 Anmeldungen in rotem Warnkasten
+     * mit dringendem Aufruf zur Anmeldung.
+     *
+     * @param {Array} criticalShifts - Schichten ohne Anmeldungen
+     * @returns {string} HTML-Warnungs-Sektion
+     */
     generateCriticalSection(criticalShifts) {
         return `
         <section class="critical-section">
@@ -465,6 +593,17 @@ class PDFGenerator {
         </section>`;
     }
 
+    /**
+     * Liefert CSS-Styles fuer PDF-Dokumente
+     *
+     * Enthaelt:
+     * - FWV-Branding (Rot #d32f2f)
+     * - Statistik-Karten mit Farbcodes
+     * - Tabellen-Styles mit Status-Farben
+     * - Print-spezifische Styles (Seitenumbruch)
+     *
+     * @returns {string} CSS-String
+     */
     getCSS() {
         return `
         * {
@@ -836,6 +975,12 @@ class PDFGenerator {
         `;
     }
 
+    /**
+     * Liefert HTML-Template fuer PDF-Kopfzeile (Einzelner Arbeitsplan)
+     *
+     * @param {Object} event - Event fuer Titel
+     * @returns {string} HTML-Header-Template fuer Puppeteer
+     */
     getHeaderTemplate(event) {
         return `
         <div style="font-size: 10px; padding: 5px 15px; width: 100%; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd;">
@@ -844,6 +989,11 @@ class PDFGenerator {
         </div>`;
     }
 
+    /**
+     * Liefert HTML-Template fuer PDF-Kopfzeile (Uebersicht)
+     *
+     * @returns {string} HTML-Header-Template fuer Puppeteer
+     */
     getOverviewHeaderTemplate() {
         return `
         <div style="font-size: 10px; padding: 5px 15px; width: 100%; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd;">
@@ -852,6 +1002,13 @@ class PDFGenerator {
         </div>`;
     }
 
+    /**
+     * Liefert HTML-Template fuer PDF-Fusszeile
+     *
+     * Enthaelt: Generierungsdatum und Seitenzahlen
+     *
+     * @returns {string} HTML-Footer-Template mit pageNumber/totalPages
+     */
     getFooterTemplate() {
         return `
         <div style="font-size: 10px; padding: 5px 15px; width: 100%; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ddd;">
@@ -860,6 +1017,13 @@ class PDFGenerator {
         </div>`;
     }
 
+    /**
+     * Berechnet Besetzungs-Statistiken fuer ein Event
+     *
+     * @param {Object} event - Event mit shifts-Array
+     * @param {Array} assignments - Zuweisungen
+     * @returns {{total: number, filled: number, open: number, fillPercentage: number}}
+     */
     calculateStats(event, assignments) {
         const totalShifts = event.shifts ? event.shifts.length : 0;
         const filledShifts = new Set(assignments.map(a => a.shiftId)).size;
@@ -874,18 +1038,38 @@ class PDFGenerator {
         };
     }
 
+    /**
+     * Findet kritische Schichten (0 Anmeldungen)
+     *
+     * @param {Object} event - Event mit shifts-Array
+     * @param {Array} assignments - Zuweisungen
+     * @returns {Array} Schichten ohne jegliche Anmeldung
+     */
     findCriticalShifts(event, assignments) {
         if (!event.shifts) return [];
-        
+
         return event.shifts.filter(shift => {
             const assignedCount = assignments.filter(a => a.shiftId === shift.id).length;
             return assignedCount === 0;
         });
     }
 
+    /**
+     * Gruppiert Schichten nach Kategorie
+     *
+     * Erkennt Kategorie anhand der Schicht-ID:
+     * - "aufbau" in ID → Aufbau
+     * - "abbau" in ID → Abbau
+     * - "samstag" in ID → Chilbi Samstag
+     * - "sonntag" in ID → Chilbi Sonntag
+     * - Sonst → Sonstige
+     *
+     * @param {Array} shifts - Alle Schichten eines Events
+     * @returns {Map<string, Array>} Map von Kategorie zu Schichten
+     */
     groupShiftsByCategory(shifts) {
         const categories = new Map();
-        
+
         for (const shift of shifts) {
             let category;
             if (shift.id.includes('aufbau')) {
@@ -909,6 +1093,15 @@ class PDFGenerator {
         return categories;
     }
 
+    /**
+     * Formatiert Event-Datum fuer Anzeige (Deutsch)
+     *
+     * Ein Tag: "Samstag, 15. Juni 2024"
+     * Mehrere Tage: "15. Juni-16. Juni 2024"
+     *
+     * @param {Object} event - Event mit startDate und endDate
+     * @returns {string} Formatiertes Datum
+     */
     formatEventDate(event) {
         const start = new Date(event.startDate);
         const end = new Date(event.endDate);
@@ -932,6 +1125,11 @@ class PDFGenerator {
         }
     }
 
+    /**
+     * Schliesst den PDF-Generator und beendet Puppeteer
+     *
+     * Sollte am Ende aufgerufen werden, um Ressourcen freizugeben.
+     */
     async close() {
         if (this.browser) {
             await this.browser.close();

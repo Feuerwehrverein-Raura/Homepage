@@ -1,24 +1,39 @@
-const sqlite3 = require('sqlite3').verbose();
+/**
+ * database.js - SQLite Datenbank-Initialisierung und Wrapper
+ *
+ * Tabellen:
+ * - event_registrations: Event-Anmeldungen (Helfer/Teilnehmer)
+ * - newsletter_subscribers: Newsletter-Abonnenten
+ * - pending_members: Pendente Mitgliedschaftsanträge
+ * - member_mutations: Datenänderungsanfragen
+ * - otp_codes: Temporäre OTP-Codes
+ * - contact_submissions: Kontaktformular-Log
+ *
+ * Wrapper-Funktionen: runQuery, getQuery, allQuery (Promise-basiert)
+ */
+const sqlite3 = require('sqlite3').verbose();  // .verbose() für bessere Fehlermeldungen
 const path = require('path');
 
+// Datenbankpfad aus Umgebungsvariable oder Standard
 const dbPath = process.env.DB_PATH || '/data/fwv-raura.db';
 
-// Initialize database
+// ========== DATENBANKVERBINDUNG ==========
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Database connection error:', err);
-        process.exit(1);
+        process.exit(1);  // Bei Fehler Server beenden
     }
     console.log('✅ SQLite database connected:', dbPath);
 });
 
-// Enable foreign keys and WAL mode for better concurrent access
-db.run('PRAGMA foreign_keys = ON');
-db.run('PRAGMA journal_mode = WAL');
+// ========== DATENBANK-OPTIMIERUNGEN ==========
+db.run('PRAGMA foreign_keys = ON');    // Fremdschlüssel aktivieren
+db.run('PRAGMA journal_mode = WAL');   // Write-Ahead Logging für bessere Parallelität
 
-// Initialize tables
+// ========== TABELLEN INITIALISIERUNG ==========
+// db.serialize() stellt sicher, dass alle Statements sequentiell ausgeführt werden
 db.serialize(() => {
-    // Event registrations
+    // Tabelle: Event-Anmeldungen (Helfer und Teilnehmer)
     db.run(`
         CREATE TABLE IF NOT EXISTS event_registrations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +50,7 @@ db.serialize(() => {
         )
     `);
 
-    // Newsletter subscribers
+    // Tabelle: Newsletter-Abonnenten
     db.run(`
         CREATE TABLE IF NOT EXISTS newsletter_subscribers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +61,7 @@ db.serialize(() => {
         )
     `);
 
-    // Members (pending approval)
+    // Tabelle: Pendente Mitgliedschaftsanträge (warten auf Vorstand-Genehmigung)
     db.run(`
         CREATE TABLE IF NOT EXISTS pending_members (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,7 +80,7 @@ db.serialize(() => {
         )
     `);
 
-    // Member mutations (pending changes)
+    // Tabelle: Datenänderungsanfragen von Mitgliedern
     db.run(`
         CREATE TABLE IF NOT EXISTS member_mutations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,7 +93,7 @@ db.serialize(() => {
         )
     `);
 
-    // OTP codes (temporary)
+    // Tabelle: OTP-Codes (temporär, 5 Min gültig)
     db.run(`
         CREATE TABLE IF NOT EXISTS otp_codes (
             email TEXT PRIMARY KEY,
@@ -89,7 +104,7 @@ db.serialize(() => {
         )
     `);
 
-    // Contact form submissions (log)
+    // Tabelle: Kontaktformular-Log (für Audit/Debugging)
     db.run(`
         CREATE TABLE IF NOT EXISTS contact_submissions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,16 +120,32 @@ db.serialize(() => {
     console.log('✅ Database tables initialized');
 });
 
-// Helper functions
+// ========== PROMISE-BASIERTE WRAPPER ==========
+// SQLite3 verwendet Callbacks, diese Wrapper ermöglichen async/await
+
+/**
+ * Führt INSERT, UPDATE oder DELETE aus
+ * @param {string} sql - SQL Statement mit ? Platzhaltern
+ * @param {Array} params - Parameter für Platzhalter
+ * @returns {Promise<{id: number, changes: number}>} lastID und Anzahl Änderungen
+ */
 function runQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.run(sql, params, function(err) {
             if (err) reject(err);
+            // this.lastID = ID des eingefügten Datensatzes
+            // this.changes = Anzahl geänderter Zeilen
             else resolve({ id: this.lastID, changes: this.changes });
         });
     });
 }
 
+/**
+ * Holt eine einzelne Zeile (SELECT ... LIMIT 1)
+ * @param {string} sql - SQL SELECT Statement
+ * @param {Array} params - Parameter für Platzhalter
+ * @returns {Promise<Object|undefined>} Zeile als Objekt oder undefined
+ */
 function getQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.get(sql, params, (err, row) => {
@@ -124,6 +155,12 @@ function getQuery(sql, params = []) {
     });
 }
 
+/**
+ * Holt alle Zeilen eines SELECT
+ * @param {string} sql - SQL SELECT Statement
+ * @param {Array} params - Parameter für Platzhalter
+ * @returns {Promise<Array>} Array von Zeilen-Objekten
+ */
 function allQuery(sql, params = []) {
     return new Promise((resolve, reject) => {
         db.all(sql, params, (err, rows) => {

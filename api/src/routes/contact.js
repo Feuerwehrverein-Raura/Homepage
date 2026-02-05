@@ -1,18 +1,36 @@
+/**
+ * contact.js - Kontaktformular mit Anti-Spam-Schutz
+ *
+ * Spam-Schutzmassnahmen:
+ * 1. Cloudflare Turnstile (Captcha-Alternative)
+ * 2. Honeypot-Feld (_honeypot muss leer sein)
+ * 3. Zeit-Check (Formular muss min. 3 Sek. ausgefüllt werden)
+ * 4. Rate Limiting (max. 3 Anfragen pro IP/Stunde)
+ * 5. Content-Filtering (Spam-Muster erkennen)
+ *
+ * Empfänger wird basierend auf Betreff dynamisch bestimmt
+ */
 const express = require('express');
 const router = express.Router();
 const { sendMail } = require('../utils/mailer');
 const { getFile } = require('../utils/github');
 
-// Cloudflare Turnstile secret key (set via environment variable)
+// Cloudflare Turnstile Secret Key (Umgebungsvariable)
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY || '';
 
 /**
- * Verify Cloudflare Turnstile token
+ * Verifiziert Cloudflare Turnstile Token
+ * Turnstile ist eine benutzerfreundliche Captcha-Alternative von Cloudflare
+ *
+ * @param {string} token - Vom Frontend übermittelter Turnstile-Token
+ * @param {string} ip - Client-IP-Adresse
+ * @returns {Promise<boolean>} true wenn gültig, false wenn Spam
  */
 async function verifyTurnstile(token, ip) {
+    // Wenn kein Secret konfiguriert, Prüfung überspringen
     if (!TURNSTILE_SECRET) {
         console.log('[Turnstile] No secret key configured, skipping verification');
-        return true; // Skip if not configured
+        return true;
     }
 
     if (!token) {
@@ -21,6 +39,7 @@ async function verifyTurnstile(token, ip) {
     }
 
     try {
+        // Turnstile API aufrufen zur Token-Verifizierung
         const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -38,20 +57,20 @@ async function verifyTurnstile(token, ip) {
         return result.success;
     } catch (error) {
         console.error('[Turnstile] Verification error:', error);
-        return true; // Allow on error to not block legitimate users
+        return true;  // Bei Fehler durchlassen um echte Benutzer nicht zu blockieren
     }
 }
 
-/**
- * Anti-Spam: Rate limiting store (IP -> { count, firstRequest })
- */
+// ========== RATE LIMITING KONFIGURATION ==========
+// In-Memory-Speicher für Rate-Limiting (IP -> { count, firstRequest })
 const rateLimitStore = new Map();
-const RATE_LIMIT_MAX = 3; // Max requests per hour
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
-const MIN_SUBMIT_TIME = 3000; // Minimum 3 seconds between form load and submit
+const RATE_LIMIT_MAX = 3;              // Max. 3 Anfragen pro IP
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000;  // Zeitfenster: 1 Stunde
+const MIN_SUBMIT_TIME = 3000;          // Min. 3 Sekunden für Formular-Ausfüllen
 
 /**
- * Clean up old rate limit entries every hour
+ * Bereinigt abgelaufene Rate-Limit-Einträge (stündlich)
+ * Verhindert Memory-Leaks bei vielen verschiedenen IPs
  */
 setInterval(() => {
     const now = Date.now();
@@ -63,23 +82,35 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW);
 
 /**
- * Anti-Spam: Check for spam patterns in content
+ * Prüft Inhalt auf typische Spam-Muster
+ *
+ * Erkannte Muster:
+ * - BBCode Links ([url=...], [link=...])
+ * - HTML Links (<a href=...>)
+ * - Typische Spam-Wörter (viagra, casino, crypto invest, etc.)
+ * - Verdächtige TLDs (.ru, .cn, .tk, etc.)
+ *
+ * @param {string} text - Zu prüfender Text
+ * @returns {boolean} true wenn Spam erkannt
  */
 function containsSpamPatterns(text) {
     const spamPatterns = [
-        /\[url=/i,
-        /\[link=/i,
-        /<a\s+href/i,
-        /viagra|cialis|casino|lottery|crypto.*invest|bitcoin.*profit/i,
-        /click\s+here.*http/i,
-        /earn\s+\$?\d+.*day/i,
-        /http[s]?:\/\/[^\s]+\.(ru|cn|tk|ml|ga|cf)\//i,
+        /\[url=/i,                                              // BBCode URL
+        /\[link=/i,                                             // BBCode Link
+        /<a\s+href/i,                                           // HTML Link
+        /viagra|cialis|casino|lottery|crypto.*invest|bitcoin.*profit/i,  // Spam-Wörter
+        /click\s+here.*http/i,                                  // "Click here" + URL
+        /earn\s+\$?\d+.*day/i,                                  // "Earn $X per day"
+        /http[s]?:\/\/[^\s]+\.(ru|cn|tk|ml|ga|cf)\//i,         // Verdächtige TLDs
     ];
     return spamPatterns.some(pattern => pattern.test(text));
 }
 
 /**
- * Extract email from markdown file
+ * Extrahiert E-Mail-Adresse aus Markdown-Datei (Front-Matter)
+ *
+ * @param {string} markdown - Markdown-Inhalt
+ * @returns {string|null} E-Mail-Adresse oder null
  */
 function extractEmail(markdown) {
     const match = markdown.match(/email:\s*(.+)/i);
@@ -88,12 +119,23 @@ function extractEmail(markdown) {
 
 /**
  * POST /api/contact
- * Handle contact form submission
+ * Verarbeitet Kontaktformular-Anfragen
+ *
+ * Body:
+ * - name, email, subject, message: Pflichtfelder
+ * - membership: Optional, für Mitgliedschaftsanfragen
+ * - _honeypot: Anti-Spam (muss leer sein)
+ * - _timestamp: Anti-Spam (Zeit seit Formular-Laden)
+ * - _turnstile: Cloudflare Turnstile Token
+ *
+ * Sendet E-Mail an Vorstand und Bestätigung an Absender
  */
 router.post('/', async (req, res) => {
     try {
         const { name, email, subject, message, type, membership, _honeypot, _timestamp, _turnstile } = req.body;
         const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+
+        // ========== ANTI-SPAM PRÜFUNGEN ==========
 
         // Anti-Spam: Turnstile verification (if configured)
         if (TURNSTILE_SECRET) {

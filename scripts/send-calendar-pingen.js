@@ -1,8 +1,34 @@
+/**
+ * send-calendar-pingen.js - Kalender-PDF Massenversand via Pingen
+ *
+ * Versendet das Jahreskalender-PDF an alle Mitglieder mit Post-Zustellung.
+ * Verwendet Pingen API v2 mit OAuth2-Authentifizierung.
+ *
+ * Verwendung: node scripts/send-calendar-pingen.js
+ *
+ * Voraussetzungen:
+ * - calendar-events.pdf im Wurzelverzeichnis
+ * - mitglieder_data.json mit Mitgliederdaten
+ * - Pingen API-Credentials
+ *
+ * Workflow:
+ * 1. OAuth2 Token von Pingen Identity Server holen
+ * 2. Upload-URL für PDF anfordern
+ * 3. PDF zu Pingen hochladen
+ * 4. Für jeden Empfänger einen Brief erstellen
+ * 5. auto_send=true löst automatischen Versand aus
+ *
+ * Umgebungsvariablen:
+ * - PINGEN_CLIENT_ID: OAuth2 Client ID
+ * - PINGEN_CLIENT_SECRET: OAuth2 Client Secret
+ * - PINGEN_ORGANISATION_ID: Pingen Organisations-ID
+ * - PINGEN_STAGING: 'true' für Testumgebung
+ */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-// Pingen API Configuration
+// Pingen API Konfiguration (Staging vs. Produktion)
 const isStaging = process.env.PINGEN_STAGING === 'true';
 const identityUrl = isStaging ? 'identity-staging.pingen.com' : 'identity.pingen.com';
 const apiUrl = isStaging ? 'api-staging.pingen.com' : 'api.pingen.com';
@@ -11,7 +37,11 @@ const clientId = process.env.PINGEN_CLIENT_ID;
 const clientSecret = process.env.PINGEN_CLIENT_SECRET;
 const organisationId = process.env.PINGEN_ORGANISATION_ID;
 
-// Load members with postal delivery
+/**
+ * Lädt alle Mitglieder mit Post-Zustellung
+ *
+ * @returns {Array<Object>} Mitglieder mit zustellung-post=true
+ */
 function loadPostMembers() {
     const membersPath = path.join(__dirname, '..', 'mitglieder_data.json');
     const members = JSON.parse(fs.readFileSync(membersPath, 'utf8'));
@@ -19,7 +49,14 @@ function loadPostMembers() {
     return members.filter(m => m['zustellung-post'] === true);
 }
 
-// Get OAuth2 access token
+/**
+ * Holt OAuth2 Access Token von Pingen Identity Server
+ *
+ * Verwendet Client Credentials Grant (M2M Authentifizierung)
+ * Scope: letter batch (für Briefversand und Batch-Operationen)
+ *
+ * @returns {Promise<string>} Access Token für API-Aufrufe
+ */
 async function getAccessToken() {
     return new Promise((resolve, reject) => {
         const postData = new URLSearchParams({
@@ -59,7 +96,15 @@ async function getAccessToken() {
     });
 }
 
-// Get file upload URL
+/**
+ * Fordert eine signierte Upload-URL von Pingen an
+ *
+ * Die URL ist nur für kurze Zeit gültig und enthält
+ * eine Signatur zur Verifizierung beim Brief-Erstellen.
+ *
+ * @param {string} accessToken - OAuth2 Access Token
+ * @returns {Promise<{url: string, urlSignature: string}>} Upload-URL mit Signatur
+ */
 async function getUploadUrl(accessToken) {
     return new Promise((resolve, reject) => {
         const options = {
@@ -93,7 +138,16 @@ async function getUploadUrl(accessToken) {
     });
 }
 
-// Upload PDF to Pingen's storage
+/**
+ * Lädt PDF zu Pingen's Speicher hoch
+ *
+ * Verwendet PUT-Request mit Binary-Content
+ * Die URL stammt von getUploadUrl()
+ *
+ * @param {string} uploadUrl - Signierte Upload-URL
+ * @param {string} pdfPath - Lokaler Pfad zur PDF-Datei
+ * @returns {Promise<void>} Erfolgreich wenn Status 200/201
+ */
 async function uploadPdf(uploadUrl, pdfPath) {
     return new Promise((resolve, reject) => {
         const pdfBuffer = fs.readFileSync(pdfPath);
@@ -128,7 +182,25 @@ async function uploadPdf(uploadUrl, pdfPath) {
     });
 }
 
-// Create letter for a member
+/**
+ * Erstellt einen Brief für ein Mitglied über Pingen API
+ *
+ * JSON:API Format (application/vnd.api+json):
+ * - file_url: URL der hochgeladenen PDF
+ * - file_url_signature: Signatur zur Verifizierung
+ * - auto_send: true = sofortiger Versand
+ * - delivery_product: cheap = B-Post (günstiger, 2-3 Tage)
+ *
+ * Adress-Handling:
+ * - CH: Schweizer PLZ direkt
+ * - DE: Deutsche PLZ mit 'DE-' Präfix entfernen
+ *
+ * @param {string} accessToken - OAuth2 Access Token
+ * @param {Object} member - Mitglied aus mitglieder_data.json
+ * @param {string} fileUrl - URL der hochgeladenen PDF
+ * @param {string} fileUrlSignature - Signatur der URL
+ * @returns {Promise<string>} Pingen Brief-ID
+ */
 async function createLetter(accessToken, member, fileUrl, fileUrlSignature) {
     return new Promise((resolve, reject) => {
         // Build address
@@ -208,7 +280,17 @@ async function createLetter(accessToken, member, fileUrl, fileUrlSignature) {
     });
 }
 
-// Main function
+/**
+ * Hauptfunktion - Orchestriert den Kalender-Massenversand
+ *
+ * Ablauf:
+ * 1. Prüft Credentials (Client ID, Secret, Org ID)
+ * 2. Lädt Mitglieder mit Post-Zustellung
+ * 3. Authentifiziert bei Pingen (OAuth2)
+ * 4. Lädt PDF einmalig hoch (wird für alle Briefe wiederverwendet)
+ * 5. Erstellt Brief pro Mitglied (auto_send=true)
+ * 6. Gibt Zusammenfassung aus
+ */
 async function main() {
     try {
         console.log('📮 Starte Pingen-Versand für Kalender-PDF...\n');

@@ -1,21 +1,40 @@
+/**
+ * newsletter.js - Newsletter An- und Abmeldung
+ *
+ * Workflow (Double Opt-In):
+ * 1. Benutzer gibt E-Mail ein -> /subscribe
+ * 2. Bestätigungslink per E-Mail
+ * 3. Klick auf Link -> /confirm
+ * 4. E-Mail wird in GitHub JSON gespeichert
+ *
+ * Datenspeicherung: GitHub Repository (newsletter_subscribers.json)
+ */
 const express = require('express');
 const router = express.Router();
 const { sendMail } = require('../utils/mailer');
-const { loadJSON, saveJSON } = require('../utils/github');
-const { generateToken } = require('../utils/otp');
+const { loadJSON, saveJSON } = require('../utils/github');  // GitHub API für JSON-Storage
+const { generateToken } = require('../utils/otp');  // Für Bestätigungstoken
 
+// JSON-Datei im GitHub Repository für Abonnenten
 const NEWSLETTER_FILE = 'newsletter_subscribers.json';
 
-// POST /api/newsletter/subscribe
+/**
+ * POST /api/newsletter/subscribe
+ * Startet Newsletter-Anmeldung (Double Opt-In Schritt 1)
+ *
+ * Body: { email }
+ * Sendet Bestätigungslink per E-Mail
+ */
 router.post('/subscribe', async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) return res.status(400).json({ error: 'E-Mail erforderlich' });
 
+        // Generiere einmaligen Token für Bestätigungslink
         const token = generateToken();
         const confirmUrl = `${process.env.WEBSITE_URL}/newsletter-confirm?token=${token}&email=${encodeURIComponent(email)}`;
 
-        // Send confirmation email
+        // Bestätigungs-E-Mail mit Link senden
         await sendMail({
             to: email,
             subject: 'Newsletter-Anmeldung bestätigen',
@@ -29,19 +48,27 @@ router.post('/subscribe', async (req, res) => {
     }
 });
 
-// POST /api/newsletter/confirm
+/**
+ * POST /api/newsletter/confirm
+ * Bestätigt Newsletter-Anmeldung (Double Opt-In Schritt 2)
+ *
+ * Body: { email, token }
+ * Speichert E-Mail in GitHub JSON-Datei
+ */
 router.post('/confirm', async (req, res) => {
     try {
         const { email, token } = req.body;
 
+        // Lade aktuelle Abonnentenliste aus GitHub
         const { data: subscribers, sha } = await loadJSON(NEWSLETTER_FILE);
         const list = subscribers || { lastUpdated: new Date().toISOString(), subscribers: [] };
 
-        // Check if already subscribed
+        // Prüfe ob bereits abonniert (Duplikat-Schutz)
         if (list.subscribers.find(s => s.email === email)) {
             return res.json({ success: true, message: 'Bereits abonniert' });
         }
 
+        // Neuen Abonnenten hinzufügen
         list.subscribers.push({
             email,
             subscribedAt: new Date().toISOString(),
@@ -49,6 +76,7 @@ router.post('/confirm', async (req, res) => {
         });
         list.lastUpdated = new Date().toISOString();
 
+        // In GitHub speichern
         await saveJSON(NEWSLETTER_FILE, list, `Newsletter-Anmeldung: ${email}`, sha);
 
         res.json({ success: true, message: 'Newsletter abonniert' });

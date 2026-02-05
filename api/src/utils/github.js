@@ -1,15 +1,32 @@
+/**
+ * github.js - GitHub API Wrapper für Datei-Operationen
+ *
+ * Verwendet Octokit für GitHub REST API Aufrufe.
+ * Ermöglicht das Lesen und Schreiben von JSON-Dateien
+ * direkt im GitHub Repository.
+ *
+ * Konfiguration über Umgebungsvariablen:
+ * - GITHUB_TOKEN: Personal Access Token mit repo-Rechten
+ * - GITHUB_OWNER: Repository-Besitzer (z.B. 'feuerwehrverein-raura')
+ * - GITHUB_REPO: Repository-Name (z.B. 'Homepage')
+ */
 const { Octokit } = require('@octokit/rest');
 
+// Octokit-Instanz mit Authentifizierung
 const octokit = new Octokit({
     auth: process.env.GITHUB_TOKEN
 });
 
+// Repository-Koordinaten aus Umgebungsvariablen
 const owner = process.env.GITHUB_OWNER;
 const repo = process.env.GITHUB_REPO;
 
 /**
- * Get file content from GitHub
- * @param {string} path - File path in repository
+ * Liest Datei-Inhalt aus GitHub Repository
+ *
+ * @param {string} path - Dateipfad im Repository (z.B. 'mitglieder_data.json')
+ * @returns {Promise<{content: string, sha: string}|null>}
+ *          Inhalt + SHA für Updates, oder null wenn nicht gefunden
  */
 async function getFile(path) {
     try {
@@ -19,24 +36,28 @@ async function getFile(path) {
             path
         });
 
+        // GitHub liefert Base64-kodierten Inhalt
         const content = Buffer.from(data.content, 'base64').toString('utf8');
-        return { content, sha: data.sha };
+        return { content, sha: data.sha };  // SHA wird für Updates benötigt
     } catch (error) {
         if (error.status === 404) {
-            return null;
+            return null;  // Datei existiert nicht
         }
         throw error;
     }
 }
 
 /**
- * Update or create file in GitHub
- * @param {string} path - File path in repository
- * @param {string} content - File content
- * @param {string} message - Commit message
- * @param {string} sha - File SHA (for updates)
+ * Erstellt oder aktualisiert eine Datei im GitHub Repository
+ *
+ * @param {string} path - Dateipfad im Repository
+ * @param {string} content - Neuer Datei-Inhalt
+ * @param {string} message - Commit-Nachricht
+ * @param {string} [sha] - SHA der bestehenden Datei (für Updates erforderlich)
+ * @returns {Promise<Object>} GitHub API Response mit Commit-Details
  */
 async function updateFile(path, content, message, sha) {
+    // Inhalt muss Base64-kodiert sein
     const contentBase64 = Buffer.from(content).toString('base64');
 
     const params = {
@@ -47,6 +68,7 @@ async function updateFile(path, content, message, sha) {
         content: contentBase64
     };
 
+    // SHA nur bei Updates hinzufügen (Konflikt-Erkennung)
     if (sha) {
         params.sha = sha;
     }
@@ -56,7 +78,10 @@ async function updateFile(path, content, message, sha) {
 }
 
 /**
- * Load JSON file from GitHub
+ * Lädt JSON-Datei aus GitHub und parst sie
+ *
+ * @param {string} path - Dateipfad im Repository
+ * @returns {Promise<{data: Object|null, sha: string|null}>}
  */
 async function loadJSON(path) {
     const file = await getFile(path);
@@ -67,10 +92,16 @@ async function loadJSON(path) {
 }
 
 /**
- * Save JSON file to GitHub
+ * Speichert Objekt als JSON-Datei in GitHub
+ *
+ * @param {string} path - Dateipfad im Repository
+ * @param {Object} data - Zu speicherndes Objekt
+ * @param {string} message - Commit-Nachricht
+ * @param {string} [sha] - SHA für Update
+ * @returns {Promise<Object>} GitHub API Response
  */
 async function saveJSON(path, data, message, sha) {
-    const content = JSON.stringify(data, null, 2);
+    const content = JSON.stringify(data, null, 2);  // Pretty-Print
     return await updateFile(path, content, message, sha);
 }
 

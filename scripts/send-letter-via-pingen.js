@@ -1,21 +1,40 @@
 #!/usr/bin/env node
 
 /**
- * Send HTML Letter via Pingen API
- * Converts HTML to PDF and sends to all members with postal delivery preference
+ * send-letter-via-pingen.js - Generischer Briefversand via Pingen
+ *
+ * Konvertiert eine HTML-Datei zu PDF und versendet sie an alle Mitglieder
+ * mit Post-Zustellung. Im Gegensatz zu send-event-letter.js akzeptiert
+ * dieses Script beliebige HTML-Dateien (nicht nur Event-Markdown).
+ *
+ * Verwendung: node scripts/send-letter-via-pingen.js <brief.html>
+ *
+ * Sicherheitsmechanismus:
+ * Die HTML-Datei muss den Marker <!-- SEND-VIA-PINGEN --> enthalten,
+ * um versehentlichen Versand zu verhindern.
+ *
+ * Umgebungsvariablen:
+ * - PINGEN_API_KEY: API-Schluessel fuer Pingen
+ * - PINGEN_STAGING: 'true' fuer Testumgebung
+ * - DRY_RUN: 'true' fuer Simulation ohne echten Versand
+ *
+ * Workflow:
+ * 1. Prueft auf SEND-VIA-PINGEN Marker in HTML
+ * 2. Laedt Empfaenger aus mitglieder_data.json
+ * 3. Konvertiert HTML zu PDF mit Puppeteer
+ * 4. Sendet PDF an alle Empfaenger via Pingen API
  */
-
 const puppeteer = require('puppeteer');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
-// Configuration
-const PINGEN_API_KEY = process.env.PINGEN_API_KEY;
-const PINGEN_STAGING = process.env.PINGEN_STAGING === 'true';
-const DRY_RUN = process.env.DRY_RUN === 'true';
+// Konfiguration aus Umgebungsvariablen
+const PINGEN_API_KEY = process.env.PINGEN_API_KEY;           // Pingen API-Key
+const PINGEN_STAGING = process.env.PINGEN_STAGING === 'true'; // Staging-Umgebung?
+const DRY_RUN = process.env.DRY_RUN === 'true';               // Nur simulieren?
 
-// Parse command line arguments
+// Kommandozeilen-Argument: Pfad zur HTML-Datei
 const args = process.argv.slice(2);
 if (args.length === 0) {
     console.error('Usage: node send-letter-via-pingen.js <letter.html>');
@@ -25,14 +44,25 @@ if (args.length === 0) {
 const letterFile = args[0];
 
 /**
- * Check if letter file contains send marker
+ * Prueft ob die HTML-Datei den Versand-Marker enthaelt
+ *
+ * Sicherheitsfeature: Ohne den Marker <!-- SEND-VIA-PINGEN --> im HTML
+ * wird der Versand abgebrochen. Verhindert versehentlichen Versand.
+ *
+ * @param {string} content - HTML-Inhalt der Brief-Datei
+ * @returns {boolean} true wenn Marker vorhanden
  */
 function hasValidSendMarker(content) {
     return content.includes('<!-- SEND-VIA-PINGEN -->');
 }
 
 /**
- * Load letter recipients from member data
+ * Laedt Brief-Empfaenger aus Mitgliederdaten
+ *
+ * Filtert: Aktiv/Ehrenmitglieder mit zustellung-post=true
+ * und vollstaendiger Adresse (Strasse, PLZ, Ort)
+ *
+ * @returns {Array<{name: string, address: Object}>} Empfaengerliste
  */
 function loadRecipients() {
     const memberDataPath = path.join(__dirname, '..', 'mitglieder_data.json');
@@ -65,7 +95,14 @@ function loadRecipients() {
 }
 
 /**
- * Convert HTML to PDF using Puppeteer
+ * Konvertiert HTML zu PDF mit Puppeteer (Headless Chrome)
+ *
+ * - A4-Format ohne Raender (fuer Adressfenster-Briefe)
+ * - Hintergrunddruck aktiviert
+ * - Speichert in /tmp
+ *
+ * @param {string} htmlPath - Pfad zur HTML-Datei
+ * @returns {Promise<string>} Pfad zur generierten PDF
  */
 async function htmlToPdf(htmlPath) {
     console.log('Starte PDF-Konvertierung...');
@@ -104,7 +141,14 @@ async function htmlToPdf(htmlPath) {
 }
 
 /**
- * Send letter via Pingen API v2
+ * Sendet Brief ueber Pingen API v2
+ *
+ * Verwendet JSON:API Format mit Base64-kodiertem PDF im meta-Block.
+ * auto_send=true fuer sofortigen Versand, delivery_product='cheap' = B-Post.
+ *
+ * @param {string} pdfPath - Pfad zur PDF-Datei
+ * @param {Object} recipient - Empfaenger mit name und address
+ * @returns {Promise<Object>} Pingen API Response
  */
 async function sendViaPingen(pdfPath, recipient) {
     return new Promise((resolve, reject) => {
@@ -178,7 +222,10 @@ async function sendViaPingen(pdfPath, recipient) {
 }
 
 /**
- * Main function
+ * Hauptfunktion - Orchestriert den Brief-Versand
+ *
+ * Ablauf: Marker pruefen -> Empfaenger laden -> HTML zu PDF ->
+ * An alle senden -> Zusammenfassung ausgeben
  */
 async function main() {
     try {

@@ -1,43 +1,49 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const { Pool } = require('pg');
+// DEUTSCH: Buchhaltungs-Backend (API-Accounting)
+// Verwaltet: Kontenplan, Buchungen, Rechnungen und Finanzberichte
+// Läuft als Docker-Container, erreichbar über Traefik unter api.fwv-raura.ch/accounts, /transactions, /invoices, /reports
+
+const express = require('express');   // DEUTSCH: Web-Framework für HTTP-Server
+const cors = require('cors');         // DEUTSCH: Cross-Origin Requests erlauben (für Frontend-Zugriff)
+const helmet = require('helmet');     // DEUTSCH: Sicherheits-Headers setzen (XSS-Schutz etc.)
+const { Pool } = require('pg');       // DEUTSCH: PostgreSQL-Verbindungspool
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SERVICE_NAME = 'api-accounting';
+// DEUTSCH: Datenbankverbindung über Connection-String aus Umgebungsvariable
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 // ===========================================
-// LOGGING UTILITIES
+// DEUTSCH: LOGGING — Strukturierte JSON-Logs mit Zeitstempel und Service-Name
 // ===========================================
 function log(level, message, data = {}) {
     const timestamp = new Date().toISOString();
     const logEntry = { timestamp, service: SERVICE_NAME, level, message, ...data };
     console.log(JSON.stringify(logEntry));
 }
-function logInfo(message, data = {}) { log('INFO', message, data); }
-function logWarn(message, data = {}) { log('WARN', message, data); }
-function logError(message, data = {}) { log('ERROR', message, data); }
+function logInfo(message, data = {}) { log('INFO', message, data); }   // DEUTSCH: Info-Log
+function logWarn(message, data = {}) { log('WARN', message, data); }   // DEUTSCH: Warnung
+function logError(message, data = {}) { log('ERROR', message, data); } // DEUTSCH: Fehler
 
+// DEUTSCH: Ermittelt die echte Client-IP (hinter Cloudflare/Traefik Proxy)
 function getClientIp(req) {
-    if (req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip'];
+    if (req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip'];     // Cloudflare
     const forwardedFor = req.headers['x-forwarded-for'];
-    if (forwardedFor) return forwardedFor.split(',')[0].trim();
-    if (req.headers['x-real-ip']) return req.headers['x-real-ip'];
-    return req.ip;
+    if (forwardedFor) return forwardedFor.split(',')[0].trim();                      // Proxy-Kette
+    if (req.headers['x-real-ip']) return req.headers['x-real-ip'];                   // Nginx
+    return req.ip;                                                                    // Fallback
 }
 
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.set('trust proxy', true);
+app.use(helmet());              // DEUTSCH: Sicherheits-Headers aktivieren
+app.use(cors());                // DEUTSCH: CORS für Frontend-Zugriff erlauben
+app.use(express.json());        // DEUTSCH: JSON-Body in Requests parsen
+app.set('trust proxy', true);   // DEUTSCH: Proxy-Headers vertrauen (für korrekte IP hinter Traefik)
 
 // ===========================================
-// REQUEST LOGGING MIDDLEWARE
+// DEUTSCH: REQUEST-LOGGING — Loggt jede Anfrage (ausser /health) mit Dauer und Statuscode
 // ===========================================
 app.use((req, res, next) => {
-    if (req.path === '/health') return next();
+    if (req.path === '/health') return next(); // DEUTSCH: Health-Checks nicht loggen
 
     const startTime = Date.now();
     const requestId = Math.random().toString(36).substring(7);
@@ -54,14 +60,16 @@ app.use((req, res, next) => {
     next();
 });
 
+// DEUTSCH: Health-Check Endpunkt — wird von Docker/Traefik abgefragt um zu prüfen ob der Service läuft
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', service: 'api-accounting', version: process.env.APP_VERSION || '0.0.0' });
 });
 
 // ============================================
-// ACCOUNTS (Kontenplan)
+// DEUTSCH: KONTENPLAN (Accounts) — Verwaltung der Buchhaltungskonten
 // ============================================
 
+// DEUTSCH: GET /accounts — Alle aktiven Konten abrufen, sortiert nach Kontonummer
 app.get('/accounts', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM accounts WHERE is_active = true ORDER BY number');
@@ -71,6 +79,7 @@ app.get('/accounts', async (req, res) => {
     }
 });
 
+// DEUTSCH: POST /accounts — Neues Konto anlegen (Nummer, Name, Typ, optional: Übergeordnetes Konto)
 app.post('/accounts', async (req, res) => {
     try {
         const { number, name, type, parent_id, description } = req.body;
@@ -85,9 +94,10 @@ app.post('/accounts', async (req, res) => {
 });
 
 // ============================================
-// TRANSACTIONS (Buchungen)
+// DEUTSCH: BUCHUNGEN (Transactions) — Soll/Haben Buchungen zwischen Konten
 // ============================================
 
+// DEUTSCH: GET /transactions — Buchungen abrufen, optional gefiltert nach Datum (from/to) und Konto (account_id)
 app.get('/transactions', async (req, res) => {
     try {
         const { from, to, account_id } = req.query;
@@ -123,6 +133,7 @@ app.get('/transactions', async (req, res) => {
     }
 });
 
+// DEUTSCH: POST /transactions — Neue Buchung erstellen (Datum, Beschreibung, Soll-/Haben-Konto, Betrag)
 app.post('/transactions', async (req, res) => {
     try {
         const {
@@ -144,9 +155,10 @@ app.post('/transactions', async (req, res) => {
 });
 
 // ============================================
-// INVOICES (Rechnungen)
+// DEUTSCH: RECHNUNGEN (Invoices) — Erstellen, abrufen und als bezahlt markieren
 // ============================================
 
+// DEUTSCH: GET /invoices — Rechnungen abrufen, optional gefiltert nach Status und Mitglied
 app.get('/invoices', async (req, res) => {
     try {
         const { status, member_id } = req.query;
@@ -170,6 +182,7 @@ app.get('/invoices', async (req, res) => {
     }
 });
 
+// DEUTSCH: GET /invoices/:id — Einzelne Rechnung nach ID abrufen
 app.get('/invoices/:id', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
@@ -182,6 +195,7 @@ app.get('/invoices/:id', async (req, res) => {
     }
 });
 
+// DEUTSCH: POST /invoices — Neue Rechnung erstellen (generiert automatisch Rechnungsnummer im Format YYYY-0001)
 app.post('/invoices', async (req, res) => {
     try {
         const {
@@ -213,6 +227,7 @@ app.post('/invoices', async (req, res) => {
     }
 });
 
+// DEUTSCH: PATCH /invoices/:id/pay — Rechnung als bezahlt markieren (setzt Status auf 'paid' und Bezahldatum)
 app.patch('/invoices/:id/pay', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -226,9 +241,10 @@ app.patch('/invoices/:id/pay', async (req, res) => {
 });
 
 // ============================================
-// REPORTS
+// DEUTSCH: BERICHTE (Reports) — Finanzübersichten und Cashflow-Analysen
 // ============================================
 
+// DEUTSCH: GET /reports/balance — Kontensaldo: Summiert Soll- und Haben-Beträge pro Konto
 app.get('/reports/balance', async (req, res) => {
     try {
         const result = await pool.query(`
@@ -248,6 +264,7 @@ app.get('/reports/balance', async (req, res) => {
     }
 });
 
+// DEUTSCH: GET /reports/cashflow — Cashflow pro Monat: Einnahmen vs. Ausgaben für ein bestimmtes Jahr
 app.get('/reports/cashflow', async (req, res) => {
     try {
         const { year } = req.query;
@@ -272,6 +289,7 @@ app.get('/reports/cashflow', async (req, res) => {
     }
 });
 
+// DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 app.listen(PORT, () => {
     console.log(`API-Accounting running on port ${PORT}`);
 });

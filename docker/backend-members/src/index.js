@@ -1,3 +1,4 @@
+// DEUTSCH: Bibliotheken importieren
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -10,16 +11,19 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+// DEUTSCH: Authentifizierungs-Middleware importieren (Token-Prüfung, Rollen-Prüfung)
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
+// DEUTSCH: Datums- und Zeitwerte als Strings zurückgeben, um Zeitzonen-Probleme zu vermeiden
 types.setTypeParser(1082, val => val); // DATE
 types.setTypeParser(1083, val => val); // TIME
 types.setTypeParser(1114, val => val); // TIMESTAMP
 types.setTypeParser(1184, val => val); // TIMESTAMPTZ
 
 // Configure multer for photo uploads
+// DEUTSCH: Multer-Konfiguration für Foto-Uploads (Speicherort, Dateiname, max. 5MB, nur Bilder)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = '/app/uploads';
@@ -51,6 +55,7 @@ const upload = multer({
 const app = express();
 
 // Helper function to fetch active layout template from dispatch API
+// DEUTSCH: Holt das aktive PDF-Layout-Template vom Dispatch-API für PDF-Generierung
 async function getLayoutTemplate() {
     try {
         const dispatchUrl = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
@@ -66,6 +71,7 @@ async function getLayoutTemplate() {
 }
 
 // Default layout settings
+// DEUTSCH: Standard-PDF-Layout-Einstellungen (Kopf-/Fusszeile, Farben, Schrift, Vereinsname)
 const defaultLayoutSettings = {
     headerHeight: 60,
     footerHeight: 22,
@@ -83,6 +89,7 @@ const SERVICE_NAME = 'api-members';
 
 // ===========================================
 // LOGGING UTILITIES
+// DEUTSCH: Strukturierte JSON-Logging-Funktionen (Info, Warn, Error, Debug)
 // ===========================================
 function log(level, message, data = {}) {
     const timestamp = new Date().toISOString();
@@ -105,10 +112,12 @@ function logDebug(message, data = {}) {
 
 // ===========================================
 // ENCRYPTION UTILITIES FOR SHARED PASSWORDS
+// DEUTSCH: AES-256-GCM Verschlüsselung für geteilte Passwörter (z.B. IMAP-Passwörter)
 // ===========================================
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 
+// DEUTSCH: Passwort verschlüsseln, gibt Format iv:authTag:verschlüsselteDaten zurück
 function encryptPassword(password) {
     const iv = crypto.randomBytes(16);
     const key = Buffer.from(ENCRYPTION_KEY.slice(0, 64), 'hex');
@@ -122,6 +131,7 @@ function encryptPassword(password) {
     return `${iv.toString('hex')}:${authTag}:${encrypted}`;
 }
 
+// DEUTSCH: Verschlüsseltes Passwort entschlüsseln
 function decryptPassword(encryptedData) {
     try {
         const [ivHex, authTagHex, encrypted] = encryptedData.split(':');
@@ -145,6 +155,7 @@ function decryptPassword(encryptedData) {
 app.set('trust proxy', true);
 
 // Helper to get real client IP from proxy headers
+// DEUTSCH: Ermittelt die echte Client-IP hinter Traefik/Cloudflare Proxies
 function getClientIp(req) {
     // Debug logging for IP detection
     console.log('IP Detection Headers:', {
@@ -174,11 +185,13 @@ function getClientIp(req) {
 }
 
 // Database
+// DEUTSCH: PostgreSQL-Verbindungspool
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL
 });
 
 // Middleware - CORS must be before helmet
+// DEUTSCH: CORS erlaubt nur *.fwv-raura.ch Subdomains und localhost
 const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (mobile apps, curl, etc.)
@@ -206,6 +219,7 @@ app.use(express.json());
 
 // ===========================================
 // REQUEST LOGGING MIDDLEWARE
+// DEUTSCH: Protokolliert alle eingehenden Anfragen und Antworten (ausser Health-Checks)
 // ===========================================
 app.use((req, res, next) => {
     // Skip health checks for cleaner logs
@@ -243,9 +257,11 @@ app.use((req, res, next) => {
 });
 
 // Serve uploaded photos statically
+// DEUTSCH: Hochgeladene Fotos als statische Dateien bereitstellen
 app.use('/uploads', express.static('/app/uploads'));
 
 // Health Check
+// DEUTSCH: Gesundheits-Check-Endpunkt für Docker/Monitoring
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
@@ -259,11 +275,13 @@ app.get('/health', (req, res) => {
 // ============================================
 
 // Get current user info from Authentik token
+// DEUTSCH: Gibt die Benutzer-Info aus dem Authentik-Token zurück
 app.get('/auth/me', authenticateToken, (req, res) => {
     res.json(req.user);
 });
 
 // Redirect to Authentik for login
+// DEUTSCH: Leitet zur Authentik-Login-Seite weiter (OAuth2 Authorization Code Flow)
 app.get('/auth/login', (req, res) => {
     const returnUrl = req.query.return || '/';
     res.redirect(`${process.env.AUTHENTIK_URL}/application/o/authorize/?client_id=${process.env.AUTHENTIK_CLIENT_ID}&redirect_uri=${encodeURIComponent(returnUrl)}&response_type=code&scope=openid%20profile%20email`);
@@ -274,6 +292,7 @@ app.get('/auth/login', (req, res) => {
 // ============================================
 
 // IMAP-based authentication for Vorstand members (with admin fallback)
+// DEUTSCH: Vorstand-Login via IMAP-Authentifizierung (oder Admin-Passwort-Fallback). Erzeugt JWT-Token (8h) und Cookie.
 app.post('/auth/vorstand/login', async (req, res) => {
     const { email, password } = req.body;
     const clientIp = getClientIp(req);
@@ -428,6 +447,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
 });
 
 // Get Vorstand user info
+// DEUTSCH: Gibt die Benutzer-Info des eingeloggten Vorstandsmitglieds zurück
 app.get('/auth/vorstand/me', authenticateVorstand, async (req, res) => {
     res.json({
         email: req.user.email,
@@ -438,6 +458,7 @@ app.get('/auth/vorstand/me', authenticateVorstand, async (req, res) => {
 });
 
 // Helper function to get role display name
+// DEUTSCH: Gibt den deutschen Anzeigenamen für eine Vorstandsrolle zurück
 function getRoleName(role) {
     const names = {
         'praesident': 'Präsident',
@@ -451,8 +472,10 @@ function getRoleName(role) {
 
 // ============================================
 // AUTHENTIK AUTO-SYNC HELPERS
+// DEUTSCH: Hilfsfunktionen zur automatischen Synchronisierung von Mitgliedern mit Authentik (SSO)
 // ============================================
 
+// DEUTSCH: Erstellt einen neuen Benutzer in Authentik mit zufälligem Passwort und fügt ihn zur Mitglieder-Gruppe hinzu
 async function createAuthentikUser(member) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -538,6 +561,7 @@ async function createAuthentikUser(member) {
     }
 }
 
+// DEUTSCH: Löscht einen Benutzer aus Authentik anhand seiner Authentik-ID
 async function deleteAuthentikUser(authentikUserId) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -564,12 +588,14 @@ async function deleteAuthentikUser(authentikUserId) {
 }
 
 // Authentik group constants (used for group membership management)
+// DEUTSCH: Authentik-Gruppen-IDs (Vorstand, Social Media, Mitglieder, Admin)
 const VORSTAND_GROUP = process.env.AUTHENTIK_VORSTAND_GROUP || '2e5db41b-b867-43e4-af75-e0241f06fb95';
 const SOCIAL_MEDIA_GROUP = process.env.AUTHENTIK_SOCIAL_MEDIA_GROUP || '494ef740-41d3-40c3-9e68-8a1e5d3b4ad9';
 const MITGLIEDER_GROUP = process.env.AUTHENTIK_MITGLIEDER_GROUP || '248db02d-6592-4571-9050-2ccc0fdf0b7e';
 const ADMIN_GROUP = process.env.AUTHENTIK_ADMIN_GROUP || '2d29d683-b42d-406e-8d24-e5e39a80f3b3';
 
 // Nextcloud configuration for GroupFolders API
+// DEUTSCH: Nextcloud-Konfiguration für Gruppenordner-Verwaltung
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'https://nextcloud.fwv-raura.ch';
 const NEXTCLOUD_USER = process.env.NEXTCLOUD_USER || 'admin';
 const NEXTCLOUD_PASSWORD = process.env.NEXTCLOUD_PASSWORD;
@@ -583,7 +609,7 @@ const AUTHENTIK_TO_NEXTCLOUD_GROUP = {
 };
 
 // Authentik group membership management
-
+// DEUTSCH: Benutzer zu einer Authentik-Gruppe hinzufügen
 async function addUserToAuthentikGroup(authentikUserId, groupId) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -628,6 +654,7 @@ async function addUserToAuthentikGroup(authentikUserId, groupId) {
     }
 }
 
+// DEUTSCH: Benutzer aus einer Authentik-Gruppe entfernen
 async function removeUserFromAuthentikGroup(authentikUserId, groupId) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -672,6 +699,7 @@ async function removeUserFromAuthentikGroup(authentikUserId, groupId) {
     }
 }
 
+// DEUTSCH: Prüft ob ein Benutzer Mitglied einer bestimmten Authentik-Gruppe ist
 async function isUserInAuthentikGroup(authentikUserId, groupId) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -695,6 +723,7 @@ async function isUserInAuthentikGroup(authentikUserId, groupId) {
 }
 
 // Get primary role from function list (Vorstand functions have priority)
+// DEUTSCH: Bestimmt die Hauptrolle aus der Funktionsliste (Vorstandsfunktionen haben Priorität)
 function getPrimaryRole(funktion) {
     if (!funktion) return '';
 
@@ -718,6 +747,7 @@ function getPrimaryRole(funktion) {
 }
 
 // Sync member profile data to Authentik
+// DEUTSCH: Synchronisiert Mitgliederdaten (Name, Adresse, Telefon, Avatar) nach Authentik
 async function syncMemberToAuthentik(authentikUserId, member) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -800,6 +830,7 @@ async function syncMemberToAuthentik(authentikUserId, member) {
 }
 
 // Sync member avatar/photo to Authentik
+// DEUTSCH: Synchronisiert das Mitgliederfoto als Base64-Avatar nach Authentik (derzeit deaktiviert wegen Token-Grössenprobleme)
 async function syncMemberAvatarToAuthentik(authentikUserId, fotoPath) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -856,6 +887,7 @@ async function syncMemberAvatarToAuthentik(authentikUserId, fotoPath) {
 }
 
 // Sync Authentik user profile to member database
+// DEUTSCH: Synchronisiert Authentik-Profildaten zurück in die Mitglieder-Datenbank (Reverse-Sync)
 async function syncAuthentikToMember(pool, authentikUserId) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
     const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
@@ -952,6 +984,7 @@ async function syncAuthentikToMember(pool, authentikUserId) {
 }
 
 // Audit logging helper
+// DEUTSCH: Schreibt einen Audit-Log-Eintrag in die Datenbank (Login, Mitglieder-Änderungen, Events)
 async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
     try {
         // Map action to entity_type
@@ -974,6 +1007,7 @@ async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
 
 // ===========================================
 // PHONE NUMBER FORMATTING
+// DEUTSCH: Formatiert Telefonnummern ins internationale Format (CH: +41, DE: +49)
 // ===========================================
 // Formats phone numbers to international format with spaces
 // Swiss: +41 XX XXX XX XX
@@ -1025,6 +1059,7 @@ function formatPhoneNumber(phone) {
 }
 
 // Helper to get the current Aktuar's name from the database
+// DEUTSCH: Holt den Namen des aktuellen Aktuars aus der Datenbank
 async function getAktuarName() {
     try {
         const result = await pool.query(`
@@ -1043,6 +1078,7 @@ async function getAktuarName() {
 }
 
 // Send notification email helper - sends to member AND aktuar
+// DEUTSCH: Sendet eine Benachrichtigungs-E-Mail an das Mitglied (wenn E-Mail-Zustellung aktiv) und immer an den Aktuar
 async function sendNotificationEmail(memberId, templateName, variables = {}) {
     try {
         const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
@@ -1102,6 +1138,7 @@ async function sendNotificationEmail(memberId, templateName, variables = {}) {
 }
 
 // Send farewell message to departing member based on delivery preferences
+// DEUTSCH: Sendet eine Verabschiedungs-Nachricht an austretende Mitglieder (per E-Mail und/oder Brief via Pingen)
 async function sendFarewellMessage(memberData) {
     try {
         const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
@@ -1253,6 +1290,7 @@ async function sendFarewellMessage(memberData) {
 }
 
 // Sync mitglieder@fwv-raura.ch alias with all zustellung emails
+// DEUTSCH: Synchronisiert den Mailcow-Alias mitglieder@fwv-raura.ch mit allen Mitgliedern, die E-Mail-Zustellung aktiviert haben
 async function syncMitgliederAlias() {
     try {
         const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://fwv-api-dispatch:3000';
@@ -1300,6 +1338,7 @@ async function syncMitgliederAlias() {
 }
 
 // OAuth2 callback - exchange code for token
+// DEUTSCH: Tauscht einen OAuth2 Authorization Code gegen ein Access Token (für Members, Vorstand oder Order)
 app.post('/auth/callback', async (req, res) => {
     try {
         const { code, redirect_uri, client_type } = req.body;
@@ -1367,9 +1406,11 @@ app.post('/auth/callback', async (req, res) => {
 
 // ============================================
 // PUBLIC ROUTES
+// DEUTSCH: Öffentlich zugängliche Endpunkte (ohne Authentifizierung)
 // ============================================
 
 // Get Vorstand members (public, for website display)
+// DEUTSCH: Gibt die Vorstandsmitglieder mit offiziellen E-Mail-Adressen für die Website zurück
 app.get('/vorstand', async (req, res) => {
     try {
         // Mapping from function to official email
@@ -1453,6 +1494,7 @@ app.get('/vorstand', async (req, res) => {
 
 // Get members with functions (public, for website display)
 // Excludes Vorstand members (Präsident, Aktuar, Kassier, Materialwart, Beisitzer)
+// DEUTSCH: Gibt Mitglieder mit Funktionen zurück (ohne Vorstand), z.B. Webmaster, Fähnrich etc.
 app.get('/funktionen', async (req, res) => {
     try {
         // Query members with functions, excluding Vorstand
@@ -1494,9 +1536,11 @@ app.get('/funktionen', async (req, res) => {
 
 // ============================================
 // MEMBERS ROUTES (protected)
+// DEUTSCH: Geschützte Mitglieder-Endpunkte (erfordern Authentifizierung)
 // ============================================
 
 // Get all members (requires authentication)
+// DEUTSCH: Alle Mitglieder abrufen, optional filterbar nach Status und Suchbegriff
 app.get('/members', authenticateAny, async (req, res) => {
     try {
         const { status, search } = req.query;
@@ -1525,6 +1569,7 @@ app.get('/members', authenticateAny, async (req, res) => {
 // IMPORTANT: These specific routes MUST come before /members/:id to avoid matching 'me' or 'stats' as an ID
 
 // Get own member data (self-service)
+// DEUTSCH: Gibt das eigene Mitgliederprofil zurück (Self-Service, basierend auf E-Mail im Token)
 app.get('/members/me', authenticateToken, async (req, res) => {
     try {
         console.log('/members/me called for user:', req.user?.email);
@@ -1548,9 +1593,11 @@ app.get('/members/me', authenticateToken, async (req, res) => {
 
 // ===========================================
 // PDF EXPORTS
+// DEUTSCH: PDF-Generierung für Mitgliederlisten (Telefonliste, Mitgliederliste, Adressliste)
 // ===========================================
 
 // Generate member phone list PDF (Vorstand only)
+// DEUTSCH: Generiert eine Telefonliste als PDF mit allen Mitgliedern (nur Vorstand)
 app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { status } = req.query;
@@ -1712,6 +1759,7 @@ app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'a
 });
 
 // Get single member (MUST come after /members/me)
+// DEUTSCH: Einzelnes Mitglied anhand der ID abrufen
 app.get('/members/:id', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -1728,6 +1776,7 @@ app.get('/members/:id', authenticateAny, async (req, res) => {
 });
 
 // Create member (requires Vorstand role)
+// DEUTSCH: Neues Mitglied erstellen, erstellt automatisch Authentik-Benutzer und synchronisiert Mailcow-Alias
 app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const {
@@ -1821,6 +1870,7 @@ app.post('/members', authenticateAny, requireRole('vorstand', 'admin'), async (r
 
 // IMPORTANT: PUT /members/me MUST come before /members/:id to avoid matching 'me' as an ID
 // Update own member data (limited fields) - Self-service
+// DEUTSCH: Eigenes Profil aktualisieren (nur erlaubte Felder: Adresse, Telefon, IBAN etc.), sendet Benachrichtigung bei Änderungen
 app.put('/members/me', authenticateToken, async (req, res) => {
     try {
         // Format phone numbers before processing
@@ -1915,6 +1965,7 @@ app.put('/members/me', authenticateToken, async (req, res) => {
 });
 
 // Upload own photo (self-service)
+// DEUTSCH: Eigenes Profilfoto hochladen (ersetzt vorheriges Foto)
 app.post('/members/me/photo', authenticateToken, upload.single('photo'), async (req, res) => {
     try {
         if (!req.file) {
@@ -1965,6 +2016,7 @@ app.post('/members/me/photo', authenticateToken, upload.single('photo'), async (
 });
 
 // Delete own photo (self-service)
+// DEUTSCH: Eigenes Profilfoto löschen
 app.delete('/members/me/photo', authenticateToken, async (req, res) => {
     try {
         // Get member
@@ -2001,6 +2053,7 @@ app.delete('/members/me/photo', authenticateToken, async (req, res) => {
 });
 
 // Update member by ID (requires Vorstand role) - MUST come after /members/me
+// DEUTSCH: Mitglied aktualisieren (nur Vorstand/Admin). Synchronisiert Authentik-Profil und -Gruppen, sendet Änderungs-E-Mail.
 app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -2120,6 +2173,7 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
 });
 
 // Request member deletion (requires Vorstand role) - sends confirmation emails to Aktuar and Kassier
+// DEUTSCH: Startet den Löschprozess für ein Mitglied. Erfordert Bestätigung durch Aktuar UND Kassier per E-Mail-Link.
 app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -2207,6 +2261,7 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
 });
 
 // Confirm member deletion (via email link)
+// DEUTSCH: Bestätigt eine Löschanfrage per Token-Link (Aktuar oder Kassier). Wenn beide bestätigt haben, wird das Mitglied gelöscht.
 app.get('/members/deletion-confirm/:token', async (req, res) => {
     try {
         const { token } = req.params;
@@ -2456,6 +2511,7 @@ app.get('/members/deletion-confirm/:token', async (req, res) => {
 });
 
 // Get pending deletion requests (for Vorstand dashboard)
+// DEUTSCH: Gibt alle ausstehenden Löschanfragen für das Vorstand-Dashboard zurück
 app.get('/deletion-requests', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(`
@@ -2472,6 +2528,7 @@ app.get('/deletion-requests', authenticateAny, requireRole('vorstand', 'admin'),
 });
 
 // Cancel deletion request
+// DEUTSCH: Bricht eine ausstehende Löschanfrage ab
 app.delete('/deletion-requests/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -2487,9 +2544,11 @@ app.delete('/deletion-requests/:id', authenticateAny, requireRole('vorstand', 'a
 
 // ============================================
 // PHOTO UPLOAD
+// DEUTSCH: Foto-Verwaltung für Mitglieder (Hochladen und Löschen durch Vorstand)
 // ============================================
 
 // Upload member photo
+// DEUTSCH: Foto für ein Mitglied hochladen (durch Vorstand), synchronisiert Avatar nach Authentik
 app.post('/members/:id/photo', authenticateVorstand, upload.single('photo'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -2547,6 +2606,7 @@ app.post('/members/:id/photo', authenticateVorstand, upload.single('photo'), asy
 });
 
 // Delete member photo
+// DEUTSCH: Foto eines Mitglieds löschen (durch Vorstand)
 app.delete('/members/:id/photo', authenticateVorstand, async (req, res) => {
     try {
         const { id } = req.params;
@@ -2587,8 +2647,10 @@ app.delete('/members/:id/photo', authenticateVorstand, async (req, res) => {
 
 // ============================================
 // ROLES ROUTES
+// DEUTSCH: Rollen-Verwaltung (z.B. Vorstand, Admin etc.)
 // ============================================
 
+// DEUTSCH: Alle verfügbaren Rollen abrufen
 app.get('/roles', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM roles ORDER BY name');
@@ -2598,6 +2660,7 @@ app.get('/roles', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Rollen eines bestimmten Mitglieds abrufen
 app.get('/members/:id/roles', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
@@ -2614,9 +2677,11 @@ app.get('/members/:id/roles', authenticateAny, async (req, res) => {
 
 // ============================================
 // AUDIT LOG
+// DEUTSCH: Audit-Log-Endpunkte (Protokoll aller wichtigen Aktionen)
 // ============================================
 
 // Get audit log (Vorstand only)
+// DEUTSCH: Audit-Log abrufen, filterbar nach Aktion, E-Mail und Zeitraum (nur Vorstand)
 app.get('/audit', authenticateVorstand, async (req, res) => {
     try {
         const { limit = 100, offset = 0, action, email, since } = req.query;
@@ -2662,9 +2727,11 @@ app.get('/audit', authenticateVorstand, async (req, res) => {
 
 // ============================================
 // MEMBER REGISTRATIONS (Pending Applications)
+// DEUTSCH: Mitglieder-Anmeldungen (öffentliches Formular -> Vorstand genehmigt/ablehnt)
 // ============================================
 
 // Get all pending registrations (Vorstand only)
+// DEUTSCH: Alle Mitglieder-Anmeldungen abrufen, filterbar nach Status
 app.get('/member-registrations', authenticateVorstand, async (req, res) => {
     try {
         const { status = 'pending' } = req.query;
@@ -2687,6 +2754,7 @@ app.get('/member-registrations', authenticateVorstand, async (req, res) => {
 });
 
 // Get single registration
+// DEUTSCH: Einzelne Mitglieder-Anmeldung anhand der ID abrufen
 app.get('/member-registrations/:id', authenticateVorstand, async (req, res) => {
     try {
         const { id } = req.params;
@@ -2703,6 +2771,7 @@ app.get('/member-registrations/:id', authenticateVorstand, async (req, res) => {
 });
 
 // Approve registration (creates member)
+// DEUTSCH: Mitglieder-Anmeldung genehmigen - erstellt ein neues Mitglied in der Datenbank
 app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, res) => {
     try {
         const { id } = req.params;
@@ -2810,6 +2879,7 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
 });
 
 // Reject registration
+// DEUTSCH: Mitglieder-Anmeldung ablehnen und Ablehnungs-E-Mail senden
 app.post('/member-registrations/:id/reject', authenticateVorstand, async (req, res) => {
     try {
         const { id } = req.params;
@@ -2891,6 +2961,7 @@ app.post('/member-registrations/:id/reject', authenticateVorstand, async (req, r
 });
 
 // Get registration count (for badge in UI)
+// DEUTSCH: Anzahl ausstehender Registrierungen für Badge-Anzeige im UI
 app.get('/member-registrations/count/pending', authenticateVorstand, async (req, res) => {
     try {
         const result = await pool.query(
@@ -2904,8 +2975,10 @@ app.get('/member-registrations/count/pending', authenticateVorstand, async (req,
 
 // ============================================
 // STATISTICS
+// DEUTSCH: Mitglieder-Statistiken
 // ============================================
 
+// DEUTSCH: Übersicht: Anzahl Aktiv-/Passiv-/Ehrenmitglieder und Zustellungspräferenzen
 app.get('/members/stats/overview', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
@@ -2926,9 +2999,11 @@ app.get('/members/stats/overview', authenticateAny, async (req, res) => {
 
 // ============================================
 // EMAIL LIST FOR DISPATCH
+// DEUTSCH: E-Mail-Listen für den Versand (Mailcow-Alias-Synchronisation)
 // ============================================
 
 // Get all email addresses with zustellung_email = true
+// DEUTSCH: Alle Mitglieder-E-Mails mit aktivierter E-Mail-Zustellung abrufen
 app.get('/members/emails/zustellung', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(`
@@ -2961,6 +3036,7 @@ app.get('/members/emails/zustellung', authenticateAny, requireRole('vorstand', '
 });
 
 // Get email alias configuration (for Mailcow/Mailserver)
+// DEUTSCH: E-Mail-Alias-Konfiguration für Mailcow (Komma-getrennte Liste aller Zustellungs-E-Mails)
 app.get('/members/emails/alias-config', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(`
@@ -2990,6 +3066,7 @@ app.get('/members/emails/alias-config', authenticateAny, requireRole('vorstand',
 });
 
 // Sync mitglieder@fwv-raura.ch alias with all zustellung emails
+// DEUTSCH: Manueller Trigger: Synchronisiert den Mailcow-Alias mitglieder@fwv-raura.ch mit allen E-Mail-Zustellungen
 app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const DISPATCH_API = process.env.DISPATCH_API || 'http://fwv-api-dispatch:3000';
@@ -3057,9 +3134,11 @@ app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 
 
 // ============================================
 // AUTHENTIK SYNC
+// DEUTSCH: Authentik-Synchronisation und Nextcloud-Admin-Verwaltung
 // ============================================
 
 // Toggle Nextcloud admin status for a member
+// DEUTSCH: Nextcloud-Admin-Rechte für ein Mitglied ein-/ausschalten (via Authentik Admin-Gruppe)
 app.post('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3111,6 +3190,7 @@ app.post('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand'
 });
 
 // Get Nextcloud admin status for a member
+// DEUTSCH: Prüft ob ein Mitglied Nextcloud-Admin-Rechte hat
 app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3143,6 +3223,7 @@ app.get('/members/:id/nextcloud-admin', authenticateAny, requireRole('vorstand',
 });
 
 // Mapping from functions to Authentik groups (constants defined at top of group section)
+// DEUTSCH: Zuordnung von Vereinsfunktionen zu Authentik-Gruppen
 const FUNCTION_TO_GROUPS = {
     // Vorstand functions -> Vorstand group
     'präsident': VORSTAND_GROUP,
@@ -3161,6 +3242,7 @@ const FUNCTION_TO_GROUPS = {
 };
 
 // Sync Authentik groups based on member's functions
+// DEUTSCH: Synchronisiert die Authentik-Gruppenzugehörigkeit basierend auf den Vereinsfunktionen des Mitglieds
 async function syncMemberAuthentikGroups(authentikUserId, funktion) {
     if (!authentikUserId) {
         console.warn('No Authentik user ID - skipping group sync');
@@ -3240,6 +3322,7 @@ async function syncMemberAuthentikGroups(authentikUserId, funktion) {
 }
 
 // Toggle Vorstand group status for a member
+// DEUTSCH: Vorstand-Gruppenzugehörigkeit für ein Mitglied ein-/ausschalten
 app.post('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3291,6 +3374,7 @@ app.post('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand',
 });
 
 // Get Vorstand group status for a member
+// DEUTSCH: Prüft ob ein Mitglied in der Vorstand-Gruppe ist
 app.get('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3323,6 +3407,7 @@ app.get('/members/:id/vorstand-group', authenticateAny, requireRole('vorstand', 
 });
 
 // Social Media group management
+// DEUTSCH: Social-Media-Gruppenzugehörigkeit für ein Mitglied ein-/ausschalten
 app.post('/members/:id/social-media-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3371,6 +3456,7 @@ app.post('/members/:id/social-media-group', authenticateAny, requireRole('vorsta
     }
 });
 
+// DEUTSCH: Prüft ob ein Mitglied in der Social-Media-Gruppe ist
 app.get('/members/:id/social-media-group', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
@@ -3402,6 +3488,7 @@ app.get('/members/:id/social-media-group', authenticateAny, requireRole('vorstan
 });
 
 // Sync all members with email to Authentik
+// DEUTSCH: Erstellt Authentik-Benutzer für alle Mitglieder die noch nicht synchronisiert sind (Bulk-Sync)
 app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
@@ -3501,6 +3588,7 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
 });
 
 // Sync Authentik groups for all members based on their functions
+// DEUTSCH: Synchronisiert die Authentik-Gruppen aller Mitglieder basierend auf ihren Funktionen (Bulk-Gruppen-Sync)
 app.post('/members/sync-authentik-groups', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         // Get all members with Authentik user ID
@@ -3558,11 +3646,13 @@ app.post('/members/sync-authentik-groups', authenticateAny, requireRole('vorstan
 
 // ============================================
 // NOTIFICATION PREFERENCES (Self-service)
+// DEUTSCH: Benachrichtigungs-Einstellungen (Schicht-Erinnerung, Event-Updates, Newsletter etc.)
 // ============================================
 
 // Note: GET /members/me and PUT /members/me are defined earlier (before /members/:id) to avoid route conflicts
 
 // Get own notification preferences
+// DEUTSCH: Eigene Benachrichtigungseinstellungen abrufen
 app.get('/members/me/notifications', authenticateToken, async (req, res) => {
     try {
         // Get member ID from email
@@ -3590,6 +3680,7 @@ app.get('/members/me/notifications', authenticateToken, async (req, res) => {
 });
 
 // Update notification preferences
+// DEUTSCH: Eigene Benachrichtigungseinstellungen aktualisieren
 app.put('/members/me/notifications', authenticateToken, async (req, res) => {
     try {
         const { preferences } = req.body; // Array of { notification_type, enabled, alternative_email }
@@ -3637,9 +3728,11 @@ app.put('/members/me/notifications', authenticateToken, async (req, res) => {
 
 // ============================================
 // FUNCTION EMAIL PASSWORD CHANGE
+// DEUTSCH: Passwort-Änderung für Funktions-E-Mail-Adressen (z.B. praesident@, aktuar@)
 // ============================================
 
 // Map functions to email addresses
+// DEUTSCH: Zuordnung von Vereinsfunktionen zu offiziellen E-Mail-Adressen
 const FUNCTION_EMAIL_MAP = {
     'Präsident': 'praesident@fwv-raura.ch',
     'Praesident': 'praesident@fwv-raura.ch',
@@ -3655,6 +3748,7 @@ const FUNCTION_EMAIL_MAP = {
 };
 
 // Change function email password (self-service)
+// DEUTSCH: Passwort der eigenen Funktions-E-Mail ändern (Mailcow), speichert verschlüsseltes Passwort für geteilten Zugang
 app.put('/members/me/function-email-password', authenticateToken, async (req, res) => {
     try {
         const { password, email: targetEmail } = req.body;
@@ -3743,8 +3837,10 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
 
 // ============================================
 // NEXTCLOUD GROUPFOLDERS API
+// DEUTSCH: Nextcloud-Gruppenordner-Zugriff (zeigt dem Benutzer seine verfügbaren Cloud-Ordner)
 // ============================================
 
+// DEUTSCH: Holt alle Nextcloud-Gruppenordner, die für die angegebenen Gruppen zugänglich sind
 async function getNextcloudGroupFolders(userGroups) {
     if (!NEXTCLOUD_PASSWORD) {
         console.warn('NEXTCLOUD_PASSWORD not configured');
@@ -3809,9 +3905,11 @@ async function getNextcloudGroupFolders(userGroups) {
 
 // ============================================
 // USER ACCESSES ENDPOINT
+// DEUTSCH: Zeigt dem Benutzer alle seine Zugänge (E-Mail, Nextcloud, Systeme, Events)
 // ============================================
 
 // Get all accesses for the current user
+// DEUTSCH: Sammelt alle Zugänge eines Mitglieds: Funktions-E-Mails, Nextcloud-Ordner, System-Zugänge und Organisator-Events
 app.get('/members/me/accesses', authenticateToken, async (req, res) => {
     try {
         // Get member with function and authentik info
@@ -4022,6 +4120,7 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
 });
 
 // Periodic sync of Authentik groups and profiles (every hour)
+// DEUTSCH: Stündliche Synchronisation: Gruppen (Website->Authentik) und Profile (Authentik->Website)
 async function periodicAuthentikSync() {
     console.log('Starting periodic Authentik sync (groups + profiles)...');
     try {
@@ -4058,6 +4157,7 @@ async function periodicAuthentikSync() {
 }
 
 // Start server
+// DEUTSCH: Server starten und periodische Authentik-Synchronisation einrichten (nach 30s, dann stündlich)
 app.listen(PORT, () => {
     console.log(`API-Members running on port ${PORT}`);
 

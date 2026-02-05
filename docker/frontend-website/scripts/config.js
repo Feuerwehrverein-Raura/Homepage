@@ -1,12 +1,13 @@
 /**
- * Zentrale Konfiguration für den Feuerwehrverein Raura Kaiseraugst
- * 
- * Hier können alle wichtigen Kontaktdaten, E-Mail-Adressen und 
- * andere Konfigurationswerte zentral verwaltet werden.
+ * DEUTSCH: Zentrale Konfiguration für den Feuerwehrverein Raura Kaiseraugst
+ *
+ * DEUTSCH: Enthält alle Vereinsdaten: Vorstandskontakte, E-Mail-Adressen, Systemeinstellungen.
+ * DEUTSCH: Wird sowohl im Browser (Frontend) als auch in Node.js (Scripts) verwendet.
+ * DEUTSCH: Vorstandsdaten werden dynamisch aus Markdown-Dateien (vorstand/*.md) geladen.
  */
 
 const FWV_CONFIG = {
-    // === VEREINSINFOS ===
+    // DEUTSCH: === VEREINSINFOS — Name und Website ===
     verein: {
         name: "Feuerwehrverein Raura",
         ort: "Kaiseraugst",
@@ -14,10 +15,10 @@ const FWV_CONFIG = {
         website: "https://feuerwehrverien-raura.github.io/Homepage/"
     },
 
-    // === HAUPTKONTAKTE ===
-    // Diese werden aus den Vorstandsdateien geladen (siehe loadFromVorstandFiles)
+    // DEUTSCH: === VORSTANDSKONTAKTE ===
+    // DEUTSCH: Werden dynamisch aus vorstand/*.md Dateien geladen (siehe loadFromVorstandFiles)
+    // DEUTSCH: Die Werte hier sind Fallbacks falls die Dateien nicht geladen werden können
     kontakte: {
-        // Fallback-Werte falls Vorstandsdateien nicht geladen werden können
         praesident: {
             name: "René Käslin",
             email: "praesident@fwv-raura.ch",
@@ -48,7 +49,7 @@ const FWV_CONFIG = {
             position: "Beisitzer"
         },
 
-        // Allgemeine Kontakte
+        // DEUTSCH: Allgemeine Kontaktadressen (nicht personengebunden)
         info: {
             name: "Info",
             email: "info@fwv-raura.ch",
@@ -61,7 +62,7 @@ const FWV_CONFIG = {
         }
     },
 
-    // === STANDARD-ORGANISATOREN FÜR EVENTS ===
+    // DEUTSCH: === STANDARD-ORGANISATOREN — Werden bei neuen Events vorgeschlagen ===
     defaultOrganizers: {
         chilbi: {
             name: "Stefan Müller",
@@ -73,19 +74,19 @@ const FWV_CONFIG = {
         }
     },
 
-    // === SYSTEM-EINSTELLUNGEN ===
+    // DEUTSCH: === SYSTEM-EINSTELLUNGEN — Zeitzone, Sprache, Kalender, Springer ===
     system: {
         defaultTimezone: "Europe/Zurich",
         defaultLanguage: "de-DE",
         
-        // Kalender-Einstellungen
+        // DEUTSCH: Kalender-Einstellungen (für ICS-Export)
         calendar: {
             prodId: "-//Feuerwehrverein Raura Kaiseraugst//Vereinskalender//DE",
             calendarName: "Feuerwehrverein Raura Kaiseraugst",
             calendarDescription: "Termine und Veranstaltungen des Feuerwehrvereins Raura Kaiseraugst"
         },
 
-        // Springer-System für Arbeitsplanung
+        // DEUTSCH: Springer-System — Ersatzperson bei kurzfristigen Ausfällen in Schichten
         springer: {
             hauptspringer: "Stefan Müller (Aktuar)",
             email: "aktuar@fwv-raura.ch",
@@ -93,7 +94,9 @@ const FWV_CONFIG = {
         }
     },
 
-    // === HILFSFUNKTIONEN ===
+    // DEUTSCH: === HILFSFUNKTIONEN — E-Mail/Name/Kontakt nach Rolle abrufen ===
+
+    // DEUTSCH: Gibt die E-Mail-Adresse einer Rolle zurück (z.B. getEmail('aktuar') → 'aktuar@fwv-raura.ch')
     getEmail: function(role) {
         const parts = role.split('.');
         let obj = this.kontakte;
@@ -110,6 +113,7 @@ const FWV_CONFIG = {
         return obj.email || this.kontakte.info.email;
     },
 
+    // DEUTSCH: Gibt den Namen einer Rolle zurück (z.B. getName('kassier') → 'Giuseppe Costanza')
     getName: function(role) {
         const parts = role.split('.');
         let obj = this.kontakte;
@@ -126,6 +130,7 @@ const FWV_CONFIG = {
         return obj.name || this.kontakte.info.name;
     },
 
+    // DEUTSCH: Gibt das komplette Kontakt-Objekt einer Rolle zurück (name, email, phone etc.)
     getContact: function(role) {
         const parts = role.split('.');
         let obj = this.kontakte;
@@ -142,9 +147,8 @@ const FWV_CONFIG = {
         return obj;
     },
 
-    // Neue Hilfsfunktion: E-Mail-Aliase auflösen
+    // DEUTSCH: Löst E-Mail-Aliase auf (Legacy-Weiterleitungen für alte Adressen)
     resolveEmail: function(email) {
-        // Legacy-Weiterleitungen für alte E-Mail-Adressen
         if (email === "aktuar@fwv-raura.ch") {
             return this.kontakte.aktuar.email; // Zur neuen Aktuar-E-Mail weiterleiten
         }
@@ -154,7 +158,7 @@ const FWV_CONFIG = {
         return email; // Keine Weiterleitung nötig
     },
 
-    // Hilfsfunktion: Alle E-Mail-Adressen auflisten
+    // DEUTSCH: Gibt alle E-Mail-Adressen als Array zurück (für Übersichten)
     getAllEmails: function() {
         const emails = [];
         for (const [key, contact] of Object.entries(this.kontakte)) {
@@ -168,9 +172,9 @@ const FWV_CONFIG = {
         return emails;
     },
 
-    // === DYNAMISCHES LADEN AUS VORSTANDSDATEIEN ===
-    
-    // Lade Vorstandsdaten aus Markdown-Dateien (Browser)
+    // DEUTSCH: === DYNAMISCHES LADEN — Vorstandsdaten aus Markdown-Dateien ===
+
+    // DEUTSCH: Lädt Vorstandsdaten aus vorstand/*.md per fetch (nur im Browser)
     async loadFromVorstandFiles() {
         if (typeof window === 'undefined') {
             console.warn('⚠️ loadFromVorstandFiles() nur im Browser verfügbar');
@@ -211,7 +215,7 @@ const FWV_CONFIG = {
         return loadedCount > 0;
     },
 
-    // Lade Vorstandsdaten aus Markdown-Dateien (Node.js)
+    // DEUTSCH: Lädt Vorstandsdaten synchron aus dem Dateisystem (nur in Node.js/Scripts)
     loadFromVorstandFilesSync() {
         if (typeof require === 'undefined') {
             console.warn('⚠️ loadFromVorstandFilesSync() nur in Node.js verfügbar');
@@ -262,7 +266,7 @@ const FWV_CONFIG = {
         return loadedCount > 0;
     },
 
-    // Parse Markdown-Frontmatter aus Vorstandsdateien
+    // DEUTSCH: Parst YAML-Frontmatter aus Markdown-Dateien (--- key: value ---)
     parseVorstandMarkdown(content) {
         try {
             const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -290,7 +294,7 @@ const FWV_CONFIG = {
         }
     },
 
-    // Automatisches Laden beim Start (Browser)
+    // DEUTSCH: Automatisches Laden — erkennt Browser vs. Node.js und lädt entsprechend
     async autoLoadVorstand() {
         if (typeof window !== 'undefined') {
             console.log('🔄 Lade Vorstandsdaten aus Markdown-Dateien...');
@@ -302,25 +306,25 @@ const FWV_CONFIG = {
     }
 };
 
-// Für Node.js (Scripts)
+// DEUTSCH: Export für Node.js (damit Scripts wie generate-ics.js die Config importieren können)
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = FWV_CONFIG;
 }
 
-// Für Browser (Global verfügbar machen)
+// DEUTSCH: Im Browser als globales window.FWV_CONFIG verfügbar machen + Vorstandsdaten automatisch laden
 if (typeof window !== 'undefined') {
     window.FWV_CONFIG = FWV_CONFIG;
     
-    // Automatisches Laden der Vorstandsdaten beim ersten Laden der Seite
+    // DEUTSCH: Vorstandsdaten automatisch laden sobald die Seite bereit ist
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             FWV_CONFIG.autoLoadVorstand();
         });
     } else {
-        // DOM bereits geladen
+        // DEUTSCH: DOM bereits geladen — sofort laden
         FWV_CONFIG.autoLoadVorstand();
     }
 } else {
-    // Node.js - lade sofort synchron
+    // DEUTSCH: Node.js — lade sofort synchron beim require()
     FWV_CONFIG.autoLoadVorstand();
 }

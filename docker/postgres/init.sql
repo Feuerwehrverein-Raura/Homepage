@@ -1,68 +1,73 @@
--- FWV Raura Database Schema
+-- DEUTSCH: Initiales Datenbankschema für den Feuerwehrverein Raura
+-- DEUTSCH: Wird beim ersten Start von PostgreSQL automatisch ausgeführt (docker-entrypoint-initdb.d)
+-- DEUTSCH: Erstellt alle Tabellen: Mitglieder, Events, Buchhaltung, Versand, Newsletter, Audit, PDF-Templates
 -- ============================================
 
--- Extensions
+-- DEUTSCH: UUID-Extension aktivieren — ermöglicht uuid_generate_v4() für Primärschlüssel
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================
--- MEMBERS SCHEMA
+-- DEUTSCH: MITGLIEDER-TABELLEN — Verwaltung aller Vereinsmitglieder
 -- ============================================
 
+-- DEUTSCH: Haupttabelle für alle Mitglieder des Feuerwehrvereins
 CREATE TABLE members (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),   -- DEUTSCH: Eindeutige ID (UUID v4)
 
-    -- Persönliche Daten
+    -- DEUTSCH: Persönliche Daten
     anrede VARCHAR(10),
     vorname VARCHAR(100) NOT NULL,
     nachname VARCHAR(100) NOT NULL,
     geschlecht CHAR(1),
     geburtstag DATE,
 
-    -- Adresse
+    -- DEUTSCH: Adresse
     strasse VARCHAR(200),
     adresszusatz VARCHAR(100),
     plz VARCHAR(10),
     ort VARCHAR(100),
 
-    -- Kontakt
+    -- DEUTSCH: Kontaktdaten
     telefon VARCHAR(50),
     mobile VARCHAR(50),
     email VARCHAR(200),
-    versand_email VARCHAR(200),
+    versand_email VARCHAR(200),                          -- DEUTSCH: Alternative E-Mail für Vereinspost
 
-    -- Mitgliedschaft
-    status VARCHAR(50) DEFAULT 'Aktivmitglied',
+    -- DEUTSCH: Mitgliedschaftsdaten
+    status VARCHAR(50) DEFAULT 'Aktivmitglied',         -- DEUTSCH: Aktivmitglied, Ehrenmitglied, Passivmitglied, Ausgetreten
     funktion VARCHAR(100),
     eintrittsdatum DATE,
     austrittsdatum DATE,
 
-    -- Finanzen
-    iban VARCHAR(50),
+    -- DEUTSCH: Finanzen
+    iban VARCHAR(50),                                    -- DEUTSCH: Bankverbindung des Mitglieds (für Rückzahlungen)
 
-    -- Zustellung
-    zustellung_email BOOLEAN DEFAULT true,
-    zustellung_post BOOLEAN DEFAULT false,
+    -- DEUTSCH: Zustellungsart — wie das Mitglied Vereinspost erhalten möchte
+    zustellung_email BOOLEAN DEFAULT true,               -- DEUTSCH: Erhält Post per E-Mail
+    zustellung_post BOOLEAN DEFAULT false,               -- DEUTSCH: Erhält Post per Brief (Pingen)
 
-    -- Meta
+    -- DEUTSCH: Metadaten
     bemerkungen TEXT,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- DEUTSCH: Rollentabelle — definiert Berechtigungsstufen (admin, vorstand, kassier, mitglied)
 CREATE TABLE roles (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(50) UNIQUE NOT NULL,
     description TEXT,
-    permissions JSONB DEFAULT '[]'
+    permissions JSONB DEFAULT '[]'                       -- DEUTSCH: JSON-Array mit Berechtigungen (z.B. ["members:read", "events:*"])
 );
 
+-- DEUTSCH: Verknüpfungstabelle — ordnet Mitgliedern ihre Rollen zu (n:m Beziehung)
 CREATE TABLE member_roles (
     member_id UUID REFERENCES members(id) ON DELETE CASCADE,
     role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
     PRIMARY KEY (member_id, role_id)
 );
 
--- Default Roles
+-- DEUTSCH: Standard-Rollen einfügen
 INSERT INTO roles (name, description, permissions) VALUES
 ('admin', 'Administrator', '["*"]'),
 ('vorstand', 'Vorstandsmitglied', '["members:read", "members:write", "events:*", "dispatch:*"]'),
@@ -70,73 +75,76 @@ INSERT INTO roles (name, description, permissions) VALUES
 ('mitglied', 'Normales Mitglied', '["members:read:self", "events:read", "events:register"]');
 
 -- ============================================
--- EVENTS SCHEMA
+-- DEUTSCH: EVENTS-TABELLEN — Veranstaltungen, Schichten, Anmeldungen
 -- ============================================
 
+-- DEUTSCH: Events-Tabelle — alle Veranstaltungen des Vereins (Feste, Übungen, GV etc.)
 CREATE TABLE events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    -- Basis
-    slug VARCHAR(100) UNIQUE NOT NULL,
+    -- DEUTSCH: Basisdaten
+    slug VARCHAR(100) UNIQUE NOT NULL,                   -- DEUTSCH: URL-freundlicher Name (z.B. "fasnacht-2026")
     title VARCHAR(200) NOT NULL,
     subtitle VARCHAR(300),
     description TEXT,
 
-    -- Datum/Zeit
+    -- DEUTSCH: Datum/Zeit
     start_date TIMESTAMP NOT NULL,
     end_date TIMESTAMP,
 
-    -- Ort
+    -- DEUTSCH: Ort
     location VARCHAR(200),
 
-    -- Organisation
-    organizer_id UUID REFERENCES members(id),
-    category VARCHAR(50),
+    -- DEUTSCH: Organisation
+    organizer_id UUID REFERENCES members(id),            -- DEUTSCH: Verantwortliches Mitglied
+    category VARCHAR(50),                                -- DEUTSCH: Kategorie (z.B. Fest, Übung, GV)
 
-    -- Einstellungen
-    registration_required BOOLEAN DEFAULT false,
+    -- DEUTSCH: Anmeldeeinstellungen
+    registration_required BOOLEAN DEFAULT false,         -- DEUTSCH: Müssen sich Teilnehmer anmelden?
     registration_deadline TIMESTAMP,
     max_participants INTEGER,
     cost VARCHAR(100),
 
-    -- Status
+    -- DEUTSCH: Status des Events (planned, active, cancelled, completed)
     status VARCHAR(20) DEFAULT 'planned',
 
-    -- Meta
+    -- DEUTSCH: Metadaten
     image_url VARCHAR(500),
-    tags TEXT[],
+    tags TEXT[],                                         -- DEUTSCH: Schlagwörter als Array
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- DEUTSCH: Schichten-Tabelle — Arbeitseinsätze innerhalb eines Events (z.B. Bar, Küche, Aufbau)
 CREATE TABLE shifts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+    event_id UUID REFERENCES events(id) ON DELETE CASCADE,  -- DEUTSCH: Gehört zu diesem Event
 
-    name VARCHAR(200) NOT NULL,
+    name VARCHAR(200) NOT NULL,                              -- DEUTSCH: Name der Schicht (z.B. "Bar Abend")
     description TEXT,
     date DATE NOT NULL,
     start_time TIME,
     end_time TIME,
-    needed INTEGER DEFAULT 2,
-    bereich VARCHAR(50) DEFAULT 'Allgemein',
+    needed INTEGER DEFAULT 2,                               -- DEUTSCH: Anzahl benötigter Helfer
+    bereich VARCHAR(50) DEFAULT 'Allgemein',                 -- DEUTSCH: Arbeitsbereich (Bar, Küche, Kasse etc.)
 
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- DEUTSCH: Anmeldungen — Mitglieder melden sich für Events/Schichten an
 CREATE TABLE registrations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_id UUID REFERENCES events(id) ON DELETE CASCADE,
     member_id UUID REFERENCES members(id) ON DELETE SET NULL,
 
-    -- Für Nicht-Mitglieder
+    -- DEUTSCH: Für Nicht-Mitglieder (Gäste können sich auch anmelden)
     guest_name VARCHAR(200),
     guest_email VARCHAR(200),
 
-    -- Schichten
+    -- DEUTSCH: Gewählte Schichten (Array von Schicht-IDs)
     shift_ids UUID[],
 
-    -- Status
+    -- DEUTSCH: Status der Anmeldung (pending, confirmed, cancelled)
     status VARCHAR(20) DEFAULT 'pending',
     notes TEXT,
 
@@ -145,68 +153,71 @@ CREATE TABLE registrations (
 );
 
 -- ============================================
--- ACCOUNTING SCHEMA
+-- DEUTSCH: BUCHHALTUNG — Kontenplan, Buchungen und Rechnungen (doppelte Buchführung)
 -- ============================================
 
+-- DEUTSCH: Kontenplan — Schweizer KMU-Kontenplan (Aktiven, Passiven, Ertrag, Aufwand)
 CREATE TABLE accounts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    number VARCHAR(20) UNIQUE NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    type VARCHAR(20) NOT NULL, -- 'asset', 'liability', 'income', 'expense'
-    parent_id UUID REFERENCES accounts(id),
+    number VARCHAR(20) UNIQUE NOT NULL,                   -- DEUTSCH: Kontonummer (z.B. 1000, 3000)
+    name VARCHAR(200) NOT NULL,                          -- DEUTSCH: Kontobezeichnung
+    type VARCHAR(20) NOT NULL,                           -- DEUTSCH: Kontotyp: asset (Aktiv), liability (Passiv), income (Ertrag), expense (Aufwand)
+    parent_id UUID REFERENCES accounts(id),              -- DEUTSCH: Übergeordnetes Konto (für Hierarchie)
     description TEXT,
     is_active BOOLEAN DEFAULT true
 );
 
+-- DEUTSCH: Buchungen — jede Buchung hat ein Soll-Konto (Debit) und Haben-Konto (Credit)
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     date DATE NOT NULL,
     description TEXT NOT NULL,
 
-    -- Buchung
-    debit_account_id UUID REFERENCES accounts(id),
-    credit_account_id UUID REFERENCES accounts(id),
-    amount DECIMAL(10,2) NOT NULL,
+    -- DEUTSCH: Doppelte Buchführung: Soll (Debit) und Haben (Credit)
+    debit_account_id UUID REFERENCES accounts(id),       -- DEUTSCH: Soll-Konto
+    credit_account_id UUID REFERENCES accounts(id),      -- DEUTSCH: Haben-Konto
+    amount DECIMAL(10,2) NOT NULL,                       -- DEUTSCH: Betrag in CHF
 
-    -- Referenz
+    -- DEUTSCH: Optionale Referenzen (welches Mitglied/Event betrifft die Buchung)
     member_id UUID REFERENCES members(id),
     event_id UUID REFERENCES events(id),
     invoice_id UUID,
 
-    -- Meta
-    receipt_url VARCHAR(500),
+    -- DEUTSCH: Metadaten
+    receipt_url VARCHAR(500),                            -- DEUTSCH: Link zum Beleg/Quittung
     created_by UUID REFERENCES members(id),
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- DEUTSCH: Rechnungen — generiert mit QR-IBAN, Format: YYYY-0001
 CREATE TABLE invoices (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    number VARCHAR(50) UNIQUE NOT NULL,
+    number VARCHAR(50) UNIQUE NOT NULL,                  -- DEUTSCH: Rechnungsnummer (z.B. 2026-0001)
 
-    -- Empfänger
+    -- DEUTSCH: Empfänger
     member_id UUID REFERENCES members(id),
     recipient_name VARCHAR(200),
     recipient_address TEXT,
 
-    -- Beträge
+    -- DEUTSCH: Beträge in CHF
     subtotal DECIMAL(10,2),
-    tax DECIMAL(10,2) DEFAULT 0,
+    tax DECIMAL(10,2) DEFAULT 0,                         -- DEUTSCH: MwSt (Vereine oft befreit)
     total DECIMAL(10,2) NOT NULL,
 
-    -- Status
+    -- DEUTSCH: Status der Rechnung (draft, issued, paid, cancelled)
     status VARCHAR(20) DEFAULT 'draft',
     issued_date DATE,
     due_date DATE,
     paid_date DATE,
 
-    -- Details
+    -- DEUTSCH: Rechnungsposten als JSON (Array von {description, quantity, price})
     items JSONB,
     notes TEXT,
 
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Default Kontenplan (Schweizer KMU)
+-- DEUTSCH: Standard-Kontenplan nach Schweizer KMU-Schema einfügen
 INSERT INTO accounts (number, name, type) VALUES
 ('1000', 'Kasse', 'asset'),
 ('1020', 'Bankkonto', 'asset'),
@@ -219,42 +230,44 @@ INSERT INTO accounts (number, name, type) VALUES
 ('4200', 'Verwaltungsaufwand', 'expense');
 
 -- ============================================
--- DISPATCH SCHEMA
+-- DEUTSCH: VERSAND (Dispatch) — E-Mail-/Brief-Vorlagen und Versandprotokoll
 -- ============================================
 
+-- DEUTSCH: Versand-Vorlagen — vordefinierte E-Mail- und Brief-Templates mit Platzhaltern
 CREATE TABLE dispatch_templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) NOT NULL,
-    type VARCHAR(20) NOT NULL, -- 'email', 'letter', 'sms'
-    subject VARCHAR(300),
-    body TEXT NOT NULL,
-    variables TEXT[],
+    type VARCHAR(20) NOT NULL,                           -- DEUTSCH: Versandart: 'email', 'letter' (Brief), 'sms'
+    subject VARCHAR(300),                                -- DEUTSCH: Betreff (mit Platzhaltern wie {{event_title}})
+    body TEXT NOT NULL,                                  -- DEUTSCH: Inhalt/Body (mit Platzhaltern)
+    variables TEXT[],                                    -- DEUTSCH: Verfügbare Platzhalter-Variablen
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- DEUTSCH: Versandprotokoll — protokolliert jeden versendeten Brief/E-Mail mit Status
 CREATE TABLE dispatch_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    -- Typ
+    -- DEUTSCH: Typ des Versands (email, letter, sms)
     type VARCHAR(20) NOT NULL,
     template_id UUID REFERENCES dispatch_templates(id),
 
-    -- Empfänger
+    -- DEUTSCH: Empfänger
     member_id UUID REFERENCES members(id),
     recipient_email VARCHAR(200),
-    recipient_address TEXT,
+    recipient_address TEXT,                               -- DEUTSCH: Postadresse (bei Briefen)
 
-    -- Inhalt
+    -- DEUTSCH: Inhalt
     subject VARCHAR(300),
     body TEXT,
 
-    -- Status
+    -- DEUTSCH: Status des Versands (pending, sent, delivered, failed)
     status VARCHAR(20) DEFAULT 'pending',
-    external_id VARCHAR(100), -- Pingen ID, etc.
+    external_id VARCHAR(100),                            -- DEUTSCH: Externe ID (z.B. Pingen Brief-ID)
     error_message TEXT,
 
-    -- Referenz
+    -- DEUTSCH: Optionale Referenzen (welches Event/Rechnung betrifft den Versand)
     event_id UUID REFERENCES events(id),
     invoice_id UUID REFERENCES invoices(id),
 
@@ -262,7 +275,7 @@ CREATE TABLE dispatch_log (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Default Templates
+-- DEUTSCH: Standard-Versandvorlagen einfügen (Event-Einladung und Schicht-Erinnerung)
 INSERT INTO dispatch_templates (name, type, subject, body, variables) VALUES
 ('Event Einladung', 'email', 'Einladung: {{event_title}}',
  'Liebe/r {{anrede}} {{nachname}}\n\nWir laden Sie herzlich ein zu:\n\n{{event_title}}\nDatum: {{event_date}}\nOrt: {{event_location}}\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura',
@@ -273,26 +286,29 @@ INSERT INTO dispatch_templates (name, type, subject, body, variables) VALUES
  ARRAY['anrede', 'nachname', 'shift_name', 'shift_date', 'shift_time']);
 
 -- ============================================
--- NEWSLETTER SCHEMA
+-- DEUTSCH: NEWSLETTER — Abonnenten mit Double-Opt-In Bestätigung
 -- ============================================
 
+-- DEUTSCH: Newsletter-Abonnenten — unabhängig von Mitgliedschaft (auch Externe)
 CREATE TABLE newsletter_subscribers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(200) UNIQUE NOT NULL,
-    token VARCHAR(100) UNIQUE NOT NULL,
-    confirmed BOOLEAN DEFAULT false,
+    token VARCHAR(100) UNIQUE NOT NULL,                  -- DEUTSCH: Bestätigungstoken für Double-Opt-In
+    confirmed BOOLEAN DEFAULT false,                     -- DEUTSCH: true = E-Mail bestätigt
     confirmed_at TIMESTAMP,
     unsubscribed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- DEUTSCH: Indizes für schnelle Suche nach E-Mail und Token
 CREATE INDEX idx_newsletter_email ON newsletter_subscribers(email);
 CREATE INDEX idx_newsletter_token ON newsletter_subscribers(token);
 
 -- ============================================
--- MEMBER REGISTRATIONS (Pending Applications)
+-- DEUTSCH: MITGLIEDER-ANTRÄGE — Neue Mitgliedschaftsanfragen (pending → approved/rejected)
 -- ============================================
 
+-- DEUTSCH: Offene Mitglieder-Anträge — Interessenten melden sich über die Website an
 CREATE TABLE member_registrations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
@@ -306,20 +322,20 @@ CREATE TABLE member_registrations (
     mobile VARCHAR(50),
     email VARCHAR(200) NOT NULL,
 
-    -- Feuerwehr-Status
-    feuerwehr_status VARCHAR(50), -- 'active', 'former', 'no'
+    -- DEUTSCH: Bisheriger Feuerwehr-Status des Antragstellers
+    feuerwehr_status VARCHAR(50),                        -- DEUTSCH: 'active' (aktiv), 'former' (ehemalig), 'no' (nie)
 
-    -- Korrespondenz
-    korrespondenz_methode VARCHAR(50), -- 'email', 'post'
+    -- DEUTSCH: Gewünschte Korrespondenzart
+    korrespondenz_methode VARCHAR(50),                   -- DEUTSCH: 'email' oder 'post'
     korrespondenz_adresse TEXT,
 
-    -- Status
-    status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
-    processed_by VARCHAR(200),
+    -- DEUTSCH: Bearbeitungsstatus (pending → approved/rejected durch Vorstand)
+    status VARCHAR(20) DEFAULT 'pending',                -- DEUTSCH: pending, approved, rejected
+    processed_by VARCHAR(200),                           -- DEUTSCH: E-Mail des Vorstandsmitglieds das entschieden hat
     processed_at TIMESTAMP,
     rejection_reason TEXT,
 
-    -- Referenz zum erstellten Mitglied (wenn genehmigt)
+    -- DEUTSCH: Referenz zum erstellten Mitglied (wird gesetzt wenn Antrag genehmigt wird)
     member_id UUID REFERENCES members(id),
 
     created_at TIMESTAMP DEFAULT NOW()
@@ -329,59 +345,61 @@ CREATE INDEX idx_registrations_status ON member_registrations(status);
 CREATE INDEX idx_registrations_email ON member_registrations(email);
 
 -- ============================================
--- AUDIT LOG
+-- DEUTSCH: AUDIT-LOG — Protokolliert alle wichtigen Aktionen (Änderungen, Logins, Löschungen)
 -- ============================================
 
+-- DEUTSCH: Audit-Tabelle — wer hat wann was geändert (für Nachvollziehbarkeit)
 CREATE TABLE audit_log (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    -- Aktion
+    -- DEUTSCH: Was wurde gemacht (CREATE, UPDATE, DELETE, LOGIN etc.)
     action VARCHAR(50) NOT NULL,
-    entity_type VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50) NOT NULL,                    -- DEUTSCH: Betroffener Typ (member, event, invoice etc.)
     entity_id UUID,
 
-    -- Änderungen
-    old_values JSONB,
-    new_values JSONB,
+    -- DEUTSCH: Vorher/Nachher-Werte für Nachvollziehbarkeit
+    old_values JSONB,                                    -- DEUTSCH: Alte Werte (vor Änderung)
+    new_values JSONB,                                    -- DEUTSCH: Neue Werte (nach Änderung)
 
-    -- Benutzer
+    -- DEUTSCH: Wer hat die Aktion ausgeführt
     user_id UUID REFERENCES members(id),
     ip_address VARCHAR(50),
 
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Index für schnelle Suche
+-- DEUTSCH: Indizes für schnelle Suche im Audit-Log und häufige Abfragen
 CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX idx_audit_user ON audit_log(user_id);
-CREATE INDEX idx_members_status ON members(status);
-CREATE INDEX idx_events_date ON events(start_date);
-CREATE INDEX idx_transactions_date ON transactions(date);
+CREATE INDEX idx_members_status ON members(status);       -- DEUTSCH: Mitglieder nach Status filtern
+CREATE INDEX idx_events_date ON events(start_date);       -- DEUTSCH: Events nach Datum sortieren
+CREATE INDEX idx_transactions_date ON transactions(date); -- DEUTSCH: Buchungen nach Datum sortieren
 
 -- ============================================
--- PDF TEMPLATES SCHEMA (pdfme)
+-- DEUTSCH: PDF-TEMPLATES — Vorlagen für PDF-Generierung mit pdfme-Library
 -- ============================================
 
+-- DEUTSCH: PDF-Vorlagen — z.B. für Rechnungen, Arbeitspläne, Mitgliederlisten
 CREATE TABLE pdf_templates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 
-    -- Identifikation
+    -- DEUTSCH: Identifikation
     name VARCHAR(100) NOT NULL,
-    slug VARCHAR(100) UNIQUE NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,                   -- DEUTSCH: URL-freundlicher Name
     description TEXT,
-    category VARCHAR(50), -- 'rechnung', 'arbeitsplan', 'mitgliederliste', 'brief', etc.
+    category VARCHAR(50),                                -- DEUTSCH: Kategorie: 'rechnung', 'arbeitsplan', 'mitgliederliste', 'brief'
 
-    -- pdfme Template Schema (JSON)
+    -- DEUTSCH: pdfme Template-Schema als JSON (definiert Layout, Felder, Positionen)
     template_schema JSONB NOT NULL,
 
-    -- Basis-PDF (optional, als Base64)
+    -- DEUTSCH: Basis-PDF als Base64 (optionaler Hintergrund, z.B. Briefpapier)
     base_pdf TEXT,
 
-    -- Verfügbare Variablen für dieses Template
+    -- DEUTSCH: Verfügbare Platzhalter-Variablen (z.B. {{name}}, {{betrag}})
     variables TEXT[],
 
-    -- Status
-    is_default BOOLEAN DEFAULT false,
+    -- DEUTSCH: Status
+    is_default BOOLEAN DEFAULT false,                    -- DEUTSCH: Standard-Template für diese Kategorie
     is_active BOOLEAN DEFAULT true,
 
     -- Meta
@@ -394,19 +412,20 @@ CREATE INDEX idx_pdf_templates_slug ON pdf_templates(slug);
 CREATE INDEX idx_pdf_templates_category ON pdf_templates(category);
 
 -- ============================================
--- ORGANISATION SETTINGS
+-- DEUTSCH: VEREINS-EINSTELLUNGEN — Konfigurierbare Werte (Name, IBAN, Farben etc.)
 -- ============================================
 
+-- DEUTSCH: Key-Value-Speicher für Vereinseinstellungen (werden im Frontend/Backend verwendet)
 CREATE TABLE organisation_settings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    key VARCHAR(100) UNIQUE NOT NULL,
-    value TEXT,
-    value_json JSONB,
+    key VARCHAR(100) UNIQUE NOT NULL,                    -- DEUTSCH: Einstellungsname (z.B. 'org_name', 'bank_iban')
+    value TEXT,                                          -- DEUTSCH: Wert als Text
+    value_json JSONB,                                    -- DEUTSCH: Wert als JSON (für komplexe Einstellungen)
     description TEXT,
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Default Organisation Settings
+-- DEUTSCH: Standard-Vereinseinstellungen einfügen
 INSERT INTO organisation_settings (key, value, description) VALUES
 ('org_name', 'Feuerwehrverein Raura', 'Name der Organisation'),
 ('org_address', 'Ruswil', 'Adresse'),

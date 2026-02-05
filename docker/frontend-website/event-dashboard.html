@@ -1,11 +1,16 @@
+<!-- DEUTSCH: Event-Dashboard fuer Organisatoren von Feuerwehrverein-Events -->
+<!-- DEUTSCH: Ermoeglicht Login, Anzeige von Event-Details, Schichten-Uebersicht und Verwaltung von Anmeldungen -->
 <!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Event Dashboard - Feuerwehrverein Raura</title>
+    <!-- DEUTSCH: Tailwind CSS wird ueber CDN geladen fuer das gesamte Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+        // DEUTSCH: Benutzerdefinierte Tailwind-Konfiguration mit eigener Farbpalette "fire"
+        // DEUTSCH: Die Farben werden in Rot-Toenen definiert (50-900) passend zum Feuerwehr-Thema
         tailwind.config = {
             theme: {
                 extend: {
@@ -22,14 +27,17 @@
     </script>
 </head>
 <body class="bg-gray-100 min-h-screen">
-    <!-- Login Section -->
+    <!-- DEUTSCH: Login-Sektion - wird angezeigt wenn kein gültiger Token vorhanden ist -->
+    <!-- DEUTSCH: Zentriertes Formular mit E-Mail und Passwort fuer Event-Organisatoren -->
     <div id="login-section" class="min-h-screen flex items-center justify-center">
         <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full mx-4">
+            <!-- DEUTSCH: Logo und Titel des Login-Bereichs -->
             <div class="text-center mb-8">
                 <img src="/images/logo.png" alt="FWV Raura" class="h-20 mx-auto mb-4">
                 <h1 class="text-2xl font-bold text-gray-800">Event Dashboard</h1>
                 <p class="text-gray-600 mt-2">Login fuer Event-Organisatoren</p>
             </div>
+            <!-- DEUTSCH: Login-Formular - sendet POST an /events/login mit E-Mail und Passwort -->
             <form id="login-form" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Event E-Mail</label>
@@ -43,6 +51,7 @@
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 focus:border-fire-500"
                         placeholder="••••••••">
                 </div>
+                <!-- DEUTSCH: Fehlermeldung wird hier eingeblendet bei fehlgeschlagenem Login -->
                 <div id="login-error" class="text-red-600 text-sm hidden"></div>
                 <button type="submit"
                     class="w-full py-3 bg-fire-500 text-white font-medium rounded-lg hover:bg-fire-600 transition-colors">
@@ -52,9 +61,10 @@
         </div>
     </div>
 
-    <!-- Dashboard Section -->
+    <!-- DEUTSCH: Dashboard-Sektion - wird nach erfolgreichem Login sichtbar geschaltet -->
+    <!-- DEUTSCH: Enthaelt Header, Event-Infokarte, Tabs fuer Schichten und Anmeldungen -->
     <div id="dashboard-section" class="hidden">
-        <!-- Header -->
+        <!-- DEUTSCH: Kopfzeile mit Logo, Event-Titel, Organisator-Name und Abmelden-Button -->
         <header class="bg-white shadow-sm">
             <div class="container mx-auto px-4 py-4 flex justify-between items-center">
                 <div class="flex items-center space-x-4">
@@ -71,9 +81,10 @@
         </header>
 
         <main class="container mx-auto px-4 py-8">
-            <!-- Event Info Card -->
+            <!-- DEUTSCH: Event-Infokarte - zeigt Titel, Datum, Ort, Status und Beschreibung des Events -->
             <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4" id="event-title"></h2>
+                <!-- DEUTSCH: 3-Spalten-Raster mit Datum, Ort und Status des Events -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div>
                         <span class="text-gray-500">Datum:</span>
@@ -89,6 +100,8 @@
                     </div>
                 </div>
                 <div class="mt-4" id="event-description"></div>
+                <!-- DEUTSCH: Arbeitsplan-Versand - Button loest E-Mail-Versand an alle genehmigten Helfer aus -->
+                <!-- DEUTSCH: Status zeigt an, ob und wann der Arbeitsplan zuletzt versendet wurde -->
                 <div class="mt-6 pt-4 border-t">
                     <button onclick="sendArbeitsplan()"
                         class="px-4 py-2 bg-fire-500 text-white font-medium rounded-lg hover:bg-fire-600 transition-colors">
@@ -98,7 +111,8 @@
                 </div>
             </div>
 
-            <!-- Tabs -->
+            <!-- DEUTSCH: Tab-Navigation - Umschalten zwischen Schichten-Uebersicht und Anmeldungen-Liste -->
+            <!-- DEUTSCH: Aktiver Tab wird durch fire-Farbe und Unterstrich hervorgehoben -->
             <div class="flex border-b border-gray-200 mb-6">
                 <button onclick="showTab('shifts')" class="tab-btn px-6 py-3 font-medium text-fire-600 border-b-2 border-fire-500" data-tab="shifts">
                     Schichten
@@ -108,20 +122,23 @@
                 </button>
             </div>
 
-            <!-- Shifts Tab -->
+            <!-- DEUTSCH: Schichten-Tab - zeigt alle Schichten gruppiert nach Datum an -->
+            <!-- DEUTSCH: Pro Schicht wird die Anzahl genehmigter Anmeldungen vs. benoetigte Helfer angezeigt -->
             <div id="shifts-tab" class="bg-white rounded-lg shadow-sm">
                 <div class="p-4 border-b flex justify-between items-center">
                     <h3 class="text-lg font-semibold">Schichten</h3>
                 </div>
                 <div id="shifts-container" class="divide-y">
-                    <!-- Shifts will be loaded here -->
+                    <!-- DEUTSCH: Wird dynamisch durch renderShifts() befuellt -->
                 </div>
             </div>
 
-            <!-- Registrations Tab -->
+            <!-- DEUTSCH: Anmeldungen-Tab - zeigt alle Helfer-Anmeldungen mit Statusfilter -->
+            <!-- DEUTSCH: Organisator kann ausstehende Anmeldungen genehmigen oder ablehnen -->
             <div id="registrations-tab" class="bg-white rounded-lg shadow-sm hidden">
                 <div class="p-4 border-b flex justify-between items-center">
                     <h3 class="text-lg font-semibold">Anmeldungen</h3>
+                    <!-- DEUTSCH: Filter-Buttons: Alle, nur Ausstehende oder nur Genehmigte anzeigen -->
                     <div class="flex space-x-2">
                         <button onclick="filterRegistrations('all')" class="px-3 py-1 text-sm rounded-full bg-gray-200 hover:bg-gray-300">Alle</button>
                         <button onclick="filterRegistrations('pending')" class="px-3 py-1 text-sm rounded-full bg-yellow-100 text-yellow-800 hover:bg-yellow-200">Ausstehend</button>
@@ -129,23 +146,33 @@
                     </div>
                 </div>
                 <div id="registrations-container" class="divide-y">
-                    <!-- Registrations will be loaded here -->
+                    <!-- DEUTSCH: Wird dynamisch durch renderRegistrations() befuellt -->
                 </div>
             </div>
         </main>
     </div>
 
     <script>
+        // DEUTSCH: ============================================================
+        // DEUTSCH: Event-Dashboard JavaScript - Gesamte Logik fuer Login,
+        // DEUTSCH: Event-Verwaltung, Schichten und Anmeldungen
+        // DEUTSCH: ============================================================
+
+        // DEUTSCH: API-Basis-URL fuer alle Backend-Anfragen
         const API_BASE = 'https://api.fwv-raura.ch';
+        // DEUTSCH: Auth-Token aus localStorage laden (bleibt zwischen Seitenaufrufen erhalten)
         let authToken = localStorage.getItem('eventAuthToken');
+        // DEUTSCH: Zwischenspeicher fuer die Event-Daten (inkl. Schichten und Anmeldungen)
         let eventData = null;
 
-        // Check if already logged in
+        // DEUTSCH: Automatischer Login-Check beim Seitenladen - wenn Token vorhanden, Dashboard direkt laden
         if (authToken) {
             loadDashboard();
         }
 
-        // Login form handler
+        // DEUTSCH: Login-Formular Event-Handler
+        // DEUTSCH: Sendet E-Mail und Passwort per POST an /events/login
+        // DEUTSCH: Bei Erfolg wird der Token in localStorage gespeichert und das Dashboard geladen
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -153,6 +180,7 @@
             const errorDiv = document.getElementById('login-error');
 
             try {
+                // DEUTSCH: Login-Anfrage an die API senden
                 const response = await fetch(`${API_BASE}/events/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -165,22 +193,28 @@
                     throw new Error(data.error || 'Login fehlgeschlagen');
                 }
 
+                // DEUTSCH: Token speichern und Dashboard laden
                 authToken = data.token;
                 localStorage.setItem('eventAuthToken', authToken);
                 loadDashboard();
             } catch (error) {
+                // DEUTSCH: Fehlermeldung im Login-Formular anzeigen
                 errorDiv.textContent = error.message;
                 errorDiv.classList.remove('hidden');
             }
         });
 
+        // DEUTSCH: Laedt die Event-Daten vom Backend und schaltet auf die Dashboard-Ansicht um
+        // DEUTSCH: Bei 401-Fehler (Token abgelaufen/ungueltig) wird automatisch ausgeloggt
         async function loadDashboard() {
             try {
+                // DEUTSCH: Event-Daten des eingeloggten Organisators abrufen
                 const response = await fetch(`${API_BASE}/events/my-event`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
                 if (!response.ok) {
+                    // DEUTSCH: Bei ungueltigem Token zurueck zum Login
                     if (response.status === 401) {
                         logout();
                         return;
@@ -188,6 +222,7 @@
                     throw new Error('Fehler beim Laden der Daten');
                 }
 
+                // DEUTSCH: Event-Daten speichern, Dashboard rendern und Ansicht umschalten
                 eventData = await response.json();
                 renderDashboard();
                 document.getElementById('login-section').classList.add('hidden');
@@ -198,19 +233,21 @@
             }
         }
 
+        // DEUTSCH: Befuellt alle Dashboard-Elemente mit den geladenen Event-Daten
+        // DEUTSCH: Aktualisiert Header, Event-Infokarte, Arbeitsplan-Status und laedt Tabs
         function renderDashboard() {
-            // Header
+            // DEUTSCH: Header-Bereich mit Event-Titel und Organisator-Name befuellen
             document.getElementById('event-title-header').textContent = eventData.title;
             document.getElementById('organizer-name-header').textContent = eventData.organizer_name || 'Organisator';
 
-            // Event Info
+            // DEUTSCH: Event-Infokarte mit Titel, Datum, Ort, Status und Beschreibung befuellen
             document.getElementById('event-title').textContent = eventData.title;
             document.getElementById('event-date').textContent = formatDate(eventData.start_date);
             document.getElementById('event-location').textContent = eventData.location || '-';
             document.getElementById('event-status').textContent = getStatusLabel(eventData.status);
             document.getElementById('event-description').textContent = eventData.description || '';
 
-            // Arbeitsplan Status
+            // DEUTSCH: Arbeitsplan-Versandstatus anzeigen (Datum/Uhrzeit des letzten Versands oder "Noch nicht versendet")
             const arbeitsplanStatus = document.getElementById('arbeitsplan-status');
             if (eventData.arbeitsplan_sent_at) {
                 const sentDate = new Date(eventData.arbeitsplan_sent_at);
@@ -219,10 +256,13 @@
                 arbeitsplanStatus.textContent = 'Noch nicht versendet';
             }
 
+            // DEUTSCH: Schichten- und Anmeldungen-Tabs rendern
             renderShifts();
             renderRegistrations();
         }
 
+        // DEUTSCH: Rendert die Schichten-Uebersicht, gruppiert nach Datum
+        // DEUTSCH: Zeigt pro Schicht den Namen, Zeitraum, Bereich und die Auslastung (genehmigte / benoetigte Helfer)
         function renderShifts() {
             const container = document.getElementById('shifts-container');
             const shifts = eventData.shifts || [];
@@ -232,7 +272,7 @@
                 return;
             }
 
-            // Group by date
+            // DEUTSCH: Schichten nach Datum gruppieren fuer uebersichtliche Darstellung
             const byDate = {};
             shifts.forEach(shift => {
                 const date = shift.date || 'Unbekannt';
@@ -240,11 +280,13 @@
                 byDate[date].push(shift);
             });
 
+            // DEUTSCH: HTML fuer jede Datumsgruppe generieren
             container.innerHTML = Object.entries(byDate).map(([date, dateShifts]) => `
                 <div class="p-4">
                     <h4 class="font-semibold text-gray-800 mb-3">${formatDate(date)}</h4>
                     <div class="space-y-2">
                         ${dateShifts.map(shift => {
+                            // DEUTSCH: Nur genehmigte Anmeldungen zaehlen, die dieser Schicht zugeordnet sind
                             const regs = (eventData.registrations || []).filter(r =>
                                 r.shift_ids && r.shift_ids.includes(shift.id) && r.status === 'approved'
                             );
@@ -256,6 +298,7 @@
                                         <span class="text-gray-400 text-xs ml-2">(${shift.bereich || 'Allgemein'})</span>
                                     </div>
                                     <div class="text-sm">
+                                        <!-- DEUTSCH: Gruen = genehmigte Anmeldungen, Grau = benoetigte Anzahl -->
                                         <span class="text-green-600 font-medium">${regs.length}</span>
                                         <span class="text-gray-400">/ ${shift.needed}</span>
                                     </div>
@@ -267,10 +310,14 @@
             `).join('');
         }
 
+        // DEUTSCH: Rendert die Anmeldungen-Liste mit optionalem Statusfilter
+        // DEUTSCH: Filter-Optionen: 'all' (alle), 'pending' (ausstehend), 'approved' (genehmigt)
+        // DEUTSCH: Bei ausstehenden Anmeldungen werden Genehmigen/Ablehnen-Buttons angezeigt
         function renderRegistrations(filter = 'all') {
             const container = document.getElementById('registrations-container');
             let registrations = eventData.registrations || [];
 
+            // DEUTSCH: Anmeldungen nach Status filtern, wenn nicht "alle" gewaehlt
             if (filter !== 'all') {
                 registrations = registrations.filter(r => r.status === filter);
             }
@@ -281,7 +328,9 @@
             }
 
             container.innerHTML = registrations.map(reg => {
+                // DEUTSCH: Name bestimmen: bei Mitgliedern Vor+Nachname, bei Gaesten den Gastnamen
                 const name = reg.member_id ? `${reg.vorname} ${reg.nachname}` : reg.guest_name;
+                // DEUTSCH: Farbige Status-Badges: Gelb=ausstehend, Gruen=genehmigt, Rot=abgelehnt
                 const statusClass = {
                     'pending': 'bg-yellow-100 text-yellow-800',
                     'approved': 'bg-green-100 text-green-800',
@@ -306,10 +355,13 @@
             }).join('');
         }
 
+        // DEUTSCH: Wrapper-Funktion fuer die Filter-Buttons - ruft renderRegistrations mit dem gewaehlten Filter auf
         function filterRegistrations(filter) {
             renderRegistrations(filter);
         }
 
+        // DEUTSCH: Genehmigt eine ausstehende Anmeldung nach Bestaetigung durch den Organisator
+        // DEUTSCH: Sendet POST an /events/my-event/registrations/{id}/approve und laedt danach das Dashboard neu
         async function approveRegistration(id) {
             if (!confirm('Anmeldung genehmigen?')) return;
             try {
@@ -318,13 +370,18 @@
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 if (!response.ok) throw new Error('Fehler beim Genehmigen');
+                // DEUTSCH: Dashboard neu laden um aktualisierte Anmeldungen und Schicht-Auslastung anzuzeigen
                 await loadDashboard();
             } catch (error) {
                 alert(error.message);
             }
         }
 
+        // DEUTSCH: Lehnt eine ausstehende Anmeldung ab, mit optionaler Begruendung
+        // DEUTSCH: Der Organisator kann einen Grund angeben, der dem Helfer mitgeteilt wird
+        // DEUTSCH: Sendet POST an /events/my-event/registrations/{id}/reject mit dem Ablehnungsgrund
         async function rejectRegistration(id) {
+            // DEUTSCH: Optionaler Ablehnungsgrund per Prompt-Dialog abfragen
             const reason = prompt('Grund fuer Ablehnung (optional):');
             try {
                 const response = await fetch(`${API_BASE}/events/my-event/registrations/${id}/reject`, {
@@ -336,12 +393,16 @@
                     body: JSON.stringify({ reason })
                 });
                 if (!response.ok) throw new Error('Fehler beim Ablehnen');
+                // DEUTSCH: Dashboard neu laden um aktualisierte Anmeldungen anzuzeigen
                 await loadDashboard();
             } catch (error) {
                 alert(error.message);
             }
         }
 
+        // DEUTSCH: Versendet den Arbeitsplan per E-Mail an alle genehmigten Helfer
+        // DEUTSCH: Sendet POST an /events/my-event/send-arbeitsplan
+        // DEUTSCH: Zeigt danach eine detaillierte Zusammenfassung mit Erfolgen, Post-only und Fehlern
         async function sendArbeitsplan() {
             if (!confirm('Arbeitsplan an alle Helfer versenden?')) return;
             try {
@@ -354,9 +415,10 @@
                     throw new Error(data.reason || 'Fehler beim Versenden');
                 }
 
-                // Detaillierte Summary anzeigen
+                // DEUTSCH: Detaillierte Versand-Zusammenfassung erstellen
                 let summary = `✓ Erfolgreich versendet: ${data.sentCount}\n`;
 
+                // DEUTSCH: Liste der Helfer, die den Arbeitsplan per E-Mail erhalten haben
                 if (data.successEmails && data.successEmails.length > 0) {
                     summary += '\nE-Mail gesendet an:\n';
                     data.successEmails.forEach(e => {
@@ -364,6 +426,7 @@
                     });
                 }
 
+                // DEUTSCH: Helfer ohne E-Mail-Adresse, die nur per Post erreichbar sind
                 if (data.postOnlyMembers && data.postOnlyMembers.length > 0) {
                     summary += '\n⚠ Post-Zustellung (keine E-Mail):\n';
                     data.postOnlyMembers.forEach(m => {
@@ -371,6 +434,7 @@
                     });
                 }
 
+                // DEUTSCH: Fehlgeschlagene Zustellungen mit Fehlerdetails
                 if (data.errors && data.errors.length > 0) {
                     summary += '\n✗ Fehlgeschlagen:\n';
                     data.errors.forEach(e => {
@@ -378,6 +442,7 @@
                     });
                 }
 
+                // DEUTSCH: Zusammenfassung in einem Alert-Dialog anzeigen und Dashboard aktualisieren
                 alert(summary);
                 await loadDashboard();
             } catch (error) {
@@ -385,18 +450,25 @@
             }
         }
 
+        // DEUTSCH: Wechselt zwischen den Tabs "Schichten" und "Anmeldungen"
+        // DEUTSCH: Setzt die aktive Tab-Hervorhebung (fire-Farbe + Unterstrich) und blendet den entsprechenden Inhalt ein/aus
         function showTab(tab) {
+            // DEUTSCH: Alle Tab-Buttons zuruecksetzen (inaktiv machen)
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('text-fire-600', 'border-b-2', 'border-fire-500');
                 btn.classList.add('text-gray-500');
             });
+            // DEUTSCH: Gewaehlten Tab als aktiv markieren
             document.querySelector(`[data-tab="${tab}"]`).classList.add('text-fire-600', 'border-b-2', 'border-fire-500');
             document.querySelector(`[data-tab="${tab}"]`).classList.remove('text-gray-500');
 
+            // DEUTSCH: Entsprechenden Tab-Inhalt ein-/ausblenden
             document.getElementById('shifts-tab').classList.toggle('hidden', tab !== 'shifts');
             document.getElementById('registrations-tab').classList.toggle('hidden', tab !== 'registrations');
         }
 
+        // DEUTSCH: Formatiert ein Datum im Schweizer Format (z.B. "Samstag, 15. Juni 2026")
+        // DEUTSCH: Verwendet die Locale 'de-CH' fuer Schweizerdeutsche Darstellung
         function formatDate(dateStr) {
             if (!dateStr) return '-';
             const date = new Date(dateStr);
@@ -408,6 +480,8 @@
             });
         }
 
+        // DEUTSCH: Uebersetzt englische Status-Werte aus der API in deutsche Bezeichnungen
+        // DEUTSCH: Wird fuer Event-Status (planned/confirmed/cancelled) und Anmeldungs-Status (pending/approved/rejected) verwendet
         function getStatusLabel(status) {
             const labels = {
                 'planned': 'Geplant',
@@ -417,15 +491,22 @@
                 'approved': 'Genehmigt',
                 'rejected': 'Abgelehnt'
             };
+            // DEUTSCH: Fallback auf den Original-Wert falls kein Mapping vorhanden
             return labels[status] || status;
         }
 
+        // DEUTSCH: Meldet den Organisator ab und setzt die Oberflaeche zurueck
+        // DEUTSCH: Loescht den Token aus localStorage, leert die Event-Daten
+        // DEUTSCH: und wechselt zurueck zur Login-Ansicht mit leerem Formular
         function logout() {
+            // DEUTSCH: Token und Daten loeschen
             localStorage.removeItem('eventAuthToken');
             authToken = null;
             eventData = null;
+            // DEUTSCH: Dashboard ausblenden, Login-Sektion einblenden
             document.getElementById('dashboard-section').classList.add('hidden');
             document.getElementById('login-section').classList.remove('hidden');
+            // DEUTSCH: Login-Formular und Fehlermeldung zuruecksetzen
             document.getElementById('login-form').reset();
             document.getElementById('login-error').classList.add('hidden');
         }
