@@ -1,3 +1,10 @@
+## [1.139.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.139.1...v1.139.2) (2026-02-05)
+
+
+### Bug Fixes
+
+* **events:** support changing member on registration edit ([ab6227b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ab6227b44f78150fdf3abe561112d7dcbb19e643))
+
 ## [1.139.1](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.139.0...v1.139.1) (2026-02-05)
 
 
