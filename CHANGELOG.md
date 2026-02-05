@@ -1,3 +1,10 @@
+# [1.140.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.139.2...v1.140.0) (2026-02-05)
+
+
+### Features
+
+* **vorstand-android:** add custom Vorstand app icon ([628913e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/628913ec68322640d24bc446202b83740ae43069))
+
 ## [1.139.2](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.139.1...v1.139.2) (2026-02-05)
 
 
