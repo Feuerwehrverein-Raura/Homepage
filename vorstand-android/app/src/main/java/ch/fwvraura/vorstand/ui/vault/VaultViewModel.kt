@@ -1,8 +1,10 @@
 package ch.fwvraura.vorstand.ui.vault
 
+import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import ch.fwvraura.vorstand.VorstandApp
 import ch.fwvraura.vorstand.data.api.ApiModule
 import ch.fwvraura.vorstand.data.model.*
 import ch.fwvraura.vorstand.util.BitwardenCrypto
@@ -13,9 +15,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-class VaultViewModel : ViewModel() {
+class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
     private val api = ApiModule.vaultwardenApi
+    private val tokenManager = VorstandApp.instance.tokenManager
 
     private val _allItems = MutableStateFlow<List<DecryptedVaultItem>>(emptyList())
     private val _searchQuery = MutableStateFlow("")
@@ -51,6 +54,11 @@ class VaultViewModel : ViewModel() {
             }.collect { filtered ->
                 _vaultItems.value = filtered
             }
+        }
+
+        // Auto-Login mit gespeicherten Credentials
+        if (tokenManager.hasVaultCredentials) {
+            login(tokenManager.vaultEmail!!, tokenManager.vaultPassword!!)
         }
     }
 
@@ -118,7 +126,11 @@ class VaultViewModel : ViewModel() {
 
                 _isAuthenticated.value = true
 
-                // 6. Sync vault
+                // 6. Save credentials for auto-login
+                tokenManager.vaultEmail = email
+                tokenManager.vaultPassword = masterPassword
+
+                // 7. Sync vault
                 syncVault()
 
             } catch (e: Exception) {
@@ -337,5 +349,6 @@ class VaultViewModel : ViewModel() {
         _allItems.value = emptyList()
         _isAuthenticated.value = false
         _error.value = null
+        tokenManager.clearVaultCredentials()
     }
 }

@@ -10,7 +10,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
+import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -27,7 +27,7 @@ class VaultFragment : Fragment() {
 
     private var _binding: FragmentVaultBinding? = null
     private val binding get() = _binding!!
-    private val viewModel: VaultViewModel by viewModels()
+    private val viewModel: VaultViewModel by activityViewModels()
     private lateinit var adapter: VaultAdapter
 
     override fun onCreateView(
@@ -122,6 +122,10 @@ class VaultFragment : Fragment() {
 
     private fun showLoginDialog() {
         val dialogBinding = DialogVaultLoginBinding.inflate(layoutInflater)
+
+        // Pre-fill saved email
+        val tokenManager = (requireActivity().application as ch.fwvraura.vorstand.VorstandApp).tokenManager
+        tokenManager.vaultEmail?.let { dialogBinding.editEmail.setText(it) }
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.vault_login_title)

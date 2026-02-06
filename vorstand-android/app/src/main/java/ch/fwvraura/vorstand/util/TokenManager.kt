@@ -96,6 +96,29 @@ class TokenManager(context: Context) {
     val isLoggedIn: Boolean
         get() = !token.isNullOrEmpty()
 
+    // Vault-Credentials (Vaultwarden E-Mail + Master-Passwort)
+    var vaultEmail: String?
+        get() = prefs.getString(KEY_VAULT_EMAIL, null)
+        set(value) {
+            prefs.edit().putString(KEY_VAULT_EMAIL, value).commit()
+        }
+
+    var vaultPassword: String?
+        get() = prefs.getString(KEY_VAULT_PASSWORD, null)
+        set(value) {
+            prefs.edit().putString(KEY_VAULT_PASSWORD, value).commit()
+        }
+
+    val hasVaultCredentials: Boolean
+        get() = !vaultEmail.isNullOrEmpty() && !vaultPassword.isNullOrEmpty()
+
+    fun clearVaultCredentials() {
+        prefs.edit()
+            .remove(KEY_VAULT_EMAIL)
+            .remove(KEY_VAULT_PASSWORD)
+            .commit()
+    }
+
     // Alle gespeicherten Werte loeschen (beim Logout)
     // Loescht Token, E-Mail, Rolle, Name UND lastAuditCheck
     fun clear() {
@@ -110,5 +133,7 @@ class TokenManager(context: Context) {
         private const val KEY_ROLE = "user_role"
         private const val KEY_NAME = "user_name"
         private const val KEY_LAST_AUDIT_CHECK = "last_audit_check"  // NEU: fuer Audit-Polling
+        private const val KEY_VAULT_EMAIL = "vault_email"
+        private const val KEY_VAULT_PASSWORD = "vault_password"
     }
 }
