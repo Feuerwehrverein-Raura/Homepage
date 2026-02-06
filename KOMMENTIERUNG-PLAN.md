@@ -204,4 +204,12 @@
 | 12 — Android Utilities          | Erledigt ✅ | 6/6  |
 | 13 — Order System               | Erledigt ✅ | 9/9  |
 | 14 — Inventory & CI/CD          | Erledigt ✅ | 8/8  |
-| **Total**                       |        | **122/122** |
+| 15 — Android MassPdf Feature    | Erledigt ✅ | 3/3  |
+| **Total**                       |        | **125/125** |
+
+---
+
+## Batch 15 — Android MassPdf Feature (Phase 7) ✅
+- [x] `vorstand-android/.../ui/masspdf/MassPdfFragment.kt`
+- [x] `vorstand-android/.../ui/masspdf/MassPdfViewModel.kt`
+- [x] `vorstand-android/.../ui/masspdf/MassPdfMemberAdapter.kt`
