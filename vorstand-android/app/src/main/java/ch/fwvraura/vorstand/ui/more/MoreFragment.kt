@@ -74,6 +74,16 @@ class MoreFragment : Fragment() {
             findNavController().navigate(R.id.action_more_to_whitelist)
         }
 
+        // Einstellungen
+        binding.cardSettings.setOnClickListener {
+            findNavController().navigate(R.id.action_more_to_settings)
+        }
+
+        // Über die App
+        binding.cardAbout.setOnClickListener {
+            findNavController().navigate(R.id.action_more_to_about)
+        }
+
         // Logout-Button: ruft die logout()-Methode der MainActivity auf,
         // die den Token loescht und zum Login-Screen zuruecknavigiert
         binding.btnLogout.setOnClickListener {

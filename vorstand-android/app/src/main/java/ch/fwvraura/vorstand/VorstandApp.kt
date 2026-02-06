@@ -7,6 +7,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import ch.fwvraura.vorstand.data.api.ApiModule
+import ch.fwvraura.vorstand.util.AppSettings
 import ch.fwvraura.vorstand.util.AuditNotificationWorker
 import ch.fwvraura.vorstand.util.NotificationHelper
 import ch.fwvraura.vorstand.util.TokenManager
@@ -29,6 +30,10 @@ class VorstandApp : Application() {
     lateinit var tokenManager: TokenManager
         private set
 
+    // AppSettings verwaltet Theme, Benachrichtigungen und andere Einstellungen
+    lateinit var appSettings: AppSettings
+        private set
+
     /**
      * Wird einmal beim App-Start aufgerufen — noch vor der ersten Activity.
      */
@@ -41,6 +46,10 @@ class VorstandApp : Application() {
 
         // TokenManager erstellen — liest/schreibt JWT-Token in verschluesselte SharedPreferences
         tokenManager = TokenManager(this)
+
+        // AppSettings erstellen und Theme anwenden
+        appSettings = AppSettings(this)
+        appSettings.applyTheme()
 
         // Retrofit API-Client initialisieren — setzt den Auth-Interceptor, der bei jedem
         // API-Aufruf automatisch den Bearer-Token aus dem TokenManager in den Header setzt

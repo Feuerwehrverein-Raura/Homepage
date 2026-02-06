@@ -116,6 +116,12 @@
         <action
             android:id="@+id/action_more_to_whitelist"
             app:destination="@id/whitelistFragment" />
+        <action
+            android:id="@+id/action_more_to_settings"
+            app:destination="@id/settingsFragment" />
+        <action
+            android:id="@+id/action_more_to_about"
+            app:destination="@id/aboutFragment" />
     </fragment>
 
     <!-- Mailcow (E-Mail Verwaltung) -->
@@ -135,5 +141,17 @@
         android:id="@+id/whitelistFragment"
         android:name="ch.fwvraura.vorstand.ui.whitelist.WhitelistFragment"
         android:label="@string/whitelist_title" />
+
+    <!-- Einstellungen -->
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="ch.fwvraura.vorstand.ui.settings.SettingsFragment"
+        android:label="@string/settings_title" />
+
+    <!-- Über die App -->
+    <fragment
+        android:id="@+id/aboutFragment"
+        android:name="ch.fwvraura.vorstand.ui.settings.AboutFragment"
+        android:label="@string/about_title" />
 
 </navigation>

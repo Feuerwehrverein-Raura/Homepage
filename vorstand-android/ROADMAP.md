@@ -93,13 +93,21 @@ IP-Adressen für den Zugriff auf das Kassensystem verwalten.
 
 ---
 
-## Phase 6: Einstellungen & Diverses (ausstehend)
+## Phase 6: Einstellungen & Diverses (abgeschlossen)
 
-| Feature | Beschreibung |
-|---------|-------------|
-| Nextcloud-Berechtigungen | Cloud-Zugriff für Mitglieder verwalten |
-| App-Einstellungen | Benachrichtigungs-Intervall, Theme, etc. |
-| Über die App | Version, Lizenzen, Links |
+| Feature | Status |
+|---------|--------|
+| App-Theme (System/Hell/Dunkel) | Done |
+| Benachrichtigungs-Einstellungen | Done |
+| Auto-Update-Prüfung Toggle | Done |
+| Über die App (Version, Lizenzen) | Done |
+| Links (Website, GitHub, Datenschutz) | Done |
+
+**Technische Details:**
+- AppSettings mit SharedPreferences
+- Theme via AppCompatDelegate.setDefaultNightMode()
+- Zugang über Mehr > Einstellungen / Über die App
+- Nextcloud-Berechtigungen bleiben im Mitglieder-Detail (wie auf Website)
 
 ---
 

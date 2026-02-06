@@ -139,6 +139,7 @@
     <string name="more_pingen">Post</string>
     <string name="more_whitelist">IP-Whitelist</string>
     <string name="more_settings">Einstellungen</string>
+    <string name="more_about">Über die App</string>
 
     <!-- Photo -->
     <string name="photo_change">Foto ändern</string>
@@ -302,4 +303,34 @@
     <string name="whitelist_created_by">Erstellt von: %1$s</string>
     <string name="whitelist_ip_added">IP hinzugefügt</string>
     <string name="whitelist_ip_removed">IP entfernt</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_appearance">Darstellung</string>
+    <string name="settings_theme">Design</string>
+    <string name="settings_theme_system">System (automatisch)</string>
+    <string name="settings_theme_light">Hell</string>
+    <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_notifications">Benachrichtigungen</string>
+    <string name="settings_notifications_enabled">Benachrichtigungen</string>
+    <string name="settings_notifications_hint">Push-Benachrichtigungen bei neuen Aktivitäten</string>
+    <string name="settings_notification_interval">Prüf-Intervall</string>
+    <string name="settings_interval_15">Alle 15 Minuten</string>
+    <string name="settings_interval_30">Alle 30 Minuten</string>
+    <string name="settings_interval_60">Stündlich</string>
+    <string name="settings_interval_120">Alle 2 Stunden</string>
+    <string name="settings_interval_240">Alle 4 Stunden</string>
+    <string name="settings_updates">Updates</string>
+    <string name="settings_auto_update">Automatisch prüfen</string>
+    <string name="settings_auto_update_hint">Beim App-Start nach neuen Versionen suchen</string>
+
+    <!-- About -->
+    <string name="about_title">Über die App</string>
+    <string name="about_version_format">Version %1$s (Build %2$d)</string>
+    <string name="about_description">Vorstand-App für den Feuerwehrverein Raura Kaiseraugst.\n\nVerwalte Mitglieder, Events, E-Mails und mehr — direkt vom Smartphone.</string>
+    <string name="about_website">Website besuchen</string>
+    <string name="about_source_code">Quellcode auf GitHub</string>
+    <string name="about_privacy">Datenschutz</string>
+    <string name="about_licenses">Open-Source-Lizenzen</string>
+    <string name="about_copyright">© 2024–2026 Feuerwehrverein Raura Kaiseraugst</string>
 </resources>
