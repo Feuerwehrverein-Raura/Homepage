@@ -12,7 +12,7 @@ data class Mailbox(
     val domain: String? = null,
     val quota: Long = 0,
     @SerializedName("quota_used") val quotaUsed: Long = 0,
-    val active: Int = 1
+    @SerializedName("active_int") val active: Int = 1
 )
 
 data class MailboxCreateRequest(
@@ -39,7 +39,7 @@ data class MailAlias(
     val address: String,
     val goto: String,
     val domain: String? = null,
-    val active: Int = 1
+    @SerializedName("active_int") val active: Int = 1
 )
 
 data class AliasCreateRequest(
