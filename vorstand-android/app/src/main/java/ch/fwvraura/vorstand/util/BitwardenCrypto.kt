@@ -33,16 +33,48 @@ object BitwardenCrypto {
     }
 
     fun deriveMasterPasswordHash(masterKey: ByteArray, password: String): String {
-        val keyChars = CharArray(masterKey.size) { (masterKey[it].toInt() and 0xFF).toChar() }
-        val spec = PBEKeySpec(
-            keyChars,
-            password.toByteArray(Charsets.UTF_8),
-            1,
-            256
-        )
-        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val hash = factory.generateSecret(spec).encoded
+        // Manual PBKDF2-SHA256: Java's PBEKeySpec uses char[]→UTF-8 conversion
+        // which corrupts raw bytes > 127. We implement PBKDF2 directly with HMAC.
+        val hash = pbkdf2Sha256(masterKey, password.toByteArray(Charsets.UTF_8), 1, 32)
         return Base64.encodeToString(hash, Base64.NO_WRAP)
+    }
+
+    private fun pbkdf2Sha256(password: ByteArray, salt: ByteArray, iterations: Int, keyLength: Int): ByteArray {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(password, "HmacSHA256"))
+
+        val numBlocks = (keyLength + 31) / 32
+        val result = ByteArray(keyLength)
+        var offset = 0
+
+        for (blockIndex in 1..numBlocks) {
+            // U1 = PRF(password, salt || INT_32_BE(blockIndex))
+            mac.reset()
+            mac.update(salt)
+            mac.update(ByteArray(4).also {
+                it[0] = (blockIndex shr 24).toByte()
+                it[1] = (blockIndex shr 16).toByte()
+                it[2] = (blockIndex shr 8).toByte()
+                it[3] = blockIndex.toByte()
+            })
+            var u = mac.doFinal()
+            val block = u.copyOf()
+
+            // U2..Uc
+            for (i in 2..iterations) {
+                mac.reset()
+                u = mac.doFinal(u)
+                for (j in block.indices) {
+                    block[j] = (block[j].toInt() xor u[j].toInt()).toByte()
+                }
+            }
+
+            val toCopy = minOf(32, keyLength - offset)
+            System.arraycopy(block, 0, result, offset, toCopy)
+            offset += toCopy
+        }
+
+        return result
     }
 
     fun deriveStretchedKey(masterKey: ByteArray): SymmetricKey {

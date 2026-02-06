@@ -88,7 +88,11 @@ class VaultViewModel : ViewModel() {
                 )
                 if (!loginResponse.isSuccessful) {
                     val errorBody = loginResponse.errorBody()?.string() ?: ""
-                    _error.value = "Login fehlgeschlagen: ${loginResponse.code()} $errorBody"
+                    val message = try {
+                        val json = com.google.gson.JsonParser.parseString(errorBody).asJsonObject
+                        json.get("message")?.asString ?: errorBody
+                    } catch (_: Exception) { errorBody }
+                    _error.value = "Login fehlgeschlagen: $message"
                     _isLoading.value = false
                     return@launch
                 }
