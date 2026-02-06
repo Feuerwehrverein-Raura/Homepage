@@ -10,21 +10,6 @@
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="@string/vault_login_email"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/editEmail"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="textEmailAddress"
-            android:maxLines="1" />
-    </com.google.android.material.textfield.TextInputLayout>
-
-    <com.google.android.material.textfield.TextInputLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
         android:hint="@string/vault_login_password"
         app:endIconMode="password_toggle"
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
