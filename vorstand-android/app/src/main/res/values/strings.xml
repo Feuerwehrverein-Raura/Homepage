@@ -324,6 +324,24 @@
     <string name="settings_auto_update">Automatisch prüfen</string>
     <string name="settings_auto_update_hint">Beim App-Start nach neuen Versionen suchen</string>
 
+    <!-- Mass PDF -->
+    <string name="mass_pdf_title">Post-Massenversand</string>
+    <string name="mass_pdf_document">PDF-Dokument</string>
+    <string name="mass_pdf_no_file">Kein PDF ausgewählt</string>
+    <string name="mass_pdf_select">Auswählen</string>
+    <string name="mass_pdf_format_hint">A4-Format, Adressfenster links oben empfohlen</string>
+    <string name="mass_pdf_subject">Betreff (optional)</string>
+    <string name="mass_pdf_subject_hint">Wird im Versand-Protokoll angezeigt</string>
+    <string name="mass_pdf_recipients">Empfänger</string>
+    <string name="mass_pdf_recipients_hint">Nur Mitglieder mit Post-Zustellung und gültiger Adresse</string>
+    <string name="mass_pdf_no_recipients">Keine Mitglieder mit Post-Zustellung gefunden</string>
+    <string name="mass_pdf_select_all">Alle</string>
+    <string name="mass_pdf_deselect_all">Keine</string>
+    <string name="mass_pdf_send">Briefe versenden</string>
+    <string name="mass_pdf_sending">Briefe werden versendet…</string>
+    <string name="mass_pdf_staging_hint">Staging-Modus: Keine echten Briefe</string>
+    <string name="mass_pdf_cost_hint">%1$d Briefe — ca. CHF %2$.2f</string>
+
     <!-- About -->
     <string name="about_title">Über die App</string>
     <string name="about_version_format">Version %1$s (Build %2$d)</string>

@@ -31,6 +31,9 @@
     <!-- Divider -->
     <color name="divider">#E5E7EB</color>
 
+    <!-- Card -->
+    <color name="card_outline">#E5E7EB</color>
+
     <!-- Member Status Chips -->
     <color name="status_aktiv">#10B981</color>
     <color name="status_aktiv_bg">#D1FAE5</color>

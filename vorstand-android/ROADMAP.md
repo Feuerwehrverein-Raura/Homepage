@@ -111,6 +111,28 @@ IP-Adressen für den Zugriff auf das Kassensystem verwalten.
 
 ---
 
+## Phase 7: Massen-PDF-Versand (abgeschlossen)
+
+Post-Massenversand per Pingen direkt aus der App.
+
+| Feature | Status |
+|---------|--------|
+| PDF-Dokument auswählen | Done |
+| Empfänger-Auswahl (alle/einzelne) | Done |
+| Staging-Modus Toggle | Done |
+| Massenversand starten | Done |
+| Kosten-Vorschau | Done |
+| Erfolgs-/Fehler-Bericht | Done |
+
+**Technische Details:**
+- PDF per Android Document Picker (ACTION_OPEN_DOCUMENT)
+- Nur Mitglieder mit Post-Zustellung und gültiger Adresse
+- Batch-Versand in 5er-Gruppen (Backend)
+- Kassier erhält automatisch Kostenbenachrichtigung
+- Zugang über Mehr > Post
+
+---
+
 ## Zukunft: iOS & Kotlin Multiplatform
 
 Für eine zukünftige iOS-Version ist **Kotlin Multiplatform (KMP)** der empfohlene Ansatz:
