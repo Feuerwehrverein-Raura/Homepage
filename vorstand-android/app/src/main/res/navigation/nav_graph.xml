@@ -113,6 +113,9 @@
         <action
             android:id="@+id/action_more_to_vault"
             app:destination="@id/vaultFragment" />
+        <action
+            android:id="@+id/action_more_to_whitelist"
+            app:destination="@id/whitelistFragment" />
     </fragment>
 
     <!-- Mailcow (E-Mail Verwaltung) -->
@@ -126,5 +129,11 @@
         android:id="@+id/vaultFragment"
         android:name="ch.fwvraura.vorstand.ui.vault.VaultFragment"
         android:label="@string/vault_title" />
+
+    <!-- Whitelist (Kassensystem IP-Freischaltung) -->
+    <fragment
+        android:id="@+id/whitelistFragment"
+        android:name="ch.fwvraura.vorstand.ui.whitelist.WhitelistFragment"
+        android:label="@string/whitelist_title" />
 
 </navigation>

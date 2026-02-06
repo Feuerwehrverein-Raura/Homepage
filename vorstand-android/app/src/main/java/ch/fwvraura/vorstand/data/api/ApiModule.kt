@@ -142,4 +142,30 @@ object ApiModule {
     }
 
     val vaultwardenApi: VaultwardenApi by lazy { vaultRetrofit.create(VaultwardenApi::class.java) }
+
+    // ============================================
+    // KASSENSYSTEM / WHITELIST (separates Retrofit, eigene Base URL)
+    // ============================================
+
+    private const val ORDER_URL = "https://order.fwv-raura.ch/"
+
+    private val orderRetrofit: Retrofit by lazy {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+        Retrofit.Builder()
+            .baseUrl(ORDER_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    val whitelistApi: WhitelistApi by lazy { orderRetrofit.create(WhitelistApi::class.java) }
 }

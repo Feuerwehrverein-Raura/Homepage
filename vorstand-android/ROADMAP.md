@@ -54,30 +54,42 @@ Mailcow-Postfächer und Aliases direkt aus der App verwalten.
 
 ---
 
-## Phase 4: Vaultwarden — Passwort-Verwaltung (ausstehend)
+## Phase 4: Vaultwarden — Passwort-Verwaltung (abgeschlossen)
 
 Geteilte Passwörter für Vereins-Accounts verwalten.
 
-| Feature | Beschreibung |
-|---------|-------------|
-| Geteilte Einträge | Passwörter der Organisation anzeigen |
-| Kopieren | Benutzername/Passwort in Zwischenablage kopieren |
-| Suche | Nach Dienst oder Benutzername suchen |
+| Feature | Status |
+|---------|--------|
+| Vault-Login (E-Mail + Master-Passwort) | Done |
+| Geteilte Einträge anzeigen | Done |
+| Passwort/Benutzername kopieren | Done |
+| Suche nach Dienst oder Benutzername | Done |
+| Auto-Login mit gespeicherten Credentials | Done |
 
-**Hinweis:** Nur Lese-Zugriff auf geteilte Organisations-Passwörter. Vollständige Verwaltung über Vaultwarden Web-UI.
+**Technische Details:**
+- Bitwarden-kompatible Crypto (PBKDF2-SHA256, AES-256-CBC)
+- Credentials in EncryptedSharedPreferences
+- Organisation: "FWV-Raura" mit Auto-Invite (Cron-Job)
 
 ---
 
-## Phase 5: IP-Whitelist — Kassensystem-Zugriff (ausstehend)
+## Phase 5: IP-Whitelist — Kassensystem-Zugriff (abgeschlossen)
 
 IP-Adressen für den Zugriff auf das Kassensystem verwalten.
 
-| Feature | Beschreibung |
-|---------|-------------|
-| Whitelist anzeigen | Aktuelle IP-Adressen mit Beschreibung |
-| IP hinzufügen | Neue IP-Adresse freischalten |
-| IP entfernen | Zugriff entziehen |
-| Aktuelle IP | Eigene IP-Adresse anzeigen und hinzufügen |
+| Feature | Status |
+|---------|--------|
+| Whitelist aktivieren/deaktivieren | Done |
+| Alle Einträge anzeigen | Done |
+| Eigene IP anzeigen | Done |
+| Eigene IP freischalten | Done |
+| IP manuell hinzufügen | Done |
+| IP entfernen | Done |
+
+**Technische Details:**
+- API auf order.fwv-raura.ch (separates Retrofit)
+- Permanente Einträge (Admin) vs. temporäre (24h Self-Register)
+- Zugang über Mehr > IP-Whitelist
 
 ---
 

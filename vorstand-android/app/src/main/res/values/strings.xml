@@ -275,4 +275,31 @@
     <string name="update_message">Version %1$s ist verfügbar. Jetzt herunterladen?</string>
     <string name="update_download">Herunterladen</string>
     <string name="update_later">Später</string>
+
+    <!-- Whitelist -->
+    <string name="whitelist_title">IP-Whitelist</string>
+    <string name="whitelist_protection">Whitelist-Schutz</string>
+    <string name="whitelist_enabled">Aktiviert — Nur freigeschaltete IPs haben Zugriff</string>
+    <string name="whitelist_disabled">Deaktiviert — Alle haben Zugriff</string>
+    <string name="whitelist_my_ip">Deine IP-Adresse</string>
+    <string name="whitelist_status">Status</string>
+    <string name="whitelist_status_allowed">Freigeschaltet</string>
+    <string name="whitelist_status_permanent">Permanent freigeschaltet</string>
+    <string name="whitelist_status_expires">Gültig bis %1$s</string>
+    <string name="whitelist_status_blocked">Nicht freigeschaltet</string>
+    <string name="whitelist_add_my_ip">Diese IP freischalten</string>
+    <string name="whitelist_entries">Freigeschaltete IPs</string>
+    <string name="whitelist_empty">Keine IPs freigeschaltet.\nBei aktivierter Whitelist hat niemand Zugriff.</string>
+    <string name="whitelist_add_ip">IP hinzufügen</string>
+    <string name="whitelist_ip_address">IP-Adresse</string>
+    <string name="whitelist_device_name">Gerätename</string>
+    <string name="whitelist_device_name_hint">Optional — z.B. \"Stefans iPhone\"</string>
+    <string name="whitelist_remove">IP entfernen</string>
+    <string name="whitelist_remove_confirm">Soll diese IP wirklich entfernt werden?\n\nDas Gerät verliert sofort den Zugriff auf das Kassensystem.</string>
+    <string name="whitelist_permanent">Permanent</string>
+    <string name="whitelist_temporary">Temporär</string>
+    <string name="whitelist_expires">Läuft ab: %1$s</string>
+    <string name="whitelist_created_by">Erstellt von: %1$s</string>
+    <string name="whitelist_ip_added">IP hinzugefügt</string>
+    <string name="whitelist_ip_removed">IP entfernt</string>
 </resources>
