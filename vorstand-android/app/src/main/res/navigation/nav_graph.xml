@@ -110,6 +110,9 @@
         <action
             android:id="@+id/action_more_to_mailcow"
             app:destination="@id/mailcowFragment" />
+        <action
+            android:id="@+id/action_more_to_vault"
+            app:destination="@id/vaultFragment" />
     </fragment>
 
     <!-- Mailcow (E-Mail Verwaltung) -->
@@ -117,5 +120,11 @@
         android:id="@+id/mailcowFragment"
         android:name="ch.fwvraura.vorstand.ui.mailcow.MailcowFragment"
         android:label="@string/mailcow_title" />
+
+    <!-- Vaultwarden (Passwörter) -->
+    <fragment
+        android:id="@+id/vaultFragment"
+        android:name="ch.fwvraura.vorstand.ui.vault.VaultFragment"
+        android:label="@string/vault_title" />
 
 </navigation>

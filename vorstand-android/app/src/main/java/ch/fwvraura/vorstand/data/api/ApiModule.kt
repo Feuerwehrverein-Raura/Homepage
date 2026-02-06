@@ -116,4 +116,30 @@ object ApiModule {
     val dispatchApi: DispatchApi by lazy { retrofit!!.create(DispatchApi::class.java) }
 
     val mailcowApi: MailcowApi by lazy { retrofit!!.create(MailcowApi::class.java) }
+
+    // ============================================
+    // VAULTWARDEN (separates Retrofit, eigene Base URL, kein AuthInterceptor)
+    // ============================================
+
+    private const val VAULT_URL = "https://vault.fwv-raura.ch/"
+
+    private val vaultRetrofit: Retrofit by lazy {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+        Retrofit.Builder()
+            .baseUrl(VAULT_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    val vaultwardenApi: VaultwardenApi by lazy { vaultRetrofit.create(VaultwardenApi::class.java) }
 }

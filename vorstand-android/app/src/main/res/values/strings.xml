@@ -241,6 +241,35 @@
     <string name="mailcow_domain_suffix">\@fwv-raura.ch</string>
     <string name="mailcow_no_zustellung">Keine Mitglieder mit E-Mail-Zustellung</string>
 
+    <!-- Vaultwarden -->
+    <string name="vault_title">Passwörter</string>
+    <string name="vault_search">Suche nach Name oder Benutzer…</string>
+    <string name="vault_login_title">Vaultwarden Anmeldung</string>
+    <string name="vault_login_email">E-Mail</string>
+    <string name="vault_login_password">Master-Passwort</string>
+    <string name="vault_login_hint">Dein Vaultwarden Master-Passwort</string>
+    <string name="vault_login_button">Entsperren</string>
+    <string name="vault_login_prompt">Melde dich mit deinem Vaultwarden-Konto an, um die gespeicherten Passwörter anzuzeigen.</string>
+    <string name="vault_logout">Vault sperren</string>
+    <string name="vault_empty">Keine Einträge im Vault</string>
+    <string name="vault_login_failed">Anmeldung fehlgeschlagen</string>
+    <string name="vault_decryption_error">Entschlüsselung fehlgeschlagen</string>
+    <string name="vault_copied">In Zwischenablage kopiert</string>
+    <string name="vault_type_login">Login</string>
+    <string name="vault_type_note">Sichere Notiz</string>
+    <string name="vault_type_card">Karte</string>
+    <string name="vault_type_identity">Identität</string>
+    <string name="vault_field_password">Passwort</string>
+    <string name="vault_field_username">Benutzer</string>
+    <string name="vault_field_uri">URI</string>
+    <string name="vault_field_totp">TOTP</string>
+    <string name="vault_field_note">Notiz</string>
+    <string name="vault_field_card_number">Kartennummer</string>
+    <string name="vault_field_card_code">Sicherheitscode</string>
+    <string name="vault_org_header">Organisation: %1$s</string>
+    <string name="vault_personal_header">Persönlich</string>
+    <string name="more_vault">Passwörter</string>
+
     <!-- Update -->
     <string name="update_available">Update verfügbar</string>
     <string name="update_message">Version %1$s ist verfügbar. Jetzt herunterladen?</string>

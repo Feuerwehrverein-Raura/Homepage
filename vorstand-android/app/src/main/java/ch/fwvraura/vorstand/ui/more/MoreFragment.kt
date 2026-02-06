@@ -64,6 +64,11 @@ class MoreFragment : Fragment() {
             findNavController().navigate(R.id.action_more_to_mailcow)
         }
 
+        // Passwörter (Vaultwarden)
+        binding.cardVault.setOnClickListener {
+            findNavController().navigate(R.id.action_more_to_vault)
+        }
+
         // Logout-Button: ruft die logout()-Methode der MainActivity auf,
         // die den Token loescht und zum Login-Screen zuruecknavigiert
         binding.btnLogout.setOnClickListener {
