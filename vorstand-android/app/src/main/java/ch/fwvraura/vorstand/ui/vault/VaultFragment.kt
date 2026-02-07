@@ -133,14 +133,20 @@ class VaultFragment : Fragment() {
     private fun showLoginDialog() {
         val dialogBinding = DialogVaultLoginBinding.inflate(layoutInflater)
         val tokenManager = (requireActivity().application as ch.fwvraura.vorstand.VorstandApp).tokenManager
-        val email = tokenManager.vaultEmail ?: tokenManager.userEmail ?: ""
+        val savedEmail = tokenManager.vaultEmail ?: tokenManager.userEmail ?: ""
+        dialogBinding.editEmail.setText(savedEmail)
 
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.vault_login_title)
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.vault_login_button) { _, _ ->
+                val email = dialogBinding.editEmail.text.toString().trim()
                 val password = dialogBinding.editPassword.text.toString()
 
+                if (email.isBlank()) {
+                    Snackbar.make(binding.root, "E-Mail ist ein Pflichtfeld", Snackbar.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
                 if (password.isBlank()) {
                     Snackbar.make(binding.root, "Master-Passwort ist ein Pflichtfeld", Snackbar.LENGTH_SHORT).show()
                     return@setPositiveButton
