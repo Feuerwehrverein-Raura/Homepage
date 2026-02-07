@@ -1,9 +1,15 @@
 package ch.fwvraura.vorstand.util
 
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.Environment
 import android.util.Log
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
@@ -52,7 +58,6 @@ class UpdateChecker(private val context: Context) {
 
     suspend fun checkForUpdate(): UpdateResult = withContext(Dispatchers.IO) {
         try {
-            // Schritt 1: Tags laden und neuesten vorstand-v* Tag finden
             val latestTag = findLatestVorstandTag()
                 ?: return@withContext UpdateResult.NoUpdate
 
@@ -65,7 +70,6 @@ class UpdateChecker(private val context: Context) {
                 return@withContext UpdateResult.NoUpdate
             }
 
-            // Schritt 2: Release fuer diesen Tag laden (fuer APK-Download-URL)
             val release = fetchReleaseByTag(latestTag)
             val apkUrl = release?.assets
                 ?.firstOrNull { it.name.contains("release") && it.name.endsWith(".apk") }
@@ -100,7 +104,6 @@ class UpdateChecker(private val context: Context) {
         val listType = object : TypeToken<List<GitHubTag>>() {}.type
         val tags: List<GitHubTag> = gson.fromJson(body, listType)
 
-        // Alle vorstand-v* Tags sammeln und nach Versionsnummer sortieren
         return tags
             .filter { it.name.startsWith(TAG_PREFIX) }
             .maxByOrNull { tag ->
@@ -151,10 +154,73 @@ class UpdateChecker(private val context: Context) {
             .setTitle("Update verfügbar")
             .setMessage("Version ${result.newVersion} ist verfügbar.\n\nAktuelle Version: ${result.currentVersion}")
             .setPositiveButton("Herunterladen") { _, _ ->
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.downloadUrl)))
+                downloadAndInstall(result)
             }
             .setNegativeButton("Später", null)
             .show()
+    }
+
+    private fun downloadAndInstall(result: UpdateResult.UpdateAvailable) {
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val fileName = "vorstand-${result.newVersion}.apk"
+
+        // Alte APK loeschen falls vorhanden
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val existingFile = java.io.File(downloadsDir, fileName)
+        if (existingFile.exists()) existingFile.delete()
+
+        val request = DownloadManager.Request(Uri.parse(result.downloadUrl))
+            .setTitle("FWV Vorstand ${result.newVersion}")
+            .setDescription("Update wird heruntergeladen…")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+            .setMimeType("application/vnd.android.package-archive")
+
+        val downloadId = downloadManager.enqueue(request)
+        Toast.makeText(context, "Download gestartet…", Toast.LENGTH_SHORT).show()
+
+        // BroadcastReceiver fuer Download-Abschluss registrieren
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context, intent: Intent) {
+                val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                if (id == downloadId) {
+                    try {
+                        ctx.unregisterReceiver(this)
+                    } catch (_: Exception) { }
+                    installApk(downloadId)
+                }
+            }
+        }
+
+        ContextCompat.registerReceiver(
+            context,
+            receiver,
+            IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_EXPORTED
+        )
+    }
+
+    private fun installApk(downloadId: Long) {
+        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val uri = downloadManager.getUriForDownloadedFile(downloadId)
+
+        if (uri == null) {
+            Toast.makeText(context, "Download fehlgeschlagen", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        try {
+            context.startActivity(installIntent)
+        } catch (e: Exception) {
+            Log.e(TAG, "Install intent failed", e)
+            Toast.makeText(context, "Installation konnte nicht gestartet werden", Toast.LENGTH_LONG).show()
+        }
     }
 
     sealed class UpdateResult {
