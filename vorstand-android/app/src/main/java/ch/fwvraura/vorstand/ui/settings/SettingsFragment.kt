@@ -11,6 +11,8 @@ import ch.fwvraura.vorstand.R
 import ch.fwvraura.vorstand.VorstandApp
 import ch.fwvraura.vorstand.databinding.FragmentSettingsBinding
 import ch.fwvraura.vorstand.util.AppSettings
+import ch.fwvraura.vorstand.util.TokenManager
+import com.google.android.material.snackbar.Snackbar
 
 /**
  * Fragment für die App-Einstellungen.
@@ -26,6 +28,7 @@ class SettingsFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var settings: AppSettings
+    private lateinit var tokenManager: TokenManager
 
     // Slider-Position zu Minuten Mapping
     private val intervalValues = listOf(15, 30, 60, 120, 240)
@@ -43,6 +46,7 @@ class SettingsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         settings = VorstandApp.instance.appSettings
+        tokenManager = VorstandApp.instance.tokenManager
 
         setupToolbar()
         loadSettings()
@@ -82,6 +86,12 @@ class SettingsFragment : Fragment() {
 
         // Auto-Update
         binding.switchAutoUpdate.isChecked = settings.autoUpdateCheck
+
+        // Vault-Credentials
+        binding.vaultEmail.setText(tokenManager.vaultEmail ?: "")
+        if (tokenManager.hasVaultCredentials) {
+            binding.vaultPassword.setText("••••••••")
+        }
     }
 
     private fun setupListeners() {
@@ -120,6 +130,30 @@ class SettingsFragment : Fragment() {
         // Auto-Update Switch
         binding.switchAutoUpdate.setOnCheckedChangeListener { _, isChecked ->
             settings.autoUpdateCheck = isChecked
+        }
+
+        // Vault speichern
+        binding.btnSaveVault.setOnClickListener {
+            val email = binding.vaultEmail.text.toString().trim()
+            val password = binding.vaultPassword.text.toString()
+
+            if (email.isBlank() && password.isBlank()) {
+                tokenManager.clearVaultCredentials()
+                Snackbar.make(binding.root, R.string.settings_vault_cleared, Snackbar.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            if (email.isBlank()) {
+                Snackbar.make(binding.root, "E-Mail ist ein Pflichtfeld", Snackbar.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            tokenManager.vaultEmail = email
+            // Nur speichern wenn nicht der Platzhalter
+            if (password != "••••••••" && password.isNotBlank()) {
+                tokenManager.vaultPassword = password
+            }
+            Snackbar.make(binding.root, R.string.settings_vault_saved, Snackbar.LENGTH_SHORT).show()
         }
     }
 

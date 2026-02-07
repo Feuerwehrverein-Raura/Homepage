@@ -323,6 +323,10 @@
     <string name="settings_updates">Updates</string>
     <string name="settings_auto_update">Automatisch prüfen</string>
     <string name="settings_auto_update_hint">Beim App-Start nach neuen Versionen suchen</string>
+    <string name="settings_vault">Passwörter (Vaultwarden)</string>
+    <string name="settings_vault_hint">Zugangsdaten für den automatischen Vault-Login. Wird verschlüsselt gespeichert.</string>
+    <string name="settings_vault_saved">Vault-Zugangsdaten gespeichert</string>
+    <string name="settings_vault_cleared">Vault-Zugangsdaten gelöscht</string>
 
     <!-- Mass PDF -->
     <string name="mass_pdf_title">Post-Massenversand</string>
