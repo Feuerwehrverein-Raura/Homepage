@@ -3078,12 +3078,13 @@
 
                 document.getElementById('feuerwehr-zugehoerigkeit').value = member.feuerwehr_zugehoerigkeit || 'keine';
 
-                // Load photo
+                // Load photo or avatar fallback
                 if (member.foto) {
                     document.getElementById('photo-preview').innerHTML = `<img src="${API_BASE}${member.foto}" class="w-full h-full object-cover">`;
                     document.getElementById('photo-delete-btn').classList.remove('hidden');
                 } else {
-                    document.getElementById('photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
+                    const avatarName = encodeURIComponent(`${member.vorname} ${member.nachname}`);
+                    document.getElementById('photo-preview').innerHTML = `<img src="${API_BASE}/avatar/${avatarName}" class="w-full h-full object-cover">`;
                     document.getElementById('photo-delete-btn').classList.add('hidden');
                 }
 
@@ -3397,7 +3398,11 @@
 
                 if (!response.ok) throw new Error('Failed to delete photo');
 
-                document.getElementById('photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
+                // Nach Löschung: Initialen-Avatar als Fallback anzeigen
+                const vorname = document.getElementById('vorname').value;
+                const nachname = document.getElementById('nachname').value;
+                const avatarName = encodeURIComponent(`${vorname} ${nachname}`);
+                document.getElementById('photo-preview').innerHTML = `<img src="${API_BASE}/avatar/${avatarName}" class="w-full h-full object-cover">`;
                 document.getElementById('photo-delete-btn').classList.add('hidden');
                 await loadMembers();
             } catch (error) {

@@ -268,9 +268,15 @@ class MemberDetailFragment : Fragment() {
                     Toast.makeText(requireContext(), R.string.photo_delete_success, Toast.LENGTH_SHORT).show()
                     // Lokales Objekt aktualisieren (Kotlin copy() erstellt eine Kopie mit geaenderten Feldern)
                     member = member?.copy(foto = null)
-                    // UI zuruecksetzen: Foto entfernen und Platzhalter anzeigen
-                    binding.memberPhoto.setImageDrawable(null)
-                    binding.memberPhoto.setBackgroundResource(R.drawable.circle_background)
+                    // Initialen-Avatar anzeigen statt leerem Platzhalter
+                    member?.let { m ->
+                        val avatarName = java.net.URLEncoder.encode(
+                            "${m.vorname} ${m.nachname}", "UTF-8"
+                        )
+                        binding.memberPhoto.load("https://api.fwv-raura.ch/avatar/$avatarName") {
+                            transformations(CircleCropTransformation())
+                        }
+                    }
                 } else {
                     Toast.makeText(requireContext(), R.string.photo_delete_error, Toast.LENGTH_SHORT).show()
                 }
@@ -321,7 +327,7 @@ class MemberDetailFragment : Fragment() {
         binding.memberName.text = m.fullName
         binding.memberFunction.text = m.funktion ?: ""
 
-        // Foto laden oder Platzhalter anzeigen
+        // Foto laden oder Initialen-Avatar anzeigen
         if (!m.foto.isNullOrEmpty()) {
             binding.memberPhoto.load("https://api.fwv-raura.ch${m.foto}") {
                 transformations(CircleCropTransformation())
@@ -329,8 +335,15 @@ class MemberDetailFragment : Fragment() {
                 memoryCachePolicy(CachePolicy.DISABLED)
             }
         } else {
-            binding.memberPhoto.setImageDrawable(null)
-            binding.memberPhoto.setBackgroundResource(R.drawable.circle_background)
+            // Kein Foto vorhanden: Initialen-Avatar vom Backend laden.
+            // Der Endpoint /avatar/:name generiert ein SVG mit farbigem Kreis
+            // und weissen Initialen (z.B. "SM" fuer Stefan Mueller).
+            val avatarName = java.net.URLEncoder.encode(
+                "${m.vorname} ${m.nachname}", "UTF-8"
+            )
+            binding.memberPhoto.load("https://api.fwv-raura.ch/avatar/$avatarName") {
+                transformations(CircleCropTransformation())
+            }
         }
 
         // Kontaktdaten anzeigen (mit "-" als Fallback)

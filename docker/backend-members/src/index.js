@@ -271,6 +271,54 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
+// AVATAR — Initialen-Avatar als SVG
+// ============================================
+
+// DEUTSCH: Generiert ein SVG-Bild mit farbigem Kreis und weissen Initialen.
+// Wird als Platzhalter fuer Mitglieder ohne Profilfoto verwendet.
+// Deterministisch: gleicher Name = immer gleiche Farbe.
+// Kein Auth noetig — der Name ist kein sensibles Datum.
+const AVATAR_COLORS = [
+    '#E53935', '#8E24AA', '#3949AB', '#039BE5',
+    '#00897B', '#43A047', '#F4511E', '#6D4C41'
+];
+
+function hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+}
+
+app.get('/avatar/:name', (req, res) => {
+    const name = decodeURIComponent(req.params.name).trim();
+    if (!name) {
+        return res.status(400).send('Name required');
+    }
+
+    // Initialen: Erste Buchstaben der ersten 2 Woerter (max 2 Zeichen)
+    const parts = name.split(/\s+/).filter(p => p.length > 0);
+    const initials = parts.slice(0, 2).map(p => p.charAt(0).toUpperCase()).join('');
+
+    // Farbe deterministisch aus dem Namen ableiten
+    const color = AVATAR_COLORS[hashCode(name) % AVATAR_COLORS.length];
+
+    // SVG generieren (128x128 Pixel)
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128">
+  <circle cx="64" cy="64" r="64" fill="${color}"/>
+  <text x="64" y="64" text-anchor="middle" dominant-baseline="central"
+        fill="white" font-size="48" font-family="Arial,Helvetica,sans-serif"
+        font-weight="bold">${initials}</text>
+</svg>`;
+
+    res.set('Content-Type', 'image/svg+xml');
+    res.set('Cache-Control', 'public, max-age=86400'); // 1 Tag Cache
+    res.send(svg);
+});
+
+// ============================================
 // AUTH INFO (Authentik handles actual auth)
 // ============================================
 

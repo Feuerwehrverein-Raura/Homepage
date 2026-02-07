@@ -126,12 +126,19 @@ class MembersAdapter(
                     placeholder(R.drawable.circle_background)
                 }
             } else {
-                // WICHTIG: dispose() bricht laufende Coil-Requests fuer dieses ImageView ab.
-                // Ohne dispose() kann ein recycelter ViewHolder noch einen alten Coil-Request
-                // ausstehend haben, der NACH setImageResource() fertig wird und das Bild
-                // des vorherigen Mitglieds anzeigt (statt des Platzhalters).
+                // Kein Foto vorhanden: Initialen-Avatar vom Backend laden.
+                // Der Endpoint /avatar/:name generiert ein SVG mit farbigem Kreis
+                // und weissen Initialen (z.B. "SM" fuer Stefan Mueller).
+                // dispose() bricht laufende Coil-Requests fuer dieses ImageView ab,
+                // damit ein recycelter ViewHolder kein altes Bild anzeigt.
                 binding.memberAvatar.dispose()
-                binding.memberAvatar.setImageResource(R.drawable.circle_background)
+                val avatarName = java.net.URLEncoder.encode(
+                    "${member.vorname} ${member.nachname}", "UTF-8"
+                )
+                binding.memberAvatar.load("https://api.fwv-raura.ch/avatar/$avatarName") {
+                    transformations(CircleCropTransformation())
+                    placeholder(R.drawable.circle_background)
+                }
             }
 
             // Click-Listener: Beim Klick auf die gesamte Zeile wird der onClick-Callback

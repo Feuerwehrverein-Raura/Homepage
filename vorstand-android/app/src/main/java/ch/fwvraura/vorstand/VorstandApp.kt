@@ -11,6 +11,9 @@ import ch.fwvraura.vorstand.util.AppSettings
 import ch.fwvraura.vorstand.util.AuditNotificationWorker
 import ch.fwvraura.vorstand.util.NotificationHelper
 import ch.fwvraura.vorstand.util.TokenManager
+import coil.Coil
+import coil.ImageLoader
+import coil.decode.SvgDecoder
 import java.util.concurrent.TimeUnit
 
 /**
@@ -54,6 +57,16 @@ class VorstandApp : Application() {
         // Retrofit API-Client initialisieren — setzt den Auth-Interceptor, der bei jedem
         // API-Aufruf automatisch den Bearer-Token aus dem TokenManager in den Header setzt
         ApiModule.init(tokenManager)
+
+        // Coil ImageLoader mit SVG-Support konfigurieren.
+        // Standardmaessig kann Coil nur Raster-Bilder (PNG, JPEG) dekodieren.
+        // Der SvgDecoder ermoeglicht das Laden von SVG-Bildern, die vom Backend
+        // als Initialen-Avatare generiert werden (GET /avatar/:name).
+        Coil.setImageLoader(
+            ImageLoader.Builder(this)
+                .components { add(SvgDecoder.Factory()) }
+                .build()
+        )
 
         // Android Notification-Kanal erstellen — muss einmal vor dem Senden von Notifications passieren
         // Der Kanal erscheint in den System-Einstellungen unter "Vorstand Benachrichtigungen"

@@ -95,8 +95,9 @@ dependencies {
     // JSON
     implementation("com.google.code.gson:gson:2.11.0")
 
-    // Image Loading
+    // Image Loading (coil-svg fuer Backend-generierte SVG-Avatare)
     implementation("io.coil-kt:coil:2.7.0")
+    implementation("io.coil-kt:coil-svg:2.7.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
