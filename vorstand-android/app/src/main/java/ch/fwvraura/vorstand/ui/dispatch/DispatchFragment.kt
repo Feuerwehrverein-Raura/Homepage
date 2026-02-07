@@ -19,7 +19,6 @@ class DispatchFragment : Fragment() {
         listOf(
             getString(R.string.dispatch_tab_send),
             getString(R.string.dispatch_tab_templates),
-            getString(R.string.dispatch_tab_post),
             getString(R.string.dispatch_tab_log)
         )
     }
@@ -49,14 +48,13 @@ class DispatchFragment : Fragment() {
 
     private inner class DispatchPagerAdapter(fragment: Fragment) : FragmentStateAdapter(fragment) {
 
-        override fun getItemCount() = 4
+        override fun getItemCount() = 3
 
         override fun createFragment(position: Int): Fragment {
             return when (position) {
                 0 -> DispatchComposeFragment()
                 1 -> DispatchTemplatesFragment()
-                2 -> DispatchPingenFragment()
-                3 -> DispatchLogFragment()
+                2 -> DispatchLogFragment()
                 else -> throw IllegalStateException("Invalid tab position: $position")
             }
         }

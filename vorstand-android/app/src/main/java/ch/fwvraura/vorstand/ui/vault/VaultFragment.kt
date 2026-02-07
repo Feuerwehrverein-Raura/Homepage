@@ -5,10 +5,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Bundle
 import android.text.Editable
+import android.text.InputType
 import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -20,6 +24,8 @@ import ch.fwvraura.vorstand.databinding.DialogVaultLoginBinding
 import ch.fwvraura.vorstand.databinding.FragmentVaultBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -179,18 +185,48 @@ class VaultFragment : Fragment() {
         val fields = item.copyFields
         if (fields.isEmpty()) return
 
-        val message = fields.entries.joinToString("\n\n") { (label, value) ->
-            val displayValue = if (label == "Passwort" || label == "Sicherheitscode") {
-                "\u2022".repeat(value.length)
-            } else {
-                value
-            }
-            "$label:\n$displayValue"
+        val ctx = requireContext()
+        val dp16 = (16 * ctx.resources.displayMetrics.density).toInt()
+        val dp8 = (8 * ctx.resources.displayMetrics.density).toInt()
+
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp16, dp16, dp16, 0)
         }
 
-        MaterialAlertDialogBuilder(requireContext())
+        for ((label, value) in fields) {
+            val isSecret = label == "Passwort" || label == "Sicherheitscode"
+
+            val inputLayout = TextInputLayout(ctx, null,
+                com.google.android.material.R.attr.textInputOutlinedStyle).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dp8 }
+                hint = label
+                if (isSecret) {
+                    endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
+                }
+            }
+
+            val editText = TextInputEditText(inputLayout.context).apply {
+                setText(value)
+                isFocusable = false
+                isCursorVisible = false
+                if (isSecret) {
+                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                }
+            }
+
+            inputLayout.addView(editText)
+            container.addView(inputLayout)
+        }
+
+        val scrollView = ScrollView(ctx).apply { addView(container) }
+
+        MaterialAlertDialogBuilder(ctx)
             .setTitle(item.name)
-            .setMessage(message)
+            .setView(scrollView)
             .setPositiveButton(R.string.close, null)
             .setNeutralButton("Kopieren") { _, _ ->
                 showCopyOptions(item)

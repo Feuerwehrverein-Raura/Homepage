@@ -67,11 +67,13 @@ class DispatchComposeFragment : Fragment() {
         setupRecipientChips()
         setupTemplateSpinner()
         setupPdfPicker()
+        setupPingenCard()
         setupButtons()
         observeData()
 
         viewModel.loadMembers()
         viewModel.loadTemplates()
+        viewModel.loadPingenDashboard()
     }
 
     private fun setupRichTextEditor() {
@@ -87,7 +89,10 @@ class DispatchComposeFragment : Fragment() {
     private fun setupSendModeChips() {
         binding.sendModeChips.setOnCheckedStateChangeListener { _, checkedIds ->
             val isPostMode = checkedIds.contains(R.id.chipPostOnly)
+            val isEmailOnly = checkedIds.contains(R.id.chipEmailOnly)
             binding.pdfCard.visibility = if (isPostMode) View.VISIBLE else View.GONE
+            // Pingen-Karte bei Smart oder Post anzeigen (nicht bei reinem E-Mail)
+            binding.pingenCard.visibility = if (!isEmailOnly) View.VISIBLE else View.GONE
             // Im reinen Post-Modus: Body-Feld und Toolbar ausblenden wenn PDF vorhanden
             val hideBody = isPostMode && pdfBytes != null
             binding.bodyLayout.visibility = if (hideBody) View.GONE else View.VISIBLE
@@ -123,6 +128,15 @@ class DispatchComposeFragment : Fragment() {
         }
     }
 
+    private fun setupPingenCard() {
+        // Standardmaessig sichtbar (Smart-Modus ist vorausgewaehlt)
+        binding.pingenCard.visibility = View.VISIBLE
+        binding.stagingSwitch.isChecked = viewModel.staging
+        binding.stagingSwitch.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.setStaging(isChecked)
+        }
+    }
+
     private fun setupPdfPicker() {
         binding.selectPdfButton.setOnClickListener {
             val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
@@ -147,6 +161,22 @@ class DispatchComposeFragment : Fragment() {
             viewModel.isLoading.collectLatest { loading ->
                 binding.sendButton.isEnabled = !loading
                 binding.previewButton.isEnabled = !loading
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.pingenAccount.collectLatest { account ->
+                if (account != null) {
+                    val balance = String.format("%.2f %s", account.balance / 100.0, account.currency)
+                    val label = if (account.isStaging) {
+                        getString(R.string.dispatch_staging_active)
+                    } else {
+                        getString(R.string.dispatch_pingen_balance)
+                    }
+                    binding.pingenBalance.text = "$label: $balance"
+                } else {
+                    binding.pingenBalance.text = ""
+                }
             }
         }
 
