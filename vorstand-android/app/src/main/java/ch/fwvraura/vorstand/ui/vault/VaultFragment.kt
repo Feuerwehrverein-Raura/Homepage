@@ -118,6 +118,16 @@ class VaultFragment : Fragment() {
                 }
             }
         }
+
+        // Bei fehlgeschlagenem Auto-Login automatisch den Login-Dialog anzeigen
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.showLoginDialog.collectLatest { show ->
+                if (show) {
+                    viewModel.loginDialogShown()
+                    showLoginDialog()
+                }
+            }
+        }
     }
 
     private fun showLoginDialog() {

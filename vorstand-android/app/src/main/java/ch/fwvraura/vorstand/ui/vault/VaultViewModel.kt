@@ -34,6 +34,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAuthenticated = MutableStateFlow(false)
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated
 
+    // Signalisiert dem Fragment, dass der Auto-Login fehlgeschlagen ist
+    // und der Login-Dialog automatisch angezeigt werden soll
+    private val _showLoginDialog = MutableStateFlow(false)
+    val showLoginDialog: StateFlow<Boolean> = _showLoginDialog
+
     // In-memory only — never persisted
     private var accessToken: String? = null
     private var symmetricKey: BitwardenCrypto.SymmetricKey? = null
@@ -64,6 +69,10 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
     fun search(query: String) {
         _searchQuery.value = query
+    }
+
+    fun loginDialogShown() {
+        _showLoginDialog.value = false
     }
 
     fun login(email: String, masterPassword: String) {
@@ -100,7 +109,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                         val json = com.google.gson.JsonParser.parseString(errorBody).asJsonObject
                         json.get("message")?.asString ?: errorBody
                     } catch (_: Exception) { errorBody }
+                    // Gespeicherte Credentials loeschen, damit der Login-Dialog
+                    // beim naechsten Mal angezeigt wird statt Auto-Login mit falschen Daten
+                    tokenManager.clearVaultCredentials()
                     _error.value = "Login fehlgeschlagen: $message"
+                    _showLoginDialog.value = true
                     _isLoading.value = false
                     return@launch
                 }
