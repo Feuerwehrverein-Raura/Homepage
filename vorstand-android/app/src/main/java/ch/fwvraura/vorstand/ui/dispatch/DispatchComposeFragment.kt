@@ -18,6 +18,7 @@ import ch.fwvraura.vorstand.R
 import ch.fwvraura.vorstand.data.model.EmailTemplate
 import ch.fwvraura.vorstand.data.model.Member
 import ch.fwvraura.vorstand.databinding.FragmentDispatchComposeBinding
+import ch.fwvraura.vorstand.util.RichTextEditor
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -31,6 +32,7 @@ class DispatchComposeFragment : Fragment() {
     private var selectedTemplate: EmailTemplate? = null
     private var pdfBytes: ByteArray? = null
     private var pdfName: String? = null
+    private var richTextEditor: RichTextEditor? = null
 
     private val pdfPickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -60,6 +62,7 @@ class DispatchComposeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        setupRichTextEditor()
         setupSendModeChips()
         setupRecipientChips()
         setupTemplateSpinner()
@@ -71,12 +74,24 @@ class DispatchComposeFragment : Fragment() {
         viewModel.loadTemplates()
     }
 
+    private fun setupRichTextEditor() {
+        richTextEditor = RichTextEditor(
+            editText = binding.bodyInput,
+            btnBold = binding.btnBold,
+            btnItalic = binding.btnItalic,
+            btnUnderline = binding.btnUnderline,
+            btnList = binding.btnList
+        )
+    }
+
     private fun setupSendModeChips() {
         binding.sendModeChips.setOnCheckedStateChangeListener { _, checkedIds ->
             val isPostMode = checkedIds.contains(R.id.chipPostOnly)
             binding.pdfCard.visibility = if (isPostMode) View.VISIBLE else View.GONE
-            // Im reinen Post-Modus: Body-Feld ausblenden wenn PDF vorhanden
-            binding.bodyLayout.visibility = if (isPostMode && pdfBytes != null) View.GONE else View.VISIBLE
+            // Im reinen Post-Modus: Body-Feld und Toolbar ausblenden wenn PDF vorhanden
+            val hideBody = isPostMode && pdfBytes != null
+            binding.bodyLayout.visibility = if (hideBody) View.GONE else View.VISIBLE
+            binding.formatToolbar.visibility = if (hideBody) View.GONE else View.VISIBLE
             updateRecipientCount()
         }
     }
@@ -97,11 +112,11 @@ class DispatchComposeFragment : Fragment() {
                     if (position == 0) {
                         selectedTemplate = null
                         binding.subjectInput.setText("")
-                        binding.bodyInput.setText("")
+                        richTextEditor?.setText("")
                     } else {
                         selectedTemplate = templates[position - 1]
                         binding.subjectInput.setText(selectedTemplate?.subject ?: "")
-                        binding.bodyInput.setText(selectedTemplate?.body ?: "")
+                        richTextEditor?.setText(selectedTemplate?.body)
                     }
                 }
             }
@@ -201,7 +216,7 @@ class DispatchComposeFragment : Fragment() {
         dialogView.findViewById<TextView>(R.id.previewMode)?.text = mode
         dialogView.findViewById<TextView>(R.id.previewRecipients)?.text = binding.recipientCount.text
         dialogView.findViewById<TextView>(R.id.previewSubject)?.text = binding.subjectInput.text?.toString() ?: ""
-        dialogView.findViewById<TextView>(R.id.previewBody)?.text = binding.bodyInput.text?.toString() ?: ""
+        dialogView.findViewById<TextView>(R.id.previewBody)?.text = richTextEditor?.toPlainText() ?: ""
 
         if (pdfBytes != null) {
             val pdfInfo = dialogView.findViewById<TextView>(R.id.previewPdf)
@@ -241,7 +256,7 @@ class DispatchComposeFragment : Fragment() {
         val members = getFilteredMembers()
         val memberIds = members.map { it.id }
         val subject = binding.subjectInput.text?.toString()
-        val body = binding.bodyInput.text?.toString()
+        val body = richTextEditor?.toHtml() ?: binding.bodyInput.text?.toString()
 
         when {
             // Post mit PDF
