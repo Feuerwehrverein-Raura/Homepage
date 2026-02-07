@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import ch.fwvraura.vorstand.R
 import ch.fwvraura.vorstand.data.model.Member
 import ch.fwvraura.vorstand.databinding.ItemMemberBinding
+import coil.dispose
 import coil.load
 import coil.transform.CircleCropTransformation
 
@@ -125,6 +126,11 @@ class MembersAdapter(
                     placeholder(R.drawable.circle_background)
                 }
             } else {
+                // WICHTIG: dispose() bricht laufende Coil-Requests fuer dieses ImageView ab.
+                // Ohne dispose() kann ein recycelter ViewHolder noch einen alten Coil-Request
+                // ausstehend haben, der NACH setImageResource() fertig wird und das Bild
+                // des vorherigen Mitglieds anzeigt (statt des Platzhalters).
+                binding.memberAvatar.dispose()
                 binding.memberAvatar.setImageResource(R.drawable.circle_background)
             }
 

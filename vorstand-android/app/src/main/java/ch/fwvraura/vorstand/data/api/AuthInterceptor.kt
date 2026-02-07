@@ -16,9 +16,11 @@ import okhttp3.Response
  *    JWT-Bearer-Token automatisch in den "Authorization"-Header eingefuegt,
  *    damit der Server den Benutzer authentifizieren kann.
  *
- * 2. 401-Fehlerbehandlung: Wenn der Server mit HTTP 401 (Unauthorized) antwortet
- *    (z.B. weil der Token abgelaufen ist), wird der Token geloescht und die App
- *    automatisch zur Login-Seite weitergeleitet.
+ * 2. 401/403-Fehlerbehandlung: Wenn der Server mit HTTP 401 (Unauthorized) oder
+ *    403 (Forbidden) antwortet (z.B. weil der Token abgelaufen ist), wird der Token
+ *    geloescht und die App automatisch zur Login-Seite weitergeleitet.
+ *    Hinweis: Das Backend gibt 403 zurueck bei abgelaufenen Vorstand-JWTs
+ *    (authenticateVorstand), daher muessen beide Status-Codes behandelt werden.
  *
  * @param tokenManager Der TokenManager, der den JWT-Token sicher speichert und bereitstellt.
  *                     Wird per Dependency Injection uebergeben.
@@ -27,7 +29,7 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
 
     /**
      * Faengt jeden HTTP-Request ab und fuegt den Authorization-Header hinzu.
-     * Prueft anschliessend die Response auf 401-Fehler.
+     * Prueft anschliessend die Response auf 401/403-Fehler.
      *
      * Ablauf Schritt fuer Schritt:
      * 1. Originalen Request aus der Chain holen
@@ -35,7 +37,8 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
      * 3. Falls Token vorhanden: Neuen Request mit "Authorization: Bearer <token>" Header erstellen
      *    Falls kein Token vorhanden: Originalen Request unveraendert verwenden
      * 4. Request ausfuehren und Response erhalten
-     * 5. Falls Response-Code 401 (Unauthorized) UND der Request kein Login-Request war:
+     * 5. Falls Response-Code 401 (Unauthorized) oder 403 (Forbidden) UND der Request
+     *    kein Login-Request war:
      *    - Token loeschen (da er ungueltig/abgelaufen ist)
      *    - App zur Login-Seite weiterleiten (durch Neustart der Haupt-Activity)
      * 6. Response zurueckgeben
@@ -69,12 +72,14 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
         // Netzwerk weiter und gibt die Server-Antwort zurueck.
         val response = chain.proceed(request)
 
-        // Schritt 5: Pruefen, ob der Server mit 401 (Unauthorized) geantwortet hat.
+        // Schritt 5: Pruefen, ob der Server mit 401 oder 403 geantwortet hat.
+        // 401 = kein Token vorhanden, 403 = Token ungueltig/abgelaufen.
+        // Das Backend (authenticateVorstand) gibt 403 bei abgelaufenen JWTs zurueck.
         // Die zusaetzliche Pruefung "!original.url.encodedPath.contains("login")" stellt
         // sicher, dass ein fehlgeschlagener Login-Versuch NICHT zur automatischen
         // Weiterleitung fuehrt - nur abgelaufene/ungueltige Tokens bei anderen Requests
         // loesen die Weiterleitung aus.
-        if (response.code == 401 && !original.url.encodedPath.contains("login")) {
+        if ((response.code == 401 || response.code == 403) && !original.url.encodedPath.contains("login")) {
             // Token loeschen, da er ungueltig oder abgelaufen ist
             tokenManager.clear()
 

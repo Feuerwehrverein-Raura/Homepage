@@ -2,6 +2,8 @@ package ch.fwvraura.vorstand
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Base64
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
@@ -9,6 +11,8 @@ import androidx.navigation.ui.setupWithNavController
 import ch.fwvraura.vorstand.databinding.ActivityMainBinding
 import ch.fwvraura.vorstand.ui.login.LoginActivity
 import ch.fwvraura.vorstand.util.UpdateChecker
+import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.launch
 
 /**
@@ -72,6 +76,60 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    /**
+     * Wird aufgerufen wenn die Activity wieder in den Vordergrund kommt
+     * (z.B. nach App-Wechsel, Bildschirm einschalten).
+     *
+     * Prueft proaktiv ob der JWT-Token noch gueltig ist (nicht abgelaufen).
+     * Das ist noetig, weil der AuthInterceptor nur bei API-Calls reagiert.
+     * Wenn die App stundenlang im Hintergrund war, wird der Benutzer sofort
+     * zum Login weitergeleitet, statt erst beim naechsten API-Call.
+     */
+    override fun onResume() {
+        super.onResume()
+        checkTokenExpiry()
+    }
+
+    /**
+     * Prueft ob der gespeicherte JWT-Token abgelaufen ist.
+     *
+     * Ein JWT besteht aus 3 Teilen, getrennt durch Punkte: header.payload.signature
+     * Der Payload (2. Teil) ist Base64-kodiert und enthaelt den "exp"-Claim
+     * (Ablaufzeitpunkt als Unix-Timestamp in Sekunden).
+     *
+     * Wenn der Token abgelaufen ist oder nicht gelesen werden kann,
+     * wird der Benutzer automatisch ausgeloggt.
+     */
+    private fun checkTokenExpiry() {
+        val token = VorstandApp.instance.tokenManager.token ?: return
+
+        try {
+            // JWT-Payload (2. Teil) extrahieren und Base64-dekodieren
+            val parts = token.split(".")
+            if (parts.size != 3) {
+                logout()
+                return
+            }
+            val payloadJson = String(Base64.decode(parts[1], Base64.URL_SAFE or Base64.NO_PADDING))
+            val payload = Gson().fromJson(payloadJson, JwtPayload::class.java)
+
+            // "exp" ist ein Unix-Timestamp in Sekunden
+            val nowSeconds = System.currentTimeMillis() / 1000
+            if (payload.exp != null && payload.exp < nowSeconds) {
+                Log.d("MainActivity", "JWT abgelaufen (exp=${payload.exp}, now=$nowSeconds)")
+                logout()
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "JWT-Pruefung fehlgeschlagen", e)
+            logout()
+        }
+    }
+
+    /** Minimale Datenklasse fuer den JWT-Payload (nur "exp" wird benoetigt). */
+    private data class JwtPayload(
+        @SerializedName("exp") val exp: Long? = null
+    )
 
     /**
      * Meldet den Benutzer ab (Logout).
