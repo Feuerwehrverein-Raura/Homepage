@@ -1,29 +1,48 @@
 #!/bin/bash
 # Synchronisiert Mitgliederdaten in Nextcloud-Benutzerprofile
-# Befuellt: Adresse, Ort, Telefon, Organisation, Funktion, Geburtstag
+# Befuellt: Adresse, Telefon, Organisation, Funktion, Geburtstag
 # Nur leere Felder werden befuellt (manuelle Aenderungen werden nicht ueberschrieben)
+# Verwendet occ user:profile statt direkter DB-Writes
 # Wird per Crontab ausgefuehrt: 15 3 * * * /opt/docker/fwv-website/cron/nextcloud-profile-sync.sh >> /var/log/fwv-nextcloud-profiles.log 2>&1
 
 DB_CONTAINER="fwv-postgres"
 DB_NAME="fwv_raura"
 DB_USER="fwv"
 
-NC_DB_CONTAINER="nextcloud-db"
-NC_DB_USER="nextcloud"
-NC_DB_PASS="1adc64d6bf7ebf2d61491b1a33eb4f66"
-NC_DB_NAME="nextcloud"
+NC_CONTAINER="nextcloud"
 
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 echo "============================================"
 echo "[$TIMESTAMP] Nextcloud Profil-Sync gestartet"
 echo "============================================"
 
-# 1. Nextcloud-Benutzer mit ihren E-Mails abrufen
+# 1. Nextcloud-Benutzer mit UIDs und E-Mails abrufen
 echo "Nextcloud-Benutzer abrufen..."
-NC_USERS=$(docker exec "$NC_DB_CONTAINER" mariadb -u "$NC_DB_USER" -p"$NC_DB_PASS" -D "$NC_DB_NAME" -N -B -e "
-    SELECT uid, LOWER(value) FROM oc_accounts_data WHERE name = 'email' AND value != ''
+NC_USER_UIDS=$(docker exec -u www-data "$NC_CONTAINER" php occ user:list --output=json 2>/dev/null | python3 -c "
+import sys, json
+users = json.load(sys.stdin)
+for uid in users:
+    print(uid)
 " 2>/dev/null)
 
+NC_USERS=""
+while read -r uid; do
+    [ -z "$uid" ] && continue
+    [ "$uid" = "fwv-system" ] && continue
+    [ "$uid" = "admin" ] && continue
+
+    USER_EMAIL=$(docker exec -u www-data "$NC_CONTAINER" php occ user:info "$uid" --output=json 2>/dev/null | python3 -c "
+import sys, json
+info = json.load(sys.stdin)
+print(info.get('email', '').lower())
+" 2>/dev/null)
+
+    if [ -n "$USER_EMAIL" ]; then
+        NC_USERS="${NC_USERS}${uid}\t${USER_EMAIL}\n"
+    fi
+done <<< "$NC_USER_UIDS"
+
+NC_USERS=$(echo -e "$NC_USERS" | grep -v '^$')
 NC_USER_COUNT=$(echo "$NC_USERS" | grep -c . 2>/dev/null || echo 0)
 echo "Nextcloud-Benutzer mit E-Mail: $NC_USER_COUNT"
 
@@ -46,8 +65,6 @@ SKIPPED=0
 
 while IFS=$'\t' read -r nc_uid nc_email; do
     [ -z "$nc_uid" ] && continue
-    [ "$nc_uid" = "fwv-system" ] && continue
-    [ "$nc_uid" = "admin" ] && continue
 
     # Mitglied anhand E-Mail finden
     MEMBER_DATA=$(echo "$MEMBERS" | grep -i "^${nc_email}|" | head -1)
@@ -57,10 +74,8 @@ while IFS=$'\t' read -r nc_uid nc_email; do
 
     IFS='|' read -r m_email m_vorname m_nachname m_telefon m_mobile m_strasse m_adresszusatz m_plz m_ort m_funktion m_geburtstag <<< "$MEMBER_DATA"
 
-    # Aktuelle NC-Profildaten abrufen
-    CURRENT_DATA=$(docker exec "$NC_DB_CONTAINER" mariadb -u "$NC_DB_USER" -p"$NC_DB_PASS" -D "$NC_DB_NAME" -N -B -e "
-        SELECT name, value FROM oc_accounts_data WHERE uid = '$nc_uid' AND name IN ('address', 'phone', 'organisation', 'role', 'birthdate')
-    " 2>/dev/null)
+    # Aktuelle NC-Profildaten via occ abrufen
+    CURRENT_PROFILE=$(docker exec -u www-data "$NC_CONTAINER" php occ user:profile "$nc_uid" --output=json 2>/dev/null)
 
     CHANGES=0
 
@@ -72,15 +87,21 @@ while IFS=$'\t' read -r nc_uid nc_email; do
         [ -z "$new_value" ] && return
 
         # Aktuellen Wert pruefen
-        local current_value=$(echo "$CURRENT_DATA" | grep "^${field_name}" | cut -f2)
+        local current_value=$(echo "$CURRENT_PROFILE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print(data.get('$field_name', ''))
+except:
+    print('')
+" 2>/dev/null)
+
         if [ -n "$current_value" ]; then
             return
         fi
 
-        # Wert setzen (UPDATE da Zeile bereits existiert)
-        docker exec "$NC_DB_CONTAINER" mariadb -u "$NC_DB_USER" -p"$NC_DB_PASS" -D "$NC_DB_NAME" -e "
-            UPDATE oc_accounts_data SET value = '$(echo "$new_value" | sed "s/'/''/g")' WHERE uid = '$nc_uid' AND name = '$field_name'
-        " 2>/dev/null
+        # Wert via occ setzen
+        docker exec -u www-data "$NC_CONTAINER" php occ user:profile "$nc_uid" "$field_name" "$new_value" 2>/dev/null
         CHANGES=$((CHANGES + 1))
     }
 
