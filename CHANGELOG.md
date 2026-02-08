@@ -3,6 +3,59 @@
 
 ### Bug Fixes
 
+* **api:** add auth headers for internal dispatch API email calls ([3f774cb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3f774cb91da42753df4fb6482f1abe6359748b41))
+* **apps:** add Auto-Update feature to KDS card and update tip text ([5982d78](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5982d784b211404f47f173d5c988b8b29edb005c))
+* **apps:** kitchen web link pointed to order.fwv-raura.ch ([2e2a0cb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2e2a0cba7f77812699d4712ef530877831e1e461))
+* **apps:** registration link now points to mein.html ([6144311](https://github.com/Feuerwehrverein-Raura/Homepage/commit/61443110779f51474c2893f2163b858968366a87))
+* **auth:** properly invalidate Authentik session on logout ([a89f054](https://github.com/Feuerwehrverein-Raura/Homepage/commit/a89f0541dd8abc1c46ce95aaaf8509e1109e5881))
+* **auth:** use OIDC end-session endpoint for proper Authentik logout ([3834178](https://github.com/Feuerwehrverein-Raura/Homepage/commit/3834178c5a10990d6a967d4db2f1574a85cd3bc3))
+* **cron:** detect NC users by profile existence instead of last_login ([cc51d04](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cc51d047bc1fad989743729acdea40526e0bd9d3))
+* **cron:** use occ user:profile for NC profile sync instead of direct DB ([d57ccd3](https://github.com/Feuerwehrverein-Raura/Homepage/commit/d57ccd39b1a4e9fe7ae88bd06eb26ba4198c5bcd))
+* **order-system:** logout also ends Authentik session ([720454b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/720454b8b07bed2eea473bbb30a207b4bf7e7b16))
+* **order-system:** redirect to main website after Authentik logout ([21f81dd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/21f81dd017f3d584dcf42a19e264fa9ee638f5a5))
+* **order-system:** remove ?next= param from Authentik logout ([dd21c82](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd21c822d1dc79438d0c3103c60f8479e7be7294))
+* **order-system:** use Authentik invalidation flow for proper logout ([8a15284](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8a152841604b8ddaefef9ff8e9466f7680c5f4ab))
+* **order-system:** use prompt=login for reliable logout ([9faaf28](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9faaf28d1d33cddf6883f564e602c804aab273b2))
+* resolve merge conflict in KDS workflow ([5e9181b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5e9181bb4ed85a77ad3f58c87bd51b3e51e93875))
+* **vorstand-app:** add email field to vault login dialog ([7966286](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7966286ed4420b4c990ef667e17b8f9093c1fca5))
+* **vorstand-app:** audit field mapping, context safety, minSdk 30 ([54f546a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/54f546ab5cfe52e62e3f9fa1dbc8d0ead93e662b))
+* **vorstand-app:** auto-logout on expired token and fix photo recycling bug ([7fcfc46](https://github.com/Feuerwehrverein-Raura/Homepage/commit/7fcfc46a7a55ea7d01aa769cadede3250cf9cda2))
+* **vorstand-app:** clear stale vault credentials on failed auto-login ([9c3911b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/9c3911b809eac7f1620b4f7ead128cc5ca358316))
+* **vorstand-app:** fix Vaultwarden login PBKDF2 byte corruption ([ee42b91](https://github.com/Feuerwehrverein-Raura/Homepage/commit/ee42b917a21d08126c6aaabf50e0413e19f47563))
+* **vorstand-app:** update versionName to 1.2.0 and versionCode to 2 ([beb5a9a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/beb5a9a50dbbcd87939fcf8b58c0063c57f60568))
+* **vorstand-app:** use active_int field for Mailcow API deserialization ([8c80447](https://github.com/Feuerwehrverein-Raura/Homepage/commit/8c804475d7f0c5a5e5e8b582d61146fe2dbe93a0))
+* **vorstand-app:** use correct DB column name 'foto' instead of 'photo_url' ([657407c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/657407cce22a58246d940c8f7eb679a700f7afa1))
+* **vorstand-app:** use DownloadManager for APK updates instead of browser ([914ff1e](https://github.com/Feuerwehrverein-Raura/Homepage/commit/914ff1e3dece054c0638d9efdfd8ea1326f7abdc))
+* **vorstand:** clear cross-subdomain cookie on logout ([67d28f3](https://github.com/Feuerwehrverein-Raura/Homepage/commit/67d28f36a8653d01b846040c043c04954659bf3d))
+
+
+### Features
+
+* add daily PostgreSQL backup for all 4 databases ([31a1ba4](https://github.com/Feuerwehrverein-Raura/Homepage/commit/31a1ba4c5b4ef3c05f3edc3a663412d106cc9822))
+* add initials-based avatar placeholders for members without photos ([cd443a7](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cd443a7db7bb94b764c8681a313a23529eec4611))
+* **cron:** add Nextcloud contacts and profile sync scripts ([abde2ac](https://github.com/Feuerwehrverein-Raura/Homepage/commit/abde2ac6c81ce12cdc3598fc7f7a35c201d07abd))
+* **order-system:** use Authentik OIDC for Kasse and Kitchen web auth ([dd39f1c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/dd39f1ccc4d1b91903a599535952133425bada75))
+* use dedicated Authentik order-system provider with 24h tokens ([e83b937](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e83b937ccf31de8f87ef35bc3587b259623d1e18))
+* **vorstand-app:** add background audit notifications via WorkManager ([e33e3d0](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e33e3d0cf4992c31a7c70560735b732296ae9302))
+* **vorstand-app:** add Mailcow email management (Phase 3) ([e61ec53](https://github.com/Feuerwehrverein-Raura/Homepage/commit/e61ec5326052895a31de43d9e50a16b5f58558f3))
+* **vorstand-app:** add photo upload/delete to member detail ([c4e700b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c4e700bc2ae83c9de2935ac937656032a304ee39))
+* **vorstand-app:** add rich text editor to dispatch compose screen ([cdd1b83](https://github.com/Feuerwehrverein-Raura/Homepage/commit/cdd1b830e5e72fb23451033b336baf0aeedfbe7c))
+* **vorstand-app:** add Vaultwarden credentials to Settings screen ([443380a](https://github.com/Feuerwehrverein-Raura/Homepage/commit/443380a0e9130ee1f7cae84c81d5323ee2c146a0))
+* **vorstand-app:** add Vaultwarden password manager integration (Phase 4) ([f791a0d](https://github.com/Feuerwehrverein-Raura/Homepage/commit/f791a0d7e353c56849b3b1f70942093560592d23))
+* **vorstand-app:** consolidate dispatch tabs and add vault password toggle ([c72699f](https://github.com/Feuerwehrverein-Raura/Homepage/commit/c72699f60d3c417235717f9e89436d0c729f56eb))
+* **vorstand-app:** derive version from git tag automatically ([2a2b5ae](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2a2b5ae106b49fae2070e3f8067d9cce49fc43df))
+* **vorstand-app:** implement dispatch feature + fix update checker ([bb643c4](https://github.com/Feuerwehrverein-Raura/Homepage/commit/bb643c470c9e15f81c9cdc5b73a4f72e9dc78108))
+* **vorstand-app:** implement Phase 5 IP-Whitelist for Kassensystem ([eccc30c](https://github.com/Feuerwehrverein-Raura/Homepage/commit/eccc30cefbf770cd09514cbfce7311c047449921))
+* **vorstand-app:** implement Phase 6 Settings and About screens ([b90cb8b](https://github.com/Feuerwehrverein-Raura/Homepage/commit/b90cb8bd37de1b2eb327f16b83727bc6b8b231e7))
+* **vorstand-app:** implement Phase 7 Mass PDF sending via Pingen ([07bc8dd](https://github.com/Feuerwehrverein-Raura/Homepage/commit/07bc8ddcd2c6c3c86db60e0a8327a3893cab41b4))
+* **vorstand-app:** persist Vault credentials for auto-login ([2fbf263](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2fbf263d61d6f6a15481217c1d3c5d81d092b7ab))
+* **vorstand-app:** use Vorstand email for Vault login, remove email field ([481bdc2](https://github.com/Feuerwehrverein-Raura/Homepage/commit/481bdc2d1b2a3cc327ac6d339451c28bf9503ebb))
+
+# [1.145.0](https://github.com/Feuerwehrverein-Raura/Homepage/compare/v1.144.0...v1.145.0) (2026-02-08)
+
+
+### Bug Fixes
+
 * **apps:** add Auto-Update feature to KDS card and update tip text ([5982d78](https://github.com/Feuerwehrverein-Raura/Homepage/commit/5982d784b211404f47f173d5c988b8b29edb005c))
 * **apps:** kitchen web link pointed to order.fwv-raura.ch ([2e2a0cb](https://github.com/Feuerwehrverein-Raura/Homepage/commit/2e2a0cba7f77812699d4712ef530877831e1e461))
 * **apps:** registration link now points to mein.html ([6144311](https://github.com/Feuerwehrverein-Raura/Homepage/commit/61443110779f51474c2893f2163b858968366a87))
