@@ -5,9 +5,18 @@
 # Wird per Crontab ausgefuehrt: 0 3 * * * /opt/docker/fwv-website/cron/nextcloud-contacts-sync.sh >> /var/log/fwv-nextcloud-contacts.log 2>&1
 
 NEXTCLOUD_URL="https://nextcloud.fwv-raura.ch"
-NEXTCLOUD_USER="fwv-system"
-NEXTCLOUD_PASS="FwvSysNC2025Raura"
 ADDRESSBOOK="fwv-mitglieder"
+
+# DEUTSCH: Zugangsdaten aus externer Datei laden (nicht in Git!)
+NC_CREDENTIALS="/opt/docker/fwv-website/cron/nc-credentials.env"
+if [ -f "$NC_CREDENTIALS" ]; then
+    source "$NC_CREDENTIALS"
+fi
+NEXTCLOUD_USER="${NEXTCLOUD_USER:-fwv-system}"
+if [ -z "$NEXTCLOUD_PASS" ]; then
+    echo "FEHLER: NEXTCLOUD_PASS nicht gesetzt. Bitte $NC_CREDENTIALS anlegen mit: NEXTCLOUD_PASS=..."
+    exit 1
+fi
 CARDDAV_BASE="${NEXTCLOUD_URL}/remote.php/dav/addressbooks/users/${NEXTCLOUD_USER}/${ADDRESSBOOK}"
 
 DB_CONTAINER="fwv-postgres"

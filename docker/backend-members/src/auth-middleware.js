@@ -134,7 +134,7 @@ function authenticateAny(req, res, next) {
         const token = authHeader.split(' ')[1];
         if (token) {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fwv-raura-secret-key');
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 if (decoded.type === 'vorstand') {
                     req.user = {
                         id: decoded.email,
@@ -172,7 +172,7 @@ function authenticateVorstand(req, res, next) {
 
     try {
         // DEUTSCH: Token mit dem gemeinsamen JWT_SECRET verifizieren (HS256)
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fwv-raura-secret-key');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // DEUTSCH: Sicherstellen dass es sich um einen Vorstand-Token handelt
         if (decoded.type !== 'vorstand') {

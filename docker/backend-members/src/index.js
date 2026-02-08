@@ -2450,6 +2450,9 @@ app.get('/members/deletion-confirm/:token', async (req, res) => {
             [request.id]
         );
         const req2 = updatedRequest.rows[0];
+        if (!req2) {
+            return res.send(renderPage('Fehler', '<div class="alert"><span class="alert-icon">!</span><div class="alert-text"><h2>Fehler</h2><p>Löschanfrage nicht gefunden.</p></div></div>'));
+        }
 
         if (req2.aktuar_confirmed_at && req2.kassier_confirmed_at) {
             // Both confirmed - execute deletion
@@ -2497,7 +2500,7 @@ app.get('/members/deletion-confirm/:token', async (req, res) => {
             });
 
             // Sync mitglieder alias in background (member removed)
-            syncMitgliederAlias();
+            syncMitgliederAlias().catch(err => console.error('Mitglieder alias sync failed:', err));
 
             return res.send(renderPage('Mitglied gelöscht', `
                 <div class="alert">
@@ -2924,7 +2927,7 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
                 eintrittsdatum: today,
                 aktuar_name: aktuarName
             }).catch(err => console.error('Welcome email failed:', err));
-        });
+        }).catch(err => console.error('getAktuarName failed:', err));
 
         res.json({
             success: true,
@@ -3146,8 +3149,13 @@ app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 
         }
 
         // Get existing aliases to find the mitglieder alias ID
+        // DEUTSCH: API-Key verwenden statt User-Token weiterzuleiten (Service-zu-Service)
+        const internalHeaders = process.env.API_KEY
+            ? { 'x-api-key': process.env.API_KEY }
+            : { 'Authorization': req.headers.authorization };
+
         const aliasesResponse = await axios.get(`${DISPATCH_API}/mailcow/aliases`, {
-            headers: { 'Authorization': req.headers.authorization }
+            headers: internalHeaders
         });
 
         const existingAlias = aliasesResponse.data.find(a => a.address === ALIAS_ADDRESS);
@@ -3158,7 +3166,7 @@ app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 
                 goto: emails.join(','),
                 active: true
             }, {
-                headers: { 'Authorization': req.headers.authorization }
+                headers: internalHeaders
             });
             res.json({
                 success: true,
@@ -3174,7 +3182,7 @@ app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 
                 goto: emails.join(','),
                 active: true
             }, {
-                headers: { 'Authorization': req.headers.authorization }
+                headers: internalHeaders
             });
             res.json({
                 success: true,

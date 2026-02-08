@@ -3281,19 +3281,6 @@ app.post('/reminders/send-daily', async (req, res) => {
 
                 if (!email) continue;
 
-                // Check if reminder was already sent
-                const existingReminder = await pool.query(`
-                    SELECT id FROM shift_reminders
-                    WHERE registration_id = $1
-                    AND shift_id = $2
-                    AND reminder_type = 'day_before'
-                `, [reg.registration_id, shift.shift_id]);
-
-                if (existingReminder.rows.length > 0) {
-                    totalSkipped++;
-                    continue;
-                }
-
                 // Format date and time
                 const dateObj = new Date(shift.shift_date + 'T12:00:00');
                 const dateFormatted = dateObj.toLocaleDateString('de-CH', {
@@ -3324,18 +3311,25 @@ Feuerwehrverein Raura
                 `.trim();
 
                 try {
+                    // DEUTSCH: Atomarer Insert mit ON CONFLICT — verhindert doppelte Erinnerungen (Race Condition)
+                    const insertResult = await pool.query(`
+                        INSERT INTO shift_reminders (registration_id, shift_id, reminder_type, email)
+                        VALUES ($1, $2, 'day_before', $3)
+                        ON CONFLICT (registration_id, shift_id, reminder_type) DO NOTHING
+                        RETURNING id
+                    `, [reg.registration_id, shift.shift_id, email]);
+
+                    if (insertResult.rows.length === 0) {
+                        totalSkipped++;
+                        continue;
+                    }
+
                     await axios.post(`${DISPATCH_API}/email/send`, {
                         to: email,
                         subject: subject,
                         body: body,
                         event_id: shift.event_id
                     });
-
-                    // Record that reminder was sent
-                    await pool.query(`
-                        INSERT INTO shift_reminders (registration_id, shift_id, reminder_type, email)
-                        VALUES ($1, $2, 'day_before', $3)
-                    `, [reg.registration_id, shift.shift_id, email]);
 
                     totalSent++;
                     logInfo('Reminder sent', {

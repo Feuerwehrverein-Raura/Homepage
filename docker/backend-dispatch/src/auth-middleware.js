@@ -15,10 +15,10 @@ const jwksClient = require('jwks-rsa');
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 
 // DEUTSCH: JWKS-Client — holt RS256-Schlüssel vom Authentik JWKS-Endpunkt
-// Hinweis: Pfad ist /fwv-raura/ (nicht /fwv-members/ wie bei den anderen Backends)
 const client = jwksClient({
-    jwksUri: `${AUTHENTIK_URL}/application/o/fwv-raura/.well-known/jwks.json`,
+    jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members/jwks/`,
     cache: true,
+    cacheMaxAge: 600000,
     rateLimit: true,
     jwksRequestsPerMinute: 10
 });
@@ -35,7 +35,7 @@ function getKey(header, callback) {
 }
 
 /**
- * DEUTSCH: Prüft Authentik JWT-Token (RS256). Issuer ist hier direkt AUTHENTIK_URL (nicht /application/o/...).
+ * DEUTSCH: Prüft Authentik JWT-Token (RS256).
  */
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -47,7 +47,7 @@ function authenticateToken(req, res, next) {
 
     jwt.verify(token, getKey, {
         algorithms: ['RS256'],
-        issuer: AUTHENTIK_URL
+        issuer: `${AUTHENTIK_URL}/application/o/fwv-members/`
     }, (err, decoded) => {
         if (err) {
             console.error('Token verification failed:', err.message);
@@ -118,7 +118,7 @@ function authenticateAny(req, res, next) {
         const token = authHeader.split(' ')[1];
         if (token) {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fwv-raura-secret-key');
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 if (decoded.type === 'vorstand') {
                     req.user = {
                         id: decoded.email,

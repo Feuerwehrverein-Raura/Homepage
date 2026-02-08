@@ -120,7 +120,7 @@ function authenticateAny(req, res, next) {
         const token = authHeader.split(' ')[1];
         if (token) {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fwv-raura-secret-key');
+                const decoded = jwt.verify(token, process.env.JWT_SECRET);
                 if (decoded.type === 'vorstand') {
                     req.user = {
                         id: decoded.email,

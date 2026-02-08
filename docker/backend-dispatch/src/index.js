@@ -895,10 +895,11 @@ app.post('/dispatch/smart', authenticateAny, async (req, res) => {
                     // Send letter
                     const template = country === 'DE' ? templates.brief_de : templates.brief_ch;
                     if (template) {
-                        // Replace variables in template body
+                        // Replace variables in template body (HTML-escaped)
                         let html = template.body;
                         Object.keys(mergedVars).forEach(key => {
-                            html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), mergedVars[key] || '');
+                            const safeValue = String(mergedVars[key] || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                            html = html.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), safeValue);
                         });
 
                         await axios.post(`http://localhost:${PORT}/pingen/send`, {
@@ -1803,21 +1804,23 @@ app.post('/newsletter/subscribe', async (req, res) => {
             [email]
         );
 
+        let subscriberToken;
         if (existing.rows.length > 0) {
             if (existing.rows[0].confirmed) {
                 return res.json({ success: true, message: 'Sie sind bereits angemeldet' });
             }
+            subscriberToken = existing.rows[0].token;
         } else {
             // Neuer Subscriber
-            const token = require('crypto').randomBytes(32).toString('hex');
+            subscriberToken = require('crypto').randomBytes(32).toString('hex');
             await pool.query(`
                 INSERT INTO newsletter_subscribers (email, token, confirmed, created_at)
                 VALUES ($1, $2, false, NOW())
-            `, [email, token]);
+            `, [email, subscriberToken]);
         }
 
         // Bestätigungs-E-Mail senden
-        const confirmUrl = `${process.env.WEBSITE_URL || 'https://fwv-raura.ch'}/newsletter-confirm?token=${existing.rows[0]?.token || token}`;
+        const confirmUrl = `${process.env.WEBSITE_URL || 'https://fwv-raura.ch'}/newsletter-confirm?token=${subscriberToken}`;
 
         await transporter.sendMail({
             from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
