@@ -4188,12 +4188,12 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
                 const userCreds = smbData.users[smbUser];
                 if (userCreds) {
                     smbCredentials = {
-                        server: 'docker.fwv-raura.ch',
+                        server: 'smb.fwv-raura.ch',
                         user: smbUser,
                         password: userCreds.password,
                         shares: userCreds.shares,
                         updatedAt: smbData.updatedAt,
-                        connectUrl: 'smb://docker.fwv-raura.ch/'
+                        connectUrl: 'smb://smb.fwv-raura.ch/'
                     };
                 }
             }
