@@ -1270,12 +1270,13 @@
                     <div class="mt-3 pt-3 border-t border-amber-200">
                         <span class="text-sm text-gray-600 font-medium">Verf\u00fcgbare Ordner:</span>
                         <div class="mt-2 space-y-1">
-                            ${creds.shares.map(share => `
-                                <div class="flex items-center justify-between py-1">
-                                    <span class="text-sm text-gray-700">\\\\\\\\${creds.server}\\\\${share}</span>
-                                    <button onclick="copyToClipboard('\\\\\\\\${creds.server}\\\\${share}')" class="text-xs text-gray-400 hover:text-gray-600">Kopieren</button>
-                                </div>
-                            `).join('')}
+                            ${creds.shares.map(share => {
+                                const uncPath = '\\\\\\\\' + creds.server + '\\\\' + share;
+                                return '<div class="flex items-center justify-between py-1">' +
+                                    '<span class="text-sm font-mono text-gray-700">' + uncPath + '</span>' +
+                                    '<button onclick="copyToClipboard(\'' + uncPath + '\')" class="text-xs text-gray-400 hover:text-gray-600">Kopieren</button>' +
+                                '</div>';
+                            }).join('')}
                         </div>
                     </div>
 
@@ -1283,7 +1284,7 @@
                         <details class="text-sm text-gray-500">
                             <summary class="cursor-pointer hover:text-gray-700">Verbindungsanleitung</summary>
                             <div class="mt-2 space-y-2 pl-4">
-                                <p><strong>Windows:</strong> Explorer \u2192 Adressleiste \u2192 <code class="bg-gray-100 px-1 rounded">\\\\\\\\${creds.server}\\\\Ordnername</code></p>
+                                <p><strong>Windows:</strong> Explorer \u2192 Adressleiste \u2192 <code class="bg-gray-100 px-1 rounded">\\\\${creds.server}\\Ordnername</code></p>
                                 <p><strong>macOS:</strong> Finder \u2192 Gehe zu \u2192 Mit Server verbinden \u2192 <code class="bg-gray-100 px-1 rounded">smb://${creds.server}/Ordnername</code></p>
                                 <p><strong>Linux:</strong> Dateimanager \u2192 <code class="bg-gray-100 px-1 rounded">smb://${creds.server}/Ordnername</code></p>
                             </div>
