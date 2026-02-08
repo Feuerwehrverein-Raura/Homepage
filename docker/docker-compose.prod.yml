@@ -61,6 +61,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     volumes:
       - ./data/uploads:/app/uploads    # DEUTSCH: Persistenter Speicher für hochgeladene Mitglieder-Fotos
+      - /opt/docker/data/smb-credentials.json:/app/smb-credentials.json:ro  # DEUTSCH: SMB-Passwörter für Mitglieder-Dashboard
     depends_on:
       postgres:
         condition: service_healthy

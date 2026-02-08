@@ -331,6 +331,20 @@
                         </div>
                     </div>
 
+                    <!-- DEUTSCH: Netzlaufwerk (SMB) - Zeigt SMB-Zugangsdaten basierend auf der Rolle des Mitglieds.
+                         Passwoerter rotieren monatlich und bei Brute-Force-Erkennung. -->
+                    <div id="smb-section" class="bg-white rounded-lg shadow p-6 hidden">
+                        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
+                            </svg>
+                            Netzlaufwerk (SMB)
+                        </h2>
+                        <div id="smb-credentials" class="space-y-4">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
                     <!-- DEUTSCH: Organisator-Events - Nur sichtbar wenn das Mitglied als Organisator fuer Events eingetragen ist.
                          Zeigt Event-Dashboard-Links und optionale Event-Zugangsdaten. -->
                     <div id="organizer-events-section" class="bg-white rounded-lg shadow p-6 hidden">
@@ -999,9 +1013,10 @@
                 const data = await response.json();
                 accessesLoaded = true;
 
-                // DEUTSCH: Alle 4 Bereiche rendern mit den Daten aus der API
+                // DEUTSCH: Alle 5 Bereiche rendern mit den Daten aus der API
                 renderFunctionEmails(data.functionEmails || []);
                 renderNextcloudFolders(data.nextcloudFolders || []);
+                renderSmbCredentials(data.smbCredentials || null);
                 renderOrganizerEvents(data.organizerEvents || []);
                 renderSystemAccesses(data.systemAccesses || []);
 
@@ -1012,6 +1027,7 @@
                 // DEUTSCH: Fallback: Zugaenge aus den lokalen Profildaten ableiten statt leere Seite zu zeigen
                 renderFunctionEmailsFromProfile();
                 renderNextcloudFolders([]);
+                renderSmbCredentials(null);
                 renderOrganizerEvents([]);
                 renderDefaultSystemAccesses();
             } finally {
@@ -1192,6 +1208,89 @@
                     </a>
                 </div>
             `).join('');
+        }
+
+        // DEUTSCH: Rendert die SMB-Netzlaufwerk-Zugangsdaten im Zugaenge-Tab.
+        // Zeigt Server, Benutzername, Passwort (mit Zeigen/Kopieren), verfuegbare Shares
+        // und eine Kurzanleitung fuer Windows/macOS/Linux.
+        function renderSmbCredentials(creds) {
+            const section = document.getElementById('smb-section');
+            const container = document.getElementById('smb-credentials');
+
+            if (!creds) {
+                section.classList.add('hidden');
+                return;
+            }
+
+            section.classList.remove('hidden');
+
+            const updatedDate = new Date(creds.updatedAt).toLocaleDateString('de-CH');
+            const nextRotation = new Date(creds.updatedAt);
+            nextRotation.setMonth(nextRotation.getMonth() + 1);
+            nextRotation.setDate(1);
+            const nextRotationStr = nextRotation.toLocaleDateString('de-CH');
+
+            container.innerHTML = `
+                <div class="border border-amber-100 bg-amber-50 rounded-lg p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-sm text-gray-600">Server:</span>
+                            <div class="flex items-center">
+                                <span class="font-mono text-gray-800">${creds.server}</span>
+                                <button onclick="copyToClipboard('${creds.server}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-600">Benutzer:</span>
+                            <div class="flex items-center">
+                                <span class="font-mono text-gray-800">${creds.user}</span>
+                                <button onclick="copyToClipboard('${creds.user}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 pt-3 border-t border-amber-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-sm text-gray-600">Passwort:</span>
+                                <span id="smb-pw-display" class="ml-2 font-mono text-gray-800">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="togglePassword('smb-pw-display', '${creds.password}')" class="text-sm text-amber-600 hover:text-amber-800">Zeigen</button>
+                                <button onclick="copyToClipboard('${creds.password}')" class="text-sm text-gray-500 hover:text-gray-700">Kopieren</button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">Letzte Rotation: ${updatedDate} &middot; N\u00e4chste: ${nextRotationStr}</p>
+                    </div>
+
+                    <div class="mt-3 pt-3 border-t border-amber-200">
+                        <span class="text-sm text-gray-600 font-medium">Verf\u00fcgbare Ordner:</span>
+                        <div class="mt-2 space-y-1">
+                            ${creds.shares.map(share => `
+                                <div class="flex items-center justify-between py-1">
+                                    <span class="text-sm text-gray-700">\\\\\\\\${creds.server}\\\\${share}</span>
+                                    <button onclick="copyToClipboard('\\\\\\\\${creds.server}\\\\${share}')" class="text-xs text-gray-400 hover:text-gray-600">Kopieren</button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="mt-3 pt-3 border-t border-amber-200">
+                        <details class="text-sm text-gray-500">
+                            <summary class="cursor-pointer hover:text-gray-700">Verbindungsanleitung</summary>
+                            <div class="mt-2 space-y-2 pl-4">
+                                <p><strong>Windows:</strong> Explorer \u2192 Adressleiste \u2192 <code class="bg-gray-100 px-1 rounded">\\\\\\\\${creds.server}\\\\Ordnername</code></p>
+                                <p><strong>macOS:</strong> Finder \u2192 Gehe zu \u2192 Mit Server verbinden \u2192 <code class="bg-gray-100 px-1 rounded">smb://${creds.server}/Ordnername</code></p>
+                                <p><strong>Linux:</strong> Dateimanager \u2192 <code class="bg-gray-100 px-1 rounded">smb://${creds.server}/Ordnername</code></p>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+            `;
         }
 
         // DEUTSCH: Rendert die System-Zugaenge als einfache Liste mit System-Name, Zugangsstufe und Oeffnen-Link.

@@ -4172,11 +4172,41 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
             console.error('Error fetching organizer events:', err.message);
         }
 
+        // 5. Get SMB credentials based on user role
+        let smbCredentials = null;
+        try {
+            const smbCredsPath = '/app/smb-credentials.json';
+            if (require('fs').existsSync(smbCredsPath)) {
+                const smbData = JSON.parse(require('fs').readFileSync(smbCredsPath, 'utf8'));
+                // DEUTSCH: Benutzer-Zuordnung: Vorstand > Social-Media > Mitglied
+                let smbUser = 'mitglied';
+                if (isVorstand) {
+                    smbUser = 'vorstand';
+                } else if (isSocialMedia) {
+                    smbUser = 'socialmedia';
+                }
+                const userCreds = smbData.users[smbUser];
+                if (userCreds) {
+                    smbCredentials = {
+                        server: 'docker.fwv-raura.ch',
+                        user: smbUser,
+                        password: userCreds.password,
+                        shares: userCreds.shares,
+                        updatedAt: smbData.updatedAt,
+                        connectUrl: 'smb://docker.fwv-raura.ch/'
+                    };
+                }
+            }
+        } catch (smbErr) {
+            console.error('Error loading SMB credentials:', smbErr.message);
+        }
+
         res.json({
             functionEmails,
             nextcloudFolders,
             systemAccesses,
-            organizerEvents
+            organizerEvents,
+            smbCredentials
         });
 
     } catch (error) {
