@@ -19,28 +19,24 @@ echo "============================================"
 echo "[$TIMESTAMP] Nextcloud Kontakt-Sync gestartet"
 echo "============================================"
 
-# 1. Nextcloud-Benutzer mit lastLogin abrufen
+# 1. Nextcloud-Benutzer E-Mails abrufen (alle mit Profil, ausser fwv-system)
 echo "Nextcloud-Benutzer abrufen..."
+NC_USER_EMAILS=""
 NC_USER_UIDS=$(docker exec -u www-data nextcloud php occ user:list 2>/dev/null | grep "^  - " | sed 's/^  - //' | cut -d: -f1)
 
-NC_LOGGED_IN_EMAILS=""
 while read -r uid; do
     [ -z "$uid" ] && continue
     [ "$uid" = "fwv-system" ] && continue
 
-    # User-Info abrufen
-    USER_INFO=$(docker exec -u www-data nextcloud php occ user:info "$uid" 2>/dev/null)
-    LAST_LOGIN=$(echo "$USER_INFO" | grep "last_login:" | sed 's/.*last_login: *//')
-    USER_EMAIL=$(echo "$USER_INFO" | grep "email:" | sed 's/.*email: *//' | tr '[:upper:]' '[:lower:]')
-
-    if [ -n "$LAST_LOGIN" ] && [ "$LAST_LOGIN" != "1970-01-01T00:00:00+00:00" ] && [ -n "$USER_EMAIL" ]; then
-        NC_LOGGED_IN_EMAILS="${NC_LOGGED_IN_EMAILS}${USER_EMAIL}\n"
+    USER_EMAIL=$(docker exec -u www-data nextcloud php occ user:info "$uid" 2>/dev/null | grep "email:" | sed 's/.*email: *//' | tr '[:upper:]' '[:lower:]')
+    if [ -n "$USER_EMAIL" ]; then
+        NC_USER_EMAILS="${NC_USER_EMAILS}${USER_EMAIL}\n"
     fi
 done <<< "$NC_USER_UIDS"
 
-NC_LOGGED_IN_EMAILS=$(echo -e "$NC_LOGGED_IN_EMAILS" | grep -v '^$')
+NC_USER_EMAILS=$(echo -e "$NC_USER_EMAILS" | grep -v '^$')
 
-echo "Eingeloggte Nextcloud-Benutzer: $(echo "$NC_LOGGED_IN_EMAILS" | grep -c . 2>/dev/null || echo 0)"
+echo "Nextcloud-Benutzer mit Profil: $(echo "$NC_USER_EMAILS" | grep -c . 2>/dev/null || echo 0)"
 
 # 2. Aktive Mitglieder aus der Datenbank abrufen
 # Adressbuch ist mit Authentik-Gruppe "Mitglieder" geteilt - alle Gruppenmitglieder sehen es automatisch
@@ -85,16 +81,16 @@ while IFS='|' read -r id vorname nachname email telefon mobile strasse adresszus
     VCARD_FILENAME="${VCARD_UID}.vcf"
     VCARD_URL="${CARDDAV_BASE}/${VCARD_FILENAME}"
 
-    # Pruefen ob Mitglied sich in Nextcloud eingeloggt hat
+    # Pruefen ob Mitglied ein Nextcloud-Profil hat
     MEMBER_EMAIL_LOWER=$(echo "$email" | tr '[:upper:]' '[:lower:]')
-    if [ -n "$MEMBER_EMAIL_LOWER" ] && echo "$NC_LOGGED_IN_EMAILS" | grep -qx "$MEMBER_EMAIL_LOWER" 2>/dev/null; then
-        # Mitglied hat Nextcloud-Konto -> vCard entfernen falls vorhanden
+    if [ -n "$MEMBER_EMAIL_LOWER" ] && echo "$NC_USER_EMAILS" | grep -qx "$MEMBER_EMAIL_LOWER" 2>/dev/null; then
+        # Mitglied hat Nextcloud-Profil -> vCard entfernen falls vorhanden
         if echo "$EXISTING_VCARDS" | grep -q "$VCARD_FILENAME" 2>/dev/null; then
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
                 -u "${NEXTCLOUD_USER}:${NEXTCLOUD_PASS}" \
                 -X DELETE "$VCARD_URL")
             if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
-                echo "  [-] $vorname $nachname (hat Nextcloud-Konto, vCard entfernt)"
+                echo "  [-] $vorname $nachname (hat Nextcloud-Profil, vCard entfernt)"
                 REMOVED=$((REMOVED + 1))
             fi
         else
