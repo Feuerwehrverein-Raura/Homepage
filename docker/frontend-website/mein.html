@@ -1271,10 +1271,11 @@
                         <span class="text-sm text-gray-600 font-medium">Verf\u00fcgbare Ordner:</span>
                         <div class="mt-2 space-y-1">
                             ${creds.shares.map(share => {
-                                const uncPath = '\\\\\\\\' + creds.server + '\\\\' + share;
+                                const displayPath = '\\\\' + creds.server + '\\' + share;
+                                const copyPath = '\\\\\\\\' + creds.server + '\\\\' + share;
                                 return '<div class="flex items-center justify-between py-1">' +
-                                    '<span class="text-sm font-mono text-gray-700">' + uncPath + '</span>' +
-                                    '<button onclick="copyToClipboard(\'' + uncPath + '\')" class="text-xs text-gray-400 hover:text-gray-600">Kopieren</button>' +
+                                    '<span class="text-sm font-mono text-gray-700">' + displayPath + '</span>' +
+                                    '<button onclick="copyToClipboard(\'' + copyPath + '\')" class="text-xs text-gray-400 hover:text-gray-600">Kopieren</button>' +
                                 '</div>';
                             }).join('')}
                         </div>
