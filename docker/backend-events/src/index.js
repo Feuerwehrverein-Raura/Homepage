@@ -26,6 +26,15 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 // Dispatch API für E-Mails
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 
+// DEUTSCH: Axios-Interceptor — fügt automatisch den API-Key bei Dispatch-Calls hinzu
+axios.interceptors.request.use((config) => {
+    if (config.url && config.url.startsWith(DISPATCH_API) && process.env.API_KEY) {
+        config.headers = config.headers || {};
+        config.headers['x-api-key'] = process.env.API_KEY;
+    }
+    return config;
+});
+
 // ===========================================
 // LOGGING UTILITIES
 // DEUTSCH: Strukturiertes JSON-Logging für alle Service-Nachrichten

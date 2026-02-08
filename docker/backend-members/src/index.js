@@ -54,6 +54,16 @@ const upload = multer({
 
 const app = express();
 
+// DEUTSCH: Axios-Interceptor — fügt automatisch den API-Key bei Dispatch-Calls hinzu
+const DISPATCH_API_BASE = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+axios.interceptors.request.use((config) => {
+    if (config.url && config.url.includes('api-dispatch') && process.env.API_KEY) {
+        config.headers = config.headers || {};
+        config.headers['x-api-key'] = process.env.API_KEY;
+    }
+    return config;
+});
+
 // Helper function to fetch active layout template from dispatch API
 // DEUTSCH: Holt das aktive PDF-Layout-Template vom Dispatch-API für PDF-Generierung
 async function getLayoutTemplate() {
