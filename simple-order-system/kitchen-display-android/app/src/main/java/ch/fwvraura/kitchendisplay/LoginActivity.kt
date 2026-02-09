@@ -75,7 +75,7 @@ class LoginActivity : AppCompatActivity() {
 
         scope.launch {
             try {
-                val result = withContext(Dispatchers.IO) { login(password) }
+                val result = login(password)
                 if (result != null) {
                     tokenManager.saveToken(result)
                     startMainActivity()
@@ -93,10 +93,13 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun login(password: String): String? {
+    private suspend fun login(password: String): String? {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        val serverUrl = prefs.getString("server_url", getString(R.string.default_server_url))
+        val configuredUrl = prefs.getString("server_url", getString(R.string.default_server_url))
             ?: getString(R.string.default_server_url)
+
+        // Auto-detect server (local first, then configured/cloud)
+        val serverUrl = ServerDetector.detectServer(configuredUrl)
 
         val json = gson.toJson(mapOf("password" to password))
         val request = Request.Builder()
@@ -104,12 +107,14 @@ class LoginActivity : AppCompatActivity() {
             .post(json.toRequestBody("application/json".toMediaType()))
             .build()
 
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful) return null
+        return withContext(Dispatchers.IO) {
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return@withContext null
 
-        val body = response.body?.string() ?: return null
-        val map = gson.fromJson(body, Map::class.java)
-        return map["token"] as? String
+            val body = response.body?.string() ?: return@withContext null
+            val map = gson.fromJson(body, Map::class.java)
+            map["token"] as? String
+        }
     }
 
     private fun startMainActivity() {

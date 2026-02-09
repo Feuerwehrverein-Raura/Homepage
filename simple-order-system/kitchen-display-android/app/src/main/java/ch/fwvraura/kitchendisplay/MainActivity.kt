@@ -2,6 +2,7 @@ package ch.fwvraura.kitchendisplay
 
 import android.content.Intent
 import android.media.AudioAttributes
+import android.util.Log
 import android.media.SoundPool
 import android.os.Bundle
 import android.os.CountDownTimer
@@ -139,15 +140,28 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
 
     private fun loadSettings() {
         val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        val serverUrl = prefs.getString("server_url", getString(R.string.default_server_url))
+        val configuredUrl = prefs.getString("server_url", getString(R.string.default_server_url))
             ?: getString(R.string.default_server_url)
         soundEnabled = prefs.getBoolean("sound_enabled", true)
 
         val token = tokenManager.getToken()
 
-        // Initialize services with server URL and auth token
-        apiService = ApiService(serverUrl, token)
-        webSocketManager = WebSocketManager(serverUrl, this, token)
+        // Start with configured URL, then auto-detect in background
+        apiService = ApiService(configuredUrl, token)
+        webSocketManager = WebSocketManager(configuredUrl, this, token)
+
+        // Auto-detect: try local (kasse.local) first, fallback to configured/cloud
+        mainScope.launch {
+            val detectedUrl = ServerDetector.detectServer(configuredUrl)
+            if (detectedUrl != configuredUrl) {
+                Log.d("MainActivity", "Switching to detected server: $detectedUrl")
+                apiService = ApiService(detectedUrl, token)
+                webSocketManager?.disconnect()
+                webSocketManager = WebSocketManager(detectedUrl, this@MainActivity, token)
+                webSocketManager?.connect()
+                fetchOrders()
+            }
+        }
     }
 
     private fun setupRecyclerView() {
