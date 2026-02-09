@@ -3126,6 +3126,35 @@ app.get('/members/emails/alias-config', authenticateAny, requireRole('vorstand',
     }
 });
 
+// Allowed senders for mitglieder@ alias (for Rspamd sender restriction)
+// DEUTSCH: Erlaubte Absender für mitglieder@fwv-raura.ch - wird von Rspamd als HTTP-Map abgefragt
+// Authentifizierung via INTERNAL_API_KEY Query-Parameter (kein JWT nötig, da Rspamd die URL direkt abruft)
+app.get('/internal/allowed-senders', async (req, res) => {
+    const apiKey = process.env.INTERNAL_API_KEY;
+    if (!apiKey || req.query.key !== apiKey) {
+        return res.status(403).send('Forbidden');
+    }
+
+    try {
+        // Get all member emails with zustellung_email enabled
+        const result = await pool.query(`
+            SELECT COALESCE(versand_email, email) as email
+            FROM members
+            WHERE zustellung_email = true
+            AND (email IS NOT NULL AND email != '')
+            AND status NOT IN ('Ausgetreten', 'Verstorben')
+            ORDER BY email
+        `);
+        const emails = result.rows.map(r => r.email).filter(e => e);
+
+        // Return plain text (one email per line) for Rspamd multimap
+        res.type('text/plain').send(emails.join('\n'));
+    } catch (error) {
+        console.error('Failed to get allowed senders:', error.message);
+        res.status(500).send('Internal server error');
+    }
+});
+
 // Sync mitglieder@fwv-raura.ch alias with all zustellung emails
 // DEUTSCH: Manueller Trigger: Synchronisiert den Mailcow-Alias mitglieder@fwv-raura.ch mit allen E-Mail-Zustellungen
 app.post('/members/emails/sync-alias', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
