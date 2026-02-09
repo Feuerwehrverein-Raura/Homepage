@@ -6,12 +6,38 @@
 #   2. Configure printer IPs and cloud sync settings
 #   3. docker compose -f docker-compose.local.yml up -d
 #
-# Access:
-#   - Kasse: http://kasse.local or http://<pi-ip>:8080
-#   - Kitchen: http://kitchen.local or http://<pi-ip>:8081
-#   - Inventar: http://inventar.local or http://<pi-ip>:8082
+# Mit Captive Portal (verhindert Mobile-Data-Switch):
+#   docker compose -f docker-compose.local.yml --profile captive-portal up -d
+#   → MikroTik hAP DNS auf PI_IP setzen
+#
+# Access (via mDNS, funktioniert sofort):
+#   - Kasse: http://kasse.local
+#   - Kitchen: http://kitchen.local
+#   - Inventar: http://inventar.local
 
 services:
+  # mDNS (Avahi) - publiziert .local Hostnamen im Netzwerk
+  avahi:
+    build: ./avahi
+    container_name: local-avahi
+    restart: unless-stopped
+    network_mode: host
+
+  # DNS + Captive Portal (optional, nur mit --profile captive-portal)
+  # Beantwortet Android/iOS/Samsung Connectivity-Checks
+  # damit Phones nicht auf Mobile Daten wechseln
+  dnsmasq:
+    build: ./dnsmasq
+    container_name: local-dnsmasq
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    environment:
+      PI_IP: ${PI_IP:?PI_IP muss in .env gesetzt sein}
+    profiles:
+      - captive-portal
+
   # Shared PostgreSQL for both systems
   postgres:
     image: postgres:16-alpine

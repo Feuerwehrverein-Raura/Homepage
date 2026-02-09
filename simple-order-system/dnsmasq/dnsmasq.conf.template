@@ -1,0 +1,45 @@
+# FWV Raura - DNS + Captive Portal
+# Verhindert dass Smartphones auf Mobile Daten wechseln
+
+port=53
+listen-address=0.0.0.0
+no-resolv
+no-hosts
+log-queries
+
+# Upstream DNS (falls Internet vorhanden)
+server=8.8.8.8
+server=1.1.1.1
+
+# =============================================
+# Lokale Dienste (.local Fallback fuer non-mDNS)
+# =============================================
+address=/kasse.local/__PI_IP__
+address=/kitchen.local/__PI_IP__
+address=/inventar.local/__PI_IP__
+address=/order.local/__PI_IP__
+
+# =============================================
+# Android Connectivity Checks -> PI_IP
+# =============================================
+address=/connectivitycheck.gstatic.com/__PI_IP__
+address=/clients3.google.com/__PI_IP__
+address=/play.googleapis.com/__PI_IP__
+address=/connectivitycheck.android.com/__PI_IP__
+
+# =============================================
+# iOS/macOS Connectivity Checks -> PI_IP
+# =============================================
+address=/captive.apple.com/__PI_IP__
+address=/www.apple.com/__PI_IP__
+address=/www.appleiphonecell.com/__PI_IP__
+
+# =============================================
+# Samsung Connectivity Checks -> PI_IP
+# =============================================
+address=/connectivitycheck.samsung.com/__PI_IP__
+
+# =============================================
+# Microsoft Connectivity Checks -> PI_IP
+# =============================================
+address=/www.msftconnecttest.com/__PI_IP__

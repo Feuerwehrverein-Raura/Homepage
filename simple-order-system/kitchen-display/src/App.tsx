@@ -50,8 +50,26 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
   );
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://order.fwv-raura.ch/api';
-const WS_URL = import.meta.env.VITE_WS_URL || 'wss://order.fwv-raura.ch/ws';
+const CLOUD_API_URL = 'https://order.fwv-raura.ch/api';
+const CLOUD_WS_URL = 'wss://order.fwv-raura.ch/ws';
+const LOCAL_API_URL = '/api';
+const LOCAL_WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+
+// Auto-detect: try local first, fallback to cloud
+let API_URL = import.meta.env.VITE_API_URL || LOCAL_API_URL;
+let WS_URL = import.meta.env.VITE_WS_URL || LOCAL_WS_URL;
+
+async function detectBackend() {
+  if (import.meta.env.VITE_API_URL) return; // explicit override
+  try {
+    const res = await fetch(`${LOCAL_API_URL}/orders`, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) return; // local works
+  } catch { /* local not reachable */ }
+  console.log('Local backend not reachable, falling back to cloud');
+  API_URL = CLOUD_API_URL;
+  WS_URL = CLOUD_WS_URL;
+}
+detectBackend();
 const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
 const AUTH_CLIENT_ID = 'order-system';
 const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
