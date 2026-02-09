@@ -134,7 +134,7 @@ function App() {
   const [splitPaymentOrder, setSplitPaymentOrder] = useState<OpenOrder | null>(null);
   const [splitPaymentMode, setSplitPaymentMode] = useState<'full' | 'split' | 'items'>('full');
   const [splitAmount, setSplitAmount] = useState<string>('');
-  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
   const [splitPaymentMethod, setSplitPaymentMethod] = useState<'cash' | 'card' | 'twint'>('cash');
 
   // TWINT payment states
@@ -599,7 +599,7 @@ function App() {
     if (!order.items) return 0;
     let total = 0;
     selectedItemIds.forEach(key => {
-      const [itemId] = (key as unknown as string).split('-');
+      const [itemId] = key.split('-');
       const item = order.items?.find(i => i.id === parseInt(itemId));
       if (item) total += parseFloat(item.price);
     });
@@ -656,7 +656,7 @@ function App() {
         // Create description with item counts
         const itemCounts: { [name: string]: number } = {};
         selectedItemIds.forEach(key => {
-          const [itemId] = (key as unknown as string).split('-');
+          const [itemId] = key.split('-');
           const item = splitPaymentOrder.items?.find(i => i.id === parseInt(itemId));
           if (item) {
             itemCounts[item.item_name] = (itemCounts[item.item_name] || 0) + 1;
@@ -1465,7 +1465,7 @@ function App() {
               <img
                 src={twintQrUrl}
                 alt="TWINT QR Code"
-                className="w-48 h-48 mx-auto border-2 border-gray-200 rounded-lg"
+                className="w-48 mx-auto border-2 border-gray-200 rounded-lg"
               />
             </div>
 
@@ -1822,15 +1822,15 @@ function App() {
                       // Create array of individual units for this item
                       return Array.from({ length: item.quantity }, (_, idx) => {
                         const unitKey = `${item.id}-${idx}`;
-                        const isSelected = selectedItemIds.includes(unitKey as any);
+                        const isSelected = selectedItemIds.includes(unitKey);
                         return (
                           <button
                             key={unitKey}
                             onClick={() => {
                               setSelectedItemIds(prev =>
-                                prev.includes(unitKey as any)
+                                prev.includes(unitKey)
                                   ? prev.filter(id => id !== unitKey)
-                                  : [...prev, unitKey as any]
+                                  : [...prev, unitKey]
                               );
                             }}
                             className={`w-full text-left p-3 rounded-lg border-2 transition ${
@@ -1860,7 +1860,7 @@ function App() {
                           // Calculate total from selected unit keys
                           let total = 0;
                           selectedItemIds.forEach(key => {
-                            const [itemId] = (key as string).split('-');
+                            const [itemId] = key.split('-');
                             const item = splitPaymentOrder.items?.find(i => i.id === parseInt(itemId));
                             if (item) total += parseFloat(item.price);
                           });
@@ -1922,7 +1922,7 @@ function App() {
                   <img
                     src={twintQrUrl}
                     alt="TWINT QR Code"
-                    className="w-48 h-48 mx-auto border-2 border-gray-200 rounded-lg"
+                    className="w-48 mx-auto border-2 border-gray-200 rounded-lg"
                   />
                 </div>
               )}
