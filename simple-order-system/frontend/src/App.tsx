@@ -589,9 +589,7 @@ function App() {
 
   // Calculate unpaid total for an order
   const getUnpaidTotal = (order: OpenOrder): number => {
-    if (!order.items) return parseFloat(order.total);
-    const unpaidItems = order.items.filter(item => !item.paid);
-    return unpaidItems.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+    return parseFloat(order.total) - parseFloat(order.paid_amount || '0');
   };
 
   // Calculate total for selected items (unit-based selection with "itemId-unitIndex" keys)
