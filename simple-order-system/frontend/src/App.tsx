@@ -135,7 +135,7 @@ function App() {
   const [splitPaymentMode, setSplitPaymentMode] = useState<'full' | 'split' | 'items'>('full');
   const [splitAmount, setSplitAmount] = useState<string>('');
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
-  const [splitPaymentMethod, setSplitPaymentMethod] = useState<'cash' | 'card'>('cash');
+  const [splitPaymentMethod, setSplitPaymentMethod] = useState<'cash' | 'card' | 'twint'>('cash');
 
   // TWINT payment states
   const [twintQrUrl, setTwintQrUrl] = useState<string | null>(null);
@@ -227,10 +227,15 @@ function App() {
       const res = await fetch(`${API_URL}/twint-qr`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setTwintQrUrl(data.url);
+        setTwintQrUrl(data.url || '/twint-qr.png');
+      } else {
+        // Fallback to local QR code in public folder
+        setTwintQrUrl('/twint-qr.png');
       }
     } catch (error) {
       console.error('Failed to fetch TWINT QR:', error);
+      // Fallback to local QR code
+      setTwintQrUrl('/twint-qr.png');
     }
   };
 
@@ -1872,7 +1877,7 @@ function App() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Zahlungsart
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={`grid gap-2 ${twintQrUrl ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <button
                     onClick={() => setSplitPaymentMethod('cash')}
                     className={`py-3 rounded-lg font-semibold transition ${
@@ -1893,8 +1898,34 @@ function App() {
                   >
                     💳 Karte
                   </button>
+                  {twintQrUrl && (
+                    <button
+                      onClick={() => setSplitPaymentMethod('twint')}
+                      className={`py-3 rounded-lg font-semibold transition ${
+                        splitPaymentMethod === 'twint'
+                          ? 'bg-black text-white'
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      TWINT
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* TWINT QR Code - shown when TWINT is selected */}
+              {splitPaymentMethod === 'twint' && twintQrUrl && (
+                <div className="bg-gray-50 rounded-xl p-4 mb-4">
+                  <p className="text-center text-sm text-gray-600 mb-3">
+                    QR-Code mit TWINT App scannen:
+                  </p>
+                  <img
+                    src={twintQrUrl}
+                    alt="TWINT QR Code"
+                    className="w-48 h-48 mx-auto border-2 border-gray-200 rounded-lg"
+                  />
+                </div>
+              )}
 
               {/* Confirm Button */}
               <button
@@ -2226,11 +2257,15 @@ function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: an
                     {order.payment_method ? (
                       <span className={`px-2 py-1 rounded text-xs ${
                         order.payment_method === 'cash' ? 'bg-green-100 text-green-800' :
+                        order.payment_method === 'card' ? 'bg-blue-100 text-blue-800' :
                         order.payment_method === 'sumup' ? 'bg-blue-100 text-blue-800' :
+                        order.payment_method === 'twint' ? 'bg-purple-100 text-purple-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
                         {order.payment_method === 'cash' ? 'Bar' :
-                         order.payment_method === 'sumup' ? 'SumUp' : order.payment_method}
+                         order.payment_method === 'card' ? 'Karte' :
+                         order.payment_method === 'sumup' ? 'SumUp' :
+                         order.payment_method === 'twint' ? 'TWINT' : order.payment_method}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
