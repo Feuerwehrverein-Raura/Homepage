@@ -308,7 +308,9 @@ function App() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch(`${API_URL}/orders`);
+      const headers: HeadersInit = {};
+      if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
+      const res = await fetch(`${API_URL}/orders`, { headers });
       const data = await res.json();
       // Filter to only show pending and paid orders (exclude completed)
       const activeOrders = data.filter((order: Order) =>
@@ -420,6 +422,7 @@ function App() {
         // Complete entire order when viewing all stations
         await fetch(`${API_URL}/orders/${orderId}/complete`, {
           method: 'PATCH',
+          headers: sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {},
         });
         setOrders(orders.filter(o => o.id !== orderId));
       } else {
@@ -439,9 +442,11 @@ function App() {
   // Mark individual items as completed
   const completeItems = async (orderId: number, itemIds: number[]) => {
     try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (sessionToken) headers['Authorization'] = `Bearer ${sessionToken}`;
       const res = await fetch(`${API_URL}/orders/${orderId}/items/complete`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ item_ids: itemIds }),
       });
       if (res.ok) {

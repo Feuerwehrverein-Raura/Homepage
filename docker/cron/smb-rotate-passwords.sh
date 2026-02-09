@@ -29,15 +29,15 @@ cat > "$CREDENTIALS_FILE" << EOF
   "users": {
     "vorstand": {
       "password": "$PW_VORSTAND",
-      "shares": ["Vorstand", "Social-Media", "Buero", "Website", "Fotos", "Roter-Schopf"]
+      "shares": ["Vorstand", "Social-Media", "Buero", "Website", "Fotos", "Roter-Schopf", "Musik"]
     },
     "socialmedia": {
       "password": "$PW_SOCIALMEDIA",
-      "shares": ["Social-Media", "Buero", "Website", "Fotos", "Roter-Schopf"]
+      "shares": ["Social-Media", "Buero", "Website", "Fotos", "Roter-Schopf", "Musik"]
     },
     "mitglied": {
       "password": "$PW_MITGLIED",
-      "shares": ["Fotos", "Roter-Schopf"]
+      "shares": ["Fotos", "Roter-Schopf", "Musik"]
     }
   }
 }
@@ -63,6 +63,7 @@ docker run -d \
     -v /opt/docker/nextcloud/data/__groupfolders/4/files:/share/Website \
     -v /opt/docker/nextcloud/data/__groupfolders/5/files:/share/Fotos \
     -v /opt/docker/nextcloud/data/__groupfolders/6/files:/share/Roter-Schopf \
+    -v /opt/docker/nextcloud/data/__groupfolders/7/files:/share/Musik \
     -v /opt/docker/data/samba-log:/var/log/samba \
     -e TZ=Europe/Zurich \
     -e USERID=33 \
@@ -77,6 +78,7 @@ docker run -d \
     -s "Website;/share/Website;yes;no;no;vorstand,socialmedia" \
     -s "Fotos;/share/Fotos;yes;no;no;vorstand,socialmedia,mitglied" \
     -s "Roter-Schopf;/share/Roter-Schopf;yes;yes;no;vorstand,socialmedia;;;mitglied" \
+    -s "Musik;/share/Musik;yes;yes;no;vorstand,socialmedia;;;mitglied" \
     -g "server min protocol = SMB2" \
     -g "server max protocol = SMB3" \
     -g "log level = 1 auth_audit:3" \

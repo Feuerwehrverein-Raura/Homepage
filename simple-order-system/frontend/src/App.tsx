@@ -215,9 +215,11 @@ function App() {
     }
   }, [token]);
 
+  const authHeaders = (): HeadersInit => token ? { 'Authorization': `Bearer ${token}` } : {};
+
   const fetchTwintQr = async () => {
     try {
-      const res = await fetch(`${API_URL}/twint-qr`);
+      const res = await fetch(`${API_URL}/twint-qr`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
         setTwintQrUrl(data.url);
@@ -243,7 +245,7 @@ function App() {
 
   const fetchItems = async () => {
     try {
-      const res = await fetch(`${API_URL}/items`);
+      const res = await fetch(`${API_URL}/items`, { headers: authHeaders() });
       const data = await res.json();
       // Parse price as float since API returns it as string
       setItems(data.map((item: any) => ({
@@ -258,8 +260,8 @@ function App() {
   const fetchHistory = async () => {
     try {
       const [historyRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/orders/history?limit=50`),
-        fetch(`${API_URL}/stats/daily`)
+        fetch(`${API_URL}/orders/history?limit=50`, { headers: authHeaders() }),
+        fetch(`${API_URL}/stats/daily`, { headers: authHeaders() })
       ]);
       const history = await historyRes.json();
       const stats = await statsRes.json();
@@ -276,7 +278,7 @@ function App() {
       return;
     }
     try {
-      const res = await fetch(`${API_URL}/orders/open/${tableNum}`);
+      const res = await fetch(`${API_URL}/orders/open/${tableNum}`, { headers: authHeaders() });
       const data = await res.json();
       setOpenOrders(data);
     } catch (error) {
@@ -298,7 +300,7 @@ function App() {
   // Fetch all open orders for tables view
   const fetchAllOpenOrders = async () => {
     try {
-      const res = await fetch(`${API_URL}/orders`);
+      const res = await fetch(`${API_URL}/orders`, { headers: authHeaders() });
       const data = await res.json();
       // Filter only table orders (table_number > 0)
       const tableOrders = data.filter((o: any) => o.table_number > 0);
@@ -314,6 +316,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/orders/${orderId}/items/${itemId}`, {
         method: 'DELETE',
+        headers: authHeaders(),
       });
       if (res.ok) {
         // Refresh the table orders
