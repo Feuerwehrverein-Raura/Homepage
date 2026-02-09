@@ -51,6 +51,8 @@ services:
       # Inventory Integration
       USE_INVENTORY_API: "true"
       INVENTORY_API_URL: http://inventory-backend:3000
+    volumes:
+      - ./data/uploads:/app/uploads
     depends_on:
       order-postgres:
         condition: service_healthy
