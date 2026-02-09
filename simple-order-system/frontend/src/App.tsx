@@ -312,8 +312,8 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/orders`, { headers: authHeaders() });
       const data = await res.json();
-      // Filter only table orders (table_number > 0)
-      const tableOrders = data.filter((o: any) => o.table_number > 0);
+      // Filter only table orders (table_number > 0) that are not fully paid
+      const tableOrders = data.filter((o: any) => o.table_number > 0 && o.status !== 'paid');
       setAllOpenOrders(tableOrders);
     } catch (error) {
       console.error('Failed to fetch all orders:', error);
