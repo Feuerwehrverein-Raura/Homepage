@@ -52,6 +52,7 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
 
 // Environment variables
 const API_URL = import.meta.env.VITE_API_URL || '/api';
+const WS_URL = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
 const AUTH_CLIENT_ID = 'order-system';
 const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
@@ -139,6 +140,10 @@ function App() {
   // TWINT payment states
   const [twintQrUrl, setTwintQrUrl] = useState<string | null>(null);
   const [twintPayment, setTwintPayment] = useState<{ orderId: number; total: number } | null>(null);
+
+  // WebSocket state
+  const wsRef = useRef<WebSocket | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
 
   // PWA Install prompt
   useEffect(() => {
@@ -342,6 +347,87 @@ function App() {
       fetchHistory();
     }
   }, [view, user]);
+
+  // WebSocket connection for real-time order updates
+  useEffect(() => {
+    if (!token) return;
+
+    const connectWebSocket = () => {
+      const ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        setWsConnected(true);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'new_order' || data.type === 'order_updated') {
+          // Refresh all open orders for Tische view
+          fetchAllOpenOrders();
+          // Refresh table-specific orders if applicable
+          if (orderType === 'tisch' && tableNumber) {
+            fetchOpenOrders(tableNumber);
+          }
+        } else if (data.type === 'order_completed') {
+          // Remove completed order from lists
+          setAllOpenOrders(prev => prev.filter(o => o.id !== parseInt(data.order_id)));
+          setOpenOrders(prev => prev.filter(o => o.id !== parseInt(data.order_id)));
+          if (selectedOrder?.id === parseInt(data.order_id)) {
+            setSelectedOrder(null);
+          }
+        } else if (data.type === 'items_completed') {
+          // Update items as completed in allOpenOrders
+          setAllOpenOrders(prev => prev.map(order => {
+            if (order.id !== parseInt(data.order_id)) return order;
+            return {
+              ...order,
+              items: order.items.map(item =>
+                data.item_ids?.includes(item.id) ? { ...item, completed: true } : item
+              )
+            };
+          }));
+          setOpenOrders(prev => prev.map(order => {
+            if (order.id !== parseInt(data.order_id)) return order;
+            return {
+              ...order,
+              items: order.items.map(item =>
+                data.item_ids?.includes(item.id) ? { ...item, completed: true } : item
+              )
+            };
+          }));
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      ws.onclose = () => {
+        setWsConnected(false);
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      wsRef.current = ws;
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
+  }, [token]);
+
+  // Auto-refresh Tische view every 15 seconds as fallback
+  useEffect(() => {
+    if (view !== 'tables' || !token) return;
+    const interval = setInterval(fetchAllOpenOrders, 15000);
+    return () => clearInterval(interval);
+  }, [view, token]);
 
   const addToCart = (item: Item) => {
     setCart(prevCart => {
@@ -867,7 +953,10 @@ function App() {
         <div className="max-w-7xl mx-auto p-2 sm:p-4">
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Offene Tische</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold">Offene Tische</h2>
+                <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`} title={wsConnected ? 'Live-Updates aktiv' : 'Keine Verbindung'} />
+              </div>
               <button
                 onClick={fetchAllOpenOrders}
                 className="bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded text-sm"
@@ -890,16 +979,27 @@ function App() {
                   const paidItems = allItems.filter(i => i.paid);
                   const unpaidItems = allItems.filter(i => !i.paid);
                   const unpaidAmount = unpaidItems.reduce((sum, i) => sum + parseFloat(i.price) * i.quantity, 0);
+                  const completedCount = allItems.filter(i => i.completed).length;
+                  const allKitchenDone = allItems.length > 0 && completedCount === allItems.length;
 
                   return (
-                    <div key={tableNum} className="border-2 border-gray-200 rounded-xl overflow-hidden">
-                      <div className="bg-fwv-red text-white p-3">
+                    <div key={tableNum} className={`border-2 rounded-xl overflow-hidden ${allKitchenDone ? 'border-green-400' : 'border-gray-200'}`}>
+                      <div className={`${allKitchenDone ? 'bg-green-600' : 'bg-fwv-red'} text-white p-3`}>
                         <div className="flex justify-between items-center">
                           <span className="text-2xl font-bold">Tisch {tableNum}</span>
                           <span className="text-lg font-semibold">
                             CHF {unpaidAmount.toFixed(2)}
                           </span>
                         </div>
+                        {allKitchenDone ? (
+                          <div className="text-sm font-medium mt-1">
+                            Küche fertig - bereit zum Servieren/Bezahlen
+                          </div>
+                        ) : completedCount > 0 ? (
+                          <div className="text-sm opacity-80 mt-1">
+                            Küche: {completedCount}/{allItems.length} fertig
+                          </div>
+                        ) : null}
                         {paidItems.length > 0 && (
                           <div className="text-sm opacity-80 mt-1">
                             ({paidItems.length} Artikel bereits bezahlt)
