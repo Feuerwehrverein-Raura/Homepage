@@ -113,6 +113,8 @@ interface OpenOrder {
   status: 'pending' | 'paid' | 'completed';
   items: OrderItem[];
   paid_amount?: string;
+  // When combining multiple orders for a table, store all order IDs
+  _allOrders?: { id: number; total: string; paid_amount?: string }[];
 }
 
 type OrderType = 'bar' | 'tisch';
@@ -621,54 +623,75 @@ function App() {
     return total;
   };
 
+  // Distribute a payment amount across multiple orders sequentially
+  const distributePayment = async (
+    allOrders: { id: number; total: string; paid_amount?: string }[],
+    totalAmount: number,
+    paymentMethod: string,
+    description: string
+  ): Promise<{ ok: boolean; allPaid: boolean; error?: string }> => {
+    let remaining = totalAmount;
+    let allPaid = true;
+
+    for (const order of allOrders) {
+      if (remaining <= 0) break;
+
+      const orderRemaining = parseFloat(order.total) - parseFloat(order.paid_amount || '0');
+      if (orderRemaining <= 0) continue;
+
+      const payAmount = Math.min(remaining, orderRemaining);
+      const response = await fetch(`${API_URL}/orders/${order.id}/split-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: payAmount,
+          payment_method: paymentMethod,
+          description
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        return { ok: false, allPaid: false, error: err.error || 'Zahlung fehlgeschlagen' };
+      }
+
+      const result = await response.json();
+      if (!result.all_paid) allPaid = false;
+      remaining -= payAmount;
+    }
+
+    if (remaining > 0.01) allPaid = false;
+    return { ok: true, allPaid };
+  };
+
   // Process split payment
   const processSplitPayment = async () => {
     if (!splitPaymentOrder) return;
 
     try {
-      let response;
       let amount: number;
       let message: string;
+      let description: string;
 
       if (splitPaymentMode === 'full') {
-        // Pay full remaining amount
         amount = getUnpaidTotal(splitPaymentOrder);
-        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/split-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount,
-            payment_method: splitPaymentMethod,
-            description: 'Vollständige Bezahlung'
-          }),
-        });
         message = 'Vollständig bezahlt';
+        description = 'Vollständige Bezahlung';
       } else if (splitPaymentMode === 'split') {
-        // Pay custom amount
         amount = parseFloat(splitAmount) || 0;
         if (amount <= 0) {
           alert('Bitte einen gültigen Betrag eingeben');
           return;
         }
-        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/split-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount,
-            payment_method: splitPaymentMethod,
-            description: `Teilzahlung CHF ${amount.toFixed(2)}`
-          }),
-        });
         message = `Teilzahlung: CHF ${amount.toFixed(2)}`;
+        description = `Teilzahlung CHF ${amount.toFixed(2)}`;
       } else {
-        // Pay selected items (unit-based) - use split-payment with calculated amount
         if (selectedItemIds.length === 0) {
           alert('Bitte mindestens einen Artikel auswählen');
           return;
         }
         amount = getSelectedItemsTotal(splitPaymentOrder);
 
-        // Create description with item counts
         const itemCounts: { [name: string]: number } = {};
         selectedItemIds.forEach(key => {
           const [itemId] = key.split('-');
@@ -677,34 +700,28 @@ function App() {
             itemCounts[item.item_name] = (itemCounts[item.item_name] || 0) + 1;
           }
         });
-        const itemDesc = Object.entries(itemCounts).map(([name, count]) => `${count}x ${name}`).join(', ');
-
-        response = await fetch(`${API_URL}/orders/${splitPaymentOrder.id}/split-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount,
-            payment_method: splitPaymentMethod,
-            description: itemDesc
-          }),
-        });
+        description = Object.entries(itemCounts).map(([name, count]) => `${count}x ${name}`).join(', ');
         message = `${selectedItemIds.length} Artikel bezahlt`;
       }
 
-      if (!response.ok) {
-        const error = await response.json();
-        alert(`Fehler: ${error.error || 'Zahlung fehlgeschlagen'}`);
+      // Distribute payment across all orders for combined table orders
+      const orders = splitPaymentOrder._allOrders || [
+        { id: splitPaymentOrder.id, total: splitPaymentOrder.total, paid_amount: splitPaymentOrder.paid_amount }
+      ];
+
+      const result = await distributePayment(orders, amount, splitPaymentMethod, description);
+
+      if (!result.ok) {
+        alert(`Fehler: ${result.error}`);
         return;
       }
-
-      const result = await response.json();
 
       setOrderConfirmation({
         orderId: splitPaymentOrder.id,
         orderType: 'tisch',
         tableNumber: splitPaymentOrder.table_number,
         total: amount,
-        message: result.all_paid ? `${message} - Bestellung abgeschlossen` : message
+        message: result.allPaid ? `${message} - Bestellung abgeschlossen` : message
       });
 
       closeSplitPayment();
@@ -1072,13 +1089,13 @@ function App() {
                         <div className="p-3 bg-gray-50 border-t">
                           <button
                             onClick={() => {
-                              // Open split payment for first order of this table
                               const firstOrder = tableOrders[0];
-                              // Combine all items from all orders for this table
                               const combinedOrder: OpenOrder = {
                                 ...firstOrder,
                                 items: allItems,
-                                total: totalAmount.toString()
+                                total: totalAmount.toString(),
+                                paid_amount: tableOrders.reduce((sum, o) => sum + parseFloat(o.paid_amount || '0'), 0).toString(),
+                                _allOrders: tableOrders.map(o => ({ id: o.id, total: o.total, paid_amount: o.paid_amount }))
                               };
                               openSplitPayment(combinedOrder);
                             }}
