@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // Offline Banner Component
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
@@ -702,15 +702,6 @@ function App() {
       console.error('Split payment error:', error);
       alert('Fehler bei der Bezahlung');
     }
-  };
-
-  // Toggle item selection for per-item payment
-  const toggleItemSelection = (itemId: number) => {
-    setSelectedItemIds(prev =>
-      prev.includes(itemId)
-        ? prev.filter(id => id !== itemId)
-        : [...prev, itemId]
-    );
   };
 
   const getTableNumber = (): number => {
