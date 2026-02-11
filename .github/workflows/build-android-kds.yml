@@ -56,6 +56,27 @@ jobs:
         with:
           gradle-version: '8.4'
 
+      - name: Inject version from tag
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/kds-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#kds-v}"
+          else
+            VERSION="${{ inputs.version || '0.0.0' }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Update versionName in build.gradle.kts
+          GRADLE_FILE="simple-order-system/kitchen-display-android/app/build.gradle.kts"
+          sed -i "s/versionName = \".*\"/versionName = \"$VERSION\"/" "$GRADLE_FILE"
+          # Increment versionCode based on tag number (major*1000 + minor*100 + patch)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VCODE=$(( ${MAJOR:-0} * 1000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          [ "$VCODE" -lt 1 ] && VCODE=1
+          sed -i "s/versionCode = [0-9]*/versionCode = $VCODE/" "$GRADLE_FILE"
+          echo "Set version: $VERSION (code: $VCODE)"
+          grep -E "version(Code|Name)" "$GRADLE_FILE"
+
       - name: Build Debug APK
         working-directory: simple-order-system/kitchen-display-android
         run: gradle assembleDebug --stacktrace
@@ -117,14 +138,6 @@ jobs:
 
       - name: Rename APKs
         run: |
-          # Extract version from tag (kds-v0.5 -> 0.5) or use input
-          if [[ "${{ github.ref }}" == refs/tags/kds-v* ]]; then
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#kds-v}"
-          else
-            VERSION="${{ inputs.version || '1.0.0' }}"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
           DEBUG_APK=$(find simple-order-system/kitchen-display-android -name "*debug*.apk" -type f | head -1)
           RELEASE_APK=$(find simple-order-system/kitchen-display-android -name "*release*.apk" -type f | head -1)
           if [ -n "$DEBUG_APK" ]; then

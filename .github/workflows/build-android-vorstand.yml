@@ -46,6 +46,25 @@ jobs:
         with:
           gradle-version: '8.12'
 
+      - name: Inject version from tag
+        shell: bash
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/vorstand-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#vorstand-v}"
+          else
+            VERSION="${{ inputs.version || '0.0.0' }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          GRADLE_FILE="vorstand-android/app/build.gradle.kts"
+          sed -i "s/versionName = \".*\"/versionName = \"$VERSION\"/" "$GRADLE_FILE"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VCODE=$(( ${MAJOR:-0} * 1000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          [ "$VCODE" -lt 1 ] && VCODE=1
+          sed -i "s/versionCode = [0-9]*/versionCode = $VCODE/" "$GRADLE_FILE"
+          echo "Set version: $VERSION (code: $VCODE)"
+          grep -E "version(Code|Name)" "$GRADLE_FILE"
+
       - name: Build Debug APK
         working-directory: vorstand-android
         run: gradle assembleDebug --stacktrace
@@ -89,13 +108,6 @@ jobs:
 
       - name: Rename APKs
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/vorstand-v* ]]; then
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#vorstand-v}"
-          else
-            VERSION="${{ inputs.version || '1.0.0' }}"
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
           DEBUG_APK=$(find vorstand-android -name "*debug*.apk" -type f | head -1)
           RELEASE_APK=$(find vorstand-android -name "*release*.apk" -type f | head -1)
           if [ -n "$DEBUG_APK" ]; then
