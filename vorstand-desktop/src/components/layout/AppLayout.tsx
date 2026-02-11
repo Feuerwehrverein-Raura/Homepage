@@ -16,7 +16,6 @@ import { RegistrationsPage } from "@/pages/admin/RegistrationsPage";
 import { AuditPage } from "@/pages/admin/AuditPage";
 import { MailcowPage } from "@/pages/mailcow/MailcowPage";
 import { VaultPage } from "@/pages/vault/VaultPage";
-import { WhitelistPage } from "@/pages/whitelist/WhitelistPage";
 import { MassPdfPage } from "@/pages/masspdf/MassPdfPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 
@@ -49,7 +48,6 @@ export function AppLayout() {
             <Route path="audit" element={<AuditPage />} />
             <Route path="mailcow" element={<MailcowPage />} />
             <Route path="vault" element={<VaultPage />} />
-            <Route path="whitelist" element={<WhitelistPage />} />
             <Route path="mass-pdf" element={<MassPdfPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Routes>

@@ -91,7 +91,6 @@ jobs:
             - E-Mail & Briefversand (Pingen, Smart Dispatch)
             - Mailcow E-Mail-Admin
             - Vaultwarden Passwort-Tresor
-            - IP-Whitelist (Kassensystem)
             - Massen-PDF-Versand
             - Audit-Protokoll
             - Auto-Update

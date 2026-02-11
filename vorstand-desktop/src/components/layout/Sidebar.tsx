@@ -10,7 +10,6 @@ import {
   FileText,
   Mail,
   KeyRound,
-  Shield,
   FileUp,
   Settings,
   LogOut,
@@ -27,7 +26,6 @@ const navItems = [
   { path: "/audit", label: "Audit", icon: FileText },
   { path: "/mailcow", label: "E-Mail", icon: Mail },
   { path: "/vault", label: "Tresor", icon: KeyRound },
-  { path: "/whitelist", label: "Whitelist", icon: Shield },
   { path: "/mass-pdf", label: "Massen-PDF", icon: FileUp },
   { path: "/settings", label: "Einstellungen", icon: Settings },
 ];

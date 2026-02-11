@@ -73,27 +73,7 @@ Geteilte Passwörter für Vereins-Accounts verwalten.
 
 ---
 
-## Phase 5: IP-Whitelist — Kassensystem-Zugriff (abgeschlossen)
-
-IP-Adressen für den Zugriff auf das Kassensystem verwalten.
-
-| Feature | Status |
-|---------|--------|
-| Whitelist aktivieren/deaktivieren | Done |
-| Alle Einträge anzeigen | Done |
-| Eigene IP anzeigen | Done |
-| Eigene IP freischalten | Done |
-| IP manuell hinzufügen | Done |
-| IP entfernen | Done |
-
-**Technische Details:**
-- API auf order.fwv-raura.ch (separates Retrofit)
-- Permanente Einträge (Admin) vs. temporäre (24h Self-Register)
-- Zugang über Mehr > IP-Whitelist
-
----
-
-## Phase 6: Einstellungen & Diverses (abgeschlossen)
+## Phase 5: Einstellungen & Diverses (abgeschlossen)
 
 | Feature | Status |
 |---------|--------|
@@ -111,7 +91,7 @@ IP-Adressen für den Zugriff auf das Kassensystem verwalten.
 
 ---
 
-## Phase 7: Massen-PDF-Versand (abgeschlossen)
+## Phase 6: Massen-PDF-Versand (abgeschlossen)
 
 Post-Massenversand per Pingen direkt aus der App.
 

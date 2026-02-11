@@ -74,11 +74,6 @@ class MoreFragment : Fragment() {
             findNavController().navigate(R.id.action_more_to_mass_pdf)
         }
 
-        // IP-Whitelist (Kassensystem)
-        binding.cardWhitelist.setOnClickListener {
-            findNavController().navigate(R.id.action_more_to_whitelist)
-        }
-
         // Einstellungen
         binding.cardSettings.setOnClickListener {
             findNavController().navigate(R.id.action_more_to_settings)

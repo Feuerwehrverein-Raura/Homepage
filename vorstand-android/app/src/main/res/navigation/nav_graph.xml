@@ -117,9 +117,6 @@
             android:id="@+id/action_more_to_mass_pdf"
             app:destination="@id/massPdfFragment" />
         <action
-            android:id="@+id/action_more_to_whitelist"
-            app:destination="@id/whitelistFragment" />
-        <action
             android:id="@+id/action_more_to_settings"
             app:destination="@id/settingsFragment" />
         <action
@@ -138,12 +135,6 @@
         android:id="@+id/vaultFragment"
         android:name="ch.fwvraura.vorstand.ui.vault.VaultFragment"
         android:label="@string/vault_title" />
-
-    <!-- Whitelist (Kassensystem IP-Freischaltung) -->
-    <fragment
-        android:id="@+id/whitelistFragment"
-        android:name="ch.fwvraura.vorstand.ui.whitelist.WhitelistFragment"
-        android:label="@string/whitelist_title" />
 
     <!-- Massen-PDF Versand -->
     <fragment

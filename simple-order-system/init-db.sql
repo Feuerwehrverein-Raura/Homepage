@@ -6,7 +6,3 @@
 
 -- This file can be used to pre-seed data if needed
 -- Example: Default settings, test items, etc.
-
--- Whitelist disabled by default for local deployment
-INSERT INTO settings (key, value) VALUES ('whitelist_enabled', 'false')
-ON CONFLICT (key) DO NOTHING;
