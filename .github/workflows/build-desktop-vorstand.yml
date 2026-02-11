@@ -1,0 +1,99 @@
+name: Build Desktop Vorstand
+
+on:
+  push:
+    tags:
+      - 'vorstand-desktop-v*'
+  pull_request:
+    paths:
+      - 'vorstand-desktop/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+        type: string
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'vorstand-desktop/src-tauri -> target'
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsecret-1-dev
+
+      - name: Install frontend dependencies
+        working-directory: vorstand-desktop
+        run: npm ci
+
+      - name: Determine version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/vorstand-desktop-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#vorstand-desktop-v}"
+          else
+            VERSION="${{ inputs.version || '1.0.0' }}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: vorstand-desktop
+          tagName: ${{ github.ref_name || format('vorstand-desktop-v{0}', inputs.version) }}
+          releaseName: 'Vorstand Desktop ${{ env.VERSION }}'
+          releaseBody: |
+            ## FWV Vorstand Desktop App v${{ env.VERSION }}
+
+            Desktop-App fuer die Vorstandsverwaltung des Feuerwehrvereins Raura.
+
+            ### Installation
+            - **Windows**: `.msi` Installer ausfuehren
+            - **Linux (Debian/Ubuntu)**: `.deb` Paket installieren mit `sudo dpkg -i <datei>.deb`
+
+            ### Features
+            - Mitgliederverwaltung (CRUD, Suche, Filter, Foto)
+            - Eventsverwaltung (Schichten, Anmeldungen, PDF)
+            - E-Mail & Briefversand (Pingen, Smart Dispatch)
+            - Mailcow E-Mail-Admin
+            - Vaultwarden Passwort-Tresor
+            - IP-Whitelist (Kassensystem)
+            - Massen-PDF-Versand
+            - Audit-Protokoll
+            - Auto-Update
+          releaseDraft: false
+          prerelease: false
