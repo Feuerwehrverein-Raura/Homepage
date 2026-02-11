@@ -8,6 +8,14 @@
     "store:default",
     "dialog:default",
     "shell:default",
-    "updater:default"
+    "updater:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.fwv-raura.ch/**" },
+        { "url": "https://vault.fwv-raura.ch/**" },
+        { "url": "https://order.fwv-raura.ch/**" }
+      ]
+    }
   ]
 }

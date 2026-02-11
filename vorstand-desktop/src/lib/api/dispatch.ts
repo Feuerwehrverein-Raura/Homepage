@@ -22,51 +22,43 @@ import type {
 
 // Templates
 export async function getTemplates(type?: string): Promise<EmailTemplate[]> {
-  const res = await apiClient.get<EmailTemplate[]>("/templates", {
-    params: type ? { type } : undefined,
-  });
-  return res.data;
+  const qs = type ? `?type=${encodeURIComponent(type)}` : "";
+  return await apiClient.get<EmailTemplate[]>(`/templates${qs}`);
 }
 
 // Email
 export async function sendEmail(
   data: SendEmailRequest
 ): Promise<EmailSendResponse> {
-  const res = await apiClient.post<EmailSendResponse>("/email/send", data);
-  return res.data;
+  return await apiClient.post<EmailSendResponse>("/email/send", data);
 }
 
 export async function sendBulkEmail(
   data: BulkEmailRequest
 ): Promise<BulkEmailResponse> {
-  const res = await apiClient.post<BulkEmailResponse>("/email/bulk", data);
-  return res.data;
+  return await apiClient.post<BulkEmailResponse>("/email/bulk", data);
 }
 
 // Smart Dispatch
 export async function smartDispatch(
   data: SmartDispatchRequest
 ): Promise<SmartDispatchResponse> {
-  const res = await apiClient.post<SmartDispatchResponse>(
+  return await apiClient.post<SmartDispatchResponse>(
     "/dispatch/smart",
     data
   );
-  return res.data;
 }
 
 // Pingen
 export async function getPingenAccount(
   staging?: boolean
 ): Promise<PingenAccount> {
-  const res = await apiClient.get<PingenAccount>("/pingen/account", {
-    params: staging !== undefined ? { staging } : undefined,
-  });
-  return res.data;
+  const qs = staging !== undefined ? `?staging=${staging}` : "";
+  return await apiClient.get<PingenAccount>(`/pingen/account${qs}`);
 }
 
 export async function getPingenStats(): Promise<PingenStats> {
-  const res = await apiClient.get<PingenStats>("/pingen/stats");
-  return res.data;
+  return await apiClient.get<PingenStats>("/pingen/stats");
 }
 
 export async function getPingenLetters(params?: {
@@ -74,51 +66,48 @@ export async function getPingenLetters(params?: {
   member_id?: string;
   limit?: number;
 }): Promise<PingenLetter[]> {
-  const res = await apiClient.get<PingenLetter[]>("/pingen/letters", {
-    params,
-  });
-  return res.data;
+  const query = new URLSearchParams();
+  if (params?.event_id) query.set("event_id", params.event_id);
+  if (params?.member_id) query.set("member_id", params.member_id);
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  return await apiClient.get<PingenLetter[]>(`/pingen/letters${qs ? `?${qs}` : ""}`);
 }
 
 export async function getPingenLetterStatus(
   letterId: string
 ): Promise<PingenLetterStatus> {
-  const res = await apiClient.get<PingenLetterStatus>(
+  return await apiClient.get<PingenLetterStatus>(
     `/pingen/letters/${letterId}/status`
   );
-  return res.data;
 }
 
 export async function sendPingenManual(
   data: PingenSendManualRequest
 ): Promise<PingenSendResponse> {
-  const res = await apiClient.post<PingenSendResponse>(
+  return await apiClient.post<PingenSendResponse>(
     "/pingen/send-manual",
     data
   );
-  return res.data;
 }
 
 export async function getPostMembers(): Promise<PostMembersResponse> {
-  const res = await apiClient.get<PostMembersResponse>("/pingen/post-members");
-  return res.data;
+  return await apiClient.get<PostMembersResponse>("/pingen/post-members");
 }
 
 export async function sendPingenPdf(
   data: PingenSendPdfRequest
 ): Promise<PingenSendResponse> {
-  const res = await apiClient.post<PingenSendResponse>("/pingen/send", data);
-  return res.data;
+  return await apiClient.post<PingenSendResponse>("/pingen/send", data);
 }
 
 export async function sendPingenBulkPdf(
   data: PingenBulkPdfRequest
 ): Promise<PingenBulkPdfResponse> {
-  const res = await apiClient.post<PingenBulkPdfResponse>(
+  return await apiClient.post<PingenBulkPdfResponse>(
     "/pingen/send-bulk-pdf",
     data
   );
-  return res.data;
 }
 
 // Dispatch Log
@@ -129,8 +118,12 @@ export async function getDispatchLog(params?: {
   event_id?: string;
   limit?: number;
 }): Promise<DispatchLogEntry[]> {
-  const res = await apiClient.get<DispatchLogEntry[]>("/dispatch-log", {
-    params,
-  });
-  return res.data;
+  const query = new URLSearchParams();
+  if (params?.type) query.set("type", params.type);
+  if (params?.status) query.set("status", params.status);
+  if (params?.member_id) query.set("member_id", params.member_id);
+  if (params?.event_id) query.set("event_id", params.event_id);
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  return await apiClient.get<DispatchLogEntry[]>(`/dispatch-log${qs ? `?${qs}` : ""}`);
 }

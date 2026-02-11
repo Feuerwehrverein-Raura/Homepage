@@ -6,6 +6,10 @@ export async function getAuditLog(params?: {
   limit?: number;
   since?: string;
 }): Promise<AuditEntry[]> {
-  const res = await apiClient.get<AuditEntry[]>("/audit", { params });
-  return res.data;
+  const query = new URLSearchParams();
+  if (params?.action) query.set("action", params.action);
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  if (params?.since) query.set("since", params.since);
+  const qs = query.toString();
+  return await apiClient.get<AuditEntry[]>(`/audit${qs ? `?${qs}` : ""}`);
 }

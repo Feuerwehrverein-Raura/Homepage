@@ -10,13 +10,11 @@ import type {
 
 // Mailboxes
 export async function getMailboxes(): Promise<Mailbox[]> {
-  const res = await apiClient.get<Mailbox[]>("/mailcow/mailboxes");
-  return res.data;
+  return await apiClient.get<Mailbox[]>("/mailcow/mailboxes");
 }
 
 export async function getMailbox(email: string): Promise<Mailbox> {
-  const res = await apiClient.get<Mailbox>(`/mailcow/mailboxes/${email}`);
-  return res.data;
+  return await apiClient.get<Mailbox>(`/mailcow/mailboxes/${email}`);
 }
 
 export async function createMailbox(data: MailboxCreateRequest): Promise<void> {
@@ -36,8 +34,7 @@ export async function deleteMailbox(email: string): Promise<void> {
 
 // Aliases
 export async function getAliases(): Promise<MailAlias[]> {
-  const res = await apiClient.get<MailAlias[]>("/mailcow/aliases");
-  return res.data;
+  return await apiClient.get<MailAlias[]>("/mailcow/aliases");
 }
 
 export async function createAlias(data: {
@@ -61,21 +58,18 @@ export async function deleteAlias(id: number): Promise<void> {
 
 // Quota
 export async function getQuota(): Promise<QuotaInfo[]> {
-  const res = await apiClient.get<QuotaInfo[]>("/mailcow/quota");
-  return res.data;
+  return await apiClient.get<QuotaInfo[]>("/mailcow/quota");
 }
 
 // Zustellung
 export async function getZustellung(): Promise<ZustellungResponse> {
-  const res = await apiClient.get<ZustellungResponse>(
+  return await apiClient.get<ZustellungResponse>(
     "/members/emails/zustellung"
   );
-  return res.data;
 }
 
 export async function syncAlias(): Promise<SyncAliasResponse> {
-  const res = await apiClient.post<SyncAliasResponse>(
+  return await apiClient.post<SyncAliasResponse>(
     "/members/emails/sync-alias"
   );
-  return res.data;
 }

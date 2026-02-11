@@ -2,26 +2,22 @@ import { apiClient } from "./client";
 import type { Event, EventCreate, ShiftCreate } from "@/lib/types/event";
 
 export async function getEvents(): Promise<Event[]> {
-  const res = await apiClient.get<Event[]>("/events");
-  return res.data;
+  return await apiClient.get<Event[]>("/events");
 }
 
 export async function getEvent(id: string): Promise<Event> {
-  const res = await apiClient.get<Event>(`/events/${id}`);
-  return res.data;
+  return await apiClient.get<Event>(`/events/${id}`);
 }
 
 export async function createEvent(data: EventCreate): Promise<Event> {
-  const res = await apiClient.post<Event>("/events", data);
-  return res.data;
+  return await apiClient.post<Event>("/events", data);
 }
 
 export async function updateEvent(
   id: string,
   data: Partial<EventCreate>
 ): Promise<Event> {
-  const res = await apiClient.put<Event>(`/events/${id}`, data);
-  return res.data;
+  return await apiClient.put<Event>(`/events/${id}`, data);
 }
 
 export async function deleteEvent(id: string): Promise<void> {

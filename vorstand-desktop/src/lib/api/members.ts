@@ -5,31 +5,30 @@ export async function getMembers(params?: {
   status?: string;
   search?: string;
 }): Promise<Member[]> {
-  const res = await apiClient.get<Member[]>("/members", { params });
-  return res.data;
+  const query = new URLSearchParams();
+  if (params?.status) query.set("status", params.status);
+  if (params?.search) query.set("search", params.search);
+  const qs = query.toString();
+  return await apiClient.get<Member[]>(`/members${qs ? `?${qs}` : ""}`);
 }
 
 export async function getMember(id: string): Promise<Member> {
-  const res = await apiClient.get<Member>(`/members/${id}`);
-  return res.data;
+  return await apiClient.get<Member>(`/members/${id}`);
 }
 
 export async function getStats(): Promise<MemberStats> {
-  const res = await apiClient.get<MemberStats>("/members/stats/overview");
-  return res.data;
+  return await apiClient.get<MemberStats>("/members/stats/overview");
 }
 
 export async function createMember(data: MemberCreate): Promise<Member> {
-  const res = await apiClient.post<Member>("/members", data);
-  return res.data;
+  return await apiClient.post<Member>("/members", data);
 }
 
 export async function updateMember(
   id: string,
   data: Partial<MemberCreate>
 ): Promise<Member> {
-  const res = await apiClient.put<Member>(`/members/${id}`, data);
-  return res.data;
+  return await apiClient.put<Member>(`/members/${id}`, data);
 }
 
 export async function deleteMember(id: string): Promise<void> {
@@ -39,9 +38,7 @@ export async function deleteMember(id: string): Promise<void> {
 export async function uploadPhoto(id: string, file: File): Promise<void> {
   const formData = new FormData();
   formData.append("photo", file);
-  await apiClient.post(`/members/${id}/photo`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  await apiClient.upload(`/members/${id}/photo`, formData);
 }
 
 export async function deletePhoto(id: string): Promise<void> {

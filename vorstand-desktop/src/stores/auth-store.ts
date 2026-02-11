@@ -40,12 +40,12 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
     } catch (err: unknown) {
       const msg =
         err instanceof Error
-          ? err.message
-          : (err as { response?: { status?: number } })?.response?.status === 401
+          ? err.message.includes("401")
             ? "Falsche Anmeldedaten"
-            : (err as { response?: { status?: number } })?.response?.status === 403
+            : err.message.includes("403")
               ? "Kein Vorstandszugang"
-              : "Netzwerkfehler";
+              : err.message
+          : "Netzwerkfehler";
       set({ error: msg, isLoading: false });
     }
   },

@@ -7,29 +7,26 @@ import type {
 } from "@/lib/types/registration";
 
 export async function getPendingCount(): Promise<PendingCount> {
-  const res = await apiClient.get<PendingCount>(
+  return await apiClient.get<PendingCount>(
     "/member-registrations/count/pending"
   );
-  return res.data;
 }
 
 export async function getRegistrations(
   status?: string
 ): Promise<MemberRegistration[]> {
-  const res = await apiClient.get<MemberRegistration[]>(
-    "/member-registrations",
-    { params: status ? { status } : undefined }
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return await apiClient.get<MemberRegistration[]>(
+    `/member-registrations${qs}`
   );
-  return res.data;
 }
 
 export async function getRegistration(
   id: string
 ): Promise<MemberRegistration> {
-  const res = await apiClient.get<MemberRegistration>(
+  return await apiClient.get<MemberRegistration>(
     `/member-registrations/${id}`
   );
-  return res.data;
 }
 
 export async function approveRegistration(

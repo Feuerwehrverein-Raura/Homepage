@@ -57,6 +57,7 @@ jobs:
         run: npm ci
 
       - name: Determine version
+        id: version
         shell: bash
         run: |
           if [[ "${{ github.ref }}" == refs/tags/vorstand-desktop-v* ]]; then
@@ -65,20 +66,18 @@ jobs:
           else
             VERSION="${{ inputs.version || '1.0.0' }}"
           fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: vorstand-desktop
           tagName: ${{ github.ref_name || format('vorstand-desktop-v{0}', inputs.version) }}
-          releaseName: 'Vorstand Desktop ${{ env.VERSION }}'
+          releaseName: 'Vorstand Desktop ${{ steps.version.outputs.value }}'
           releaseBody: |
-            ## FWV Vorstand Desktop App v${{ env.VERSION }}
+            ## FWV Vorstand Desktop App v${{ steps.version.outputs.value }}
 
             Desktop-App fuer die Vorstandsverwaltung des Feuerwehrvereins Raura.
 
