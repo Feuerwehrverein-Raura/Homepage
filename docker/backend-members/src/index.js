@@ -4230,12 +4230,40 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
             console.error('Error loading SMB credentials:', smbErr.message);
         }
 
+        // 6. Get service account credentials
+        // DEUTSCH: Service-Account Zugangsdaten (z.B. roterschopf fuer Kasse/KDS) fuer alle Mitglieder anzeigen
+        let serviceAccounts = [];
+        try {
+            const saResult = await pool.query(
+                'SELECT account_name, username, display_name, encrypted_password, description, rotation_days, updated_at FROM service_account_credentials ORDER BY account_name'
+            );
+            serviceAccounts = saResult.rows.map(sa => {
+                const password = decryptPassword(sa.encrypted_password);
+                const updatedAt = sa.updated_at;
+                const nextRotation = new Date(updatedAt);
+                nextRotation.setDate(nextRotation.getDate() + sa.rotation_days);
+                return {
+                    accountName: sa.account_name,
+                    username: sa.username,
+                    displayName: sa.display_name,
+                    password: password,
+                    description: sa.description,
+                    rotationDays: sa.rotation_days,
+                    updatedAt: updatedAt,
+                    nextRotation: nextRotation.toISOString()
+                };
+            });
+        } catch (saErr) {
+            console.error('Error loading service account credentials:', saErr.message);
+        }
+
         res.json({
             functionEmails,
             nextcloudFolders,
             systemAccesses,
             organizerEvents,
-            smbCredentials
+            smbCredentials,
+            serviceAccounts
         });
 
     } catch (error) {
@@ -4243,6 +4271,137 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// ============================================
+// SERVICE ACCOUNT PASSWORD ROTATION
+// DEUTSCH: Automatische Passwort-Rotation fuer Service-Accounts (z.B. roterschopf)
+// DEUTSCH: Generiert alle X Tage ein neues Passwort und setzt es in Authentik
+// ============================================
+
+// DEUTSCH: Generiert ein sicheres zufaelliges Passwort (16 Zeichen, alphanumerisch + Sonderzeichen)
+function generateSecurePassword(length = 16) {
+    const chars = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%';
+    let password = '';
+    const randomBytes = crypto.randomBytes(length);
+    for (let i = 0; i < length; i++) {
+        password += chars[randomBytes[i] % chars.length];
+    }
+    return password;
+}
+
+// DEUTSCH: Setzt ein neues Passwort fuer einen Authentik-Benutzer via API
+async function setAuthentikUserPassword(userId, newPassword) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN) {
+        throw new Error('AUTHENTIK_API_TOKEN not configured');
+    }
+
+    await axios.post(
+        `${AUTHENTIK_API_URL}/api/v3/core/users/${userId}/set_password/`,
+        { password: newPassword },
+        {
+            headers: {
+                'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                'Content-Type': 'application/json'
+            }
+        }
+    );
+}
+
+// DEUTSCH: Findet die Authentik User-ID anhand des Benutzernamens
+async function getAuthentikUserByUsername(username) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+
+    if (!AUTHENTIK_API_TOKEN) return null;
+
+    const response = await axios.get(
+        `${AUTHENTIK_API_URL}/api/v3/core/users/?search=${encodeURIComponent(username)}`,
+        {
+            headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` }
+        }
+    );
+
+    const user = response.data.results.find(u => u.username === username);
+    return user || null;
+}
+
+// DEUTSCH: Prueft und rotiert Service-Account-Passwoerter wenn faellig
+async function rotateServiceAccountPasswords() {
+    console.log('Checking service account password rotation...');
+    try {
+        // Ensure table exists (idempotent)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS service_account_credentials (
+                id SERIAL PRIMARY KEY,
+                account_name VARCHAR(100) NOT NULL UNIQUE,
+                username VARCHAR(100) NOT NULL,
+                display_name VARCHAR(200) NOT NULL,
+                encrypted_password TEXT NOT NULL,
+                description TEXT,
+                rotation_days INTEGER NOT NULL DEFAULT 7,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        `);
+
+        // DEUTSCH: Sicherstellen dass der roterschopf Service-Account existiert
+        const existing = await pool.query(
+            'SELECT id, updated_at, rotation_days FROM service_account_credentials WHERE account_name = $1',
+            ['roterschopf']
+        );
+
+        if (existing.rows.length === 0) {
+            // DEUTSCH: Erster Start - Account anlegen und initiales Passwort setzen
+            console.log('Creating initial service account entry for roterschopf...');
+            const initialPassword = generateSecurePassword();
+            const authentikUser = await getAuthentikUserByUsername('roterschopf');
+
+            if (authentikUser) {
+                await setAuthentikUserPassword(authentikUser.pk, initialPassword);
+                await pool.query(
+                    `INSERT INTO service_account_credentials (account_name, username, display_name, encrypted_password, description, rotation_days)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    ['roterschopf', 'roterschopf', 'Roter Schopf (Kasse/KDS)',
+                     encryptPassword(initialPassword),
+                     'Generischer Login fuer Kassensystem, Kitchen Display und Bestell-App',
+                     7]
+                );
+                console.log('Service account roterschopf initialized with new password');
+            } else {
+                console.warn('Authentik user roterschopf not found - skipping initialization');
+            }
+            return;
+        }
+
+        // DEUTSCH: Pruefen ob Rotation faellig ist
+        const sa = existing.rows[0];
+        const daysSinceUpdate = (Date.now() - new Date(sa.updated_at).getTime()) / (1000 * 60 * 60 * 24);
+
+        if (daysSinceUpdate >= sa.rotation_days) {
+            console.log(`Rotating password for roterschopf (${Math.floor(daysSinceUpdate)} days since last rotation)...`);
+            const newPassword = generateSecurePassword();
+            const authentikUser = await getAuthentikUserByUsername('roterschopf');
+
+            if (authentikUser) {
+                await setAuthentikUserPassword(authentikUser.pk, newPassword);
+                await pool.query(
+                    'UPDATE service_account_credentials SET encrypted_password = $1, updated_at = NOW() WHERE account_name = $2',
+                    [encryptPassword(newPassword), 'roterschopf']
+                );
+                console.log('Service account roterschopf password rotated successfully');
+            } else {
+                console.warn('Authentik user roterschopf not found - skipping rotation');
+            }
+        } else {
+            console.log(`Service account roterschopf: ${Math.floor(sa.rotation_days - daysSinceUpdate)} days until next rotation`);
+        }
+    } catch (error) {
+        console.error('Service account password rotation error:', error.message);
+    }
+}
 
 // Periodic sync of Authentik groups and profiles (every hour)
 // DEUTSCH: Stündliche Synchronisation: Gruppen (Website->Authentik) und Profile (Authentik->Website)
@@ -4282,17 +4441,24 @@ async function periodicAuthentikSync() {
 }
 
 // Start server
-// DEUTSCH: Server starten und periodische Authentik-Synchronisation einrichten (nach 30s, dann stündlich)
+// DEUTSCH: Server starten, periodische Synchronisationen und Passwort-Rotation einrichten
 app.listen(PORT, () => {
     console.log(`API-Members running on port ${PORT}`);
 
-    // Run initial sync after 30 seconds (to allow container to fully start)
+    // Run initial sync and rotation after 30 seconds (to allow container to fully start)
     setTimeout(() => {
         periodicAuthentikSync();
+        rotateServiceAccountPasswords();
     }, 30000);
 
-    // Then run every hour
+    // Authentik sync every hour
     setInterval(() => {
         periodicAuthentikSync();
+    }, 60 * 60 * 1000); // 1 hour
+
+    // Service account password rotation check every hour
+    // DEUTSCH: Prueft stuendlich ob eine Passwort-Rotation faellig ist (alle 7 Tage)
+    setInterval(() => {
+        rotateServiceAccountPasswords();
     }, 60 * 60 * 1000); // 1 hour
 });
