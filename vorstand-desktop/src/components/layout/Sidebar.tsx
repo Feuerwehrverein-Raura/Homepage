@@ -16,8 +16,8 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  Flame,
 } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 const navItems = [
   { path: "/members", label: "Mitglieder", icon: Users },
@@ -40,20 +40,20 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col border-r border-border bg-card h-screen transition-all duration-200",
+        "flex flex-col h-screen transition-all duration-200",
         sidebarCollapsed ? "w-14" : "w-56"
       )}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-4 border-b border-border">
-        <Flame className="h-6 w-6 text-primary shrink-0" />
+      {/* Header - Feuerwehrrot */}
+      <div className="flex items-center gap-2 px-3 py-3 bg-sidebar text-sidebar-foreground">
+        <img src={logo} alt="FWV Logo" className="h-8 w-8 shrink-0 rounded" />
         {!sidebarCollapsed && (
           <span className="font-semibold text-sm truncate">FWV Vorstand</span>
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav className="flex-1 overflow-y-auto py-2 bg-card border-r border-border">
         {navItems.map((item) => {
           const isActive = location.pathname.startsWith(item.path);
           return (
@@ -76,7 +76,7 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-border p-2 space-y-1">
+      <div className="border-t border-border bg-card border-r p-2 space-y-1">
         {!sidebarCollapsed && user && (
           <div className="px-2 py-1 text-xs text-muted-foreground truncate">
             {user.name || user.email}
