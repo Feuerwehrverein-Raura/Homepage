@@ -1,0 +1,52 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/tauri/master/core/tauri-config-schema/schema.json",
+  "productName": "FWV Vorstand",
+  "version": "1.0.0",
+  "identifier": "ch.fwvraura.vorstand.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "FWV Vorstand - Feuerwehrverein Raura",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://api.fwv-raura.ch https://vault.fwv-raura.ch https://order.fwv-raura.ch; img-src 'self' https://api.fwv-raura.ch data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libsecret-1-0"]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/Feuerwehrverein-Raura/Homepage/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
+    }
+  }
+}
