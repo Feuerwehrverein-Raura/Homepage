@@ -97,7 +97,7 @@ Im Mitglieder-Tab werden folgende Statistiken angezeigt:
 ## Technische Details
 
 ### Session-Verwaltung
-- Login via IMAP-Authentifizierung gegen `mail.fwv-raura.ch`
+- Login via IMAP-Authentifizierung gegen `mail.test.juroct.net`
 - JWT-Token (HS256) mit 8 Stunden Gültigkeit
 - Cookie auf `.fwv-raura.ch` für Cross-Subdomain-Zugriff (Vorstand-Portal, PDF-Designer)
 - Token wird im Browser-Cookie und `sessionStorage` gespeichert

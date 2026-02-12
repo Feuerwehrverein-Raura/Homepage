@@ -4048,10 +4048,10 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
                         email: email,
                         password: password,
                         passwordUpdatedAt: passwordUpdatedAt,
-                        server: 'mail.fwv-raura.ch',
+                        server: 'mail.test.juroct.net',
                         imapPort: 993,
                         smtpPort: 587,
-                        webmail: 'https://mail.fwv-raura.ch'
+                        webmail: 'https://mail.test.juroct.net'
                     });
                 }
             }

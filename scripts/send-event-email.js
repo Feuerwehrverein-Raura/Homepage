@@ -15,7 +15,7 @@
  * 4. Versendet einzeln via Mailcow SMTP
  *
  * Umgebungsvariablen:
- * - SMTP_HOST: Mail-Server (Standard: mail.fwv-raura.ch)
+ * - SMTP_HOST: Mail-Server (Standard: mail.test.juroct.net)
  * - SMTP_PORT: Port (Standard: 587 STARTTLS)
  * - SMTP_USER: Benutzername für SMTP-Auth
  * - SMTP_PASS: Passwort für SMTP-Auth
@@ -28,7 +28,7 @@ const path = require('path');
 const Handlebars = require('handlebars');
 
 // Configuration from environment variables
-const SMTP_HOST = process.env.SMTP_HOST || 'mail.fwv-raura.ch';
+const SMTP_HOST = process.env.SMTP_HOST || 'mail.test.juroct.net';
 const SMTP_PORT = process.env.SMTP_PORT || 587;
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;

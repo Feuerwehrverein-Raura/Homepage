@@ -10,7 +10,7 @@ Benötigte Secrets:
 
 | Secret Name | Wert | Beispiel |
 |-------------|------|----------|
-| `SMTP_HOST` | Mailcow Server | `mail.fwv-raura.ch` |
+| `SMTP_HOST` | Mailcow Server | `mail.test.juroct.net` |
 | `SMTP_PORT` | SMTP Port | `587` |
 | `SMTP_USER` | SMTP Benutzer | `alle@fwv-raura.ch` |
 | `SMTP_PASS` | SMTP Passwort | `IhrPasswort123` |

@@ -10,7 +10,7 @@
  * Verwendung: node scripts/sync-mailcow-distribution-list.js
  *
  * Umgebungsvariablen:
- * - MAILCOW_API_URL: Mailcow Server (Standard: https://mail.fwv-raura.ch)
+ * - MAILCOW_API_URL: Mailcow Server (Standard: https://mail.test.juroct.net)
  * - MAILCOW_API_KEY: API-Schluessel fuer Mailcow Admin-API
  * - MAILCOW_ALIAS_ADDRESS: Verteilerliste (Standard: alle@fwv-raura.ch)
  *
@@ -29,7 +29,7 @@ const fs = require('fs');
 const path = require('path');
 
 // Konfiguration aus Umgebungsvariablen
-const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'https://mail.fwv-raura.ch';
+const MAILCOW_API_URL = process.env.MAILCOW_API_URL || 'https://mail.test.juroct.net';
 const MAILCOW_API_KEY = process.env.MAILCOW_API_KEY;
 const MAILCOW_ALIAS_ADDRESS = process.env.MAILCOW_ALIAS_ADDRESS || 'alle@fwv-raura.ch';
 

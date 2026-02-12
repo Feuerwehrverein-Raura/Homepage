@@ -67,7 +67,7 @@ Erstellen Sie auch diese Secrets (falls noch nicht vorhanden):
 
 | Secret Name | Beispiel-Wert | Beschreibung |
 |-------------|---------------|--------------|
-| `SMTP_HOST` | `mail.fwv-raura.ch` | Mailcow Server |
+| `SMTP_HOST` | `mail.test.juroct.net` | Mailcow Server |
 | `SMTP_PORT` | `587` | SMTP Port (587 oder 465) |
 | `SMTP_USER` | `alle@fwv-raura.ch` | SMTP Benutzername |
 | `SMTP_PASS` | `IhrPasswort123` | SMTP Passwort |

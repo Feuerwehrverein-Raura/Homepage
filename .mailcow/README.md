@@ -29,7 +29,7 @@ Erstellen Sie folgende Secrets:
 
 | Secret Name | Wert | Beispiel |
 |-------------|------|----------|
-| `MAILCOW_API_URL` | Mailcow URL | `https://mail.fwv-raura.ch` |
+| `MAILCOW_API_URL` | Mailcow URL | `https://mail.test.juroct.net` |
 | `MAILCOW_API_KEY` | API Key aus Schritt 1 | `XXXXXX-XXXXXX-XXXXXX` |
 | `MAILCOW_ALIAS_ADDRESS` | Alias-Adresse | `alle@fwv-raura.ch` |
 

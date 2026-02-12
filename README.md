@@ -368,7 +368,7 @@ const decoded = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
 ```javascript
 // IMAP-Authentifizierung
 const client = new ImapFlow({
-  host: 'mail.fwv-raura.ch',
+  host: 'mail.test.juroct.net',
   auth: { user: email, pass: password }
 });
 ```
@@ -690,7 +690,7 @@ AUTHENTIK_CLIENT_SECRET_ORDER=xxx
 AUTHENTIK_API_TOKEN=xxx           # Für Benutzer-Synchronisierung
 
 # IMAP (Vorstand-Login)
-IMAP_HOST=mail.fwv-raura.ch
+IMAP_HOST=mail.test.juroct.net
 IMAP_PORT=993
 VORSTAND_EMAILS=praesident@fwv-raura.ch,aktuar@fwv-raura.ch,...
 
@@ -703,7 +703,7 @@ ADMIN_PASSWORD=xxx
 
 ```env
 # E-Mail (SMTP)
-SMTP_HOST=mail.fwv-raura.ch
+SMTP_HOST=mail.test.juroct.net
 SMTP_PORT=587
 SMTP_USER=xxx
 SMTP_PASSWORD=xxx
@@ -715,7 +715,7 @@ PINGEN_ORGANISATION_ID=xxx
 PINGEN_STAGING=false              # true für Testbetrieb
 
 # Mailcow (E-Mail-Verwaltung)
-MAILCOW_API_URL=https://mail.fwv-raura.ch
+MAILCOW_API_URL=https://mail.test.juroct.net
 MAILCOW_API_KEY=xxx
 ```
 
