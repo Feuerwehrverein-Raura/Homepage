@@ -282,6 +282,44 @@ services:
       - traefik.http.routers.onlyoffice.middlewares=onlyoffice-headers
       - com.centurylinklabs.watchtower.enable=true
 
+  # DEUTSCH: Spam Manager — Verwaltung von Spam-Meldungen und Sperrlisten
+  # Erreichbar unter: spam.fwv-raura.ch
+  spam-manager:
+    image: ghcr.io/feuerwehrverein-raura/fwv-raura-spam-manager:latest
+    container_name: fwv-spam-manager
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      AUTHENTIK_URL: https://auth.fwv-raura.ch
+      AUTHENTIK_APP_SLUG: spam-manager
+      AUTHENTIK_CLIENT_ID: ${SPAM_AUTHENTIK_CLIENT_ID}
+      AUTHENTIK_CLIENT_SECRET: ${SPAM_AUTHENTIK_CLIENT_SECRET}
+      IMAP_HOST: ${IMAP_HOST:-mail.test.juroct.net}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      SPAM_IMAP_USER: spam@fwv-raura.ch
+      SPAM_IMAP_PASSWORD: ${SPAM_IMAP_PASSWORD}
+      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}
+      MAILCOW_API_KEY: ${MAILCOW_API_KEY}
+    volumes:
+      - ./data/spam-manager:/app/data
+    networks:
+      - proxy
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://localhost:3000/api/health]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.spam-manager.rule=Host(`spam.fwv-raura.ch`)
+      - traefik.http.routers.spam-manager.entrypoints=https
+      - traefik.http.routers.spam-manager.tls=true
+      - traefik.http.routers.spam-manager.tls.certresolver=letsencrypt
+      - traefik.http.services.spam-manager.loadbalancer.server.port=3000
+      - com.centurylinklabs.watchtower.enable=true
+
 # DEUTSCH: Externes Docker-Netzwerk — wird von Traefik verwaltet
 networks:
   proxy:

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Manager - FWV Raura</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { 'fire': { 50:'#fef2f2', 100:'#fee2e2', 200:'#fecaca', 500:'#ef4444', 600:'#dc2626', 700:'#b91c1c', 800:'#991b1b', 900:'#7f1d1d' } } } }
+        }
+    </script>
+    <style>
+        .toast { animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s; }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } }
+        @keyframes fadeOut { to { opacity: 0; } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-fire-700 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M3 12l9-9 9 9M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
+                <h1 class="text-xl font-bold">Spam Manager</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span id="user-name" class="text-sm opacity-90"></span>
+                <button onclick="logout()" class="text-sm bg-fire-800 hover:bg-fire-900 px-3 py-1 rounded transition-colors">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Tabs -->
+    <div class="max-w-7xl mx-auto px-4 mt-6">
+        <div class="flex border-b border-gray-200">
+            <button onclick="switchTab('reports')" id="tab-reports" class="tab-btn px-6 py-3 font-medium text-sm border-b-2 border-fire-700 text-fire-700">
+                Spam-Meldungen <span id="reports-count" class="ml-1 bg-fire-100 text-fire-700 px-2 py-0.5 rounded-full text-xs"></span>
+            </button>
+            <button onclick="switchTab('blocklist')" id="tab-blocklist" class="tab-btn px-6 py-3 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                Sperrliste <span id="blocklist-count" class="ml-1 bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Reports Tab -->
+    <div id="panel-reports" class="max-w-7xl mx-auto px-4 mt-4">
+        <div class="flex justify-between items-center mb-4">
+            <p class="text-sm text-gray-500">E-Mails im Postfach spam@fwv-raura.ch</p>
+            <button onclick="loadReports()" class="text-sm bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Aktualisieren
+            </button>
+        </div>
+        <div id="reports-loading" class="text-center py-12 text-gray-400">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-fire-700 mx-auto mb-3"></div>
+            Lade Spam-Meldungen...
+        </div>
+        <div id="reports-empty" class="hidden text-center py-12">
+            <svg class="w-16 h-16 text-green-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <p class="text-gray-500 font-medium">Keine Spam-Meldungen</p>
+            <p class="text-sm text-gray-400 mt-1">Das Postfach ist leer.</p>
+        </div>
+        <div id="reports-table" class="hidden"></div>
+    </div>
+
+    <!-- Blocklist Tab -->
+    <div id="panel-blocklist" class="max-w-7xl mx-auto px-4 mt-4 hidden">
+        <p class="text-sm text-gray-500 mb-4">Gesperrte Absender, Domains und Server-IPs</p>
+        <div id="blocklist-loading" class="text-center py-12 text-gray-400">Lade Sperrliste...</div>
+        <div id="blocklist-empty" class="hidden text-center py-12">
+            <p class="text-gray-500">Keine Einträge in der Sperrliste.</p>
+        </div>
+        <div id="blocklist-table" class="hidden"></div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between p-4 border-b">
+                <h2 id="modal-title" class="text-lg font-bold text-gray-800 truncate"></h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div id="modal-content" class="p-4 overflow-y-auto flex-1"></div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

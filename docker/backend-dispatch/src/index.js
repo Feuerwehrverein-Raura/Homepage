@@ -1913,7 +1913,17 @@ async function mailcowApi(method, endpoint, data = null) {
         }
     };
     if (data) config.data = data;
-    return axios(config);
+    const response = await axios(config);
+    // Mailcow gibt HTTP 200 auch bei Fehlern zurueck, Fehler stehen im Body
+    const result = Array.isArray(response.data) ? response.data[0] : response.data;
+    if (result && result.type === 'danger') {
+        const msg = Array.isArray(result.msg) ? result.msg[0] : result.msg;
+        const err = new Error(msg || 'Mailcow operation failed');
+        err.mailcowError = true;
+        err.response = { data: response.data };
+        throw err;
+    }
+    return response;
 }
 
 // DEUTSCH: Alle Mailboxen der Domain fwv-raura.ch abrufen

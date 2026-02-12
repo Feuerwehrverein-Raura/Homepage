@@ -6257,6 +6257,25 @@ ${grussformel}`;
             btn.textContent = '↻ Alias synchronisieren';
         }
 
+        // Uebersetzt Mailcow-Fehlercodes in lesbare deutsche Meldungen.
+        function parseMailcowError(data) {
+            if (!data) return null;
+            const item = Array.isArray(data) ? data[0] : data;
+            const msg = item?.msg || item;
+            const code = Array.isArray(msg) ? msg[0] : (typeof msg === 'string' ? msg : null);
+            const errors = {
+                'max_mailbox_exceeded': 'Maximale Anzahl Mailboxen erreicht (Domain-Limit)',
+                'mailbox_quota_exceeded': 'Mailbox-Quota ueberschritten',
+                'object_exists': 'Existiert bereits',
+                'password_complexity': 'Passwort zu schwach (min. 6 Zeichen, Gross-/Kleinbuchstaben + Zahl)',
+                'is_alias': 'Adresse wird bereits als Alias verwendet',
+                'domain_not_found': 'Domain nicht gefunden',
+                'is_spam_alias': 'Adresse ist ein temporaerer Alias',
+                'alias_domain_exists': 'Domain ist eine Alias-Domain',
+            };
+            return errors[code] || code || null;
+        }
+
         // Oeffnet das Modal zum Erstellen einer neuen Mailbox.
         function openNewMailboxModal() {
             document.getElementById('mailbox-modal-title').textContent = 'Neue Mailbox';
@@ -6321,7 +6340,11 @@ ${grussformel}`;
                     body: JSON.stringify(data)
                 });
 
-                if (!response.ok) throw new Error('Fehler beim Speichern');
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => null);
+                    const errMsg = parseMailcowError(errData?.error || errData);
+                    throw new Error(errMsg || 'Fehler beim Speichern');
+                }
                 document.getElementById('mailbox-modal').classList.add('hidden');
                 loadMailboxes();
             } catch (error) {
@@ -6333,13 +6356,17 @@ ${grussformel}`;
         async function deleteMailbox(email) {
             if (!confirm(`Mailbox ${email} wirklich loeschen? Alle E-Mails gehen verloren!`)) return;
             try {
-                await fetch(`${API_BASE}/mailcow/mailboxes/${email}`, {
+                const response = await fetch(`${API_BASE}/mailcow/mailboxes/${email}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => null);
+                    throw new Error(parseMailcowError(errData?.error || errData) || 'Fehler beim Loeschen');
+                }
                 loadMailboxes();
             } catch (error) {
-                alert('Fehler beim Loeschen');
+                alert('Fehler: ' + error.message);
             }
         }
 
@@ -6390,7 +6417,10 @@ ${grussformel}`;
                     body: JSON.stringify(data)
                 });
 
-                if (!response.ok) throw new Error('Fehler beim Speichern');
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => null);
+                    throw new Error(parseMailcowError(errData?.error || errData) || 'Fehler beim Speichern');
+                }
                 document.getElementById('alias-modal').classList.add('hidden');
                 loadAliases();
             } catch (error) {
@@ -6402,13 +6432,17 @@ ${grussformel}`;
         async function deleteAlias(id) {
             if (!confirm('Alias wirklich loeschen?')) return;
             try {
-                await fetch(`${API_BASE}/mailcow/aliases/${id}`, {
+                const response = await fetch(`${API_BASE}/mailcow/aliases/${id}`, {
                     method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => null);
+                    throw new Error(parseMailcowError(errData?.error || errData) || 'Fehler beim Loeschen');
+                }
                 loadAliases();
             } catch (error) {
-                alert('Fehler beim Loeschen');
+                alert('Fehler: ' + error.message);
             }
         }
 

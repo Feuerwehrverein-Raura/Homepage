@@ -79,6 +79,7 @@ jobs:
       order-register: ${{ steps.filter.outputs.order-register }}
       inventory-backend: ${{ steps.filter.outputs.inventory-backend }}
       inventory-frontend: ${{ steps.filter.outputs.inventory-frontend }}
+      spam-manager: ${{ steps.filter.outputs.spam-manager }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -111,6 +112,8 @@ jobs:
               - 'simple-inventory-system/backend/**'
             inventory-frontend:
               - 'simple-inventory-system/frontend/**'
+            spam-manager:
+              - 'docker/spam-manager/**'
 
   build-backend-events:
     needs: [release, detect-changes]
@@ -507,3 +510,33 @@ jobs:
             ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:latest
             ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:${{ github.sha }}
+
+  build-spam-manager:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.spam-manager == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/spam-manager
+          push: true
+          no-cache: true
+          build-args: |
+            VERSION=${{ needs.release.outputs.version }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-spam-manager:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-spam-manager:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-spam-manager:${{ github.sha }}
