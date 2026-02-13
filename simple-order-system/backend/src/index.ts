@@ -1643,13 +1643,13 @@ app.put('/api/settings', authenticateToken, async (req: AuthenticatedRequest, re
 // Test printer connection
 app.post('/api/settings/test-printer', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const { station, ip, port } = req.body;
+    const { station, ip, port, protocol } = req.body;
 
     if (!ip) {
       return res.status(400).json({ error: 'IP-Adresse erforderlich' });
     }
 
-    const printerConfig = { ip, port: parseInt(port) || 9100 };
+    const printerConfig = { ip, port: parseInt(port) || 9100, protocol: protocol || 'raw' };
 
     // Try to print a test receipt
     await printToNetworkPrinter(printerConfig, station || 'test', 0, 0, [
@@ -1758,15 +1758,17 @@ function getClientIp(req: any): string {
 }
 
 // Get printer configuration (from database first, fallback to env vars)
-async function getPrinterConfig(): Promise<{ [key: string]: { ip: string; port: number } | null }> {
+async function getPrinterConfig(): Promise<{ [key: string]: { ip: string; port: number; protocol: string } | null }> {
   const barIp = await getSetting('printer_bar_ip') || process.env.PRINTER_BAR_IP;
   const barPort = await getSetting('printer_bar_port') || process.env.PRINTER_BAR_PORT || '9100';
+  const barProtocol = await getSetting('printer_bar_protocol') || process.env.PRINTER_BAR_PROTOCOL || 'raw';
   const kitchenIp = await getSetting('printer_kitchen_ip') || process.env.PRINTER_KITCHEN_IP;
   const kitchenPort = await getSetting('printer_kitchen_port') || process.env.PRINTER_KITCHEN_PORT || '9100';
+  const kitchenProtocol = await getSetting('printer_kitchen_protocol') || process.env.PRINTER_KITCHEN_PROTOCOL || 'raw';
 
   return {
-    bar: barIp ? { ip: barIp, port: parseInt(barPort) } : null,
-    kitchen: kitchenIp ? { ip: kitchenIp, port: parseInt(kitchenPort) } : null
+    bar: barIp ? { ip: barIp, port: parseInt(barPort), protocol: barProtocol } : null,
+    kitchen: kitchenIp ? { ip: kitchenIp, port: parseInt(kitchenPort), protocol: kitchenProtocol } : null
   };
 }
 
@@ -1774,8 +1776,94 @@ async function getPrinterConfig(): Promise<{ [key: string]: { ip: string; port: 
 import escpos from 'escpos';
 import Network from 'escpos-network';
 
-// Print to a specific network printer
-async function printToNetworkPrinter(
+// XML-Sonderzeichen escapen fuer ePOS-Print
+function escapeXml(str: string): string {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Print via Epson ePOS-Print (HTTPS/XML) - fuer TM-m30III und neuere Modelle
+async function printViaEpos(
+  ip: string,
+  station: string,
+  orderId: number,
+  tableNumber: number,
+  items: any[]
+): Promise<void> {
+  const https = require('https');
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString('de-CH');
+
+  let itemsXml = '';
+  items.forEach((item: any) => {
+    itemsXml += `<text bold="true">${escapeXml(item.quantity + 'x ' + item.item_name)}&#10;</text>`;
+    if (item.notes) {
+      itemsXml += `<text bold="false">   -&gt; ${escapeXml(item.notes)}&#10;</text>`;
+    }
+  });
+
+  const eposXml = `<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+      <text align="center" font="font_a" bold="true" width="2" height="2"/>
+      <text>TISCH ${tableNumber}&#10;</text>
+      <text width="1" height="1"/>
+      <text>&#10;</text>
+      <text align="left" bold="false"/>
+      <text>Bestellung: #${orderId}&#10;</text>
+      <text>Zeit: ${escapeXml(dateStr)} ${escapeXml(timeStr)}&#10;</text>
+      <text>Station: ${escapeXml(station.toUpperCase())}&#10;</text>
+      <text>--------------------------------&#10;</text>
+      ${itemsXml}
+      <text bold="false">--------------------------------&#10;</text>
+      <text>&#10;</text>
+      <text align="center" bold="true" width="2" height="2"/>
+      <text>TISCH ${tableNumber}&#10;</text>
+      <text width="1" height="1"/>
+      <feed line="3"/>
+      <cut type="feed"/>
+    </epos-print>
+  </s:Body>
+</s:Envelope>`;
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: ip,
+      port: 443,
+      path: '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000',
+      method: 'POST',
+      rejectUnauthorized: false,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'Content-Length': Buffer.byteLength(eposXml),
+        'SOAPAction': '""'
+      }
+    };
+
+    const req = https.request(options, (res: any) => {
+      let data = '';
+      res.on('data', (chunk: any) => data += chunk);
+      res.on('end', () => {
+        if (data.includes('success="true"')) {
+          console.log(`Printed to ${station} printer via ePOS (${ip})`);
+          resolve();
+        } else {
+          const codeMatch = data.match(/code="([^"]+)"/);
+          reject(new Error(`ePOS print failed: ${codeMatch ? codeMatch[1] : 'unknown error'}`));
+        }
+      });
+    });
+
+    req.on('error', (e: any) => reject(e));
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('ePOS print timeout')); });
+    req.write(eposXml);
+    req.end();
+  });
+}
+
+// Print via Raw TCP (ESC/POS) - fuer TM-T20III und aeltere Modelle
+async function printViaRawTcp(
   printerConfig: { ip: string; port: number },
   station: string,
   orderId: number,
@@ -1814,7 +1902,6 @@ async function printToNetworkPrinter(
           .text('--------------------------------')
           .style('b');
 
-        // Print each item
         items.forEach((item: any) => {
           printer.text(`${item.quantity}x ${item.item_name}`);
           if (item.notes) {
@@ -1842,6 +1929,20 @@ async function printToNetworkPrinter(
       }
     });
   });
+}
+
+// Print to a specific network printer (dispatches to ePOS or Raw TCP)
+async function printToNetworkPrinter(
+  printerConfig: { ip: string; port: number; protocol?: string },
+  station: string,
+  orderId: number,
+  tableNumber: number,
+  items: any[]
+): Promise<void> {
+  if (printerConfig.protocol === 'epos') {
+    return printViaEpos(printerConfig.ip, station, orderId, tableNumber, items);
+  }
+  return printViaRawTcp(printerConfig, station, orderId, tableNumber, items);
 }
 
 // Printer function (ESC/POS)

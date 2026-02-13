@@ -2324,8 +2324,10 @@ function SettingsView({ token }: { token: string | null }) {
   const [settings, setSettings] = useState({
     printer_bar_ip: '',
     printer_bar_port: '9100',
+    printer_bar_protocol: 'raw',
     printer_kitchen_ip: '',
     printer_kitchen_port: '9100',
+    printer_kitchen_protocol: 'raw',
     twint_qr_url: '',
   });
   const [loading, setLoading] = useState(true);
@@ -2384,6 +2386,7 @@ function SettingsView({ token }: { token: string | null }) {
   const testPrinter = async (station: 'bar' | 'kitchen') => {
     const ip = station === 'bar' ? settings.printer_bar_ip : settings.printer_kitchen_ip;
     const port = station === 'bar' ? settings.printer_bar_port : settings.printer_kitchen_port;
+    const protocol = station === 'bar' ? settings.printer_bar_protocol : settings.printer_kitchen_protocol;
 
     if (!ip) {
       alert('Bitte IP-Adresse eingeben');
@@ -2398,7 +2401,7 @@ function SettingsView({ token }: { token: string | null }) {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ station, ip, port }),
+        body: JSON.stringify({ station, ip, port, protocol }),
       });
 
       const result = await res.json();
@@ -2432,7 +2435,7 @@ function SettingsView({ token }: { token: string | null }) {
         {/* Printer Settings */}
         <div className="mb-8">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            🖨️ Bondrucker (Epson TM-T20III)
+            🖨️ Bondrucker
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2440,6 +2443,17 @@ function SettingsView({ token }: { token: string | null }) {
             <div className="border rounded-lg p-4">
               <h4 className="font-semibold mb-3">Bar / Getränke</h4>
               <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Protokoll</label>
+                  <select
+                    value={settings.printer_bar_protocol}
+                    onChange={(e) => setSettings({ ...settings, printer_bar_protocol: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="raw">Raw TCP (TM-T20III)</option>
+                    <option value="epos">ePOS-Print (TM-m30III)</option>
+                  </select>
+                </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">IP-Adresse</label>
                   <input
@@ -2475,6 +2489,17 @@ function SettingsView({ token }: { token: string | null }) {
               <h4 className="font-semibold mb-3">Küche / Essen</h4>
               <div className="space-y-3">
                 <div>
+                  <label className="block text-sm text-gray-600 mb-1">Protokoll</label>
+                  <select
+                    value={settings.printer_kitchen_protocol}
+                    onChange={(e) => setSettings({ ...settings, printer_kitchen_protocol: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="raw">Raw TCP (TM-T20III)</option>
+                    <option value="epos">ePOS-Print (TM-m30III)</option>
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm text-gray-600 mb-1">IP-Adresse</label>
                   <input
                     type="text"
@@ -2506,7 +2531,7 @@ function SettingsView({ token }: { token: string | null }) {
           </div>
 
           <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-            <p><strong>Hinweis:</strong> Die Epson TM-T20III Drucker müssen im selben Netzwerk sein und auf Port 9100 (Standard) erreichbar sein.</p>
+            <p><strong>Hinweis:</strong> Raw TCP (Port 9100) fuer TM-T20III, ePOS-Print (HTTPS) fuer TM-m30III und neuere Modelle.</p>
           </div>
         </div>
 
