@@ -1777,6 +1777,11 @@ async function getPrinterConfig(): Promise<{ [key: string]: { ip: string; port: 
 import escpos from 'escpos';
 import Network from 'escpos-network';
 
+// Tischnummer als lesbaren Text (0 = Bar)
+function tableLabel(tableNumber: number): string {
+  return tableNumber === 0 ? 'BAR' : `TISCH ${tableNumber}`;
+}
+
 // XML-Sonderzeichen escapen fuer ePOS-Print
 function escapeXml(str: string): string {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1807,7 +1812,7 @@ async function printViaEpos(
   <s:Body>
     <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
       <text align="center" font="font_a" em="true" width="3" height="3"/>
-      <text>TISCH ${tableNumber}&#10;</text>
+      <text>${escapeXml(tableLabel(tableNumber))}&#10;</text>
       <text width="1" height="1" em="false"/>
       <text>&#10;</text>
       <text align="left" width="1" height="2"/>
@@ -1820,7 +1825,7 @@ async function printViaEpos(
       <text>================================&#10;</text>
       <text>&#10;</text>
       <text align="center" em="true" width="3" height="3"/>
-      <text>TISCH ${tableNumber}&#10;</text>
+      <text>${escapeXml(tableLabel(tableNumber))}&#10;</text>
       <text width="1" height="1"/>
       <feed line="3"/>
       <cut type="feed"/>
@@ -1892,7 +1897,7 @@ async function printViaRawTcp(
           .align('ct')
           .style('b')
           .size(2, 2)
-          .text(`TISCH ${tableNumber}`)
+          .text(tableLabel(tableNumber))
           .size(1, 1)
           .text('')
           .align('lt')
@@ -1915,7 +1920,7 @@ async function printViaRawTcp(
           .text('')
           .align('ct')
           .size(2, 2)
-          .text(`TISCH ${tableNumber}`)
+          .text(tableLabel(tableNumber))
           .size(1, 1)
           .text('')
           .cut()
