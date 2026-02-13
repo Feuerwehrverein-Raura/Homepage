@@ -1796,9 +1796,9 @@ async function printViaEpos(
 
   let itemsXml = '';
   items.forEach((item: any) => {
-    itemsXml += `<text bold="true">${escapeXml(item.quantity + 'x ' + item.item_name)}&#10;</text>`;
+    itemsXml += `<text em="true">${escapeXml(item.quantity + 'x ' + item.item_name)}&#10;</text>`;
     if (item.notes) {
-      itemsXml += `<text bold="false">   -&gt; ${escapeXml(item.notes)}&#10;</text>`;
+      itemsXml += `<text em="false">   -&gt; ${escapeXml(item.notes)}&#10;</text>`;
     }
   });
 
@@ -1806,19 +1806,19 @@ async function printViaEpos(
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
     <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
-      <text align="center" font="font_a" bold="true" width="2" height="2"/>
+      <text align="center" font="font_a" em="true" width="2" height="2"/>
       <text>TISCH ${tableNumber}&#10;</text>
       <text width="1" height="1"/>
       <text>&#10;</text>
-      <text align="left" bold="false"/>
+      <text align="left" em="false"/>
       <text>Bestellung: #${orderId}&#10;</text>
       <text>Zeit: ${escapeXml(dateStr)} ${escapeXml(timeStr)}&#10;</text>
       <text>Station: ${escapeXml(station.toUpperCase())}&#10;</text>
       <text>--------------------------------&#10;</text>
       ${itemsXml}
-      <text bold="false">--------------------------------&#10;</text>
+      <text em="false">--------------------------------&#10;</text>
       <text>&#10;</text>
-      <text align="center" bold="true" width="2" height="2"/>
+      <text align="center" em="true" width="2" height="2"/>
       <text>TISCH ${tableNumber}&#10;</text>
       <text width="1" height="1"/>
       <feed line="3"/>
