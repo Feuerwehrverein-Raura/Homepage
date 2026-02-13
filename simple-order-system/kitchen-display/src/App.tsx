@@ -312,12 +312,16 @@ function App() {
     fetchOrders();
     connectWebSocket();
 
+    // Fallback-Polling: alle 30s Orders neu laden falls WebSocket ausfaellt
+    const pollInterval = setInterval(fetchOrders, 30000);
+
     // Check existing notification permission
     if ('Notification' in window && Notification.permission === 'granted') {
       setNotificationsEnabled(true);
     }
 
     return () => {
+      clearInterval(pollInterval);
       if (wsRef.current) {
         wsRef.current.close();
       }
@@ -346,6 +350,7 @@ function App() {
     ws.onopen = () => {
       console.log('WebSocket connected');
       setWsConnected(true);
+      fetchOrders();
     };
 
     ws.onmessage = (event) => {
