@@ -1995,12 +1995,28 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
 
             const shifts = eventData.shifts || [];
 
-            // Header
-            doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
-            doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
-            doc.moveDown(0.3);
-            doc.fontSize(16).font('Helvetica-Bold').text(eventData.title || 'Event', { align: 'center' });
-            doc.moveDown(1);
+            // Header mit Logo links und Titel rechts
+            const headerY = doc.y;
+            const logoSize = 60;
+            const textStartX = doc.page.margins.left + logoSize + 15;
+            const textWidth = doc.page.width - textStartX - doc.page.margins.right;
+
+            if (logoBase64) {
+                try {
+                    const logoBuffer = Buffer.from(logoBase64, 'base64');
+                    doc.image(logoBuffer, doc.page.margins.left, headerY, { width: logoSize, height: logoSize });
+                } catch (logoErr) {
+                    console.error('Logo embedding failed:', logoErr.message);
+                }
+            }
+
+            doc.fontSize(14).font('Helvetica-Bold').fillColor('#cc0000')
+                .text('Feuerwehrverein Raura, Kaiseraugst', textStartX, headerY, { width: textWidth });
+            doc.fontSize(16).font('Helvetica-Bold').fillColor('#000000')
+                .text(`Arbeitsplan ${eventData.title || 'Event'}`, textStartX, headerY + 20, { width: textWidth, underline: true });
+
+            doc.y = headerY + logoSize + 10;
+            doc.moveDown(0.5);
 
             // Get all unique Bereiche for table headers
             const allBereiche = [...new Set(shifts.map(s => s.bereich || 'Allgemein'))].sort();
@@ -2058,34 +2074,107 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
                     };
                 });
 
-                // Render as simple list (table is complex in PDFKit)
-                Object.entries(byTimeSlot).sort((a, b) => a[0].localeCompare(b[0])).forEach(([timeKey, slot]) => {
-                    const timeDisplay = slot.startTime && slot.endTime
-                        ? `${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}`
-                        : timeKey;
+                // DEUTSCH: Tabelle mit Bereichen als Spalten zeichnen
+                const sortedSlots = Object.entries(byTimeSlot).sort((a, b) => a[0].localeCompare(b[0]));
 
-                    doc.fontSize(10).font('Helvetica-Bold').text(`  ${timeDisplay}`);
+                // Bereiche nur fuer diesen Tag (als Spalten)
+                const dayBereiche = [...new Set(shiftsByDate[date].map(s => s.bereich || 'Allgemein'))].sort();
 
-                    allBereiche.forEach(bereich => {
-                        const data = slot.bereiche[bereich];
-                        if (data) {
-                            const helperList = data.helpers.length > 0
-                                ? data.helpers.join(', ')
-                                : '(noch offen)';
-                            const countStr = `${data.helpers.length}/${data.needed}`;
+                const tableLeft = doc.page.margins.left;
+                const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+                const timeColWidth = 80;
+                const bereichColWidth = (tableWidth - timeColWidth) / dayBereiche.length;
+                const cellPadding = 4;
+                const fontSize = 8;
+                const headerFontSize = 9;
 
-                            doc.fontSize(9).font('Helvetica')
-                                .text(`      ${bereich} [${countStr}]: ${helperList}`);
-                        } else {
-                            // No shift exists for this time/bereich - show as blocked
-                            doc.fontSize(9).font('Helvetica').fillColor('#666666')
-                                .text(`      ${bereich}: ▬▬▬`)
-                                .fillColor('#000000');
-                        }
-                    });
-                    doc.moveDown(0.3);
+                // Tabellenheader zeichnen
+                let tableY = doc.y;
+                const headerHeight = 20;
+
+                // Pruefen ob genug Platz auf der Seite
+                if (tableY + headerHeight + 40 > doc.page.height - doc.page.margins.bottom) {
+                    doc.addPage();
+                    tableY = doc.page.margins.top;
+                }
+
+                // Header-Hintergrund
+                doc.rect(tableLeft, tableY, tableWidth, headerHeight).lineWidth(0.5).stroke();
+                doc.rect(tableLeft, tableY, timeColWidth, headerHeight).lineWidth(0.5).stroke();
+
+                doc.fontSize(headerFontSize).font('Helvetica-Bold');
+                doc.text('Zeit', tableLeft + cellPadding, tableY + cellPadding, { width: timeColWidth - 2 * cellPadding });
+
+                dayBereiche.forEach((bereich, i) => {
+                    const colX = tableLeft + timeColWidth + i * bereichColWidth;
+                    doc.rect(colX, tableY, bereichColWidth, headerHeight).lineWidth(0.5).stroke();
+                    doc.fontSize(headerFontSize).font('Helvetica-Bold');
+                    doc.text(bereich, colX + cellPadding, tableY + cellPadding, { width: bereichColWidth - 2 * cellPadding });
                 });
 
+                tableY += headerHeight;
+
+                // Datenzeilen
+                sortedSlots.forEach(([timeKey, slot]) => {
+                    const timeDisplay = slot.startTime && slot.endTime
+                        ? `${slot.startTime.substring(0, 5)}-${slot.endTime.substring(0, 5)}`
+                        : timeKey;
+
+                    // Zeilenhoehe berechnen (basierend auf max. Helfer pro Bereich)
+                    let maxLines = 1;
+                    dayBereiche.forEach(bereich => {
+                        const data = slot.bereiche[bereich];
+                        if (data) {
+                            const lines = Math.max(data.helpers.length, data.needed);
+                            maxLines = Math.max(maxLines, lines);
+                        }
+                    });
+                    const rowHeight = Math.max(18, maxLines * 12 + 2 * cellPadding);
+
+                    // Seitenumbruch pruefen
+                    if (tableY + rowHeight > doc.page.height - doc.page.margins.bottom) {
+                        doc.addPage();
+                        tableY = doc.page.margins.top;
+                    }
+
+                    // Zeitzelle
+                    doc.rect(tableLeft, tableY, timeColWidth, rowHeight).lineWidth(0.5).stroke();
+                    doc.fontSize(fontSize).font('Helvetica-Bold');
+                    doc.text(timeDisplay, tableLeft + cellPadding, tableY + cellPadding, { width: timeColWidth - 2 * cellPadding });
+
+                    // Bereichszellen
+                    dayBereiche.forEach((bereich, i) => {
+                        const colX = tableLeft + timeColWidth + i * bereichColWidth;
+                        doc.rect(colX, tableY, bereichColWidth, rowHeight).lineWidth(0.5).stroke();
+
+                        const data = slot.bereiche[bereich];
+                        doc.fontSize(fontSize).font('Helvetica');
+                        let textY = tableY + cellPadding;
+
+                        if (data) {
+                            if (data.helpers.length > 0) {
+                                data.helpers.forEach(name => {
+                                    doc.text(`- ${name}`, colX + cellPadding, textY, { width: bereichColWidth - 2 * cellPadding });
+                                    textY += 12;
+                                });
+                                // Leere Plaetze als Strich
+                                for (let j = data.helpers.length; j < data.needed; j++) {
+                                    doc.text('-', colX + cellPadding, textY, { width: bereichColWidth - 2 * cellPadding });
+                                    textY += 12;
+                                }
+                            } else {
+                                for (let j = 0; j < data.needed; j++) {
+                                    doc.text('-', colX + cellPadding, textY, { width: bereichColWidth - 2 * cellPadding });
+                                    textY += 12;
+                                }
+                            }
+                        }
+                    });
+
+                    tableY += rowHeight;
+                });
+
+                doc.y = tableY;
                 doc.moveDown(0.5);
             });
 
