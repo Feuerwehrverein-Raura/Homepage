@@ -8,6 +8,7 @@ import PaymentService from './payments.js';
 import SumUpTerminal from './terminal.js';
 import fs from 'fs';
 import path from 'path';
+import https from 'https';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp } from './auth.js';
 
 // Nextcloud configuration
@@ -1789,7 +1790,6 @@ async function printViaEpos(
   tableNumber: number,
   items: any[]
 ): Promise<void> {
-  const https = require('https');
   const now = new Date();
   const timeStr = now.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString('de-CH');
