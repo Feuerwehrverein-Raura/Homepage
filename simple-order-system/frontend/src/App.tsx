@@ -1455,8 +1455,7 @@ function App() {
                   disabled={loading}
                   className="w-full bg-black hover:bg-gray-800 active:bg-gray-900 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 touch-manipulation disabled:bg-gray-400"
                 >
-                  <img src="https://www.twint.ch/content/uploads/2021/05/twint-logo-quer-weiss.png" alt="TWINT" className="h-6" />
-                  TWINT
+                  <img src="/twint-logo.png" alt="TWINT" className="h-8" />
                 </button>
               )}
             </div>

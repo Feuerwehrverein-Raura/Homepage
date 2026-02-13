@@ -1327,8 +1327,34 @@
 
             container.innerHTML = accounts.map((sa, index) => {
                 const updatedDate = new Date(sa.updatedAt).toLocaleDateString('de-CH');
-                const nextRotationDate = new Date(sa.nextRotation).toLocaleDateString('de-CH');
                 const saId = 'sa-' + index;
+                const hasRotation = sa.rotationDays > 0;
+                const hasUsername = sa.username && sa.username.trim() !== '';
+
+                // DEUTSCH: Kontextabhaengige Login-URLs und Verwendungshinweise
+                let loginUrls = '';
+                let usageDetails = '';
+                if (sa.accountName === 'roterschopf') {
+                    loginUrls = `<a href="https://kitchen.fwv-raura.ch" target="_blank" class="text-sm text-fire-600 hover:text-fire-800">kitchen.fwv-raura.ch</a>`;
+                    usageDetails = `
+                        <p>\u2022 <strong>Kitchen Display Web:</strong> <a href="https://kitchen.fwv-raura.ch" target="_blank" class="text-fire-600 hover:underline">kitchen.fwv-raura.ch</a> \u2192 Login mit Benutzer &amp; Passwort</p>
+                    `;
+                } else if (sa.accountName === 'order-system') {
+                    loginUrls = `<a href="https://order.fwv-raura.ch" target="_blank" class="text-sm text-fire-600 hover:text-fire-800">order.fwv-raura.ch</a>`;
+                    usageDetails = `
+                        <p>\u2022 <strong>Kassensystem:</strong> <a href="https://order.fwv-raura.ch" target="_blank" class="text-fire-600 hover:underline">order.fwv-raura.ch</a> \u2192 Login mit Passwort</p>
+                        <p>\u2022 <strong>KDS Android App:</strong> Gleicher Login in der App</p>
+                    `;
+                } else {
+                    loginUrls = `<span class="text-sm text-gray-500">-</span>`;
+                }
+
+                const rotationInfo = hasRotation
+                    ? (() => {
+                        const nextRotationDate = new Date(sa.nextRotation).toLocaleDateString('de-CH');
+                        return `<p class="text-xs text-gray-400 mt-1">Letzte Rotation: ${updatedDate} \u00b7 N\u00e4chste: ${nextRotationDate} (alle ${sa.rotationDays} Tage)</p>`;
+                    })()
+                    : '';
 
                 return `
                     <div class="border border-red-100 bg-red-50 rounded-lg p-4">
@@ -1338,6 +1364,7 @@
                         </div>
                         ${sa.description ? `<p class="text-sm text-gray-600 mb-3">${sa.description}</p>` : ''}
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            ${hasUsername ? `
                             <div>
                                 <span class="text-sm text-gray-600">Benutzer:</span>
                                 <div class="flex items-center">
@@ -1347,11 +1374,10 @@
                                     </button>
                                 </div>
                             </div>
+                            ` : ''}
                             <div>
                                 <span class="text-sm text-gray-600">Login-Seite:</span>
-                                <div>
-                                    <a href="https://order.fwv-raura.ch" target="_blank" class="text-sm text-fire-600 hover:text-fire-800">order.fwv-raura.ch</a>
-                                </div>
+                                <div>${loginUrls}</div>
                             </div>
                         </div>
 
@@ -1366,19 +1392,19 @@
                                     <button onclick="copyToClipboard('${sa.password}')" class="text-sm text-gray-500 hover:text-gray-700">Kopieren</button>
                                 </div>
                             </div>
-                            <p class="text-xs text-gray-400 mt-1">Letzte Rotation: ${updatedDate} \u00b7 N\u00e4chste: ${nextRotationDate} (alle ${sa.rotationDays} Tage)</p>
+                            ${rotationInfo}
                         </div>
 
+                        ${usageDetails ? `
                         <div class="mt-3 pt-3 border-t border-red-200">
                             <details class="text-sm text-gray-500">
                                 <summary class="cursor-pointer hover:text-gray-700">Verwendung</summary>
                                 <div class="mt-2 space-y-1 pl-4">
-                                    <p>\u2022 <strong>Kassensystem:</strong> <a href="https://order.fwv-raura.ch" target="_blank" class="text-fire-600 hover:underline">order.fwv-raura.ch</a> \u2192 Login mit Benutzer &amp; Passwort</p>
-                                    <p>\u2022 <strong>Kitchen Display:</strong> <a href="https://order.fwv-raura.ch/kitchen" target="_blank" class="text-fire-600 hover:underline">order.fwv-raura.ch/kitchen</a> \u2192 Login mit Benutzer &amp; Passwort</p>
-                                    <p>\u2022 <strong>Bestell-App:</strong> Gleicher Login in der mobilen App</p>
+                                    ${usageDetails}
                                 </div>
                             </details>
                         </div>
+                        ` : ''}
                     </div>
                 `;
             }).join('');

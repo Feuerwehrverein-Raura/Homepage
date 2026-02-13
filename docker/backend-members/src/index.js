@@ -4364,39 +4364,72 @@ async function rotateServiceAccountPasswords() {
                 await pool.query(
                     `INSERT INTO service_account_credentials (account_name, username, display_name, encrypted_password, description, rotation_days)
                      VALUES ($1, $2, $3, $4, $5, $6)`,
-                    ['roterschopf', 'roterschopf', 'Roter Schopf (Kasse/KDS)',
+                    ['roterschopf', 'roterschopf', 'Roter Schopf (Authentik)',
                      encryptPassword(initialPassword),
-                     'Generischer Login fuer Kassensystem, Kitchen Display und Bestell-App',
+                     'Login fuer Kitchen Display Web (kitchen.fwv-raura.ch). Wird alle 7 Tage automatisch rotiert.',
                      7]
                 );
                 console.log('Service account roterschopf initialized with new password');
             } else {
                 console.warn('Authentik user roterschopf not found - skipping initialization');
             }
-            return;
+        } else {
+            // DEUTSCH: Pruefen ob Rotation faellig ist
+            const sa = existing.rows[0];
+            const daysSinceUpdate = (Date.now() - new Date(sa.updated_at).getTime()) / (1000 * 60 * 60 * 24);
+
+            if (daysSinceUpdate >= sa.rotation_days) {
+                console.log(`Rotating password for roterschopf (${Math.floor(daysSinceUpdate)} days since last rotation)...`);
+                const newPassword = generateSecurePassword();
+                const authentikUser = await getAuthentikUserByUsername('roterschopf');
+
+                if (authentikUser) {
+                    await setAuthentikUserPassword(authentikUser.pk, newPassword);
+                    await pool.query(
+                        'UPDATE service_account_credentials SET encrypted_password = $1, updated_at = NOW() WHERE account_name = $2',
+                        [encryptPassword(newPassword), 'roterschopf']
+                    );
+                    console.log('Service account roterschopf password rotated successfully');
+                } else {
+                    console.warn('Authentik user roterschopf not found - skipping rotation');
+                }
+            } else {
+                console.log(`Service account roterschopf: ${Math.floor(sa.rotation_days - daysSinceUpdate)} days until next rotation`);
+            }
         }
 
-        // DEUTSCH: Pruefen ob Rotation faellig ist
-        const sa = existing.rows[0];
-        const daysSinceUpdate = (Date.now() - new Date(sa.updated_at).getTime()) / (1000 * 60 * 60 * 24);
+        // DEUTSCH: Kassensystem/KDS-Passwort (ADMIN_PASSWORD) als Service-Account speichern
+        const orderPassword = process.env.ADMIN_PASSWORD;
+        if (orderPassword) {
+            const orderExisting = await pool.query(
+                'SELECT id, encrypted_password FROM service_account_credentials WHERE account_name = $1',
+                ['order-system']
+            );
 
-        if (daysSinceUpdate >= sa.rotation_days) {
-            console.log(`Rotating password for roterschopf (${Math.floor(daysSinceUpdate)} days since last rotation)...`);
-            const newPassword = generateSecurePassword();
-            const authentikUser = await getAuthentikUserByUsername('roterschopf');
+            const encOrderPw = encryptPassword(orderPassword);
 
-            if (authentikUser) {
-                await setAuthentikUserPassword(authentikUser.pk, newPassword);
+            if (orderExisting.rows.length === 0) {
+                console.log('Creating service account entry for order-system...');
                 await pool.query(
-                    'UPDATE service_account_credentials SET encrypted_password = $1, updated_at = NOW() WHERE account_name = $2',
-                    [encryptPassword(newPassword), 'roterschopf']
+                    `INSERT INTO service_account_credentials (account_name, username, display_name, encrypted_password, description, rotation_days)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    ['order-system', '', 'Kassensystem / KDS App',
+                     encOrderPw,
+                     'Passwort fuer Kasse (order.fwv-raura.ch) und KDS Android App. Kein Benutzername noetig.',
+                     0]
                 );
-                console.log('Service account roterschopf password rotated successfully');
+                console.log('Service account order-system created');
             } else {
-                console.warn('Authentik user roterschopf not found - skipping rotation');
+                // DEUTSCH: Passwort aktualisieren falls es sich geaendert hat
+                const storedPw = decryptPassword(orderExisting.rows[0].encrypted_password);
+                if (storedPw !== orderPassword) {
+                    console.log('Order system password changed, updating DB...');
+                    await pool.query(
+                        'UPDATE service_account_credentials SET encrypted_password = $1, updated_at = NOW() WHERE account_name = $2',
+                        [encOrderPw, 'order-system']
+                    );
+                }
             }
-        } else {
-            console.log(`Service account roterschopf: ${Math.floor(sa.rotation_days - daysSinceUpdate)} days until next rotation`);
         }
     } catch (error) {
         console.error('Service account password rotation error:', error.message);
