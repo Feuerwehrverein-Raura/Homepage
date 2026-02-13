@@ -2080,39 +2080,38 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
                 // Bereiche nur fuer diesen Tag (als Spalten)
                 const dayBereiche = [...new Set(shiftsByDate[date].map(s => s.bereich || 'Allgemein'))].sort();
 
+                // DEUTSCH: Tabelle mit Bereichen als Spalten zeichnen
                 const tableLeft = doc.page.margins.left;
                 const tableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
                 const timeColWidth = 80;
                 const bereichColWidth = (tableWidth - timeColWidth) / dayBereiche.length;
-                const cellPadding = 4;
-                const fontSize = 8;
-                const headerFontSize = 9;
+                const cellPad = 5;
+                const lineH = 14;
+                const tableFontSize = 9;
 
-                // Tabellenheader zeichnen
                 let tableY = doc.y;
-                const headerHeight = 20;
 
-                // Pruefen ob genug Platz auf der Seite
-                if (tableY + headerHeight + 40 > doc.page.height - doc.page.margins.bottom) {
+                // Seitenumbruch pruefen
+                if (tableY + 60 > doc.page.height - doc.page.margins.bottom) {
                     doc.addPage();
                     tableY = doc.page.margins.top;
                 }
 
-                // Header-Hintergrund
-                doc.rect(tableLeft, tableY, tableWidth, headerHeight).lineWidth(0.5).stroke();
-                doc.rect(tableLeft, tableY, timeColWidth, headerHeight).lineWidth(0.5).stroke();
-
-                doc.fontSize(headerFontSize).font('Helvetica-Bold');
-                doc.text('Zeit', tableLeft + cellPadding, tableY + cellPadding, { width: timeColWidth - 2 * cellPadding });
+                // Header-Zeile
+                const headerH = 22;
+                doc.save();
+                doc.rect(tableLeft, tableY, timeColWidth, headerH).lineWidth(0.5).stroke();
+                doc.fontSize(tableFontSize).font('Helvetica-Bold')
+                    .text('Zeit', tableLeft + cellPad, tableY + 5, { width: timeColWidth - 2 * cellPad, lineBreak: false });
 
                 dayBereiche.forEach((bereich, i) => {
                     const colX = tableLeft + timeColWidth + i * bereichColWidth;
-                    doc.rect(colX, tableY, bereichColWidth, headerHeight).lineWidth(0.5).stroke();
-                    doc.fontSize(headerFontSize).font('Helvetica-Bold');
-                    doc.text(bereich, colX + cellPadding, tableY + cellPadding, { width: bereichColWidth - 2 * cellPadding });
+                    doc.rect(colX, tableY, bereichColWidth, headerH).lineWidth(0.5).stroke();
+                    doc.fontSize(tableFontSize).font('Helvetica-Bold')
+                        .text(bereich, colX + cellPad, tableY + 5, { width: bereichColWidth - 2 * cellPad, lineBreak: false });
                 });
-
-                tableY += headerHeight;
+                doc.restore();
+                tableY += headerH;
 
                 // Datenzeilen
                 sortedSlots.forEach(([timeKey, slot]) => {
@@ -2120,62 +2119,69 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
                         ? `${slot.startTime.substring(0, 5)}-${slot.endTime.substring(0, 5)}`
                         : timeKey;
 
-                    // Zeilenhoehe berechnen (basierend auf max. Helfer pro Bereich)
-                    let maxLines = 1;
+                    // Zellhöhe mit Textumbruch berechnen
+                    doc.fontSize(tableFontSize).font('Helvetica');
+                    const colTextWidth = bereichColWidth - 2 * cellPad;
+                    let maxCellHeight = lineH;
                     dayBereiche.forEach(bereich => {
                         const data = slot.bereiche[bereich];
                         if (data) {
-                            const lines = Math.max(data.helpers.length, data.needed);
-                            maxLines = Math.max(maxLines, lines);
+                            let cellHeight = 0;
+                            const names = data.helpers.length > 0 ? data.helpers : [];
+                            names.forEach(name => {
+                                cellHeight += doc.heightOfString(`- ${name}`, { width: colTextWidth });
+                            });
+                            for (let j = names.length; j < data.needed; j++) {
+                                cellHeight += lineH;
+                            }
+                            maxCellHeight = Math.max(maxCellHeight, cellHeight);
                         }
                     });
-                    const rowHeight = Math.max(18, maxLines * 12 + 2 * cellPadding);
+                    const rowH = Math.max(22, maxCellHeight + 2 * cellPad);
 
-                    // Seitenumbruch pruefen
-                    if (tableY + rowHeight > doc.page.height - doc.page.margins.bottom) {
+                    // Seitenumbruch
+                    if (tableY + rowH > doc.page.height - doc.page.margins.bottom) {
                         doc.addPage();
                         tableY = doc.page.margins.top;
                     }
 
                     // Zeitzelle
-                    doc.rect(tableLeft, tableY, timeColWidth, rowHeight).lineWidth(0.5).stroke();
-                    doc.fontSize(fontSize).font('Helvetica-Bold');
-                    doc.text(timeDisplay, tableLeft + cellPadding, tableY + cellPadding, { width: timeColWidth - 2 * cellPadding });
+                    doc.save();
+                    doc.rect(tableLeft, tableY, timeColWidth, rowH).lineWidth(0.5).stroke();
+                    doc.fontSize(tableFontSize).font('Helvetica-Bold')
+                        .text(timeDisplay, tableLeft + cellPad, tableY + cellPad, { width: timeColWidth - 2 * cellPad, lineBreak: false });
+                    doc.restore();
 
                     // Bereichszellen
                     dayBereiche.forEach((bereich, i) => {
                         const colX = tableLeft + timeColWidth + i * bereichColWidth;
-                        doc.rect(colX, tableY, bereichColWidth, rowHeight).lineWidth(0.5).stroke();
+                        doc.rect(colX, tableY, bereichColWidth, rowH).lineWidth(0.5).stroke();
 
                         const data = slot.bereiche[bereich];
-                        doc.fontSize(fontSize).font('Helvetica');
-                        let textY = tableY + cellPadding;
+                        if (!data) return;
 
-                        if (data) {
-                            if (data.helpers.length > 0) {
-                                data.helpers.forEach(name => {
-                                    doc.text(`- ${name}`, colX + cellPadding, textY, { width: bereichColWidth - 2 * cellPadding });
-                                    textY += 12;
-                                });
-                                // Leere Plaetze als Strich
-                                for (let j = data.helpers.length; j < data.needed; j++) {
-                                    doc.text('-', colX + cellPadding, textY, { width: bereichColWidth - 2 * cellPadding });
-                                    textY += 12;
-                                }
-                            } else {
-                                for (let j = 0; j < data.needed; j++) {
-                                    doc.text('-', colX + cellPadding, textY, { width: bereichColWidth - 2 * cellPadding });
-                                    textY += 12;
-                                }
-                            }
+                        doc.save();
+                        doc.fontSize(tableFontSize).font('Helvetica');
+                        let curY = tableY + cellPad;
+
+                        const names = data.helpers.length > 0 ? data.helpers : [];
+                        names.forEach(name => {
+                            const textH = doc.heightOfString(`- ${name}`, { width: bereichColWidth - 2 * cellPad });
+                            doc.text(`- ${name}`, colX + cellPad, curY, { width: bereichColWidth - 2 * cellPad });
+                            curY += textH;
+                        });
+                        for (let j = names.length; j < data.needed; j++) {
+                            doc.text('-', colX + cellPad, curY, { width: bereichColWidth - 2 * cellPad });
+                            curY += lineH;
                         }
+                        doc.restore();
                     });
 
-                    tableY += rowHeight;
+                    tableY += rowH;
                 });
 
-                doc.y = tableY;
-                doc.moveDown(0.5);
+                doc.x = doc.page.margins.left;
+                doc.y = tableY + 10;
             });
 
             // Springer section if available
