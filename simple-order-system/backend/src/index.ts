@@ -1807,10 +1807,26 @@ async function printViaEpos(
     }
   });
 
+  // Load kitchen logo for kitchen station
+  let logoXml = '';
+  if (station === 'kitchen') {
+    try {
+      const logoPath = path.join(process.cwd(), 'assets', 'logo-kitchen.png');
+      if (fs.existsSync(logoPath)) {
+        const logoBuffer = fs.readFileSync(logoPath);
+        const logoBase64 = logoBuffer.toString('base64');
+        logoXml = `<image align="center">${logoBase64}</image><text>&#10;</text>`;
+      }
+    } catch (err) {
+      console.error('Failed to load kitchen logo:', err);
+    }
+  }
+
   const eposXml = `<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
     <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+      ${logoXml}
       <text align="center" font="font_a" em="true" width="3" height="3"/>
       <text>${escapeXml(tableLabel(tableNumber))}&#10;</text>
       <text width="1" height="1" em="false"/>
