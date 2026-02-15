@@ -561,6 +561,25 @@ async function autoCancelOldOrders() {
         queueOrderSync(order.id, 'update');
       }
     }
+
+    // Auto-complete old paid orders (paid but not yet completed after 2h)
+    const completedResult = await pool.query(`
+      UPDATE orders
+      SET status = 'completed'
+      WHERE status = 'paid'
+        AND created_at < $1
+      RETURNING id, table_number
+    `, [cutoffTime]);
+
+    if (completedResult.rows.length > 0) {
+      console.log(`Auto-completed ${completedResult.rows.length} paid orders older than ${ORDER_AUTO_CANCEL_HOURS}h:`,
+        completedResult.rows.map((r: any) => `#${r.id}`).join(', '));
+
+      for (const order of completedResult.rows) {
+        broadcast({ type: 'order_completed', order_id: order.id });
+        queueOrderSync(order.id, 'update');
+      }
+    }
   } catch (error) {
     console.error('Auto-cancel error:', error);
   }
@@ -743,6 +762,7 @@ app.get('/api/orders', async (req, res) => {
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE o.status IN ('pending', 'paid', 'completed')
+        AND o.created_at > NOW() - INTERVAL '24 hours'
       GROUP BY o.id
       ORDER BY o.created_at DESC
     `);
