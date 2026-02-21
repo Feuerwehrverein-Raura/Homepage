@@ -702,7 +702,8 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             slug, title, subtitle, description, start_date, end_date,
             location, category, registration_required,
             registration_deadline, max_participants, cost, status, image_url, tags,
-            organizer_name, organizer_email, create_access
+            organizer_name, organizer_email, create_access,
+            meal_options
         } = req.body;
 
         // Event-Zugang generieren falls gewuenscht
@@ -746,14 +747,16 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
                 slug, title, subtitle, description, start_date, end_date,
                 location, category, registration_required,
                 registration_deadline, max_participants, cost, status, image_url, tags,
-                organizer_name, organizer_email, event_email, event_password_hash, event_access_expires
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+                organizer_name, organizer_email, event_email, event_password_hash, event_access_expires,
+                meal_options
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
             RETURNING *
         `, [
             slug, title, subtitle, description, start_date, end_date,
             location, category, registration_required,
             registration_deadline, max_participants, cost, status || 'planned', image_url, tags,
-            organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventAccessExpires
+            organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventAccessExpires,
+            meal_options ? JSON.stringify(meal_options) : null
         ]);
 
         const newEvent = result.rows[0];
@@ -808,7 +811,8 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             'location', 'category', 'registration_required', 'registration_deadline',
             'max_participants', 'cost', 'status', 'image_url', 'tags',
             'organizer_id', 'organizer_name', 'organizer_email',
-            'event_email', 'event_password_hash', 'event_access_expires'
+            'event_email', 'event_password_hash', 'event_access_expires',
+            'meal_options'
         ];
 
         const filteredUpdates = {};
@@ -1328,6 +1332,8 @@ app.post('/registrations/public', async (req, res) => {
             shifts, shiftIds, // für Schicht-Anmeldung
             participants, // für Teilnehmer-Anmeldung
             notes,
+            meal_selection, // DEUTSCH: Gewähltes Menü (für GV-Events)
+            allergies, // DEUTSCH: Allergien/Unverträglichkeiten (für GV-Events)
             skipMemberCheck // Falls der User trotzdem als Gast anmelden möchte
         } = req.body;
 
@@ -1370,8 +1376,17 @@ app.post('/registrations/public', async (req, res) => {
             name,
             email,
             type === 'shift' ? shiftIds : null,
-            JSON.stringify({ phone, participants, shifts, notes })
+            JSON.stringify({ phone, participants, shifts, notes, meal_selection: meal_selection || null, allergies: allergies || null })
         ]);
+
+        // DEUTSCH: Menü-Info für E-Mails aufbereiten
+        let mealInfo = '';
+        if (meal_selection) {
+            mealInfo += `\nMenüwahl: ${meal_selection}`;
+        }
+        if (allergies) {
+            mealInfo += `\nAllergien/Unverträglichkeiten: ${allergies}`;
+        }
 
         // Schicht-Details für E-Mail aus DB laden
         let shiftInfo = '';
@@ -1400,7 +1415,7 @@ Vielen Dank für Ihre Anmeldung${type === 'shift' ? ' als Helfer/in' : ''}!
 
 Event: ${eventTitle}
 ${shiftInfo}
-${participants ? `Anzahl Personen: ${participants}` : ''}
+${participants ? `Anzahl Personen: ${participants}` : ''}${mealInfo}
 ${notes ? `\nBemerkungen: ${notes}` : ''}
 
 Wir werden Ihre Anmeldung bearbeiten und uns bei Ihnen melden.
@@ -1428,13 +1443,18 @@ Name: ${name}
 E-Mail: ${email}
 ${phone ? `Telefon: ${phone}` : ''}
 ${shiftInfo}
-${participants ? `Anzahl Personen: ${participants}` : ''}
+${participants ? `Anzahl Personen: ${participants}` : ''}${mealInfo}
 ${notes ? `\nBemerkungen: ${notes}` : ''}
         `.trim();
 
+        // DEUTSCH: GV-Events: Benachrichtigung immer an vorstand@fwv-raura.ch
+        const notifyEmail = (event.rows[0].category === 'GV')
+            ? 'vorstand@fwv-raura.ch'
+            : (organizerEmail || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
+
         try {
             await axios.post(`${DISPATCH_API}/email/send`, {
-                to: organizerEmail || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch',
+                to: notifyEmail,
                 subject: orgSubject,
                 body: orgBody,
                 event_id: event.rows[0].id

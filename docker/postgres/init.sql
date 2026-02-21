@@ -111,6 +111,7 @@ CREATE TABLE events (
     -- DEUTSCH: Metadaten
     image_url VARCHAR(500),
     tags TEXT[],                                         -- DEUTSCH: Schlagwörter als Array
+    meal_options JSONB,                                  -- DEUTSCH: Menü-Optionen für GV-Events (JSON-Array von Strings)
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );

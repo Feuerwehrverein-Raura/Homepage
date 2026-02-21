@@ -1665,6 +1665,7 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">Kategorie</label>
                             <select id="event-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
                                 <option value="Dorffest">Dorffest</option>
+                                <option value="GV">Generalversammlung</option>
                                 <option value="Aufbau">Aufbau</option>
                                 <option value="Abbau">Abbau</option>
                                 <option value="Ausflug">Ausflug</option>
@@ -1732,6 +1733,18 @@
                             </div>
                             <div>
                                 <!-- Platzhalter -->
+                            </div>
+                        </div>
+
+                        <!-- Menue-Optionen (fuer GV-Events) -->
+                        <div id="meal-options-section" class="md:col-span-2 border-t pt-4 mt-2 hidden">
+                            <div class="flex justify-between items-center mb-3">
+                                <h4 class="font-medium text-gray-800">Menue-Optionen</h4>
+                                <button type="button" onclick="addMealOption()" class="text-sm text-fire-600 hover:text-fire-800">+ Option hinzufuegen</button>
+                            </div>
+                            <p class="text-xs text-gray-500 mb-3">Teilnehmer koennen bei der Anmeldung ein Menue waehlen oder "Kein Essen" auswaehlen. Allergien koennen separat angegeben werden.</p>
+                            <div id="meal-options-container" class="space-y-2">
+                                <!-- Dynamisch befuellt -->
                             </div>
                         </div>
 
@@ -3575,17 +3588,24 @@ ${grussformel}`;
             const category = document.getElementById('event-category').value;
             const registrationSection = document.getElementById('registration-section');
             const shiftsSection = document.getElementById('shifts-section');
+            const mealSection = document.getElementById('meal-options-section');
             const noRegHint = document.getElementById('no-registration-hint');
 
             // Alle verstecken
             registrationSection.classList.add('hidden');
             registrationSection.classList.remove('contents');
             shiftsSection.classList.add('hidden');
+            mealSection.classList.add('hidden');
             noRegHint.classList.add('hidden');
 
             if (category === 'Dorffest') {
                 // Dorffest: Nur Schichten
                 shiftsSection.classList.remove('hidden');
+            } else if (category === 'GV') {
+                // GV: Teilnehmer-Anmeldung + Menue-Optionen
+                registrationSection.classList.remove('hidden');
+                registrationSection.classList.add('contents');
+                mealSection.classList.remove('hidden');
             } else if (category === 'Aufbau' || category === 'Abbau' || category === 'Ausflug mit Anmeldung') {
                 // Teilnehmer-Anmeldung ohne Schichten
                 registrationSection.classList.remove('hidden');
@@ -3601,11 +3621,49 @@ ${grussformel}`;
             }
         }
 
+        // DEUTSCH: Menue-Option zum Editor hinzufuegen
+        function addMealOption(value = '') {
+            const container = document.getElementById('meal-options-container');
+            const div = document.createElement('div');
+            div.className = 'flex gap-2 items-center';
+            div.innerHTML = `
+                <input type="text" value="${value}" placeholder="z.B. Schweinsbraten mit Kartoffelstock"
+                       class="meal-option-input flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700 px-2 py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        // DEUTSCH: Menue-Optionen aus dem Editor sammeln
+        function collectMealOptions() {
+            const inputs = document.querySelectorAll('#meal-options-container .meal-option-input');
+            const options = [];
+            inputs.forEach(input => {
+                const val = input.value.trim();
+                if (val) options.push(val);
+            });
+            return options.length > 0 ? options : null;
+        }
+
+        // DEUTSCH: Menue-Editor mit bestehenden Optionen befuellen
+        function populateMealOptions(mealOptions) {
+            const container = document.getElementById('meal-options-container');
+            container.innerHTML = '';
+            if (mealOptions && Array.isArray(mealOptions)) {
+                mealOptions.forEach(option => addMealOption(option));
+            }
+        }
+
         function openNewEventModal() {
             document.getElementById('event-modal-title').textContent = 'Neues Event';
             document.getElementById('event-form').reset();
             document.getElementById('event-id').value = '';
             document.getElementById('event-shifts-container').innerHTML = '';
+            document.getElementById('meal-options-container').innerHTML = '';
             document.getElementById('event-organizer-name').value = '';
             document.getElementById('event-organizer-email').value = '';
             document.getElementById('event-create-access').checked = false;
@@ -3645,6 +3703,9 @@ ${grussformel}`;
 
                 // Load shifts
                 loadEventShifts(event.shifts || []);
+
+                // Menue-Optionen laden (fuer GV-Events)
+                populateMealOptions(event.meal_options);
 
                 // Felder je nach Kategorie aktualisieren
                 updateEventFormByCategory();
@@ -3842,7 +3903,8 @@ ${grussformel}`;
                 location: document.getElementById('event-location').value || null,
                 description: document.getElementById('event-description').value || null,
                 // registration_required basierend auf Kategorie
-                registration_required: ['Dorffest', 'Aufbau', 'Abbau', 'Ausflug mit Anmeldung'].includes(document.getElementById('event-category').value),
+                registration_required: ['Dorffest', 'GV', 'Aufbau', 'Abbau', 'Ausflug mit Anmeldung'].includes(document.getElementById('event-category').value),
+                meal_options: document.getElementById('event-category').value === 'GV' ? collectMealOptions() : null,
                 registration_deadline: document.getElementById('event-registration-deadline').value || null,
                 max_participants: document.getElementById('event-max-participants').value ? parseInt(document.getElementById('event-max-participants').value) : null,
                 cost: document.getElementById('event-cost').value || null,
@@ -4102,17 +4164,22 @@ ${grussformel}`;
                                     PDF
                                 </button>
                             </div>
-                            <table class="min-w-full">
+                            // GV-Events: Extra Spalten fuer Menue und Allergien
+                            const isGV = event.category === 'GV';
+
+                            html += \`<table class="min-w-full">
                                 <thead class="bg-purple-100">
                                     <tr>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">E-Mail</th>
+                                        \${isGV ? '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Menue</th>' : ''}
+                                        \${isGV ? '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Allergien</th>' : ''}
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Status</th>
                                         <th class="px-4 py-2 text-right text-xs font-medium text-gray-500">Aktionen</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200">
-                    `;
+                    \`;
 
                     for (const reg of allDirect) {
                         const statusBadge = reg.status === 'approved'
@@ -4128,16 +4195,22 @@ ${grussformel}`;
 
                         // Parse notes for extra info
                         let extraInfo = '';
+                        let mealDisplay = '-';
+                        let allergiesDisplay = '-';
                         try {
                             const notes = typeof reg.notes === 'string' ? JSON.parse(reg.notes) : reg.notes;
                             if (notes?.participants) extraInfo += ` (${notes.participants} Pers.)`;
                             if (notes?.phone) extraInfo += ` Tel: ${notes.phone}`;
+                            if (notes?.meal_selection) mealDisplay = notes.meal_selection;
+                            if (notes?.allergies) allergiesDisplay = notes.allergies;
                         } catch(e) {}
 
                         html += `
                             <tr>
                                 <td class="px-4 py-2 text-sm text-gray-900">${reg.name || 'Unbekannt'}${extraInfo}</td>
                                 <td class="px-4 py-2 text-sm text-gray-600">${reg.email || '-'}</td>
+                                ${isGV ? `<td class="px-4 py-2 text-sm text-gray-900">${mealDisplay}</td>` : ''}
+                                ${isGV ? `<td class="px-4 py-2 text-sm ${allergiesDisplay !== '-' ? 'text-orange-700 font-medium' : 'text-gray-400'}">${allergiesDisplay}</td>` : ''}
                                 <td class="px-4 py-2">${statusBadge}</td>
                                 <td class="px-4 py-2 text-right text-sm">${actions}</td>
                             </tr>
