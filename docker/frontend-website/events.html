@@ -254,6 +254,7 @@
                     const urlParams = new URLSearchParams(window.location.search);
                     if (this.selectedEvent) {
                         urlParams.set('event', this.selectedEvent.slug || this.selectedEvent.id);
+                        urlParams.set('regtype', this.selectedEvent.category || '');
                     }
                     urlParams.set('autofill', 'member');
                     const returnPath = window.location.pathname + '?' + urlParams.toString();
@@ -295,7 +296,7 @@
                     if (phoneInput) phoneInput.value = this.memberData.phone || '';
 
                     // DEUTSCH: Login-Button durch Erfolgsmeldung ersetzen ("Angemeldet als ...")
-                    const loginSection = document.getElementById('member-login-section') || document.getElementById('member-login-section-participant');
+                    const loginSection = document.getElementById('member-login-section') || document.getElementById('member-login-section-participant') || document.getElementById('member-login-section-gv');
                     if (loginSection) {
                         loginSection.innerHTML = `
                             <div class="flex items-center gap-2 text-green-700">
@@ -347,11 +348,22 @@
                     console.log('🔗 Opening event from URL:', eventSlug);
                     this.showEventModal(eventSlug);
 
-                    // DEUTSCH: Nach OAuth-Rueckkehr: kurze Verzoegerung damit das Modal gerendert ist,
-                    // DEUTSCH: dann automatisch die Mitgliederdaten ins Formular eintragen
+                    // DEUTSCH: Nach OAuth-Rueckkehr: Anmeldeformular erneut oeffnen und Mitgliederdaten eintragen
                     if (autoFillMember && this.authToken) {
+                        const regType = urlParams.get('regtype');
                         setTimeout(() => {
-                            this.fillMemberData();
+                            // DEUTSCH: Registrierungsformular basierend auf Event-Kategorie oeffnen
+                            if (regType === 'GV') {
+                                this.showGVRegistration();
+                            } else if (this.selectedEvent && ['Aufbau', 'Abbau', 'Ausflug mit Anmeldung'].includes(regType)) {
+                                this.showParticipantRegistration();
+                            } else if (this.selectedEvent) {
+                                this.showParticipantRegistration();
+                            }
+                            // DEUTSCH: Kurze Verzoegerung damit das Formular gerendert ist
+                            setTimeout(() => {
+                                this.fillMemberData();
+                            }, 300);
                         }, 500);
                     }
                 }
