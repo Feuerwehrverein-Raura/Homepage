@@ -286,14 +286,14 @@
                     this.memberData = await response.json();
 
                     // DEUTSCH: Formularfelder (Name, E-Mail, Telefon) mit den Mitgliederdaten befuellen
-                    const fullName = `${this.memberData.first_name || ''} ${this.memberData.last_name || ''}`.trim();
+                    const fullName = `${this.memberData.vorname || ''} ${this.memberData.nachname || ''}`.trim();
                     const nameInput = document.querySelector('input[name="name"]');
                     const emailInput = document.querySelector('input[name="email"]');
                     const phoneInput = document.querySelector('input[name="phone"]');
 
                     if (nameInput) nameInput.value = fullName;
                     if (emailInput) emailInput.value = this.memberData.email || '';
-                    if (phoneInput) phoneInput.value = this.memberData.phone || '';
+                    if (phoneInput) phoneInput.value = this.memberData.mobile || this.memberData.telefon || '';
 
                     // DEUTSCH: Login-Button durch Erfolgsmeldung ersetzen ("Angemeldet als ...")
                     const loginSection = document.getElementById('member-login-section') || document.getElementById('member-login-section-participant') || document.getElementById('member-login-section-gv');
