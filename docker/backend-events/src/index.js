@@ -1306,16 +1306,20 @@ app.get('/registrations', authenticateAny, async (req, res) => {
     }
 });
 
-// DEUTSCH: Neue Registrierung erstellen (authentifiziert, z.B. via Vorstand-App)
+// DEUTSCH: Neue Registrierung erstellen (authentifiziert, z.B. via Vorstand-App). Vorstand kann Status direkt setzen (z.B. 'approved')
 app.post('/registrations', authenticateAny, async (req, res) => {
     try {
-        const { event_id, member_id, guest_name, guest_email, shift_ids, notes } = req.body;
+        const { event_id, member_id, guest_name, guest_email, shift_ids, notes, status } = req.body;
+
+        // Vorstand/Admin darf Status direkt setzen, sonst immer 'pending'
+        const isPrivileged = req.user?.groups?.some(g => ['vorstand', 'admin'].includes(g));
+        const regStatus = (isPrivileged && status) ? status : 'pending';
 
         const result = await pool.query(`
-            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
-        `, [event_id, member_id, guest_name, guest_email, shift_ids, notes]);
+        `, [event_id, member_id, guest_name, guest_email, shift_ids, notes, regStatus]);
 
         res.status(201).json(result.rows[0]);
     } catch (error) {

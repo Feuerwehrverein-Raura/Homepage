@@ -51,6 +51,9 @@ class EventRegistrationsFragment : Fragment() {
     /** ID des Events dessen Anmeldungen angezeigt werden */
     private var eventId: String? = null
 
+    /** Aktuelles Event (fuer direktes Hinzufuegen ohne Schicht) */
+    private var currentEvent: Event? = null
+
     /**
      * Erstellt die View-Hierarchie des Fragments.
      */
@@ -92,6 +95,7 @@ class EventRegistrationsFragment : Fragment() {
                 val response = ApiModule.eventsApi.getEvent(eventId!!)
                 if (response.isSuccessful) {
                     val event = response.body() ?: return@launch
+                    currentEvent = event
                     binding.toolbar.title = event.title
                     // Schicht-basierte Anmeldungen anzeigen
                     displayShifts(event)
@@ -177,17 +181,22 @@ class EventRegistrationsFragment : Fragment() {
             (direct?.approved ?: emptyList()).map { it.copy(status = it.status ?: "approved") } +
             (direct?.pending ?: emptyList()).map { it.copy(status = it.status ?: "pending") }
 
-        // Falls keine direkten Anmeldungen vorhanden: Bereich ausblenden
-        if (allDirect.isEmpty()) {
-            binding.directRegistrationsHeader.visibility = View.GONE
+        val hasShifts = !event.shifts.isNullOrEmpty()
+
+        // Bei Events ohne Schichten: Header+Button immer anzeigen (auch wenn leer)
+        if (allDirect.isEmpty() && hasShifts) {
+            binding.directRegistrationsHeaderRow.visibility = View.GONE
             binding.directRegistrationsContainer.visibility = View.GONE
             return
         }
 
         // Direkten Anmeldungsbereich sichtbar machen
-        binding.directRegistrationsHeader.visibility = View.VISIBLE
-        binding.directRegistrationsContainer.visibility = View.VISIBLE
+        binding.directRegistrationsHeaderRow.visibility = View.VISIBLE
+        binding.directRegistrationsContainer.visibility = if (allDirect.isNotEmpty()) View.VISIBLE else View.GONE
         binding.directRegistrationsContainer.removeAllViews()
+
+        // "Person hinzufügen" Button für direkte Anmeldungen
+        binding.btnAddDirectPerson.setOnClickListener { showAddDirectPersonDialog() }
 
         // Pro direkte Anmeldung ein Item-Layout erstellen
         for (reg in allDirect) {
@@ -547,6 +556,109 @@ class EventRegistrationsFragment : Fragment() {
                         "guest_name" to name
                     )
                     // Optionale Felder nur setzen wenn nicht leer
+                    val email = guestEmail.text?.toString()?.trim() ?: ""
+                    if (email.isNotEmpty()) body["guest_email"] = email
+                    val phone = guestPhone.text?.toString()?.trim() ?: ""
+                    if (phone.isNotEmpty()) body["phone"] = phone
+                    createRegistration(body, dialog)
+                }
+            }
+        }
+
+        dialog.show()
+    }
+
+    /**
+     * Oeffnet den Dialog zum Hinzufuegen einer Person als direkte Anmeldung (ohne Schicht).
+     * Wird verwendet bei Events ohne Schichten (z.B. Ausflug mit Anmeldung, GV).
+     */
+    private fun showAddDirectPersonDialog() {
+        val event = currentEvent ?: return
+        val dialogView = layoutInflater.inflate(R.layout.dialog_add_person, null)
+
+        val toggleGroup = dialogView.findViewById<MaterialButtonToggleGroup>(R.id.toggleGroup)
+        val memberSection = dialogView.findViewById<LinearLayout>(R.id.memberSection)
+        val guestSection = dialogView.findViewById<LinearLayout>(R.id.guestSection)
+        val memberDropdown = dialogView.findViewById<AutoCompleteTextView>(R.id.memberDropdown)
+        val guestName = dialogView.findViewById<TextInputEditText>(R.id.guestName)
+        val guestEmail = dialogView.findViewById<TextInputEditText>(R.id.guestEmail)
+        val guestPhone = dialogView.findViewById<TextInputEditText>(R.id.guestPhone)
+
+        var members: List<Member> = emptyList()
+        var selectedMember: Member? = null
+
+        toggleGroup.check(R.id.btnMitglied)
+
+        toggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                when (checkedId) {
+                    R.id.btnMitglied -> {
+                        memberSection.visibility = View.VISIBLE
+                        guestSection.visibility = View.GONE
+                    }
+                    R.id.btnGast -> {
+                        memberSection.visibility = View.GONE
+                        guestSection.visibility = View.VISIBLE
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.membersApi.getMembers()
+                if (response.isSuccessful) {
+                    members = response.body() ?: emptyList()
+                    val memberNames = members.map { "${it.vorname} ${it.nachname}" }
+                    val adapter = ArrayAdapter(
+                        requireContext(),
+                        android.R.layout.simple_dropdown_item_1line,
+                        memberNames
+                    )
+                    memberDropdown.setAdapter(adapter)
+                    memberDropdown.setOnItemClickListener { _, _, position, _ ->
+                        selectedMember = members[position]
+                    }
+                }
+            } catch (_: Exception) { }
+        }
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Person hinzufügen – ${event.title}")
+            .setView(dialogView)
+            .setPositiveButton("Speichern", null)
+            .setNegativeButton("Abbrechen", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val isMember = toggleGroup.checkedButtonId == R.id.btnMitglied
+
+                if (isMember) {
+                    if (selectedMember == null) {
+                        Toast.makeText(requireContext(), "Bitte ein Mitglied auswählen", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    val m = selectedMember!!
+                    val body = mutableMapOf<String, Any>(
+                        "event_id" to event.id,
+                        "status" to "approved",
+                        "member_id" to m.id,
+                        "guest_name" to "${m.vorname} ${m.nachname}"
+                    )
+                    if (!m.email.isNullOrEmpty()) body["guest_email"] = m.email
+                    createRegistration(body, dialog)
+                } else {
+                    val name = guestName.text?.toString()?.trim() ?: ""
+                    if (name.isEmpty()) {
+                        Toast.makeText(requireContext(), "Bitte einen Namen eingeben", Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    val body = mutableMapOf<String, Any>(
+                        "event_id" to event.id,
+                        "status" to "approved",
+                        "guest_name" to name
+                    )
                     val email = guestEmail.text?.toString()?.trim() ?: ""
                     if (email.isNotEmpty()) body["guest_email"] = email
                     val phone = guestPhone.text?.toString()?.trim() ?: ""

@@ -3469,7 +3469,7 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <span class="text-sm">${registrationsDisplay}</span>
-                            ${hasAny ? `<button onclick="openEventRegistrations('${event.id}')" class="ml-2 text-fire-600 hover:text-fire-800 text-xs underline">verwalten</button>` : ''}
+                            ${hasAny || event.registration_required ? `<button onclick="openEventRegistrations('${event.id}')" class="ml-2 text-fire-600 hover:text-fire-800 text-xs underline">verwalten</button>` : ''}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
                             <button onclick="generateEventInvitation('${event.id}')" class="text-green-600 hover:text-green-800" title="Einladung generieren">
@@ -4059,14 +4059,28 @@ ${grussformel}`;
         // Rendert die Anmeldungen eines Events, gruppiert nach Schichten. Zeigt je Schicht: Bereich, Name, Zeitraum, Auslastung und eine Tabelle der angemeldeten Personen mit Status-Badges.
         function renderEventRegistrations() {
             const event = currentEventForRegistrations;
-            if (!event || !event.shifts) return;
+            if (!event) return;
 
             const container = document.getElementById('event-reg-content');
 
             // Group by shift
             let html = '<div class="space-y-6">';
 
-            for (const shift of event.shifts) {
+            if (!event.shifts || event.shifts.length === 0) {
+                // Event ohne Schichten - direkter "Person hinzufügen" Button
+                html += `
+                    <div class="flex justify-end mb-2">
+                        <button onclick="openAddPersonModal('__direct__', '${escapeForOnclick(event.title)}')" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Person hinzufügen
+                        </button>
+                    </div>
+                `;
+            }
+
+            for (const shift of (event.shifts || [])) {
                 const regs = shift.registrations || { pending: [], approved: [] };
                 const pending = regs.pending || [];
                 const approved = regs.approved || [];
@@ -4235,9 +4249,15 @@ ${grussformel}`;
                 return (regs.pending?.length || 0) + (regs.approved?.length || 0) > 0;
             });
             const hasDirectRegs = (event.directRegistrations?.pendingCount || 0) + (event.directRegistrations?.approvedCount || 0) > 0;
+            const hasShifts = (event.shifts?.length || 0) > 0;
 
             if (!hasShiftRegs && !hasDirectRegs) {
-                html = '<p class="text-center text-gray-500 py-8">Keine Anmeldungen vorhanden</p>';
+                // Bei Events ohne Schichten: "Person hinzufügen" Button beibehalten
+                if (!hasShifts) {
+                    html += '<p class="text-center text-gray-500 py-4">Keine Anmeldungen vorhanden</p>';
+                } else {
+                    html = '<p class="text-center text-gray-500 py-8">Keine Anmeldungen vorhanden</p>';
+                }
             }
 
             container.innerHTML = html;
@@ -4394,14 +4414,21 @@ ${grussformel}`;
             const mode = document.getElementById('add-person-mode').value;
             const event = currentEventForRegistrations;
 
-            if (!event || !shiftId) {
-                alert('Fehler: Event oder Schicht nicht gefunden');
+            if (!event) {
+                alert('Fehler: Event nicht gefunden');
+                return;
+            }
+
+            const isDirect = shiftId === '__direct__';
+
+            if (!isDirect && !shiftId) {
+                alert('Fehler: Schicht nicht gefunden');
                 return;
             }
 
             let payload = {
                 event_id: event.id,
-                shift_ids: [shiftId],
+                shift_ids: isDirect ? null : [shiftId],
                 status: 'approved'
             };
 
