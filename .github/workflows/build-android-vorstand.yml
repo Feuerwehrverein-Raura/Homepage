@@ -57,11 +57,11 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           GRADLE_FILE="vorstand-android/app/build.gradle.kts"
-          sed -i "s/versionName = \".*\"/versionName = \"$VERSION\"/" "$GRADLE_FILE"
+          sed -i "s/versionName = .*/versionName = \"$VERSION\"/" "$GRADLE_FILE"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
           VCODE=$(( ${MAJOR:-0} * 1000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
           [ "$VCODE" -lt 1 ] && VCODE=1
-          sed -i "s/versionCode = [0-9]*/versionCode = $VCODE/" "$GRADLE_FILE"
+          sed -i "s/versionCode = .*/versionCode = $VCODE/" "$GRADLE_FILE"
           echo "Set version: $VERSION (code: $VCODE)"
           grep -E "version(Code|Name)" "$GRADLE_FILE"
 
