@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Environment
 import android.util.Log
@@ -71,12 +72,13 @@ class UpdateChecker(private val context: Context) {
             }
 
             val release = fetchReleaseByTag(latestTag)
+            val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+            val variant = if (isDebugBuild) "debug" else "release"
+            Log.d(TAG, "Current build variant: $variant")
+
             val apkUrl = release?.assets
-                ?.firstOrNull { it.name.contains("release") && it.name.endsWith(".apk") }
+                ?.firstOrNull { it.name.contains(variant) && it.name.endsWith(".apk") }
                 ?.downloadUrl
-                ?: release?.assets
-                    ?.firstOrNull { it.name.endsWith(".apk") }
-                    ?.downloadUrl
 
             UpdateResult.UpdateAvailable(
                 currentVersion = currentVersion,
