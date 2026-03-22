@@ -1648,10 +1648,10 @@
 
                 // DEUTSCH: Server gibt den Pfad zum gespeicherten Foto zurueck
                 const data = await response.json();
-                memberData.foto = data.foto;
+                memberData.foto = data.photo_url;
 
                 // DEUTSCH: Vorschau aktualisieren und Loeschen-Button einblenden
-                document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${data.foto}" class="w-full h-full object-cover">`;
+                document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${data.photo_url}" class="w-full h-full object-cover">`;
                 document.getElementById('my-photo-delete-btn').classList.remove('hidden');
 
                 alert('Foto erfolgreich hochgeladen!');

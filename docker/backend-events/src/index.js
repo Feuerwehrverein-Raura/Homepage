@@ -1321,7 +1321,46 @@ app.post('/registrations', authenticateAny, async (req, res) => {
             RETURNING *
         `, [event_id, member_id, guest_name, guest_email, shift_ids, notes, regStatus]);
 
-        res.status(201).json(result.rows[0]);
+        const reg = result.rows[0];
+
+        // E-Mail-Benachrichtigung an Vorstand senden
+        try {
+            const event = await pool.query('SELECT title, category FROM events WHERE id = $1', [event_id]);
+            const eventTitle = event.rows[0]?.title || 'Unbekanntes Event';
+
+            // Name ermitteln: Gast-Name oder Mitglied nachschlagen
+            let personName = guest_name;
+            if (!personName && member_id) {
+                const member = await pool.query('SELECT vorname, nachname FROM members WHERE id = $1', [member_id]);
+                if (member.rows.length > 0) {
+                    personName = `${member.rows[0].vorname} ${member.rows[0].nachname}`;
+                }
+            }
+
+            const eingetragenVon = req.user.email || req.user.name || 'Vorstand';
+
+            const notifyBody = `Neue Anmeldung durch Vorstand eingetragen!
+
+Event: ${eventTitle}
+Person: ${personName || 'Unbekannt'}${guest_email ? `\nE-Mail: ${guest_email}` : ''}
+Status: ${regStatus}
+Eingetragen von: ${eingetragenVon}${notes ? `\nBemerkungen: ${notes}` : ''}`;
+
+            const notifyEmail = (event.rows[0]?.category === 'GV')
+                ? 'vorstand@fwv-raura.ch'
+                : (process.env.CONTACT_EMAIL || 'vorstand@fwv-raura.ch');
+
+            await axios.post(`${DISPATCH_API}/email/send`, {
+                to: notifyEmail,
+                subject: `Neue Anmeldung für ${eventTitle} (durch Vorstand)`,
+                body: notifyBody,
+                event_id: event_id
+            });
+        } catch (emailErr) {
+            console.error('Vorstand-Benachrichtigungs-E-Mail fehlgeschlagen:', emailErr.message);
+        }
+
+        res.status(201).json(reg);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
