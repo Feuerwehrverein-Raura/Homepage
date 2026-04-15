@@ -2466,6 +2466,99 @@
                 </div>
             </div>
         </section>
+
+        <!-- ============================================ -->
+        <!-- BEITRAGS-EINSTELLUNGEN & ZAHLUNGSTABELLE     -->
+        <!-- ============================================ -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">Jahreseinstellungen</h2>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Jahr</label>
+                        <select id="fee-year-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Betrag (CHF)</label>
+                        <input type="number" id="fee-amount" step="0.50" value="25.00" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">GV-Datum</label>
+                        <input type="text" id="fee-gv-date" placeholder="z.B. 22.März 2026" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fälligkeitsdatum</label>
+                        <input type="date" id="fee-due-date" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="fee-save-btn" class="bg-fire-500 text-white px-4 py-2 rounded-lg hover:bg-fire-600 text-sm">Speichern</button>
+                        <button id="fee-generate-btn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">Beiträge erstellen</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Statistiken -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-4">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-gray-600 text-sm">Gesamt</div>
+                        <div id="fee-stat-total" class="text-2xl font-bold text-gray-800">-</div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <div class="text-green-600 text-sm">Bezahlt</div>
+                        <div id="fee-stat-paid" class="text-2xl font-bold text-green-800">-</div>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg">
+                        <div class="text-red-600 text-sm">Offen</div>
+                        <div id="fee-stat-open" class="text-2xl font-bold text-red-800">-</div>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="text-blue-600 text-sm">Eingenommen</div>
+                        <div id="fee-stat-amount" class="text-2xl font-bold text-blue-800">-</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Zahlungstabelle -->
+        <section class="py-4">
+            <div class="container mx-auto px-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-gray-800">Zahlungsübersicht</h2>
+                    <div class="flex items-center space-x-3">
+                        <input type="text" id="fee-search" placeholder="Mitglied suchen..." class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                        <select id="fee-status-filter" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                            <option value="">Alle</option>
+                            <option value="offen">Offen</option>
+                            <option value="bezahlt">Bezahlt</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mitglied</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ref. Nr.</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank-Referenz</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Betrag</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bezahlt am</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fee-payments-tbody" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="fee-payments-empty" class="hidden text-center py-8 text-gray-500">
+                    Keine Beiträge für dieses Jahr. Klicke "Beiträge erstellen" um Einträge zu generieren.
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- Toast Container -->
@@ -6388,9 +6481,12 @@ ${grussformel}`;
             }
         }
 
-        // Laedt den Beitrag-Tab: Mitglieder-Dropdown befuellen und QR aktualisieren
+        // Laedt den Beitrag-Tab: Mitglieder-Dropdown, Jahres-Einstellungen und Zahlungen
         function loadBeitragBriefe() {
             loadBeitragMembers();
+            initFeeYearSelect();
+            loadFeeSettings();
+            loadFeePayments();
             updateBeitragDerived();
         }
 
@@ -6636,6 +6732,217 @@ ${grussformel}`;
             }
         }
 
+        // ============================================
+        // BEITRAGS-EINSTELLUNGEN & ZAHLUNGSVERFOLGUNG
+        // ============================================
+
+        const FEES_API = 'https://api.fwv-raura.ch/membership-fees';
+
+        // Jahres-Dropdown befuellen (aktuelles Jahr +/- 2)
+        function initFeeYearSelect() {
+            const select = document.getElementById('fee-year-select');
+            if (select.options.length > 0) return;
+            const currentYear = new Date().getFullYear();
+            for (let y = currentYear + 1; y >= currentYear - 5; y--) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                if (y === currentYear) opt.selected = true;
+                select.appendChild(opt);
+            }
+        }
+
+        // Einstellungen fuer gewaehltes Jahr laden
+        async function loadFeeSettings() {
+            const year = document.getElementById('fee-year-select').value;
+            try {
+                const response = await fetch(`${FEES_API}/settings/${year}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (response.ok) {
+                    const settings = await response.json();
+                    document.getElementById('fee-amount').value = settings.amount;
+                    document.getElementById('fee-gv-date').value = settings.gv_date || '';
+                    document.getElementById('fee-due-date').value = settings.due_date || '';
+                    // Brief-Felder synchronisieren
+                    document.getElementById('brief-betrag').value = settings.amount;
+                    document.getElementById('brief-gv-datum').value = settings.gv_date || '';
+                    document.getElementById('brief-jahr').value = year;
+                    updateBeitragDerived();
+                }
+            } catch (e) { /* Keine Einstellung fuer dieses Jahr */ }
+        }
+
+        // Einstellungen speichern
+        async function saveFeeSettings() {
+            const year = document.getElementById('fee-year-select').value;
+            const amount = document.getElementById('fee-amount').value;
+            const gvDate = document.getElementById('fee-gv-date').value;
+            const dueDate = document.getElementById('fee-due-date').value;
+
+            try {
+                const response = await fetch(`${FEES_API}/settings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ year: parseInt(year), amount: parseFloat(amount), gv_date: gvDate, due_date: dueDate || null })
+                });
+                if (!response.ok) throw new Error('Speichern fehlgeschlagen');
+                showToast('Einstellungen gespeichert', 'success');
+                // Brief-Felder synchronisieren
+                document.getElementById('brief-betrag').value = amount;
+                document.getElementById('brief-gv-datum').value = gvDate;
+                document.getElementById('brief-jahr').value = year;
+                updateBeitragDerived();
+            } catch (error) {
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
+        // Beitraege fuer alle Mitglieder generieren
+        async function generateFeePayments() {
+            const year = document.getElementById('fee-year-select').value;
+            const amount = document.getElementById('fee-amount').value;
+
+            if (!confirm(`Beitragseinträge für alle Mitglieder im Jahr ${year} erstellen (CHF ${amount})?`)) return;
+
+            try {
+                const response = await fetch(`${FEES_API}/payments/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ year: parseInt(year), amount: parseFloat(amount) })
+                });
+                if (!response.ok) throw new Error('Generierung fehlgeschlagen');
+                const result = await response.json();
+                showToast(`${result.created} Einträge erstellt, ${result.skipped} übersprungen`, 'success');
+                loadFeePayments();
+            } catch (error) {
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
+        // Zahlungen und Statistiken laden
+        async function loadFeePayments() {
+            const year = document.getElementById('fee-year-select').value;
+            const search = (document.getElementById('fee-search').value || '').toLowerCase();
+            const statusFilter = document.getElementById('fee-status-filter').value;
+
+            try {
+                // Zahlungen und Summary parallel laden
+                const [paymentsRes, summaryRes] = await Promise.all([
+                    fetch(`${FEES_API}/payments?year=${year}`, { headers: { 'Authorization': `Bearer ${authToken}` } }),
+                    fetch(`${FEES_API}/summary?year=${year}`, { headers: { 'Authorization': `Bearer ${authToken}` } })
+                ]);
+
+                if (summaryRes.ok) {
+                    const summary = await summaryRes.json();
+                    document.getElementById('fee-stat-total').textContent = summary.total || '0';
+                    document.getElementById('fee-stat-paid').textContent = summary.paid || '0';
+                    document.getElementById('fee-stat-open').textContent = summary.open || '0';
+                    document.getElementById('fee-stat-amount').textContent = `CHF ${parseFloat(summary.paid_amount || 0).toFixed(2)}`;
+                }
+
+                if (!paymentsRes.ok) throw new Error('Laden fehlgeschlagen');
+                let payments = await paymentsRes.json();
+
+                // Filter anwenden
+                if (search) {
+                    payments = payments.filter(p =>
+                        `${p.nachname} ${p.vorname}`.toLowerCase().includes(search) ||
+                        (p.reference_nr || '').includes(search) ||
+                        (p.bank_reference || '').toLowerCase().includes(search)
+                    );
+                }
+                if (statusFilter) {
+                    payments = payments.filter(p => p.status === statusFilter);
+                }
+
+                const tbody = document.getElementById('fee-payments-tbody');
+                const empty = document.getElementById('fee-payments-empty');
+
+                if (payments.length === 0) {
+                    tbody.innerHTML = '';
+                    empty.classList.remove('hidden');
+                    return;
+                }
+                empty.classList.add('hidden');
+
+                tbody.innerHTML = payments.map(p => {
+                    const statusBadge = p.status === 'bezahlt'
+                        ? '<span class="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Bezahlt</span>'
+                        : '<span class="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Offen</span>';
+
+                    const paidDate = p.paid_date ? new Date(p.paid_date).toLocaleDateString('de-CH') : '-';
+
+                    const actions = p.status === 'offen'
+                        ? `<button onclick="markFeePaid('${p.id}')" class="text-green-600 hover:text-green-800 text-sm font-medium mr-2">Bezahlt</button>`
+                        : `<button onclick="markFeeUnpaid('${p.id}')" class="text-red-600 hover:text-red-800 text-sm font-medium mr-2">Zurücksetzen</button>`;
+
+                    const bankRefId = `bank-ref-${p.id}`;
+
+                    return `<tr>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${p.nachname} ${p.vorname}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${p.reference_nr}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <input type="text" id="${bankRefId}" value="${p.bank_reference || ''}" placeholder="Bank-Ref..."
+                                class="w-32 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500"
+                                onchange="saveBankReference('${p.id}', this.value)">
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">CHF ${parseFloat(p.amount).toFixed(2)}</td>
+                        <td class="px-4 py-3">${statusBadge}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${paidDate}</td>
+                        <td class="px-4 py-3">${actions}</td>
+                    </tr>`;
+                }).join('');
+
+            } catch (error) {
+                showToast('Fehler beim Laden: ' + error.message, 'error');
+            }
+        }
+
+        // Zahlung als bezahlt markieren
+        async function markFeePaid(paymentId) {
+            try {
+                const response = await fetch(`${FEES_API}/payments/${paymentId}/pay`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({})
+                });
+                if (!response.ok) throw new Error('Fehler');
+                loadFeePayments();
+            } catch (error) {
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
+        // Zahlung zuruecksetzen auf offen
+        async function markFeeUnpaid(paymentId) {
+            try {
+                const response = await fetch(`${FEES_API}/payments/${paymentId}/unpay`, {
+                    method: 'PATCH',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error('Fehler');
+                loadFeePayments();
+            } catch (error) {
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
+        // Bank-Referenz speichern
+        async function saveBankReference(paymentId, bankRef) {
+            try {
+                const response = await fetch(`${FEES_API}/payments/${paymentId}/reference`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ bank_reference: bankRef })
+                });
+                if (!response.ok) throw new Error('Fehler');
+                showToast('Bank-Referenz gespeichert', 'success');
+            } catch (error) {
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
         // PDF generieren via Backend-API
         async function generateBeitragPDF() {
             const memberId = document.getElementById('beitrag-member-select').value;
@@ -6808,6 +7115,12 @@ ${grussformel}`;
             w.document.write(html);
             w.document.close();
         });
+        // Beitrags-Einstellungen & Zahlungen
+        document.getElementById('fee-year-select').addEventListener('change', () => { loadFeeSettings(); loadFeePayments(); });
+        document.getElementById('fee-save-btn').addEventListener('click', saveFeeSettings);
+        document.getElementById('fee-generate-btn').addEventListener('click', generateFeePayments);
+        document.getElementById('fee-search').addEventListener('input', loadFeePayments);
+        document.getElementById('fee-status-filter').addEventListener('change', loadFeePayments);
         // Brief-Felder: bei Aenderung abgeleitete Felder aktualisieren
         ['brief-ref', 'brief-betrag', 'brief-jahr', 'brief-name', 'brief-strasse', 'brief-plz-ort'].forEach(id => {
             document.getElementById(id).addEventListener('input', updateBeitragDerived);

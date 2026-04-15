@@ -289,6 +289,219 @@ app.get('/reports/cashflow', async (req, res) => {
     }
 });
 
+// ============================================
+// DEUTSCH: MITGLIEDSBEITRAEGE — Jahres-Einstellungen und Zahlungsverfolgung
+// ============================================
+
+// DEUTSCH: GET /membership-fees/settings — Alle Jahres-Einstellungen abrufen
+app.get('/membership-fees/settings', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM membership_fee_settings ORDER BY year DESC');
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: GET /membership-fees/settings/:year — Einstellung fuer ein bestimmtes Jahr
+app.get('/membership-fees/settings/:year', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [req.params.year]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Keine Einstellung fuer dieses Jahr' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: POST /membership-fees/settings — Neue Jahres-Einstellung erstellen oder aktualisieren (Upsert)
+app.post('/membership-fees/settings', async (req, res) => {
+    try {
+        const { year, amount, gv_date, due_date, description } = req.body;
+        if (!year || !amount) {
+            return res.status(400).json({ error: 'year und amount sind erforderlich' });
+        }
+
+        const result = await pool.query(`
+            INSERT INTO membership_fee_settings (year, amount, gv_date, due_date, description)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (year) DO UPDATE SET
+                amount = EXCLUDED.amount,
+                gv_date = EXCLUDED.gv_date,
+                due_date = EXCLUDED.due_date,
+                description = EXCLUDED.description,
+                updated_at = NOW()
+            RETURNING *
+        `, [year, amount, gv_date, due_date, description]);
+
+        logInfo('Membership fee settings saved', { year, amount });
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: GET /membership-fees/payments?year=YYYY — Alle Zahlungen fuer ein Jahr mit Mitgliederdaten
+app.get('/membership-fees/payments', async (req, res) => {
+    try {
+        const { year } = req.query;
+        if (!year) {
+            return res.status(400).json({ error: 'year Parameter erforderlich' });
+        }
+
+        const result = await pool.query(`
+            SELECT
+                p.*,
+                m.vorname, m.nachname, m.email, m.strasse, m.plz, m.ort, m.status as member_status
+            FROM membership_fee_payments p
+            JOIN members m ON p.member_id = m.id
+            WHERE p.year = $1
+            ORDER BY m.nachname, m.vorname
+        `, [year]);
+
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: POST /membership-fees/payments/generate — Zahlungseintraege fuer alle Mitglieder eines Jahres generieren
+app.post('/membership-fees/payments/generate', async (req, res) => {
+    try {
+        const { year, amount } = req.body;
+        if (!year || !amount) {
+            return res.status(400).json({ error: 'year und amount sind erforderlich' });
+        }
+
+        // Alle aktiven Mitglieder holen
+        const membersResult = await pool.query(
+            "SELECT id FROM members WHERE status IN ('Aktivmitglied', 'Passivmitglied', 'Ehrenmitglied')"
+        );
+
+        let created = 0;
+        let skipped = 0;
+
+        for (const member of membersResult.rows) {
+            const refNr = String(member.id).replace(/\D/g, '').slice(-4).padStart(4, '0');
+
+            try {
+                await pool.query(`
+                    INSERT INTO membership_fee_payments (member_id, year, amount, reference_nr, status)
+                    VALUES ($1, $2, $3, $4, 'offen')
+                    ON CONFLICT (member_id, year) DO NOTHING
+                `, [member.id, year, amount, refNr]);
+                created++;
+            } catch (e) {
+                skipped++;
+            }
+        }
+
+        logInfo('Membership fee payments generated', { year, created, skipped });
+        res.json({ created, skipped, total: membersResult.rows.length });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: PATCH /membership-fees/payments/:id/pay — Zahlung als bezahlt markieren
+app.patch('/membership-fees/payments/:id/pay', async (req, res) => {
+    try {
+        const { paid_date, payment_method, bank_reference, notes } = req.body;
+
+        const result = await pool.query(`
+            UPDATE membership_fee_payments
+            SET status = 'bezahlt',
+                paid_date = COALESCE($2, CURRENT_DATE),
+                payment_method = COALESCE($3, payment_method),
+                bank_reference = COALESCE($4, bank_reference),
+                notes = COALESCE($5, notes),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [req.params.id, paid_date, payment_method, bank_reference, notes]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Zahlung nicht gefunden' });
+        }
+        logInfo('Payment marked as paid', { id: req.params.id });
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: PATCH /membership-fees/payments/:id/unpay — Zahlung zuruecksetzen auf offen
+app.patch('/membership-fees/payments/:id/unpay', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            UPDATE membership_fee_payments
+            SET status = 'offen', paid_date = NULL, updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [req.params.id]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Zahlung nicht gefunden' });
+        }
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: PATCH /membership-fees/payments/:id/reference — Bank-Referenznummer zuweisen
+app.patch('/membership-fees/payments/:id/reference', async (req, res) => {
+    try {
+        const { bank_reference } = req.body;
+        if (!bank_reference) {
+            return res.status(400).json({ error: 'bank_reference erforderlich' });
+        }
+
+        const result = await pool.query(`
+            UPDATE membership_fee_payments
+            SET bank_reference = $2, updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        `, [req.params.id, bank_reference]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Zahlung nicht gefunden' });
+        }
+        logInfo('Bank reference assigned', { id: req.params.id, bank_reference });
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: GET /membership-fees/summary?year=YYYY — Zusammenfassung: bezahlt/offen/Gesamtbetrag
+app.get('/membership-fees/summary', async (req, res) => {
+    try {
+        const { year } = req.query;
+        if (!year) {
+            return res.status(400).json({ error: 'year Parameter erforderlich' });
+        }
+
+        const result = await pool.query(`
+            SELECT
+                COUNT(*) as total,
+                COUNT(*) FILTER (WHERE status = 'bezahlt') as paid,
+                COUNT(*) FILTER (WHERE status = 'offen') as open,
+                COALESCE(SUM(amount), 0) as total_amount,
+                COALESCE(SUM(amount) FILTER (WHERE status = 'bezahlt'), 0) as paid_amount,
+                COALESCE(SUM(amount) FILTER (WHERE status = 'offen'), 0) as open_amount
+            FROM membership_fee_payments
+            WHERE year = $1
+        `, [year]);
+
+        res.json(result.rows[0]);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 app.listen(PORT, () => {
     console.log(`API-Accounting running on port ${PORT}`);
