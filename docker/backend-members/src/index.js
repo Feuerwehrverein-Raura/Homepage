@@ -2707,6 +2707,76 @@ app.delete('/members/:id/photo', authenticateVorstand, async (req, res) => {
 });
 
 // ============================================
+// PASSWORD MANAGEMENT (Vorstand)
+// DEUTSCH: Passwort-Verwaltung fuer Mitglieder durch den Vorstand
+// ============================================
+
+// DEUTSCH: Passwort zuruecksetzen - generiert ein temporaeres Passwort und gibt es zurueck
+app.post('/members/:id/reset-password', authenticateVorstand, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const member = await pool.query('SELECT vorname, nachname, authentik_user_id FROM members WHERE id = $1', [id]);
+
+        if (member.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const { vorname, nachname, authentik_user_id } = member.rows[0];
+
+        if (!authentik_user_id) {
+            return res.status(400).json({ error: 'Mitglied hat keinen Authentik-Account' });
+        }
+
+        const tempPassword = `FWV-${Math.floor(100000 + Math.random() * 900000)}`;
+        await setAuthentikUserPassword(authentik_user_id, tempPassword);
+
+        await logAudit(pool, 'MEMBER_PASSWORD_RESET', null, req.user.email, getClientIp(req), {
+            member_id: id, member_name: `${vorname} ${nachname}`
+        });
+
+        res.json({ success: true, tempPassword, message: `Temporaeres Passwort fuer ${vorname} ${nachname} gesetzt` });
+    } catch (error) {
+        console.error('Password reset error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Passwort manuell setzen (Vorstand gibt ein bestimmtes Passwort ein)
+app.post('/members/:id/set-password', authenticateVorstand, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { password } = req.body;
+
+        if (!password || password.length < 8) {
+            return res.status(400).json({ error: 'Passwort muss mindestens 8 Zeichen lang sein' });
+        }
+
+        const member = await pool.query('SELECT vorname, nachname, authentik_user_id FROM members WHERE id = $1', [id]);
+
+        if (member.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+
+        const { vorname, nachname, authentik_user_id } = member.rows[0];
+
+        if (!authentik_user_id) {
+            return res.status(400).json({ error: 'Mitglied hat keinen Authentik-Account' });
+        }
+
+        await setAuthentikUserPassword(authentik_user_id, password);
+
+        await logAudit(pool, 'MEMBER_PASSWORD_SET', null, req.user.email, getClientIp(req), {
+            member_id: id, member_name: `${vorname} ${nachname}`
+        });
+
+        res.json({ success: true, message: `Passwort fuer ${vorname} ${nachname} gesetzt` });
+    } catch (error) {
+        console.error('Password set error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // ROLES ROUTES
 // DEUTSCH: Rollen-Verwaltung (z.B. Vorstand, Admin etc.)
 // ============================================

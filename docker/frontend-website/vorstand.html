@@ -549,6 +549,28 @@
                         <div id="cloud-permissions-status" class="mt-2 text-sm text-gray-500"></div>
                     </div>
 
+                    <!-- Passwort-Verwaltung -->
+                    <div id="password-section" class="hidden">
+                        <h4 class="font-semibold text-gray-700 mb-3">Passwort-Verwaltung</h4>
+                        <div class="flex flex-wrap gap-2 mb-2">
+                            <button type="button" id="reset-password-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm">
+                                Passwort zuruecksetzen
+                            </button>
+                            <button type="button" id="set-password-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
+                                Passwort setzen
+                            </button>
+                        </div>
+                        <div id="password-result" class="hidden mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm"></div>
+                        <div id="set-password-form" class="hidden mt-2">
+                            <div class="flex gap-2">
+                                <input type="text" id="new-password-input" placeholder="Neues Passwort (min. 8 Zeichen)" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
+                                <button type="button" id="set-password-confirm-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 text-sm">
+                                    Setzen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Bemerkungen -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Bemerkungen</label>
@@ -2915,6 +2937,7 @@
             // Reset photo preview
             document.getElementById('photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
             document.getElementById('photo-delete-btn').classList.add('hidden');
+            document.getElementById('password-section').classList.add('hidden');
             document.getElementById('member-modal').classList.remove('hidden');
         }
 
@@ -2972,6 +2995,19 @@
 
                 // Load cloud permissions if member has Authentik account
                 loadCloudPermissions(member.id);
+
+                // Show password section if member has Authentik account
+                const pwSection = document.getElementById('password-section');
+                const pwResult = document.getElementById('password-result');
+                const setPwForm = document.getElementById('set-password-form');
+                pwResult.classList.add('hidden');
+                setPwForm.classList.add('hidden');
+                if (member.authentik_user_id) {
+                    pwSection.classList.remove('hidden');
+                    pwSection.dataset.memberId = member.id;
+                } else {
+                    pwSection.classList.add('hidden');
+                }
             } catch (error) {
                 console.error('Error loading member:', error);
                 alert('Fehler beim Laden des Mitglieds');
@@ -3287,6 +3323,64 @@
             } catch (error) {
                 console.error('Error deleting photo:', error);
                 alert('Fehler beim Entfernen des Fotos');
+            }
+        }
+
+        async function resetMemberPassword() {
+            const memberId = document.getElementById('password-section').dataset.memberId;
+            if (!memberId) return;
+            if (!confirm('Temporaeres Passwort generieren?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/members/${memberId}/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+
+                const resultEl = document.getElementById('password-result');
+                resultEl.innerHTML = `<strong>Temporaeres Passwort:</strong> <code class="bg-white px-2 py-1 rounded border text-base select-all">${data.tempPassword}</code><br><span class="text-xs text-gray-500">Bitte dem Mitglied mitteilen. Es sollte beim naechsten Login geaendert werden.</span>`;
+                resultEl.classList.remove('hidden');
+                document.getElementById('set-password-form').classList.add('hidden');
+            } catch (error) {
+                console.error('Password reset error:', error);
+                alert('Fehler: ' + error.message);
+            }
+        }
+
+        async function setMemberPassword() {
+            const memberId = document.getElementById('password-section').dataset.memberId;
+            const password = document.getElementById('new-password-input').value;
+            if (!memberId || !password) return;
+
+            if (password.length < 8) {
+                alert('Passwort muss mindestens 8 Zeichen lang sein');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/members/${memberId}/set-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error);
+
+                const resultEl = document.getElementById('password-result');
+                resultEl.innerHTML = `<span class="text-green-700">Passwort erfolgreich gesetzt.</span>`;
+                resultEl.classList.remove('hidden');
+                document.getElementById('set-password-form').classList.add('hidden');
+                document.getElementById('new-password-input').value = '';
+            } catch (error) {
+                console.error('Set password error:', error);
+                alert('Fehler: ' + error.message);
             }
         }
 
@@ -5991,6 +6085,16 @@ ${grussformel}`;
         document.getElementById('cancel-btn').addEventListener('click', () => document.getElementById('member-modal').classList.add('hidden'));
         document.getElementById('search-input').addEventListener('input', (e) => loadMembers({ search: e.target.value, status: document.getElementById('status-filter').value }));
         document.getElementById('status-filter').addEventListener('change', (e) => loadMembers({ search: document.getElementById('search-input').value, status: e.target.value }));
+
+        // Password management
+        document.getElementById('reset-password-btn').addEventListener('click', resetMemberPassword);
+        document.getElementById('set-password-btn').addEventListener('click', () => {
+            const form = document.getElementById('set-password-form');
+            form.classList.toggle('hidden');
+            document.getElementById('password-result').classList.add('hidden');
+            document.getElementById('new-password-input').value = '';
+        });
+        document.getElementById('set-password-confirm-btn').addEventListener('click', setMemberPassword);
 
         // Export dropdown
         const exportDropdownBtn = document.getElementById('export-dropdown-btn');
