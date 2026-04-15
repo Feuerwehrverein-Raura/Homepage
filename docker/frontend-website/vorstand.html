@@ -2269,42 +2269,105 @@
             <div class="container mx-auto px-4 py-4">
                 <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                        <h1 class="text-2xl font-bold text-gray-800">Mitgliedsbeitrag-Brief</h1>
-                        <p class="text-gray-600 text-sm mt-1">Felder bearbeiten und als PDF generieren</p>
+                        <h1 class="text-2xl font-bold text-gray-800">Mitgliedsbeitrag</h1>
+                        <p class="text-gray-600 text-sm mt-1">Brief erstellen, versenden und Zahlungen verwalten</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
+                        <!-- Zustellpräferenz -->
+                        <div class="flex rounded-lg border border-gray-300 overflow-hidden">
+                            <button id="delivery-post" class="px-4 py-2 text-sm font-medium bg-fire-500 text-white" onclick="switchDeliveryMode('post')">
+                                Post
+                            </button>
+                            <button id="delivery-email" class="px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50" onclick="switchDeliveryMode('email')">
+                                E-Mail
+                            </button>
+                        </div>
                         <select id="beitrag-member-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
                             <option value="">Mitglied auswählen...</option>
                         </select>
-                        <button id="beitrag-pdf-btn" class="bg-fire-500 text-white px-5 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-2 text-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            <span>PDF generieren</span>
-                        </button>
-                        <button id="beitrag-bulk-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                            <span>Alle generieren</span>
-                        </button>
-                        <button id="beitrag-email-btn" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                            <span>E-Mail senden</span>
-                        </button>
-                        <button id="beitrag-email-bulk-btn" class="bg-blue-800 text-white px-5 py-2 rounded-lg hover:bg-blue-900 transition-colors flex items-center space-x-2 text-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5"></path></svg>
-                            <span>Alle per E-Mail</span>
-                        </button>
-                        <button id="beitrag-preview-email-btn" class="bg-gray-600 text-white px-5 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 text-sm">
+                        <button id="beitrag-preview-btn" class="bg-gray-600 text-white px-5 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                            <span>E-Mail Vorschau</span>
+                            <span>Vorschau</span>
+                        </button>
+                        <button id="beitrag-send-btn" class="bg-fire-500 text-white px-5 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-2 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                            <span>Senden</span>
+                        </button>
+                        <button id="beitrag-send-all-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <span>An alle senden</span>
                         </button>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- A4 Brief-Maske -->
-        <section class="py-6 bg-gray-100">
-            <div class="container mx-auto px-4 flex justify-center">
-                <div id="brief-a4" class="bg-white shadow-xl" style="width: 210mm; min-height: 297mm; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; position: relative; box-sizing: border-box;">
+        <!-- Formular (nur die variablen Felder, ohne A4-Layout) -->
+        <section id="beitrag-form-section" class="bg-white border-b">
+            <div class="container mx-auto px-4 py-6">
+                <div class="max-w-3xl">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Nur bei Post sichtbar: Empfaenger -->
+                        <div id="form-address-block" class="md:col-span-2 bg-gray-50 rounded-lg p-4">
+                            <h3 class="font-semibold text-gray-700 mb-3">Empfänger (nur Post)</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Name</label>
+                                    <input id="brief-name" type="text" value="Müller Stefan" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Strasse</label>
+                                    <input id="brief-strasse" type="text" value="Rosenweg 9" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">PLZ / Ort</label>
+                                    <input id="brief-plz-ort" type="text" value="4303 Kaiseraugst" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Gemeinsame Felder -->
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Datum</label>
+                            <input id="brief-datum" type="text" value="08.04.2026" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">GV-Datum</label>
+                            <input id="brief-gv-datum" type="text" value="22.März 2026" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Betrag (CHF)</label>
+                            <input id="brief-betrag" type="text" value="25.00" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500 font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Referenz Nr.</label>
+                            <input id="brief-ref" type="text" value="0732" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">Jahr</label>
+                            <input id="brief-jahr" type="text" value="2026" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-fire-500">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Vorschau-Modal (Post-Brief A4 oder E-Mail HTML) -->
+        <div id="beitrag-preview-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-100 rounded-lg max-w-[230mm] w-full max-h-[95vh] overflow-y-auto">
+                <div class="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center rounded-t-lg z-10">
+                    <h3 class="text-lg font-bold text-gray-800">Vorschau</h3>
+                    <button id="close-preview-modal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div id="preview-modal-content" class="p-6 flex justify-center">
+                <!-- Inhalt wird dynamisch befuellt -->
+                </div>
+            </div>
+        </div>
+
+        <!-- A4 Brief-Template (versteckt, wird fuer Post-Vorschau geklont) -->
+        <template id="brief-a4-template">
+            <div class="bg-white shadow-xl" style="width: 210mm; height: 297mm; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; position: relative; box-sizing: border-box;">
 
                     <!-- Briefkopf: Logo links, Titel rechts -->
                     <div style="position: absolute; top: 15mm; left: 25mm; width: 35mm;">
@@ -2465,7 +2528,7 @@
 
                 </div>
             </div>
-        </section>
+        </template>
 
         <!-- ============================================ -->
         <!-- BEITRAGS-EINSTELLUNGEN & ZAHLUNGSTABELLE     -->
@@ -6350,6 +6413,113 @@ ${grussformel}`;
 
         // IBAN fuer QR-Rechnung (Feuerwehrverein Raura)
         const BEITRAG_IBAN = 'CH6430769442492432001';
+        let currentDeliveryMode = 'post';
+
+        // Wechselt zwischen Post und E-Mail Modus
+        function switchDeliveryMode(mode) {
+            currentDeliveryMode = mode;
+            const postBtn = document.getElementById('delivery-post');
+            const emailBtn = document.getElementById('delivery-email');
+            const addressBlock = document.getElementById('form-address-block');
+
+            if (mode === 'post') {
+                postBtn.className = 'px-4 py-2 text-sm font-medium bg-fire-500 text-white';
+                emailBtn.className = 'px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50';
+                addressBlock.classList.remove('hidden');
+            } else {
+                emailBtn.className = 'px-4 py-2 text-sm font-medium bg-blue-600 text-white';
+                postBtn.className = 'px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50';
+                addressBlock.classList.add('hidden');
+            }
+        }
+
+        // Oeffnet die Vorschau als Modal (Post = A4 Brief, E-Mail = HTML)
+        function openBeitragPreview() {
+            const container = document.getElementById('preview-modal-content');
+
+            if (currentDeliveryMode === 'post') {
+                // A4-Brief aus Template klonen und Felder befuellen
+                const tmpl = document.getElementById('brief-a4-template');
+                const clone = tmpl.content.cloneNode(true);
+                const div = clone.querySelector('div');
+
+                // Felder im geklonten Brief ersetzen (Inputs durch Text)
+                const vals = {
+                    name: document.getElementById('brief-name').value,
+                    strasse: document.getElementById('brief-strasse').value,
+                    plzOrt: document.getElementById('brief-plz-ort').value,
+                    datum: document.getElementById('brief-datum').value,
+                    gvDatum: document.getElementById('brief-gv-datum').value,
+                    betrag: document.getElementById('brief-betrag').value,
+                    ref: document.getElementById('brief-ref').value,
+                    jahr: document.getElementById('brief-jahr').value
+                };
+                // Inputs im Template durch statischen Text ersetzen
+                div.querySelectorAll('input.brief-input').forEach(input => {
+                    const span = document.createElement('span');
+                    span.textContent = input.value;
+                    if (input.style.fontWeight === 'bold') span.style.fontWeight = 'bold';
+                    input.replaceWith(span);
+                });
+                // Dynamische Spans befuellen
+                const betragZeile = div.querySelector('#brief-betrag-zeile');
+                if (betragZeile) betragZeile.textContent = parseInt(vals.betrag) || vals.betrag;
+
+                const refPadded = vals.ref.replace(/\D/g, '').padStart(5, '0') + '0';
+                const refFormatted = '00 00000 00000 00000 00000 ' + refPadded.padStart(5, '0');
+                const betragFormatted = parseFloat(vals.betrag).toFixed(2);
+                ['es-referenz', 'zt-referenz'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = refFormatted; });
+                ['es-betrag', 'zt-betrag'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = betragFormatted; });
+                const ztJahr = div.querySelector('#zt-jahr'); if (ztJahr) ztJahr.textContent = vals.jahr;
+                const ztRefName = div.querySelector('#zt-ref-name'); if (ztRefName) ztRefName.textContent = `Ref. ${vals.ref} - ${vals.name}`;
+
+                // QR-Code generieren
+                const qrContainer = div.querySelector('#beitrag-qr-code');
+                if (qrContainer) {
+                    try {
+                        const qrRefClean = ('00000000000000000000' + refPadded).slice(-26);
+                        const qrPayload = [
+                            'SPC', '0200', '1', BEITRAG_IBAN,
+                            'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
+                            '', '', '', '', '', '', betragFormatted, 'CHF',
+                            'S', vals.name, vals.strasse, '', vals.plzOrt.match(/^\d+/)?.[0] || '', vals.plzOrt.replace(/^\d+\s*/, '') || '', 'CH',
+                            'QRR', qrRefClean, 'Mitgliederbeitrag ' + vals.jahr, 'EPD', ''
+                        ].join('\n');
+                        const qr = qrcode(0, 'M');
+                        qr.addData(qrPayload);
+                        qr.make();
+                        qrContainer.innerHTML = qr.createImgTag(3, 0);
+                        const img = qrContainer.querySelector('img');
+                        if (img) { img.style.width = '40mm'; img.style.height = '40mm'; }
+                    } catch (e) { qrContainer.innerHTML = '<span style="font-size:7pt;color:#c00;">QR-Fehler</span>'; }
+                }
+
+                container.innerHTML = '';
+                container.appendChild(clone);
+            } else {
+                // E-Mail HTML Vorschau
+                const html = generateBeitragEmailHTML(null);
+                container.innerHTML = '<div style="max-width:700px;width:100%;background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,0.1);">' +
+                    html.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '') +
+                    '</div>';
+            }
+
+            document.getElementById('beitrag-preview-modal').classList.remove('hidden');
+        }
+
+        function closeBeitragPreview() {
+            document.getElementById('beitrag-preview-modal').classList.add('hidden');
+        }
+
+        // Senden-Button: je nach Modus E-Mail oder PDF
+        function handleBeitragSend(bulk) {
+            if (currentDeliveryMode === 'email') {
+                sendBeitragEmail(bulk);
+            } else {
+                if (bulk) generateBeitragBulk();
+                else generateBeitragPDF();
+            }
+        }
 
         // Befuellt das Mitglieder-Dropdown im Beitrag-Tab
         function loadBeitragMembers() {
@@ -6377,108 +6547,10 @@ ${grussformel}`;
             updateBeitragDerived();
         }
 
-        // Aktualisiert abgeleitete Felder (Referenz, Betragszeile, QR-Code)
+        // Aktualisiert abgeleitete Felder (nur Formular-Synchronisation, kein DOM im Template)
         function updateBeitragDerived() {
-            const refNr = document.getElementById('brief-ref').value;
-            const betrag = document.getElementById('brief-betrag').value;
-            const jahr = document.getElementById('brief-jahr').value;
-            const name = document.getElementById('brief-name').value;
-
-            // Betragszeile synchronisieren
-            document.getElementById('brief-betrag-zeile').textContent = parseInt(betrag) || betrag;
-
-            // QR-Referenz: Ref-Nr mit fuehrender 0 auffuellen (26-stellig)
-            const refPadded = refNr.replace(/\D/g, '').padStart(5, '0') + '0';
-            const refFormatted = '00 00000 00000 00000 00000 ' + refPadded.padStart(5, '0');
-            document.getElementById('es-referenz').textContent = refFormatted;
-            document.getElementById('zt-referenz').textContent = refFormatted;
-
-            // Betrag synchronisieren
-            const betragFormatted = parseFloat(betrag).toFixed(2);
-            document.getElementById('es-betrag').textContent = betragFormatted;
-            document.getElementById('zt-betrag').textContent = betragFormatted;
-
-            // Jahr und Ref-Name
-            document.getElementById('zt-jahr').textContent = jahr;
-            document.getElementById('zt-ref-name').textContent = `Ref. ${refNr} - ${name}`;
-
-            // QR-Code generieren (Swiss QR-Bill Format)
-            generateSwissQRCode();
-        }
-
-        // Generiert den Swiss QR-Bill QR-Code
-        function generateSwissQRCode() {
-            const container = document.getElementById('beitrag-qr-code');
-            const betrag = parseFloat(document.getElementById('brief-betrag').value).toFixed(2);
-            const refNr = document.getElementById('brief-ref').value.replace(/\D/g, '');
-            const name = document.getElementById('brief-name').value;
-            const strasse = document.getElementById('brief-strasse').value;
-            const plzOrt = document.getElementById('brief-plz-ort').value;
-
-            // Swiss QR-Bill Payload (SPC Format)
-            // Referenz als QR-Referenz (26 Stellen + Pruefziffer)
-            const refPadded = refNr.padStart(5, '0') + '0';
-            const qrRef = '00 00000 00000 00000 00000 ' + refPadded.padStart(5, '0');
-            const qrRefClean = qrRef.replace(/\s/g, '');
-
-            const qrPayload = [
-                'SPC',                              // QR Type
-                '0200',                             // Version
-                '1',                                // Coding (UTF-8)
-                BEITRAG_IBAN,                       // IBAN
-                'S',                                // Creditor Address Type (structured)
-                'Feuerwehrverein Raura',             // Creditor Name
-                'Marksteinweg 12',                  // Creditor Street
-                '',                                 // Creditor Building
-                '4304',                             // Creditor ZIP
-                'Giebenach',                        // Creditor City
-                'CH',                               // Creditor Country
-                '',                                 // Ultimate Creditor (leer)
-                '',                                 //
-                '',                                 //
-                '',                                 //
-                '',                                 //
-                '',                                 //
-                betrag,                             // Amount
-                'CHF',                              // Currency
-                'S',                                // Debtor Address Type
-                name,                               // Debtor Name
-                strasse,                            // Debtor Street
-                '',                                 // Debtor Building
-                plzOrt.match(/^\d+/)?.[0] || '',    // Debtor ZIP
-                plzOrt.replace(/^\d+\s*/, '') || '', // Debtor City
-                'CH',                               // Debtor Country
-                'QRR',                              // Reference Type (QR-Referenz)
-                qrRefClean,                         // Reference
-                'Mitgliederbeitrag ' + document.getElementById('brief-jahr').value,  // Message
-                'EPD',                              // Trailer
-                ''                                  // Additional info
-            ].join('\n');
-
-            try {
-                const qr = qrcode(0, 'M');
-                qr.addData(qrPayload);
-                qr.make();
-
-                // Swiss QR-Bill: QR-Code mit Schweizerkreuz in der Mitte
-                const imgTag = qr.createImgTag(3, 0);
-                container.innerHTML = imgTag;
-
-                // Schweizerkreuz ueberlagern
-                const img = container.querySelector('img');
-                if (img) {
-                    img.style.width = '40mm';
-                    img.style.height = '40mm';
-                    container.style.position = 'relative';
-
-                    const cross = document.createElement('div');
-                    cross.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7mm;height:7mm;background:white;border:0.5mm solid black;display:flex;align-items:center;justify-content:center;';
-                    cross.innerHTML = '<div style="position:relative;width:4.5mm;height:4.5mm;background:black;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3mm;height:1mm;background:white;"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:1mm;height:3mm;background:white;"></div></div>';
-                    container.appendChild(cross);
-                }
-            } catch (e) {
-                container.innerHTML = '<span style="font-size:7pt;color:#c00;">QR-Fehler</span>';
-            }
+            // Nichts zu tun - die Brief-Vorschau und QR-Code werden
+            // erst beim Oeffnen des Vorschau-Modals generiert
         }
 
         // Laedt den Beitrag-Tab: Mitglieder-Dropdown, Jahres-Einstellungen und Zahlungen
@@ -7105,15 +7177,12 @@ ${grussformel}`;
         document.getElementById('beitrag-member-select').addEventListener('change', (e) => {
             if (e.target.value) fillBeitragFromMember(e.target.value);
         });
-        document.getElementById('beitrag-pdf-btn').addEventListener('click', generateBeitragPDF);
-        document.getElementById('beitrag-bulk-btn').addEventListener('click', generateBeitragBulk);
-        document.getElementById('beitrag-email-btn').addEventListener('click', () => sendBeitragEmail(false));
-        document.getElementById('beitrag-email-bulk-btn').addEventListener('click', () => sendBeitragEmail(true));
-        document.getElementById('beitrag-preview-email-btn').addEventListener('click', () => {
-            const html = generateBeitragEmailHTML(null);
-            const w = window.open('', '_blank', 'width=750,height=900');
-            w.document.write(html);
-            w.document.close();
+        document.getElementById('beitrag-preview-btn').addEventListener('click', openBeitragPreview);
+        document.getElementById('beitrag-send-btn').addEventListener('click', () => handleBeitragSend(false));
+        document.getElementById('beitrag-send-all-btn').addEventListener('click', () => handleBeitragSend(true));
+        document.getElementById('close-preview-modal').addEventListener('click', closeBeitragPreview);
+        document.getElementById('beitrag-preview-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('beitrag-preview-modal')) closeBeitragPreview();
         });
         // Beitrags-Einstellungen & Zahlungen
         document.getElementById('fee-year-select').addEventListener('change', () => { loadFeeSettings(); loadFeePayments(); });
