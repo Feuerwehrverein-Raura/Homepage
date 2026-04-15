@@ -17,6 +17,39 @@
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
     <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+    <!-- QR Code Generator fuer Swiss QR-Rechnung -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <style>
+        /* Brief-Maske: editierbare Felder unsichtbar eingebettet */
+        .brief-input {
+            border: none;
+            border-bottom: 1.5px dashed #dc2626;
+            background: #fef2f2;
+            outline: none;
+            padding: 1px 3px;
+            font-family: Arial, Helvetica, sans-serif;
+            border-radius: 2px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .brief-input:focus {
+            background: #fee2e2;
+            border-bottom-color: #b91c1c;
+        }
+        .brief-input-bold { font-weight: bold; }
+        /* Druckansicht: Inputs wie normaler Text */
+        @media print {
+            .brief-input {
+                border: none !important;
+                background: none !important;
+                padding: 0 !important;
+            }
+            #beitrag-section > section:first-child { display: none !important; }
+            body { background: white !important; }
+            nav, .tab-btn, section.bg-white.border-b { display: none !important; }
+            #beitrag-section { display: block !important; }
+            #brief-a4 { box-shadow: none !important; margin: 0 !important; }
+        }
+    </style>
     <style>
         /* Template Editor Quill customization */
         #template-editor-quill { height: 400px; background: white; }
@@ -191,6 +224,9 @@
                 </button>
                 <button id="tab-pingen" class="tab-btn py-3 md:py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap text-sm md:text-base touch-manipulation">
                     Post
+                </button>
+                <button id="tab-beitrag" class="tab-btn py-3 md:py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap text-sm md:text-base touch-manipulation">
+                    Mitgliedsbeitrag
                 </button>
             </div>
         </div>
@@ -2220,6 +2256,204 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- ============================================================
+         MITGLIEDSBEITRAG-BEREICH
+         Briefmaske die exakt wie der PDF-Brief aussieht.
+         Variable Felder sind editierbar, der Rest ist fixe Vorlage.
+         ============================================================ -->
+    <div id="beitrag-section" class="hidden">
+        <!-- Toolbar -->
+        <section class="bg-white border-b">
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Mitgliedsbeitrag-Brief</h1>
+                        <p class="text-gray-600 text-sm mt-1">Felder bearbeiten und als PDF generieren</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <select id="beitrag-member-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
+                            <option value="">Mitglied auswählen...</option>
+                        </select>
+                        <button id="beitrag-pdf-btn" class="bg-fire-500 text-white px-5 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-2 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            <span>PDF generieren</span>
+                        </button>
+                        <button id="beitrag-bulk-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                            <span>Alle generieren</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- A4 Brief-Maske -->
+        <section class="py-6 bg-gray-100">
+            <div class="container mx-auto px-4 flex justify-center">
+                <div id="brief-a4" class="bg-white shadow-xl" style="width: 210mm; min-height: 297mm; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.5; position: relative; box-sizing: border-box;">
+
+                    <!-- Briefkopf: Logo links, Titel rechts -->
+                    <div style="position: absolute; top: 15mm; left: 25mm; width: 35mm;">
+                        <img src="images/logo.png" alt="FWV Raura Logo" style="width: 35mm; height: auto;">
+                    </div>
+                    <div style="position: absolute; top: 15mm; left: 118mm;">
+                        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Feuerwehrverein Raura</div>
+                        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
+                    </div>
+
+                    <!-- Absender klein (ueber dem Adressfenster) -->
+                    <div style="position: absolute; top: 48mm; left: 118mm; font-size: 8pt; color: #333;">
+                        G.Costanza, Marksteinweg 12, 4304 Giebenach
+                    </div>
+
+                    <!-- Empfaenger im Adressfenster: Swiss Standard X=118mm, Y=60mm -->
+                    <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm; height: 25.5mm;">
+                        <input id="brief-name" type="text" value="Müller Stefan" class="brief-input" style="display: block; width: 75mm; font-size: 11pt; font-weight: normal;">
+                        <input id="brief-strasse" type="text" value="Rosenweg 9" class="brief-input" style="display: block; width: 75mm; font-size: 11pt;">
+                        <input id="brief-plz-ort" type="text" value="4303 Kaiseraugst" class="brief-input" style="display: block; width: 75mm; font-size: 11pt;">
+                    </div>
+
+                    <!-- Datum rechtsbündig (EDITIERBAR) -->
+                    <div style="position: absolute; top: 87mm; right: 25mm; text-align: right;">
+                        Giebenach, <input id="brief-datum" type="text" value="08.04.2026" class="brief-input" style="width: 25mm; text-align: left; font-size: 11pt;">
+                    </div>
+
+                    <!-- Briefinhalt: startet bei 97mm, muss vor 185mm enden -->
+                    <div style="position: absolute; top: 97mm; left: 25mm; right: 25mm; font-size: 11pt; line-height: 1.4;">
+
+                        <div style="margin-bottom: 4mm;">
+                            Liebe Mitglieder
+                        </div>
+
+                        <div style="margin-bottom: 2mm;">
+                            Der Mitgliedsbeitrag ist wie gewohnt um diese Jahreszeit fällig.
+                        </div>
+                        <div style="margin-bottom: 2mm;">
+                            Die Generalversammlung vom <input id="brief-gv-datum" type="text" value="22.März 2026" class="brief-input" style="width: 28mm; font-size: 11pt;"> hat beschlossen, den Beitrag auf den
+                            bewährten &nbsp;&nbsp;&nbsp;&nbsp;<strong>Fr. <input id="brief-betrag" type="text" value="25.00" class="brief-input brief-input-bold" style="width: 14mm; font-size: 11pt; font-weight: bold;"></strong>&nbsp;&nbsp;&nbsp;&nbsp; pro Mitglied zu belassen.
+                        </div>
+
+                        <div style="margin-bottom: 3mm;">
+                            Mir obliegt es nun traditionsgemäss Euch um die Entrichtung dieses Beitrages
+                            anzugehen. Ich danke Euch herzlich für eine baldige Überweisung mit beiliegendem
+                            Einzahlungsschein, Ref. Nr. <input id="brief-ref" type="text" value="0732" class="brief-input" style="width: 14mm; font-size: 11pt;">
+                        </div>
+
+                        <div style="margin-bottom: 6mm;">
+                            Mitgliederbeitrag <input id="brief-jahr" type="text" value="2026" class="brief-input" style="width: 13mm; font-size: 11pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sFr. <span id="brief-betrag-zeile">25</span>.-
+                        </div>
+
+                        <div style="margin-bottom: 4mm;">
+                            Mit freundlichen Grüssen
+                        </div>
+
+                        <div style="margin-bottom: 0;">
+                            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+                            <em>der Kassier</em><br><br>
+                            G. Costanza
+                        </div>
+
+                    </div>
+
+                    <!-- ============================================ -->
+                    <!-- EINZAHLUNGSSCHEIN / QR-RECHNUNG              -->
+                    <!-- ============================================ -->
+                    <!-- Scherenlinie: 105mm vom unteren Rand = 192mm von oben -->
+                    <div style="position: absolute; top: 188mm; left: 0; right: 0; text-align: center; font-size: 7pt; color: #555; letter-spacing: 0.5mm;">
+                        &#9660; &#9660; &#9660;&nbsp; Vor der Einzahlung abzutrennen / A détacher avant le versement / Da staccare prima del versamento &nbsp;&#9660; &#9660; &#9660;
+                    </div>
+
+                    <!-- QR-Rechnung: beginnt bei 192mm von oben (105mm vom unteren Rand) -->
+                    <div style="border-top: 1px dashed #000; padding-top: 1mm; position: absolute; top: 192mm; left: 0; right: 0; bottom: 0; padding-left: 5mm; padding-right: 5mm;">
+                        <div style="text-align: center; font-size: 7pt; margin-bottom: 3mm; color: #555;">
+                            Vor der Einzahlung abzutrennen
+                        </div>
+
+                        <div style="display: flex; font-size: 8pt; line-height: 1.4;">
+                            <!-- Empfangsschein (links) -->
+                            <div style="width: 62mm; border-right: 1px dashed #ccc; padding-right: 3mm;">
+                                <div style="font-size: 10pt; font-weight: bold; margin-bottom: 3mm;">Empfangsschein</div>
+
+                                <div style="font-size: 6pt; font-weight: bold; margin-bottom: 1mm;">Konto / Zahlbar an</div>
+                                <div style="font-size: 7pt; margin-bottom: 2mm;">
+                                    CH64 3076 9442 4924 3200 1<br>
+                                    Feuerwehrverein Raura<br>
+                                    Marksteinweg 12<br>
+                                    4304 Giebenach
+                                </div>
+
+                                <div style="font-size: 6pt; font-weight: bold; margin-bottom: 1mm;">Referenz</div>
+                                <div id="es-referenz" style="font-size: 7pt; margin-bottom: 2mm;">00 00000 00000 00000 00000 07320</div>
+
+                                <div style="font-size: 6pt; font-weight: bold; margin-bottom: 1mm;">Zahlbar durch (Name/Adresse)</div>
+                                <div style="border: 1px solid #000; width: 50mm; height: 15mm; margin-bottom: 3mm;"></div>
+
+                                <div style="display: flex; justify-content: space-between; width: 50mm;">
+                                    <div>
+                                        <div style="font-size: 6pt; font-weight: bold;">Währung</div>
+                                        <div style="font-size: 8pt;">CHF</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 6pt; font-weight: bold;">Betrag</div>
+                                        <div id="es-betrag" style="font-size: 8pt;">25.00</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 6pt; text-align: right; margin-top: 1mm; width: 50mm;">Annahmestelle</div>
+                            </div>
+
+                            <!-- Zahlteil (mitte mit QR) -->
+                            <div style="width: 51mm; padding: 0 3mm;">
+                                <div style="font-size: 10pt; font-weight: bold; margin-bottom: 3mm;">Zahlteil</div>
+                                <!-- QR Code Platzhalter -->
+                                <div id="beitrag-qr-code" style="width: 40mm; height: 40mm; margin-bottom: 3mm; display: flex; align-items: center; justify-content: center; background: #f9f9f9;">
+                                    <span style="font-size: 7pt; color: #999;">QR-Code wird generiert...</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; width: 46mm;">
+                                    <div>
+                                        <div style="font-size: 6pt; font-weight: bold;">Währung</div>
+                                        <div style="font-size: 8pt;">CHF</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 6pt; font-weight: bold;">Betrag</div>
+                                        <div id="zt-betrag" style="font-size: 8pt;">25.00</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Konto rechts -->
+                            <div style="flex: 1; padding-left: 3mm;">
+                                <div style="font-size: 6pt; font-weight: bold; margin-bottom: 1mm;">Konto / Zahlbar an</div>
+                                <div style="font-size: 8pt; margin-bottom: 3mm;">
+                                    CH64 3076 9442 4924 3200 1<br>
+                                    Feuerwehrverein Raura<br>
+                                    Marksteinweg 12<br>
+                                    4304 Giebenach
+                                </div>
+
+                                <div style="font-size: 6pt; font-weight: bold; margin-bottom: 1mm;">Referenz</div>
+                                <div id="zt-referenz" style="font-size: 8pt; margin-bottom: 3mm;">00 00000 00000 00000 00000 07320</div>
+
+                                <div style="font-size: 6pt; font-weight: bold; margin-bottom: 1mm;">Zusätzliche Informationen</div>
+                                <div style="font-size: 8pt; margin-bottom: 1mm;">Mitgliederbeitrag <span id="zt-jahr">2026</span></div>
+                                <div id="zt-ref-name" style="font-size: 8pt; margin-bottom: 3mm;">Ref. 0732 - Müller Stefan</div>
+
+                                <div style="font-size: 6pt; font-weight: bold; margin-bottom: 1mm;">Zahlbar durch (Name/Adresse)</div>
+                                <div style="border: 1px solid #000; width: 100%; height: 18mm; margin-bottom: 1mm;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div style="display: flex; justify-content: space-between; font-size: 7pt; color: #555; margin-top: 3mm; padding: 0 5mm;">
+                            <div>Kassier: Costanza Giuseppe, Marksteinweg 12, 4304 Giebenach Tel.+41 61 811 26 32</div>
+                            <div>Nat. +41 79 501 71 20</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- Toast Container -->
@@ -6006,6 +6240,229 @@ ${grussformel}`;
         }
 
         // ============================================
+        // MITGLIEDSBEITRAG BRIEF-MASKE
+        // ============================================
+
+        // IBAN fuer QR-Rechnung (Feuerwehrverein Raura)
+        const BEITRAG_IBAN = 'CH6430769442492432001';
+
+        // Befuellt das Mitglieder-Dropdown im Beitrag-Tab
+        function loadBeitragMembers() {
+            const select = document.getElementById('beitrag-member-select');
+            if (select.options.length > 1) return;
+            const sorted = [...members].sort((a, b) => a.nachname.localeCompare(b.nachname));
+            sorted.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.textContent = `${m.nachname} ${m.vorname}`;
+                select.appendChild(opt);
+            });
+        }
+
+        // Wird aufgerufen wenn ein Mitglied ausgewaehlt wird - befuellt alle Felder
+        function fillBeitragFromMember(memberId) {
+            const member = members.find(m => String(m.id) === String(memberId));
+            if (!member) return;
+            document.getElementById('brief-name').value = `${member.nachname} ${member.vorname}`;
+            document.getElementById('brief-strasse').value = member.strasse || '';
+            document.getElementById('brief-plz-ort').value = `${member.plz || ''} ${member.ort || ''}`.trim();
+            // Ref Nr. aus Mitglieds-ID ableiten (4-stellig)
+            const refNr = String(member.id).padStart(4, '0');
+            document.getElementById('brief-ref').value = refNr;
+            updateBeitragDerived();
+        }
+
+        // Aktualisiert abgeleitete Felder (Referenz, Betragszeile, QR-Code)
+        function updateBeitragDerived() {
+            const refNr = document.getElementById('brief-ref').value;
+            const betrag = document.getElementById('brief-betrag').value;
+            const jahr = document.getElementById('brief-jahr').value;
+            const name = document.getElementById('brief-name').value;
+
+            // Betragszeile synchronisieren
+            document.getElementById('brief-betrag-zeile').textContent = parseInt(betrag) || betrag;
+
+            // QR-Referenz: Ref-Nr mit fuehrender 0 auffuellen (26-stellig)
+            const refPadded = refNr.replace(/\D/g, '').padStart(5, '0') + '0';
+            const refFormatted = '00 00000 00000 00000 00000 ' + refPadded.padStart(5, '0');
+            document.getElementById('es-referenz').textContent = refFormatted;
+            document.getElementById('zt-referenz').textContent = refFormatted;
+
+            // Betrag synchronisieren
+            const betragFormatted = parseFloat(betrag).toFixed(2);
+            document.getElementById('es-betrag').textContent = betragFormatted;
+            document.getElementById('zt-betrag').textContent = betragFormatted;
+
+            // Jahr und Ref-Name
+            document.getElementById('zt-jahr').textContent = jahr;
+            document.getElementById('zt-ref-name').textContent = `Ref. ${refNr} - ${name}`;
+
+            // QR-Code generieren (Swiss QR-Bill Format)
+            generateSwissQRCode();
+        }
+
+        // Generiert den Swiss QR-Bill QR-Code
+        function generateSwissQRCode() {
+            const container = document.getElementById('beitrag-qr-code');
+            const betrag = parseFloat(document.getElementById('brief-betrag').value).toFixed(2);
+            const refNr = document.getElementById('brief-ref').value.replace(/\D/g, '');
+            const name = document.getElementById('brief-name').value;
+            const strasse = document.getElementById('brief-strasse').value;
+            const plzOrt = document.getElementById('brief-plz-ort').value;
+
+            // Swiss QR-Bill Payload (SPC Format)
+            // Referenz als QR-Referenz (26 Stellen + Pruefziffer)
+            const refPadded = refNr.padStart(5, '0') + '0';
+            const qrRef = '00 00000 00000 00000 00000 ' + refPadded.padStart(5, '0');
+            const qrRefClean = qrRef.replace(/\s/g, '');
+
+            const qrPayload = [
+                'SPC',                              // QR Type
+                '0200',                             // Version
+                '1',                                // Coding (UTF-8)
+                BEITRAG_IBAN,                       // IBAN
+                'S',                                // Creditor Address Type (structured)
+                'Feuerwehrverein Raura',             // Creditor Name
+                'Marksteinweg 12',                  // Creditor Street
+                '',                                 // Creditor Building
+                '4304',                             // Creditor ZIP
+                'Giebenach',                        // Creditor City
+                'CH',                               // Creditor Country
+                '',                                 // Ultimate Creditor (leer)
+                '',                                 //
+                '',                                 //
+                '',                                 //
+                '',                                 //
+                '',                                 //
+                betrag,                             // Amount
+                'CHF',                              // Currency
+                'S',                                // Debtor Address Type
+                name,                               // Debtor Name
+                strasse,                            // Debtor Street
+                '',                                 // Debtor Building
+                plzOrt.match(/^\d+/)?.[0] || '',    // Debtor ZIP
+                plzOrt.replace(/^\d+\s*/, '') || '', // Debtor City
+                'CH',                               // Debtor Country
+                'QRR',                              // Reference Type (QR-Referenz)
+                qrRefClean,                         // Reference
+                'Mitgliederbeitrag ' + document.getElementById('brief-jahr').value,  // Message
+                'EPD',                              // Trailer
+                ''                                  // Additional info
+            ].join('\n');
+
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData(qrPayload);
+                qr.make();
+
+                // Swiss QR-Bill: QR-Code mit Schweizerkreuz in der Mitte
+                const imgTag = qr.createImgTag(3, 0);
+                container.innerHTML = imgTag;
+
+                // Schweizerkreuz ueberlagern
+                const img = container.querySelector('img');
+                if (img) {
+                    img.style.width = '40mm';
+                    img.style.height = '40mm';
+                    container.style.position = 'relative';
+
+                    const cross = document.createElement('div');
+                    cross.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7mm;height:7mm;background:white;border:0.5mm solid black;display:flex;align-items:center;justify-content:center;';
+                    cross.innerHTML = '<div style="position:relative;width:4.5mm;height:4.5mm;background:black;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3mm;height:1mm;background:white;"></div><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:1mm;height:3mm;background:white;"></div></div>';
+                    container.appendChild(cross);
+                }
+            } catch (e) {
+                container.innerHTML = '<span style="font-size:7pt;color:#c00;">QR-Fehler</span>';
+            }
+        }
+
+        // Laedt den Beitrag-Tab: Mitglieder-Dropdown befuellen und QR aktualisieren
+        function loadBeitragBriefe() {
+            loadBeitragMembers();
+            updateBeitragDerived();
+        }
+
+        // PDF generieren via Backend-API
+        async function generateBeitragPDF() {
+            const memberId = document.getElementById('beitrag-member-select').value;
+            if (!memberId) {
+                showToast('Bitte wähle zuerst ein Mitglied aus', 'warning');
+                return;
+            }
+
+            const betrag = document.getElementById('brief-betrag').value;
+            const jahr = document.getElementById('brief-jahr').value;
+
+            try {
+                showToast('PDF wird generiert...', 'info');
+
+                const response = await fetch(`${API_BASE}/invoices/generate-qr`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        member_id: memberId,
+                        amount: parseFloat(betrag),
+                        year: parseInt(jahr),
+                        description: `Mitgliederbeitrag ${jahr}`,
+                        preview: true
+                    })
+                });
+
+                if (!response.ok) throw new Error('PDF-Generierung fehlgeschlagen');
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const name = document.getElementById('brief-name').value.replace(/\s+/g, '_');
+                a.href = url;
+                a.download = `Mitgliederbeitrag_${jahr}_${name}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showToast('PDF erfolgreich generiert', 'success');
+            } catch (error) {
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
+        // Massen-PDF: Fuer alle Mitglieder generieren
+        async function generateBeitragBulk() {
+            const betrag = document.getElementById('brief-betrag').value;
+            const jahr = document.getElementById('brief-jahr').value;
+
+            if (!confirm(`Mitgliedsbeitragsbriefe für alle ${members.length} Mitglieder generieren?`)) return;
+
+            try {
+                showToast('Massen-PDF wird generiert...', 'info');
+
+                const response = await fetch(`${API_BASE}/invoices/generate-bulk`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        amount: parseFloat(betrag),
+                        year: parseInt(jahr),
+                        description: `Mitgliederbeitrag ${jahr}`
+                    })
+                });
+
+                if (!response.ok) throw new Error('Massen-Generierung fehlgeschlagen');
+
+                const result = await response.json();
+                showToast(`${result.count || result.generated || 'Alle'} Briefe generiert`, 'success');
+            } catch (error) {
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
+        // ============================================
         // TAB SWITCHING
         // ============================================
 
@@ -6025,6 +6482,7 @@ ${grussformel}`;
             document.getElementById('email-section').classList.add('hidden');
             document.getElementById('registrations-section').classList.add('hidden');
             document.getElementById('pingen-section').classList.add('hidden');
+            document.getElementById('beitrag-section').classList.add('hidden');
 
             if (tab === 'members') {
                 document.getElementById('tab-members').classList.add('border-fire-500', 'text-fire-600');
@@ -6059,6 +6517,10 @@ ${grussformel}`;
                 document.getElementById('tab-pingen').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('pingen-section').classList.remove('hidden');
                 loadPingenData();
+            } else if (tab === 'beitrag') {
+                document.getElementById('tab-beitrag').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('beitrag-section').classList.remove('hidden');
+                loadBeitragBriefe();
             }
         }
 
@@ -6076,6 +6538,18 @@ ${grussformel}`;
         document.getElementById('tab-email').addEventListener('click', () => switchTab('email'));
         document.getElementById('tab-registrations').addEventListener('click', () => switchTab('registrations'));
         document.getElementById('tab-pingen').addEventListener('click', () => switchTab('pingen'));
+        document.getElementById('tab-beitrag').addEventListener('click', () => switchTab('beitrag'));
+
+        // Beitrag
+        document.getElementById('beitrag-member-select').addEventListener('change', (e) => {
+            if (e.target.value) fillBeitragFromMember(e.target.value);
+        });
+        document.getElementById('beitrag-pdf-btn').addEventListener('click', generateBeitragPDF);
+        document.getElementById('beitrag-bulk-btn').addEventListener('click', generateBeitragBulk);
+        // Brief-Felder: bei Aenderung abgeleitete Felder aktualisieren
+        ['brief-ref', 'brief-betrag', 'brief-jahr', 'brief-name', 'brief-strasse', 'brief-plz-ort'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateBeitragDerived);
+        });
 
         // Members
         document.getElementById('add-member-btn').addEventListener('click', openNewMemberModal);
