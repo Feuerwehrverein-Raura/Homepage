@@ -6902,11 +6902,21 @@ ${grussformel}`;
 
         // Massenversand: Jedes Mitglied bekommt seine Post nach seiner eigenen Zustellpraeferenz
         // Ehrenmitglieder werden ausgeschlossen (beitragsbefreit)
+        let beitragBulkSending = false;
         async function sendBeitragBulkByPreference() {
-            const beitragspflichtig = members.filter(m => m.status !== 'Ehrenmitglied');
-            const emailMembers = beitragspflichtig.filter(m => m.zustellung_email && m.email);
-            const postMembers = beitragspflichtig.filter(m => m.zustellung_post && m.strasse && m.plz && m.ort);
-            const ehrenCount = members.length - beitragspflichtig.length;
+            // Doppelklick-/Parallel-Schutz: verhindert dass ein zweiter Versand gestartet wird
+            // waehrend der erste noch laeuft
+            if (beitragBulkSending) {
+                showToast('Versand läuft bereits - bitte warten', 'warning');
+                return;
+            }
+            // Ehrenmitglieder (beitragsbefreit) UND bereits bezahlte ausschliessen
+            const isPaid = (m) => currentYearPayments[m.id]?.status === 'bezahlt';
+            const beitragspflichtig = members.filter(m => m.status !== 'Ehrenmitglied' && !isPaid(m));
+            let emailMembers = beitragspflichtig.filter(m => m.zustellung_email && m.email);
+            let postMembers = beitragspflichtig.filter(m => m.zustellung_post && m.strasse && m.plz && m.ort);
+            const ehrenCount = members.filter(m => m.status === 'Ehrenmitglied').length;
+            const paidCount = members.filter(m => m.status !== 'Ehrenmitglied' && isPaid(m)).length;
 
             // Pruefen: haben alle beitragspflichtigen Mitglieder eine Ref-Nr. im aktuellen Jahr?
             const withoutRef = beitragspflichtig.filter(m => !currentYearPayments[m.id]?.reference_nr);
@@ -6916,13 +6926,43 @@ ${grussformel}`;
                 if (!confirm(`⚠ Für ${withoutRef.length} Mitglieder fehlt die Referenznummer für ${document.getElementById('brief-jahr').value}:\n\n${list}${more}\n\nTrotzdem senden? Die QR-Rechnung ohne Referenz ist unbrauchbar!`)) return;
             }
 
-            const msg = `Mitgliedsbeitrag an alle senden:\n` +
-                `- ${emailMembers.length} per E-Mail\n` +
-                `- ${postMembers.length} per Post\n` +
-                (ehrenCount > 0 ? `- ${ehrenCount} Ehrenmitglieder (beitragsbefreit, ausgeschlossen)\n` : '') +
-                `(Gemäss individueller Zustellpräferenz jedes Mitglieds)`;
-            if (!confirm(msg)) return;
+            // Fehlerrobuste Abfrage pro Kanal: Jede Sendeaktion muss einzeln bestaetigt werden.
+            // So kann nicht versehentlich ein unerwuenschter Kanal ausgeloest werden.
+            let sendEmails = false;
+            let sendPost = false;
 
+            if (emailMembers.length > 0) {
+                sendEmails = confirm(
+                    `E-MAIL-VERSAND\n\n` +
+                    `${emailMembers.length} Mitglieder bekommen den Beitragsbrief per E-Mail.\n` +
+                    (ehrenCount > 0 ? `(${ehrenCount} Ehrenmitglieder ausgeschlossen, ` : `(`) +
+                    `${paidCount} bereits bezahlt ausgeschlossen)\n\n` +
+                    `JETZT E-MAILS SENDEN?\n\n` +
+                    `OK = E-Mails senden\nAbbrechen = E-Mails überspringen`
+                );
+            }
+            if (postMembers.length > 0) {
+                sendPost = confirm(
+                    `POSTVERSAND via Pingen\n\n` +
+                    `${postMembers.length} Mitglieder bekommen einen gedruckten Brief per Post.\n\n` +
+                    `JETZT BRIEFE VERSENDEN?\n\n` +
+                    `OK = Briefe drucken & versenden\nAbbrechen = Post überspringen`
+                );
+            }
+            if (!sendEmails && !sendPost) {
+                showToast('Abgebrochen - nichts gesendet', 'info');
+                return;
+            }
+            if (!sendEmails) emailMembers = [];
+            if (!sendPost) postMembers = [];
+
+            beitragBulkSending = true;
+            // Buttons deaktivieren waehrend des Versands (Doppelklick-Schutz UI)
+            const sendBtn = document.getElementById('beitrag-send-btn');
+            const sendAllBtn = document.getElementById('beitrag-send-all-btn');
+            if (sendBtn) sendBtn.disabled = true;
+            if (sendAllBtn) sendAllBtn.disabled = true;
+            try {
             showToast('Versand läuft...', 'info');
             let emailSuccess = 0, emailFailed = 0, postSuccess = 0, postFailed = 0;
             const jahr = document.getElementById('brief-jahr').value;
@@ -6976,6 +7016,11 @@ ${grussformel}`;
                 `E-Mail: ${emailSuccess} gesendet${emailFailed ? `, ${emailFailed} fehlgeschlagen` : ''}\n` +
                 `Post: ${postSuccess} generiert${postFailed ? `, ${postFailed} fehlgeschlagen` : ''}`;
             showToast(resultMsg, (emailFailed + postFailed) ? 'warning' : 'success');
+            } finally {
+                beitragBulkSending = false;
+                if (sendBtn) sendBtn.disabled = false;
+                if (sendAllBtn) sendAllBtn.disabled = false;
+            }
         }
 
         // Befuellt das Mitglieder-Dropdown im Beitrag-Tab

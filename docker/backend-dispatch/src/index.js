@@ -714,12 +714,13 @@ app.delete('/templates/:id', authenticateAny, async (req, res) => {
 
 // DEUTSCH: Einzelne E-Mail senden - optional mit Template und Variablen (z.B. {{vorname}})
 app.post('/email/send', authenticateAny, async (req, res) => {
-    console.log('[EMAIL] /email/send called with:', { to: req.body.to, cc: req.body.cc, template_id: req.body.template_id, member_id: req.body.member_id });
+    console.log('[EMAIL] /email/send called with:', { to: req.body.to, cc: req.body.cc, template_id: req.body.template_id, member_id: req.body.member_id, hasHtml: !!req.body.html });
     try {
-        const { to, cc, subject, body, template_id, variables, member_id, event_id } = req.body;
+        const { to, cc, subject, body, html, template_id, variables, member_id, event_id } = req.body;
 
         let emailSubject = subject;
         let emailBody = body;
+        let emailHtmlOverride = html;
 
         // Use template if provided
         if (template_id) {
@@ -739,22 +740,28 @@ app.post('/email/send', authenticateAny, async (req, res) => {
             }
         }
 
-        // Convert URLs to clickable links for HTML version
-        // IMPORTANT: Match URLs BEFORE replacing newlines, otherwise <br> gets included in URLs
-        const urlRegex = /(https?:\/\/[^\s<]+)/g;
-        const emailHtml = emailBody
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(urlRegex, '<a href="$1">$1</a>')
-            .replace(/\n/g, '<br>');
+        // Wenn HTML explizit mitgegeben: direkt nutzen. Sonst aus Body generieren.
+        let emailHtml;
+        if (emailHtmlOverride) {
+            emailHtml = emailHtmlOverride;
+        } else {
+            // Convert URLs to clickable links for HTML version
+            // IMPORTANT: Match URLs BEFORE replacing newlines, otherwise <br> gets included in URLs
+            const urlRegex = /(https?:\/\/[^\s<]+)/g;
+            emailHtml = (emailBody || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(urlRegex, '<a href="$1">$1</a>')
+                .replace(/\n/g, '<br>');
+        }
 
         // Send email with both text and HTML versions
         const mailOptions = {
             from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
             to,
             subject: emailSubject,
-            text: emailBody,
+            text: emailBody || '',
             html: emailHtml
         };
         if (cc) {
@@ -785,14 +792,21 @@ app.post('/email/bulk', authenticateAny, async (req, res) => {
 
         // Get members (Authorization-Header vom Request weiterreichen)
         console.log('[EMAIL BULK] Fetching members from:', `${process.env.MEMBERS_API_URL}/members`);
-        const members = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
+        const membersResp = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
             params: { ids: member_ids.join(',') },
             headers: { Authorization: req.headers.authorization || '' }
         });
-        console.log('[EMAIL BULK] Fetched', members.data.length, 'members');
+        // SICHERHEIT: Zusaetzlich client-seitig nach den angefragten IDs filtern, falls das Members-API
+        // den ids-Parameter (noch) nicht unterstuetzt. Sonst wuerde an ALLE Mitglieder gesendet!
+        const requestedIds = new Set((member_ids || []).map(String));
+        const filteredMembers = membersResp.data.filter(m => requestedIds.has(String(m.id)));
+        if (filteredMembers.length !== membersResp.data.length) {
+            console.warn('[EMAIL BULK] Members-API did not respect ids filter. Filtered', membersResp.data.length, '->', filteredMembers.length);
+        }
+        console.log('[EMAIL BULK] Processing', filteredMembers.length, 'members (requested:', requestedIds.size + ')');
 
         const results = [];
-        for (const member of members.data) {
+        for (const member of filteredMembers) {
             if (!member.email || !member.zustellung_email) continue;
             // Sicherheit: Ehrenmitglieder werden bei Mitgliedsbeitrag-Versand ausgeschlossen
             if (exclude_honored && member.status === 'Ehrenmitglied') {

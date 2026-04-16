@@ -1601,7 +1601,7 @@ app.get('/funktionen', async (req, res) => {
 // DEUTSCH: Alle Mitglieder abrufen, optional filterbar nach Status und Suchbegriff
 app.get('/members', authenticateAny, async (req, res) => {
     try {
-        const { status, search } = req.query;
+        const { status, search, ids } = req.query;
         let query = 'SELECT * FROM members WHERE 1=1';
         const params = [];
 
@@ -1613,6 +1613,17 @@ app.get('/members', authenticateAny, async (req, res) => {
         if (search) {
             params.push(`%${search}%`);
             query += ` AND (vorname ILIKE $${params.length} OR nachname ILIKE $${params.length} OR email ILIKE $${params.length})`;
+        }
+
+        // DEUTSCH: Wenn 'ids' uebergeben ist (komma-separiert), nur diese Mitglieder zurueckgeben.
+        // Kritisch fuer Bulk-Endpunkte, damit sie nicht an ALLE Mitglieder senden wenn nur bestimmte gemeint sind.
+        if (ids) {
+            const idList = ids.split(',').map(s => s.trim()).filter(Boolean);
+            if (idList.length === 0) {
+                return res.json([]);
+            }
+            params.push(idList);
+            query += ` AND id = ANY($${params.length}::uuid[])`;
         }
 
         query += ' ORDER BY nachname, vorname';
