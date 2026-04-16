@@ -6925,7 +6925,7 @@ ${grussformel}`;
             // Post-Versand: pro Mitglied personalisiertes HTML generieren und via Pingen versenden
             for (const member of postMembers) {
                 try {
-                    const html = generateBeitragEmailHTML(member, true);
+                    const html = generateBeitragLetterHTML(member);
                     const response = await fetch(`${API_BASE}/dispatch/send-post`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
@@ -7264,6 +7264,138 @@ ${grussformel}`;
     <div style="font-size:8pt;color:#333;margin-bottom:15px;">${getAktuarAbsenderLine()}</div>
     <div style="text-align:right;margin-bottom:20px;">Kaiseraugst, ${datum}</div>
     ${bodyContent}
+</div>
+</body></html>`;
+        }
+
+        // Generiert den Mitgliedsbeitrag-Brief im A4-Format (fuer Pingen/Post-Versand)
+        // Gleicher Kopf wie Dispatch-Letter (Logo links, Titel rechts, Adresse im Schweizer Fensterkuvert)
+        // + QR-Rechnung unten
+        function generateBeitragLetterHTML(member) {
+            const betrag = document.getElementById('brief-betrag').value;
+            const jahr = document.getElementById('brief-jahr').value;
+            const datum = document.getElementById('brief-datum').value || new Date().toLocaleDateString('de-CH');
+            const gvDatum = document.getElementById('brief-gv-datum').value;
+            const refNr = member
+                ? (currentYearPayments[member.id]?.reference_nr || '')
+                : document.getElementById('brief-ref').value;
+            const name = member ? `${member.nachname} ${member.vorname}` : document.getElementById('brief-name').value;
+            const strasse = member?.strasse || document.getElementById('brief-strasse').value;
+            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : document.getElementById('brief-plz-ort').value;
+
+            const qrRef27 = buildQRReference(refNr);
+            const refFormatted = formatQRReference(qrRef27);
+            const refShort = qrRef27.slice(-5);
+            const betragFormatted = parseFloat(betrag).toFixed(2);
+            const betragGanz = parseInt(betrag) || betrag;
+
+            // QR-Code als Base64 generieren
+            let qrImgSrc = '';
+            try {
+                const qrPayload = [
+                    'SPC', '0200', '1', BEITRAG_IBAN,
+                    'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
+                    '', '', '', '', '', '',
+                    betragFormatted, 'CHF',
+                    'S', name, strasse, '',
+                    plzOrt.match(/^\d+/)?.[0] || '',
+                    plzOrt.replace(/^\d+\s*/, '') || '',
+                    'CH',
+                    'QRR', qrRef27, 'Mitgliederbeitrag ' + jahr, 'EPD', ''
+                ].join('\n');
+                const qr = qrcode(0, 'M');
+                qr.addData(qrPayload);
+                qr.make();
+                qrImgSrc = qr.createDataURL(4, 0);
+            } catch (e) { qrImgSrc = ''; }
+
+            return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
+<body>
+<div style="width:210mm;height:297mm;position:relative;box-sizing:border-box;background:white;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
+    <!-- Logo links -->
+    <div style="position:absolute;top:15mm;left:25mm;width:35mm;">
+        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
+    </div>
+    <!-- Titel rechts (ausserhalb Frankierbereich Y<40mm) -->
+    <div style="position:absolute;top:15mm;left:118mm;">
+        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
+        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
+    </div>
+    <!-- Absender klein (Y<40mm, ueber Frankierbereich) -->
+    <div style="position:absolute;top:35mm;left:118mm;font-size:8pt;color:#333;">${getAbsenderLine()}</div>
+    <!-- Empfaenger im Schweizer Adressfenster X=118mm Y=60mm -->
+    <div style="position:absolute;top:60mm;left:118mm;width:85mm;">
+        <div>${name}</div>
+        <div>${strasse}</div>
+        <div>${plzOrt}</div>
+    </div>
+    <!-- Datum rechtsbuendig -->
+    <div style="position:absolute;top:97mm;right:25mm;text-align:right;">Giebenach, ${datum}</div>
+
+    <!-- Brieftext -->
+    <div style="position:absolute;top:110mm;left:25mm;right:25mm;font-size:11pt;line-height:1.4;">
+        <div style="margin-bottom:4mm;">Liebe Mitglieder</div>
+        <div style="margin-bottom:2mm;">Der Mitgliedsbeitrag ist wie gewohnt um diese Jahreszeit fällig.</div>
+        <div style="margin-bottom:2mm;">
+            Die Generalversammlung vom ${gvDatum} hat beschlossen, den Beitrag auf den
+            bewährten &nbsp;&nbsp;&nbsp;&nbsp;<strong>Fr. ${betragFormatted}</strong>&nbsp;&nbsp;&nbsp;&nbsp; pro Mitglied zu belassen.
+        </div>
+        <div style="margin-bottom:3mm;">
+            Mir obliegt es nun traditionsgemäss Euch um die Entrichtung dieses Beitrages
+            anzugehen. Ich danke Euch herzlich für eine baldige Überweisung mit beiliegendem
+            Einzahlungsschein, Ref. Nr. ${refShort}
+        </div>
+        <div style="margin-bottom:6mm;">Mitgliederbeitrag ${jahr}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sFr. ${betragGanz}.-</div>
+        <div style="margin-bottom:4mm;">Mit freundlichen Grüssen</div>
+        <div>
+            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+            <em>der Kassier</em><br><br>
+            ${getKassierSignature()}
+        </div>
+    </div>
+
+    <!-- QR-Rechnung unten (Swiss QR-Bill Standard: Hoehe 105mm ab Unterkante) -->
+    <div style="position:absolute;top:188mm;left:0;right:0;text-align:center;font-size:7pt;color:#555;letter-spacing:0.5mm;">
+        &#9660; &#9660; &#9660;&nbsp; Vor der Einzahlung abzutrennen &nbsp;&#9660; &#9660; &#9660;
+    </div>
+    <div style="border-top:1px dashed #000;padding-top:1mm;position:absolute;top:192mm;left:0;right:0;bottom:0;padding-left:5mm;padding-right:5mm;">
+        <div style="display:flex;font-size:8pt;line-height:1.4;">
+            <div style="width:62mm;border-right:1px dashed #ccc;padding-right:3mm;">
+                <div style="font-size:10pt;font-weight:bold;margin-bottom:3mm;">Empfangsschein</div>
+                <div style="font-size:6pt;font-weight:bold;">Konto / Zahlbar an</div>
+                <div style="font-size:7pt;margin-bottom:2mm;">CH64 3076 9442 4924 3200 1<br>Feuerwehrverein Raura<br>Marksteinweg 12<br>4304 Giebenach</div>
+                <div style="font-size:6pt;font-weight:bold;">Referenz</div>
+                <div style="font-size:7pt;margin-bottom:2mm;">${refFormatted}</div>
+                <div style="font-size:6pt;font-weight:bold;">Zahlbar durch (Name/Adresse)</div>
+                <div style="border:1px solid #000;width:50mm;height:15mm;margin-bottom:3mm;"></div>
+                <div style="display:flex;justify-content:space-between;width:50mm;">
+                    <div><div style="font-size:6pt;font-weight:bold;">Währung</div><div>CHF</div></div>
+                    <div><div style="font-size:6pt;font-weight:bold;">Betrag</div><div>${betragFormatted}</div></div>
+                </div>
+                <div style="font-size:6pt;text-align:right;margin-top:1mm;width:50mm;">Annahmestelle</div>
+            </div>
+            <div style="width:51mm;padding:0 3mm;">
+                <div style="font-size:10pt;font-weight:bold;margin-bottom:3mm;">Zahlteil</div>
+                ${qrImgSrc ? `<img src="${qrImgSrc}" alt="QR-Code" style="width:40mm;height:40mm;margin-bottom:3mm;">` : '<div style="width:40mm;height:40mm;background:#f0f0f0;margin-bottom:3mm;"></div>'}
+                <div style="display:flex;justify-content:space-between;width:46mm;">
+                    <div><div style="font-size:6pt;font-weight:bold;">Währung</div><div>CHF</div></div>
+                    <div><div style="font-size:6pt;font-weight:bold;">Betrag</div><div>${betragFormatted}</div></div>
+                </div>
+            </div>
+            <div style="flex:1;padding-left:3mm;">
+                <div style="font-size:6pt;font-weight:bold;">Konto / Zahlbar an</div>
+                <div style="font-size:8pt;margin-bottom:3mm;">CH64 3076 9442 4924 3200 1<br>Feuerwehrverein Raura<br>Marksteinweg 12<br>4304 Giebenach</div>
+                <div style="font-size:6pt;font-weight:bold;">Referenz</div>
+                <div style="font-size:8pt;margin-bottom:3mm;">${refFormatted}</div>
+                <div style="font-size:6pt;font-weight:bold;">Zusätzliche Informationen</div>
+                <div style="font-size:8pt;margin-bottom:1mm;">Mitgliederbeitrag ${jahr}</div>
+                <div style="font-size:8pt;margin-bottom:3mm;">Ref. ${refShort} - ${name}</div>
+                <div style="font-size:6pt;font-weight:bold;">Zahlbar durch (Name/Adresse)</div>
+                <div style="border:1px solid #000;width:100%;height:18mm;"></div>
+            </div>
+        </div>
+    </div>
 </div>
 </body></html>`;
         }
@@ -7761,7 +7893,7 @@ ${grussformel}`;
                 showToast('Brief wird an Pingen gesendet...', 'info');
 
                 // Gleicher Flow wie Bulk: HTML generieren und via Pingen senden
-                const html = generateBeitragEmailHTML(member, true);
+                const html = generateBeitragLetterHTML(member);
                 const response = await fetch(`${API_BASE}/dispatch/send-post`, {
                     method: 'POST',
                     headers: {
