@@ -1176,7 +1176,8 @@
                         </div>
                         <textarea id="dispatch-body-plain" rows="10" class="hidden w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 font-mono text-sm" placeholder="Nachrichtentext..."></textarea>
                         <p class="text-xs text-gray-400 mt-1">
-                            Verfügbare Platzhalter: <code>{{anrede}}</code> <code>{{vorname}}</code> <code>{{nachname}}</code> <code>{{strasse}}</code> <code>{{plz}}</code> <code>{{ort}}</code> <code>{{email}}</code>
+                            Platzhalter: <code>{{anrede}}</code> <code>{{vorname}}</code> <code>{{nachname}}</code> <code>{{strasse}}</code> <code>{{plz}}</code> <code>{{ort}}</code> <code>{{email}}</code>
+                            &nbsp;•&nbsp; Event: <code>{{event_title}}</code> <code>{{event_date}}</code> <code>{{event_location}}</code> <code>{{organizer}}</code> <code>{{organizer_phone}}</code>
                         </p>
                     </div>
 
@@ -5965,7 +5966,7 @@ ${grussformel}`;
                 type: 'email',
                 layout: 'event-invitation',                  // Speziallayout mit Event-Auswahl
                 subject: 'Einladung: {{event_title}}',
-                body: '<p>Hiermit möchte der Vorstand euch zur Veranstaltung einladen.</p><p>Eine Rückmeldung, ob Ihr kommt oder nicht könnt, dürft ihr gerne via Webseite (QR-Code) oder direkt beim Aktuar abgeben.</p>'
+                body: '<p>Hiermit möchte der Vorstand euch zum Event <strong>{{event_title}}</strong> einladen.</p><p>Eine Rückmeldung, ob Ihr kommt oder nicht könnt, dürft ihr gerne bei {{organizer}} {{organizer_phone}} oder via Webseite (QR-Code) abgeben.</p>'
             },
             // Weitere Templates folgen hier
         ];
@@ -7072,10 +7073,40 @@ ${grussformel}`;
             return `${datum}, ${zeit} Uhr`;
         }
 
+        // Gibt den Event-Organisator zurueck (Mitglied aus organizer_id) - Fallback: Aktuar
+        function getEventOrganizer(event) {
+            if (event?.organizer_id) {
+                const org = members.find(m => String(m.id) === String(event.organizer_id));
+                if (org) return org;
+            }
+            // Fallback: Aktuar
+            const a = getAktuar();
+            if (!a) return null;
+            return members.find(m => m.funktion && /aktuar/i.test(m.funktion)) || null;
+        }
+
+        // Ersetzt Event-spezifische Platzhalter im Text
+        // Platzhalter: {{event_title}} {{event_date}} {{event_location}} {{organizer}} {{organizer_phone}}
+        function replaceEventPlaceholders(text, event) {
+            if (!text || !event) return text;
+            const organizer = getEventOrganizer(event);
+            const orgName = organizer ? `${organizer.vorname} ${organizer.nachname}`.trim() : 'Aktuar';
+            const orgPhone = organizer ? (organizer.mobile || organizer.telefon || '') : '';
+            return text
+                .replace(/\{\{event_title\}\}/g, event.title || '')
+                .replace(/\{\{event_date\}\}/g, event.start_date ? formatEventDate(event.start_date) : '')
+                .replace(/\{\{event_location\}\}/g, event.location || '')
+                .replace(/\{\{organizer\}\}/g, orgName)
+                .replace(/\{\{organizer_phone\}\}/g, orgPhone);
+        }
+
         // Generiert den Event-Einladungs-Block (Tabelle Was/Wo/Wann..., Unterschriften, QR)
         // Wird im Body sowohl von Letter- als auch Email-Version verwendet
         function buildEventInvitationBody(event, introHtml) {
             if (!event) return introHtml || '';
+
+            // Event-Platzhalter im Intro-Text ersetzen
+            introHtml = replaceEventPlaceholders(introHtml, event);
             const startDate = formatEventDate(event.start_date);
             const endDate = event.end_date ? formatEventDate(event.end_date) : '';
             const deadline = event.registration_deadline ? formatEventDate(event.registration_deadline) : '';
