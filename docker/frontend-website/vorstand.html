@@ -2338,7 +2338,8 @@
                             <select id="beitrag-kassier-select" class="px-3 py-2 border border-amber-400 bg-amber-50 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm"></select>
                         </div>
                         <select id="beitrag-member-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
-                            <option value="">Mitglied auswählen...</option>
+                            <option value="all" selected>Alle Mitglieder</option>
+                            <option value="">-- einzelnes Mitglied --</option>
                         </select>
                         <button id="beitrag-preview-btn" class="bg-gray-600 text-white px-5 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
@@ -6859,28 +6860,28 @@ ${grussformel}`;
             document.getElementById('beitrag-preview-modal').classList.add('hidden');
         }
 
-        // Senden-Button: je nach Modus Auto / E-Mail / PDF
+        // Senden-Button: je nach Auswahl Einzel- oder Massenversand
         function handleBeitragSend(bulk) {
-            if (bulk) {
-                // Massenversand: immer nach individueller Zustellpraeferenz (jedes Mitglied seinen Weg)
-                // im Auto-Modus: alle Mitglieder; sonst nur die passenden
+            const memberId = document.getElementById('beitrag-member-select').value;
+            // "all" oder explizit bulk → Massenversand
+            if (bulk || memberId === 'all') {
                 sendBeitragBulkByPreference();
+                return;
+            }
+            // Einzelversand
+            if (!memberId) {
+                showToast('Bitte Mitglied auswählen oder "Alle Mitglieder"', 'warning');
+                return;
+            }
+            const member = members.find(m => String(m.id) === String(memberId));
+            if (currentDeliveryMode === 'auto' && member) {
+                if (member.zustellung_email && member.email) sendBeitragEmail(false);
+                else if (member.zustellung_post && member.strasse) generateBeitragPDF();
+                else showToast('Mitglied hat keine Zustellpräferenz gesetzt', 'warning');
+            } else if (currentDeliveryMode === 'email') {
+                sendBeitragEmail(false);
             } else {
-                // Einzelversand
-                const memberId = document.getElementById('beitrag-member-select').value;
-                const member = members.find(m => String(m.id) === String(memberId));
-                if (currentDeliveryMode === 'auto' && member) {
-                    // Zustellpraeferenz des Mitglieds nutzen
-                    if (member.zustellung_email && member.email) sendBeitragEmail(false);
-                    else if (member.zustellung_post && member.strasse) generateBeitragPDF();
-                    else {
-                        showToast('Mitglied hat keine Zustellpräferenz gesetzt', 'warning');
-                    }
-                } else if (currentDeliveryMode === 'email') {
-                    sendBeitragEmail(false);
-                } else {
-                    generateBeitragPDF();
-                }
+                generateBeitragPDF();
             }
         }
 
@@ -6964,7 +6965,8 @@ ${grussformel}`;
         // Befuellt das Mitglieder-Dropdown im Beitrag-Tab
         function loadBeitragMembers() {
             const select = document.getElementById('beitrag-member-select');
-            if (select.options.length > 1) return;
+            // Default-Optionen: "Alle Mitglieder" + Separator (also >2 bedeutet Mitglieder schon geladen)
+            if (select.options.length > 2) return;
             const sorted = [...members].sort((a, b) => a.nachname.localeCompare(b.nachname));
             sorted.forEach(m => {
                 const opt = document.createElement('option');
@@ -7682,14 +7684,17 @@ ${grussformel}`;
                         ? `<button onclick="markFeePaid('${p.id}')" class="text-green-600 hover:text-green-800 text-sm font-medium mr-2">Bezahlt</button>`
                         : `<button onclick="markFeeUnpaid('${p.id}')" class="text-red-600 hover:text-red-800 text-sm font-medium mr-2">Zurücksetzen</button>`;
 
-                    // Ref-Nr. editierbar - wird jedes Jahr von der Bank neu zugewiesen
+                    // Ref-Nr. editierbar - Anzeige als QR-Kurzform (inkl. Pruefziffer)
                     const refInputId = `ref-${p.id}`;
+                    const refRaw = p.reference_nr || '';
+                    const refShortDisplay = refRaw ? buildQRReference(refRaw).slice(-5) : '';
 
                     return `<tr>
                         <td class="px-4 py-3 text-sm font-medium text-gray-900">${p.nachname} ${p.vorname}</td>
                         <td class="px-4 py-3 text-sm">
-                            <input type="text" id="${refInputId}" value="${p.reference_nr || ''}" placeholder="z.B. 0732"
+                            <input type="text" id="${refInputId}" value="${refShortDisplay}" placeholder="z.B. 05590"
                                 class="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500 font-mono"
+                                title="QR-Referenz (letzte 5 Stellen inkl. Prüfziffer)"
                                 onchange="saveReferenceNr('${p.id}', this.value)">
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-600">CHF ${parseFloat(p.amount).toFixed(2)}</td>
@@ -7882,7 +7887,9 @@ ${grussformel}`;
 
         // Beitrag
         document.getElementById('beitrag-member-select').addEventListener('change', (e) => {
-            if (e.target.value) fillBeitragFromMember(e.target.value);
+            const v = e.target.value;
+            // "all" = alle Mitglieder (Standard), "" = Separator, sonst Mitglieds-ID
+            if (v && v !== 'all') fillBeitragFromMember(v);
         });
         document.getElementById('beitrag-kassier-select').addEventListener('change', (e) => {
             selectedKassierId = e.target.value;
