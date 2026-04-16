@@ -6528,7 +6528,7 @@ ${grussformel}`;
                 const clone = tmpl.content.cloneNode(true);
                 const div = clone.querySelector('div');
 
-                // Felder im geklonten Brief ersetzen (Inputs durch Text)
+                // Form-Werte lesen (aus dem Live-DOM, NICHT aus dem Template)
                 const vals = {
                     name: document.getElementById('brief-name').value,
                     strasse: document.getElementById('brief-strasse').value,
@@ -6539,11 +6539,26 @@ ${grussformel}`;
                     ref: document.getElementById('brief-ref').value,
                     jahr: document.getElementById('brief-jahr').value
                 };
-                // Inputs im Template durch statischen Text ersetzen
+                // Mapping Template-Input-ID -> Form-Wert-Key
+                const idToVal = {
+                    'brief-name': vals.name,
+                    'brief-strasse': vals.strasse,
+                    'brief-plz-ort': vals.plzOrt,
+                    'brief-datum': vals.datum,
+                    'brief-gv-datum': vals.gvDatum,
+                    'brief-betrag': vals.betrag,
+                    'brief-ref': vals.ref,
+                    'brief-jahr': vals.jahr
+                };
+                // Inputs im Template durch statischen Text ersetzen und Block-Display erhalten
                 div.querySelectorAll('input.brief-input').forEach(input => {
                     const span = document.createElement('span');
-                    span.textContent = input.value;
-                    if (input.style.fontWeight === 'bold') span.style.fontWeight = 'bold';
+                    span.textContent = idToVal[input.id] !== undefined ? idToVal[input.id] : input.value;
+                    // Style vom Input uebernehmen (display: block fuer Namen/Adresse wichtig!)
+                    if (input.style.display === 'block') span.style.display = 'block';
+                    if (input.style.fontWeight === 'bold' || input.classList.contains('brief-input-bold')) {
+                        span.style.fontWeight = 'bold';
+                    }
                     input.replaceWith(span);
                 });
                 // Dynamische Spans befuellen
