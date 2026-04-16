@@ -2282,6 +2282,10 @@
                                 E-Mail
                             </button>
                         </div>
+                        <div id="beitrag-kassier-wrapper" class="hidden flex items-center">
+                            <label class="text-xs text-gray-600 mr-2">Kassier:</label>
+                            <select id="beitrag-kassier-select" class="px-3 py-2 border border-amber-400 bg-amber-50 rounded-lg focus:ring-2 focus:ring-amber-500 text-sm"></select>
+                        </div>
                         <select id="beitrag-member-select" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
                             <option value="">Mitglied auswählen...</option>
                         </select>
@@ -2378,8 +2382,8 @@
                         <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
                     </div>
 
-                    <!-- Absender klein (ueber dem Adressfenster) -->
-                    <div style="position: absolute; top: 48mm; left: 118mm; font-size: 8pt; color: #333;">
+                    <!-- Absender klein - oberhalb Frankierbereich (Y<40mm), dynamisch aus Kassier-DB -->
+                    <div id="brief-absender" style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">
                         G.Costanza, Marksteinweg 12, 4304 Giebenach
                     </div>
 
@@ -2427,7 +2431,7 @@
                         <div style="margin-bottom: 0;">
                             <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
                             <em>der Kassier</em><br><br>
-                            G. Costanza
+                            <span data-kassier-signature>G. Costanza</span>
                         </div>
 
                     </div>
@@ -2519,10 +2523,10 @@
                             </div>
                         </div>
 
-                        <!-- Footer -->
+                        <!-- Footer (dynamisch aus Kassier-DB) -->
                         <div style="display: flex; justify-content: space-between; font-size: 7pt; color: #555; margin-top: 3mm; padding: 0 5mm;">
-                            <div>Kassier: Costanza Giuseppe, Marksteinweg 12, 4304 Giebenach Tel.+41 61 811 26 32</div>
-                            <div>Nat. +41 79 501 71 20</div>
+                            <div data-kassier-footer-left>Kassier: Costanza Giuseppe, Marksteinweg 12, 4304 Giebenach Tel.+41 61 811 26 32</div>
+                            <div data-kassier-footer-right>Nat. +41 79 501 71 20</div>
                         </div>
                     </div>
 
@@ -6415,6 +6419,82 @@ ${grussformel}`;
         const BEITRAG_IBAN = 'CH6430769442492432001';
         let currentDeliveryMode = 'post';
 
+        // Aktuell ausgewaehlter Kassier (ID) - waehrend Uebergangsphase wenn mehrere vorhanden
+        let selectedKassierId = null;
+
+        // Liefert alle Mitglieder mit Kassier-Funktion (kann mehrere geben in Uebergangsphase)
+        function getAllKassiers() {
+            return members.filter(m => m.funktion && /kassier/i.test(m.funktion));
+        }
+
+        // Liefert den aktuell gewaehlten Kassier - oder den einzigen wenn nur einer
+        function getKassier() {
+            const kassiers = getAllKassiers();
+            if (kassiers.length === 0) return null;
+
+            let kassier;
+            if (selectedKassierId) {
+                kassier = kassiers.find(k => String(k.id) === String(selectedKassierId)) || kassiers[0];
+            } else {
+                kassier = kassiers[0];
+            }
+
+            return {
+                id: kassier.id,
+                vorname: kassier.vorname || '',
+                nachname: kassier.nachname || '',
+                name: `${kassier.vorname || ''} ${kassier.nachname || ''}`.trim(),
+                kurzName: `${(kassier.vorname || '').charAt(0)}. ${kassier.nachname || ''}`.trim(),
+                strasse: kassier.strasse || '',
+                plz: kassier.plz || '',
+                ort: kassier.ort || '',
+                mobile: kassier.mobile || kassier.telefon || '',
+                telefon: kassier.telefon || ''
+            };
+        }
+
+        // Befuellt das Kassier-Dropdown, zeigt es nur wenn mehrere Kassiers existieren
+        function initKassierSelect() {
+            const kassiers = getAllKassiers();
+            const select = document.getElementById('beitrag-kassier-select');
+            const wrapper = document.getElementById('beitrag-kassier-wrapper');
+            if (!select || !wrapper) return;
+
+            if (kassiers.length <= 1) {
+                wrapper.classList.add('hidden');
+                selectedKassierId = kassiers[0]?.id || null;
+                return;
+            }
+
+            wrapper.classList.remove('hidden');
+            select.innerHTML = '';
+            kassiers.forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k.id;
+                opt.textContent = `${k.nachname} ${k.vorname}`;
+                select.appendChild(opt);
+            });
+            if (!selectedKassierId) selectedKassierId = kassiers[0].id;
+            select.value = selectedKassierId;
+        }
+
+        // Formatiert die Absenderzeile (Kassier) - Fallback auf hardcoded wenn kein Kassier in DB
+        function getAbsenderLine() {
+            const k = getKassier();
+            if (!k || !k.strasse) return 'G.Costanza, Marksteinweg 12, 4304 Giebenach';
+            return `${k.kurzName}, ${k.strasse}, ${k.plz} ${k.ort}`;
+        }
+
+        // Footer-Zeile mit Kassier-Kontakt
+        function getKassierFooter() {
+            const k = getKassier();
+            if (!k) return { left: 'Kassier: Costanza Giuseppe, Marksteinweg 12, 4304 Giebenach Tel.+41 61 811 26 32', right: 'Nat. +41 79 501 71 20' };
+            const nachVorname = `${k.nachname} ${k.vorname}`.trim();
+            const left = `Kassier: ${nachVorname}, ${k.strasse}, ${k.plz} ${k.ort}${k.telefon ? ' Tel.' + k.telefon : ''}`;
+            const right = k.mobile ? `Nat. ${k.mobile}` : '';
+            return { left, right };
+        }
+
         // Wechselt zwischen Post und E-Mail Modus
         function switchDeliveryMode(mode) {
             currentDeliveryMode = mode;
@@ -6464,6 +6544,14 @@ ${grussformel}`;
                 // Dynamische Spans befuellen
                 const betragZeile = div.querySelector('#brief-betrag-zeile');
                 if (betragZeile) betragZeile.textContent = parseInt(vals.betrag) || vals.betrag;
+
+                // Kassier-Felder dynamisch befuellen (Absender, Unterschrift, Footer)
+                const absender = div.querySelector('#brief-absender');
+                if (absender) absender.textContent = getAbsenderLine();
+                const footer = getKassierFooter();
+                div.querySelectorAll('[data-kassier-footer-left]').forEach(el => el.textContent = footer.left);
+                div.querySelectorAll('[data-kassier-footer-right]').forEach(el => el.textContent = footer.right);
+                div.querySelectorAll('[data-kassier-signature]').forEach(el => el.textContent = getKassier()?.kurzName || 'G. Costanza');
 
                 const refPadded = vals.ref.replace(/\D/g, '').padStart(5, '0') + '0';
                 const refFormatted = '00 00000 00000 00000 00000 ' + refPadded.padStart(5, '0');
@@ -6619,14 +6707,17 @@ ${grussformel}`;
         // Laedt den Beitrag-Tab: Mitglieder-Dropdown, Jahres-Einstellungen und Zahlungen
         function loadBeitragBriefe() {
             loadBeitragMembers();
+            initKassierSelect();
             initFeeYearSelect();
             loadFeeSettings();
             loadFeePayments();
             updateBeitragDerived();
         }
 
-        // Generiert den kompletten Brief als HTML-E-Mail (ohne Empfaenger-Adressblock, mit QR-Slip)
-        function generateBeitragEmailHTML(member) {
+        // Generiert den kompletten Brief als HTML (fuer E-Mail oder Post)
+        // includeAddress=true: Empfaenger-Adressblock im Schweizer Adressfenster (fuer Post-Versand via Pingen)
+        // includeAddress=false: ohne Adressblock (fuer E-Mail-Versand)
+        function generateBeitragEmailHTML(member, includeAddress = false) {
             const betrag = document.getElementById('brief-betrag').value;
             const jahr = document.getElementById('brief-jahr').value;
             const datum = document.getElementById('brief-datum').value;
@@ -6685,9 +6776,9 @@ ${grussformel}`;
         </tr>
     </table>
 
-    <!-- Absender -->
+    <!-- Absender (Kassier, dynamisch aus DB) -->
     <div style="font-size:8pt;color:#333;margin-bottom:5px;">
-        G.Costanza, Marksteinweg 12, 4304 Giebenach
+        ${getAbsenderLine()}
     </div>
 
     <!-- Datum -->
@@ -6718,7 +6809,7 @@ ${grussformel}`;
     <div>
         <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
         <em>der Kassier</em><br><br>
-        G. Costanza
+        ${getKassier()?.kurzName || 'G. Costanza'}
     </div>
 
     <!-- Trennlinie -->
@@ -6781,10 +6872,10 @@ ${grussformel}`;
         </tr>
     </table>
 
-    <!-- Footer -->
+    <!-- Footer (dynamisch aus Kassier-DB) -->
     <div style="font-size:7pt;color:#555;margin-top:10px;display:flex;justify-content:space-between;">
-        <span>Kassier: Costanza Giuseppe, Marksteinweg 12, 4304 Giebenach Tel.+41 61 811 26 32</span>
-        <span style="float:right;">Nat. +41 79 501 71 20</span>
+        <span>${getKassierFooter().left}</span>
+        <span style="float:right;">${getKassierFooter().right}</span>
     </div>
 
 </div>
@@ -7239,6 +7330,9 @@ ${grussformel}`;
         // Beitrag
         document.getElementById('beitrag-member-select').addEventListener('change', (e) => {
             if (e.target.value) fillBeitragFromMember(e.target.value);
+        });
+        document.getElementById('beitrag-kassier-select').addEventListener('change', (e) => {
+            selectedKassierId = e.target.value;
         });
         document.getElementById('beitrag-preview-btn').addEventListener('click', openBeitragPreview);
         document.getElementById('beitrag-send-btn').addEventListener('click', () => handleBeitragSend(false));

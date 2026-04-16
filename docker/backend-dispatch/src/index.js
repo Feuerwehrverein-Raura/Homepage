@@ -3912,7 +3912,7 @@ app.put('/organisation-settings/:key', authenticateAny, async (req, res) => {
 // ============================================
 
 // DEUTSCH: Standard-Layout fuer Mitgliederbeitrags-Rechnungen (Positionen in PDF-Points)
-// Default Mitgliederbeitrag Layout Settings (positions in points, A4 = 595.28 x 841.89)
+// Wird nur noch fuer den alten Einzel-/invoices/generate-qr Endpoint verwendet
 const defaultMitgliederbeitragLayout = {
     absender: { x: 400, y: 50, size: 10, lineHeight: 12 },
     empfaenger: { x: 70, y: 150, size: 11, lineHeight: 15 },
@@ -3921,7 +3921,7 @@ const defaultMitgliederbeitragLayout = {
     datum: { x: 70, y: 285, size: 10 },
     text: { x: 70, y: 320, size: 11, lineHeight: 20 },
     betrag: { x: 400, y: 380, size: 14 },
-    footer: { x: 150, y: 320, size: 8, fromBottom: true }, // y from bottom when QR-Bill is attached
+    footer: { x: 150, y: 320, size: 8, fromBottom: true },
     rechnungstext: [
         'Wir erlauben uns, Ihnen den Mitgliederbeitrag in Rechnung zu stellen.',
         'Bitte überweisen Sie den Betrag innert 30 Tagen.'
@@ -4196,121 +4196,77 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Massen-Rechnungsgenerierung fuer alle Mitglieder (optional nach Status filtern)
-// DEUTSCH: Generiert Mitgliedsbeitrag-PDFs fuer mehrere Mitglieder und versendet sie via Pingen (Post)
-// Pro Mitglied wird ein personalisiertes QR-Rechnungs-PDF erstellt und einzeln an Pingen uebergeben
-app.post('/invoices/generate-bulk', authenticateAny, async (req, res) => {
+// DEUTSCH: Sendet Mitgliedsbeitrags-Brief als fertig-formatiertes HTML via Pingen
+// Das HTML enthaelt bereits den Empfaenger im Adressfenster (Schweizer Standard X=118mm/Y=60mm)
+// daher kein Adress-Embedding oder Deckblatt noetig - auto_send mit address_position=right
+app.post('/invoices/send-post', authenticateAny, async (req, res) => {
     try {
-        const { amount, year, description, member_ids, staging = false } = req.body;
+        const { html, recipient, member_id, staging = false } = req.body;
 
-        if (!amount) {
-            return res.status(400).json({ error: 'amount ist erforderlich' });
+        if (!html || !recipient) {
+            return res.status(400).json({ error: 'html und recipient erforderlich' });
         }
 
-        // Mitglieder mit Post-Zustellung und gueltiger Adresse laden
-        let query = `
-            SELECT id, vorname, nachname, strasse, plz, ort
-            FROM members
-            WHERE strasse IS NOT NULL AND strasse != ''
-              AND plz IS NOT NULL AND plz != ''
-              AND ort IS NOT NULL AND ort != ''
-        `;
-        const params = [];
-        if (member_ids && member_ids.length > 0) {
-            query += ` AND id = ANY($1)`;
-            params.push(member_ids);
-        } else {
-            query += ` AND zustellung_post = true`;
-        }
-        query += ' ORDER BY nachname, vorname';
+        const PINGEN_API = getPingenApi(staging);
 
-        const membersResult = await pool.query(query, params);
-        const membersList = membersResult.rows;
-
-        if (membersList.length === 0) {
-            return res.status(404).json({ error: 'Keine Mitglieder mit gueltiger Adresse gefunden' });
-        }
-
-        logInfo('Bulk QR-Invoice Pingen dispatch started', { count: membersList.length, amount, year });
-
-        // Antwort sofort zurueckgeben - Versand laeuft asynchron im Hintergrund
-        res.json({
-            success: true,
-            message: `${membersList.length} Briefe werden verarbeitet`,
-            count: membersList.length
+        // HTML via Puppeteer zu PDF konvertieren (1:1 Umwandlung des HTML-Layouts)
+        const browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: 0, right: 0, bottom: 0, left: 0 }
+        });
+        await browser.close();
 
-        // Asynchron: Pingen-Token holen, dann pro Mitglied: generate-qr + pingen/send
-        (async () => {
-            const PINGEN_API = getPingenApi(staging);
-            let success = 0, failed = 0;
+        // Pingen-Token holen
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+        const token = tokenResponse.data.access_token;
 
-            try {
-                const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
-                    grant_type: 'client_credentials',
-                    client_id: process.env.PINGEN_CLIENT_ID,
-                    client_secret: process.env.PINGEN_CLIENT_SECRET
-                });
-                const token = tokenResponse.data.access_token;
+        // File-Upload URL holen
+        const uploadUrlRes = await axios.get(`${PINGEN_API}/file-upload`, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' }
+        });
+        const fileUrl = uploadUrlRes.data.data.attributes.url;
+        const fileUrlSignature = uploadUrlRes.data.data.attributes.url_signature;
 
-                for (const member of membersList) {
-                    try {
-                        // QR-Rechnung als PDF generieren (intern via selben Service)
-                        const internalRes = await axios.post(`http://localhost:${PORT}/invoices/generate-qr`,
-                            {
-                                member_id: member.id,
-                                amount: parseFloat(amount),
-                                year: year || new Date().getFullYear(),
-                                description: description || `Mitgliederbeitrag ${year}`,
-                                preview: false
-                            },
-                            { headers: { Authorization: req.headers.authorization } }
-                        );
-                        const pdfBuffer = Buffer.from(internalRes.data.pdf_base64, 'base64');
+        // PDF hochladen
+        await axios.put(fileUrl, pdfBuffer, { headers: { 'Content-Type': 'application/pdf' } });
 
-                        // PDF zu Pingen hochladen
-                        const uploadUrlRes = await axios.get(`${PINGEN_API}/file-upload`, {
-                            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' }
-                        });
-                        const fileUrl = uploadUrlRes.data.data.attributes.url;
-                        const fileUrlSignature = uploadUrlRes.data.data.attributes.url_signature;
-
-                        await axios.put(fileUrl, pdfBuffer, { headers: { 'Content-Type': 'application/pdf' } });
-
-                        // Brief bei Pingen erstellen (Adresse ist bereits im PDF)
-                        await axios.post(
-                            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
-                            {
-                                data: {
-                                    type: 'letters',
-                                    attributes: {
-                                        file_original_name: `Mitgliederbeitrag_${year}_${member.nachname}.pdf`,
-                                        file_url: fileUrl,
-                                        file_url_signature: fileUrlSignature,
-                                        auto_send: true,
-                                        delivery_product: 'cheap',
-                                        print_mode: 'simplex',
-                                        print_spectrum: 'grayscale',
-                                        address_position: 'right'
-                                    }
-                                }
-                            },
-                            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
-                        );
-                        success++;
-                        logInfo('Membership fee letter sent via Pingen', { member_id: member.id, name: `${member.vorname} ${member.nachname}` });
-                    } catch (err) {
-                        failed++;
-                        logError('Failed to send letter via Pingen', { member_id: member.id, error: err.message });
+        // Brief bei Pingen erstellen - Adresse ist bereits im HTML/PDF, daher nur address_position setzen
+        const letterRes = await axios.post(
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
+            {
+                data: {
+                    type: 'letters',
+                    attributes: {
+                        file_original_name: `Mitgliederbeitrag_${recipient.name.replace(/\s+/g, '_')}.pdf`,
+                        file_url: fileUrl,
+                        file_url_signature: fileUrlSignature,
+                        auto_send: true,
+                        delivery_product: 'cheap',
+                        print_mode: 'simplex',
+                        print_spectrum: 'grayscale',
+                        address_position: 'right'
                     }
                 }
-                logInfo('Bulk Pingen dispatch finished', { success, failed, total: membersList.length });
-            } catch (err) {
-                logError('Bulk Pingen dispatch failed', { error: err.message });
-            }
-        })();
+            },
+            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+        );
+
+        logInfo('Membership fee letter sent via Pingen (HTML)', { member_id, name: recipient.name });
+        res.json({ success: true, letter_id: letterRes.data.data?.id });
 
     } catch (error) {
-        logError('Failed to start bulk QR dispatch', { error: error.message });
+        logError('Failed to send post letter', { error: error.message, details: error.response?.data });
         res.status(500).json({ error: error.message });
     }
 });
