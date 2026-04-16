@@ -777,10 +777,11 @@ app.post('/email/send', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Massen-E-Mail an mehrere Mitglieder senden (nur an jene mit E-Mail-Zustellung)
+// Wenn exclude_honored=true gesetzt ist, werden Ehrenmitglieder ausgeschlossen (Sicherheit fuer Beitragsbriefe)
 app.post('/email/bulk', authenticateAny, async (req, res) => {
-    console.log('[EMAIL BULK] /email/bulk called with:', { member_ids: req.body.member_ids, template_id: req.body.template_id });
+    console.log('[EMAIL BULK] /email/bulk called with:', { member_ids: req.body.member_ids, template_id: req.body.template_id, exclude_honored: req.body.exclude_honored });
     try {
-        const { member_ids, template_id, variables } = req.body;
+        const { member_ids, template_id, variables, exclude_honored } = req.body;
 
         // Get members (Authorization-Header vom Request weiterreichen)
         console.log('[EMAIL BULK] Fetching members from:', `${process.env.MEMBERS_API_URL}/members`);
@@ -793,6 +794,11 @@ app.post('/email/bulk', authenticateAny, async (req, res) => {
         const results = [];
         for (const member of members.data) {
             if (!member.email || !member.zustellung_email) continue;
+            // Sicherheit: Ehrenmitglieder werden bei Mitgliedsbeitrag-Versand ausgeschlossen
+            if (exclude_honored && member.status === 'Ehrenmitglied') {
+                console.log('[EMAIL BULK] Skipping Ehrenmitglied:', member.vorname, member.nachname);
+                continue;
+            }
 
             try {
                 // Merge member data with variables

@@ -6902,7 +6902,7 @@ ${grussformel}`;
             const betrag = document.getElementById('brief-betrag').value;
             const subject = `Mitgliederbeitrag ${jahr} - Feuerwehrverein Raura`;
 
-            // E-Mail-Versand
+            // E-Mail-Versand (exclude_honored: Sicherheit damit keine Ehrenmitglieder durchrutschen)
             for (const member of emailMembers) {
                 try {
                     const html = generateBeitragEmailHTML(member);
@@ -6914,7 +6914,8 @@ ${grussformel}`;
                             subject,
                             body: '',
                             html: html,
-                            attachments: []
+                            attachments: [],
+                            exclude_honored: true
                         })
                     });
                     if (response.ok) emailSuccess++; else emailFailed++;
@@ -7469,7 +7470,8 @@ ${grussformel}`;
                                 subject,
                                 body: '',
                                 html: html,
-                                attachments: []
+                                attachments: [],
+                                exclude_honored: true
                             })
                         });
                         if (response.ok) success++;
@@ -7507,7 +7509,8 @@ ${grussformel}`;
                             subject,
                             body: '',
                             html: html,
-                            attachments: []
+                            attachments: [],
+                            exclude_honored: true
                         })
                     });
                     if (!response.ok) throw new Error('E-Mail-Versand fehlgeschlagen');
