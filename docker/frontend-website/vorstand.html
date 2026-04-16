@@ -6631,13 +6631,17 @@ ${grussformel}`;
         }
 
         // Massenversand: Jedes Mitglied bekommt seine Post nach seiner eigenen Zustellpraeferenz
+        // Ehrenmitglieder werden ausgeschlossen (beitragsbefreit)
         async function sendBeitragBulkByPreference() {
-            const emailMembers = members.filter(m => m.zustellung_email && m.email);
-            const postMembers = members.filter(m => m.zustellung_post && m.strasse && m.plz && m.ort);
+            const beitragspflichtig = members.filter(m => m.status !== 'Ehrenmitglied');
+            const emailMembers = beitragspflichtig.filter(m => m.zustellung_email && m.email);
+            const postMembers = beitragspflichtig.filter(m => m.zustellung_post && m.strasse && m.plz && m.ort);
+            const ehrenCount = members.length - beitragspflichtig.length;
 
             const msg = `Mitgliedsbeitrag an alle senden:\n` +
                 `- ${emailMembers.length} per E-Mail\n` +
                 `- ${postMembers.length} per Post\n` +
+                (ehrenCount > 0 ? `- ${ehrenCount} Ehrenmitglieder (beitragsbefreit, ausgeschlossen)\n` : '') +
                 `(Gemäss individueller Zustellpräferenz jedes Mitglieds)`;
             if (!confirm(msg)) return;
 
@@ -6666,24 +6670,27 @@ ${grussformel}`;
                 } catch (e) { emailFailed++; }
             }
 
-            // Post-Versand (PDF-Generierung via Bulk-API)
-            if (postMembers.length > 0) {
+            // Post-Versand: pro Mitglied personalisiertes HTML generieren und via Pingen versenden
+            for (const member of postMembers) {
                 try {
-                    const response = await fetch(`${API_BASE}/invoices/generate-bulk`, {
+                    const html = generateBeitragEmailHTML(member, true);
+                    const response = await fetch(`${API_BASE}/invoices/send-post`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            amount: parseFloat(betrag),
-                            year: parseInt(jahr),
-                            description: `Mitgliederbeitrag ${jahr}`,
-                            member_ids: postMembers.map(m => m.id)
+                            html: html,
+                            recipient: {
+                                name: `${member.vorname} ${member.nachname}`,
+                                street: member.strasse,
+                                zip: member.plz,
+                                city: member.ort,
+                                country: 'CH'
+                            },
+                            member_id: member.id
                         })
                     });
-                    if (response.ok) {
-                        const result = await response.json();
-                        postSuccess = result.count || result.generated || postMembers.length;
-                    } else postFailed = postMembers.length;
-                } catch (e) { postFailed = postMembers.length; }
+                    if (response.ok) postSuccess++; else postFailed++;
+                } catch (e) { postFailed++; }
             }
 
             const resultMsg = `Versand abgeschlossen:\n` +
@@ -6908,8 +6915,12 @@ ${grussformel}`;
             const subject = `Mitgliederbeitrag ${jahr} - Feuerwehrverein Raura`;
 
             if (bulk) {
-                const emailMembers = members.filter(m => m.email);
-                if (!confirm(`Beitragsbrief per E-Mail an ${emailMembers.length} Mitglieder senden?`)) return;
+                // Ehrenmitglieder ausschliessen (beitragsbefreit)
+                const emailMembers = members.filter(m => m.email && m.status !== 'Ehrenmitglied');
+                const ehrenCount = members.filter(m => m.status === 'Ehrenmitglied').length;
+                const confirmMsg = `Beitragsbrief per E-Mail an ${emailMembers.length} Mitglieder senden?` +
+                    (ehrenCount > 0 ? `\n(${ehrenCount} Ehrenmitglieder sind beitragsbefreit und werden ausgeschlossen)` : '');
+                if (!confirm(confirmMsg)) return;
 
                 showToast('E-Mails werden gesendet...', 'info');
                 let success = 0;
@@ -7237,36 +7248,10 @@ ${grussformel}`;
             }
         }
 
-        // Massen-PDF: Fuer alle Mitglieder generieren
+        // Massen-Versand Post: delegiert an preference-basierten Bulk-Versand
+        // (Ehrenmitglieder werden dort ausgeschlossen)
         async function generateBeitragBulk() {
-            const betrag = document.getElementById('brief-betrag').value;
-            const jahr = document.getElementById('brief-jahr').value;
-
-            if (!confirm(`Mitgliedsbeitragsbriefe für alle ${members.length} Mitglieder generieren?`)) return;
-
-            try {
-                showToast('Massen-PDF wird generiert...', 'info');
-
-                const response = await fetch(`${API_BASE}/invoices/generate-bulk`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
-                    body: JSON.stringify({
-                        amount: parseFloat(betrag),
-                        year: parseInt(jahr),
-                        description: `Mitgliederbeitrag ${jahr}`
-                    })
-                });
-
-                if (!response.ok) throw new Error('Massen-Generierung fehlgeschlagen');
-
-                const result = await response.json();
-                showToast(`${result.count || result.generated || 'Alle'} Briefe generiert`, 'success');
-            } catch (error) {
-                showToast('Fehler: ' + error.message, 'error');
-            }
+            return sendBeitragBulkByPreference();
         }
 
         // ============================================

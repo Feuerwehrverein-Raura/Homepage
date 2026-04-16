@@ -420,9 +420,9 @@ app.post('/membership-fees/payments/generate', async (req, res) => {
             return res.status(400).json({ error: 'year und amount sind erforderlich' });
         }
 
-        // Alle aktiven Mitglieder holen
+        // Alle zahlenden Mitglieder holen (Ehrenmitglieder sind beitragsbefreit)
         const membersResult = await pool.query(
-            "SELECT id FROM members WHERE status IN ('Aktivmitglied', 'Passivmitglied', 'Ehrenmitglied')"
+            "SELECT id FROM members WHERE status IN ('Aktivmitglied', 'Passivmitglied')"
         );
 
         let created = 0;
