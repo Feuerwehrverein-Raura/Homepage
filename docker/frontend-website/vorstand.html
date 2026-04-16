@@ -5807,38 +5807,20 @@ ${grussformel}`;
             `;
         }
 
-        // Zeigt die Brief-Vorschau an im A4-Format mit Adressfeld (CH/DE) und Inhalt.
+        // Zeigt die Brief-Vorschau im A4-Format (Layout wie Mitgliedsbeitrag-Kopf, ohne QR)
         function showLetterPreview() {
+            const subject = document.getElementById('dispatch-subject').value;
             const content = getDispatchContent();
+            const bodyHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
 
             const sampleMember = members[0] || {
                 anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
                 strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
             };
 
-            let text = content.text || htmlToPlainText(content.html);
-            text = replacePlaceholders(text, sampleMember);
-
+            const letterHtml = generateDispatchLetterHTML(bodyHtml, subject, sampleMember);
             const previewDiv = document.getElementById('dispatch-preview');
-            previewDiv.innerHTML = `
-                <div class="border rounded-lg overflow-hidden bg-white" style="max-width: 600px; margin: 0 auto;">
-                    <div class="p-8 font-serif text-sm" style="min-height: 400px;">
-                        <div class="text-right text-gray-500 text-xs mb-8">
-                            Feuerwehrverein Raura<br>
-                            Datum: ${new Date().toLocaleDateString('de-CH')}
-                        </div>
-                        <div class="mb-8">
-                            <strong>${sampleMember.anrede} ${sampleMember.vorname} ${sampleMember.nachname}</strong><br>
-                            ${sampleMember.strasse}<br>
-                            ${sampleMember.plz} ${sampleMember.ort}
-                        </div>
-                        <div class="whitespace-pre-wrap">${text}</div>
-                    </div>
-                    <div class="border-t px-4 py-2 bg-orange-50 text-xs text-orange-700">
-                        📮 Wird via Pingen als Brief versendet (ca. CHF 1.00)
-                    </div>
-                </div>
-            `;
+            previewDiv.innerHTML = letterHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '');
         }
 
         // Ersetzt Platzhalter im Text mit den tatsächlichen Mitgliederdaten.
@@ -6199,15 +6181,15 @@ ${grussformel}`;
                     }
                 }
 
-                // Post-Versand: pro Mitglied personalisiertes HTML an Pingen
-                // (FIX: html statt text - der Pingen-Endpoint konvertiert HTML via Puppeteer zu PDF)
+                // Post-Versand: pro Mitglied Brief im offiziellen Layout (Kopf wie Mitgliedsbeitrag)
+                // an /invoices/send-post (Adresse schon im HTML, daher kein Deckblatt noetig)
                 if (postRecipients.length > 0) {
                     const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
 
                     for (let i = 0; i < postRecipients.length; i++) {
                         const member = postRecipients[i];
-                        // Platzhalter pro Mitglied ersetzen (im HTML, nicht Plain Text!)
-                        const personalizedHtml = replacePlaceholders(sourceHtml, member);
+                        // Ganzer Brief im offiziellen Layout (inkl. Kopf, Adresse im Fensterkuvert, Betreff, Body, Schluss)
+                        const letterHtml = generateDispatchLetterHTML(sourceHtml, subject, member);
 
                         const recipient = {
                             name: `${member.vorname} ${member.nachname}`,
@@ -6218,14 +6200,14 @@ ${grussformel}`;
                         };
 
                         try {
-                            const response = await fetch(`${API_BASE}/pingen/send`, {
+                            const response = await fetch(`${API_BASE}/invoices/send-post`, {
                                 method: 'POST',
                                 headers: {
                                     'Authorization': `Bearer ${authToken}`,
                                     'Content-Type': 'application/json'
                                 },
                                 body: JSON.stringify({
-                                    html: personalizedHtml,
+                                    html: letterHtml,
                                     recipient,
                                     member_id: member.id
                                 })
@@ -6609,6 +6591,31 @@ ${grussformel}`;
             return getKassier()?.kurzName || 'Kassier des Feuerwehrverein Raura';
         }
 
+        // Aktuar-Helpers (fuer allgemeine Briefe via Nachrichten-Tab)
+        function getAktuar() {
+            const aktuar = members.find(m => m.funktion && /aktuar/i.test(m.funktion));
+            if (!aktuar) return null;
+            return {
+                id: aktuar.id,
+                vorname: aktuar.vorname || '',
+                nachname: aktuar.nachname || '',
+                name: `${aktuar.vorname || ''} ${aktuar.nachname || ''}`.trim(),
+                kurzName: `${(aktuar.vorname || '').charAt(0)}. ${aktuar.nachname || ''}`.trim(),
+                strasse: aktuar.strasse || '',
+                plz: aktuar.plz || '',
+                ort: aktuar.ort || '',
+                telefon: aktuar.telefon || '',
+                mobile: aktuar.mobile || aktuar.telefon || ''
+            };
+        }
+
+        // Absenderzeile Aktuar (fuer allgemeine Briefe) - Fallback generisch
+        function getAktuarAbsenderLine() {
+            const a = getAktuar();
+            if (!a || !a.strasse) return 'Aktuar des Feuerwehrverein Raura';
+            return `${a.kurzName}, ${a.strasse}, ${a.plz} ${a.ort}`;
+        }
+
         // Wechselt zwischen Post und E-Mail Modus
         function switchDeliveryMode(mode) {
             currentDeliveryMode = mode;
@@ -6868,6 +6875,63 @@ ${grussformel}`;
         // Generiert den kompletten Brief als HTML (fuer E-Mail oder Post)
         // includeAddress=true: Empfaenger-Adressblock im Schweizer Adressfenster (fuer Post-Versand via Pingen)
         // includeAddress=false: ohne Adressblock (fuer E-Mail-Versand)
+        // Generiert einen allgemeinen Brief (fuer Nachrichten-Tab Post-Versand)
+        // Nutzt den gleichen Kopf wie generateBeitragEmailHTML aber ohne QR-Einzahlungsschein.
+        // Layout: Logo + Titel + Absender + Empfaenger im Fensterkuvert + Datum + Betreff + Body + Schluss
+        function generateDispatchLetterHTML(bodyHtml, subject, member) {
+            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const name = member ? `${member.vorname} ${member.nachname}`.trim() : '{{vorname}} {{nachname}}';
+            const strasse = member?.strasse || '{{strasse}}';
+            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : '{{plz}} {{ort}}';
+
+            // Platzhalter im Body ersetzen falls Mitglied uebergeben
+            let body = bodyHtml || '';
+            if (member) body = replacePlaceholders(body, member);
+
+            return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  @page { size: A4; margin: 0; }
+  body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
+  .a4 { width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background: white; }
+  .logo { position: absolute; top: 15mm; left: 25mm; width: 35mm; }
+  .logo img { width: 35mm; height: auto; display: block; }
+  .title { position: absolute; top: 15mm; left: 118mm; font-size: 20pt; font-weight: bold; line-height: 1.2; }
+  .absender { position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333; }
+  .empfaenger { position: absolute; top: 60mm; left: 118mm; width: 85mm; font-size: 11pt; }
+  .datum { position: absolute; top: 97mm; right: 25mm; text-align: right; font-size: 11pt; }
+  .content { position: absolute; top: 110mm; left: 25mm; right: 25mm; font-size: 11pt; line-height: 1.4; }
+  .subject-title { font-weight: bold; font-size: 13pt; }
+  .divider { border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0; }
+  .body p { margin: 2mm 0; }
+  .body ul, .body ol { margin: 2mm 0; padding-left: 6mm; }
+  .signoff { margin-top: 10mm; }
+</style>
+</head>
+<body>
+<div class="a4">
+  <div class="logo"><img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura"></div>
+  <div class="title">Feuerwehrverein Raura<br>Kaiseraugst</div>
+  <div class="absender">${getAktuarAbsenderLine()}</div>
+  <div class="empfaenger">
+    ${name}<br>
+    ${strasse}<br>
+    ${plzOrt}
+  </div>
+  <div class="datum">Kaiseraugst, ${datum}</div>
+  <div class="content">
+    ${subject ? `<div class="subject-title">${subject}</div><hr class="divider">` : ''}
+    <div class="body">${body}</div>
+    <div class="signoff">
+      Mit freundlichen Grüssen<br><br>
+      <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+      <em>Der Vorstand</em>
+    </div>
+  </div>
+</div>
+</body></html>`;
+        }
+
         function generateBeitragEmailHTML(member, includeAddress = false) {
             const betrag = document.getElementById('brief-betrag').value;
             const jahr = document.getElementById('brief-jahr').value;
