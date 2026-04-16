@@ -4196,53 +4196,121 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Massen-Rechnungsgenerierung fuer alle Mitglieder (optional nach Status filtern)
+// DEUTSCH: Generiert Mitgliedsbeitrag-PDFs fuer mehrere Mitglieder und versendet sie via Pingen (Post)
+// Pro Mitglied wird ein personalisiertes QR-Rechnungs-PDF erstellt und einzeln an Pingen uebergeben
 app.post('/invoices/generate-bulk', authenticateAny, async (req, res) => {
     try {
-        const {
-            amount,
-            year,
-            description,
-            status_filter, // e.g., 'Aktivmitglied', 'Ehrenmitglied'
-            preview = false
-        } = req.body;
+        const { amount, year, description, member_ids, staging = false } = req.body;
 
         if (!amount) {
             return res.status(400).json({ error: 'amount ist erforderlich' });
         }
 
-        // Get members based on filter
-        let query = 'SELECT * FROM members WHERE status IS NOT NULL';
+        // Mitglieder mit Post-Zustellung und gueltiger Adresse laden
+        let query = `
+            SELECT id, vorname, nachname, strasse, plz, ort
+            FROM members
+            WHERE strasse IS NOT NULL AND strasse != ''
+              AND plz IS NOT NULL AND plz != ''
+              AND ort IS NOT NULL AND ort != ''
+        `;
         const params = [];
-
-        if (status_filter) {
-            query += ' AND status = $1';
-            params.push(status_filter);
+        if (member_ids && member_ids.length > 0) {
+            query += ` AND id = ANY($1)`;
+            params.push(member_ids);
+        } else {
+            query += ` AND zustellung_post = true`;
         }
-
         query += ' ORDER BY nachname, vorname';
 
         const membersResult = await pool.query(query, params);
-        const members = membersResult.rows;
+        const membersList = membersResult.rows;
 
-        if (members.length === 0) {
-            return res.status(404).json({ error: 'Keine Mitglieder gefunden' });
+        if (membersList.length === 0) {
+            return res.status(404).json({ error: 'Keine Mitglieder mit gueltiger Adresse gefunden' });
         }
 
-        logInfo('Bulk QR-Invoice generation started', {
-            member_count: members.length,
-            amount,
-            year
-        });
+        logInfo('Bulk QR-Invoice Pingen dispatch started', { count: membersList.length, amount, year });
 
+        // Antwort sofort zurueckgeben - Versand laeuft asynchron im Hintergrund
         res.json({
             success: true,
-            message: `${members.length} Rechnungen werden generiert`,
-            member_count: members.length,
-            total_amount: parseFloat(amount) * members.length
+            message: `${membersList.length} Briefe werden verarbeitet`,
+            count: membersList.length
         });
 
+        // Asynchron: Pingen-Token holen, dann pro Mitglied: generate-qr + pingen/send
+        (async () => {
+            const PINGEN_API = getPingenApi(staging);
+            let success = 0, failed = 0;
+
+            try {
+                const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+                    grant_type: 'client_credentials',
+                    client_id: process.env.PINGEN_CLIENT_ID,
+                    client_secret: process.env.PINGEN_CLIENT_SECRET
+                });
+                const token = tokenResponse.data.access_token;
+
+                for (const member of membersList) {
+                    try {
+                        // QR-Rechnung als PDF generieren (intern via selben Service)
+                        const internalRes = await axios.post(`http://localhost:${PORT}/invoices/generate-qr`,
+                            {
+                                member_id: member.id,
+                                amount: parseFloat(amount),
+                                year: year || new Date().getFullYear(),
+                                description: description || `Mitgliederbeitrag ${year}`,
+                                preview: false
+                            },
+                            { headers: { Authorization: req.headers.authorization } }
+                        );
+                        const pdfBuffer = Buffer.from(internalRes.data.pdf_base64, 'base64');
+
+                        // PDF zu Pingen hochladen
+                        const uploadUrlRes = await axios.get(`${PINGEN_API}/file-upload`, {
+                            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' }
+                        });
+                        const fileUrl = uploadUrlRes.data.data.attributes.url;
+                        const fileUrlSignature = uploadUrlRes.data.data.attributes.url_signature;
+
+                        await axios.put(fileUrl, pdfBuffer, { headers: { 'Content-Type': 'application/pdf' } });
+
+                        // Brief bei Pingen erstellen (Adresse ist bereits im PDF)
+                        await axios.post(
+                            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
+                            {
+                                data: {
+                                    type: 'letters',
+                                    attributes: {
+                                        file_original_name: `Mitgliederbeitrag_${year}_${member.nachname}.pdf`,
+                                        file_url: fileUrl,
+                                        file_url_signature: fileUrlSignature,
+                                        auto_send: true,
+                                        delivery_product: 'cheap',
+                                        print_mode: 'simplex',
+                                        print_spectrum: 'grayscale',
+                                        address_position: 'right'
+                                    }
+                                }
+                            },
+                            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+                        );
+                        success++;
+                        logInfo('Membership fee letter sent via Pingen', { member_id: member.id, name: `${member.vorname} ${member.nachname}` });
+                    } catch (err) {
+                        failed++;
+                        logError('Failed to send letter via Pingen', { member_id: member.id, error: err.message });
+                    }
+                }
+                logInfo('Bulk Pingen dispatch finished', { success, failed, total: membersList.length });
+            } catch (err) {
+                logError('Bulk Pingen dispatch failed', { error: err.message });
+            }
+        })();
+
     } catch (error) {
-        logError('Failed to generate bulk QR invoices', { error: error.message });
+        logError('Failed to start bulk QR dispatch', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
