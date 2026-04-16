@@ -6588,6 +6588,32 @@ ${grussformel}`;
 
         // IBAN fuer QR-Rechnung (Feuerwehrverein Raura)
         const BEITRAG_IBAN = 'CH6430769442492432001';
+
+        // Modulo 10 Rekursiv (ESR/Swiss QR-Bill): berechnet Pruefziffer fuer Referenz
+        function mod10Recursive(digits) {
+            const table = [0, 9, 4, 6, 8, 2, 7, 1, 3, 5];
+            let carry = 0;
+            for (const ch of digits.replace(/\D/g, '')) {
+                carry = table[(carry + parseInt(ch, 10)) % 10];
+            }
+            return ((10 - carry) % 10).toString();
+        }
+
+        // Liefert die volle 27-stellige QR-Referenz aus einer beliebig langen Eingabe
+        // Wenn Eingabe 27 Stellen: Pruefziffer bereits enthalten (wie von Bank geliefert)
+        // Sonst: auf 26 Stellen padden, Pruefziffer berechnen und anhaengen
+        function buildQRReference(input) {
+            const clean = (input || '').replace(/\D/g, '');
+            if (clean.length === 27) return clean; // Bank-Ref inkl. Pruefziffer
+            const ref26 = clean.padStart(26, '0');
+            return ref26 + mod10Recursive(ref26);
+        }
+
+        // Formatiert eine QR-Referenz in Gruppen: "XX XXXXX XXXXX XXXXX XXXXX XXXXX"
+        function formatQRReference(qrRef27) {
+            const r = qrRef27.padStart(27, '0');
+            return r.slice(0,2) + ' ' + r.slice(2,7) + ' ' + r.slice(7,12) + ' ' + r.slice(12,17) + ' ' + r.slice(17,22) + ' ' + r.slice(22,27);
+        }
         let currentDeliveryMode = 'auto';
 
         // Aktuell ausgewaehlter Kassier (ID) - waehrend Uebergangsphase wenn mehrere vorhanden
@@ -6784,9 +6810,9 @@ ${grussformel}`;
                 div.querySelectorAll('[data-kassier-footer-right]').forEach(el => el.textContent = footer.right);
                 div.querySelectorAll('[data-kassier-signature]').forEach(el => el.textContent = getKassierSignature());
 
-                // Ref + Pruefziffer, rechtsbuendig auf 5 Stellen (z.B. "0812" → "08120")
-                const refWithCheck = (vals.ref.replace(/\D/g, '') + '0').padStart(5, '0');
-                const refFormatted = '00 00000 00000 00000 00000 ' + refWithCheck;
+                // Volle QR-Referenz (inkl. Pruefziffer, Modulo 10 Rekursiv)
+                const qrRef27 = buildQRReference(vals.ref);
+                const refFormatted = formatQRReference(qrRef27);
                 const betragFormatted = parseFloat(vals.betrag).toFixed(2);
                 ['es-referenz', 'zt-referenz'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = refFormatted; });
                 ['es-betrag', 'zt-betrag'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = betragFormatted; });
@@ -6797,8 +6823,7 @@ ${grussformel}`;
                 const qrContainer = div.querySelector('#beitrag-qr-code');
                 if (qrContainer) {
                     try {
-                        // QR-Referenz: 26-stellig + 1 Pruefziffer = 27 Stellen
-                        const qrRefClean = (vals.ref.replace(/\D/g, '') + '0').padStart(27, '0');
+                        const qrRefClean = qrRef27; // bereits 27-stellig inkl. Pruefziffer
                         const qrPayload = [
                             'SPC', '0200', '1', BEITRAG_IBAN,
                             'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
@@ -7262,17 +7287,16 @@ ${grussformel}`;
                 : document.getElementById('brief-ref').value;
             const name = member ? `${member.nachname} ${member.vorname}` : document.getElementById('brief-name').value;
 
-            // Ref + Pruefziffer, rechtsbuendig auf 5 Stellen (z.B. "0812" → "08120")
-            const refWithCheck = (refNr.replace(/\D/g, '') + '0').padStart(5, '0');
-            const refFormatted = '00 00000 00000 00000 00000 ' + refWithCheck;
+            // Volle QR-Referenz (inkl. Pruefziffer, Modulo 10 Rekursiv)
+            const qrRef27 = buildQRReference(refNr);
+            const refFormatted = formatQRReference(qrRef27);
             const betragFormatted = parseFloat(betrag).toFixed(2);
             const betragGanz = parseInt(betrag) || betrag;
 
             // QR-Code als Base64 generieren
             let qrImgSrc = '';
             try {
-                // QR-Referenz: 26-stellig + 1 Pruefziffer = 27 Stellen, rechtsbuendig
-                const qrRefClean = (refNr.replace(/\D/g, '') + '0').padStart(27, '0');
+                const qrRefClean = qrRef27; // bereits 27-stellig inkl. Pruefziffer
                 const strasse = member ? (member.strasse || '') : document.getElementById('brief-strasse').value;
                 const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : document.getElementById('brief-plz-ort').value;
                 const qrPayload = [
