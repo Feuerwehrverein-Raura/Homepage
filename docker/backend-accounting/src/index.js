@@ -66,6 +66,51 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================
+// DEUTSCH: AUTO-MIGRATION — Erstellt benoetigte Tabellen beim Start (idempotent)
+// Fuehrt Migration 019 (Mitgliedsbeitraege) automatisch aus falls noch nicht vorhanden
+// ============================================
+async function runStartupMigrations() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS membership_fee_settings (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                year INTEGER NOT NULL UNIQUE,
+                amount DECIMAL(10,2) NOT NULL,
+                gv_date VARCHAR(50),
+                due_date DATE,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            );
+
+            CREATE TABLE IF NOT EXISTS membership_fee_payments (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+                year INTEGER NOT NULL,
+                amount DECIMAL(10,2) NOT NULL,
+                reference_nr VARCHAR(20) NOT NULL,
+                bank_reference VARCHAR(50),
+                status VARCHAR(20) DEFAULT 'offen',
+                paid_date DATE,
+                payment_method VARCHAR(50),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(member_id, year)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_fee_payments_year ON membership_fee_payments(year);
+            CREATE INDEX IF NOT EXISTS idx_fee_payments_status ON membership_fee_payments(status);
+            CREATE INDEX IF NOT EXISTS idx_fee_payments_reference ON membership_fee_payments(reference_nr);
+            CREATE INDEX IF NOT EXISTS idx_fee_payments_bank_ref ON membership_fee_payments(bank_reference);
+        `);
+        logInfo('Startup migrations applied successfully');
+    } catch (error) {
+        logError('Startup migration failed', { error: error.message });
+    }
+}
+
+// ============================================
 // DEUTSCH: KONTENPLAN (Accounts) — Verwaltung der Buchhaltungskonten
 // ============================================
 
@@ -503,6 +548,7 @@ app.get('/membership-fees/summary', async (req, res) => {
 });
 
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`API-Accounting running on port ${PORT}`);
+    await runStartupMigrations();
 });
