@@ -6776,6 +6776,9 @@ ${grussformel}`;
                     ref: document.getElementById('brief-ref').value,
                     jahr: document.getElementById('brief-jahr').value
                 };
+                // Volle QR-Referenz berechnen (inkl. Pruefziffer) und Kurzform daraus ableiten
+                const qrRef27 = buildQRReference(vals.ref);
+                const refShort = qrRef27.slice(-5); // letzte 5 Stellen (inkl. Pruefziffer) = auf Brief angezeigte Ref
                 // Mapping Template-Input-ID -> Form-Wert-Key
                 const idToVal = {
                     'brief-name': vals.name,
@@ -6784,7 +6787,7 @@ ${grussformel}`;
                     'brief-datum': vals.datum,
                     'brief-gv-datum': vals.gvDatum,
                     'brief-betrag': vals.betrag,
-                    'brief-ref': vals.ref,
+                    'brief-ref': refShort,                  // im Brieftext Kurzform (z.B. "05590")
                     'brief-jahr': vals.jahr
                 };
                 // Inputs im Template durch statischen Text ersetzen und Block-Display erhalten
@@ -6810,14 +6813,13 @@ ${grussformel}`;
                 div.querySelectorAll('[data-kassier-footer-right]').forEach(el => el.textContent = footer.right);
                 div.querySelectorAll('[data-kassier-signature]').forEach(el => el.textContent = getKassierSignature());
 
-                // Volle QR-Referenz (inkl. Pruefziffer, Modulo 10 Rekursiv)
-                const qrRef27 = buildQRReference(vals.ref);
+                // QR-Ref und Betrag in Empfangsschein/Zahlteil setzen
                 const refFormatted = formatQRReference(qrRef27);
                 const betragFormatted = parseFloat(vals.betrag).toFixed(2);
                 ['es-referenz', 'zt-referenz'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = refFormatted; });
                 ['es-betrag', 'zt-betrag'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = betragFormatted; });
                 const ztJahr = div.querySelector('#zt-jahr'); if (ztJahr) ztJahr.textContent = vals.jahr;
-                const ztRefName = div.querySelector('#zt-ref-name'); if (ztRefName) ztRefName.textContent = `Ref. ${vals.ref} - ${vals.name}`;
+                const ztRefName = div.querySelector('#zt-ref-name'); if (ztRefName) ztRefName.textContent = `Ref. ${refShort} - ${vals.name}`;
 
                 // QR-Code generieren
                 const qrContainer = div.querySelector('#beitrag-qr-code');
@@ -7290,6 +7292,7 @@ ${grussformel}`;
             // Volle QR-Referenz (inkl. Pruefziffer, Modulo 10 Rekursiv)
             const qrRef27 = buildQRReference(refNr);
             const refFormatted = formatQRReference(qrRef27);
+            const refShort = qrRef27.slice(-5); // Kurzform fuer Brieftext/Mitteilungsfeld
             const betragFormatted = parseFloat(betrag).toFixed(2);
             const betragGanz = parseInt(betrag) || betrag;
 
@@ -7362,7 +7365,7 @@ ${grussformel}`;
     <div style="margin-bottom:12px;">
         Mir obliegt es nun traditionsgemäss Euch um die Entrichtung dieses Beitrages
         anzugehen. Ich danke Euch herzlich für eine baldige Überweisung mit beiliegendem
-        Einzahlungsschein, Ref. Nr. ${refNr}
+        Einzahlungsschein, Ref. Nr. ${refShort}
     </div>
     <div style="margin-bottom:18px;">
         Mitgliederbeitrag ${jahr}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sFr. ${betragGanz}.-
@@ -7428,7 +7431,7 @@ ${grussformel}`;
                 <div style="margin-bottom:8px;">${refFormatted}</div>
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:2px;">Zusätzliche Informationen</div>
                 <div style="margin-bottom:2px;">Mitgliederbeitrag ${jahr}</div>
-                <div style="margin-bottom:8px;">Ref. ${refNr} - ${name}</div>
+                <div style="margin-bottom:8px;">Ref. ${refShort} - ${name}</div>
                 <div style="font-size:6pt;font-weight:bold;margin-bottom:2px;">Zahlbar durch (Name/Adresse)</div>
                 <div style="border:1px solid #000;width:100%;height:60px;"></div>
             </td>
