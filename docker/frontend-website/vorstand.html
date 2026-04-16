@@ -6140,23 +6140,38 @@ ${grussformel}`;
             if (deliveryMethod === 'auto') {
                 emailRecipients = recipients.filter(m => m.zustellung_email && m.email);
                 postRecipients = recipients.filter(m => m.zustellung_post && m.strasse && m.plz && m.ort);
+                const skipped = recipients.length - emailRecipients.length - postRecipients.length;
 
                 const totalToSend = emailRecipients.length + postRecipients.length;
-                const message = `Versand an ${totalToSend} Empfänger:\n- ${emailRecipients.length} per E-Mail\n- ${postRecipients.length} per Post`;
+                let message = `Versand gemäss individueller Zustellpräferenz:\n` +
+                    `- ${emailRecipients.length} per E-Mail\n` +
+                    `- ${postRecipients.length} per Post`;
+                if (skipped > 0) message += `\n- ${skipped} ohne Präferenz/Adresse (werden übersprungen)`;
+                message += `\n\nInsgesamt ${totalToSend} Empfänger`;
                 if (!confirm(message)) return;
             } else if (deliveryMethod === 'email') {
                 emailRecipients = recipients.filter(m => m.email);
-                if (!confirm(`E-Mail an ${emailRecipients.length} Empfänger senden?`)) return;
+                const skipped = recipients.length - emailRecipients.length;
+                let message = `E-Mail an ${emailRecipients.length} Empfänger senden?`;
+                if (skipped > 0) message += `\n(${skipped} ohne E-Mail-Adresse werden übersprungen)`;
+                if (!confirm(message)) return;
             } else {
                 postRecipients = recipients.filter(m => m.strasse && m.plz && m.ort);
-                if (!confirm(`Brief an ${postRecipients.length} Empfänger senden?`)) return;
+                const skipped = recipients.length - postRecipients.length;
+                let message = `Brief an ${postRecipients.length} Empfänger senden (via Pingen)?`;
+                if (skipped > 0) message += `\n(${skipped} ohne vollständige Adresse werden übersprungen)`;
+                if (!confirm(message)) return;
             }
 
             try {
                 let emailSuccess = 0;
+                let emailFailed = 0;
                 let postSuccess = 0;
+                let postFailed = 0;
 
-                // Send emails (with HTML support)
+                showToast('Versand läuft...', 'info');
+
+                // E-Mail-Versand
                 if (emailRecipients.length > 0) {
                     const response = await fetch(`${API_BASE}/email/bulk`, {
                         method: 'POST',
@@ -6171,7 +6186,6 @@ ${grussformel}`;
                             body: content.text,
                             html: content.html,
                             variables: {},
-                            // TODO: Add attachments support
                             attachments: []
                         })
                     });
@@ -6179,53 +6193,70 @@ ${grussformel}`;
                     if (response.ok) {
                         const result = await response.json();
                         emailSuccess = result.success || 0;
+                        emailFailed = result.failed || (emailRecipients.length - emailSuccess);
                     } else {
-                        throw new Error(`Email API error: ${response.status}`);
+                        emailFailed = emailRecipients.length;
                     }
                 }
 
-                // Send post (convert HTML to plain text for letters)
+                // Post-Versand: pro Mitglied personalisiertes HTML an Pingen
+                // (FIX: html statt text - der Pingen-Endpoint konvertiert HTML via Puppeteer zu PDF)
                 if (postRecipients.length > 0) {
-                    const letterText = content.html ? htmlToPlainText(content.html) : content.text;
+                    const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
 
-                    for (const member of postRecipients) {
-                        // Replace placeholders for this member
-                        const personalizedText = replacePlaceholders(letterText, member);
+                    for (let i = 0; i < postRecipients.length; i++) {
+                        const member = postRecipients[i];
+                        // Platzhalter pro Mitglied ersetzen (im HTML, nicht Plain Text!)
+                        const personalizedHtml = replacePlaceholders(sourceHtml, member);
 
                         const recipient = {
                             name: `${member.vorname} ${member.nachname}`,
                             street: member.strasse,
                             zip: member.plz,
-                            city: member.ort
+                            city: member.ort,
+                            country: 'CH'
                         };
 
-                        const response = await fetch(`${API_BASE}/pingen/send`, {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${authToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                text: personalizedText,
-                                recipient,
-                                member_id: member.id
-                            })
-                        });
+                        try {
+                            const response = await fetch(`${API_BASE}/pingen/send`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${authToken}`,
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    html: personalizedHtml,
+                                    recipient,
+                                    member_id: member.id
+                                })
+                            });
+                            if (response.ok) postSuccess++;
+                            else postFailed++;
+                        } catch (e) {
+                            postFailed++;
+                        }
 
-                        if (response.ok) {
-                            postSuccess++;
+                        // Fortschritts-Toast alle 5 Briefe
+                        if ((i + 1) % 5 === 0 || i === postRecipients.length - 1) {
+                            showToast(`Briefe: ${i + 1}/${postRecipients.length} verarbeitet`, 'info');
                         }
                     }
                 }
 
-                let message = 'Versand erfolgreich:';
-                if (emailSuccess > 0) message += `\n- ${emailSuccess} E-Mails`;
-                if (postSuccess > 0) message += `\n- ${postSuccess} Briefe`;
-                alert(message);
+                // Abschluss-Meldung
+                let msg = 'Versand abgeschlossen:';
+                if (emailSuccess + emailFailed > 0) {
+                    msg += `\nE-Mail: ${emailSuccess} gesendet${emailFailed ? `, ${emailFailed} fehlgeschlagen` : ''}`;
+                }
+                if (postSuccess + postFailed > 0) {
+                    msg += `\nPost: ${postSuccess} versendet${postFailed ? `, ${postFailed} fehlgeschlagen` : ''}`;
+                }
+                const hasErrors = emailFailed + postFailed > 0;
+                showToast(msg, hasErrors ? 'warning' : 'success');
                 loadDispatchHistory();
             } catch (error) {
                 console.error('Error sending dispatch:', error);
-                alert(`Fehler beim Versand: ${error.message}`);
+                showToast('Fehler beim Versand: ' + error.message, 'error');
             }
         }
 
