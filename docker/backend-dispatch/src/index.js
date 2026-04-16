@@ -806,7 +806,13 @@ app.post('/email/bulk', authenticateAny, async (req, res) => {
                     to: member.versand_email || member.email,
                     template_id,
                     variables: mergedVars,
-                    member_id: member.id
+                    member_id: member.id,
+                    subject: req.body.subject,
+                    body: req.body.body,
+                    html: req.body.html,
+                    attachments: req.body.attachments
+                }, {
+                    headers: { Authorization: req.headers.authorization || '' }
                 });
 
                 results.push({ member_id: member.id, success: true });
@@ -885,12 +891,14 @@ app.post('/dispatch/smart', authenticateAny, async (req, res) => {
 
             try {
                 if (hasEmail && templates.email) {
-                    // Send email
+                    // Send email (Authorization-Header weiterreichen)
                     await axios.post(`http://localhost:${PORT}/email/send`, {
                         to: member.versand_email || member.email,
                         template_id: templates.email.id,
                         variables: mergedVars,
                         member_id: member.id
+                    }, {
+                        headers: { Authorization: req.headers.authorization || '' }
                     });
                     results.email.push({ member_id: member.id, name: `${member.vorname} ${member.nachname}` });
                 } else if (hasPost) {
@@ -916,6 +924,8 @@ app.post('/dispatch/smart', authenticateAny, async (req, res) => {
                             member_id: member.id,
                             staging,
                             template_id: template.id
+                        }, {
+                            headers: { Authorization: req.headers.authorization || '' }
                         });
                         results[country === 'DE' ? 'brief_de' : 'brief_ch'].push({
                             member_id: member.id,
