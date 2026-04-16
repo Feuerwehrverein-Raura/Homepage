@@ -2384,7 +2384,7 @@
 
                     <!-- Absender klein - oberhalb Frankierbereich (Y<40mm), dynamisch aus Kassier-DB -->
                     <div id="brief-absender" style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">
-                        G.Costanza, Marksteinweg 12, 4304 Giebenach
+                        Kassier des Feuerwehrverein Raura
                     </div>
 
                     <!-- Empfaenger im Adressfenster: Swiss Standard X=118mm, Y=60mm -->
@@ -2431,7 +2431,7 @@
                         <div style="margin-bottom: 0;">
                             <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
                             <em>der Kassier</em><br><br>
-                            <span data-kassier-signature>G. Costanza</span>
+                            <span data-kassier-signature>Kassier des Feuerwehrverein Raura</span>
                         </div>
 
                     </div>
@@ -2525,8 +2525,8 @@
 
                         <!-- Footer (dynamisch aus Kassier-DB) -->
                         <div style="display: flex; justify-content: space-between; font-size: 7pt; color: #555; margin-top: 3mm; padding: 0 5mm;">
-                            <div data-kassier-footer-left>Kassier: Costanza Giuseppe, Marksteinweg 12, 4304 Giebenach Tel.+41 61 811 26 32</div>
-                            <div data-kassier-footer-right>Nat. +41 79 501 71 20</div>
+                            <div data-kassier-footer-left>Kassier des Feuerwehrverein Raura</div>
+                            <div data-kassier-footer-right></div>
                         </div>
                     </div>
 
@@ -6478,21 +6478,26 @@ ${grussformel}`;
             select.value = selectedKassierId;
         }
 
-        // Formatiert die Absenderzeile (Kassier) - Fallback auf hardcoded wenn kein Kassier in DB
+        // Formatiert die Absenderzeile (Kassier) - Fallback generisch wenn kein Kassier in DB
         function getAbsenderLine() {
             const k = getKassier();
-            if (!k || !k.strasse) return 'G.Costanza, Marksteinweg 12, 4304 Giebenach';
+            if (!k || !k.strasse) return 'Kassier des Feuerwehrverein Raura';
             return `${k.kurzName}, ${k.strasse}, ${k.plz} ${k.ort}`;
         }
 
-        // Footer-Zeile mit Kassier-Kontakt
+        // Footer-Zeile mit Kassier-Kontakt - Fallback generisch
         function getKassierFooter() {
             const k = getKassier();
-            if (!k) return { left: 'Kassier: Costanza Giuseppe, Marksteinweg 12, 4304 Giebenach Tel.+41 61 811 26 32', right: 'Nat. +41 79 501 71 20' };
+            if (!k) return { left: 'Kassier des Feuerwehrverein Raura', right: '' };
             const nachVorname = `${k.nachname} ${k.vorname}`.trim();
             const left = `Kassier: ${nachVorname}, ${k.strasse}, ${k.plz} ${k.ort}${k.telefon ? ' Tel.' + k.telefon : ''}`;
             const right = k.mobile ? `Nat. ${k.mobile}` : '';
             return { left, right };
+        }
+
+        // Unterschrift - Fallback generisch
+        function getKassierSignature() {
+            return getKassier()?.kurzName || 'Kassier des Feuerwehrverein Raura';
         }
 
         // Wechselt zwischen Post und E-Mail Modus
@@ -6551,7 +6556,7 @@ ${grussformel}`;
                 const footer = getKassierFooter();
                 div.querySelectorAll('[data-kassier-footer-left]').forEach(el => el.textContent = footer.left);
                 div.querySelectorAll('[data-kassier-footer-right]').forEach(el => el.textContent = footer.right);
-                div.querySelectorAll('[data-kassier-signature]').forEach(el => el.textContent = getKassier()?.kurzName || 'G. Costanza');
+                div.querySelectorAll('[data-kassier-signature]').forEach(el => el.textContent = getKassierSignature());
 
                 const refPadded = vals.ref.replace(/\D/g, '').padStart(5, '0') + '0';
                 const refFormatted = '00 00000 00000 00000 00000 ' + refPadded.padStart(5, '0');
@@ -6809,7 +6814,7 @@ ${grussformel}`;
     <div>
         <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
         <em>der Kassier</em><br><br>
-        ${getKassier()?.kurzName || 'G. Costanza'}
+        ${getKassierSignature()}
     </div>
 
     <!-- Trennlinie -->
