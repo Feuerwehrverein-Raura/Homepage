@@ -79,8 +79,9 @@ function getClientIp(req) {
 }
 
 // DEUTSCH: SMTP-Transporter fuer E-Mail-Versand (Mailcow/SMTP-Server)
+// Akzeptiert sowohl SMTP_HOST (fwv-website .env) als auch SMTP_SERVER (shared /opt/docker/.env)
 const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host: process.env.SMTP_HOST || process.env.SMTP_SERVER,
     port: process.env.SMTP_PORT,
     secure: process.env.SMTP_PORT === '465',
     auth: {
