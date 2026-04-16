@@ -2349,6 +2349,10 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                             <span>Senden</span>
                         </button>
+                        <button id="beitrag-print-all-btn" class="bg-gray-700 text-white px-5 py-2 rounded-lg hover:bg-gray-800 transition-colors flex items-center space-x-2 text-sm" title="Alle beitragspflichtigen Briefe in einem Druckfenster zum Ausdrucken oder PDF-Speichern">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            <span>Alle drucken</span>
+                        </button>
                         <button id="beitrag-send-all-btn" class="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             <span>An alle senden</span>
@@ -6603,6 +6607,28 @@ ${grussformel}`;
             const r = qrRef27.padStart(27, '0');
             return r.slice(0,2) + ' ' + r.slice(2,7) + ' ' + r.slice(7,12) + ' ' + r.slice(12,17) + ' ' + r.slice(17,22) + ' ' + r.slice(22,27);
         }
+
+        // Baut den Swiss QR-Bill Payload (SPC-Format, v0200)
+        // Referenz: SIX Paymentstandards Implementation Guidelines QR-Bill v2.x
+        // Feldreihenfolge MUSS stimmen: Header(3) + IBAN(1) + CR(7) + UCR(7) + CcyAmt(2) + UDB(7) + RmtInf(3) + Trailer(1) = 31 Zeilen
+        function buildSwissQRPayload({ iban, amount, reference, debtorName, debtorStreet, debtorPlz, debtorOrt, message }) {
+            return [
+                'SPC', '0200', '1',
+                iban,
+                // Creditor (Feuerwehrverein Raura)
+                'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
+                // Ultimate Creditor - alle 7 Felder leer (nicht genutzt)
+                '', '', '', '', '', '', '',
+                // Betrag + Waehrung
+                amount, 'CHF',
+                // Ultimate Debtor (Mitglied)
+                'S', debtorName || '', debtorStreet || '', '', debtorPlz || '', debtorOrt || '', 'CH',
+                // Zahlungsreferenz
+                'QRR', reference, message || '',
+                // Trailer
+                'EPD'
+            ].join('\n');
+        }
         let currentDeliveryMode = 'auto';
 
         // Aktuell ausgewaehlter Kassier (ID) - waehrend Uebergangsphase wenn mehrere vorhanden
@@ -6819,13 +6845,16 @@ ${grussformel}`;
             const qrContainer = div.querySelector('#beitrag-qr-code');
             if (qrContainer) {
                 try {
-                    const qrPayload = [
-                        'SPC', '0200', '1', BEITRAG_IBAN,
-                        'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
-                        '', '', '', '', '', '', betragFormatted, 'CHF',
-                        'S', vals.name, vals.strasse, '', vals.plzOrt.match(/^\d+/)?.[0] || '', vals.plzOrt.replace(/^\d+\s*/, '') || '', 'CH',
-                        'QRR', qrRef27, 'Mitgliederbeitrag ' + vals.jahr, 'EPD', ''
-                    ].join('\n');
+                    const qrPayload = buildSwissQRPayload({
+                        iban: BEITRAG_IBAN,
+                        amount: betragFormatted,
+                        reference: qrRef27,
+                        debtorName: vals.name,
+                        debtorStreet: vals.strasse,
+                        debtorPlz: (vals.plzOrt.match(/^\d+/)?.[0] || ''),
+                        debtorOrt: (vals.plzOrt.replace(/^\d+\s*/, '') || ''),
+                        message: `Mitgliederbeitrag ${vals.jahr}//Ref. ${refShort} - ${vals.name}`
+                    });
                     const qr = qrcode(0, 'M');
                     qr.addData(qrPayload);
                     qr.make();
@@ -7366,20 +7395,16 @@ ${grussformel}`;
                 const qrRefClean = qrRef27; // bereits 27-stellig inkl. Pruefziffer
                 const strasse = member ? (member.strasse || '') : document.getElementById('brief-strasse').value;
                 const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : document.getElementById('brief-plz-ort').value;
-                const qrPayload = [
-                    'SPC', '0200', '1',
-                    BEITRAG_IBAN,
-                    'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
-                    '', '', '', '', '', '',
-                    betragFormatted, 'CHF',
-                    'S', name, strasse, '',
-                    plzOrt.match(/^\d+/)?.[0] || '',
-                    plzOrt.replace(/^\d+\s*/, '') || '',
-                    'CH',
-                    'QRR', qrRefClean,
-                    'Mitgliederbeitrag ' + jahr,
-                    'EPD', ''
-                ].join('\n');
+                const qrPayload = buildSwissQRPayload({
+                    iban: BEITRAG_IBAN,
+                    amount: betragFormatted,
+                    reference: qrRefClean,
+                    debtorName: name,
+                    debtorStreet: strasse,
+                    debtorPlz: plzOrt.match(/^\d+/)?.[0] || '',
+                    debtorOrt: plzOrt.replace(/^\d+\s*/, '') || '',
+                    message: `Mitgliederbeitrag ${jahr}//Ref. ${refShort} - ${name}`
+                });
                 const qr = qrcode(0, 'M');
                 qr.addData(qrPayload);
                 qr.make();
@@ -7867,6 +7892,58 @@ ${grussformel}`;
             return sendBeitragBulkByPreference();
         }
 
+        // Oeffnet ein Druckfenster mit allen beitragspflichtigen Briefen (nicht bezahlt, kein Ehrenmitglied).
+        // Nutzt buildBeitragLetterDiv(member) fuer jedes Mitglied (gleiche Logik wie Vorschau & Pingen-Versand).
+        // User kann im Browser-Druckdialog "Als PDF speichern" oder direkt drucken.
+        function printAllBeitragLetters() {
+            const isPaid = (m) => currentYearPayments[m.id]?.status === 'bezahlt';
+            const eligible = members.filter(m =>
+                m.status !== 'Ehrenmitglied' &&
+                !isPaid(m) &&
+                currentYearPayments[m.id]?.reference_nr
+            );
+            const withoutRef = members.filter(m =>
+                m.status !== 'Ehrenmitglied' &&
+                !isPaid(m) &&
+                !currentYearPayments[m.id]?.reference_nr
+            );
+            if (eligible.length === 0) {
+                showToast('Keine beitragspflichtigen Mitglieder mit Ref-Nr. gefunden', 'warning');
+                return;
+            }
+            const warn = withoutRef.length > 0
+                ? `\n\n⚠ ${withoutRef.length} Mitglieder ohne Ref-Nr. werden ueberspruengen.`
+                : '';
+            if (!confirm(`${eligible.length} Briefe zum Drucken generieren?${warn}`)) return;
+
+            // Alle Briefe in einen Container packen mit Seitenumbruch dazwischen
+            const container = document.createElement('div');
+            for (const member of eligible) {
+                const letter = buildBeitragLetterDiv(member);
+                // Absolute URLs fuer Bilder, damit der Druck-Tab sie findet
+                letter.querySelectorAll('img').forEach(img => {
+                    const src = img.getAttribute('src');
+                    if (src && !src.startsWith('http') && !src.startsWith('data:')) {
+                        img.setAttribute('src', location.origin + '/' + src.replace(/^\/+/, ''));
+                    }
+                });
+                letter.style.pageBreakAfter = 'always';
+                letter.style.breakAfter = 'page';
+                container.appendChild(letter);
+            }
+
+            const printWin = window.open('', '_blank');
+            if (!printWin) {
+                showToast('Popup wurde blockiert. Bitte Popups fuer diese Seite erlauben.', 'error');
+                return;
+            }
+            printWin.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Mitgliedsbeitrag ${document.getElementById('brief-jahr').value} - ${eligible.length} Briefe</title><style>@page{size:A4;margin:0}body{margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}</style></head><body></body></html>`);
+            printWin.document.close();
+            printWin.document.body.appendChild(container);
+            // Nach einem kurzen Delay drucken (Bilder/QR brauchen Zeit zum Rendern)
+            setTimeout(() => { printWin.focus(); printWin.print(); }, 800);
+        }
+
         // ============================================
         // TAB SWITCHING
         // ============================================
@@ -7957,6 +8034,7 @@ ${grussformel}`;
         document.getElementById('beitrag-preview-btn').addEventListener('click', openBeitragPreview);
         document.getElementById('beitrag-send-btn').addEventListener('click', () => handleBeitragSend(false));
         document.getElementById('beitrag-send-all-btn').addEventListener('click', () => handleBeitragSend(true));
+        document.getElementById('beitrag-print-all-btn').addEventListener('click', () => printAllBeitragLetters());
         document.getElementById('close-preview-modal').addEventListener('click', closeBeitragPreview);
         document.getElementById('beitrag-preview-modal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('beitrag-preview-modal')) closeBeitragPreview();
