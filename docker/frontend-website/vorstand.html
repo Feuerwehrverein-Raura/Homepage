@@ -7744,46 +7744,42 @@ ${grussformel}`;
         // PDF generieren via Backend-API
         async function generateBeitragPDF() {
             const memberId = document.getElementById('beitrag-member-select').value;
-            if (!memberId) {
+            if (!memberId || memberId === 'all') {
                 showToast('Bitte wähle zuerst ein Mitglied aus', 'warning');
                 return;
             }
-
-            const betrag = document.getElementById('brief-betrag').value;
-            const jahr = document.getElementById('brief-jahr').value;
+            const member = members.find(m => String(m.id) === String(memberId));
+            if (!member) {
+                showToast('Mitglied nicht gefunden', 'error');
+                return;
+            }
 
             try {
-                showToast('PDF wird generiert...', 'info');
+                showToast('Brief wird an Pingen gesendet...', 'info');
 
-                const response = await fetch(`${API_BASE}/invoices/generate-qr`, {
+                // Gleicher Flow wie Bulk: HTML generieren und via Pingen senden
+                const html = generateBeitragEmailHTML(member, true);
+                const response = await fetch(`${API_BASE}/dispatch/send-post`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
                     body: JSON.stringify({
-                        member_id: memberId,
-                        amount: parseFloat(betrag),
-                        year: parseInt(jahr),
-                        description: `Mitgliederbeitrag ${jahr}`,
-                        preview: true
+                        html: html,
+                        recipient: {
+                            name: `${member.vorname} ${member.nachname}`,
+                            street: member.strasse,
+                            zip: member.plz,
+                            city: member.ort,
+                            country: 'CH'
+                        },
+                        member_id: member.id
                     })
                 });
 
-                if (!response.ok) throw new Error('PDF-Generierung fehlgeschlagen');
-
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                const name = document.getElementById('brief-name').value.replace(/\s+/g, '_');
-                a.href = url;
-                a.download = `Mitgliederbeitrag_${jahr}_${name}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                showToast('PDF erfolgreich generiert', 'success');
+                if (!response.ok) throw new Error('Pingen-Versand fehlgeschlagen (' + response.status + ')');
+                showToast(`Brief an ${member.vorname} ${member.nachname} via Pingen gesendet`, 'success');
             } catch (error) {
                 showToast('Fehler: ' + error.message, 'error');
             }
