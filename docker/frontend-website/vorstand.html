@@ -1152,6 +1152,15 @@
                         </div>
                     </div>
 
+                    <!-- Event-Auswahl (nur sichtbar bei Event-Einladung Template) -->
+                    <div id="dispatch-event-wrapper" class="hidden mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Event auswählen</label>
+                        <select id="dispatch-event-select" class="w-full px-3 py-2 border border-amber-400 bg-white rounded-lg focus:ring-2 focus:ring-amber-500 text-sm">
+                            <option value="">-- Event auswählen --</option>
+                        </select>
+                        <p class="text-xs text-amber-700 mt-1">Titel, Datum, Ort, Anmeldung und QR-Code werden aus den Event-Daten übernommen. Im Editor nur den einleitenden Text eingeben.</p>
+                    </div>
+
                     <!-- Nachrichten-Editor -->
                     <div class="mb-4">
                         <div class="flex justify-between items-center mb-1">
@@ -5785,7 +5794,11 @@ ${grussformel}`;
                 email: 'max@example.com'
             };
 
-            const emailHtml = generateDispatchEmailHTML(bodyHtml, subject, sampleMember);
+            // Event-Einladung: anderes Layout verwenden
+            const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
+            const emailHtml = event
+                ? generateEventInvitationEmailHTML(event, bodyHtml, sampleMember)
+                : generateDispatchEmailHTML(bodyHtml, subject, sampleMember);
             const previewDiv = document.getElementById('dispatch-preview');
 
             // Header ueber der Vorschau + generiertes Email-HTML (DOCTYPE/body gestrippt)
@@ -5816,7 +5829,11 @@ ${grussformel}`;
                 strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
             };
 
-            const letterHtml = generateDispatchLetterHTML(bodyHtml, subject, sampleMember);
+            // Event-Einladung: anderes Layout verwenden
+            const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
+            const letterHtml = event
+                ? generateEventInvitationLetterHTML(event, bodyHtml, sampleMember)
+                : generateDispatchLetterHTML(bodyHtml, subject, sampleMember);
             const previewDiv = document.getElementById('dispatch-preview');
             previewDiv.innerHTML = letterHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '');
         }
@@ -5942,15 +5959,15 @@ ${grussformel}`;
         // Platzhalter: {{anrede}} {{vorname}} {{nachname}} {{strasse}} {{plz}} {{ort}} {{email}}
         // ============================================
         const HARDCODED_TEMPLATES = [
-            // --- TEMPLATES HIER EINFUEGEN ---
-            // Beispiel-Struktur:
-            // {
-            //     id: 'tmpl_welcome',
-            //     name: 'Willkommen neues Mitglied',
-            //     type: 'email',                          // 'email' oder 'post'
-            //     subject: 'Willkommen beim FWV Raura',
-            //     body: '<p>Liebe/r {{vorname}} {{nachname}}</p>...'
-            // },
+            {
+                id: 'tmpl_event_invitation',
+                name: 'Event-Einladung',
+                type: 'email',
+                layout: 'event-invitation',                  // Speziallayout mit Event-Auswahl
+                subject: 'Einladung: {{event_title}}',
+                body: '<p>Hiermit möchte der Vorstand euch zur Veranstaltung einladen.</p><p>Eine Rückmeldung, ob Ihr kommt oder nicht könnt, dürft ihr gerne via Webseite (QR-Code) oder direkt beim Aktuar abgeben.</p>'
+            },
+            // Weitere Templates folgen hier
         ];
 
         async function loadDispatchTemplates() {
@@ -6029,6 +6046,48 @@ ${grussformel}`;
             } else {
                 variablesContainer.classList.add('hidden');
             }
+
+            // Event-Einladung: Event-Dropdown zeigen und befuellen
+            const eventWrapper = document.getElementById('dispatch-event-wrapper');
+            if (currentTemplate.layout === 'event-invitation') {
+                eventWrapper.classList.remove('hidden');
+                populateDispatchEventSelect();
+            } else {
+                eventWrapper.classList.add('hidden');
+            }
+        }
+
+        // Befuellt das Event-Dropdown im Nachrichten-Tab aus der globalen events-Liste
+        async function populateDispatchEventSelect() {
+            const select = document.getElementById('dispatch-event-select');
+            // Events laden falls noch leer
+            if (!events || events.length === 0) {
+                try {
+                    const response = await fetch(`${API_BASE}/events`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    if (response.ok) events = await response.json();
+                } catch (e) { /* ignore */ }
+            }
+            // Nur zukuenftige bzw. aktive Events anzeigen
+            const now = new Date();
+            const upcoming = events.filter(e => e.status !== 'cancelled' && (!e.end_date || new Date(e.end_date) >= now))
+                .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+
+            select.innerHTML = '<option value="">-- Event auswählen --</option>';
+            upcoming.forEach(e => {
+                const opt = document.createElement('option');
+                opt.value = e.id;
+                opt.textContent = `${e.title} (${formatEventDate(e.start_date, false)})`;
+                select.appendChild(opt);
+            });
+        }
+
+        // Gibt das aktuell im Dropdown ausgewaehlte Event zurueck (oder null)
+        function getSelectedDispatchEvent() {
+            const eventId = document.getElementById('dispatch-event-select')?.value;
+            if (!eventId) return null;
+            return events.find(e => String(e.id) === String(eventId)) || null;
         }
 
         // Aktualisiert die angezeigte Empfängeranzahl basierend auf dem Versandtyp-Filter.
@@ -6068,13 +6127,19 @@ ${grussformel}`;
             const isScheduled = document.getElementById('dispatch-scheduled').checked;
             const scheduleDate = document.getElementById('dispatch-schedule-date').value;
 
-            if (!subject && deliveryMethod !== 'post') {
+            if (!subject && deliveryMethod !== 'post' && currentTemplate?.layout !== 'event-invitation') {
                 alert('Bitte Betreff eingeben');
                 return;
             }
 
             if (!content.text && !templateId) {
                 alert('Bitte Nachricht oder Vorlage auswählen');
+                return;
+            }
+
+            // Event-Einladung: Event muss gewaehlt sein
+            if (currentTemplate?.layout === 'event-invitation' && !getSelectedDispatchEvent()) {
+                alert('Bitte ein Event auswählen');
                 return;
             }
 
@@ -6155,8 +6220,11 @@ ${grussformel}`;
                 // Placeholders {{vorname}} etc. werden vom Backend pro Empfaenger ersetzt
                 if (emailRecipients.length > 0) {
                     const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
-                    // Wrapper mit Platzhaltern (ohne Member) - Backend ersetzt sie per-member
-                    const wrappedHtml = generateDispatchEmailHTML(sourceHtml, subject, null);
+                    // Event-Einladung: spezielles Layout; sonst Standard-Layout
+                    const evt = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
+                    const wrappedHtml = evt
+                        ? generateEventInvitationEmailHTML(evt, sourceHtml, null)
+                        : generateDispatchEmailHTML(sourceHtml, subject, null);
 
                     const response = await fetch(`${API_BASE}/email/bulk`, {
                         method: 'POST',
@@ -6189,10 +6257,15 @@ ${grussformel}`;
                 if (postRecipients.length > 0) {
                     const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
 
+                    // Event-Einladung: spezielles Layout; sonst Standard-Layout
+                    const evtForPost = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
+
                     for (let i = 0; i < postRecipients.length; i++) {
                         const member = postRecipients[i];
                         // Ganzer Brief im offiziellen Layout (inkl. Kopf, Adresse im Fensterkuvert, Betreff, Body, Schluss)
-                        const letterHtml = generateDispatchLetterHTML(sourceHtml, subject, member);
+                        const letterHtml = evtForPost
+                            ? generateEventInvitationLetterHTML(evtForPost, sourceHtml, member)
+                            : generateDispatchLetterHTML(sourceHtml, subject, member);
 
                         const recipient = {
                             name: `${member.vorname} ${member.nachname}`,
@@ -6619,6 +6692,17 @@ ${grussformel}`;
             return `${a.kurzName}, ${a.strasse}, ${a.plz} ${a.ort}`;
         }
 
+        // Praesident-Helper (fuer Event-Einladungen)
+        function getPraesident() {
+            const p = members.find(m => m.funktion && /pr[aä]sident/i.test(m.funktion));
+            if (!p) return null;
+            return {
+                vorname: p.vorname || '',
+                nachname: p.nachname || '',
+                name: `${p.vorname || ''} ${p.nachname || ''}`.trim()
+            };
+        }
+
         // Wechselt zwischen Post und E-Mail Modus
         function switchDeliveryMode(mode) {
             currentDeliveryMode = mode;
@@ -6973,6 +7057,141 @@ ${grussformel}`;
             <em>Der Vorstand</em>
         </div>
     </div>
+</div>
+</body></html>`;
+        }
+
+        // Formatiert ein Event-Datum fuer die Anzeige (z.B. "29. Juni 2024, 16:00 Uhr")
+        function formatEventDate(isoDate, includeTime = true) {
+            if (!isoDate) return '';
+            const d = new Date(isoDate);
+            const monate = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+            const datum = `${d.getDate()}. ${monate[d.getMonth()]} ${d.getFullYear()}`;
+            if (!includeTime) return datum;
+            const zeit = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            return `${datum}, ${zeit} Uhr`;
+        }
+
+        // Generiert den Event-Einladungs-Block (Tabelle Was/Wo/Wann..., Unterschriften, QR)
+        // Wird im Body sowohl von Letter- als auch Email-Version verwendet
+        function buildEventInvitationBody(event, introHtml) {
+            if (!event) return introHtml || '';
+            const startDate = formatEventDate(event.start_date);
+            const endDate = event.end_date ? formatEventDate(event.end_date) : '';
+            const deadline = event.registration_deadline ? formatEventDate(event.registration_deadline) : '';
+            const subtitle = event.subtitle || startDate;
+
+            const eventUrl = `https://www.fwv-raura.ch/events.html?event=${event.slug || event.id}`;
+
+            // QR-Code fuer Event-Link generieren (als data: URL)
+            let qrImg = '';
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData(eventUrl);
+                qr.make();
+                qrImg = qr.createDataURL(4, 0);
+            } catch (e) {}
+
+            const praesident = getPraesident();
+            const aktuar = getAktuar();
+
+            // Tabellen-Zeilen (nur wenn Wert vorhanden)
+            const rows = [
+                `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;width:38mm;">Was:</td><td>${event.title || ''}</td></tr>`,
+                event.location ? `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Wo:</td><td>${event.location}</td></tr>` : '',
+                `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Wann:</td><td style="font-weight:bold;">${startDate}${endDate ? ' – ' + endDate : ''}</td></tr>`,
+                `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Anmeldung:</td><td>${event.registration_required ? 'Zwingend' : 'Freiwillig'}</td></tr>`,
+                deadline ? `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;color:#c00;">Anmeldeschluss:</td><td style="color:#c00;font-weight:bold;">${deadline}</td></tr>` : '',
+                event.cost ? `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;">Kosten:</td><td>${event.cost}</td></tr>` : ''
+            ].filter(Boolean).join('');
+
+            return `
+                <div style="font-size:14pt;font-weight:bold;text-decoration:underline;margin-bottom:2mm;">${event.title || ''}</div>
+                <div style="font-size:10pt;margin-bottom:5mm;">${subtitle}</div>
+                <hr style="border:none;border-top:1px solid #000;margin:0 0 6mm 0;">
+                ${introHtml ? `<div style="margin-bottom:4mm;">${introHtml}</div>` : ''}
+                <p style="margin:0 0 3mm 0;">Die wichtigsten Daten nochmals zusammengefasst:</p>
+                <table style="margin:0 0 6mm 0;border-collapse:collapse;">${rows}</table>
+                <p style="margin:0;">Wir freuen uns über zahlreiches Erscheinen.</p>
+                <p style="margin:0 0 8mm 0;">Im Namen des Vorstandes.</p>
+                <p style="margin:0 0 15mm 0;">Mit freundlichen Grüssen</p>
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="vertical-align:top;width:50%;">
+                            <div>${praesident?.name || 'Präsident FWV Raura'}</div>
+                            <div>Präsident</div>
+                        </td>
+                        <td style="vertical-align:top;width:30%;">
+                            <div>${aktuar?.name || 'Aktuar FWV Raura'}</div>
+                            <div>Aktuar</div>
+                        </td>
+                        <td style="vertical-align:top;width:20%;text-align:right;">
+                            ${qrImg ? `<img src="${qrImg}" alt="QR-Code Event" style="width:28mm;height:28mm;">` : ''}
+                        </td>
+                    </tr>
+                </table>`;
+        }
+
+        // Generiert eine Event-Einladung als A4-Brief (fuer Post via Pingen)
+        function generateEventInvitationLetterHTML(event, introHtml, member) {
+            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const name = member ? `${member.vorname} ${member.nachname}`.trim() : '{{vorname}} {{nachname}}';
+            const strasse = member?.strasse || '{{strasse}}';
+            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : '{{plz}} {{ort}}';
+
+            let intro = introHtml || '';
+            if (member) intro = replacePlaceholders(intro, member);
+
+            const bodyContent = buildEventInvitationBody(event, intro);
+
+            return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
+<body>
+<div style="width:210mm;height:297mm;position:relative;box-sizing:border-box;background:white;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
+    <div style="position:absolute;top:15mm;left:25mm;width:35mm;">
+        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
+    </div>
+    <div style="position:absolute;top:15mm;left:118mm;">
+        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
+        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
+    </div>
+    <div style="position:absolute;top:35mm;left:118mm;font-size:8pt;color:#333;">${getAktuarAbsenderLine()}</div>
+    <div style="position:absolute;top:60mm;left:118mm;width:85mm;">
+        <div>${name}</div>
+        <div>${strasse}</div>
+        <div>${plzOrt}</div>
+    </div>
+    <div style="position:absolute;top:97mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
+    <div style="position:absolute;top:110mm;left:25mm;right:25mm;">${bodyContent}</div>
+</div>
+</body></html>`;
+        }
+
+        // Generiert eine Event-Einladung als E-Mail (responsive Layout)
+        function generateEventInvitationEmailHTML(event, introHtml, member) {
+            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            let intro = introHtml || '';
+            if (member) intro = replacePlaceholders(intro, member);
+            const bodyContent = buildEventInvitationBody(event, intro);
+
+            return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
+<div style="max-width:660px;margin:0 auto;padding:20px;background:white;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:15px;">
+        <tr>
+            <td width="120" valign="top">
+                <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" width="110" style="display:block;">
+            </td>
+            <td valign="top" style="padding-left:15px;">
+                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
+                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
+            </td>
+        </tr>
+    </table>
+    <div style="font-size:8pt;color:#333;margin-bottom:15px;">${getAktuarAbsenderLine()}</div>
+    <div style="text-align:right;margin-bottom:20px;">Kaiseraugst, ${datum}</div>
+    ${bodyContent}
 </div>
 </body></html>`;
         }
