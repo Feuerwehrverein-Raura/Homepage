@@ -6029,7 +6029,7 @@ ${grussformel}`;
 
             // Fill subject and body from template
             subjectInput.value = currentTemplate.subject || '';
-            setDispatchContent(null, currentTemplate.body || '');
+            setDispatchContent(currentTemplate.body || '', null);
 
             // Show template variables if any
             const variables = currentTemplate.variables || [];
