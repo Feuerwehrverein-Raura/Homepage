@@ -6258,7 +6258,7 @@ ${grussformel}`;
                 }
 
                 // Post-Versand: pro Mitglied Brief im offiziellen Layout (Kopf wie Mitgliedsbeitrag)
-                // an /invoices/send-post (Adresse schon im HTML, daher kein Deckblatt noetig)
+                // an /dispatch/send-post (Adresse schon im HTML, daher kein Deckblatt noetig)
                 if (postRecipients.length > 0) {
                     const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
 
@@ -6281,7 +6281,7 @@ ${grussformel}`;
                         };
 
                         try {
-                            const response = await fetch(`${API_BASE}/invoices/send-post`, {
+                            const response = await fetch(`${API_BASE}/dispatch/send-post`, {
                                 method: 'POST',
                                 headers: {
                                     'Authorization': `Bearer ${authToken}`,
@@ -6925,7 +6925,7 @@ ${grussformel}`;
             for (const member of postMembers) {
                 try {
                     const html = generateBeitragEmailHTML(member, true);
-                    const response = await fetch(`${API_BASE}/invoices/send-post`, {
+                    const response = await fetch(`${API_BASE}/dispatch/send-post`, {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({

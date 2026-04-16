@@ -4212,7 +4212,7 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
 // DEUTSCH: Sendet Mitgliedsbeitrags-Brief als fertig-formatiertes HTML via Pingen
 // Das HTML enthaelt bereits den Empfaenger im Adressfenster (Schweizer Standard X=118mm/Y=60mm)
 // daher kein Adress-Embedding oder Deckblatt noetig - auto_send mit address_position=right
-app.post('/invoices/send-post', authenticateAny, async (req, res) => {
+app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
     try {
         const { html, recipient, member_id, staging = false } = req.body;
 
