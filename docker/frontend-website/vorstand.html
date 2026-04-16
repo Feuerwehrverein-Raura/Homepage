@@ -6745,94 +6745,114 @@ ${grussformel}`;
         }
 
         // Oeffnet die Vorschau als Modal (Post = A4 Brief, E-Mail = HTML)
+        // Kernfunktion: Klont das A4-Brief-Template, befuellt alle Felder (Mitglied, Beitrag, QR-Code)
+        // und liefert das fertige DIV-Element zurueck. Wird von Vorschau UND Post-Versand verwendet.
+        function buildBeitragLetterDiv(member) {
+            const tmpl = document.getElementById('brief-a4-template');
+            const clone = tmpl.content.cloneNode(true);
+            const div = clone.querySelector('div');
+
+            // Werte aus Form oder Mitglied
+            const vals = member ? {
+                name: `${member.nachname} ${member.vorname}`.trim(),
+                strasse: member.strasse || '',
+                plzOrt: `${member.plz || ''} ${member.ort || ''}`.trim(),
+                datum: document.getElementById('brief-datum').value,
+                gvDatum: document.getElementById('brief-gv-datum').value,
+                betrag: document.getElementById('brief-betrag').value,
+                ref: currentYearPayments[member.id]?.reference_nr || '',
+                jahr: document.getElementById('brief-jahr').value
+            } : {
+                name: document.getElementById('brief-name').value,
+                strasse: document.getElementById('brief-strasse').value,
+                plzOrt: document.getElementById('brief-plz-ort').value,
+                datum: document.getElementById('brief-datum').value,
+                gvDatum: document.getElementById('brief-gv-datum').value,
+                betrag: document.getElementById('brief-betrag').value,
+                ref: document.getElementById('brief-ref').value,
+                jahr: document.getElementById('brief-jahr').value
+            };
+
+            const qrRef27 = buildQRReference(vals.ref);
+            const refShort = qrRef27.slice(-5);
+
+            // Empfaenger-Feld (3 Inputs: name, strasse, plz-ort) - spezielle Behandlung
+            // Das Template-Empfaenger-Feld hat 3 Inputs: brief-name, brief-strasse, brief-plz-ort
+            const idToVal = {
+                'brief-name': vals.name,
+                'brief-strasse': vals.strasse,
+                'brief-plz-ort': vals.plzOrt,
+                'brief-datum': vals.datum,
+                'brief-gv-datum': vals.gvDatum,
+                'brief-betrag': vals.betrag,
+                'brief-ref': refShort,
+                'brief-jahr': vals.jahr
+            };
+            div.querySelectorAll('input.brief-input').forEach(input => {
+                const span = document.createElement('span');
+                span.textContent = idToVal[input.id] !== undefined ? idToVal[input.id] : input.value;
+                if (input.style.display === 'block') span.style.display = 'block';
+                if (input.style.fontWeight === 'bold' || input.classList.contains('brief-input-bold')) {
+                    span.style.fontWeight = 'bold';
+                }
+                input.replaceWith(span);
+            });
+
+            const betragZeile = div.querySelector('#brief-betrag-zeile');
+            if (betragZeile) betragZeile.textContent = parseInt(vals.betrag) || vals.betrag;
+
+            const absender = div.querySelector('#brief-absender');
+            if (absender) absender.textContent = getAbsenderLine();
+            const footer = getKassierFooter();
+            div.querySelectorAll('[data-kassier-footer-left]').forEach(el => el.textContent = footer.left);
+            div.querySelectorAll('[data-kassier-footer-right]').forEach(el => el.textContent = footer.right);
+            div.querySelectorAll('[data-kassier-signature]').forEach(el => el.textContent = getKassierSignature());
+
+            const refFormatted = formatQRReference(qrRef27);
+            const betragFormatted = parseFloat(vals.betrag).toFixed(2);
+            ['es-referenz', 'zt-referenz'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = refFormatted; });
+            ['es-betrag', 'zt-betrag'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = betragFormatted; });
+            const ztJahr = div.querySelector('#zt-jahr'); if (ztJahr) ztJahr.textContent = vals.jahr;
+            const ztRefName = div.querySelector('#zt-ref-name'); if (ztRefName) ztRefName.textContent = `Ref. ${refShort} - ${vals.name}`;
+
+            // QR-Code generieren
+            const qrContainer = div.querySelector('#beitrag-qr-code');
+            if (qrContainer) {
+                try {
+                    const qrPayload = [
+                        'SPC', '0200', '1', BEITRAG_IBAN,
+                        'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
+                        '', '', '', '', '', '', betragFormatted, 'CHF',
+                        'S', vals.name, vals.strasse, '', vals.plzOrt.match(/^\d+/)?.[0] || '', vals.plzOrt.replace(/^\d+\s*/, '') || '', 'CH',
+                        'QRR', qrRef27, 'Mitgliederbeitrag ' + vals.jahr, 'EPD', ''
+                    ].join('\n');
+                    const qr = qrcode(0, 'M');
+                    qr.addData(qrPayload);
+                    qr.make();
+                    qrContainer.innerHTML = qr.createImgTag(3, 0);
+                    const img = qrContainer.querySelector('img');
+                    if (img) { img.style.width = '40mm'; img.style.height = '40mm'; }
+                } catch (e) { qrContainer.innerHTML = '<span style="font-size:7pt;color:#c00;">QR-Fehler</span>'; }
+            }
+
+            return div;
+        }
+
+        // Serialisiert das gebaute Brief-Div zu einem standalone HTML-Dokument fuer Puppeteer/Pingen
+        function generateBeitragLetterHTML(member) {
+            const div = buildBeitragLetterDiv(member);
+            const wrapper = document.createElement('div');
+            wrapper.appendChild(div);
+            return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>@page{size:A4;margin:0}body{margin:0;padding:0}</style></head><body>${wrapper.innerHTML}</body></html>`;
+        }
+
         function openBeitragPreview() {
             const container = document.getElementById('preview-modal-content');
 
             if (currentDeliveryMode === 'post') {
-                // A4-Brief aus Template klonen und Felder befuellen
-                const tmpl = document.getElementById('brief-a4-template');
-                const clone = tmpl.content.cloneNode(true);
-                const div = clone.querySelector('div');
-
-                // Form-Werte lesen (aus dem Live-DOM, NICHT aus dem Template)
-                const vals = {
-                    name: document.getElementById('brief-name').value,
-                    strasse: document.getElementById('brief-strasse').value,
-                    plzOrt: document.getElementById('brief-plz-ort').value,
-                    datum: document.getElementById('brief-datum').value,
-                    gvDatum: document.getElementById('brief-gv-datum').value,
-                    betrag: document.getElementById('brief-betrag').value,
-                    ref: document.getElementById('brief-ref').value,
-                    jahr: document.getElementById('brief-jahr').value
-                };
-                // Volle QR-Referenz berechnen (inkl. Pruefziffer) und Kurzform daraus ableiten
-                const qrRef27 = buildQRReference(vals.ref);
-                const refShort = qrRef27.slice(-5); // letzte 5 Stellen (inkl. Pruefziffer) = auf Brief angezeigte Ref
-                // Mapping Template-Input-ID -> Form-Wert-Key
-                const idToVal = {
-                    'brief-name': vals.name,
-                    'brief-strasse': vals.strasse,
-                    'brief-plz-ort': vals.plzOrt,
-                    'brief-datum': vals.datum,
-                    'brief-gv-datum': vals.gvDatum,
-                    'brief-betrag': vals.betrag,
-                    'brief-ref': refShort,                  // im Brieftext Kurzform (z.B. "05590")
-                    'brief-jahr': vals.jahr
-                };
-                // Inputs im Template durch statischen Text ersetzen und Block-Display erhalten
-                div.querySelectorAll('input.brief-input').forEach(input => {
-                    const span = document.createElement('span');
-                    span.textContent = idToVal[input.id] !== undefined ? idToVal[input.id] : input.value;
-                    // Style vom Input uebernehmen (display: block fuer Namen/Adresse wichtig!)
-                    if (input.style.display === 'block') span.style.display = 'block';
-                    if (input.style.fontWeight === 'bold' || input.classList.contains('brief-input-bold')) {
-                        span.style.fontWeight = 'bold';
-                    }
-                    input.replaceWith(span);
-                });
-                // Dynamische Spans befuellen
-                const betragZeile = div.querySelector('#brief-betrag-zeile');
-                if (betragZeile) betragZeile.textContent = parseInt(vals.betrag) || vals.betrag;
-
-                // Kassier-Felder dynamisch befuellen (Absender, Unterschrift, Footer)
-                const absender = div.querySelector('#brief-absender');
-                if (absender) absender.textContent = getAbsenderLine();
-                const footer = getKassierFooter();
-                div.querySelectorAll('[data-kassier-footer-left]').forEach(el => el.textContent = footer.left);
-                div.querySelectorAll('[data-kassier-footer-right]').forEach(el => el.textContent = footer.right);
-                div.querySelectorAll('[data-kassier-signature]').forEach(el => el.textContent = getKassierSignature());
-
-                // QR-Ref und Betrag in Empfangsschein/Zahlteil setzen
-                const refFormatted = formatQRReference(qrRef27);
-                const betragFormatted = parseFloat(vals.betrag).toFixed(2);
-                ['es-referenz', 'zt-referenz'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = refFormatted; });
-                ['es-betrag', 'zt-betrag'].forEach(id => { const el = div.querySelector('#' + id); if (el) el.textContent = betragFormatted; });
-                const ztJahr = div.querySelector('#zt-jahr'); if (ztJahr) ztJahr.textContent = vals.jahr;
-                const ztRefName = div.querySelector('#zt-ref-name'); if (ztRefName) ztRefName.textContent = `Ref. ${refShort} - ${vals.name}`;
-
-                // QR-Code generieren
-                const qrContainer = div.querySelector('#beitrag-qr-code');
-                if (qrContainer) {
-                    try {
-                        const qrRefClean = qrRef27; // bereits 27-stellig inkl. Pruefziffer
-                        const qrPayload = [
-                            'SPC', '0200', '1', BEITRAG_IBAN,
-                            'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
-                            '', '', '', '', '', '', betragFormatted, 'CHF',
-                            'S', vals.name, vals.strasse, '', vals.plzOrt.match(/^\d+/)?.[0] || '', vals.plzOrt.replace(/^\d+\s*/, '') || '', 'CH',
-                            'QRR', qrRefClean, 'Mitgliederbeitrag ' + vals.jahr, 'EPD', ''
-                        ].join('\n');
-                        const qr = qrcode(0, 'M');
-                        qr.addData(qrPayload);
-                        qr.make();
-                        qrContainer.innerHTML = qr.createImgTag(3, 0);
-                        const img = qrContainer.querySelector('img');
-                        if (img) { img.style.width = '40mm'; img.style.height = '40mm'; }
-                    } catch (e) { qrContainer.innerHTML = '<span style="font-size:7pt;color:#c00;">QR-Fehler</span>'; }
-                }
-
+                // Vorschau nutzt die gleiche Funktion wie der Versand (getestet gegen Pingen)
                 container.innerHTML = '';
-                container.appendChild(clone);
+                container.appendChild(buildBeitragLetterDiv(null));
             } else {
                 // E-Mail HTML Vorschau
                 const html = generateBeitragEmailHTML(null);
@@ -7268,137 +7288,6 @@ ${grussformel}`;
 </body></html>`;
         }
 
-        // Generiert den Mitgliedsbeitrag-Brief im A4-Format (fuer Pingen/Post-Versand)
-        // Gleicher Kopf wie Dispatch-Letter (Logo links, Titel rechts, Adresse im Schweizer Fensterkuvert)
-        // + QR-Rechnung unten
-        function generateBeitragLetterHTML(member) {
-            const betrag = document.getElementById('brief-betrag').value;
-            const jahr = document.getElementById('brief-jahr').value;
-            const datum = document.getElementById('brief-datum').value || new Date().toLocaleDateString('de-CH');
-            const gvDatum = document.getElementById('brief-gv-datum').value;
-            const refNr = member
-                ? (currentYearPayments[member.id]?.reference_nr || '')
-                : document.getElementById('brief-ref').value;
-            const name = member ? `${member.nachname} ${member.vorname}` : document.getElementById('brief-name').value;
-            const strasse = member?.strasse || document.getElementById('brief-strasse').value;
-            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : document.getElementById('brief-plz-ort').value;
-
-            const qrRef27 = buildQRReference(refNr);
-            const refFormatted = formatQRReference(qrRef27);
-            const refShort = qrRef27.slice(-5);
-            const betragFormatted = parseFloat(betrag).toFixed(2);
-            const betragGanz = parseInt(betrag) || betrag;
-
-            // QR-Code als Base64 generieren
-            let qrImgSrc = '';
-            try {
-                const qrPayload = [
-                    'SPC', '0200', '1', BEITRAG_IBAN,
-                    'S', 'Feuerwehrverein Raura', 'Marksteinweg 12', '', '4304', 'Giebenach', 'CH',
-                    '', '', '', '', '', '',
-                    betragFormatted, 'CHF',
-                    'S', name, strasse, '',
-                    plzOrt.match(/^\d+/)?.[0] || '',
-                    plzOrt.replace(/^\d+\s*/, '') || '',
-                    'CH',
-                    'QRR', qrRef27, 'Mitgliederbeitrag ' + jahr, 'EPD', ''
-                ].join('\n');
-                const qr = qrcode(0, 'M');
-                qr.addData(qrPayload);
-                qr.make();
-                qrImgSrc = qr.createDataURL(4, 0);
-            } catch (e) { qrImgSrc = ''; }
-
-            return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
-<body>
-<div style="width:210mm;height:297mm;position:relative;box-sizing:border-box;background:white;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
-    <!-- Logo links -->
-    <div style="position:absolute;top:15mm;left:25mm;width:35mm;">
-        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
-    </div>
-    <!-- Titel rechts (ausserhalb Frankierbereich Y<40mm) -->
-    <div style="position:absolute;top:15mm;left:118mm;">
-        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
-        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
-    </div>
-    <!-- Absender klein (Y<40mm, ueber Frankierbereich) -->
-    <div style="position:absolute;top:35mm;left:118mm;font-size:8pt;color:#333;">${getAbsenderLine()}</div>
-    <!-- Empfaenger im Schweizer Adressfenster X=118mm Y=60mm -->
-    <div style="position:absolute;top:60mm;left:118mm;width:85mm;">
-        <div>${name}</div>
-        <div>${strasse}</div>
-        <div>${plzOrt}</div>
-    </div>
-    <!-- Datum rechtsbuendig -->
-    <div style="position:absolute;top:97mm;right:25mm;text-align:right;">Giebenach, ${datum}</div>
-
-    <!-- Brieftext -->
-    <div style="position:absolute;top:110mm;left:25mm;right:25mm;font-size:11pt;line-height:1.4;">
-        <div style="margin-bottom:4mm;">Liebe Mitglieder</div>
-        <div style="margin-bottom:2mm;">Der Mitgliedsbeitrag ist wie gewohnt um diese Jahreszeit fällig.</div>
-        <div style="margin-bottom:2mm;">
-            Die Generalversammlung vom ${gvDatum} hat beschlossen, den Beitrag auf den
-            bewährten &nbsp;&nbsp;&nbsp;&nbsp;<strong>Fr. ${betragFormatted}</strong>&nbsp;&nbsp;&nbsp;&nbsp; pro Mitglied zu belassen.
-        </div>
-        <div style="margin-bottom:3mm;">
-            Mir obliegt es nun traditionsgemäss Euch um die Entrichtung dieses Beitrages
-            anzugehen. Ich danke Euch herzlich für eine baldige Überweisung mit beiliegendem
-            Einzahlungsschein, Ref. Nr. ${refShort}
-        </div>
-        <div style="margin-bottom:6mm;">Mitgliederbeitrag ${jahr}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sFr. ${betragGanz}.-</div>
-        <div style="margin-bottom:4mm;">Mit freundlichen Grüssen</div>
-        <div>
-            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
-            <em>der Kassier</em><br><br>
-            ${getKassierSignature()}
-        </div>
-    </div>
-
-    <!-- QR-Rechnung unten (Swiss QR-Bill Standard: Hoehe 105mm ab Unterkante) -->
-    <div style="position:absolute;top:188mm;left:0;right:0;text-align:center;font-size:7pt;color:#555;letter-spacing:0.5mm;">
-        &#9660; &#9660; &#9660;&nbsp; Vor der Einzahlung abzutrennen &nbsp;&#9660; &#9660; &#9660;
-    </div>
-    <div style="border-top:1px dashed #000;padding-top:1mm;position:absolute;top:192mm;left:0;right:0;bottom:0;padding-left:5mm;padding-right:5mm;">
-        <div style="display:flex;font-size:8pt;line-height:1.4;">
-            <div style="width:62mm;border-right:1px dashed #ccc;padding-right:3mm;">
-                <div style="font-size:10pt;font-weight:bold;margin-bottom:3mm;">Empfangsschein</div>
-                <div style="font-size:6pt;font-weight:bold;">Konto / Zahlbar an</div>
-                <div style="font-size:7pt;margin-bottom:2mm;">CH64 3076 9442 4924 3200 1<br>Feuerwehrverein Raura<br>Marksteinweg 12<br>4304 Giebenach</div>
-                <div style="font-size:6pt;font-weight:bold;">Referenz</div>
-                <div style="font-size:7pt;margin-bottom:2mm;">${refFormatted}</div>
-                <div style="font-size:6pt;font-weight:bold;">Zahlbar durch (Name/Adresse)</div>
-                <div style="border:1px solid #000;width:50mm;height:15mm;margin-bottom:3mm;"></div>
-                <div style="display:flex;justify-content:space-between;width:50mm;">
-                    <div><div style="font-size:6pt;font-weight:bold;">Währung</div><div>CHF</div></div>
-                    <div><div style="font-size:6pt;font-weight:bold;">Betrag</div><div>${betragFormatted}</div></div>
-                </div>
-                <div style="font-size:6pt;text-align:right;margin-top:1mm;width:50mm;">Annahmestelle</div>
-            </div>
-            <div style="width:51mm;padding:0 3mm;">
-                <div style="font-size:10pt;font-weight:bold;margin-bottom:3mm;">Zahlteil</div>
-                ${qrImgSrc ? `<img src="${qrImgSrc}" alt="QR-Code" style="width:40mm;height:40mm;margin-bottom:3mm;">` : '<div style="width:40mm;height:40mm;background:#f0f0f0;margin-bottom:3mm;"></div>'}
-                <div style="display:flex;justify-content:space-between;width:46mm;">
-                    <div><div style="font-size:6pt;font-weight:bold;">Währung</div><div>CHF</div></div>
-                    <div><div style="font-size:6pt;font-weight:bold;">Betrag</div><div>${betragFormatted}</div></div>
-                </div>
-            </div>
-            <div style="flex:1;padding-left:3mm;">
-                <div style="font-size:6pt;font-weight:bold;">Konto / Zahlbar an</div>
-                <div style="font-size:8pt;margin-bottom:3mm;">CH64 3076 9442 4924 3200 1<br>Feuerwehrverein Raura<br>Marksteinweg 12<br>4304 Giebenach</div>
-                <div style="font-size:6pt;font-weight:bold;">Referenz</div>
-                <div style="font-size:8pt;margin-bottom:3mm;">${refFormatted}</div>
-                <div style="font-size:6pt;font-weight:bold;">Zusätzliche Informationen</div>
-                <div style="font-size:8pt;margin-bottom:1mm;">Mitgliederbeitrag ${jahr}</div>
-                <div style="font-size:8pt;margin-bottom:3mm;">Ref. ${refShort} - ${name}</div>
-                <div style="font-size:6pt;font-weight:bold;">Zahlbar durch (Name/Adresse)</div>
-                <div style="border:1px solid #000;width:100%;height:18mm;"></div>
-            </div>
-        </div>
-    </div>
-</div>
-</body></html>`;
-        }
 
         function generateBeitragEmailHTML(member, includeAddress = false) {
             const betrag = document.getElementById('brief-betrag').value;
