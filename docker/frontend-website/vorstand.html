@@ -6590,24 +6590,12 @@ ${grussformel}`;
         // IBAN fuer QR-Rechnung (Feuerwehrverein Raura)
         const BEITRAG_IBAN = 'CH6430769442492432001';
 
-        // Modulo 10 Rekursiv (ESR/Swiss QR-Bill): berechnet Pruefziffer fuer Referenz
-        function mod10Recursive(digits) {
-            const table = [0, 9, 4, 6, 8, 2, 7, 1, 3, 5];
-            let carry = 0;
-            for (const ch of digits.replace(/\D/g, '')) {
-                carry = table[(carry + parseInt(ch, 10)) % 10];
-            }
-            return ((10 - carry) % 10).toString();
-        }
-
         // Liefert die volle 27-stellige QR-Referenz aus einer beliebig langen Eingabe
-        // Wenn Eingabe 27 Stellen: Pruefziffer bereits enthalten (wie von Bank geliefert)
-        // Sonst: auf 26 Stellen padden, Pruefziffer berechnen und anhaengen
+        // Die Bank liefert die Ref INKLUSIVE Pruefziffer - wir padden einfach auf 27 Stellen.
+        // Mod10-Pruefziffer muss also NICHT berechnet werden.
         function buildQRReference(input) {
             const clean = (input || '').replace(/\D/g, '');
-            if (clean.length === 27) return clean; // Bank-Ref inkl. Pruefziffer
-            const ref26 = clean.padStart(26, '0');
-            return ref26 + mod10Recursive(ref26);
+            return clean.padStart(27, '0');
         }
 
         // Formatiert eine QR-Referenz in Gruppen: "XX XXXXX XXXXX XXXXX XXXXX XXXXX"
