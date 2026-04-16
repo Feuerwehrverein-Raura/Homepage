@@ -1232,22 +1232,11 @@
                         </div>
                     </div>
 
-                    <!-- Preview Section -->
-                    <div class="mb-6 border rounded-lg overflow-hidden">
-                        <div class="bg-gray-50 px-4 py-2 border-b flex justify-between items-center">
-                            <span class="font-medium text-sm">Vorschau</span>
-                            <div class="flex gap-2">
-                                <button type="button" id="preview-email-btn" class="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                                    📧 E-Mail
-                                </button>
-                                <button type="button" id="preview-letter-btn" class="text-xs px-3 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200">
-                                    ✉️ Brief
-                                </button>
-                            </div>
-                        </div>
-                        <div id="dispatch-preview" class="p-4 bg-white min-h-[200px]">
-                            <p class="text-gray-400 text-sm text-center py-8">Klicke auf "E-Mail" oder "Brief" um eine Vorschau zu sehen</p>
-                        </div>
+                    <!-- Preview Section (versteckt - Inhalt wird im Modal gezeigt) -->
+                    <div class="hidden">
+                        <button type="button" id="preview-email-btn">E-Mail</button>
+                        <button type="button" id="preview-letter-btn">Brief</button>
+                        <div id="dispatch-preview"></div>
                     </div>
 
                     <!-- Cost Estimate (for Pingen) -->
@@ -1281,6 +1270,25 @@
                             <button id="dispatch-send-btn" class="px-6 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600">
                                 📤 Senden
                             </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vorschau-Modal (Stil: Mitgliedsbeitrag) -->
+                <div id="dispatch-preview-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+                    <div class="bg-gray-100 rounded-lg max-w-[230mm] w-full max-h-[95vh] overflow-y-auto">
+                        <div class="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center rounded-t-lg z-10">
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-lg font-bold text-gray-800">Vorschau</h3>
+                                <div class="flex rounded-lg border border-gray-300 overflow-hidden text-xs">
+                                    <button type="button" id="preview-modal-email-btn" class="px-3 py-1 font-medium bg-fire-500 text-white">📧 E-Mail</button>
+                                    <button type="button" id="preview-modal-letter-btn" class="px-3 py-1 font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300">✉️ Brief (A4)</button>
+                                </div>
+                            </div>
+                            <button id="close-dispatch-preview" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                        </div>
+                        <div id="dispatch-preview-modal-content" class="p-6 flex justify-center">
+                            <p class="text-gray-400 text-sm py-8">Lade Vorschau...</p>
                         </div>
                     </div>
                 </div>
@@ -7595,7 +7603,53 @@ ${grussformel}`;
         document.getElementById('dispatch-recipients-quick').addEventListener('change', (e) => applyDispatchRecipientsQuick(e.target.value));
         document.getElementById('dispatch-send-btn-top').addEventListener('click', () => document.getElementById('dispatch-send-btn').click());
         document.getElementById('dispatch-draft-btn-top').addEventListener('click', () => document.getElementById('dispatch-save-draft-btn').click());
-        // Vorschau-Button wird in Schritt 2 (Vorschau-Modal) angebunden
+
+        // === Vorschau-Modal ===
+        // Vorschau-Button öffnet Modal mit E-Mail-Ansicht (Default)
+        function openDispatchPreviewModal(mode) {
+            // Modal öffnen
+            document.getElementById('dispatch-preview-modal').classList.remove('hidden');
+            // Per Default die aktuelle Versandart zeigen
+            if (!mode) {
+                const method = document.querySelector('input[name="delivery-method"]:checked')?.value || 'auto';
+                mode = method === 'post' ? 'letter' : 'email';
+            }
+            renderDispatchPreviewMode(mode);
+        }
+
+        // Zeigt im Modal entweder E-Mail- oder Brief-Vorschau (nutzt bestehende Funktionen)
+        function renderDispatchPreviewMode(mode) {
+            // Toggle-Buttons aktualisieren
+            const emailBtn = document.getElementById('preview-modal-email-btn');
+            const letterBtn = document.getElementById('preview-modal-letter-btn');
+            emailBtn.className = mode === 'email'
+                ? 'px-3 py-1 font-medium bg-fire-500 text-white'
+                : 'px-3 py-1 font-medium bg-white text-gray-700 hover:bg-gray-50';
+            letterBtn.className = mode === 'letter'
+                ? 'px-3 py-1 font-medium bg-fire-500 text-white border-l border-gray-300'
+                : 'px-3 py-1 font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300';
+
+            // Bestehende Render-Funktion aufrufen (schreibt in #dispatch-preview)
+            if (mode === 'email') showEmailPreview();
+            else showLetterPreview();
+
+            // Inhalt in das Modal verschieben
+            const previewDiv = document.getElementById('dispatch-preview');
+            const modalContent = document.getElementById('dispatch-preview-modal-content');
+            modalContent.innerHTML = previewDiv.innerHTML;
+        }
+
+        function closeDispatchPreviewModal() {
+            document.getElementById('dispatch-preview-modal').classList.add('hidden');
+        }
+
+        document.getElementById('dispatch-preview-modal-btn').addEventListener('click', () => openDispatchPreviewModal());
+        document.getElementById('close-dispatch-preview').addEventListener('click', closeDispatchPreviewModal);
+        document.getElementById('preview-modal-email-btn').addEventListener('click', () => renderDispatchPreviewMode('email'));
+        document.getElementById('preview-modal-letter-btn').addEventListener('click', () => renderDispatchPreviewMode('letter'));
+        document.getElementById('dispatch-preview-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('dispatch-preview-modal')) closeDispatchPreviewModal();
+        });
 
         // Dispatch
         document.querySelectorAll('input[name="delivery-method"]').forEach(radio => {
