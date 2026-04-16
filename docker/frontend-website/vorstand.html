@@ -1272,48 +1272,68 @@
                     </div>
                 </div>
 
-                <!-- Saved Drafts -->
-                <div id="drafts-section" class="bg-white rounded-lg shadow-md p-6 mt-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold text-gray-800">📝 Gespeicherte Entwürfe</h2>
-                        <button id="refresh-drafts-btn" class="text-sm text-gray-500 hover:text-gray-700">↻ Aktualisieren</button>
+                <!-- Sub-Tabs: Entwürfe / Geplant / Historie (kompakt in einer Box) -->
+                <div class="bg-white rounded-lg shadow-md mt-6">
+                    <div class="flex border-b">
+                        <button id="dispatch-subtab-drafts" class="dispatch-subtab flex-1 py-3 px-4 font-medium border-b-2 border-fire-500 text-fire-600 text-sm">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            Entwürfe <span id="drafts-count-badge" class="ml-1 text-xs text-gray-400"></span>
+                        </button>
+                        <button id="dispatch-subtab-scheduled" class="dispatch-subtab flex-1 py-3 px-4 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800 text-sm">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Geplant <span id="scheduled-count-badge" class="ml-1 text-xs text-gray-400"></span>
+                        </button>
+                        <button id="dispatch-subtab-history" class="dispatch-subtab flex-1 py-3 px-4 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800 text-sm">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                            Versandhistorie
+                        </button>
+                        <div class="flex items-center px-3">
+                            <button id="dispatch-subtab-refresh-btn" class="text-gray-400 hover:text-gray-600 p-2" title="Aktualisieren">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                            </button>
+                        </div>
                     </div>
-                    <div id="drafts-list" class="space-y-2">
-                        <p class="text-gray-500 text-sm py-4 text-center">Keine Entwürfe vorhanden</p>
-                    </div>
-                </div>
 
-                <!-- Scheduled Messages -->
-                <div id="scheduled-section" class="bg-white rounded-lg shadow-md p-6 mt-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold text-gray-800">⏰ Geplante Nachrichten</h2>
-                        <button id="refresh-scheduled-btn" class="text-sm text-gray-500 hover:text-gray-700">↻ Aktualisieren</button>
+                    <!-- Entwürfe -->
+                    <div id="dispatch-subtab-drafts-content" class="p-4">
+                        <div id="drafts-list" class="space-y-2">
+                            <p class="text-gray-500 text-sm py-4 text-center">Keine Entwürfe vorhanden</p>
+                        </div>
                     </div>
-                    <div id="scheduled-list" class="space-y-2">
-                        <p class="text-gray-500 text-sm py-4 text-center">Keine geplanten Nachrichten</p>
-                    </div>
-                </div>
 
-                <!-- Send History -->
-                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">📋 Versandhistorie</h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Datum</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Typ</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Betreff</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Empfänger</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dispatch-history-tbody" class="divide-y divide-gray-200">
-                                <tr>
-                                    <td colspan="5" class="px-6 py-8 text-center text-gray-500">Keine Versandhistorie vorhanden</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <!-- Geplante Nachrichten -->
+                    <div id="dispatch-subtab-scheduled-content" class="p-4 hidden">
+                        <div id="scheduled-list" class="space-y-2">
+                            <p class="text-gray-500 text-sm py-4 text-center">Keine geplanten Nachrichten</p>
+                        </div>
+                    </div>
+
+                    <!-- Versandhistorie -->
+                    <div id="dispatch-subtab-history-content" class="p-0 hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Datum</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Typ</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Betreff</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Empfänger</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dispatch-history-tbody" class="divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="5" class="px-4 py-8 text-center text-gray-500 text-sm">Keine Versandhistorie vorhanden</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Versteckte Legacy-Buttons (werden von Refresh-Logik aufgerufen) -->
+                    <div class="hidden">
+                        <button id="refresh-drafts-btn"></button>
+                        <button id="refresh-scheduled-btn"></button>
                     </div>
                 </div>
             </div>
@@ -5871,6 +5891,9 @@ ${grussformel}`;
         function loadDrafts() {
             dispatchDrafts = JSON.parse(localStorage.getItem('dispatchDrafts') || '[]');
             const container = document.getElementById('drafts-list');
+            // Badge-Counter aktualisieren
+            const badge = document.getElementById('drafts-count-badge');
+            if (badge) badge.textContent = dispatchDrafts.length > 0 ? `(${dispatchDrafts.length})` : '';
 
             if (dispatchDrafts.length === 0) {
                 container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">Keine Entwürfe vorhanden</p>';
@@ -7660,6 +7683,32 @@ ${grussformel}`;
         document.getElementById('preview-modal-letter-btn').addEventListener('click', () => renderDispatchPreviewMode('letter'));
         document.getElementById('dispatch-preview-modal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('dispatch-preview-modal')) closeDispatchPreviewModal();
+        });
+
+        // === Sub-Tabs: Entwürfe / Geplant / Historie ===
+        let currentDispatchSubtab = 'drafts';
+        function switchDispatchSubtab(tab) {
+            currentDispatchSubtab = tab;
+            ['drafts', 'scheduled', 'history'].forEach(t => {
+                const btn = document.getElementById(`dispatch-subtab-${t}`);
+                const content = document.getElementById(`dispatch-subtab-${t}-content`);
+                if (t === tab) {
+                    btn.className = 'dispatch-subtab flex-1 py-3 px-4 font-medium border-b-2 border-fire-500 text-fire-600 text-sm';
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = 'dispatch-subtab flex-1 py-3 px-4 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800 text-sm';
+                    content.classList.add('hidden');
+                }
+            });
+        }
+        document.getElementById('dispatch-subtab-drafts').addEventListener('click', () => switchDispatchSubtab('drafts'));
+        document.getElementById('dispatch-subtab-scheduled').addEventListener('click', () => switchDispatchSubtab('scheduled'));
+        document.getElementById('dispatch-subtab-history').addEventListener('click', () => switchDispatchSubtab('history'));
+        document.getElementById('dispatch-subtab-refresh-btn').addEventListener('click', () => {
+            // Refresh aktuell sichtbaren Sub-Tab
+            if (currentDispatchSubtab === 'drafts') loadDrafts();
+            else if (currentDispatchSubtab === 'scheduled') loadScheduledMessages();
+            else if (currentDispatchSubtab === 'history') loadDispatchHistory();
         });
 
         // Dispatch
