@@ -30,3 +30,16 @@ briefe/
 
 # Claude Code local settings (may contain secrets)
 .claude/settings.local.json
+
+# ---- heinzel sysadmin rules (memory state) --------
+memory/*
+!memory/MEMORY.md
+!memory/user.md.example
+!memory/opencode.json.example
+!memory/servers/
+memory/servers/*
+!memory/servers/.gitkeep
+!memory/custom-rules/
+memory/custom-rules/*
+!memory/custom-rules/.gitkeep
+HISTORY.md

@@ -785,6 +785,16 @@ Dieses Projekt ist unter der MIT License lizenziert.
 - **E-Mail:** webmaster@fwv-raura.ch
 - **GitHub:** https://github.com/Feuerwehrverein-Raura
 
+## Sysadmin-Regeln (heinzel)
+
+Dieses Repository enthält auf Root-Ebene das Regel-Set
+[heinzel](https://github.com/wintermeyer/heinzel) (`CLAUDE.md`,
+`rules/`, `bin/`, `memory/`, `VERSION`). Es aktiviert Safety-
+Guardrails für AI-Coding-Assistants bei Server-Administration
+(SSH, Deployment, Backups). Der `memory/`-Ordner enthält lokale
+Server-State-Informationen und wird gemäss heinzels `.gitignore`
+standardmässig nicht mit gecheckt (ausser explizit gewünscht).
+
 ---
 
 **Made with love by Feuerwehrverein Raura Kaiseraugst**
