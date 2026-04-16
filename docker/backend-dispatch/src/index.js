@@ -781,10 +781,11 @@ app.post('/email/bulk', authenticateAny, async (req, res) => {
     try {
         const { member_ids, template_id, variables } = req.body;
 
-        // Get members
+        // Get members (Authorization-Header vom Request weiterreichen)
         console.log('[EMAIL BULK] Fetching members from:', `${process.env.MEMBERS_API_URL}/members`);
         const members = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
-            params: { ids: member_ids.join(',') }
+            params: { ids: member_ids.join(',') },
+            headers: { Authorization: req.headers.authorization || '' }
         });
         console.log('[EMAIL BULK] Fetched', members.data.length, 'members');
 
@@ -852,9 +853,10 @@ app.post('/dispatch/smart', authenticateAny, async (req, res) => {
 
         console.log('[SMART DISPATCH] Found templates:', Object.keys(templates));
 
-        // Get members
+        // Get members (Authorization-Header vom Request weiterreichen)
         const membersResponse = await axios.get(`${process.env.MEMBERS_API_URL}/members`, {
-            params: { ids: member_ids.join(',') }
+            params: { ids: member_ids.join(',') },
+            headers: { Authorization: req.headers.authorization || '' }
         });
         const members = membersResponse.data;
         console.log('[SMART DISPATCH] Processing', members.length, 'members');
