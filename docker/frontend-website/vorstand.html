@@ -2321,12 +2321,15 @@
                         <p class="text-gray-600 text-sm mt-1">Brief erstellen, versenden und Zahlungen verwalten</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
-                        <!-- Zustellpräferenz -->
+                        <!-- Zustellpräferenz: Auto / Post / E-Mail -->
                         <div class="flex rounded-lg border border-gray-300 overflow-hidden">
-                            <button id="delivery-post" class="px-4 py-2 text-sm font-medium bg-fire-500 text-white" onclick="switchDeliveryMode('post')">
+                            <button id="delivery-auto" class="px-4 py-2 text-sm font-medium bg-fire-500 text-white" onclick="switchDeliveryMode('auto')" title="Jedes Mitglied nach seiner Zustellpräferenz">
+                                Auto
+                            </button>
+                            <button id="delivery-post" class="px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300" onclick="switchDeliveryMode('post')">
                                 Post
                             </button>
-                            <button id="delivery-email" class="px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50" onclick="switchDeliveryMode('email')">
+                            <button id="delivery-email" class="px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300" onclick="switchDeliveryMode('email')">
                                 E-Mail
                             </button>
                         </div>
@@ -6585,7 +6588,7 @@ ${grussformel}`;
 
         // IBAN fuer QR-Rechnung (Feuerwehrverein Raura)
         const BEITRAG_IBAN = 'CH6430769442492432001';
-        let currentDeliveryMode = 'post';
+        let currentDeliveryMode = 'auto';
 
         // Aktuell ausgewaehlter Kassier (ID) - waehrend Uebergangsphase wenn mehrere vorhanden
         let selectedKassierId = null;
@@ -6704,21 +6707,25 @@ ${grussformel}`;
             };
         }
 
-        // Wechselt zwischen Post und E-Mail Modus
+        // Wechselt zwischen Auto / Post / E-Mail Modus
         function switchDeliveryMode(mode) {
             currentDeliveryMode = mode;
-            const postBtn = document.getElementById('delivery-post');
-            const emailBtn = document.getElementById('delivery-email');
+            const modes = ['auto', 'post', 'email'];
+            modes.forEach((m, i) => {
+                const btn = document.getElementById(`delivery-${m}`);
+                if (!btn) return;
+                const borderLeft = i > 0 ? ' border-l border-gray-300' : '';
+                if (m === mode) {
+                    btn.className = 'px-4 py-2 text-sm font-medium bg-fire-500 text-white' + borderLeft;
+                } else {
+                    btn.className = 'px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50' + borderLeft;
+                }
+            });
+            // Adressblock nur bei Post-Modus einblenden (fuer Einzelversand)
             const addressBlock = document.getElementById('form-address-block');
-
-            if (mode === 'post') {
-                postBtn.className = 'px-4 py-2 text-sm font-medium bg-fire-500 text-white';
-                emailBtn.className = 'px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50';
-                addressBlock.classList.remove('hidden');
-            } else {
-                emailBtn.className = 'px-4 py-2 text-sm font-medium bg-blue-600 text-white';
-                postBtn.className = 'px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50';
-                addressBlock.classList.add('hidden');
+            if (addressBlock) {
+                if (mode === 'post') addressBlock.classList.remove('hidden');
+                else addressBlock.classList.add('hidden');
             }
         }
 
@@ -6823,14 +6830,28 @@ ${grussformel}`;
             document.getElementById('beitrag-preview-modal').classList.add('hidden');
         }
 
-        // Senden-Button: je nach Modus E-Mail oder PDF
+        // Senden-Button: je nach Modus Auto / E-Mail / PDF
         function handleBeitragSend(bulk) {
             if (bulk) {
-                // Massenversand: pro Mitglied individuelle Zustellpraeferenz beruecksichtigen
+                // Massenversand: immer nach individueller Zustellpraeferenz (jedes Mitglied seinen Weg)
+                // im Auto-Modus: alle Mitglieder; sonst nur die passenden
                 sendBeitragBulkByPreference();
             } else {
-                if (currentDeliveryMode === 'email') sendBeitragEmail(false);
-                else generateBeitragPDF();
+                // Einzelversand
+                const memberId = document.getElementById('beitrag-member-select').value;
+                const member = members.find(m => String(m.id) === String(memberId));
+                if (currentDeliveryMode === 'auto' && member) {
+                    // Zustellpraeferenz des Mitglieds nutzen
+                    if (member.zustellung_email && member.email) sendBeitragEmail(false);
+                    else if (member.zustellung_post && member.strasse) generateBeitragPDF();
+                    else {
+                        showToast('Mitglied hat keine Zustellpräferenz gesetzt', 'warning');
+                    }
+                } else if (currentDeliveryMode === 'email') {
+                    sendBeitragEmail(false);
+                } else {
+                    generateBeitragPDF();
+                }
             }
         }
 
