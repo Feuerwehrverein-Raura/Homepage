@@ -1026,85 +1026,116 @@
          - Pingen-Integration für Briefpost
          ============================================================ -->
     <div id="dispatch-section" class="hidden">
+        <!-- Neue kompakte Toolbar (Stil: Mitgliedsbeitrag) -->
         <section class="bg-white border-b">
-            <div class="container mx-auto px-4 py-6">
-                <div>
-                    <h1 class="text-3xl font-bold text-gray-800">Nachricht verfassen</h1>
-                    <p class="text-gray-600 mt-1">E-Mail oder Brief an Mitglieder senden</p>
+            <div class="container mx-auto px-4 py-4">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Nachricht verfassen</h1>
+                        <p class="text-gray-600 text-sm mt-1">E-Mail oder Brief an Mitglieder senden</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Versandart-Toggle: Auto / E-Mail / Post -->
+                        <div class="flex rounded-lg border border-gray-300 overflow-hidden">
+                            <button id="dispatch-mode-auto" class="px-3 py-2 text-sm font-medium bg-fire-500 text-white" onclick="switchDispatchMode('auto')" title="Jedes Mitglied nach seiner Zustellpräferenz">
+                                Auto
+                            </button>
+                            <button id="dispatch-mode-email" class="px-3 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300" onclick="switchDispatchMode('email')">
+                                E-Mail
+                            </button>
+                            <button id="dispatch-mode-post" class="px-3 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300" onclick="switchDispatchMode('post')">
+                                Post
+                            </button>
+                        </div>
+                        <!-- Empfänger-Auswahl -->
+                        <select id="dispatch-recipients-quick" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
+                            <option value="all">Alle Mitglieder</option>
+                            <option value="aktiv">Nur Aktivmitglieder</option>
+                            <option value="passiv">Nur Passivmitglieder</option>
+                            <option value="ehren">Nur Ehrenmitglieder</option>
+                            <option value="selected">Ausgewählte Mitglieder...</option>
+                        </select>
+                        <span class="text-sm text-gray-500" id="dispatch-recipients-info">
+                            <span class="dispatch-recipient-count-display">0</span> Empfänger
+                            (<span class="dispatch-email-count-display">0</span> E-Mail, <span class="dispatch-post-count-display">0</span> Post)
+                        </span>
+                        <!-- Buttons -->
+                        <button id="dispatch-preview-modal-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-1 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            <span>Vorschau</span>
+                        </button>
+                        <button id="dispatch-draft-btn-top" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-1 text-sm" title="Entwurf speichern">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                            <span>Entwurf</span>
+                        </button>
+                        <button id="dispatch-send-btn-top" class="bg-fire-500 text-white px-5 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-1 text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                            <span>Senden</span>
+                        </button>
+                    </div>
                 </div>
+                <p class="text-xs text-gray-500 mt-2" id="dispatch-mode-hint">
+                    <span class="font-medium">Auto:</span> Jedes Mitglied wird gemäss seiner Zustellpräferenz (E-Mail oder Post) benachrichtigt.
+                </p>
             </div>
         </section>
 
         <section class="container mx-auto px-4 py-8">
             <div class="max-w-4xl mx-auto">
                 <div class="bg-white rounded-lg shadow-md p-6">
-                    <!-- Delivery Method -->
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Versandart</label>
-                        <div class="flex gap-4">
-                            <label class="flex items-center cursor-pointer">
-                                <input type="radio" name="delivery-method" value="auto" checked class="mr-2">
-                                <span>Automatisch (nach Mitglieder-Einstellung)</span>
-                            </label>
-                            <label class="flex items-center cursor-pointer">
-                                <input type="radio" name="delivery-method" value="email" class="mr-2">
-                                <span>Nur E-Mail (erzwingen)</span>
-                            </label>
-                            <label class="flex items-center cursor-pointer">
-                                <input type="radio" name="delivery-method" value="post" class="mr-2">
-                                <span>Nur Briefpost (erzwingen)</span>
-                            </label>
-                        </div>
-                        <p class="text-xs text-gray-500 mt-1">
-                            Bei "Automatisch" wird jedes Mitglied gemäß seiner Zustellungs-Einstellung (E-Mail/Post) benachrichtigt.
-                        </p>
+                    <!-- Delivery Method (versteckt, wird via Toolbar gesteuert) -->
+                    <div class="hidden">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="delivery-method" value="auto" checked class="mr-2">
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="delivery-method" value="email" class="mr-2">
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="delivery-method" value="post" class="mr-2">
+                        </label>
                     </div>
 
-                    <!-- Recipients Selection -->
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Empfänger</label>
-                        <div class="space-y-3">
-                            <div>
-                                <label class="flex items-center cursor-pointer">
-                                    <input type="radio" name="recipient-type" value="all" class="mr-2" checked>
-                                    <span>Alle Mitglieder</span>
-                                </label>
-                            </div>
-                            <div>
-                                <label class="flex items-center cursor-pointer">
-                                    <input type="radio" name="recipient-type" value="filter" class="mr-2">
-                                    <span>Gefilterte Mitglieder</span>
-                                </label>
-                                <div id="recipient-filter" class="ml-6 mt-2 hidden">
-                                    <select id="dispatch-filter-status" class="px-3 py-2 border border-gray-300 rounded-lg mr-2">
-                                        <option value="">Alle Status</option>
-                                        <option value="aktiv">Aktiv</option>
-                                        <option value="passiv">Passiv</option>
-                                        <option value="ehrenmitglied">Ehrenmitglied</option>
-                                    </select>
-                                    <label class="inline-flex items-center ml-4">
-                                        <input type="checkbox" id="dispatch-filter-email" class="mr-2" checked>
-                                        <span class="text-sm">nur mit E-Mail-Zustellung</span>
-                                    </label>
-                                    <label class="inline-flex items-center ml-4">
-                                        <input type="checkbox" id="dispatch-filter-post" class="mr-2">
-                                        <span class="text-sm">nur mit Post-Zustellung</span>
-                                    </label>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="flex items-center cursor-pointer">
-                                    <input type="radio" name="recipient-type" value="selected" class="mr-2">
-                                    <span>Ausgewählte Mitglieder</span>
-                                </label>
-                                <div id="recipient-selected" class="ml-6 mt-2 hidden">
-                                    <button id="select-members-btn" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">
-                                        Mitglieder auswählen (<span id="selected-count">0</span>)
-                                    </button>
-                                    <div id="selected-members-list" class="mt-2 text-sm text-gray-600"></div>
-                                </div>
-                            </div>
+                    <!-- Recipients Selection (versteckt, wird via Toolbar gesteuert; Filter/Auswahl als Sekundär-Zeile sichtbar) -->
+                    <div class="hidden">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="recipient-type" value="all" class="mr-2" checked>
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="recipient-type" value="filter" class="mr-2">
+                        </label>
+                        <label class="flex items-center cursor-pointer">
+                            <input type="radio" name="recipient-type" value="selected" class="mr-2">
+                        </label>
+                    </div>
+
+                    <!-- Sekundärfilter (nur sichtbar wenn benötigt) -->
+                    <div id="recipient-filter" class="hidden mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <label class="text-sm text-gray-700">Zusätzlicher Filter:</label>
+                            <select id="dispatch-filter-status" class="px-3 py-1 border border-gray-300 rounded-lg text-sm">
+                                <option value="">Alle Status</option>
+                                <option value="aktiv">Aktiv</option>
+                                <option value="passiv">Passiv</option>
+                                <option value="ehrenmitglied">Ehrenmitglied</option>
+                            </select>
+                            <label class="inline-flex items-center text-sm">
+                                <input type="checkbox" id="dispatch-filter-email" class="mr-2" checked>
+                                nur mit E-Mail-Zustellung
+                            </label>
+                            <label class="inline-flex items-center text-sm">
+                                <input type="checkbox" id="dispatch-filter-post" class="mr-2">
+                                nur mit Post-Zustellung
+                            </label>
                         </div>
+                    </div>
+
+                    <!-- Ausgewählte Mitglieder (nur sichtbar wenn "selected" gewählt) -->
+                    <div id="recipient-selected" class="hidden mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <button id="select-members-btn" class="px-4 py-2 bg-white hover:bg-gray-100 border border-gray-300 rounded-lg text-sm">
+                            Mitglieder auswählen (<span id="selected-count">0</span>)
+                        </button>
+                        <div id="selected-members-list" class="mt-2 text-sm text-gray-600"></div>
                     </div>
 
                     <!-- Template Selection -->
@@ -5690,6 +5721,10 @@ ${grussformel}`;
             document.getElementById('dispatch-recipient-count').textContent = recipients.length;
             document.getElementById('dispatch-email-count').textContent = emailCount;
             document.getElementById('dispatch-post-count').textContent = postCount;
+            // Auch die neue Toolbar-Anzeige aktualisieren
+            document.querySelectorAll('.dispatch-recipient-count-display').forEach(el => el.textContent = recipients.length);
+            document.querySelectorAll('.dispatch-email-count-display').forEach(el => el.textContent = emailCount);
+            document.querySelectorAll('.dispatch-post-count-display').forEach(el => el.textContent = postCount);
 
             // Show/hide Pingen cost estimate
             const costEstimate = document.getElementById('pingen-cost-estimate');
@@ -5997,6 +6032,8 @@ ${grussformel}`;
             }
 
             document.getElementById('dispatch-recipient-count').textContent = count;
+            // Auch die Toolbar-Anzeige aktualisieren
+            document.querySelectorAll('.dispatch-recipient-count-display').forEach(el => el.textContent = count);
         }
 
         // Sendet die Nachricht (E-Mail und/oder Brief) an die ausgewählten Empfänger. Unterstützt zeitgesteuerten Versand und Dateianhänge.
@@ -7503,6 +7540,62 @@ ${grussformel}`;
         document.getElementById('copy-emails-btn').addEventListener('click', copyZustellungEmails);
         document.getElementById('refresh-emails-btn').addEventListener('click', loadZustellungEmails);
         document.getElementById('sync-alias-btn').addEventListener('click', syncMitgliederAlias);
+
+        // === Neue kompakte Dispatch-Toolbar (Stil: Mitgliedsbeitrag) ===
+        // Versandart-Toggle: setzt die versteckten Radio-Buttons und triggert Change-Event
+        function switchDispatchMode(mode) {
+            const modes = ['auto', 'email', 'post'];
+            modes.forEach(m => {
+                const btn = document.getElementById(`dispatch-mode-${m}`);
+                if (m === mode) {
+                    btn.className = 'px-3 py-2 text-sm font-medium bg-fire-500 text-white' + (m !== 'auto' ? ' border-l border-gray-300' : '');
+                } else {
+                    btn.className = 'px-3 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50' + (m !== 'auto' ? ' border-l border-gray-300' : '');
+                }
+            });
+            // Verstecktes Radio-Feld setzen und Change-Event ausloesen
+            const radio = document.querySelector(`input[name="delivery-method"][value="${mode}"]`);
+            if (radio) {
+                radio.checked = true;
+                radio.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            // Hint-Text aktualisieren
+            const hints = {
+                auto: '<span class="font-medium">Auto:</span> Jedes Mitglied wird gemäss seiner Zustellpräferenz (E-Mail oder Post) benachrichtigt.',
+                email: '<span class="font-medium">E-Mail:</span> Alle Empfänger erhalten die Nachricht per E-Mail (Zustellpräferenz wird ignoriert).',
+                post: '<span class="font-medium">Post:</span> Alle Empfänger erhalten die Nachricht per Brief via Pingen (Zustellpräferenz wird ignoriert).'
+            };
+            document.getElementById('dispatch-mode-hint').innerHTML = hints[mode];
+        }
+
+        // Empfänger-Schnellauswahl (all / aktiv / passiv / ehren / selected)
+        function applyDispatchRecipientsQuick(value) {
+            if (value === 'selected') {
+                // Modus "Ausgewählte Mitglieder"
+                document.querySelector('input[name="recipient-type"][value="selected"]').checked = true;
+                document.getElementById('recipient-filter').classList.add('hidden');
+                document.getElementById('recipient-selected').classList.remove('hidden');
+            } else if (value === 'all') {
+                document.querySelector('input[name="recipient-type"][value="all"]').checked = true;
+                document.getElementById('recipient-filter').classList.add('hidden');
+                document.getElementById('recipient-selected').classList.add('hidden');
+                document.getElementById('dispatch-filter-status').value = '';
+            } else {
+                // Statusfilter: aktiv / passiv / ehren
+                document.querySelector('input[name="recipient-type"][value="filter"]').checked = true;
+                document.getElementById('recipient-filter').classList.remove('hidden');
+                document.getElementById('recipient-selected').classList.add('hidden');
+                const statusMap = { aktiv: 'aktiv', passiv: 'passiv', ehren: 'ehrenmitglied' };
+                document.getElementById('dispatch-filter-status').value = statusMap[value] || '';
+            }
+            updateRecipientCount();
+        }
+
+        // Event-Listener für neue Toolbar
+        document.getElementById('dispatch-recipients-quick').addEventListener('change', (e) => applyDispatchRecipientsQuick(e.target.value));
+        document.getElementById('dispatch-send-btn-top').addEventListener('click', () => document.getElementById('dispatch-send-btn').click());
+        document.getElementById('dispatch-draft-btn-top').addEventListener('click', () => document.getElementById('dispatch-save-draft-btn').click());
+        // Vorschau-Button wird in Schritt 2 (Vorschau-Modal) angebunden
 
         // Dispatch
         document.querySelectorAll('input[name="delivery-method"]').forEach(radio => {
