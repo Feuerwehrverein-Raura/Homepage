@@ -6513,12 +6513,75 @@ ${grussformel}`;
 
         // Senden-Button: je nach Modus E-Mail oder PDF
         function handleBeitragSend(bulk) {
-            if (currentDeliveryMode === 'email') {
-                sendBeitragEmail(bulk);
+            if (bulk) {
+                // Massenversand: pro Mitglied individuelle Zustellpraeferenz beruecksichtigen
+                sendBeitragBulkByPreference();
             } else {
-                if (bulk) generateBeitragBulk();
+                if (currentDeliveryMode === 'email') sendBeitragEmail(false);
                 else generateBeitragPDF();
             }
+        }
+
+        // Massenversand: Jedes Mitglied bekommt seine Post nach seiner eigenen Zustellpraeferenz
+        async function sendBeitragBulkByPreference() {
+            const emailMembers = members.filter(m => m.zustellung_email && m.email);
+            const postMembers = members.filter(m => m.zustellung_post && m.strasse && m.plz && m.ort);
+
+            const msg = `Mitgliedsbeitrag an alle senden:\n` +
+                `- ${emailMembers.length} per E-Mail\n` +
+                `- ${postMembers.length} per Post\n` +
+                `(Gemäss individueller Zustellpräferenz jedes Mitglieds)`;
+            if (!confirm(msg)) return;
+
+            showToast('Versand läuft...', 'info');
+            let emailSuccess = 0, emailFailed = 0, postSuccess = 0, postFailed = 0;
+            const jahr = document.getElementById('brief-jahr').value;
+            const betrag = document.getElementById('brief-betrag').value;
+            const subject = `Mitgliederbeitrag ${jahr} - Feuerwehrverein Raura`;
+
+            // E-Mail-Versand
+            for (const member of emailMembers) {
+                try {
+                    const html = generateBeitragEmailHTML(member);
+                    const response = await fetch(`${API_BASE}/email/bulk`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            member_ids: [member.id],
+                            subject,
+                            body: '',
+                            html: html,
+                            attachments: []
+                        })
+                    });
+                    if (response.ok) emailSuccess++; else emailFailed++;
+                } catch (e) { emailFailed++; }
+            }
+
+            // Post-Versand (PDF-Generierung via Bulk-API)
+            if (postMembers.length > 0) {
+                try {
+                    const response = await fetch(`${API_BASE}/invoices/generate-bulk`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            amount: parseFloat(betrag),
+                            year: parseInt(jahr),
+                            description: `Mitgliederbeitrag ${jahr}`,
+                            member_ids: postMembers.map(m => m.id)
+                        })
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        postSuccess = result.count || result.generated || postMembers.length;
+                    } else postFailed = postMembers.length;
+                } catch (e) { postFailed = postMembers.length; }
+            }
+
+            const resultMsg = `Versand abgeschlossen:\n` +
+                `E-Mail: ${emailSuccess} gesendet${emailFailed ? `, ${emailFailed} fehlgeschlagen` : ''}\n` +
+                `Post: ${postSuccess} generiert${postFailed ? `, ${postFailed} fehlgeschlagen` : ''}`;
+            showToast(resultMsg, (emailFailed + postFailed) ? 'warning' : 'success');
         }
 
         // Befuellt das Mitglieder-Dropdown im Beitrag-Tab
