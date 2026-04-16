@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS membership_fee_payments (
     member_id UUID REFERENCES members(id) ON DELETE CASCADE,
     year INTEGER NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
-    reference_nr VARCHAR(20) NOT NULL,
+    reference_nr VARCHAR(20) DEFAULT '',
     bank_reference VARCHAR(50),
     status VARCHAR(20) DEFAULT 'offen',
     paid_date DATE,
@@ -37,3 +37,6 @@ CREATE INDEX IF NOT EXISTS idx_fee_payments_year ON membership_fee_payments(year
 CREATE INDEX IF NOT EXISTS idx_fee_payments_status ON membership_fee_payments(status);
 CREATE INDEX IF NOT EXISTS idx_fee_payments_reference ON membership_fee_payments(reference_nr);
 CREATE INDEX IF NOT EXISTS idx_fee_payments_bank_ref ON membership_fee_payments(bank_reference);
+
+-- DEUTSCH: Bank-Referenz pro Mitglied (wird von der Bank vergeben, bleibt konstant)
+ALTER TABLE members ADD COLUMN IF NOT EXISTS bank_reference VARCHAR(20);

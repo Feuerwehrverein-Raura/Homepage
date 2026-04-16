@@ -71,6 +71,9 @@ app.get('/health', (req, res) => {
 // ============================================
 async function runStartupMigrations() {
     try {
+        // Bestehende NOT NULL auf reference_nr aufheben falls noch vorhanden
+        await pool.query(`ALTER TABLE IF EXISTS membership_fee_payments ALTER COLUMN reference_nr DROP NOT NULL;`).catch(() => {});
+        await pool.query(`ALTER TABLE IF EXISTS membership_fee_payments ALTER COLUMN reference_nr SET DEFAULT '';`).catch(() => {});
         await pool.query(`
             CREATE TABLE IF NOT EXISTS membership_fee_settings (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -88,7 +91,7 @@ async function runStartupMigrations() {
                 member_id UUID REFERENCES members(id) ON DELETE CASCADE,
                 year INTEGER NOT NULL,
                 amount DECIMAL(10,2) NOT NULL,
-                reference_nr VARCHAR(20) NOT NULL,
+                reference_nr VARCHAR(20) DEFAULT '',
                 bank_reference VARCHAR(50),
                 status VARCHAR(20) DEFAULT 'offen',
                 paid_date DATE,
@@ -421,6 +424,7 @@ app.post('/membership-fees/payments/generate', async (req, res) => {
         }
 
         // Alle zahlenden Mitglieder holen (Ehrenmitglieder sind beitragsbefreit)
+        // Ref.-Nr. wird pro Jahr von der Bank neu zugewiesen und muss vom User manuell eingetragen werden
         const membersResult = await pool.query(
             "SELECT id FROM members WHERE status IN ('Aktivmitglied', 'Passivmitglied')"
         );
@@ -429,14 +433,12 @@ app.post('/membership-fees/payments/generate', async (req, res) => {
         let skipped = 0;
 
         for (const member of membersResult.rows) {
-            const refNr = String(member.id).replace(/\D/g, '').slice(-4).padStart(4, '0');
-
             try {
                 await pool.query(`
                     INSERT INTO membership_fee_payments (member_id, year, amount, reference_nr, status)
-                    VALUES ($1, $2, $3, $4, 'offen')
+                    VALUES ($1, $2, $3, '', 'offen')
                     ON CONFLICT (member_id, year) DO NOTHING
-                `, [member.id, year, amount, refNr]);
+                `, [member.id, year, amount]);
                 created++;
             } catch (e) {
                 skipped++;
@@ -496,25 +498,27 @@ app.patch('/membership-fees/payments/:id/unpay', async (req, res) => {
     }
 });
 
-// DEUTSCH: PATCH /membership-fees/payments/:id/reference — Bank-Referenznummer zuweisen
+// DEUTSCH: PATCH /membership-fees/payments/:id/reference — QR-Referenznummer zuweisen
+// Die Referenz wird jedes Jahr von der Bank neu zugewiesen, pro Mitglied und Jahr
 app.patch('/membership-fees/payments/:id/reference', async (req, res) => {
     try {
-        const { bank_reference } = req.body;
-        if (!bank_reference) {
-            return res.status(400).json({ error: 'bank_reference erforderlich' });
+        const { reference_nr, bank_reference } = req.body;
+        const refValue = reference_nr !== undefined ? reference_nr : bank_reference;
+        if (refValue === undefined) {
+            return res.status(400).json({ error: 'reference_nr erforderlich' });
         }
 
         const result = await pool.query(`
             UPDATE membership_fee_payments
-            SET bank_reference = $2, updated_at = NOW()
+            SET reference_nr = $2, updated_at = NOW()
             WHERE id = $1
             RETURNING *
-        `, [req.params.id, bank_reference]);
+        `, [req.params.id, refValue]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Zahlung nicht gefunden' });
         }
-        logInfo('Bank reference assigned', { id: req.params.id, bank_reference });
+        logInfo('Reference number assigned', { id: req.params.id, reference_nr: refValue });
         res.json(result.rows[0]);
     } catch (error) {
         res.status(500).json({ error: error.message });

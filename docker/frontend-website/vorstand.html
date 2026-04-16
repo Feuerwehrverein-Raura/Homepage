@@ -2609,8 +2609,7 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mitglied</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ref. Nr.</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank-Referenz</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">QR-Referenz (von Bank)</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Betrag</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bezahlt am</th>
@@ -7134,15 +7133,15 @@ ${grussformel}`;
                         ? `<button onclick="markFeePaid('${p.id}')" class="text-green-600 hover:text-green-800 text-sm font-medium mr-2">Bezahlt</button>`
                         : `<button onclick="markFeeUnpaid('${p.id}')" class="text-red-600 hover:text-red-800 text-sm font-medium mr-2">Zurücksetzen</button>`;
 
-                    const bankRefId = `bank-ref-${p.id}`;
+                    // Ref-Nr. editierbar - wird jedes Jahr von der Bank neu zugewiesen
+                    const refInputId = `ref-${p.id}`;
 
                     return `<tr>
                         <td class="px-4 py-3 text-sm font-medium text-gray-900">${p.nachname} ${p.vorname}</td>
-                        <td class="px-4 py-3 text-sm text-gray-600">${p.reference_nr}</td>
                         <td class="px-4 py-3 text-sm">
-                            <input type="text" id="${bankRefId}" value="${p.bank_reference || ''}" placeholder="Bank-Ref..."
-                                class="w-32 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500"
-                                onchange="saveBankReference('${p.id}', this.value)">
+                            <input type="text" id="${refInputId}" value="${p.reference_nr || ''}" placeholder="z.B. 0732"
+                                class="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500 font-mono"
+                                onchange="saveReferenceNr('${p.id}', this.value)">
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-600">CHF ${parseFloat(p.amount).toFixed(2)}</td>
                         <td class="px-4 py-3">${statusBadge}</td>
@@ -7185,16 +7184,16 @@ ${grussformel}`;
             }
         }
 
-        // Bank-Referenz speichern
-        async function saveBankReference(paymentId, bankRef) {
+        // QR-Referenznummer speichern (wird jedes Jahr von der Bank neu zugewiesen)
+        async function saveReferenceNr(paymentId, refNr) {
             try {
                 const response = await fetch(`${FEES_API}/payments/${paymentId}/reference`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-                    body: JSON.stringify({ bank_reference: bankRef })
+                    body: JSON.stringify({ reference_nr: refNr })
                 });
                 if (!response.ok) throw new Error('Fehler');
-                showToast('Bank-Referenz gespeichert', 'success');
+                showToast('Referenznummer gespeichert', 'success');
             } catch (error) {
                 showToast('Fehler: ' + error.message, 'error');
             }
