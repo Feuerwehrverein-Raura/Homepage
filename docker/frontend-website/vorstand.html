@@ -5773,10 +5773,11 @@ ${grussformel}`;
             return [];
         }
 
-        // Zeigt die E-Mail-Vorschau an: Betreff, Empfänger-Liste und formatierter HTML-Inhalt.
+        // Zeigt die E-Mail-Vorschau im offiziellen Layout (gleicher Kopf wie Brief, email-freundlich)
         function showEmailPreview() {
             const subject = document.getElementById('dispatch-subject').value;
             const content = getDispatchContent();
+            const bodyHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
 
             const sampleMember = members[0] || {
                 anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
@@ -5784,26 +5785,23 @@ ${grussformel}`;
                 email: 'max@example.com'
             };
 
-            let html = content.html || content.text.replace(/\n/g, '<br>');
-            html = replacePlaceholders(html, sampleMember);
-
+            const emailHtml = generateDispatchEmailHTML(bodyHtml, subject, sampleMember);
             const previewDiv = document.getElementById('dispatch-preview');
+
+            // Header ueber der Vorschau + generiertes Email-HTML (DOCTYPE/body gestrippt)
             previewDiv.innerHTML = `
-                <div class="border rounded-lg overflow-hidden">
-                    <div class="bg-blue-50 px-4 py-2 border-b">
-                        <div class="text-xs text-gray-500">An: ${sampleMember.email}</div>
-                        <div class="font-semibold">${replacePlaceholders(subject, sampleMember) || '(kein Betreff)'}</div>
-                    </div>
-                    <div class="p-4 dispatch-preview-html">
-                        ${html}
-                    </div>
-                    ${dispatchAttachments.length > 0 ? `
-                        <div class="border-t px-4 py-2 bg-gray-50">
-                            <span class="text-xs text-gray-500">Anhänge:</span>
-                            ${dispatchAttachments.map(f => `<span class="ml-2 text-xs">📎 ${f.name}</span>`).join('')}
-                        </div>
-                    ` : ''}
+                <div style="background:#f3f4f6;padding:15px;border-radius:6px 6px 0 0;border:1px solid #e5e7eb;border-bottom:none;">
+                    <div style="font-size:11px;color:#6b7280;">An: ${sampleMember.email}</div>
+                    <div style="font-weight:600;color:#111827;">${replacePlaceholders(subject, sampleMember) || '(kein Betreff)'}</div>
                 </div>
+                <div style="border:1px solid #e5e7eb;border-radius:0 0 6px 6px;background:white;overflow:hidden;">
+                    ${emailHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '')}
+                </div>
+                ${dispatchAttachments.length > 0 ? `
+                    <div style="padding:8px 15px;background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 6px 6px;font-size:11px;color:#6b7280;">
+                        Anhänge: ${dispatchAttachments.map(f => `📎 ${f.name}`).join(', ')}
+                    </div>
+                ` : ''}
             `;
         }
 
@@ -6153,8 +6151,13 @@ ${grussformel}`;
 
                 showToast('Versand läuft...', 'info');
 
-                // E-Mail-Versand
+                // E-Mail-Versand: HTML im offiziellen Layout einwickeln (Kopf + Body + Schluss)
+                // Placeholders {{vorname}} etc. werden vom Backend pro Empfaenger ersetzt
                 if (emailRecipients.length > 0) {
+                    const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
+                    // Wrapper mit Platzhaltern (ohne Member) - Backend ersetzt sie per-member
+                    const wrappedHtml = generateDispatchEmailHTML(sourceHtml, subject, null);
+
                     const response = await fetch(`${API_BASE}/email/bulk`, {
                         method: 'POST',
                         headers: {
@@ -6166,7 +6169,7 @@ ${grussformel}`;
                             template_id: templateId || null,
                             subject,
                             body: content.text,
-                            html: content.html,
+                            html: wrappedHtml,
                             variables: {},
                             attachments: []
                         })
@@ -6875,6 +6878,55 @@ ${grussformel}`;
         // Generiert den kompletten Brief als HTML (fuer E-Mail oder Post)
         // includeAddress=true: Empfaenger-Adressblock im Schweizer Adressfenster (fuer Post-Versand via Pingen)
         // includeAddress=false: ohne Adressblock (fuer E-Mail-Versand)
+        // Generiert eine allgemeine E-Mail (fuer Nachrichten-Tab E-Mail-Versand)
+        // Layout: Gleicher Kopf wie Dispatch-Letter, aber email-freundlich (Tabelle, max 660px)
+        // Kein Adressfenster (bei E-Mail unnoetig), kein QR-Slip.
+        function generateDispatchEmailHTML(bodyHtml, subject, member) {
+            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            // Platzhalter im Body ersetzen falls Mitglied uebergeben
+            let body = bodyHtml || '';
+            if (member) body = replacePlaceholders(body, member);
+
+            return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
+<div style="max-width:660px;margin:0 auto;padding:20px;background:white;">
+
+    <!-- Briefkopf: Logo links, Titel rechts -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:15px;">
+        <tr>
+            <td width="120" valign="top">
+                <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" width="110" style="display:block;">
+            </td>
+            <td valign="top" style="padding-left:15px;">
+                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
+                <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Absenderzeile (Aktuar) -->
+    <div style="font-size:8pt;color:#333;margin-bottom:15px;">${getAktuarAbsenderLine()}</div>
+
+    <!-- Datum rechtsbuendig -->
+    <div style="text-align:right;margin-bottom:20px;">Kaiseraugst, ${datum}</div>
+
+    ${subject ? `<div style="font-weight:bold;font-size:13pt;">${subject}</div><hr style="border:none;border-top:1px solid #000;margin:8px 0 15px 0;">` : ''}
+
+    <!-- Body -->
+    <div>${body}</div>
+
+    <!-- Abschluss -->
+    <div style="margin-top:25px;">
+        Mit freundlichen Grüssen<br><br>
+        <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+        <em>Der Vorstand</em>
+    </div>
+
+</div>
+</body></html>`;
+        }
+
         // Generiert einen allgemeinen Brief (fuer Nachrichten-Tab Post-Versand)
         // Layout: Kopf wie Mitgliedsbeitrag (Logo+Titel+Absender+Empfaenger+Datum), ohne QR.
         // Inline-Styles damit Vorschau und PDF-Generierung konsistent sind.
