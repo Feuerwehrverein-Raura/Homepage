@@ -6876,8 +6876,8 @@ ${grussformel}`;
         // includeAddress=true: Empfaenger-Adressblock im Schweizer Adressfenster (fuer Post-Versand via Pingen)
         // includeAddress=false: ohne Adressblock (fuer E-Mail-Versand)
         // Generiert einen allgemeinen Brief (fuer Nachrichten-Tab Post-Versand)
-        // Nutzt den gleichen Kopf wie generateBeitragEmailHTML aber ohne QR-Einzahlungsschein.
-        // Layout: Logo + Titel + Absender + Empfaenger im Fensterkuvert + Datum + Betreff + Body + Schluss
+        // Layout: Kopf wie Mitgliedsbeitrag (Logo+Titel+Absender+Empfaenger+Datum), ohne QR.
+        // Inline-Styles damit Vorschau und PDF-Generierung konsistent sind.
         function generateDispatchLetterHTML(bodyHtml, subject, member) {
             const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
             const name = member ? `${member.vorname} ${member.nachname}`.trim() : '{{vorname}} {{nachname}}';
@@ -6889,45 +6889,38 @@ ${grussformel}`;
             if (member) body = replacePlaceholders(body, member);
 
             return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<style>
-  @page { size: A4; margin: 0; }
-  body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
-  .a4 { width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background: white; }
-  .logo { position: absolute; top: 15mm; left: 25mm; width: 35mm; }
-  .logo img { width: 35mm; height: auto; display: block; }
-  .title { position: absolute; top: 15mm; left: 118mm; font-size: 20pt; font-weight: bold; line-height: 1.2; }
-  .absender { position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333; }
-  .empfaenger { position: absolute; top: 60mm; left: 118mm; width: 85mm; font-size: 11pt; }
-  .datum { position: absolute; top: 97mm; right: 25mm; text-align: right; font-size: 11pt; }
-  .content { position: absolute; top: 110mm; left: 25mm; right: 25mm; font-size: 11pt; line-height: 1.4; }
-  .subject-title { font-weight: bold; font-size: 13pt; }
-  .divider { border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0; }
-  .body p { margin: 2mm 0; }
-  .body ul, .body ol { margin: 2mm 0; padding-left: 6mm; }
-  .signoff { margin-top: 10mm; }
-</style>
-</head>
+<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
 <body>
-<div class="a4">
-  <div class="logo"><img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura"></div>
-  <div class="title">Feuerwehrverein Raura<br>Kaiseraugst</div>
-  <div class="absender">${getAktuarAbsenderLine()}</div>
-  <div class="empfaenger">
-    ${name}<br>
-    ${strasse}<br>
-    ${plzOrt}
-  </div>
-  <div class="datum">Kaiseraugst, ${datum}</div>
-  <div class="content">
-    ${subject ? `<div class="subject-title">${subject}</div><hr class="divider">` : ''}
-    <div class="body">${body}</div>
-    <div class="signoff">
-      Mit freundlichen Grüssen<br><br>
-      <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
-      <em>Der Vorstand</em>
+<div style="width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000;">
+    <!-- Logo links -->
+    <div style="position: absolute; top: 15mm; left: 25mm; width: 35mm;">
+        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width: 35mm; height: auto; display: block;">
     </div>
-  </div>
+    <!-- Titel rechts -->
+    <div style="position: absolute; top: 15mm; left: 118mm;">
+        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Feuerwehrverein Raura</div>
+        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
+    </div>
+    <!-- Absenderzeile (Aktuar, oberhalb Frankierbereich Y<40mm) -->
+    <div style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">${getAktuarAbsenderLine()}</div>
+    <!-- Empfaenger im Schweizer Adressfenster X=118mm Y=60mm -->
+    <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm;">
+        <div>${name}</div>
+        <div>${strasse}</div>
+        <div>${plzOrt}</div>
+    </div>
+    <!-- Datum rechtsbuendig -->
+    <div style="position: absolute; top: 97mm; right: 25mm; text-align: right;">Kaiseraugst, ${datum}</div>
+    <!-- Brieftext -->
+    <div style="position: absolute; top: 110mm; left: 25mm; right: 25mm;">
+        ${subject ? `<div style="font-weight: bold; font-size: 13pt;">${subject}</div><hr style="border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0;">` : ''}
+        <div>${body}</div>
+        <div style="margin-top: 10mm;">
+            Mit freundlichen Grüssen<br><br>
+            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+            <em>Der Vorstand</em>
+        </div>
+    </div>
 </div>
 </body></html>`;
         }
