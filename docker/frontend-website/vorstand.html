@@ -6841,6 +6841,13 @@ ${grussformel}`;
         // Serialisiert das gebaute Brief-Div zu einem standalone HTML-Dokument fuer Puppeteer/Pingen
         function generateBeitragLetterHTML(member) {
             const div = buildBeitragLetterDiv(member);
+            // Relative Bild-URLs zu absoluten machen (Puppeteer hat keine Base-URL)
+            div.querySelectorAll('img').forEach(img => {
+                const src = img.getAttribute('src');
+                if (src && !src.startsWith('http') && !src.startsWith('data:')) {
+                    img.setAttribute('src', 'https://www.fwv-raura.ch/' + src.replace(/^\/+/, ''));
+                }
+            });
             const wrapper = document.createElement('div');
             wrapper.appendChild(div);
             return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>@page{size:A4;margin:0}body{margin:0;padding:0}</style></head><body>${wrapper.innerHTML}</body></html>`;
