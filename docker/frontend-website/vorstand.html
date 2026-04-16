@@ -6637,6 +6637,14 @@ ${grussformel}`;
             const postMembers = beitragspflichtig.filter(m => m.zustellung_post && m.strasse && m.plz && m.ort);
             const ehrenCount = members.length - beitragspflichtig.length;
 
+            // Pruefen: haben alle beitragspflichtigen Mitglieder eine Ref-Nr. im aktuellen Jahr?
+            const withoutRef = beitragspflichtig.filter(m => !currentYearPayments[m.id]?.reference_nr);
+            if (withoutRef.length > 0) {
+                const list = withoutRef.slice(0, 10).map(m => `- ${m.nachname} ${m.vorname}`).join('\n');
+                const more = withoutRef.length > 10 ? `\n... und ${withoutRef.length - 10} weitere` : '';
+                if (!confirm(`⚠ Für ${withoutRef.length} Mitglieder fehlt die Referenznummer für ${document.getElementById('brief-jahr').value}:\n\n${list}${more}\n\nTrotzdem senden? Die QR-Rechnung ohne Referenz ist unbrauchbar!`)) return;
+            }
+
             const msg = `Mitgliedsbeitrag an alle senden:\n` +
                 `- ${emailMembers.length} per E-Mail\n` +
                 `- ${postMembers.length} per Post\n` +
@@ -6712,15 +6720,22 @@ ${grussformel}`;
         }
 
         // Wird aufgerufen wenn ein Mitglied ausgewaehlt wird - befuellt alle Felder
+        // Cache der geladenen Zahlungen fuer das aktuelle Jahr (Key: member_id → payment record)
+        let currentYearPayments = {};
+
         function fillBeitragFromMember(memberId) {
             const member = members.find(m => String(m.id) === String(memberId));
             if (!member) return;
             document.getElementById('brief-name').value = `${member.nachname} ${member.vorname}`;
             document.getElementById('brief-strasse').value = member.strasse || '';
             document.getElementById('brief-plz-ort').value = `${member.plz || ''} ${member.ort || ''}`.trim();
-            // Ref Nr. aus Mitglieds-ID ableiten (4-stellig)
-            const refNr = String(member.id).padStart(4, '0');
+            // Ref-Nr. aus der payments-Tabelle fuer das aktuelle Jahr holen (von der Bank zugewiesen)
+            const payment = currentYearPayments[memberId];
+            const refNr = payment?.reference_nr || '';
             document.getElementById('brief-ref').value = refNr;
+            if (!refNr) {
+                showToast('⚠ Keine Referenznummer für dieses Mitglied im ' + document.getElementById('brief-jahr').value + ' hinterlegt', 'warning');
+            }
             updateBeitragDerived();
         }
 
@@ -6748,7 +6763,11 @@ ${grussformel}`;
             const jahr = document.getElementById('brief-jahr').value;
             const datum = document.getElementById('brief-datum').value;
             const gvDatum = document.getElementById('brief-gv-datum').value;
-            const refNr = member ? String(member.id).padStart(4, '0') : document.getElementById('brief-ref').value;
+            // Referenz aus der payments-Tabelle holen (von der Bank zugewiesen pro Jahr)
+            // Fallback: Form-Feld (fuer manuelle Einzelvorschau)
+            const refNr = member
+                ? (currentYearPayments[member.id]?.reference_nr || '')
+                : document.getElementById('brief-ref').value;
             const name = member ? `${member.nachname} ${member.vorname}` : document.getElementById('brief-name').value;
 
             const refPadded = refNr.replace(/\D/g, '').padStart(5, '0') + '0';
@@ -7099,6 +7118,15 @@ ${grussformel}`;
 
                 if (!paymentsRes.ok) throw new Error('Laden fehlgeschlagen');
                 let payments = await paymentsRes.json();
+
+                // Cache aktualisieren: Zuordnung member_id → payment (fuer Vorschau/Senden)
+                currentYearPayments = {};
+                payments.forEach(p => { currentYearPayments[p.member_id] = p; });
+                // Falls ein Mitglied ausgewaehlt ist, Ref-Nr. neu laden
+                const selectedMember = document.getElementById('beitrag-member-select').value;
+                if (selectedMember && currentYearPayments[selectedMember]) {
+                    document.getElementById('brief-ref').value = currentYearPayments[selectedMember].reference_nr || '';
+                }
 
                 // Filter anwenden
                 if (search) {
