@@ -4152,11 +4152,8 @@
                 // Absender: Organisator falls vorhanden, sonst Vorstand
                 const hasOrganizer = event.organizer_name && event.organizer_name.trim();
                 const einladungVon = hasOrganizer
-                    ? `${event.organizer_name} lädt euch herzlich ein:`
-                    : 'Der Vorstand möchte euch herzlich einladen:';
-                const grussformel = hasOrganizer
-                    ? `Mit freundlichen Grüssen\n\n${event.organizer_name}`
-                    : `Mit freundlichen Grüssen\nDer Vorstand`;
+                    ? `${event.organizer_name} lädt euch herzlich ein zum Anlass:`
+                    : 'Der Vorstand möchte euch herzlich einladen zum Anlass:';
 
                 const invitationSubject = `Einladung: ${event.title}`;
                 const invitationBody = `Liebe Mitglieder
@@ -4173,9 +4170,7 @@ Wo:       ${event.location || 'Wird noch bekannt gegeben'}${anmeldungInfo}${kost
 
 ${event.description || ''}
 
-Wir freuen uns über zahlreiches Erscheinen!
-
-${grussformel}`;
+Wir freuen uns über zahlreiches Erscheinen!`;
 
                 // Switch to dispatch tab and fill in the data
                 switchTab('dispatch');
