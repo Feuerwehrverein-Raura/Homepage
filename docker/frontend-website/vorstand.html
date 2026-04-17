@@ -7455,14 +7455,13 @@ Wir freuen uns über zahlreiches Erscheinen!`;
 
             return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
-/* Puppeteer setzt die Page-Margins (0 top, 25mm seit, 20mm unten) via pdf()-Option */
-/* Folgeseiten bekommen 20mm oben durch @page margin-top: 20mm */
-@page { margin-top: 20mm; }
-@page :first { margin-top: 0; }
+/* Puppeteer: margin: 20mm top/bottom, 25mm sides — Content-Breite = 160mm */
 * { box-sizing: border-box; }
 body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
+/* Seite-1-Header: ragt mit negativem Margin in die @page-Margin rein */
 .first-page-header {
-    position: relative; height: 110mm; margin: 0 -25mm 0 -25mm;
+    position: relative; width: 210mm; height: 110mm;
+    margin: -20mm -25mm 10mm -25mm;
     page-break-inside: avoid; page-break-after: avoid;
 }
 .first-page-header .logo { position: absolute; top: 15mm; left: 25mm; width: 35mm; }
