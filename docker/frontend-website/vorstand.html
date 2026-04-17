@@ -6231,11 +6231,7 @@ ${grussformel}`;
                     const member = postRecipients[i];
 
                     // Deckblatt im offiziellen Layout generieren
-                    const coverHtml = generateDispatchLetterHTML(
-                        '<p>&nbsp;</p>', // Leerer Body — nur Deckblatt mit Adresse + Betreff
-                        subject,
-                        member
-                    );
+                    const coverHtml = generatePdfCoverHTML(subject, member);
 
                     const recipient = {
                         name: `${member.vorname} ${member.nachname}`,
@@ -7361,6 +7357,57 @@ ${grussformel}`;
             Mit freundlichen Grüssen<br><br>
             <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
             <em>Der Vorstand</em>
+        </div>
+    </div>
+</div>
+</body></html>`;
+        }
+
+        // Deckblatt fuer PDF-Brief Modus: Logo, Adressfenster, Betreff, Hinweis auf Beilage
+        function generatePdfCoverHTML(subject, member) {
+            const datum = new Date().toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const name = member ? `${member.vorname} ${member.nachname}`.trim() : '{{vorname}} {{nachname}}';
+            const strasse = member?.strasse || '{{strasse}}';
+            const plzOrt = member ? `${member.plz || ''} ${member.ort || ''}`.trim() : '{{plz}} {{ort}}';
+
+            return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
+<body>
+<div style="width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000;">
+    <!-- Logo links -->
+    <div style="position: absolute; top: 15mm; left: 25mm; width: 35mm;">
+        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width: 35mm; height: auto; display: block;">
+    </div>
+    <!-- Titel rechts -->
+    <div style="position: absolute; top: 15mm; left: 118mm;">
+        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Feuerwehrverein Raura</div>
+        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
+    </div>
+    <!-- Absenderzeile -->
+    <div style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">${getAktuarAbsenderLine()}</div>
+    <!-- Empfaenger im Schweizer Adressfenster -->
+    <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm;">
+        <div>${name}</div>
+        <div>${strasse}</div>
+        <div>${plzOrt}</div>
+    </div>
+    <!-- Datum -->
+    <div style="position: absolute; top: 97mm; right: 25mm; text-align: right;">Kaiseraugst, ${datum}</div>
+    <!-- Betreff + Beilage-Hinweis -->
+    <div style="position: absolute; top: 110mm; left: 25mm; right: 25mm;">
+        <div style="font-weight: bold; font-size: 14pt; margin-bottom: 3mm;">${subject || ''}</div>
+        <hr style="border: none; border-top: 1.5px solid #cc0000; margin: 4mm 0 8mm 0;">
+        <div style="font-size: 11pt; color: #333;">
+            <p>${member?.anrede === 'Frau' ? 'Liebe' : 'Lieber'} ${member?.vorname || '{{vorname}}'},</p>
+            <p>Beiliegend erhältst du das Dokument zum oben genannten Betreff.</p>
+        </div>
+        <div style="margin-top: 15mm;">
+            Mit freundlichen Grüssen<br><br>
+            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+            <em>Der Vorstand</em>
+        </div>
+        <div style="margin-top: 15mm; padding-top: 5mm; border-top: 1px solid #ddd; font-size: 9pt; color: #666;">
+            Beilage: 1 Dokument
         </div>
     </div>
 </div>
