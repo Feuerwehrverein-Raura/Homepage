@@ -761,7 +761,23 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
 
         const newEvent = result.rows[0];
 
-        // E-Mail mit Zugangsdaten an Organisator senden
+        // Organisator benachrichtigen (immer wenn organizer_email gesetzt)
+        if (organizer_email && !create_access) {
+            try {
+                const eventUrl = `https://fwv-raura.ch/events.html?event=${newEvent.slug || newEvent.id}`;
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: organizer_email,
+                    subject: `Du bist Organisator/in: ${title}`,
+                    body: `Hallo ${organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${title}" eingetragen.\n\nDatum: ${start_date ? new Date(start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${newEvent.location || 'wird noch mitgeteilt'}\n\nDu kannst die Anmeldungen im Vorstand-Dashboard verwalten:\nhttps://fwv-raura.ch/vorstand.html\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar.\n\nFreundliche Gruesse\nFeuerwehrverein Raura`,
+                    event_id: newEvent.id
+                });
+                console.log(`Organisator-Benachrichtigung gesendet an ${organizer_email}`);
+            } catch (emailErr) {
+                console.error('Organisator-Benachrichtigung fehlgeschlagen:', emailErr.message);
+            }
+        }
+
+        // E-Mail mit Zugangsdaten an Organisator senden (create_access Modus)
         if (create_access && organizer_email && eventPassword) {
             try {
                 await axios.post(`${DISPATCH_API}/email/send`, {
@@ -832,13 +848,36 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
         values.push(id);
 
+        // Vorherigen Organisator laden (um Änderung zu erkennen)
+        const oldEvent = await pool.query('SELECT organizer_email, organizer_name, title FROM events WHERE id = $1', [id]);
+        const oldOrgEmail = oldEvent.rows[0]?.organizer_email;
+
         const result = await pool.query(`
             UPDATE events SET ${setClause}, updated_at = NOW()
             WHERE id = $${values.length}
             RETURNING *
         `, values);
 
-        res.json(result.rows[0]);
+        const updatedEvent = result.rows[0];
+
+        // Organisator benachrichtigen wenn neu zugewiesen
+        const newOrgEmail = updatedEvent.organizer_email;
+        if (newOrgEmail && newOrgEmail !== oldOrgEmail) {
+            try {
+                const eventUrl = `https://fwv-raura.ch/events.html?event=${updatedEvent.slug || updatedEvent.id}`;
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: newOrgEmail,
+                    subject: `Du bist Organisator/in: ${updatedEvent.title}`,
+                    body: `Hallo ${updatedEvent.organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${updatedEvent.title}" eingetragen.\n\nDatum: ${updatedEvent.start_date ? new Date(updatedEvent.start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${updatedEvent.location || 'wird noch mitgeteilt'}\n\nDu kannst die Anmeldungen im Vorstand-Dashboard verwalten:\nhttps://fwv-raura.ch/vorstand.html\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar.\n\nFreundliche Gruesse\nFeuerwehrverein Raura`,
+                    event_id: updatedEvent.id
+                });
+                console.log(`Organisator-Benachrichtigung gesendet an ${newOrgEmail} fuer Event "${updatedEvent.title}"`);
+            } catch (emailErr) {
+                console.error('Organisator-Benachrichtigung fehlgeschlagen:', emailErr.message);
+            }
+        }
+
+        res.json(updatedEvent);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1491,9 +1530,11 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
         `.trim();
 
         // DEUTSCH: GV-Events: Benachrichtigung immer an vorstand@fwv-raura.ch
+        // Organisator-E-Mail aus DB laden (zuverlässiger als aus Request)
+        const dbOrgEmail = event.rows[0].organizer_email;
         const notifyEmail = (event.rows[0].category === 'GV')
             ? 'vorstand@fwv-raura.ch'
-            : (organizerEmail || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
+            : (dbOrgEmail || organizerEmail || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
 
         try {
             await axios.post(`${DISPATCH_API}/email/send`, {
