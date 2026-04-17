@@ -157,39 +157,62 @@
         </main>
     </div>
 
-    <!-- DEUTSCH: Modal zum Hinzufuegen eines Teilnehmers -->
+    <!-- DEUTSCH: Modal zum Hinzufuegen eines Teilnehmers (Mitglied/Gast Toggle wie Vorstand) -->
     <div id="add-participant-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div class="flex items-center justify-between p-4 border-b">
-                <h3 class="text-lg font-bold text-gray-800">Teilnehmer hinzufügen</h3>
+                <h3 class="text-lg font-bold text-gray-800">Person hinzufügen</h3>
                 <button onclick="closeAddParticipant()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
             </div>
-            <form id="add-participant-form" class="p-4 space-y-3">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                    <input type="text" id="add-p-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Vorname Nachname">
+            <div class="p-4">
+                <p class="text-sm text-gray-500 mb-3" id="add-p-event-label"></p>
+                <!-- Mitglied/Gast Toggle -->
+                <div class="flex rounded-lg overflow-hidden border border-gray-300 mb-4">
+                    <button type="button" id="add-p-mode-member" onclick="setAddMode('member')" class="flex-1 py-2 text-sm font-medium bg-fire-500 text-white">Mitglied</button>
+                    <button type="button" id="add-p-mode-guest" onclick="setAddMode('guest')" class="flex-1 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300">Gast</button>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
-                    <input type="email" id="add-p-email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="email@example.ch">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
-                    <input type="tel" id="add-p-phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="079 ...">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Anzahl Personen</label>
-                    <input type="number" id="add-p-participants" min="1" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Bemerkungen</label>
-                    <textarea id="add-p-notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Optionale Bemerkungen"></textarea>
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="closeAddParticipant()" class="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Abbrechen</button>
-                    <button type="submit" class="px-4 py-2 text-sm text-white bg-fire-500 rounded-lg hover:bg-fire-600">Hinzufügen</button>
-                </div>
-            </form>
+                <form id="add-participant-form" class="space-y-3">
+                    <!-- Mitglied-Modus: Dropdown -->
+                    <div id="add-p-member-section">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mitglied auswählen *</label>
+                        <select id="add-p-member-select" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
+                            <option value="">Bitte wählen...</option>
+                        </select>
+                        <div id="add-p-member-info" class="mt-2 text-sm text-gray-500 hidden">
+                            <span id="add-p-member-email"></span><br>
+                            <span id="add-p-member-phone"></span>
+                        </div>
+                    </div>
+                    <!-- Gast-Modus: Manuelle Eingabe -->
+                    <div id="add-p-guest-section" class="hidden space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                            <input type="text" id="add-p-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Vorname Nachname">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                            <input type="email" id="add-p-email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="email@example.ch">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                            <input type="tel" id="add-p-phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="079 ...">
+                        </div>
+                    </div>
+                    <!-- Gemeinsame Felder -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Anzahl Personen</label>
+                        <input type="number" id="add-p-participants" min="1" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Bemerkungen</label>
+                        <textarea id="add-p-notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Optionale Bemerkungen"></textarea>
+                    </div>
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button type="button" onclick="closeAddParticipant()" class="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Abbrechen</button>
+                        <button type="submit" class="px-4 py-2 text-sm text-white bg-green-600 rounded-lg hover:bg-green-700">Hinzufügen</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -560,48 +583,128 @@
             document.getElementById('login-form').reset();
             document.getElementById('login-error').classList.add('hidden');
         }
-        // DEUTSCH: Modal zum Hinzufuegen von Teilnehmern oeffnen/schliessen
+        // DEUTSCH: Mitgliederliste fuer Dropdown laden
+        let membersList = [];
+        let addMode = 'member';
+
+        async function loadMembersList() {
+            try {
+                const response = await fetch(`${API_BASE}/events/my-event/members`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (response.ok) {
+                    membersList = await response.json();
+                    const select = document.getElementById('add-p-member-select');
+                    select.innerHTML = '<option value="">Bitte wählen...</option>';
+                    membersList.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.id;
+                        opt.textContent = m.name;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (e) {
+                console.error('Mitgliederliste laden fehlgeschlagen:', e);
+            }
+        }
+
+        // DEUTSCH: Mitglied/Gast Toggle
+        function setAddMode(mode) {
+            addMode = mode;
+            const memberBtn = document.getElementById('add-p-mode-member');
+            const guestBtn = document.getElementById('add-p-mode-guest');
+            const memberSection = document.getElementById('add-p-member-section');
+            const guestSection = document.getElementById('add-p-guest-section');
+
+            if (mode === 'member') {
+                memberBtn.className = 'flex-1 py-2 text-sm font-medium bg-fire-500 text-white';
+                guestBtn.className = 'flex-1 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300';
+                memberSection.classList.remove('hidden');
+                guestSection.classList.add('hidden');
+            } else {
+                guestBtn.className = 'flex-1 py-2 text-sm font-medium bg-fire-500 text-white';
+                memberBtn.className = 'flex-1 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50';
+                memberSection.classList.add('hidden');
+                guestSection.classList.remove('hidden');
+            }
+        }
+
+        // DEUTSCH: Mitglied-Dropdown: Info anzeigen bei Auswahl
+        document.getElementById('add-p-member-select').addEventListener('change', function() {
+            const member = membersList.find(m => m.id === this.value);
+            const info = document.getElementById('add-p-member-info');
+            if (member) {
+                document.getElementById('add-p-member-email').textContent = member.email || '-';
+                document.getElementById('add-p-member-phone').textContent = member.telefon || '-';
+                info.classList.remove('hidden');
+            } else {
+                info.classList.add('hidden');
+            }
+        });
+
+        // DEUTSCH: Modal oeffnen/schliessen
         function openAddParticipant() {
+            document.getElementById('add-p-event-label').textContent = eventData.title;
+            if (membersList.length === 0) loadMembersList();
+            setAddMode('member');
             document.getElementById('add-participant-modal').classList.remove('hidden');
         }
         function closeAddParticipant() {
             document.getElementById('add-participant-modal').classList.add('hidden');
             document.getElementById('add-participant-form').reset();
+            document.getElementById('add-p-member-info').classList.add('hidden');
         }
 
-        // DEUTSCH: Teilnehmer hinzufuegen ueber oeffentliche Registrierungs-API
+        // DEUTSCH: Teilnehmer hinzufuegen (Mitglied oder Gast)
         document.getElementById('add-participant-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const name = document.getElementById('add-p-name').value.trim();
-            const email = document.getElementById('add-p-email').value.trim();
-            const phone = document.getElementById('add-p-phone').value.trim();
-            const participants = document.getElementById('add-p-participants').value;
-            const notes = document.getElementById('add-p-notes').value.trim();
+
+            let body;
+            let displayName;
+
+            if (addMode === 'member') {
+                const memberId = document.getElementById('add-p-member-select').value;
+                if (!memberId) { alert('Bitte ein Mitglied auswählen'); return; }
+                const member = membersList.find(m => m.id === memberId);
+                displayName = member.name;
+                body = {
+                    member_id: memberId,
+                    guest_name: member.name,
+                    guest_email: member.email,
+                    guest_phone: member.telefon,
+                    participants: parseInt(document.getElementById('add-p-participants').value) || 1,
+                    notes: document.getElementById('add-p-notes').value.trim()
+                };
+            } else {
+                const name = document.getElementById('add-p-name').value.trim();
+                if (!name) { alert('Bitte einen Namen eingeben'); return; }
+                displayName = name;
+                body = {
+                    guest_name: name,
+                    guest_email: document.getElementById('add-p-email').value.trim(),
+                    guest_phone: document.getElementById('add-p-phone').value.trim(),
+                    participants: parseInt(document.getElementById('add-p-participants').value) || 1,
+                    notes: document.getElementById('add-p-notes').value.trim()
+                };
+            }
 
             try {
-                const response = await fetch(`${API_BASE}/registrations/public`, {
+                const response = await fetch(`${API_BASE}/events/my-event/registrations`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'participant',
-                        eventId: eventData.id,
-                        eventTitle: eventData.title,
-                        organizerEmail: eventData.organizer_email,
-                        name,
-                        email: email || undefined,
-                        phone: phone || undefined,
-                        participants: parseInt(participants) || 1,
-                        notes: notes || undefined
-                    })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(body)
                 });
 
                 if (!response.ok) {
                     const err = await response.json();
-                    throw new Error(err.error || err.message || 'Fehler');
+                    throw new Error(err.error || 'Fehler');
                 }
 
                 closeAddParticipant();
-                alert(`${name} wurde erfolgreich angemeldet.`);
+                alert(`${displayName} wurde erfolgreich angemeldet.`);
                 await loadDashboard();
             } catch (error) {
                 alert('Fehler: ' + error.message);

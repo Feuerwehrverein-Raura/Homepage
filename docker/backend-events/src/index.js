@@ -1205,6 +1205,59 @@ app.post('/events/my-event/send-arbeitsplan', authenticateEventOrganizer, async 
     }
 });
 
+// DEUTSCH: Mitgliederliste fuer Event-Organisatoren (nur Name, E-Mail, Telefon)
+app.get('/events/my-event/members', authenticateEventOrganizer, async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT id, vorname, nachname, email, mobile, telefon
+            FROM members
+            WHERE status = 'Aktivmitglied'
+            ORDER BY nachname, vorname
+        `);
+        res.json(result.rows.map(m => ({
+            id: m.id,
+            name: `${m.vorname} ${m.nachname}`.trim(),
+            vorname: m.vorname,
+            nachname: m.nachname,
+            email: m.email,
+            telefon: m.mobile || m.telefon || ''
+        })));
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Teilnehmer manuell hinzufuegen (Event-Organisator)
+app.post('/events/my-event/registrations', authenticateEventOrganizer, async (req, res) => {
+    try {
+        const eventId = req.eventOrganizer.event_id;
+        const { member_id, guest_name, guest_email, guest_phone, participants, notes } = req.body;
+
+        if (!member_id && !guest_name) {
+            return res.status(400).json({ error: 'Mitglied oder Gastname erforderlich' });
+        }
+
+        const name = guest_name || '';
+        const email = guest_email || '';
+
+        const registration = await pool.query(`
+            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
+            VALUES ($1, $2, $3, $4, NULL, $5, 'approved')
+            RETURNING *
+        `, [
+            eventId,
+            member_id || null,
+            name,
+            email,
+            JSON.stringify({ phone: guest_phone, participants: participants || 1, notes })
+        ]);
+
+        res.json({ success: true, registration: registration.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Middleware: Prüft JWT-Token auf Typ 'event-organizer' und setzt req.eventOrganizer
 function authenticateEventOrganizer(req, res, next) {
     const authHeader = req.headers['authorization'];
