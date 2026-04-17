@@ -13,6 +13,7 @@ const fs = require('fs');
 const PDFDocument = require('pdfkit');
 // DEUTSCH: Authentifizierungs-Middleware importieren (Token-Prüfung, Rollen-Prüfung)
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
+const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -2227,6 +2228,8 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
         if (fields.includes('funktion') && result.rows[0].authentik_user_id) {
             syncMemberAuthentikGroups(result.rows[0].authentik_user_id, result.rows[0].funktion)
                 .catch(err => console.error('Authentik group sync failed:', err));
+            syncVorstandToVaultwarden(pool)
+                .catch(err => console.error('Vaultwarden sync failed:', err));
         }
 
         // Sync profile to Authentik if relevant fields changed
@@ -3816,6 +3819,18 @@ app.post('/members/sync-authentik-groups', authenticateAny, requireRole('vorstan
 
     } catch (error) {
         console.error('Authentik groups sync error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Sync Vorstand members to Vaultwarden organization
+// DEUTSCH: Synchronisiert Vorstand-Mitglieder mit der Vaultwarden-Organisation FWV-Raura
+app.post('/members/sync-vaultwarden', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const results = await syncVorstandToVaultwarden(pool);
+        res.json({ success: true, ...results });
+    } catch (error) {
+        console.error('Vaultwarden sync error:', error);
         res.status(500).json({ error: error.message });
     }
 });

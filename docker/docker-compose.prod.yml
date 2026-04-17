@@ -64,6 +64,11 @@ services:
       NEXTCLOUD_URL: https://nextcloud.fwv-raura.ch
       NEXTCLOUD_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
       NEXTCLOUD_PASSWORD: ${NEXTCLOUD_PASSWORD}
+      VAULTWARDEN_URL: https://vault.fwv-raura.ch
+      VAULTWARDEN_SYNC_EMAIL: vaultwarden-sync@fwv-raura.ch
+      VAULTWARDEN_SYNC_PASSWORD: ${VAULTWARDEN_SYNC_PASSWORD}
+      VAULTWARDEN_ORG_ID: dbc02839-7b9c-4003-8285-1b64cb1d521a
+      VAULTWARDEN_COLLECTION_ID: 62cec13c-7300-4637-b5f6-bd9f9f1e02f6
     volumes:
       - ./data/uploads:/app/uploads    # DEUTSCH: Persistenter Speicher für hochgeladene Mitglieder-Fotos
       - /opt/docker/data/smb-credentials.json:/app/smb-credentials.json:ro  # DEUTSCH: SMB-Passwörter für Mitglieder-Dashboard
