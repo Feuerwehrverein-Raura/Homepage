@@ -8418,10 +8418,15 @@ ${grussformel}`;
                 if (plainText) plainText.classList.add('hidden');
                 if (pdfUpload) pdfUpload.classList.remove('hidden');
                 if (attachments) attachments.classList.add('hidden');
-                if (templateContainer) templateContainer.classList.add('hidden');
-                // Betreff-Container einzeln zeigen (wird auf Deckblatt verwendet)
+                // Template-Dropdown verstecken, Betreff als volle Breite zeigen
+                const templateSelect = document.getElementById('dispatch-template')?.closest('div');
+                if (templateSelect) templateSelect.classList.add('hidden');
+                if (templateContainer) {
+                    templateContainer.classList.remove('hidden');
+                    templateContainer.className = templateContainer.className.replace('grid-cols-2', 'grid-cols-1');
+                }
                 document.getElementById('dispatch-subject-container').style.display = 'block';
-                document.getElementById('dispatch-subject-container').classList.remove('hidden');
+                document.getElementById('dispatch-subject').placeholder = 'Betreff (wird auf dem Deckblatt angezeigt)';
                 // Editor-Label ausblenden
                 const editorLabel = editorContainer?.closest('.mb-4');
                 if (editorLabel) editorLabel.classList.add('hidden');
@@ -8429,7 +8434,16 @@ ${grussformel}`;
                 // Standard-Modi: Editor und Template zeigen, PDF-Upload verstecken
                 if (pdfUpload) pdfUpload.classList.add('hidden');
                 if (attachments) attachments.classList.remove('hidden');
-                if (templateContainer) templateContainer.classList.remove('hidden');
+                // Template-Dropdown und Grid wiederherstellen
+                const templateSelect = document.getElementById('dispatch-template')?.closest('div');
+                if (templateSelect) templateSelect.classList.remove('hidden');
+                if (templateContainer) {
+                    templateContainer.classList.remove('hidden');
+                    if (!templateContainer.className.includes('grid-cols-2')) {
+                        templateContainer.className = templateContainer.className.replace('grid-cols-1', 'grid-cols-2');
+                    }
+                }
+                document.getElementById('dispatch-subject').placeholder = 'Betreff der E-Mail';
                 const editorLabel = editorContainer?.closest('.mb-4');
                 if (editorLabel) editorLabel.classList.remove('hidden');
                 if (editorContainer && !document.getElementById('dispatch-body-plain').classList.contains('block')) {
@@ -8661,9 +8675,8 @@ ${grussformel}`;
         document.querySelectorAll('input[name="delivery-method"]').forEach(radio => {
             radio.addEventListener('change', () => {
                 const method = document.querySelector('input[name="delivery-method"]:checked').value;
-                // Show subject for email, auto and pdf-post (used on cover page)
-                const showSubject = method === 'email' || method === 'auto' || window.currentDispatchMode === 'pdf-post';
-                document.getElementById('dispatch-subject-container').style.display = showSubject ? 'block' : 'none';
+                // Show subject for all modes (pdf-post needs it for cover page, post for letter heading)
+                document.getElementById('dispatch-subject-container').style.display = 'block';
             });
         });
 
