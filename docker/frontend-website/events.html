@@ -419,7 +419,8 @@
                         description: e.description || '',
                         shifts: e.shifts || [],
                         directRegistrations: e.directRegistrations || { approved: [], pending: [], approvedCount: 0, pendingCount: 0 },
-                        meal_options: e.meal_options || null
+                        meal_options: e.meal_options || null,
+                        pdf_filename: e.pdf_filename || null
                     })).sort((a, b) => a.startDate - b.startDate);
                 } catch (error) {
                     console.error('❌ API-Fehler, versuche Markdown-Fallback...', error);
@@ -1206,6 +1207,19 @@
                         <div class="prose max-w-none mb-6">
                             ${event.description}
                         </div>
+
+                        ${event.pdf_filename ? `
+                        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+                            <svg class="w-8 h-8 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6zm2-6h8v2H8v-2zm0-3h8v2H8v-2z"/></svg>
+                            <div>
+                                <a href="${API_BASE}/events/${event.dbId || event.id}/pdf" target="_blank"
+                                   class="text-blue-700 hover:text-blue-900 font-medium text-sm hover:underline">
+                                    📎 ${event.pdf_filename}
+                                </a>
+                                <p class="text-xs text-blue-600 mt-0.5">PDF-Anhang herunterladen</p>
+                            </div>
+                        </div>
+                        ` : ''}
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-lg mb-6">
                             <div class="space-y-3">
