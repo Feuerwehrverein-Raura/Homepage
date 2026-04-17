@@ -5973,7 +5973,7 @@ Wir freuen uns über zahlreiches Erscheinen!`;
             container.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">PDF wird generiert...</div>';
 
             try {
-                const response = await fetch(`${API_BASE}/dispatch/preview-pdf`, {
+                const response = await fetch(`${API_BASE}/dispatch/preview-pdf?zones=1`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${authToken}`,
@@ -6010,7 +6010,7 @@ Wir freuen uns über zahlreiches Erscheinen!`;
             previewDiv.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">PDF wird generiert...</div>';
 
             try {
-                const response = await fetch(`${API_BASE}/dispatch/preview-pdf`, {
+                const response = await fetch(`${API_BASE}/dispatch/preview-pdf?zones=1`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${authToken}`,

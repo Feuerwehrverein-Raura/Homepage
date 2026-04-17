@@ -4397,17 +4397,37 @@ app.post('/dispatch/send-pdf-post', authenticateAny, async (req, res) => {
 
 // DEUTSCH: Brief-Vorschau als PDF rendern (ohne Pingen-Versand)
 // Nimmt HTML entgegen und liefert ein PDF zurueck - fuer Vorschau-Anzeige im Frontend
+// Query-Param ?zones=1 fuegt Pingen-Zonen-Overlay (Frankier/Adressbereich) hinzu
 app.post('/dispatch/preview-pdf', authenticateAny, async (req, res) => {
     try {
         const { html } = req.body;
+        const showZones = req.query.zones === '1';
         if (!html) return res.status(400).json({ error: 'html erforderlich' });
+
+        // Zonen-Overlay vor </body> injizieren (nur auf Seite 1)
+        let finalHtml = html;
+        if (showZones) {
+            const zoneOverlay = `
+<div style="position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; pointer-events: none; z-index: 9999;">
+    <!-- Randsperrbereich 5mm rundum -->
+    <div style="position: absolute; top: 0; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-bottom: 1px dashed rgba(239,68,68,0.6);"></div>
+    <div style="position: absolute; bottom: 0; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-top: 1px dashed rgba(239,68,68,0.6);"></div>
+    <div style="position: absolute; top: 0; left: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
+    <div style="position: absolute; top: 0; right: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
+    <!-- Frankierbereich X=116, Y=40, W=89.5, H=47.5 -->
+    <div style="position: absolute; top: 40mm; left: 116mm; width: 89.5mm; height: 47.5mm; background: rgba(251,146,60,0.15); border: 1px dashed rgba(251,146,60,0.6); font-size: 7pt; color: #9a3412; padding: 1mm;">Frankierbereich (116/40/89.5/47.5mm)</div>
+    <!-- Adressbereich X=118, Y=60, W=85.5, H=25.5 -->
+    <div style="position: absolute; top: 60mm; left: 118mm; width: 85.5mm; height: 25.5mm; background: rgba(220,38,38,0.15); border: 1.5px solid rgba(220,38,38,0.8); font-size: 7pt; color: #7f1d1d; padding: 1mm;">Adressbereich (118/60/85.5/25.5mm)</div>
+</div>`;
+            finalHtml = html.replace('</body>', zoneOverlay + '</body>');
+        }
 
         const browser = await puppeteer.launch({
             headless: 'new',
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
         const page = await browser.newPage();
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
