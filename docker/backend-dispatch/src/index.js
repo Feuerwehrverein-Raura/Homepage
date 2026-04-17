@@ -4304,6 +4304,94 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: PDF-Brief mit Deckblatt senden
+// Generiert ein Deckblatt aus dem HTML, konvertiert beides zu PDF,
+// fuegt Deckblatt + hochgeladenes PDF zusammen und sendet via Pingen
+app.post('/dispatch/send-pdf-post', authenticateAny, async (req, res) => {
+    try {
+        const { cover_html, pdf_base64, recipient, member_id, subject, staging = false } = req.body;
+
+        if (!cover_html || !pdf_base64 || !recipient) {
+            return res.status(400).json({ error: 'cover_html, pdf_base64 und recipient erforderlich' });
+        }
+
+        const PINGEN_API = getPingenApi(staging);
+
+        // 1. Deckblatt HTML -> PDF
+        const browser = await puppeteer.launch({
+            headless: 'new',
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        const page = await browser.newPage();
+        await page.setContent(cover_html, { waitUntil: 'networkidle0' });
+        const coverPdf = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: 0, right: 0, bottom: 0, left: 0 }
+        });
+        await browser.close();
+
+        // 2. PDFs zusammenfuegen (Deckblatt + Anhangs-PDF)
+        const { PDFDocument: PDFDoc } = require('pdf-lib');
+        const mergedPdf = await PDFDoc.create();
+
+        const coverDoc = await PDFDoc.load(coverPdf);
+        const coverPages = await mergedPdf.copyPages(coverDoc, coverDoc.getPageIndices());
+        coverPages.forEach(p => mergedPdf.addPage(p));
+
+        const attachBuffer = Buffer.from(pdf_base64, 'base64');
+        const attachDoc = await PDFDoc.load(attachBuffer);
+        const attachPages = await mergedPdf.copyPages(attachDoc, attachDoc.getPageIndices());
+        attachPages.forEach(p => mergedPdf.addPage(p));
+
+        const finalPdf = Buffer.from(await mergedPdf.save());
+
+        // 3. Via Pingen versenden
+        const tokenResponse = await axios.post(`${PINGEN_IDENTITY}/auth/access-tokens`, {
+            grant_type: 'client_credentials',
+            client_id: process.env.PINGEN_CLIENT_ID,
+            client_secret: process.env.PINGEN_CLIENT_SECRET
+        });
+        const token = tokenResponse.data.access_token;
+
+        const uploadUrlRes = await axios.get(`${PINGEN_API}/file-upload`, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' }
+        });
+        const fileUrl = uploadUrlRes.data.data.attributes.url;
+        const fileUrlSignature = uploadUrlRes.data.data.attributes.url_signature;
+
+        await axios.put(fileUrl, finalPdf, { headers: { 'Content-Type': 'application/pdf' } });
+
+        const fileName = `PDF-Brief_${(subject || 'Dokument').replace(/[^a-zA-Z0-9]/g, '_')}_${recipient.name.replace(/\s+/g, '_')}.pdf`;
+        const letterRes = await axios.post(
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters`,
+            {
+                data: {
+                    type: 'letters',
+                    attributes: {
+                        file_original_name: fileName,
+                        file_url: fileUrl,
+                        file_url_signature: fileUrlSignature,
+                        auto_send: true,
+                        delivery_product: 'cheap',
+                        print_mode: 'simplex',
+                        print_spectrum: 'grayscale',
+                        address_position: 'right'
+                    }
+                }
+            },
+            { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
+        );
+
+        logInfo('PDF-Brief sent via Pingen', { member_id, name: recipient.name, subject });
+        res.json({ success: true, letter_id: letterRes.data.data?.id });
+
+    } catch (error) {
+        logError('Failed to send PDF-Brief', { error: error.message, details: error.response?.data });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 app.listen(PORT, () => {
     console.log(`API-Dispatch running on port ${PORT}`);

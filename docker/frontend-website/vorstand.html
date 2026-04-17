@@ -222,9 +222,7 @@
                     Anträge
                     <span id="registrations-badge" class="hidden absolute -top-1 -right-2 bg-fire-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">0</span>
                 </button>
-                <button id="tab-pingen" class="tab-btn py-3 md:py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap text-sm md:text-base touch-manipulation">
-                    Post
-                </button>
+                <!-- Post-Tab entfernt: Funktionalität in Nachricht-Tab integriert (PDF-Brief Modus + Pingen Sub-Tab) -->
                 <button id="tab-beitrag" class="tab-btn py-3 md:py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800 whitespace-nowrap text-sm md:text-base touch-manipulation">
                     Mitgliedsbeitrag
                 </button>
@@ -1046,6 +1044,9 @@
                             <button id="dispatch-mode-post" class="px-3 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300" onclick="switchDispatchMode('post')">
                                 Post
                             </button>
+                            <button id="dispatch-mode-pdf-post" class="px-3 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300" onclick="switchDispatchMode('pdf-post')">
+                                PDF-Brief
+                            </button>
                         </div>
                         <!-- Empfänger-Auswahl -->
                         <select id="dispatch-recipients-quick" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
@@ -1192,6 +1193,31 @@
                         <button type="button" class="w-full text-left px-3 py-1 hover:bg-gray-100 text-sm" data-placeholder="{{email}}">E-Mail</button>
                     </div>
 
+                    <!-- PDF-Upload (nur sichtbar im PDF-Brief Modus) -->
+                    <div id="dispatch-pdf-upload" class="hidden mb-4">
+                        <label class="block text-xs font-medium text-gray-700 mb-2">PDF-Datei</label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-fire-400 transition-colors">
+                            <input type="file" id="dispatch-pdf-file" accept=".pdf" class="hidden">
+                            <div id="dispatch-pdf-placeholder" class="cursor-pointer" onclick="document.getElementById('dispatch-pdf-file').click()">
+                                <svg class="w-10 h-10 text-gray-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                <p class="text-sm text-gray-600">PDF hierher ziehen oder <span class="text-fire-600 font-medium">klicken</span></p>
+                                <p class="text-xs text-gray-400 mt-1">Das PDF wird mit einem Deckblatt (Adresse + Betreff) pro Empfänger versehen</p>
+                            </div>
+                            <div id="dispatch-pdf-selected" class="hidden">
+                                <div class="flex items-center justify-center gap-3">
+                                    <svg class="w-8 h-8 text-fire-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                                    <div class="text-left">
+                                        <p id="dispatch-pdf-name" class="text-sm font-medium text-gray-800"></p>
+                                        <p id="dispatch-pdf-size" class="text-xs text-gray-500"></p>
+                                    </div>
+                                    <button type="button" onclick="clearDispatchPdf()" class="ml-4 text-gray-400 hover:text-red-500">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Anhänge (kompakt, als Chip-Liste) -->
                     <div class="mb-4">
                         <div class="flex items-center gap-2 mb-1">
@@ -1297,6 +1323,10 @@
                             <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
                             Versandhistorie
                         </button>
+                        <button id="dispatch-subtab-pingen" class="dispatch-subtab flex-1 py-3 px-4 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800 text-sm">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            Pingen
+                        </button>
                         <div class="flex items-center px-3">
                             <button id="dispatch-subtab-refresh-btn" class="text-gray-400 hover:text-gray-600 p-2" title="Aktualisieren">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -1337,6 +1367,31 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <!-- Pingen Übersicht -->
+                    <div id="dispatch-subtab-pingen-content" class="p-4 hidden">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                            <div class="bg-blue-50 rounded-lg p-3 text-center">
+                                <div id="pingen-stat-balance" class="text-xl font-bold text-blue-700">-</div>
+                                <div class="text-xs text-gray-500">Guthaben (CHF)</div>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-3 text-center">
+                                <div id="pingen-stat-sent" class="text-xl font-bold text-green-700">-</div>
+                                <div class="text-xs text-gray-500">Gesendet</div>
+                            </div>
+                            <div class="bg-yellow-50 rounded-lg p-3 text-center">
+                                <div id="pingen-stat-pending" class="text-xl font-bold text-yellow-700">-</div>
+                                <div class="text-xs text-gray-500">In Bearbeitung</div>
+                            </div>
+                            <div class="bg-red-50 rounded-lg p-3 text-center">
+                                <div id="pingen-stat-failed" class="text-xl font-bold text-red-700">-</div>
+                                <div class="text-xs text-gray-500">Fehlgeschlagen</div>
+                            </div>
+                        </div>
+                        <div id="pingen-letters-table" class="overflow-x-auto">
+                            <p class="text-gray-500 text-sm py-4 text-center">Lade Pingen-Daten...</p>
                         </div>
                     </div>
 
@@ -6126,6 +6181,108 @@ ${grussformel}`;
             document.querySelectorAll('.dispatch-recipient-count-display').forEach(el => el.textContent = count);
         }
 
+        // PDF-Brief Modus: PDF mit Deckblatt per Pingen an Empfänger senden
+        async function sendPdfPost() {
+            const subject = document.getElementById('dispatch-subject').value;
+            const fileInput = document.getElementById('dispatch-pdf-file');
+
+            if (!fileInput?.files[0]) {
+                alert('Bitte eine PDF-Datei auswählen');
+                return;
+            }
+            if (!subject) {
+                alert('Bitte Betreff eingeben (wird auf dem Deckblatt angezeigt)');
+                return;
+            }
+
+            const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
+            let recipients = [];
+            if (recipientType === 'all') {
+                recipients = members;
+            } else if (recipientType === 'filter') {
+                const status = document.getElementById('dispatch-filter-status').value;
+                recipients = members.filter(m => !status || m.status === status);
+            } else if (recipientType === 'selected') {
+                recipients = selectedMembersForDispatch;
+            }
+
+            // Nur Empfänger mit vollständiger Adresse
+            const postRecipients = recipients.filter(m => m.strasse && m.plz && m.ort);
+            const skipped = recipients.length - postRecipients.length;
+
+            if (postRecipients.length === 0) {
+                alert('Keine Empfänger mit vollständiger Adresse');
+                return;
+            }
+
+            let message = `PDF-Brief an ${postRecipients.length} Empfänger senden (via Pingen)?`;
+            message += `\n\nJeder Brief bekommt ein Deckblatt mit Name/Adresse und Betreff "${subject}".`;
+            if (skipped > 0) message += `\n(${skipped} ohne vollständige Adresse werden übersprungen)`;
+            if (!confirm(message)) return;
+
+            try {
+                showToast('PDF-Briefe werden versendet...', 'info');
+
+                const pdfBase64 = await fileToBase64(fileInput.files[0]);
+                let success = 0;
+                let failed = 0;
+
+                for (let i = 0; i < postRecipients.length; i++) {
+                    const member = postRecipients[i];
+
+                    // Deckblatt im offiziellen Layout generieren
+                    const coverHtml = generateDispatchLetterHTML(
+                        '<p>&nbsp;</p>', // Leerer Body — nur Deckblatt mit Adresse + Betreff
+                        subject,
+                        member
+                    );
+
+                    const recipient = {
+                        name: `${member.vorname} ${member.nachname}`,
+                        street: member.strasse,
+                        zip: member.plz,
+                        city: member.ort,
+                        country: 'CH'
+                    };
+
+                    try {
+                        const response = await fetch(`${API_BASE}/dispatch/send-pdf-post`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${authToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                cover_html: coverHtml,
+                                pdf_base64: pdfBase64,
+                                recipient,
+                                member_id: member.id,
+                                subject
+                            })
+                        });
+                        if (response.ok) success++;
+                        else failed++;
+                    } catch (e) {
+                        failed++;
+                    }
+
+                    if ((i + 1) % 5 === 0 || i === postRecipients.length - 1) {
+                        showToast(`PDF-Briefe: ${i + 1}/${postRecipients.length} verarbeitet`, 'info');
+                    }
+                }
+
+                const hasErrors = failed > 0;
+                showToast(
+                    `PDF-Brief Versand: ${success} gesendet${failed ? `, ${failed} fehlgeschlagen` : ''}`,
+                    hasErrors ? 'warning' : 'success'
+                );
+                loadDispatchHistory();
+            } catch (error) {
+                console.error('PDF-Brief Versand Fehler:', error);
+                showToast('Fehler: ' + error.message, 'error');
+            }
+        }
+
         // Sendet die Nachricht (E-Mail und/oder Brief) an die ausgewählten Empfänger. Unterstützt zeitgesteuerten Versand und Dateianhänge.
         async function sendDispatch() {
             const deliveryMethod = document.querySelector('input[name="delivery-method"]:checked').value;
@@ -6135,6 +6292,12 @@ ${grussformel}`;
             const content = getDispatchContent();
             const isScheduled = document.getElementById('dispatch-scheduled').checked;
             const scheduleDate = document.getElementById('dispatch-schedule-date').value;
+
+            // PDF-Brief Modus: eigene Logik
+            if (window.currentDispatchMode === 'pdf-post') {
+                await sendPdfPost();
+                return;
+            }
 
             if (!subject && deliveryMethod !== 'post' && currentTemplate?.layout !== 'event-invitation') {
                 alert('Bitte Betreff eingeben');
@@ -7963,7 +8126,7 @@ ${grussformel}`;
             document.getElementById('dispatch-section').classList.add('hidden');
             document.getElementById('email-section').classList.add('hidden');
             document.getElementById('registrations-section').classList.add('hidden');
-            document.getElementById('pingen-section').classList.add('hidden');
+            document.getElementById('pingen-section')?.classList.add('hidden');
             document.getElementById('beitrag-section').classList.add('hidden');
 
             if (tab === 'members') {
@@ -7995,10 +8158,6 @@ ${grussformel}`;
                 document.getElementById('tab-registrations').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('registrations-section').classList.remove('hidden');
                 loadRegistrations();
-            } else if (tab === 'pingen') {
-                document.getElementById('tab-pingen').classList.add('border-fire-500', 'text-fire-600');
-                document.getElementById('pingen-section').classList.remove('hidden');
-                loadPingenData();
             } else if (tab === 'beitrag') {
                 document.getElementById('tab-beitrag').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('beitrag-section').classList.remove('hidden');
@@ -8019,7 +8178,7 @@ ${grussformel}`;
         document.getElementById('tab-dispatch').addEventListener('click', () => switchTab('dispatch'));
         document.getElementById('tab-email').addEventListener('click', () => switchTab('email'));
         document.getElementById('tab-registrations').addEventListener('click', () => switchTab('registrations'));
-        document.getElementById('tab-pingen').addEventListener('click', () => switchTab('pingen'));
+        // tab-pingen entfernt (in Nachricht-Tab integriert)
         document.getElementById('tab-beitrag').addEventListener('click', () => switchTab('beitrag'));
 
         // Beitrag
@@ -8173,28 +8332,89 @@ ${grussformel}`;
         // === Neue kompakte Dispatch-Toolbar (Stil: Mitgliedsbeitrag) ===
         // Versandart-Toggle: setzt die versteckten Radio-Buttons und triggert Change-Event
         function switchDispatchMode(mode) {
-            const modes = ['auto', 'email', 'post'];
+            const modes = ['auto', 'email', 'post', 'pdf-post'];
             modes.forEach(m => {
                 const btn = document.getElementById(`dispatch-mode-${m}`);
+                if (!btn) return;
                 if (m === mode) {
-                    btn.className = 'px-3 py-2 text-sm font-medium bg-fire-500 text-white' + (m !== 'auto' ? ' border-l border-gray-300' : '');
+                    btn.className = 'px-3 py-2 text-sm font-medium bg-fire-500 text-white border-l border-gray-300';
                 } else {
-                    btn.className = 'px-3 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50' + (m !== 'auto' ? ' border-l border-gray-300' : '');
+                    btn.className = 'px-3 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300';
                 }
             });
-            // Verstecktes Radio-Feld setzen und Change-Event ausloesen
-            const radio = document.querySelector(`input[name="delivery-method"][value="${mode}"]`);
+            // Fix first button (auto) - no left border
+            const autoBtn = document.getElementById('dispatch-mode-auto');
+            if (autoBtn) autoBtn.className = autoBtn.className.replace(' border-l border-gray-300', '');
+
+            // Verstecktes Radio-Feld setzen (pdf-post uses post radio)
+            const radioValue = mode === 'pdf-post' ? 'post' : mode;
+            const radio = document.querySelector(`input[name="delivery-method"][value="${radioValue}"]`);
             if (radio) {
                 radio.checked = true;
                 radio.dispatchEvent(new Event('change', { bubbles: true }));
             }
+
+            // Toggle editor vs PDF upload
+            const editorContainer = document.getElementById('dispatch-editor-container');
+            const plainText = document.getElementById('dispatch-body-plain');
+            const pdfUpload = document.getElementById('dispatch-pdf-upload');
+            const attachments = document.querySelector('#dispatch-attachments')?.closest('.mb-4');
+            const templateRow = document.getElementById('dispatch-template')?.closest('.grid');
+            const placeholderHint = document.querySelector('#dispatch-editor-container')?.closest('.mb-4')?.querySelector('.text-xs.text-gray-400');
+
+            if (mode === 'pdf-post') {
+                // PDF-Brief Modus: Editor verstecken, PDF-Upload zeigen
+                if (editorContainer) editorContainer.classList.add('hidden');
+                if (plainText) plainText.classList.add('hidden');
+                if (pdfUpload) pdfUpload.classList.remove('hidden');
+                if (attachments) attachments.classList.add('hidden');
+                // Label "Nachricht" ausblenden
+                const editorLabel = editorContainer?.closest('.mb-4');
+                if (editorLabel) editorLabel.classList.add('hidden');
+            } else {
+                // Standard-Modi: Editor zeigen, PDF-Upload verstecken
+                if (pdfUpload) pdfUpload.classList.add('hidden');
+                if (attachments) attachments.classList.remove('hidden');
+                const editorLabel = editorContainer?.closest('.mb-4');
+                if (editorLabel) editorLabel.classList.remove('hidden');
+                if (editorContainer && !document.getElementById('dispatch-body-plain').classList.contains('block')) {
+                    editorContainer.classList.remove('hidden');
+                }
+            }
+
             // Hint-Text aktualisieren
             const hints = {
                 auto: '<span class="font-medium">Auto:</span> Jedes Mitglied wird gemäss seiner Zustellpräferenz (E-Mail oder Post) benachrichtigt.',
                 email: '<span class="font-medium">E-Mail:</span> Alle Empfänger erhalten die Nachricht per E-Mail (Zustellpräferenz wird ignoriert).',
-                post: '<span class="font-medium">Post:</span> Alle Empfänger erhalten die Nachricht per Brief via Pingen (Zustellpräferenz wird ignoriert).'
+                post: '<span class="font-medium">Post:</span> Alle Empfänger erhalten die Nachricht per Brief via Pingen (Zustellpräferenz wird ignoriert).',
+                'pdf-post': '<span class="font-medium">PDF-Brief:</span> Ein PDF wird mit automatischem Deckblatt (Adresse + Betreff) per Pingen an alle Empfänger versendet.'
             };
             document.getElementById('dispatch-mode-hint').innerHTML = hints[mode];
+
+            // Store current mode
+            window.currentDispatchMode = mode;
+        }
+
+        // PDF-Brief: Datei-Upload Handler
+        document.getElementById('dispatch-pdf-file')?.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+            if (file.type !== 'application/pdf') {
+                alert('Bitte nur PDF-Dateien hochladen');
+                this.value = '';
+                return;
+            }
+            document.getElementById('dispatch-pdf-name').textContent = file.name;
+            document.getElementById('dispatch-pdf-size').textContent = (file.size / 1024).toFixed(0) + ' KB';
+            document.getElementById('dispatch-pdf-placeholder').classList.add('hidden');
+            document.getElementById('dispatch-pdf-selected').classList.remove('hidden');
+        });
+
+        function clearDispatchPdf() {
+            const input = document.getElementById('dispatch-pdf-file');
+            if (input) input.value = '';
+            document.getElementById('dispatch-pdf-placeholder').classList.remove('hidden');
+            document.getElementById('dispatch-pdf-selected').classList.add('hidden');
         }
 
         // Empfänger-Schnellauswahl (all / aktiv / passiv / ehren / selected)
@@ -8276,9 +8496,10 @@ ${grussformel}`;
         let currentDispatchSubtab = 'drafts';
         function switchDispatchSubtab(tab) {
             currentDispatchSubtab = tab;
-            ['drafts', 'scheduled', 'history'].forEach(t => {
+            ['drafts', 'scheduled', 'history', 'pingen'].forEach(t => {
                 const btn = document.getElementById(`dispatch-subtab-${t}`);
                 const content = document.getElementById(`dispatch-subtab-${t}-content`);
+                if (!btn || !content) return;
                 if (t === tab) {
                     btn.className = 'dispatch-subtab flex-1 py-3 px-4 font-medium border-b-2 border-fire-500 text-fire-600 text-sm';
                     content.classList.remove('hidden');
@@ -8287,23 +8508,69 @@ ${grussformel}`;
                     content.classList.add('hidden');
                 }
             });
+            if (tab === 'pingen') loadPingenStats();
         }
         document.getElementById('dispatch-subtab-drafts').addEventListener('click', () => switchDispatchSubtab('drafts'));
         document.getElementById('dispatch-subtab-scheduled').addEventListener('click', () => switchDispatchSubtab('scheduled'));
         document.getElementById('dispatch-subtab-history').addEventListener('click', () => switchDispatchSubtab('history'));
+        document.getElementById('dispatch-subtab-pingen').addEventListener('click', () => switchDispatchSubtab('pingen'));
         document.getElementById('dispatch-subtab-refresh-btn').addEventListener('click', () => {
-            // Refresh aktuell sichtbaren Sub-Tab
             if (currentDispatchSubtab === 'drafts') loadDrafts();
             else if (currentDispatchSubtab === 'scheduled') loadScheduledMessages();
             else if (currentDispatchSubtab === 'history') loadDispatchHistory();
+            else if (currentDispatchSubtab === 'pingen') loadPingenStats();
         });
+
+        // Pingen Stats laden (fuer Sub-Tab)
+        async function loadPingenStats() {
+            try {
+                const res = await fetch(`${DISPATCH_API}/pingen/stats`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (res.ok) {
+                    const stats = await res.json();
+                    document.getElementById('pingen-stat-balance').textContent = stats.balance != null ? stats.balance.toFixed(2) : '-';
+                    document.getElementById('pingen-stat-sent').textContent = stats.sent ?? '-';
+                    document.getElementById('pingen-stat-pending').textContent = stats.pending ?? '-';
+                    document.getElementById('pingen-stat-failed').textContent = stats.failed ?? '-';
+                }
+
+                // Lade Briefe-Liste
+                const lettersRes = await fetch(`${DISPATCH_API}/pingen/letters`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (lettersRes.ok) {
+                    const letters = await lettersRes.json();
+                    const container = document.getElementById('pingen-letters-table');
+                    if (!letters.length) {
+                        container.innerHTML = '<p class="text-gray-500 text-sm py-4 text-center">Keine Pingen-Briefe vorhanden</p>';
+                        return;
+                    }
+                    container.innerHTML = `<table class="min-w-full text-sm">
+                        <thead class="bg-gray-50"><tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Datum</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Empfänger</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Seiten</th>
+                        </tr></thead>
+                        <tbody class="divide-y divide-gray-200">${letters.map(l => `<tr>
+                            <td class="px-3 py-2 text-gray-600">${l.created_at ? new Date(l.created_at).toLocaleDateString('de-CH') : '-'}</td>
+                            <td class="px-3 py-2">${l.recipient_name || l.file_original_name || '-'}</td>
+                            <td class="px-3 py-2"><span class="px-2 py-0.5 rounded text-xs ${l.status === 'sent' ? 'bg-green-100 text-green-700' : l.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}">${l.status || '?'}</span></td>
+                            <td class="px-3 py-2 text-gray-500">${l.pages || '-'}</td>
+                        </tr>`).join('')}</tbody></table>`;
+                }
+            } catch (e) {
+                console.error('Pingen stats error:', e);
+            }
+        }
 
         // Dispatch
         document.querySelectorAll('input[name="delivery-method"]').forEach(radio => {
             radio.addEventListener('change', () => {
                 const method = document.querySelector('input[name="delivery-method"]:checked').value;
-                // Show subject field for email or auto mode (since auto can send emails)
-                const showSubject = method === 'email' || method === 'auto';
+                // Show subject for email, auto and pdf-post (used on cover page)
+                const showSubject = method === 'email' || method === 'auto' || window.currentDispatchMode === 'pdf-post';
                 document.getElementById('dispatch-subject-container').style.display = showSubject ? 'block' : 'none';
             });
         });
