@@ -1862,16 +1862,30 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">Organisator E-Mail</label>
                             <input type="email" id="event-organizer-email" placeholder="max@example.ch" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
                         </div>
-                        <div class="md:col-span-2">
+                        <div class="md:col-span-2" id="event-create-access-wrapper">
                             <label class="flex items-center space-x-2">
                                 <input type="checkbox" id="event-create-access" class="rounded border-gray-300 text-fire-500 focus:ring-fire-500">
                                 <span class="text-sm font-medium text-gray-700">Organisator-Zugang erstellen</span>
                             </label>
-                            <p class="text-xs text-gray-500 mt-1">Erstellt Login fuer Event-Dashboard und sendet Zugangsdaten per E-Mail</p>
+                            <p class="text-xs text-gray-500 mt-1">Erstellt Login fuer Event-Dashboard und sendet Zugangsdaten per E-Mail (automatisch fuer Nicht-Vorstandsmitglieder)</p>
                         </div>
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Beschreibung</label>
                             <textarea id="event-description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"></textarea>
+                        </div>
+
+                        <!-- PDF-Anhang -->
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">PDF-Anhang (z.B. Flyer, Programm)</label>
+                            <div class="flex items-center gap-3">
+                                <input type="file" id="event-pdf-upload" accept=".pdf" class="hidden">
+                                <button type="button" onclick="document.getElementById('event-pdf-upload').click()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                    PDF hochladen
+                                </button>
+                                <span id="event-pdf-info" class="text-sm text-gray-500"></span>
+                                <button type="button" id="event-pdf-remove" onclick="removeEventPdf()" class="hidden text-red-500 hover:text-red-700 text-sm">Entfernen</button>
+                            </div>
                         </div>
 
                         <!-- Anmeldung (fuer Teilnehmer-Events wie Ausfluege) -->
@@ -4309,7 +4323,32 @@ ${grussformel}`;
                 // Organisator-Felder
                 document.getElementById('event-organizer-name').value = event.organizer_name || '';
                 document.getElementById('event-organizer-email').value = event.organizer_email || '';
-                document.getElementById('event-create-access').checked = false; // Immer unchecked beim Bearbeiten
+                // Organisator-Zugang: automatisch aktivieren wenn Organisator kein Vorstandsmitglied
+                const vorstandEmails = ['praesident@fwv-raura.ch','aktuar@fwv-raura.ch','kassier@fwv-raura.ch','materialwart@fwv-raura.ch','beisitzer@fwv-raura.ch','vorstand@fwv-raura.ch'];
+                const orgEmail = (event.organizer_email || '').toLowerCase();
+                const hasAccess = !!event.event_email;
+                const isVorstand = vorstandEmails.includes(orgEmail);
+                document.getElementById('event-create-access').checked = orgEmail && !isVorstand && !hasAccess;
+                // Checkbox verstecken wenn Zugang bereits existiert oder Vorstandsmitglied
+                if (hasAccess) {
+                    document.getElementById('event-create-access-wrapper').innerHTML = '<p class="text-sm text-green-600">✓ Organisator-Zugang aktiv (' + event.event_email + ')</p>';
+                } else if (isVorstand) {
+                    document.getElementById('event-create-access-wrapper').innerHTML = '<p class="text-sm text-blue-600">Vorstandsmitglied — nutzt SSO-Login</p>';
+                }
+
+                // PDF-Anhang anzeigen wenn vorhanden
+                const pdfInfo = document.getElementById('event-pdf-info');
+                const pdfRemove = document.getElementById('event-pdf-remove');
+                document.getElementById('event-pdf-upload').value = '';
+                window._eventPdfRemoved = false;
+                if (event.pdf_filename) {
+                    pdfInfo.textContent = event.pdf_filename;
+                    pdfInfo.innerHTML = `<a href="${API_BASE}/events/${event.id}/pdf" target="_blank" class="text-fire-600 hover:underline">${event.pdf_filename}</a>`;
+                    pdfRemove.classList.remove('hidden');
+                } else {
+                    pdfInfo.textContent = '';
+                    pdfRemove.classList.add('hidden');
+                }
 
                 // Load shifts
                 loadEventShifts(event.shifts || []);
@@ -4497,6 +4536,34 @@ ${grussformel}`;
             return localDate.toISOString().slice(0, 16);
         }
 
+        // PDF-Upload: Dateinamen anzeigen wenn Datei gewaehlt
+        document.getElementById('event-pdf-upload')?.addEventListener('change', function() {
+            const file = this.files[0];
+            const info = document.getElementById('event-pdf-info');
+            const remove = document.getElementById('event-pdf-remove');
+            if (file) {
+                if (file.type !== 'application/pdf') {
+                    alert('Nur PDF-Dateien erlaubt');
+                    this.value = '';
+                    return;
+                }
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('PDF darf maximal 10 MB gross sein');
+                    this.value = '';
+                    return;
+                }
+                info.textContent = `${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+                remove.classList.remove('hidden');
+            }
+        });
+
+        function removeEventPdf() {
+            document.getElementById('event-pdf-upload').value = '';
+            document.getElementById('event-pdf-info').textContent = '';
+            document.getElementById('event-pdf-remove').classList.add('hidden');
+            window._eventPdfRemoved = true;
+        }
+
         // Speichert ein Event (neu erstellen oder aktualisieren). Sammelt alle Formularfelder inkl. Schichten, Teilnehmer-Einstellungen und Organisator-Zugang.
         async function saveEvent(e) {
             e.preventDefault();
@@ -4523,7 +4590,18 @@ ${grussformel}`;
                 create_access: document.getElementById('event-create-access').checked
             };
 
-            console.log('Saving event data:', data);
+            // PDF-Anhang hinzufuegen wenn vorhanden
+            const pdfFile = document.getElementById('event-pdf-upload').files[0];
+            if (pdfFile) {
+                data.pdf_attachment = await fileToBase64(pdfFile);
+                data.pdf_filename = pdfFile.name;
+            } else if (window._eventPdfRemoved) {
+                data.pdf_attachment = null;
+                data.pdf_filename = null;
+            }
+            window._eventPdfRemoved = false;
+
+            console.log('Saving event data:', { ...data, pdf_attachment: data.pdf_attachment ? '(base64)' : null });
 
             try {
                 const url = id ? `${API_BASE}/events/${id}` : `${API_BASE}/events`;

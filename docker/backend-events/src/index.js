@@ -601,6 +601,30 @@ app.get('/events', async (req, res) => {
     }
 });
 
+// DEUTSCH: PDF-Anhang eines Events herunterladen
+app.get('/events/:id/pdf', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        let result;
+        if (uuidRegex.test(id)) {
+            result = await pool.query('SELECT pdf_attachment, pdf_filename FROM events WHERE id = $1', [id]);
+        } else {
+            result = await pool.query('SELECT pdf_attachment, pdf_filename FROM events WHERE slug = $1', [id]);
+        }
+        if (result.rows.length === 0 || !result.rows[0].pdf_attachment) {
+            return res.status(404).json({ error: 'Kein PDF vorhanden' });
+        }
+        const buffer = Buffer.from(result.rows[0].pdf_attachment, 'base64');
+        const filename = result.rows[0].pdf_filename || 'anhang.pdf';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
 app.get('/events/:id', async (req, res, next) => {
     // "my-event" und "login" sind eigene Routen — weiterleiten
@@ -705,7 +729,7 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             location, category, registration_required,
             registration_deadline, max_participants, cost, status, image_url, tags,
             organizer_name, organizer_email, create_access,
-            meal_options
+            meal_options, pdf_attachment, pdf_filename
         } = req.body;
 
         // Event-Zugang generieren falls gewuenscht
@@ -750,15 +774,16 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
                 location, category, registration_required,
                 registration_deadline, max_participants, cost, status, image_url, tags,
                 organizer_name, organizer_email, event_email, event_password_hash, event_access_expires,
-                meal_options
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+                meal_options, pdf_attachment, pdf_filename
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
             RETURNING *
         `, [
             slug, title, subtitle, description, start_date, end_date,
             location, category, registration_required,
             registration_deadline, max_participants, cost, status || 'planned', image_url, tags,
             organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventAccessExpires,
-            meal_options ? JSON.stringify(meal_options) : null
+            meal_options ? JSON.stringify(meal_options) : null,
+            pdf_attachment || null, pdf_filename || null
         ]);
 
         const newEvent = result.rows[0];
@@ -830,7 +855,7 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             'max_participants', 'cost', 'status', 'image_url', 'tags',
             'organizer_id', 'organizer_name', 'organizer_email',
             'event_email', 'event_password_hash', 'event_access_expires',
-            'meal_options'
+            'meal_options', 'pdf_attachment', 'pdf_filename'
         ];
 
         const filteredUpdates = {};
