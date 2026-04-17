@@ -4252,10 +4252,10 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            preferCSSPageSize: true,
+            margin: { top: '0', right: '25mm', bottom: '20mm', left: '25mm' },
             displayHeaderFooter: true,
             headerTemplate: '<div></div>',
-            footerTemplate: '<div style="width: 100%; padding: 0 25mm 8mm 0; font-family: Arial, sans-serif; font-size: 9pt; color: #666; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
+            footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
         });
         await browser.close();
 
@@ -4411,10 +4411,10 @@ app.post('/dispatch/preview-pdf', authenticateAny, async (req, res) => {
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            preferCSSPageSize: true,
+            margin: { top: '0', right: '25mm', bottom: '20mm', left: '25mm' },
             displayHeaderFooter: true,
             headerTemplate: '<div></div>',
-            footerTemplate: '<div style="width: 100%; padding: 0 25mm 8mm 0; font-family: Arial, sans-serif; font-size: 9pt; color: #666; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
+            footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
         });
         await browser.close();
 
