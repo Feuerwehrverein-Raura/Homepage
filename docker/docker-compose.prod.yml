@@ -313,6 +313,9 @@ services:
       IMAP_PORT: ${IMAP_PORT:-993}
       SPAM_IMAP_USER: spam@fwv-raura.ch
       SPAM_IMAP_PASSWORD: ${SPAM_IMAP_PASSWORD}
+      DMARC_IMAP_USER: dmarc@fwv-raura.ch
+      DMARC_IMAP_PASSWORD: ${DMARC_IMAP_PASSWORD}
+      DMARC_DOMAIN: fwv-raura.ch
       MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}
       MAILCOW_API_KEY: ${MAILCOW_API_KEY}
     volumes:

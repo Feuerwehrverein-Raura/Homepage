@@ -69,9 +69,11 @@ function switchTab(tab) {
 
     document.getElementById('panel-reports').classList.toggle('hidden', tab !== 'reports');
     document.getElementById('panel-blocklist').classList.toggle('hidden', tab !== 'blocklist');
+    document.getElementById('panel-dmarc').classList.toggle('hidden', tab !== 'dmarc');
 
     if (tab === 'reports') loadReports();
     if (tab === 'blocklist') loadBlocklist();
+    if (tab === 'dmarc') loadDmarc();
 }
 
 // === REPORTS ===
@@ -275,6 +277,157 @@ async function unblock(id) {
     const res = await apiCall(`/api/block/${id}`, { method: 'DELETE' });
     if (res && res.ok) { showToast('Sperre aufgehoben', 'success'); loadBlocklist(); }
     else showToast('Fehler beim Entsperren', 'error');
+}
+
+// === DMARC ===
+
+async function loadDmarc() {
+    show('dmarc-loading'); hide('dmarc-stats'); hide('dmarc-table'); hide('dmarc-empty');
+    const res = await apiCall('/api/dmarc/stats');
+    if (!res) return;
+    const stats = await res.json();
+    hide('dmarc-loading');
+
+    if (stats.reportCount === 0) {
+        show('dmarc-empty');
+        return;
+    }
+
+    const passColor = stats.passRate >= 90 ? 'text-green-600' : stats.passRate >= 70 ? 'text-yellow-600' : 'text-red-600';
+    const passBg = stats.passRate >= 90 ? 'bg-green-50 border-green-200' : stats.passRate >= 70 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200';
+
+    const statsHtml = `
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="${passBg} border rounded-lg p-4 text-center">
+                <div class="text-3xl font-bold ${passColor}">${stats.passRate}%</div>
+                <div class="text-sm text-gray-600 mt-1">DMARC Pass-Rate</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-4 text-center">
+                <div class="text-3xl font-bold text-gray-800">${stats.totalMessages}</div>
+                <div class="text-sm text-gray-600 mt-1">Nachrichten total</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-4 text-center">
+                <div class="text-3xl font-bold text-green-600">${stats.passMessages}</div>
+                <div class="text-sm text-gray-600 mt-1">Bestanden</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-4 text-center">
+                <div class="text-3xl font-bold text-red-600">${stats.failMessages}</div>
+                <div class="text-sm text-gray-600 mt-1">Fehlgeschlagen</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <!-- Quell-IPs -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-4 py-3 border-b">
+                    <h3 class="font-medium text-gray-800">Quell-IPs</h3>
+                    <p class="text-xs text-gray-500">Server die als fwv-raura.ch senden</p>
+                </div>
+                <div class="divide-y max-h-80 overflow-y-auto">
+                    ${stats.sourceIps.map(ip => `
+                        <div class="px-4 py-2 flex items-center justify-between">
+                            <span class="font-mono text-sm">${escHtml(ip.ip)}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500">${ip.total} Mails</span>
+                                ${ip.fail > 0
+                                    ? `<span class="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded">${ip.fail} fail</span>`
+                                    : `<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded">pass</span>`
+                                }
+                            </div>
+                        </div>
+                    `).join('') || '<div class="px-4 py-3 text-sm text-gray-400">Keine Daten</div>'}
+                </div>
+            </div>
+
+            <!-- Reporting-Organisationen -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-4 py-3 border-b">
+                    <h3 class="font-medium text-gray-800">Report-Absender</h3>
+                    <p class="text-xs text-gray-500">Wer hat DMARC-Reports geschickt</p>
+                </div>
+                <div class="divide-y max-h-80 overflow-y-auto">
+                    ${stats.organizations.map(org => `
+                        <div class="px-4 py-2 flex items-center justify-between">
+                            <span class="text-sm">${escHtml(org.name)}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500">${org.total} Mails</span>
+                                ${org.fail > 0
+                                    ? `<span class="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded">${org.fail} fail</span>`
+                                    : `<span class="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded">alles pass</span>`
+                                }
+                            </div>
+                        </div>
+                    `).join('') || '<div class="px-4 py-3 text-sm text-gray-400">Keine Daten</div>'}
+                </div>
+            </div>
+        </div>`;
+
+    document.getElementById('dmarc-stats').innerHTML = statsHtml;
+    show('dmarc-stats');
+
+    // Load detailed reports table
+    const reportsRes = await apiCall('/api/dmarc/reports');
+    if (!reportsRes) return;
+    const reports = await reportsRes.json();
+
+    if (reports.length > 0) {
+        const tableHtml = `
+            <h3 class="text-lg font-medium text-gray-800 mb-3">Einzelne Reports (${reports.length})</h3>
+            <div class="bg-white rounded-lg shadow overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zeitraum</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Organisation</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Policy</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Einträge</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${reports.map(r => dmarcReportRow(r)).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        document.getElementById('dmarc-table').innerHTML = tableHtml;
+        show('dmarc-table');
+    }
+}
+
+function dmarcReportRow(r) {
+    const begin = r.dateBegin ? formatDate(r.dateBegin) : '-';
+    const end = r.dateEnd ? formatDate(r.dateEnd) : '-';
+    const totalMsgs = r.records.reduce((sum, rec) => sum + rec.count, 0);
+    const failMsgs = r.records.reduce((sum, rec) => sum + ((rec.dkim !== 'pass' && rec.spf !== 'pass') ? rec.count : 0), 0);
+
+    const recordDetails = r.records.map(rec => {
+        const pass = rec.dkim === 'pass' || rec.spf === 'pass';
+        const cls = pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+        return `<div class="inline-flex items-center gap-1 mr-2 mb-1">
+            <span class="font-mono text-xs">${escHtml(rec.sourceIp)}</span>
+            <span class="${cls} text-xs px-1.5 py-0.5 rounded">${rec.count}x ${rec.disposition}</span>
+            <span class="text-xs text-gray-400">SPF:${rec.spf} DKIM:${rec.dkim}</span>
+        </div>`;
+    }).join('');
+
+    return `<tr class="hover:bg-gray-50">
+        <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+            <div>${begin}</div>
+            <div class="text-xs text-gray-400">bis ${end}</div>
+        </td>
+        <td class="px-4 py-3 text-sm">
+            <div class="font-medium text-gray-900">${escHtml(r.orgName)}</div>
+            <div class="text-xs text-gray-400">${escHtml(r.email || '')}</div>
+        </td>
+        <td class="px-4 py-3 text-sm">
+            <span class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded">${escHtml(r.policy)}</span>
+        </td>
+        <td class="px-4 py-3 text-sm">
+            <span class="font-medium">${totalMsgs}</span>
+            ${failMsgs > 0 ? `<span class="text-red-600 text-xs ml-1">(${failMsgs} fail)</span>` : ''}
+        </td>
+        <td class="px-4 py-3 text-sm">${recordDetails}</td>
+    </tr>`;
 }
 
 // === HELPERS ===

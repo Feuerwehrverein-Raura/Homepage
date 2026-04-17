@@ -40,6 +40,9 @@
             <button onclick="switchTab('blocklist')" id="tab-blocklist" class="tab-btn px-6 py-3 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
                 Sperrliste <span id="blocklist-count" class="ml-1 bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs"></span>
             </button>
+            <button onclick="switchTab('dmarc')" id="tab-dmarc" class="tab-btn px-6 py-3 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                DMARC
+            </button>
         </div>
     </div>
 
@@ -72,6 +75,28 @@
             <p class="text-gray-500">Keine Einträge in der Sperrliste.</p>
         </div>
         <div id="blocklist-table" class="hidden"></div>
+    </div>
+
+    <!-- DMARC Tab -->
+    <div id="panel-dmarc" class="max-w-7xl mx-auto px-4 mt-4 hidden">
+        <div class="flex justify-between items-center mb-4">
+            <p class="text-sm text-gray-500">DMARC Aggregate Reports für fwv-raura.ch</p>
+            <button onclick="loadDmarc()" class="text-sm bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Aktualisieren
+            </button>
+        </div>
+        <div id="dmarc-loading" class="text-center py-12 text-gray-400">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-fire-700 mx-auto mb-3"></div>
+            Lade DMARC-Reports...
+        </div>
+        <div id="dmarc-empty" class="hidden text-center py-12">
+            <svg class="w-16 h-16 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <p class="text-gray-500 font-medium">Keine DMARC-Reports</p>
+            <p class="text-sm text-gray-400 mt-1">Es liegen noch keine Aggregate Reports vor.</p>
+        </div>
+        <div id="dmarc-stats" class="hidden"></div>
+        <div id="dmarc-table" class="hidden mt-6"></div>
     </div>
 
     <!-- Detail Modal -->

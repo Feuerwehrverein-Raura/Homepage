@@ -7,6 +7,7 @@ const { authenticateToken } = require('./auth-middleware');
 const ImapService = require('./imap-service');
 const MailcowService = require('./mailcow-service');
 const BlocklistStore = require('./blocklist-store');
+const DmarcService = require('./dmarc-service');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,14 @@ const mailcowService = new MailcowService(
 );
 
 const blocklistStore = new BlocklistStore(process.env.BLOCKLIST_FILE || '/app/data/blocklist.json');
+
+const dmarcService = new DmarcService({
+    host: process.env.IMAP_HOST || 'mail.test.juroct.net',
+    port: parseInt(process.env.IMAP_PORT || '993'),
+    user: process.env.DMARC_IMAP_USER || 'dmarc@fwv-raura.ch',
+    password: process.env.DMARC_IMAP_PASSWORD,
+    domain: process.env.DMARC_DOMAIN || 'fwv-raura.ch'
+});
 
 // Health
 app.get('/api/health', (req, res) => {
@@ -204,6 +213,29 @@ app.delete('/api/block/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         log('ERROR', 'Failed to remove block', { error: error.message });
         res.status(500).json({ error: 'Failed to remove block' });
+    }
+});
+
+// === DMARC REPORTS ===
+
+app.get('/api/dmarc/reports', authenticateToken, async (req, res) => {
+    try {
+        const reports = await dmarcService.fetchReports();
+        res.json(reports);
+    } catch (error) {
+        log('ERROR', 'Failed to fetch DMARC reports', { error: error.message });
+        res.status(500).json({ error: 'Failed to fetch DMARC reports' });
+    }
+});
+
+app.get('/api/dmarc/stats', authenticateToken, async (req, res) => {
+    try {
+        const reports = await dmarcService.fetchReports();
+        const stats = dmarcService.aggregateStats(reports);
+        res.json(stats);
+    } catch (error) {
+        log('ERROR', 'Failed to get DMARC stats', { error: error.message });
+        res.status(500).json({ error: 'Failed to get DMARC stats' });
     }
 });
 
