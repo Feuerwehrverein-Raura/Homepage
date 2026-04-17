@@ -5954,6 +5954,42 @@ Wir freuen uns über zahlreiches Erscheinen!`;
             `;
         }
 
+        // Rendert die Brief-Vorschau als PDF direkt in den angegebenen Container
+        async function showLetterPreviewInto(container) {
+            const subject = document.getElementById('dispatch-subject').value;
+            const content = getDispatchContent();
+            const bodyHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
+
+            const sampleMember = members[0] || {
+                anrede: 'Herr', vorname: 'Max', nachname: 'Mustermann',
+                strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
+            };
+
+            const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
+            const letterHtml = event
+                ? generateEventInvitationLetterHTML(event, bodyHtml, sampleMember)
+                : generateDispatchLetterHTML(bodyHtml, subject, sampleMember);
+
+            container.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">PDF wird generiert...</div>';
+
+            try {
+                const response = await fetch(`${API_BASE}/dispatch/preview-pdf`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ html: letterHtml })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                const pdfUrl = URL.createObjectURL(blob);
+                container.innerHTML = `<iframe src="${pdfUrl}" style="width: 100%; height: 75vh; border: none; background: #e5e7eb;" title="Brief-Vorschau"></iframe>`;
+            } catch (error) {
+                container.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Fehler bei PDF-Vorschau: ${error.message}</div>`;
+            }
+        }
+
         // Zeigt die Brief-Vorschau als echtes PDF (via Backend-Preview-Endpoint)
         async function showLetterPreview() {
             const subject = document.getElementById('dispatch-subject').value;
@@ -8619,7 +8655,7 @@ body { margin: 0; padding: 0; }
             renderDispatchPreviewMode(mode);
         }
 
-        function renderDispatchPreviewMode(mode) {
+        async function renderDispatchPreviewMode(mode) {
             const emailBtn = document.getElementById('preview-modal-email-btn');
             const letterBtn = document.getElementById('preview-modal-letter-btn');
             const modalContent = document.getElementById('dispatch-preview-modal-content');
@@ -8669,11 +8705,14 @@ body { margin: 0; padding: 0; }
                 ? 'px-3 py-1 font-medium bg-fire-500 text-white border-l border-gray-300'
                 : 'px-3 py-1 font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300';
 
-            if (mode === 'email') showEmailPreview();
-            else showLetterPreview();
-
-            const previewDiv = document.getElementById('dispatch-preview');
-            modalContent.innerHTML = previewDiv.innerHTML;
+            if (mode === 'email') {
+                showEmailPreview();
+                const previewDiv = document.getElementById('dispatch-preview');
+                modalContent.innerHTML = previewDiv.innerHTML;
+            } else {
+                // Brief-Vorschau: async PDF-Generierung, schreibt direkt ins Modal
+                await showLetterPreviewInto(modalContent);
+            }
         }
 
         function closeDispatchPreviewModal() {
