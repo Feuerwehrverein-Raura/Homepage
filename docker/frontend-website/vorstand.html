@@ -8503,35 +8503,72 @@ ${grussformel}`;
         // === Vorschau-Modal ===
         // Vorschau-Button öffnet Modal mit E-Mail-Ansicht (Default)
         function openDispatchPreviewModal(mode) {
-            // Modal öffnen
             document.getElementById('dispatch-preview-modal').classList.remove('hidden');
-            // Per Default die aktuelle Versandart zeigen
             if (!mode) {
-                const method = document.querySelector('input[name="delivery-method"]:checked')?.value || 'auto';
-                mode = method === 'post' ? 'letter' : 'email';
+                if (window.currentDispatchMode === 'pdf-post') {
+                    mode = 'pdf-cover';
+                } else {
+                    const method = document.querySelector('input[name="delivery-method"]:checked')?.value || 'auto';
+                    mode = method === 'post' ? 'letter' : 'email';
+                }
             }
             renderDispatchPreviewMode(mode);
         }
 
-        // Zeigt im Modal entweder E-Mail- oder Brief-Vorschau (nutzt bestehende Funktionen)
         function renderDispatchPreviewMode(mode) {
-            // Toggle-Buttons aktualisieren
             const emailBtn = document.getElementById('preview-modal-email-btn');
             const letterBtn = document.getElementById('preview-modal-letter-btn');
+            const modalContent = document.getElementById('dispatch-preview-modal-content');
+
+            if (mode === 'pdf-cover') {
+                // PDF-Brief Vorschau: Deckblatt mit Beispiel-Empfänger
+                emailBtn.className = 'px-3 py-1 font-medium bg-white text-gray-700 hover:bg-gray-50';
+                letterBtn.className = 'px-3 py-1 font-medium bg-fire-500 text-white border-l border-gray-300';
+                letterBtn.textContent = '📄 Deckblatt (A4)';
+
+                const subject = document.getElementById('dispatch-subject').value || '(kein Betreff)';
+                const sampleMember = members.find(m => m.strasse && m.plz && m.ort) || {
+                    anrede: 'Herr', vorname: 'Max', nachname: 'Muster',
+                    strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
+                };
+                const coverHtml = generatePdfCoverHTML(subject, sampleMember);
+                const bodyOnly = coverHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '');
+
+                const pdfFile = document.getElementById('dispatch-pdf-file')?.files[0];
+                let pdfPreview = '';
+                if (pdfFile) {
+                    const pdfUrl = URL.createObjectURL(pdfFile);
+                    pdfPreview = `
+                        <div style="margin-top: 16px; text-align: center;">
+                            <div style="font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600;">📎 Anhang: ${pdfFile.name} (${(pdfFile.size / 1024).toFixed(0)} KB)</div>
+                            <iframe src="${pdfUrl}" style="width: 210mm; height: 297mm; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></iframe>
+                        </div>`;
+                } else {
+                    pdfPreview = '<div style="margin-top: 10px; padding: 12px; background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; font-size: 13px; color: #92400e;">⚠️ Noch kein PDF hochgeladen</div>';
+                }
+
+                modalContent.innerHTML = `
+                    <div style="text-align: center; font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600;">Seite 1: Deckblatt</div>
+                    <div style="background: white; width: 210mm; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                        ${bodyOnly}
+                    </div>
+                    ${pdfPreview}`;
+                return;
+            }
+
+            // Standard E-Mail / Brief Vorschau
             emailBtn.className = mode === 'email'
                 ? 'px-3 py-1 font-medium bg-fire-500 text-white'
                 : 'px-3 py-1 font-medium bg-white text-gray-700 hover:bg-gray-50';
+            letterBtn.textContent = '✉️ Brief (A4)';
             letterBtn.className = mode === 'letter'
                 ? 'px-3 py-1 font-medium bg-fire-500 text-white border-l border-gray-300'
                 : 'px-3 py-1 font-medium bg-white text-gray-700 hover:bg-gray-50 border-l border-gray-300';
 
-            // Bestehende Render-Funktion aufrufen (schreibt in #dispatch-preview)
             if (mode === 'email') showEmailPreview();
             else showLetterPreview();
 
-            // Inhalt in das Modal verschieben
             const previewDiv = document.getElementById('dispatch-preview');
-            const modalContent = document.getElementById('dispatch-preview-modal-content');
             modalContent.innerHTML = previewDiv.innerHTML;
         }
 
