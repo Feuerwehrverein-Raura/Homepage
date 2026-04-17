@@ -7399,9 +7399,15 @@ Wir freuen uns über zahlreiches Erscheinen!`;
             if (member) body = replacePlaceholders(body, member);
 
             return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
+<html><head><meta charset="UTF-8"><style>
+@page { size: A4; margin: 0; }
+body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
+.page1-header { width: 210mm; height: 105mm; position: relative; }
+.letter-body { padding: 5mm 25mm 20mm 25mm; }
+</style></head>
 <body>
-<div style="width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000;">
+<!-- Kopf: nur auf Seite 1 als fixer Header-Block -->
+<div class="page1-header">
     <!-- Logo links -->
     <div style="position: absolute; top: 15mm; left: 25mm; width: 35mm;">
         <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width: 35mm; height: auto; display: block;">
@@ -7411,9 +7417,9 @@ Wir freuen uns über zahlreiches Erscheinen!`;
         <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Feuerwehrverein Raura</div>
         <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
     </div>
-    <!-- Absenderzeile (Aktuar, oberhalb Frankierbereich Y<40mm) -->
+    <!-- Absenderzeile -->
     <div style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">${getAktuarAbsenderLine()}</div>
-    <!-- Empfaenger im Schweizer Adressfenster X=118mm Y=60mm -->
+    <!-- Empfaenger im Schweizer Adressfenster -->
     <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm;">
         <div>${name}</div>
         <div>${strasse}</div>
@@ -7421,15 +7427,15 @@ Wir freuen uns über zahlreiches Erscheinen!`;
     </div>
     <!-- Datum rechtsbuendig -->
     <div style="position: absolute; top: 97mm; right: 25mm; text-align: right;">Kaiseraugst, ${datum}</div>
-    <!-- Brieftext -->
-    <div style="position: absolute; top: 110mm; left: 25mm; right: 25mm;">
-        ${subject ? `<div style="font-weight: bold; font-size: 13pt;">${subject}</div><hr style="border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0;">` : ''}
-        <div>${body}</div>
-        <div style="margin-top: 10mm;">
-            Mit freundlichen Grüssen<br><br>
-            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
-            <em>Der Vorstand</em>
-        </div>
+</div>
+<!-- Brieftext: flow layout, umbricht auf Folgeseiten -->
+<div class="letter-body">
+    ${subject ? `<div style="font-weight: bold; font-size: 13pt;">${subject}</div><hr style="border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0;">` : ''}
+    <div>${body}</div>
+    <div style="margin-top: 10mm;">
+        Mit freundlichen Grüssen<br><br>
+        <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+        <em>Der Vorstand</em>
     </div>
 </div>
 </body></html>`;
