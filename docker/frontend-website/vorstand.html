@@ -7455,13 +7455,13 @@ Wir freuen uns über zahlreiches Erscheinen!`;
 
             return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
-/* Puppeteer: margin: 20mm top/bottom, 25mm sides — Content-Breite = 160mm */
+/* Puppeteer: margin 0 top/sides, 20mm bottom (fuer Footer-Seitenzahlen) */
 * { box-sizing: border-box; }
 body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
-/* Seite-1-Header: ragt mit negativem Margin in die @page-Margin rein */
+/* Seite-1-Header: volle 210mm Breite, absolut positionierte Elemente */
+/* Schweizer Standard: Adressfenster X=118mm, Y=60mm */
 .first-page-header {
     position: relative; width: 210mm; height: 110mm;
-    margin: -20mm -25mm 10mm -25mm;
     page-break-inside: avoid; page-break-after: avoid;
 }
 .first-page-header .logo { position: absolute; top: 15mm; left: 25mm; width: 35mm; }
@@ -7470,9 +7470,12 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 .first-page-header .sender { position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333; }
 .first-page-header .recipient { position: absolute; top: 60mm; left: 118mm; width: 85mm; }
 .first-page-header .date { position: absolute; top: 97mm; right: 25mm; text-align: right; }
+/* Brieftext: 25mm links/rechts, 20mm Top-Margin auf Folgeseiten via @page */
+.letter-body { padding: 0 25mm; }
 .letter-body h1, .letter-body h2, .letter-body h3 { margin: 0.5em 0 0.3em 0; page-break-after: avoid; }
 .letter-body p { margin: 0.5em 0; orphans: 3; widows: 3; }
 .letter-closing { margin-top: 10mm; page-break-inside: avoid; }
+@page :not(:first) { margin-top: 20mm; }
 </style></head>
 <body>
 <div class="first-page-header">
