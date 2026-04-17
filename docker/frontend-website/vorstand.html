@@ -4179,27 +4179,42 @@ ${grussformel}`;
 
                 // Switch to dispatch tab and fill in the data
                 switchTab('dispatch');
+                switchDispatchMode('auto');
 
-                // Wait a moment for the tab to load
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Wait for tab to render
+                await new Promise(resolve => setTimeout(resolve, 200));
 
-                // Fill in the dispatch form
+                // Fill in subject
                 document.getElementById('dispatch-subject').value = invitationSubject;
-                document.getElementById('dispatch-body').value = invitationBody;
 
-                // Reset template selection (using free text)
-                document.getElementById('dispatch-template').value = '';
-                document.getElementById('dispatch-variables').classList.add('hidden');
+                // Fill in body via Quill editor or plain text
+                const bodyHtml = invitationBody.split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
+                setDispatchContent(bodyHtml, invitationBody);
 
-                // Set delivery method to auto
-                document.querySelector('input[name="delivery-method"][value="auto"]').checked = true;
+                // Select Event-Einladung template if available
+                const templateSelect = document.getElementById('dispatch-template');
+                const eventTemplate = Array.from(templateSelect.options).find(o => o.value === 'tmpl_event_invitation');
+                if (eventTemplate) {
+                    templateSelect.value = 'tmpl_event_invitation';
+                    onTemplateSelected();
+                    // Re-fill subject after template
+                    document.getElementById('dispatch-subject').value = invitationSubject;
+                    // Select the event in the event-dropdown
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    const eventSelect = document.getElementById('dispatch-event-select');
+                    if (eventSelect) {
+                        const option = Array.from(eventSelect.options).find(o => o.value === eventId);
+                        if (option) {
+                            eventSelect.value = eventId;
+                            eventSelect.dispatchEvent(new Event('change'));
+                        }
+                    }
+                }
 
                 // Update recipient count
                 updateRecipientCount();
 
-                // Show preview automatically
-                await new Promise(resolve => setTimeout(resolve, 150));
-                showDispatchPreview();
+                showToast('Einladung vorbereitet — prüfe den Text und klicke Senden', 'info');
 
             } catch (error) {
                 console.error('Error generating invitation:', error);
