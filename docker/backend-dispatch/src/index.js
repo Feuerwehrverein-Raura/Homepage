@@ -4252,7 +4252,7 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: 0, right: 0, bottom: 0, left: 0 }
+            preferCSSPageSize: true
         });
         await browser.close();
 
@@ -4408,7 +4408,7 @@ app.post('/dispatch/preview-pdf', authenticateAny, async (req, res) => {
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: 0, right: 0, bottom: 0, left: 0 }
+            preferCSSPageSize: true
         });
         await browser.close();
 

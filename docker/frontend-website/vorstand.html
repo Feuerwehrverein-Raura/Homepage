@@ -7455,13 +7455,15 @@ Wir freuen uns über zahlreiches Erscheinen!`;
 
             return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
-@page { size: A4; margin: 0; }
+/* A4 mit Rand für Folgeseiten: 20mm oben, 25mm links/rechts, 20mm unten */
+@page { size: A4; margin: 20mm 25mm 20mm 25mm; }
+/* Seite 1 ohne oberen Rand (Header nutzt absolute Positionierung) */
+@page :first { margin: 0 25mm 20mm 25mm; }
 * { box-sizing: border-box; }
 body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
-/* Seite 1: fixer Header-Bereich mit 110mm Platz, dann fliessender Text */
 .first-page-header {
-    position: relative; width: 210mm; height: 110mm;
-    page-break-inside: avoid;
+    position: relative; height: 110mm; margin: 0 -25mm;
+    page-break-inside: avoid; page-break-after: avoid;
 }
 .first-page-header .logo { position: absolute; top: 15mm; left: 25mm; width: 35mm; }
 .first-page-header .logo img { width: 35mm; height: auto; display: block; }
@@ -7469,9 +7471,9 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 .first-page-header .sender { position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333; }
 .first-page-header .recipient { position: absolute; top: 60mm; left: 118mm; width: 85mm; }
 .first-page-header .date { position: absolute; top: 97mm; right: 25mm; text-align: right; }
-.letter-body { padding: 0 25mm 20mm 25mm; }
-.letter-body h1, .letter-body h2, .letter-body h3 { margin: 0.5em 0 0.3em 0; }
-.letter-body p { margin: 0.5em 0; }
+.letter-body h1, .letter-body h2, .letter-body h3 { margin: 0.5em 0 0.3em 0; page-break-after: avoid; }
+.letter-body p { margin: 0.5em 0; orphans: 3; widows: 3; }
+.letter-closing { margin-top: 10mm; page-break-inside: avoid; }
 </style></head>
 <body>
 <div class="first-page-header">
@@ -7488,7 +7490,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 <div class="letter-body">
     ${subject ? `<div style="font-weight: bold; font-size: 13pt;">${subject}</div><hr style="border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0;">` : ''}
     <div>${body}</div>
-    <div style="margin-top: 10mm;">
+    <div class="letter-closing">
         Mit freundlichen Grüssen<br><br>
         <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
         <em>Der Vorstand</em>
