@@ -602,7 +602,9 @@ app.get('/events', async (req, res) => {
 });
 
 // DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
-app.get('/events/:id', async (req, res) => {
+app.get('/events/:id', async (req, res, next) => {
+    // "my-event" und "login" sind eigene Routen — weiterleiten
+    if (req.params.id === 'my-event' || req.params.id === 'login') return next();
     try {
         const { id } = req.params;
 
