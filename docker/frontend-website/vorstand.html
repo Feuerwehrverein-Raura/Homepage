@@ -8362,19 +8362,27 @@ ${grussformel}`;
             const templateRow = document.getElementById('dispatch-template')?.closest('.grid');
             const placeholderHint = document.querySelector('#dispatch-editor-container')?.closest('.mb-4')?.querySelector('.text-xs.text-gray-400');
 
+            // Template-Dropdown und Editor-Bereich
+            const templateContainer = document.getElementById('dispatch-template')?.closest('.grid');
+
             if (mode === 'pdf-post') {
-                // PDF-Brief Modus: Editor verstecken, PDF-Upload zeigen
+                // PDF-Brief Modus: Editor und Template verstecken, PDF-Upload zeigen
                 if (editorContainer) editorContainer.classList.add('hidden');
                 if (plainText) plainText.classList.add('hidden');
                 if (pdfUpload) pdfUpload.classList.remove('hidden');
                 if (attachments) attachments.classList.add('hidden');
-                // Label "Nachricht" ausblenden
+                if (templateContainer) templateContainer.classList.add('hidden');
+                // Betreff-Container einzeln zeigen (wird auf Deckblatt verwendet)
+                document.getElementById('dispatch-subject-container').style.display = 'block';
+                document.getElementById('dispatch-subject-container').classList.remove('hidden');
+                // Editor-Label ausblenden
                 const editorLabel = editorContainer?.closest('.mb-4');
                 if (editorLabel) editorLabel.classList.add('hidden');
             } else {
-                // Standard-Modi: Editor zeigen, PDF-Upload verstecken
+                // Standard-Modi: Editor und Template zeigen, PDF-Upload verstecken
                 if (pdfUpload) pdfUpload.classList.add('hidden');
                 if (attachments) attachments.classList.remove('hidden');
+                if (templateContainer) templateContainer.classList.remove('hidden');
                 const editorLabel = editorContainer?.closest('.mb-4');
                 if (editorLabel) editorLabel.classList.remove('hidden');
                 if (editorContainer && !document.getElementById('dispatch-body-plain').classList.contains('block')) {
