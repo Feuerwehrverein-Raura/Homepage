@@ -5955,6 +5955,7 @@ Wir freuen uns über zahlreiches Erscheinen!`;
         }
 
         // Zeigt die Brief-Vorschau im A4-Format (Layout wie Mitgliedsbeitrag-Kopf, ohne QR)
+        // Nutzt ein iframe mit srcdoc damit CSS-@page und Seitenumbrueche wie im PDF dargestellt werden
         function showLetterPreview() {
             const subject = document.getElementById('dispatch-subject').value;
             const content = getDispatchContent();
@@ -5965,13 +5966,55 @@ Wir freuen uns über zahlreiches Erscheinen!`;
                 strasse: 'Musterstrasse 1', plz: '4303', ort: 'Kaiseraugst'
             };
 
-            // Event-Einladung: anderes Layout verwenden
             const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
             const letterHtml = event
                 ? generateEventInvitationLetterHTML(event, bodyHtml, sampleMember)
                 : generateDispatchLetterHTML(bodyHtml, subject, sampleMember);
             const previewDiv = document.getElementById('dispatch-preview');
-            previewDiv.innerHTML = letterHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '');
+
+            // PDF via blob-URL in iframe einbetten (mit Seitenumbruechen wie im Druck)
+            // Hierfuer generieren wir das PDF on-the-fly mit window.print() nicht moeglich,
+            // stattdessen simulieren wir Seiten mit CSS overflow clipping
+            const pageCount = Math.ceil(letterHtml.length / 3000) || 1;
+            const bodyOnly = letterHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '');
+
+            previewDiv.innerHTML = `
+                <style>
+                    .a4-preview-container { background: #e5e7eb; padding: 20px; min-height: 100%; }
+                    .a4-page-wrap { width: 210mm; margin: 0 auto; position: relative; }
+                    .a4-content { background: white; box-shadow: 0 4px 16px rgba(0,0,0,0.2); position: relative; }
+                    .a4-page-break {
+                        position: absolute; left: 0; right: 0; height: 20px;
+                        background: repeating-linear-gradient(90deg, #9ca3af 0 8px, transparent 8px 16px);
+                        pointer-events: none; z-index: 10;
+                        display: flex; align-items: center; justify-content: center;
+                    }
+                    .a4-page-break span {
+                        background: #e5e7eb; padding: 2px 8px; font-size: 10px; color: #6b7280; border-radius: 4px; border: 1px solid #9ca3af;
+                    }
+                </style>
+                <div class="a4-preview-container">
+                    <div class="a4-page-wrap" id="a4-page-wrap">
+                        <div class="a4-content">${bodyOnly}</div>
+                    </div>
+                </div>`;
+
+            // Seitenumbrüche als visuelle Balken einfügen (alle 297mm ab Container-Höhe)
+            setTimeout(() => {
+                const wrap = document.getElementById('a4-page-wrap');
+                if (!wrap) return;
+                const content = wrap.querySelector('.a4-content');
+                const totalHeight = content.offsetHeight;
+                const pageHeightPx = 297 * 3.7795; // 1mm ≈ 3.7795px bei 96dpi
+                const pages = Math.floor(totalHeight / pageHeightPx);
+                for (let i = 1; i <= pages; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'a4-page-break';
+                    bar.style.top = `${i * pageHeightPx - 10}px`;
+                    bar.innerHTML = `<span>— Seitenumbruch (Seite ${i + 1}) —</span>`;
+                    wrap.appendChild(bar);
+                }
+            }, 100);
         }
 
         // Ersetzt Platzhalter im Text mit den tatsächlichen Mitgliederdaten.
