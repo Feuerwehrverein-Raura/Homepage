@@ -7464,13 +7464,21 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
     position: relative; width: 210mm; height: 110mm;
     page-break-inside: avoid; page-break-after: avoid;
 }
-.first-page-header .logo { position: absolute; top: 15mm; left: 25mm; width: 35mm; }
+/* Pingen-Vorgaben:
+ * Randsperrbereich: 5mm rundum
+ * Frankierbereich: X=116-205.5mm, Y=40-87.5mm (reserviert, KEINE Absenderzeile hier)
+ * Adressbereich: X=118-203.5mm, Y=60-85.5mm (NUR Empfängeradresse)
+ * Logo oben links (ausserhalb Frankierbereich X<116mm) */
+.first-page-header .logo { position: absolute; top: 15mm; left: 20mm; width: 35mm; }
 .first-page-header .logo img { width: 35mm; height: auto; display: block; }
-.first-page-header .title { position: absolute; top: 15mm; left: 118mm; font-size: 20pt; font-weight: bold; line-height: 1.2; }
-/* Absenderzeile: Y=28-32mm (sicher oberhalb Frankierbereich-Start Y=40mm) */
-.first-page-header .sender { position: absolute; top: 28mm; left: 118mm; width: 85mm; font-size: 7pt; color: #555; border-bottom: 0.3pt solid #999; padding-bottom: 0.5mm; }
-.first-page-header .recipient { position: absolute; top: 65mm; left: 120mm; width: 83mm; }
-.first-page-header .date { position: absolute; top: 97mm; right: 25mm; text-align: right; }
+/* Titel links oberhalb Frankierbereich (X<116mm und Y<40mm) */
+.first-page-header .title { position: absolute; top: 15mm; left: 60mm; font-size: 20pt; font-weight: bold; line-height: 1.2; }
+/* Absenderzeile: Y<40mm, links vom Frankierbereich (X<116mm) */
+.first-page-header .sender { position: absolute; top: 35mm; left: 20mm; width: 90mm; font-size: 7pt; color: #555; border-bottom: 0.3pt solid #999; padding-bottom: 0.5mm; }
+/* Empfängeradresse: EXAKT im Adressbereich X=118, Y=60, W=85.5, H=25.5 */
+.first-page-header .recipient { position: absolute; top: 60mm; left: 118mm; width: 85.5mm; max-height: 25.5mm; overflow: hidden; }
+/* Datum: unterhalb Frankierbereich (Y>87.5mm), rechts */
+.first-page-header .date { position: absolute; top: 92mm; right: 20mm; text-align: right; }
 /* Brieftext: 25mm links/rechts, 20mm Top-Margin auf Folgeseiten via @page */
 .letter-body { padding: 0 25mm; }
 .letter-body h1, .letter-body h2, .letter-body h3 { margin: 0.5em 0 0.3em 0; page-break-after: avoid; }
