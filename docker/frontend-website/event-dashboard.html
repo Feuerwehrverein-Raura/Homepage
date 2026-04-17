@@ -100,9 +100,8 @@
                     </div>
                 </div>
                 <div class="mt-4" id="event-description"></div>
-                <!-- DEUTSCH: Arbeitsplan-Versand - Button loest E-Mail-Versand an alle genehmigten Helfer aus -->
-                <!-- DEUTSCH: Status zeigt an, ob und wann der Arbeitsplan zuletzt versendet wurde -->
-                <div class="mt-6 pt-4 border-t">
+                <!-- DEUTSCH: Arbeitsplan-Versand - nur sichtbar wenn Event Schichten hat -->
+                <div class="mt-6 pt-4 border-t hidden" id="arbeitsplan-section">
                     <button onclick="sendArbeitsplan()"
                         class="px-4 py-2 bg-fire-500 text-white font-medium rounded-lg hover:bg-fire-600 transition-colors">
                         Arbeitsplan versenden
@@ -133,11 +132,17 @@
                 </div>
             </div>
 
-            <!-- DEUTSCH: Anmeldungen-Tab - zeigt alle Helfer-Anmeldungen mit Statusfilter -->
-            <!-- DEUTSCH: Organisator kann ausstehende Anmeldungen genehmigen oder ablehnen -->
+            <!-- DEUTSCH: Anmeldungen-Tab - zeigt alle Anmeldungen mit Statusfilter -->
+            <!-- DEUTSCH: Organisator kann Anmeldungen genehmigen, ablehnen und Teilnehmer hinzufuegen -->
             <div id="registrations-tab" class="bg-white rounded-lg shadow-sm hidden">
                 <div class="p-4 border-b flex justify-between items-center">
-                    <h3 class="text-lg font-semibold">Anmeldungen</h3>
+                    <div class="flex items-center gap-3">
+                        <h3 class="text-lg font-semibold">Anmeldungen</h3>
+                        <button onclick="openAddParticipant()" class="px-3 py-1.5 text-sm bg-fire-500 text-white rounded-lg hover:bg-fire-600 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                            Teilnehmer hinzufügen
+                        </button>
+                    </div>
                     <!-- DEUTSCH: Filter-Buttons: Alle, nur Ausstehende oder nur Genehmigte anzeigen -->
                     <div class="flex space-x-2">
                         <button onclick="filterRegistrations('all')" class="px-3 py-1 text-sm rounded-full bg-gray-200 hover:bg-gray-300">Alle</button>
@@ -150,6 +155,42 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- DEUTSCH: Modal zum Hinzufuegen eines Teilnehmers -->
+    <div id="add-participant-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div class="flex items-center justify-between p-4 border-b">
+                <h3 class="text-lg font-bold text-gray-800">Teilnehmer hinzufügen</h3>
+                <button onclick="closeAddParticipant()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <form id="add-participant-form" class="p-4 space-y-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                    <input type="text" id="add-p-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Vorname Nachname">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                    <input type="email" id="add-p-email" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="email@example.ch">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                    <input type="tel" id="add-p-phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="079 ...">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Anzahl Personen</label>
+                    <input type="number" id="add-p-participants" min="1" value="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Bemerkungen</label>
+                    <textarea id="add-p-notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Optionale Bemerkungen"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeAddParticipant()" class="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Abbrechen</button>
+                    <button type="submit" class="px-4 py-2 text-sm text-white bg-fire-500 rounded-lg hover:bg-fire-600">Hinzufügen</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
@@ -247,13 +288,22 @@
             document.getElementById('event-status').textContent = getStatusLabel(eventData.status);
             document.getElementById('event-description').textContent = eventData.description || '';
 
-            // DEUTSCH: Arbeitsplan-Versandstatus anzeigen (Datum/Uhrzeit des letzten Versands oder "Noch nicht versendet")
-            const arbeitsplanStatus = document.getElementById('arbeitsplan-status');
-            if (eventData.arbeitsplan_sent_at) {
-                const sentDate = new Date(eventData.arbeitsplan_sent_at);
-                arbeitsplanStatus.textContent = `Versendet am ${sentDate.toLocaleDateString('de-CH')} um ${sentDate.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}`;
-            } else {
-                arbeitsplanStatus.textContent = 'Noch nicht versendet';
+            // DEUTSCH: Arbeitsplan nur anzeigen wenn Event Schichten hat
+            if (eventData.shifts && eventData.shifts.length > 0) {
+                document.getElementById('arbeitsplan-section').classList.remove('hidden');
+                const arbeitsplanStatus = document.getElementById('arbeitsplan-status');
+                if (eventData.arbeitsplan_sent_at) {
+                    const sentDate = new Date(eventData.arbeitsplan_sent_at);
+                    arbeitsplanStatus.textContent = `Versendet am ${sentDate.toLocaleDateString('de-CH')} um ${sentDate.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}`;
+                } else {
+                    arbeitsplanStatus.textContent = 'Noch nicht versendet';
+                }
+            }
+
+            // DEUTSCH: Schichten-Tab nur anzeigen wenn Schichten vorhanden
+            if (!eventData.shifts || eventData.shifts.length === 0) {
+                document.querySelector('[data-tab="shifts"]').classList.add('hidden');
+                showTab('registrations');
             }
 
             // DEUTSCH: Schichten- und Anmeldungen-Tabs rendern
@@ -510,6 +560,53 @@
             document.getElementById('login-form').reset();
             document.getElementById('login-error').classList.add('hidden');
         }
+        // DEUTSCH: Modal zum Hinzufuegen von Teilnehmern oeffnen/schliessen
+        function openAddParticipant() {
+            document.getElementById('add-participant-modal').classList.remove('hidden');
+        }
+        function closeAddParticipant() {
+            document.getElementById('add-participant-modal').classList.add('hidden');
+            document.getElementById('add-participant-form').reset();
+        }
+
+        // DEUTSCH: Teilnehmer hinzufuegen ueber oeffentliche Registrierungs-API
+        document.getElementById('add-participant-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('add-p-name').value.trim();
+            const email = document.getElementById('add-p-email').value.trim();
+            const phone = document.getElementById('add-p-phone').value.trim();
+            const participants = document.getElementById('add-p-participants').value;
+            const notes = document.getElementById('add-p-notes').value.trim();
+
+            try {
+                const response = await fetch(`${API_BASE}/registrations/public`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'participant',
+                        eventId: eventData.id,
+                        eventTitle: eventData.title,
+                        organizerEmail: eventData.organizer_email,
+                        name,
+                        email: email || undefined,
+                        phone: phone || undefined,
+                        participants: parseInt(participants) || 1,
+                        notes: notes || undefined
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || err.message || 'Fehler');
+                }
+
+                closeAddParticipant();
+                alert(`${name} wurde erfolgreich angemeldet.`);
+                await loadDashboard();
+            } catch (error) {
+                alert('Fehler: ' + error.message);
+            }
+        });
     </script>
 </body>
 </html>
