@@ -4184,32 +4184,16 @@ ${grussformel}`;
                 // Wait for tab to render
                 await new Promise(resolve => setTimeout(resolve, 200));
 
-                // Fill in subject
-                document.getElementById('dispatch-subject').value = invitationSubject;
+                // Reset template to "Allgemein" (no template) — wir nutzen den generierten Text direkt
+                document.getElementById('dispatch-template').value = '';
+                currentTemplate = null;
+                document.getElementById('dispatch-variables').classList.add('hidden');
+                document.getElementById('dispatch-event-wrapper')?.classList.add('hidden');
 
-                // Fill in body via Quill editor or plain text
+                // Fill in subject and body
+                document.getElementById('dispatch-subject').value = invitationSubject;
                 const bodyHtml = invitationBody.split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
                 setDispatchContent(bodyHtml, invitationBody);
-
-                // Select Event-Einladung template if available
-                const templateSelect = document.getElementById('dispatch-template');
-                const eventTemplate = Array.from(templateSelect.options).find(o => o.value === 'tmpl_event_invitation');
-                if (eventTemplate) {
-                    templateSelect.value = 'tmpl_event_invitation';
-                    onTemplateSelected();
-                    // Re-fill subject after template
-                    document.getElementById('dispatch-subject').value = invitationSubject;
-                    // Select the event in the event-dropdown
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    const eventSelect = document.getElementById('dispatch-event-select');
-                    if (eventSelect) {
-                        const option = Array.from(eventSelect.options).find(o => o.value === eventId);
-                        if (option) {
-                            eventSelect.value = eventId;
-                            eventSelect.dispatchEvent(new Event('change'));
-                        }
-                    }
-                }
 
                 // Update recipient count
                 updateRecipientCount();
