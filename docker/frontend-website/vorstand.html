@@ -7564,7 +7564,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             const orgName = organizer
                 ? `${organizer.vorname} ${organizer.nachname}`.trim()
                 : (event.organizer_name || 'Aktuar');
-            const orgPhone = organizer ? (organizer.mobile || organizer.telefon || '') : '';
+            const orgPhone = organizer ? (organizer.telefon || organizer.mobile || '') : '';
             return text
                 .replace(/\{\{event_title\}\}/g, event.title || '')
                 .replace(/\{\{event_date\}\}/g, event.start_date ? formatEventDate(event.start_date) : '')
