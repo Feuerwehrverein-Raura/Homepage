@@ -4118,77 +4118,30 @@
             return classes[status] || 'bg-gray-100 text-gray-800';
         }
 
-        // Generiert eine Einladung für ein Event via Template und öffnet den Dispatch-Bereich.
+        // Generiert eine Einladung für ein Event via Event-Einladungs-Template
+        // und öffnet den Dispatch-Bereich mit vorausgewähltem Event.
         async function generateEventInvitation(eventId) {
             try {
-                // Load event data
-                const response = await fetch(`${API_BASE}/events/${eventId}`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                if (!response.ok) throw new Error('Event nicht gefunden');
-                const event = await response.json();
-
-                // Format date and time
-                const startDate = new Date(event.start_date);
-                const endDate = event.end_date ? new Date(event.end_date) : null;
-                const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-                const timeOptions = { hour: '2-digit', minute: '2-digit' };
-
-                const formattedDate = startDate.toLocaleDateString('de-CH', dateOptions);
-                const formattedTime = startDate.toLocaleTimeString('de-CH', timeOptions) + ' Uhr';
-
-                let dateRange = formattedDate;
-                if (endDate && endDate.toDateString() !== startDate.toDateString()) {
-                    dateRange += ` bis ${endDate.toLocaleDateString('de-CH', dateOptions)}`;
-                }
-
-                // Build invitation text
-                const anmeldungInfo = event.registration_required
-                    ? `\nAnmeldung: Erforderlich${event.registration_deadline ? ` bis ${new Date(event.registration_deadline).toLocaleDateString('de-CH')}` : ''}`
-                    : '\nAnmeldung: Nicht erforderlich';
-
-                const kostenInfo = event.cost ? `\nKosten: ${event.cost}` : '';
-
-                // Absender: Organisator falls vorhanden, sonst Vorstand
-                const hasOrganizer = event.organizer_name && event.organizer_name.trim();
-                const einladungVon = hasOrganizer
-                    ? `${event.organizer_name} lädt euch herzlich ein zum Anlass:`
-                    : 'Der Vorstand möchte euch herzlich einladen zum Anlass:';
-
-                const invitationSubject = `Einladung: ${event.title}`;
-                const invitationBody = `Liebe Mitglieder
-
-${einladungVon}
-
-═══════════════════════════════════════════
-${event.title}${event.subtitle ? '\n' + event.subtitle : ''}
-═══════════════════════════════════════════
-
-Was:      ${event.title}
-Wann:     ${formattedDate}, ${formattedTime}
-Wo:       ${event.location || 'Wird noch bekannt gegeben'}${anmeldungInfo}${kostenInfo}
-
-${event.description || ''}
-
-Wir freuen uns über zahlreiches Erscheinen!`;
-
-                // Switch to dispatch tab and fill in the data
+                // Switch to dispatch tab
                 switchTab('dispatch');
                 switchDispatchMode('auto');
 
-                // Wait for tab to render
+                // Wait for tab to render and templates to load
                 await new Promise(resolve => setTimeout(resolve, 200));
 
-                // Reset template to "Allgemein" (no template) — wir nutzen den generierten Text direkt
-                document.getElementById('dispatch-template').value = '';
-                currentTemplate = null;
-                document.getElementById('dispatch-variables').classList.add('hidden');
-                document.getElementById('dispatch-event-wrapper')?.classList.add('hidden');
+                // Event-Einladungs-Template im Dropdown auswählen
+                const templateSelect = document.getElementById('dispatch-template');
+                templateSelect.value = 'tmpl_event_invitation';
+                onTemplateSelected();
 
-                // Fill in subject and body
-                document.getElementById('dispatch-subject').value = invitationSubject;
-                const bodyHtml = invitationBody.split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
-                setDispatchContent(bodyHtml, invitationBody);
+                // Event-Dropdown befüllen und das Event vorauswählen
+                await populateDispatchEventSelect();
+                const eventSelect = document.getElementById('dispatch-event-select');
+                if (eventSelect) {
+                    eventSelect.value = eventId;
+                    // Change-Event auslösen, damit abhängige UI reagiert
+                    eventSelect.dispatchEvent(new Event('change'));
+                }
 
                 // Update recipient count
                 updateRecipientCount();
