@@ -7525,16 +7525,25 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             return `${datum}, ${zeit} Uhr`;
         }
 
-        // Gibt den Event-Organisator zurueck (Mitglied aus organizer_id) - Fallback: Aktuar
+        // Gibt den Event-Organisator zurueck - Suche nach organizer_id, organizer_email oder
+        // organizer_name im Mitgliederbestand. Fallback: Aktuar
         function getEventOrganizer(event) {
-            if (event?.organizer_id) {
+            if (!event) return getAktuar();
+            if (event.organizer_id) {
                 const org = members.find(m => String(m.id) === String(event.organizer_id));
                 if (org) return org;
             }
+            if (event.organizer_email) {
+                const org = members.find(m => (m.email || '').toLowerCase() === event.organizer_email.toLowerCase());
+                if (org) return org;
+            }
+            if (event.organizer_name) {
+                const name = event.organizer_name.trim().toLowerCase();
+                const org = members.find(m => `${m.vorname} ${m.nachname}`.trim().toLowerCase() === name);
+                if (org) return org;
+            }
             // Fallback: Aktuar
-            const a = getAktuar();
-            if (!a) return null;
-            return members.find(m => m.funktion && /aktuar/i.test(m.funktion)) || null;
+            return getAktuar();
         }
 
         // Ersetzt Event-spezifische Platzhalter im Text
@@ -7542,7 +7551,10 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         function replaceEventPlaceholders(text, event) {
             if (!text || !event) return text;
             const organizer = getEventOrganizer(event);
-            const orgName = organizer ? `${organizer.vorname} ${organizer.nachname}`.trim() : 'Aktuar';
+            // Bevorzugt: Mitglied-Datensatz, sonst Event-Text-Felder
+            const orgName = organizer
+                ? `${organizer.vorname} ${organizer.nachname}`.trim()
+                : (event.organizer_name || 'Aktuar');
             const orgPhone = organizer ? (organizer.mobile || organizer.telefon || '') : '';
             return text
                 .replace(/\{\{event_title\}\}/g, event.title || '')
