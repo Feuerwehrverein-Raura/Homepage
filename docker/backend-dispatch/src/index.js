@@ -716,7 +716,12 @@ app.delete('/templates/:id', authenticateAny, async (req, res) => {
 app.post('/email/send', authenticateAny, async (req, res) => {
     console.log('[EMAIL] /email/send called with:', { to: req.body.to, cc: req.body.cc, template_id: req.body.template_id, member_id: req.body.member_id, hasHtml: !!req.body.html });
     try {
-        const { to, cc, subject, body, html, template_id, variables, member_id, event_id } = req.body;
+        const { to, cc, subject, body, html, template_id: rawTemplateId, variables, member_id, event_id } = req.body;
+
+        // Nur DB-UUIDs als Template-ID akzeptieren - hardcoded Frontend-IDs wie
+        // "tmpl_event_invitation" existieren nicht in der dispatch_templates Tabelle
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const template_id = (rawTemplateId && uuidRegex.test(rawTemplateId)) ? rawTemplateId : null;
 
         let emailSubject = subject;
         let emailBody = body;
