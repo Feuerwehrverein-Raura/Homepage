@@ -4234,7 +4234,7 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
 // daher kein Adress-Embedding oder Deckblatt noetig - auto_send mit address_position=right
 app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
     try {
-        const { html, recipient, member_id, staging = false } = req.body;
+        const { html, recipient, member_id, subject, staging = false } = req.body;
 
         if (!html || !recipient) {
             return res.status(400).json({ error: 'html und recipient erforderlich' });
@@ -4284,7 +4284,7 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
                 data: {
                     type: 'letters',
                     attributes: {
-                        file_original_name: `Mitgliederbeitrag_${recipient.name.replace(/\s+/g, '_')}.pdf`,
+                        file_original_name: `${(subject || 'Brief').replace(/[^a-zA-Z0-9äöüÄÖÜ]/g, '_')}_${recipient.name.replace(/\s+/g, '_')}.pdf`,
                         file_url: fileUrl,
                         file_url_signature: fileUrlSignature,
                         auto_send: true,
@@ -4298,7 +4298,7 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
             { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/vnd.api+json' } }
         );
 
-        logInfo('Membership fee letter sent via Pingen (HTML)', { member_id, name: recipient.name });
+        logInfo('Letter sent via Pingen (HTML)', { member_id, name: recipient.name, subject });
         res.json({ success: true, letter_id: letterRes.data.data?.id });
 
     } catch (error) {

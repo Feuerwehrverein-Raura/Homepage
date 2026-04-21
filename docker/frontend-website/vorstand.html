@@ -6533,6 +6533,7 @@
                         };
 
                         try {
+                            const postSubject = evtForPost ? `Einladung_${evtForPost.title}` : (subject || 'Brief');
                             const response = await fetch(`${API_BASE}/dispatch/send-post`, {
                                 method: 'POST',
                                 headers: {
@@ -6542,7 +6543,8 @@
                                 body: JSON.stringify({
                                     html: letterHtml,
                                     recipient,
-                                    member_id: member.id
+                                    member_id: member.id,
+                                    subject: postSubject
                                 })
                             });
                             if (response.ok) postSuccess++;
