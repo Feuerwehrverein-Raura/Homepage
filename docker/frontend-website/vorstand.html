@@ -4460,9 +4460,9 @@
         function collectShiftsData() {
             const shifts = [];
             document.querySelectorAll('.shift-row').forEach(row => {
-                const shiftId = row.dataset.shiftId;
+                const shiftId = row.dataset.shiftId || '';
                 shifts.push({
-                    id: shiftId.startsWith('new-') ? null : shiftId,
+                    id: (shiftId && !shiftId.startsWith('new-')) ? shiftId : null,
                     bereich: row.querySelector('.shift-bereich').value,
                     name: row.querySelector('.shift-name').value,
                     date: row.querySelector('.shift-date').value,
@@ -4572,9 +4572,18 @@
                 const savedEvent = await response.json();
                 const eventId = savedEvent.id;
 
-                // Save shifts
-                const shiftsData = collectShiftsData();
-                await saveEventShifts(eventId, shiftsData);
+                // Schichten nur speichern wenn Kategorie welche unterstuetzt (sonst skippen)
+                const category = document.getElementById('event-category').value;
+                const supportsShifts = ['Dorffest', 'Sonstiges'].includes(category);
+                if (supportsShifts) {
+                    try {
+                        const shiftsData = collectShiftsData();
+                        await saveEventShifts(eventId, shiftsData);
+                    } catch (shiftError) {
+                        console.error('Shifts save failed (event saved):', shiftError);
+                        alert('Event gespeichert, aber Schichten konnten nicht aktualisiert werden: ' + shiftError.message);
+                    }
+                }
 
                 document.getElementById('event-modal').classList.add('hidden');
                 await loadEvents();
