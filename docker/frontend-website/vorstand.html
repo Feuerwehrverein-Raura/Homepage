@@ -4534,7 +4534,7 @@
                 cost: document.getElementById('event-cost').value || null,
                 organizer_name: document.getElementById('event-organizer-name').value || null,
                 organizer_email: document.getElementById('event-organizer-email').value || null,
-                create_access: document.getElementById('event-create-access').checked
+                create_access: document.getElementById('event-create-access')?.checked || false
             };
 
             // PDF-Anhang hinzufuegen wenn vorhanden
