@@ -2,6 +2,7 @@ package ch.fwvraura.vorstand.data.api
 
 import ch.fwvraura.vorstand.data.model.LoginRequest
 import ch.fwvraura.vorstand.data.model.LoginResponse
+import ch.fwvraura.vorstand.data.model.QrLoginRequest
 import ch.fwvraura.vorstand.data.model.UserInfo
 import retrofit2.Response
 import retrofit2.http.Body
@@ -40,6 +41,13 @@ interface AuthApi {
      */
     @POST("auth/vorstand/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
+
+    /**
+     * QR-Login-Endpunkt. Tauscht einen persistenten App-Token (aus dem QR-Code)
+     * gegen einen JWT. Kein Auth-Header noetig — der Token IST die Authentifizierung.
+     */
+    @POST("auth/vorstand/qr-login")
+    suspend fun qrLogin(@Body request: QrLoginRequest): Response<LoginResponse>
 
     /**
      * Endpunkt zum Abrufen der eigenen Benutzerinformationen.

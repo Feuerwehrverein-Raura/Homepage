@@ -71,6 +71,10 @@ class LoginActivity : AppCompatActivity() {
             doLogin()
         }
 
+        binding.qrLoginButton.setOnClickListener {
+            startActivity(Intent(this, QrScannerActivity::class.java))
+        }
+
         binding.passwordInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 doLogin()

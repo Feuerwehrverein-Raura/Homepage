@@ -13,6 +13,14 @@ data class LoginRequest(
 )
 
 /**
+ * Request-Body fuer den QR-Login-Endpunkt POST /auth/vorstand/qr-login.
+ * Wird als JSON gesendet: {"token": "fwv-app-..."}
+ */
+data class QrLoginRequest(
+    val token: String  // Persistenter App-Token aus dem QR-Code
+)
+
+/**
  * Response-Body vom Login-Endpunkt.
  * Bei erfolgreichem Login enthaelt die Antwort den JWT-Token und User-Informationen.
  */

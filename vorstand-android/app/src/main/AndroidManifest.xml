@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:name=".VorstandApp"
@@ -13,6 +15,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FWVVorstand"
         android:usesCleartextTraffic="false">
+
+        <!-- Pre-cache des ML-Kit Barcode-Models bei der Installation,
+             damit der QR-Scan ohne Wartezeit funktioniert -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode" />
 
         <activity
             android:name=".ui.login.LoginActivity"
@@ -27,6 +35,11 @@
         <activity
             android:name=".MainActivity"
             android:exported="false" />
+
+        <activity
+            android:name=".ui.login.QrScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
