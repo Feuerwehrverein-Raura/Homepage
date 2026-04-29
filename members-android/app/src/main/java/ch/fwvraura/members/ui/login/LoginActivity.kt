@@ -13,7 +13,6 @@ import ch.fwvraura.members.MainActivity
 import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
-import ch.fwvraura.members.data.model.OrganizerLoginRequest
 import ch.fwvraura.members.databinding.ActivityLoginBinding
 import ch.fwvraura.members.util.OidcConstants
 import com.google.android.material.tabs.TabLayout
@@ -81,8 +80,7 @@ class LoginActivity : AppCompatActivity() {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 binding.errorText.visibility = View.GONE
                 binding.paneMember.visibility = if (tab.position == 0) View.VISIBLE else View.GONE
-                binding.paneOrganizer.visibility = if (tab.position == 1) View.VISIBLE else View.GONE
-                binding.paneQr.visibility = if (tab.position == 2) View.VISIBLE else View.GONE
+                binding.paneQr.visibility = if (tab.position == 1) View.VISIBLE else View.GONE
             }
             override fun onTabUnselected(tab: TabLayout.Tab) {}
             override fun onTabReselected(tab: TabLayout.Tab) {}
@@ -92,53 +90,8 @@ class LoginActivity : AppCompatActivity() {
     private fun setupActions() {
         binding.btnMemberLogin.setOnClickListener { startOidcLogin() }
 
-        binding.btnOrganizerLogin.setOnClickListener {
-            val email = binding.orgEmailInput.text?.toString()?.trim().orEmpty()
-            val password = binding.orgPasswordInput.text?.toString().orEmpty()
-            if (email.isEmpty() || password.isEmpty()) {
-                showError(getString(R.string.login_error_empty))
-                return@setOnClickListener
-            }
-            doOrganizerLogin(email, password)
-        }
-
         binding.btnQrLogin.setOnClickListener {
             startActivity(Intent(this, QrScannerActivity::class.java))
-        }
-    }
-
-    private fun doOrganizerLogin(email: String, password: String) {
-        binding.loginProgress.visibility = View.VISIBLE
-        binding.errorText.visibility = View.GONE
-        binding.btnOrganizerLogin.isEnabled = false
-        lifecycleScope.launch {
-            try {
-                val response = ApiModule.authApi.organizerLogin(OrganizerLoginRequest(email, password))
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    if (body == null) {
-                        showError("Leere Antwort vom Server")
-                        return@launch
-                    }
-                    val tm = MembersApp.instance.tokenManager
-                    tm.token = body.token
-                    tm.accountType = "organizer"
-                    tm.userEmail = email
-                    tm.eventId = body.event_id
-                    navigateToMain()
-                } else {
-                    val msg = when (response.code()) {
-                        401 -> "Ungültige Anmeldedaten"
-                        else -> "Anmeldung fehlgeschlagen (${response.code()})"
-                    }
-                    showError(msg)
-                }
-            } catch (e: Exception) {
-                showError("Netzwerkfehler: ${e.message}")
-            } finally {
-                binding.loginProgress.visibility = View.GONE
-                binding.btnOrganizerLogin.isEnabled = true
-            }
         }
     }
 

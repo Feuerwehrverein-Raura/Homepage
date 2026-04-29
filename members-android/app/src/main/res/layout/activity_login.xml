@@ -57,7 +57,6 @@
                 app:tabSelectedTextColor="@color/primary"
                 app:tabTextColor="@color/text_secondary">
                 <com.google.android.material.tabs.TabItem android:text="@string/login_tab_member" />
-                <com.google.android.material.tabs.TabItem android:text="@string/login_tab_organizer" />
                 <com.google.android.material.tabs.TabItem android:text="@string/login_tab_qr" />
             </com.google.android.material.tabs.TabLayout>
 
@@ -82,51 +81,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:text="@string/login_member_button"
-                    android:textSize="15sp"
-                    app:cornerRadius="12dp" />
-            </LinearLayout>
-
-            <!-- Organisator-Bereich -->
-            <LinearLayout
-                android:id="@+id/paneOrganizer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="24dp"
-                android:visibility="gone">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:hint="@string/login_organizer_email"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/orgEmailInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textEmailAddress" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:hint="@string/login_organizer_password"
-                    app:endIconMode="password_toggle"
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/orgPasswordInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="textPassword" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnOrganizerLogin"
-                    android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:text="@string/login_organizer_button"
                     android:textSize="15sp"
                     app:cornerRadius="12dp" />
             </LinearLayout>
