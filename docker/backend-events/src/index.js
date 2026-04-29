@@ -1758,6 +1758,112 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
 // ============================================
 
 // DEUTSCH: Alle Registrierungen mit Filtern abrufen (nur Vorstand). Inkl. Schicht-Details und geparste Notizen
+// DEUTSCH: Events bei denen der eingeloggte User der Organisator ist (per E-Mail-Match).
+// Erlaubt der Mitglieder-App den "Organisator"-Tab automatisch einzublenden ohne
+// separates Event-Login.
+app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
+    try {
+        const email = (req.user?.email || '').toLowerCase();
+        if (!email) return res.json([]);
+        const result = await pool.query(
+            `SELECT * FROM events WHERE LOWER(organizer_email) = $1
+             AND (end_date IS NULL OR end_date >= NOW() - INTERVAL '7 days')
+             ORDER BY start_date ASC`,
+            [email]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Anmeldungen fuer ein Event, das der eingeloggte User organisiert.
+// Erlaubt Mitgliedern (per E-Mail-Match auf event.organizer_email) Anmeldungen zu sehen,
+// ohne dass sie sich mit dem Event-Token einloggen muessen.
+app.get('/events/:id/organizer-registrations', authenticateAny, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userEmail = (req.user?.email || '').toLowerCase();
+        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+
+        const event = await pool.query('SELECT id, organizer_email FROM events WHERE id = $1', [id]);
+        if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
+
+        const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        if (!isPrivileged && !isOrganizer) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
+        }
+
+        const regs = await pool.query(
+            `SELECT r.*, m.vorname AS member_vorname, m.nachname AS member_nachname
+             FROM registrations r
+             LEFT JOIN members m ON r.member_id = m.id
+             WHERE r.event_id = $1
+             ORDER BY r.created_at DESC`,
+            [id]
+        );
+        for (const reg of regs.rows) {
+            if (reg.notes) {
+                try { reg.parsed_notes = JSON.parse(reg.notes); } catch (_) { /* keep raw */ }
+            }
+        }
+        res.json(regs.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Anmeldung als Event-Organisator (per E-Mail-Match) genehmigen.
+app.post('/events/:eventId/registrations/:regId/approve-as-organizer', authenticateAny, async (req, res) => {
+    return organizerActOnRegistration(req, res, 'approved');
+});
+
+// DEUTSCH: Anmeldung als Event-Organisator ablehnen.
+app.post('/events/:eventId/registrations/:regId/reject-as-organizer', authenticateAny, async (req, res) => {
+    return organizerActOnRegistration(req, res, 'rejected');
+});
+
+async function organizerActOnRegistration(req, res, newStatus) {
+    try {
+        const { eventId, regId } = req.params;
+        const userEmail = (req.user?.email || '').toLowerCase();
+        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+
+        const event = await pool.query('SELECT id, title, organizer_email FROM events WHERE id = $1', [eventId]);
+        if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
+
+        const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        if (!isPrivileged && !isOrganizer) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
+        }
+
+        const result = await pool.query(
+            `UPDATE registrations SET status = $1, approved_by = $2, approved_at = NOW()
+             WHERE id = $3 AND event_id = $4
+             RETURNING *`,
+            [newStatus, req.user.email || req.user.name, regId, eventId]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
+
+        const reg = result.rows[0];
+        if (reg.guest_email) {
+            const subject = newStatus === 'approved'
+                ? `Ihre Anmeldung wurde bestätigt - ${event.rows[0].title}`
+                : `Ihre Anmeldung wurde abgelehnt - ${event.rows[0].title}`;
+            const body = newStatus === 'approved'
+                ? `Guten Tag ${reg.guest_name},\n\nIhre Anmeldung für "${event.rows[0].title}" wurde bestätigt.\n\nWir freuen uns auf Sie!\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
+                : `Guten Tag ${reg.guest_name},\n\nLeider müssen wir Ihre Anmeldung für "${event.rows[0].title}" ablehnen.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`;
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, { to: reg.guest_email, subject, body });
+            } catch (e) { console.error('Email-Versand fehlgeschlagen:', e.message); }
+        }
+
+        res.json({ success: true, registration: reg });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
 app.get('/registrations/manage', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { event_id, status } = req.query;
