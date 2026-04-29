@@ -9934,9 +9934,8 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             document.getElementById('app-qr-display').classList.add('hidden');
             document.getElementById('app-qr-list-section').classList.remove('hidden');
             document.getElementById('app-qr-description').value = '';
-            // Admin sieht E-Mail-Auswahl, andere nur eigenes
-            const isAdmin = (currentUser?.role === 'admin');
-            document.getElementById('app-qr-target-row').classList.toggle('hidden', !isAdmin);
+            // E-Mail-Auswahl ist fuer alle Vorstandsmitglieder sichtbar
+            document.getElementById('app-qr-target-row').classList.remove('hidden');
             await loadAppQrTokens();
         }
 
@@ -9970,9 +9969,10 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 
         async function createAppQrToken() {
             const description = document.getElementById('app-qr-description').value.trim();
-            const isAdmin = (currentUser?.role === 'admin');
-            const body = { description };
-            if (isAdmin) body.email = document.getElementById('app-qr-target-email').value;
+            const body = {
+                description,
+                email: document.getElementById('app-qr-target-email').value
+            };
             try {
                 const r = await fetch(`${API_BASE}/auth/vorstand/app-tokens`, {
                     method: 'POST',

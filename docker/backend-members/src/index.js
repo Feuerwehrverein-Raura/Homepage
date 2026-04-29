@@ -535,40 +535,34 @@ function getRoleName(role) {
 // einmal im Web generiert, als QR ausgedruckt und dauerhaft per Scan verwendet.
 // ============================================
 
-// DEUTSCH: Liste der App-Tokens. Admin sieht alle, andere nur eigene.
+// DEUTSCH: Liste aller App-Tokens (jedes Vorstandsmitglied sieht alle, da der Vorstand
+// gemeinschaftlich entscheidet, fuer wen ein Zugang erstellt wird).
 app.get('/auth/vorstand/app-tokens', authenticateVorstand, async (req, res) => {
     try {
-        const isAdmin = (req.user.groups || []).includes('admin');
-        const sql = isAdmin
-            ? `SELECT id, email, description, created_at, last_used_at FROM vorstand_app_tokens WHERE revoked_at IS NULL ORDER BY email, created_at DESC`
-            : `SELECT id, email, description, created_at, last_used_at FROM vorstand_app_tokens WHERE email = $1 AND revoked_at IS NULL ORDER BY created_at DESC`;
-        const params = isAdmin ? [] : [req.user.email];
-        const result = await pool.query(sql, params);
+        const result = await pool.query(
+            `SELECT id, email, description, created_at, last_used_at
+             FROM vorstand_app_tokens
+             WHERE revoked_at IS NULL
+             ORDER BY email, created_at DESC`
+        );
         res.json(result.rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// DEUTSCH: Neuen App-Token erstellen. Admin kann fuer beliebige Vorstand-E-Mail
-// generieren (z.B. um aelteren Mitgliedern einen ausgedruckten QR zu uebergeben);
-// Nicht-Admin nur fuer sich selbst. Gibt den Klartext-Token einmalig zurueck.
+// DEUTSCH: Neuen App-Token erstellen. Jedes Vorstandsmitglied darf fuer beliebige
+// Vorstand-E-Mail einen Token generieren (z.B. um aelteren Mitgliedern einen
+// ausgedruckten QR zu uebergeben). Audit-Log dokumentiert wer den Token erstellt hat.
 app.post('/auth/vorstand/app-tokens', authenticateVorstand, async (req, res) => {
     try {
         const { description, email: targetEmail } = req.body;
-        const isAdmin = (req.user.groups || []).includes('admin');
+        const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,materialwart@fwv-raura.ch,beisitzer@fwv-raura.ch')
+            .split(',').map(e => e.trim().toLowerCase());
 
-        let email = req.user.email;
-        if (targetEmail && targetEmail.toLowerCase() !== req.user.email.toLowerCase()) {
-            if (!isAdmin) {
-                return res.status(403).json({ error: 'Nur Admin darf Tokens fuer andere erstellen' });
-            }
-            const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,materialwart@fwv-raura.ch,beisitzer@fwv-raura.ch')
-                .split(',').map(e => e.trim().toLowerCase());
-            email = targetEmail.toLowerCase();
-            if (!allowedEmails.includes(email)) {
-                return res.status(400).json({ error: 'E-Mail-Adresse ist kein gueltiger Vorstand-Account' });
-            }
+        const email = (targetEmail || req.user.email).toLowerCase();
+        if (!allowedEmails.includes(email)) {
+            return res.status(400).json({ error: 'E-Mail-Adresse ist kein gueltiger Vorstand-Account' });
         }
 
         const token = 'fwv-app-' + crypto.randomBytes(32).toString('base64url');
@@ -587,15 +581,15 @@ app.post('/auth/vorstand/app-tokens', authenticateVorstand, async (req, res) => 
     }
 });
 
-// DEUTSCH: App-Token widerrufen. Admin darf alle widerrufen, andere nur eigene.
+// DEUTSCH: App-Token widerrufen. Jedes Vorstandsmitglied darf alle widerrufen.
 app.delete('/auth/vorstand/app-tokens/:id', authenticateVorstand, async (req, res) => {
     try {
-        const isAdmin = (req.user.groups || []).includes('admin');
-        const sql = isAdmin
-            ? `UPDATE vorstand_app_tokens SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL RETURNING id, email`
-            : `UPDATE vorstand_app_tokens SET revoked_at = NOW() WHERE id = $1 AND email = $2 AND revoked_at IS NULL RETURNING id, email`;
-        const params = isAdmin ? [req.params.id] : [req.params.id, req.user.email];
-        const result = await pool.query(sql, params);
+        const result = await pool.query(
+            `UPDATE vorstand_app_tokens SET revoked_at = NOW()
+             WHERE id = $1 AND revoked_at IS NULL
+             RETURNING id, email`,
+            [req.params.id]
+        );
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Token nicht gefunden' });
         }
