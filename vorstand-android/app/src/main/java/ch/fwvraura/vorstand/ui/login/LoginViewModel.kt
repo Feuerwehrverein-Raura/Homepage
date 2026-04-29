@@ -68,7 +68,11 @@ class LoginViewModel : ViewModel() {
                 val response = ApiModule.authApi.login(LoginRequest(email, password))
                 if (response.isSuccessful) {
                     // Erfolgreiche Antwort: Token und Benutzerdaten speichern
-                    val body = response.body()!!
+                    val body = response.body()
+                    if (body == null) {
+                        _loginState.value = LoginState.Error("Leere Antwort vom Server")
+                        return@launch
+                    }
                     val tokenManager = VorstandApp.instance.tokenManager
                     tokenManager.token = body.token
                     tokenManager.userEmail = body.user.email

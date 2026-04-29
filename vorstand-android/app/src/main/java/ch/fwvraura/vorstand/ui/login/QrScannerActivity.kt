@@ -149,7 +149,11 @@ class QrScannerActivity : AppCompatActivity() {
             try {
                 val response = ApiModule.authApi.qrLogin(QrLoginRequest(token))
                 if (response.isSuccessful) {
-                    val body = response.body()!!
+                    val body = response.body()
+                    if (body == null) {
+                        showError("Leere Antwort vom Server")
+                        return@launch
+                    }
                     val tokenManager = VorstandApp.instance.tokenManager
                     tokenManager.token = body.token
                     tokenManager.userEmail = body.user.email
