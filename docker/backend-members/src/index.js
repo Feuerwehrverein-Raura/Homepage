@@ -2080,7 +2080,8 @@ app.put('/members/me', authenticateToken, async (req, res) => {
         // Format phone numbers before processing
         const telefon = formatPhoneNumber(req.body.telefon);
         const mobile = formatPhoneNumber(req.body.mobile);
-        const { email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen } = req.body;
+        const { email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen,
+                vorname, nachname, geburtstag, anrede } = req.body;
 
         console.log('PUT /members/me called for user:', req.user?.email);
 
@@ -2100,6 +2101,10 @@ app.put('/members/me', authenticateToken, async (req, res) => {
         // Track which fields changed with old and new values
         const changedFields = [];
         const fieldLabels = {
+            anrede: 'Anrede',
+            vorname: 'Vorname',
+            nachname: 'Nachname',
+            geburtstag: 'Geburtstag',
             telefon: 'Telefon',
             mobile: 'Mobile',
             email: 'E-Mail',
@@ -2112,7 +2117,7 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             bemerkungen: 'Bemerkungen'
         };
 
-        const updates = { telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen };
+        const updates = { anrede, vorname, nachname, geburtstag, telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen };
         for (const [field, value] of Object.entries(updates)) {
             if (value !== undefined && value !== currentMember[field]) {
                 const oldValue = currentMember[field] || '(leer)';
@@ -2138,10 +2143,15 @@ app.put('/members/me', authenticateToken, async (req, res) => {
                 ort = COALESCE($8, ort),
                 iban = COALESCE($9, iban),
                 bemerkungen = COALESCE($10, bemerkungen),
+                vorname = COALESCE($11, vorname),
+                nachname = COALESCE($12, nachname),
+                geburtstag = COALESCE($13, geburtstag),
+                anrede = COALESCE($14, anrede),
                 updated_at = NOW()
-            WHERE id = $11
+            WHERE id = $15
             RETURNING *
-        `, [telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen, memberId]);
+        `, [telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen,
+            vorname, nachname, geburtstag, anrede, memberId]);
 
         console.log('Profile updated successfully for:', req.user.email);
 

@@ -39,6 +39,11 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
+        <activity
+            android:name=".ui.profile.EditProfileActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
         <!-- AppAuth: empfaengt OIDC-Redirect von Authentik -->
         <activity
             android:name="net.openid.appauth.RedirectUriReceiverActivity"

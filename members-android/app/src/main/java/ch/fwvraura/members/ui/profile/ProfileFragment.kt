@@ -1,5 +1,6 @@
 package ch.fwvraura.members.ui.profile
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -26,12 +27,20 @@ class ProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.swipeRefresh.setOnRefreshListener { loadProfile() }
+        binding.btnEdit.setOnClickListener {
+            startActivity(Intent(requireContext(), EditProfileActivity::class.java))
+        }
 
         // Sofort die in TokenManager gespeicherten Daten anzeigen
         val tm = MembersApp.instance.tokenManager
         binding.profileName.text = tm.userName ?: tm.userEmail ?: "FWV-Mitglied"
         binding.profileEmail.text = tm.userEmail.orEmpty()
 
+        loadProfile()
+    }
+
+    override fun onResume() {
+        super.onResume()
         loadProfile()
     }
 
