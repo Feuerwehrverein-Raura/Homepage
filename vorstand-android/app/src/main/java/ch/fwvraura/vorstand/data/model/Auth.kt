@@ -39,3 +39,14 @@ data class UserInfo(
     val name: String? = null,        // Anzeigename (optional)
     val groups: List<String>? = null // Gruppen-Zugehoerigkeiten (optional, fuer Berechtigungen)
 )
+
+/**
+ * Inhalt eines gescannten Login-QR-Codes. Top-Level damit ProGuard die Klasse
+ * fuer die Gson-Deserialisierung nicht entfernt (innere Klassen sind anders behandelt).
+ */
+data class QrLoginPayload(
+    val v: Int? = null,
+    val type: String? = null,
+    val email: String? = null,
+    val token: String? = null
+)

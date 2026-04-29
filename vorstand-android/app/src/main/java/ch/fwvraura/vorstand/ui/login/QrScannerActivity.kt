@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.vorstand.MainActivity
 import ch.fwvraura.vorstand.VorstandApp
 import ch.fwvraura.vorstand.data.api.ApiModule
+import ch.fwvraura.vorstand.data.model.QrLoginPayload
 import ch.fwvraura.vorstand.data.model.QrLoginRequest
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
@@ -143,7 +144,7 @@ class QrScannerActivity : AppCompatActivity() {
 
     private fun parseToken(raw: String): String? {
         return try {
-            val payload = gson.fromJson(raw, QrPayload::class.java)
+            val payload = gson.fromJson(raw, QrLoginPayload::class.java)
             if (payload?.type == "fwv-vorstand-login" && !payload.token.isNullOrBlank()) {
                 payload.token
             } else null
@@ -170,10 +171,4 @@ class QrScannerActivity : AppCompatActivity() {
         try { barcodeScannerView.pauseAndWait() } catch (_: Exception) { }
     }
 
-    private data class QrPayload(
-        val v: Int? = null,
-        val type: String? = null,
-        val email: String? = null,
-        val token: String? = null
-    )
 }
