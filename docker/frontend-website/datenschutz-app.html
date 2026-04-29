@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="de" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datenschutzerklärung – FWV Raura Mitglieder-App</title>
+    <meta name="description" content="Datenschutzerklärung für die FWV Raura Mitglieder-App.">
+    <meta name="robots" content="index, follow">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="images/logo.png">
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <header class="bg-fire-700 text-white py-6 shadow-lg" style="background-color:#b91c1c;">
+        <div class="container mx-auto px-4 flex items-center gap-4">
+            <img src="images/logo.png" alt="FWV Raura" class="h-12 w-12 rounded-full bg-white p-1">
+            <div>
+                <h1 class="text-2xl font-bold">Datenschutzerklärung</h1>
+                <p class="text-sm opacity-90">FWV Raura Mitglieder-App</p>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 py-8 max-w-3xl">
+        <p class="text-sm text-gray-600 mb-6">Stand: April 2026 · Verantwortlich: Feuerwehrverein Raura, Kaiseraugst</p>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">1. Überblick</h2>
+            <p>Der Feuerwehrverein Raura (nachfolgend «FWV Raura» oder «wir») betreibt die Mitglieder-App «FWV Raura» für Android. Diese Erklärung beschreibt, welche Daten die App verarbeitet, zu welchem Zweck und wer Zugriff darauf hat.</p>
+            <p class="mt-3">Verantwortlich für die Datenverarbeitung:<br>
+                <strong>Feuerwehrverein Raura</strong><br>
+                Kaiseraugst, Schweiz<br>
+                E-Mail: <a class="text-red-700 underline" href="mailto:vorstand@fwv-raura.ch">vorstand@fwv-raura.ch</a></p>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">2. Welche Daten erhebt die App?</h2>
+            <h3 class="font-semibold mt-3">2.1 Beim Login als Mitglied (Authentik)</h3>
+            <ul class="list-disc list-inside ml-2 space-y-1">
+                <li>E-Mail-Adresse</li>
+                <li>Vor- und Nachname</li>
+                <li>Funktion im Verein (z. B. «Aktuar», «Mitglied»)</li>
+                <li>Authentifizierungs-Token (lokal verschlüsselt im Gerät)</li>
+            </ul>
+            <h3 class="font-semibold mt-4">2.2 Beim Login als Veranstaltungs-Organisator</h3>
+            <ul class="list-disc list-inside ml-2 space-y-1">
+                <li>Event-spezifische E-Mail-Adresse und Passwort</li>
+                <li>Authentifizierungs-Token (lokal verschlüsselt im Gerät)</li>
+            </ul>
+            <h3 class="font-semibold mt-4">2.3 Bei der Anmeldung zu einer Veranstaltung</h3>
+            <ul class="list-disc list-inside ml-2 space-y-1">
+                <li>Name und Kontaktdaten</li>
+                <li>Optional: Anzahl Begleitpersonen, Allergien, Menüauswahl, Bemerkungen</li>
+            </ul>
+            <h3 class="font-semibold mt-4">2.4 Geräte-Token (optional, für Push-Benachrichtigungen)</h3>
+            <p>Wenn Push-Benachrichtigungen aktiviert sind, registriert die App einen anonymen Geräte-Token bei Firebase Cloud Messaging (Google), um Benachrichtigungen über neue Veranstaltungen zu liefern. Dieser Token enthält keine personenbezogenen Daten und kann jederzeit in den App-Einstellungen widerrufen werden.</p>
+            <h3 class="font-semibold mt-4">2.5 Was die App NICHT erhebt</h3>
+            <ul class="list-disc list-inside ml-2 space-y-1">
+                <li>Keine Standortdaten</li>
+                <li>Keine Werbe-IDs</li>
+                <li>Keine Tracking-/Analyse-Frameworks</li>
+                <li>Keine Kontaktliste, Fotos oder andere Geräte-Inhalte</li>
+                <li>Kamera nur, wenn du den QR-Login-Scanner aktiv öffnest — keine Hintergrund-Aufnahmen</li>
+            </ul>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">3. Wo werden die Daten gespeichert?</h2>
+            <p>Alle personenbezogenen Daten werden auf eigenen Servern in Deutschland (Hetzner Online GmbH) gespeichert. Es gibt keine Weitergabe an Dritte ausserhalb der vom FWV Raura selbst betriebenen Infrastruktur:</p>
+            <ul class="list-disc list-inside ml-2 mt-2 space-y-1">
+                <li><code>api.fwv-raura.ch</code> — Mitglieder- und Event-API</li>
+                <li><code>auth.fwv-raura.ch</code> — Authentik (Login)</li>
+                <li><code>order.fwv-raura.ch</code> — Bestell-/Anmelde-Backend</li>
+            </ul>
+            <p class="mt-3">Push-Token (sofern aktiviert) werden bei Google Firebase Cloud Messaging (USA) registriert. Über diesen Token kann Google keine Verbindung zu deiner Identität herstellen.</p>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">4. Zwecke der Datenverarbeitung</h2>
+            <ul class="list-disc list-inside ml-2 space-y-1">
+                <li>Authentifizierung und Zugriffskontrolle</li>
+                <li>Verwaltung der Vereinsmitgliedschaft</li>
+                <li>Anmeldung zu Vereinsanlässen und Versand von Bestätigungen</li>
+                <li>Information über kommende Veranstaltungen</li>
+            </ul>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">5. Berechtigungen der App</h2>
+            <ul class="list-disc list-inside ml-2 space-y-1">
+                <li><strong>Internet</strong> — für die Kommunikation mit den FWV-Servern</li>
+                <li><strong>Kamera</strong> — nur beim Öffnen des QR-Login-Scanners</li>
+                <li><strong>Benachrichtigungen</strong> — optional für Push-Mitteilungen über neue Anlässe</li>
+            </ul>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">6. Deine Rechte</h2>
+            <ul class="list-disc list-inside ml-2 space-y-1">
+                <li><strong>Auskunft</strong> über die zu dir gespeicherten Daten</li>
+                <li><strong>Berichtigung</strong> falscher Daten (auch direkt im Profil-Bereich der App)</li>
+                <li><strong>Löschung</strong> deines Mitglieder-Accounts und aller damit verbundenen Daten</li>
+                <li><strong>Datenübertragbarkeit</strong> — auf Anfrage erhältst du deine Daten als JSON-Export</li>
+            </ul>
+            <p class="mt-3">Anfragen richtest du bitte schriftlich oder per E-Mail an <a class="text-red-700 underline" href="mailto:vorstand@fwv-raura.ch">vorstand@fwv-raura.ch</a>. Eine Account-Löschung ist auch direkt in der App möglich (Profil → Account löschen).</p>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">7. Aufbewahrungsfristen</h2>
+            <p>Mitgliederdaten werden für die Dauer der Mitgliedschaft gespeichert, anschliessend gemäss Vereinsstatuten archiviert (für Statistik und Vereinsgeschichte) oder vollständig gelöscht. Anmeldungen zu vergangenen Anlässen werden 3 Monate nach dem Anlass anonymisiert.</p>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">8. Sicherheit</h2>
+            <p>Die App kommuniziert ausschliesslich verschlüsselt (TLS 1.2+). Authentifizierungs-Token werden im Gerät über Android EncryptedSharedPreferences abgelegt. Server-seitig werden Passwörter nur als Hash gespeichert (Authentik nutzt argon2, Mailcow nutzt BLF-CRYPT).</p>
+        </section>
+
+        <section class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold mb-3">9. Änderungen dieser Erklärung</h2>
+            <p>Wir können diese Datenschutzerklärung bei Änderungen an der App oder Infrastruktur aktualisieren. Die jeweils aktuelle Version ist unter <a class="text-red-700 underline" href="https://www.fwv-raura.ch/datenschutz-app.html">www.fwv-raura.ch/datenschutz-app.html</a> verfügbar.</p>
+        </section>
+
+        <p class="text-center text-sm text-gray-500 mt-8"><a href="index.html" class="text-red-700 underline">Zurück zur Vereinsseite</a></p>
+    </main>
+</body>
+</html>
