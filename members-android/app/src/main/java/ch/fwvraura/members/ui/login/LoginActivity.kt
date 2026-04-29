@@ -147,18 +147,40 @@ class LoginActivity : AppCompatActivity() {
         val tm = MembersApp.instance.tokenManager
         tm.token = token
         tm.accountType = "member"
-        // Profil im Hintergrund laden, um Name/E-Mail anzuzeigen
+        // Profil laden, um Vorstands-User abzuweisen und Name/E-Mail zu setzen.
+        binding.loginProgress.visibility = View.VISIBLE
         lifecycleScope.launch {
             try {
                 val profile = ApiModule.membersApi.getMe().body()
+                if (profile != null && isVorstandFunktion(profile.funktion)) {
+                    tm.clear()
+                    binding.loginProgress.visibility = View.GONE
+                    showError("Vorstandsmitglieder nutzen bitte die separate Vorstand-App.")
+                    return@launch
+                }
                 if (profile != null) {
                     tm.userEmail = profile.email
                     tm.userName = listOfNotNull(profile.vorname, profile.nachname)
                         .joinToString(" ").ifBlank { null }
                 }
-            } catch (_: Exception) { /* nicht kritisch */ }
+            } catch (_: Exception) { /* nicht kritisch — kein Profil = kein Vorstand-Check moeglich */ }
             navigateToMain()
         }
+    }
+
+    /** Erkennt Vorstandsfunktionen anhand des members.funktion-Felds. */
+    private fun isVorstandFunktion(funktion: String?): Boolean {
+        if (funktion.isNullOrBlank()) return false
+        val keywords = listOf(
+            "präsident", "praesident",
+            "aktuar",
+            "kassier",
+            "materialwart",
+            "beisitzer",
+            "admin"
+        )
+        val lower = funktion.lowercase()
+        return keywords.any { lower.contains(it) }
     }
 
     private fun showError(msg: String) {
