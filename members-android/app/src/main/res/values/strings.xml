@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FWV Raura</string>
+    <string name="login_title">Anmelden</string>
+    <string name="login_subtitle">Feuerwehrverein Raura</string>
+    <string name="login_tab_member">Mitglied</string>
+    <string name="login_tab_organizer">Organisator</string>
+    <string name="login_tab_qr">QR-Code</string>
+    <string name="login_member_hint">Anmeldung über das offizielle Vereins-Login (auth.fwv-raura.ch). Du wirst kurz zum Browser geleitet.</string>
+    <string name="login_member_button">Mit Mitglieder-Konto anmelden</string>
+    <string name="login_organizer_email">Event-E-Mail</string>
+    <string name="login_organizer_password">Passwort</string>
+    <string name="login_organizer_button">Als Organisator anmelden</string>
+    <string name="login_qr_hint">Scanne den QR-Code, den dir der Vorstand gegeben hat.</string>
+    <string name="login_qr_button">QR-Code scannen</string>
+    <string name="login_error_empty">Bitte E-Mail und Passwort eingeben</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="logout">Abmelden</string>
+    <string name="placeholder_main">Willkommen im FWV-Mitgliederbereich. Funktionen kommen Schritt für Schritt.</string>
+</resources>
