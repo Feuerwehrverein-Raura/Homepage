@@ -1758,6 +1758,35 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
 // ============================================
 
 // DEUTSCH: Alle Registrierungen mit Filtern abrufen (nur Vorstand). Inkl. Schicht-Details und geparste Notizen
+// DEUTSCH: Eigene Anmeldungen des eingeloggten Users (Mitglieder-App-Profil).
+// Matcht entweder ueber member_id (wenn das members-Backend die Mitgliedschaft verknuepft hat)
+// oder ueber guest_email == req.user.email als Fallback.
+app.get('/registrations/mine', authenticateAny, async (req, res) => {
+    try {
+        const email = (req.user?.email || '').toLowerCase();
+        if (!email) return res.json([]);
+        const result = await pool.query(
+            `SELECT r.*, e.title AS event_title, e.slug AS event_slug,
+                    e.start_date AS event_start_date, e.end_date AS event_end_date,
+                    e.location AS event_location
+             FROM registrations r
+             JOIN events e ON r.event_id = e.id
+             WHERE LOWER(r.guest_email) = $1
+                OR r.member_id IN (SELECT id FROM members WHERE LOWER(email) = $1)
+             ORDER BY e.start_date DESC`,
+            [email]
+        );
+        for (const reg of result.rows) {
+            if (reg.notes) {
+                try { reg.parsed_notes = JSON.parse(reg.notes); } catch (_) {}
+            }
+        }
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Events bei denen der eingeloggte User der Organisator ist (per E-Mail-Match).
 // Erlaubt der Mitglieder-App den "Organisator"-Tab automatisch einzublenden ohne
 // separates Event-Login.

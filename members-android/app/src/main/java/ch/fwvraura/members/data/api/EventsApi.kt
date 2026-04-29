@@ -2,6 +2,7 @@ package ch.fwvraura.members.data.api
 
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.data.model.EventRegistration
+import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.data.model.PublicRegistrationRequest
 import ch.fwvraura.members.data.model.PublicRegistrationResponse
 import retrofit2.Response
@@ -52,4 +53,8 @@ interface EventsApi {
         @Path("eventId") eventId: String,
         @Path("regId") regId: String
     ): Response<Unit>
+
+    /** Eigene Anmeldungen des eingeloggten Users (mit Event-Details). */
+    @GET("registrations/mine")
+    suspend fun listMyRegistrations(): Response<List<MyRegistration>>
 }

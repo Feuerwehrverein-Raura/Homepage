@@ -7,14 +7,22 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.TextView
 import ch.fwvraura.members.MembersApp
+import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.data.model.PublicRegistrationRequest
+import ch.fwvraura.members.data.model.Shift
 import ch.fwvraura.members.databinding.ActivityEventDetailBinding
 import ch.fwvraura.members.databinding.DialogRegisterBinding
+import ch.fwvraura.members.databinding.DialogRegisterShiftsBinding
+import ch.fwvraura.members.databinding.ItemShiftChoiceBinding
 import ch.fwvraura.members.util.DateUtils
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.checkbox.MaterialCheckBox
 import kotlinx.coroutines.launch
 
 class EventDetailActivity : AppCompatActivity() {
@@ -38,7 +46,103 @@ class EventDetailActivity : AppCompatActivity() {
         loadEvent(eventId)
 
         binding.btnRegister.setOnClickListener {
-            event?.let { showRegisterDialog(it) }
+            event?.let { e ->
+                if (!e.shifts.isNullOrEmpty()) showShiftRegisterDialog(e)
+                else showRegisterDialog(e)
+            }
+        }
+    }
+
+    private fun renderShifts(shifts: List<Shift>) {
+        binding.shiftsHeader.visibility = View.VISIBLE
+        binding.shiftsList.visibility = View.VISIBLE
+        binding.shiftsList.removeAllViews()
+        for (s in shifts) {
+            val card = ItemShiftChoiceBinding.inflate(layoutInflater, binding.shiftsList, false)
+            card.shiftCheck.visibility = View.GONE
+            card.shiftName.text = listOfNotNull(s.bereich, s.name).joinToString(" – ")
+            val parts = mutableListOf<String>()
+            if (!s.date.isNullOrBlank()) parts.add(DateUtils.formatDate(s.date))
+            val time = listOfNotNull(s.startTime, s.endTime).joinToString(" - ")
+            if (time.isNotBlank()) parts.add(time)
+            if (s.needed != null) parts.add("${s.needed} Helfer")
+            card.shiftDetails.text = parts.joinToString(" · ")
+            binding.shiftsList.addView(card.root)
+        }
+    }
+
+    private fun showShiftRegisterDialog(e: Event) {
+        val dialogBinding = DialogRegisterShiftsBinding.inflate(LayoutInflater.from(this))
+        val tm = MembersApp.instance.tokenManager
+        if (!tm.userName.isNullOrBlank()) dialogBinding.regName.setText(tm.userName)
+        if (!tm.userEmail.isNullOrBlank()) dialogBinding.regEmail.setText(tm.userEmail)
+
+        val checkBoxes = mutableMapOf<String, MaterialCheckBox>()
+        for (s in e.shifts.orEmpty()) {
+            val item = ItemShiftChoiceBinding.inflate(layoutInflater, dialogBinding.shiftsContainer, false)
+            item.shiftName.text = listOfNotNull(s.bereich, s.name).joinToString(" – ")
+            val parts = mutableListOf<String>()
+            if (!s.date.isNullOrBlank()) parts.add(DateUtils.formatDate(s.date))
+            val time = listOfNotNull(s.startTime, s.endTime).joinToString(" - ")
+            if (time.isNotBlank()) parts.add(time)
+            item.shiftDetails.text = parts.joinToString(" · ")
+            checkBoxes[s.id] = item.shiftCheck
+            item.root.setOnClickListener { item.shiftCheck.isChecked = !item.shiftCheck.isChecked }
+            dialogBinding.shiftsContainer.addView(item.root)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Schicht-Anmeldung: ${e.title}")
+            .setView(dialogBinding.root)
+            .setPositiveButton("Anmelden") { _, _ ->
+                val name = dialogBinding.regName.text?.toString()?.trim().orEmpty()
+                val selected = checkBoxes.filter { it.value.isChecked }.keys.toList()
+                if (name.isBlank()) {
+                    Snackbar.make(binding.root, "Bitte Namen eingeben", Snackbar.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if (selected.isEmpty()) {
+                    Snackbar.make(binding.root, "Bitte mindestens eine Schicht wählen", Snackbar.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                submitShiftRegistration(
+                    e, name,
+                    dialogBinding.regEmail.text?.toString()?.trim().orEmpty(),
+                    dialogBinding.regPhone.text?.toString()?.trim().orEmpty(),
+                    dialogBinding.regNotes.text?.toString()?.trim().orEmpty(),
+                    selected
+                )
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun submitShiftRegistration(
+        e: Event, name: String, email: String, phone: String, notes: String, shiftIds: List<String>
+    ) {
+        val req = PublicRegistrationRequest(
+            type = "shift",
+            eventId = e.id,
+            eventTitle = e.title,
+            organizerEmail = e.organizerEmail,
+            name = name,
+            email = email.ifBlank { null },
+            phone = phone.ifBlank { null },
+            notes = notes.ifBlank { null },
+            shiftIds = shiftIds
+        )
+        lifecycleScope.launch {
+            try {
+                val response = ApiModule.eventsApi.publicRegister(req)
+                if (response.isSuccessful && response.body()?.success == true) {
+                    Snackbar.make(binding.root, "Anmeldung gesendet!", Snackbar.LENGTH_LONG).show()
+                } else {
+                    val msg = response.body()?.message ?: "Fehler ${response.code()}"
+                    Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
+                }
+            } catch (ex: Exception) {
+                Snackbar.make(binding.root, "Netzwerkfehler: ${ex.message}", Snackbar.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -92,8 +196,15 @@ class EventDetailActivity : AppCompatActivity() {
         binding.eventDescription.text = e.description.orEmpty()
         binding.eventDescription.visibility = if (e.description.isNullOrBlank()) View.GONE else View.VISIBLE
 
-        // Anmelde-Button nur sichtbar wenn Event Anmeldungen unterstuetzt
-        binding.btnRegister.visibility = if (regRequired) View.VISIBLE else View.GONE
+        if (!e.shifts.isNullOrEmpty()) renderShifts(e.shifts) else {
+            binding.shiftsHeader.visibility = View.GONE
+            binding.shiftsList.visibility = View.GONE
+        }
+
+        // Anmelde-Button: bei regRequired ODER wenn Schichten vorhanden
+        val canRegister = regRequired || !e.shifts.isNullOrEmpty()
+        binding.btnRegister.visibility = if (canRegister) View.VISIBLE else View.GONE
+        binding.btnRegister.text = if (!e.shifts.isNullOrEmpty()) "Helfen" else "Anmelden"
     }
 
     private fun buildDateText(e: Event): String {

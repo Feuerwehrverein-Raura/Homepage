@@ -13,7 +13,23 @@ data class PublicRegistrationRequest(
     val phone: String? = null,
     val participants: Int? = null,
     val notes: String? = null,
-    val allergies: String? = null
+    val allergies: String? = null,
+    /** Bei Schicht-Anmeldungen: IDs der gewaehlten Schichten. */
+    val shiftIds: List<String>? = null
+)
+
+/** Eine eigene Anmeldung mit eingebetteten Event-Daten (GET /registrations/mine). */
+data class MyRegistration(
+    val id: String,
+    val status: String? = null,
+    @SerializedName("event_id") val eventId: String? = null,
+    @SerializedName("event_title") val eventTitle: String? = null,
+    @SerializedName("event_start_date") val eventStartDate: String? = null,
+    @SerializedName("event_end_date") val eventEndDate: String? = null,
+    @SerializedName("event_location") val eventLocation: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("shift_ids") val shiftIds: List<String>? = null,
+    @SerializedName("parsed_notes") val parsedNotes: ParsedNotes? = null
 )
 
 data class PublicRegistrationResponse(

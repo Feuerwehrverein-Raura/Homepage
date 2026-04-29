@@ -19,5 +19,19 @@ data class Event(
     @SerializedName("max_participants") val maxParticipants: Int? = null,
     val cost: String? = null,
     @SerializedName("organizer_name") val organizerName: String? = null,
-    @SerializedName("organizer_email") val organizerEmail: String? = null
+    @SerializedName("organizer_email") val organizerEmail: String? = null,
+    val shifts: List<Shift>? = null
+)
+
+/** Eine Helfer-Schicht eines Events (z.B. Dorffest Bar Samstag Abend). */
+data class Shift(
+    val id: String,
+    @SerializedName("event_id") val eventId: String,
+    val name: String,
+    val description: String? = null,
+    val date: String? = null,
+    @SerializedName("start_time") val startTime: String? = null,
+    @SerializedName("end_time") val endTime: String? = null,
+    val needed: Int? = null,
+    val bereich: String? = null
 )

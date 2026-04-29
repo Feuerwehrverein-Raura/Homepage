@@ -1,6 +1,7 @@
 package ch.fwvraura.members.ui.profile
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +11,10 @@ import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.data.api.ApiModule
 import ch.fwvraura.members.data.model.MemberProfile
+import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.databinding.FragmentProfileBinding
+import ch.fwvraura.members.databinding.ItemMyRegistrationBinding
+import ch.fwvraura.members.util.DateUtils
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 
@@ -42,6 +46,38 @@ class ProfileFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         loadProfile()
+        loadMyRegistrations()
+    }
+
+    private fun loadMyRegistrations() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.eventsApi.listMyRegistrations()
+                if (response.isSuccessful) renderMyRegistrations(response.body().orEmpty())
+            } catch (_: Exception) { /* nicht kritisch */ }
+        }
+    }
+
+    private fun renderMyRegistrations(regs: List<MyRegistration>) {
+        binding.myRegsList.removeAllViews()
+        binding.myRegsEmpty.visibility = if (regs.isEmpty()) View.VISIBLE else View.GONE
+        for (r in regs) {
+            val item = ItemMyRegistrationBinding.inflate(layoutInflater, binding.myRegsList, false)
+            item.regEventTitle.text = r.eventTitle.orEmpty()
+            item.regEventDate.text = DateUtils.formatDate(r.eventStartDate)
+            item.regEventLocation.text = r.eventLocation.orEmpty()
+            item.regEventLocation.visibility = if (r.eventLocation.isNullOrBlank()) View.GONE else View.VISIBLE
+
+            val (label, color) = when (r.status) {
+                "approved" -> "Bestätigt" to Color.parseColor("#0F7A2D")
+                "rejected" -> "Abgelehnt" to Color.parseColor("#B91C1C")
+                "pending"  -> "Wartend" to Color.parseColor("#A05A00")
+                else       -> (r.status ?: "") to Color.parseColor("#4B5563")
+            }
+            item.regStatus.text = label
+            item.regStatus.setTextColor(color)
+            binding.myRegsList.addView(item.root)
+        }
     }
 
     private fun loadProfile() {
