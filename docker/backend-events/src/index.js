@@ -49,6 +49,31 @@ function logInfo(message, data = {}) { log('INFO', message, data); }
 function logWarn(message, data = {}) { log('WARN', message, data); }
 function logError(message, data = {}) { log('ERROR', message, data); }
 
+// DEUTSCH: AES-256-GCM Ver-/Entschluesselung fuer Event-Passwoerter, damit sie bei
+// einem Organisator-Wechsel wiederverwendet und in der Benachrichtigung mitgesendet
+// werden koennen. Nutzt JWT_SECRET als Schluesselableitungs-Quelle.
+const ENC_KEY = crypto.createHash('sha256').update(process.env.JWT_SECRET || 'fwv-fallback-key').digest();
+function encryptPassword(plain) {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', ENC_KEY, iv);
+    const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return Buffer.concat([iv, tag, enc]).toString('base64');
+}
+function decryptPassword(stored) {
+    try {
+        const buf = Buffer.from(stored, 'base64');
+        const iv = buf.subarray(0, 12);
+        const tag = buf.subarray(12, 28);
+        const enc = buf.subarray(28);
+        const decipher = crypto.createDecipheriv('aes-256-gcm', ENC_KEY, iv);
+        decipher.setAuthTag(tag);
+        return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
+    } catch (e) {
+        return null;
+    }
+}
+
 // DEUTSCH: Ermittelt die echte Client-IP (berücksichtigt Cloudflare, Proxy-Header)
 function getClientIp(req) {
     if (req.headers['cf-connecting-ip']) return req.headers['cf-connecting-ip'];
@@ -768,20 +793,22 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             eventAccessExpires.setMonth(eventAccessExpires.getMonth() + 3);
         }
 
+        const eventPasswordEncrypted = eventPassword ? encryptPassword(eventPassword) : null;
+
         const result = await pool.query(`
             INSERT INTO events (
                 slug, title, subtitle, description, start_date, end_date,
                 location, category, registration_required,
                 registration_deadline, max_participants, cost, status, image_url, tags,
-                organizer_name, organizer_email, event_email, event_password_hash, event_access_expires,
+                organizer_name, organizer_email, event_email, event_password_hash, event_password_encrypted, event_access_expires,
                 meal_options, pdf_attachment, pdf_filename
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
             RETURNING *
         `, [
             slug, title, subtitle, description, start_date, end_date,
             location, category, registration_required,
             registration_deadline, max_participants, cost, status || 'planned', image_url, tags,
-            organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventAccessExpires,
+            organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventPasswordEncrypted, eventAccessExpires,
             meal_options ? JSON.stringify(meal_options) : null,
             pdf_attachment || null, pdf_filename || null
         ]);
@@ -876,8 +903,9 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         values.push(id);
 
         // Vorherigen Organisator laden (um Änderung zu erkennen)
-        const oldEvent = await pool.query('SELECT organizer_email, organizer_name, title FROM events WHERE id = $1', [id]);
+        const oldEvent = await pool.query('SELECT organizer_email, organizer_name, title, event_password_encrypted FROM events WHERE id = $1', [id]);
         const oldOrgEmail = oldEvent.rows[0]?.organizer_email;
+        const oldEncryptedPw = oldEvent.rows[0]?.event_password_encrypted;
 
         const result = await pool.query(`
             UPDATE events SET ${setClause}, updated_at = NOW()
@@ -897,24 +925,36 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             ];
             const isVorstand = vorstandEmails.some(ve => newOrgEmail.toLowerCase() === ve.toLowerCase());
 
-            // Fuer Nicht-Vorstand: Event-Zugang erstellen oder bei Organisator-Wechsel neues Passwort generieren
+            // Fuer Nicht-Vorstand: Event-Zugang erstellen oder bei Organisator-Wechsel
+            // das bestehende Passwort wiederverwenden (entschluesselt aus event_password_encrypted)
             let eventPassword = null;
             if (!isVorstand) {
-                eventPassword = crypto.randomBytes(6).toString('base64').replace(/[+/=]/g, '').substring(0, 12);
-                const eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
-                const eventEmail = updatedEvent.event_email || `${updatedEvent.slug}@fwv-raura.ch`;
-                const endDate = updatedEvent.end_date ? new Date(updatedEvent.end_date) : new Date(updatedEvent.start_date);
-                const accessExpires = new Date(endDate);
-                accessExpires.setMonth(accessExpires.getMonth() + 3);
+                // Versuche das bestehende verschluesselte Passwort wiederzuverwenden
+                if (oldEncryptedPw) {
+                    eventPassword = decryptPassword(oldEncryptedPw);
+                }
+                if (!eventPassword) {
+                    // Kein altes Passwort vorhanden (oder Entschluesselung fehlgeschlagen):
+                    // neues generieren und verschluesselt + gehasht ablegen
+                    eventPassword = crypto.randomBytes(6).toString('base64').replace(/[+/=]/g, '').substring(0, 12);
+                    const eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
+                    const encrypted = encryptPassword(eventPassword);
+                    const eventEmail = updatedEvent.event_email || `${updatedEvent.slug}@fwv-raura.ch`;
+                    const endDate = updatedEvent.end_date ? new Date(updatedEvent.end_date) : new Date(updatedEvent.start_date);
+                    const accessExpires = new Date(endDate);
+                    accessExpires.setMonth(accessExpires.getMonth() + 3);
 
-                await pool.query(
-                    'UPDATE events SET event_email = $1, event_password_hash = $2, event_access_expires = $3 WHERE id = $4',
-                    [eventEmail, eventPasswordHash, accessExpires, id]
-                );
-                updatedEvent.event_email = eventEmail;
-                updatedEvent.event_access_expires = accessExpires;
-                const action = oldOrgEmail ? 'Organisator-Wechsel: neues Passwort generiert' : 'Event-Zugang erstellt';
-                console.log(`${action}: ${eventEmail}`);
+                    await pool.query(
+                        'UPDATE events SET event_email = $1, event_password_hash = $2, event_password_encrypted = $3, event_access_expires = $4 WHERE id = $5',
+                        [eventEmail, eventPasswordHash, encrypted, accessExpires, id]
+                    );
+                    updatedEvent.event_email = eventEmail;
+                    updatedEvent.event_access_expires = accessExpires;
+                    const action = oldOrgEmail ? 'Organisator-Wechsel: neues Passwort generiert (kein altes verfuegbar)' : 'Event-Zugang erstellt';
+                    console.log(`${action}: ${eventEmail}`);
+                } else {
+                    console.log(`Organisator-Wechsel: bestehendes Passwort wiederverwendet fuer ${updatedEvent.event_email}`);
+                }
             }
 
             try {
@@ -930,7 +970,7 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
                     if (eventPassword) {
                         emailBody += `\n\nDeine Zugangsdaten fuer das Event-Dashboard:\n\nURL: ${dashboardUrl}\nE-Mail: ${updatedEvent.event_email}\nPasswort: ${eventPassword}\n\nDieser Zugang ist gueltig bis ${new Date(updatedEvent.event_access_expires || Date.now()).toLocaleDateString('de-CH')}.`;
                     } else if (updatedEvent.event_email) {
-                        emailBody += `\n\nDein Event-Dashboard:\n${dashboardUrl}\nE-Mail: ${updatedEvent.event_email}\n(Passwort wurde bereits zugestellt)`;
+                        emailBody += `\n\nDein Event-Dashboard:\n${dashboardUrl}\nE-Mail: ${updatedEvent.event_email}\n(Bitte wende dich an den Aktuar fuer das Passwort)`;
                     }
 
                     emailBody += `\n\nIm Dashboard kannst du:\n- Alle Anmeldungen einsehen\n- Anmeldungen genehmigen oder ablehnen\n- Den Ueberblick ueber die Teilnehmerzahl behalten\n\nDu wirst automatisch per E-Mail benachrichtigt, wenn sich jemand anmeldet.`;
