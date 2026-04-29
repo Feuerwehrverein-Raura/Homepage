@@ -105,10 +105,8 @@ dependencies {
     // Encrypted SharedPreferences
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // CameraX + ML Kit Barcode-Scanning fuer QR-Code-Login
-    implementation("androidx.camera:camera-core:1.4.0")
-    implementation("androidx.camera:camera-camera2:1.4.0")
-    implementation("androidx.camera:camera-lifecycle:1.4.0")
-    implementation("androidx.camera:camera-view:1.4.0")
-    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    // QR-Code-Scanner (zxing-android-embedded). Reine Kotlin/Java-Implementation
+    // ohne Native Libraries -> kompatibel mit 16 KB Page-Size-Geraeten
+    // wie Pixel 9 / Fairphone 6 (Android 15+).
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }

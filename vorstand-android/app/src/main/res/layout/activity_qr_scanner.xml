@@ -6,20 +6,11 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <androidx.camera.view.PreviewView
-        android:id="@+id/previewView"
+    <com.journeyapps.barcodescanner.DecoratedBarcodeView
+        android:id="@+id/barcodeScannerView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <View
-        android:id="@+id/scanOverlay"
-        android:layout_width="280dp"
-        android:layout_height="280dp"
-        android:background="@android:color/transparent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        android:layout_height="match_parent"
+        app:zxing_use_texture_view="true" />
 
     <TextView
         android:id="@+id/instructionText"
