@@ -3,8 +3,10 @@ package ch.fwvraura.members.ui.login
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.members.MainActivity
@@ -13,8 +15,16 @@ import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
 import ch.fwvraura.members.data.model.OrganizerLoginRequest
 import ch.fwvraura.members.databinding.ActivityLoginBinding
+import ch.fwvraura.members.util.OidcConstants
 import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.launch
+import net.openid.appauth.AuthorizationException
+import net.openid.appauth.AuthorizationRequest
+import net.openid.appauth.AuthorizationResponse
+import net.openid.appauth.AuthorizationService
+import net.openid.appauth.AuthorizationServiceConfiguration
+import net.openid.appauth.ResponseTypeValues
+import net.openid.appauth.TokenResponse
 
 /**
  * Login-Screen mit drei Modi (Tabs): Mitglied, Organisator, QR-Code.
@@ -26,6 +36,24 @@ import kotlinx.coroutines.launch
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
+    private lateinit var authService: AuthorizationService
+
+    private val oidcLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        if (data == null) {
+            showError("Login abgebrochen")
+            return@registerForActivityResult
+        }
+        val resp = AuthorizationResponse.fromIntent(data)
+        val ex = AuthorizationException.fromIntent(data)
+        when {
+            resp != null -> exchangeAuthCode(resp)
+            ex != null -> showError("Login-Fehler: ${ex.errorDescription ?: ex.error}")
+            else -> showError("Login fehlgeschlagen")
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,9 +65,15 @@ class LoginActivity : AppCompatActivity() {
 
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        authService = AuthorizationService(this)
 
         setupTabs()
         setupActions()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::authService.isInitialized) authService.dispose()
     }
 
     private fun setupTabs() {
@@ -56,13 +90,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupActions() {
-        binding.btnMemberLogin.setOnClickListener {
-            // Phase 1b: OIDC-Login mit AppAuth. Vorlaeufig oeffnen wir die Mitglieder-Webseite,
-            // damit Tester den Flow im Browser absolvieren koennen.
-            val url = "https://fwv-raura.ch/mein.html"
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            Toast.makeText(this, "OIDC-Login folgt in der naechsten Version", Toast.LENGTH_LONG).show()
-        }
+        binding.btnMemberLogin.setOnClickListener { startOidcLogin() }
 
         binding.btnOrganizerLogin.setOnClickListener {
             val email = binding.orgEmailInput.text?.toString()?.trim().orEmpty()
@@ -111,6 +139,72 @@ class LoginActivity : AppCompatActivity() {
                 binding.loginProgress.visibility = View.GONE
                 binding.btnOrganizerLogin.isEnabled = true
             }
+        }
+    }
+
+    private fun startOidcLogin() {
+        binding.loginProgress.visibility = View.VISIBLE
+        binding.errorText.visibility = View.GONE
+        AuthorizationServiceConfiguration.fetchFromIssuer(
+            Uri.parse(OidcConstants.AUTHENTIK_ISSUER)
+        ) { config, ex ->
+            if (config == null) {
+                runOnUiThread {
+                    binding.loginProgress.visibility = View.GONE
+                    showError("Konnte Login-Server nicht erreichen: ${ex?.errorDescription ?: ex?.error}")
+                }
+                return@fetchFromIssuer
+            }
+            val request = AuthorizationRequest.Builder(
+                config,
+                OidcConstants.CLIENT_ID,
+                ResponseTypeValues.CODE,
+                Uri.parse(OidcConstants.REDIRECT_URI)
+            ).setScopes(OidcConstants.SCOPES).build()
+            val intent = authService.getAuthorizationRequestIntent(request)
+            runOnUiThread {
+                binding.loginProgress.visibility = View.GONE
+                oidcLauncher.launch(intent)
+            }
+        }
+    }
+
+    private fun exchangeAuthCode(authResponse: AuthorizationResponse) {
+        binding.loginProgress.visibility = View.VISIBLE
+        binding.errorText.visibility = View.GONE
+        authService.performTokenRequest(authResponse.createTokenExchangeRequest()) { tokenResp, ex ->
+            runOnUiThread {
+                binding.loginProgress.visibility = View.GONE
+                if (tokenResp != null) {
+                    saveTokenAndContinue(tokenResp)
+                } else {
+                    Log.e("LoginActivity", "Token exchange failed", ex)
+                    showError("Token-Tausch fehlgeschlagen: ${ex?.errorDescription ?: ex?.error}")
+                }
+            }
+        }
+    }
+
+    private fun saveTokenAndContinue(tokenResp: TokenResponse) {
+        val token = tokenResp.accessToken ?: tokenResp.idToken
+        if (token.isNullOrBlank()) {
+            showError("Kein Token erhalten")
+            return
+        }
+        val tm = MembersApp.instance.tokenManager
+        tm.token = token
+        tm.accountType = "member"
+        // Profil im Hintergrund laden, um Name/E-Mail anzuzeigen
+        lifecycleScope.launch {
+            try {
+                val profile = ApiModule.membersApi.getMe().body()
+                if (profile != null) {
+                    tm.userEmail = profile.email
+                    tm.userName = listOfNotNull(profile.vorname, profile.nachname)
+                        .joinToString(" ").ifBlank { null }
+                }
+            } catch (_: Exception) { /* nicht kritisch */ }
+            navigateToMain()
         }
     }
 

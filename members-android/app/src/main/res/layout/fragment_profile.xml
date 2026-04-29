@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/swipeRefresh"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <TextView
+                android:id="@+id/profileName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/profileFunktion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="@color/primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="@color/divider" />
+
+            <TableLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:stretchColumns="1">
+
+                <TableRow android:layout_marginBottom="6dp">
+                    <TextView android:text="E-Mail:" android:textStyle="bold" android:paddingEnd="12dp" android:textColor="@color/text_primary"/>
+                    <TextView android:id="@+id/profileEmail" android:textColor="@color/text_primary"/>
+                </TableRow>
+                <TableRow android:id="@+id/rowMobile" android:layout_marginBottom="6dp">
+                    <TextView android:text="Mobile:" android:textStyle="bold" android:paddingEnd="12dp" android:textColor="@color/text_primary"/>
+                    <TextView android:id="@+id/profileMobile" android:textColor="@color/text_primary"/>
+                </TableRow>
+                <TableRow android:id="@+id/rowTelefon" android:layout_marginBottom="6dp">
+                    <TextView android:text="Telefon:" android:textStyle="bold" android:paddingEnd="12dp" android:textColor="@color/text_primary"/>
+                    <TextView android:id="@+id/profileTelefon" android:textColor="@color/text_primary"/>
+                </TableRow>
+                <TableRow android:id="@+id/rowAdresse" android:layout_marginBottom="6dp">
+                    <TextView android:text="Adresse:" android:textStyle="bold" android:paddingEnd="12dp" android:textColor="@color/text_primary"/>
+                    <TextView android:id="@+id/profileAdresse" android:textColor="@color/text_primary"/>
+                </TableRow>
+                <TableRow android:id="@+id/rowStatus" android:layout_marginBottom="6dp">
+                    <TextView android:text="Status:" android:textStyle="bold" android:paddingEnd="12dp" android:textColor="@color/text_primary"/>
+                    <TextView android:id="@+id/profileStatus" android:textColor="@color/text_primary"/>
+                </TableRow>
+            </TableLayout>
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/profileProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:indeterminate="true"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

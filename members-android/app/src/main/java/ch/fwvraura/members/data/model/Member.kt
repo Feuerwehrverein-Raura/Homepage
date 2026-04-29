@@ -1,0 +1,23 @@
+package ch.fwvraura.members.data.model
+
+import com.google.gson.annotations.SerializedName
+
+/** Mitglieder-Profil — Antwort von GET /members/me. */
+data class MemberProfile(
+    val id: String? = null,
+    val vorname: String? = null,
+    val nachname: String? = null,
+    val email: String? = null,
+    val anrede: String? = null,
+    val mobile: String? = null,
+    val telefon: String? = null,
+    val strasse: String? = null,
+    val plz: String? = null,
+    val ort: String? = null,
+    val funktion: String? = null,
+    val status: String? = null,
+    val geburtstag: String? = null,
+    val foto: String? = null,
+    @SerializedName("zustellung_email") val zustellungEmail: Boolean? = null,
+    @SerializedName("zustellung_post") val zustellungPost: Boolean? = null
+)
