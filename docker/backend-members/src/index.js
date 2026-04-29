@@ -530,6 +530,146 @@ function getRoleName(role) {
 }
 
 // ============================================
+// VORSTAND APP-TOKEN (QR-Login fuer Android-App)
+// DEUTSCH: Persistente Login-Tokens fuer die Vorstand-Android-App. Ein Token wird
+// einmal im Web generiert, als QR ausgedruckt und dauerhaft per Scan verwendet.
+// ============================================
+
+// DEUTSCH: Liste der App-Tokens. Admin sieht alle, andere nur eigene.
+app.get('/auth/vorstand/app-tokens', authenticateVorstand, async (req, res) => {
+    try {
+        const isAdmin = (req.user.groups || []).includes('admin');
+        const sql = isAdmin
+            ? `SELECT id, email, description, created_at, last_used_at FROM vorstand_app_tokens WHERE revoked_at IS NULL ORDER BY email, created_at DESC`
+            : `SELECT id, email, description, created_at, last_used_at FROM vorstand_app_tokens WHERE email = $1 AND revoked_at IS NULL ORDER BY created_at DESC`;
+        const params = isAdmin ? [] : [req.user.email];
+        const result = await pool.query(sql, params);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: Neuen App-Token erstellen. Admin kann fuer beliebige Vorstand-E-Mail
+// generieren (z.B. um aelteren Mitgliedern einen ausgedruckten QR zu uebergeben);
+// Nicht-Admin nur fuer sich selbst. Gibt den Klartext-Token einmalig zurueck.
+app.post('/auth/vorstand/app-tokens', authenticateVorstand, async (req, res) => {
+    try {
+        const { description, email: targetEmail } = req.body;
+        const isAdmin = (req.user.groups || []).includes('admin');
+
+        let email = req.user.email;
+        if (targetEmail && targetEmail.toLowerCase() !== req.user.email.toLowerCase()) {
+            if (!isAdmin) {
+                return res.status(403).json({ error: 'Nur Admin darf Tokens fuer andere erstellen' });
+            }
+            const allowedEmails = (process.env.VORSTAND_EMAILS || 'praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,materialwart@fwv-raura.ch,beisitzer@fwv-raura.ch')
+                .split(',').map(e => e.trim().toLowerCase());
+            email = targetEmail.toLowerCase();
+            if (!allowedEmails.includes(email)) {
+                return res.status(400).json({ error: 'E-Mail-Adresse ist kein gueltiger Vorstand-Account' });
+            }
+        }
+
+        const token = 'fwv-app-' + crypto.randomBytes(32).toString('base64url');
+        const result = await pool.query(
+            `INSERT INTO vorstand_app_tokens (email, token, description)
+             VALUES ($1, $2, $3)
+             RETURNING id, email, description, created_at`,
+            [email, token, (description || '').substring(0, 200) || null]
+        );
+        await logAudit(pool, 'APP_TOKEN_CREATED', null, req.user.email, getClientIp(req), {
+            token_id: result.rows[0].id, target_email: email, description: result.rows[0].description
+        });
+        res.status(201).json({ ...result.rows[0], token });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: App-Token widerrufen. Admin darf alle widerrufen, andere nur eigene.
+app.delete('/auth/vorstand/app-tokens/:id', authenticateVorstand, async (req, res) => {
+    try {
+        const isAdmin = (req.user.groups || []).includes('admin');
+        const sql = isAdmin
+            ? `UPDATE vorstand_app_tokens SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL RETURNING id, email`
+            : `UPDATE vorstand_app_tokens SET revoked_at = NOW() WHERE id = $1 AND email = $2 AND revoked_at IS NULL RETURNING id, email`;
+        const params = isAdmin ? [req.params.id] : [req.params.id, req.user.email];
+        const result = await pool.query(sql, params);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Token nicht gefunden' });
+        }
+        await logAudit(pool, 'APP_TOKEN_REVOKED', null, req.user.email, getClientIp(req), {
+            token_id: req.params.id, target_email: result.rows[0].email
+        });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: QR-Login: tauscht Token gegen JWT (kein Auth-Header noetig - der Token IST die Auth)
+app.post('/auth/vorstand/qr-login', async (req, res) => {
+    const clientIp = getClientIp(req);
+    try {
+        const { token } = req.body;
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ error: 'Token fehlt' });
+        }
+        const result = await pool.query(
+            `SELECT id, email FROM vorstand_app_tokens
+             WHERE token = $1 AND revoked_at IS NULL`,
+            [token]
+        );
+        if (result.rows.length === 0) {
+            await logAudit(pool, 'QR_LOGIN_FAILED', null, null, clientIp, { reason: 'Invalid token' });
+            return res.status(401).json({ error: 'Ungueltiger oder widerrufener Token' });
+        }
+        const { id: tokenId, email } = result.rows[0];
+
+        // last_used_at aktualisieren
+        await pool.query('UPDATE vorstand_app_tokens SET last_used_at = NOW() WHERE id = $1', [tokenId]);
+
+        // Rolle/Gruppen analog zum normalen Vorstand-Login bestimmen
+        const emailLower = email.toLowerCase();
+        const emailPrefix = emailLower.split('@')[0];
+        let role = emailPrefix;
+        let groups = ['vorstand'];
+        let memberName = getRoleName(role);
+        try {
+            const memberResult = await pool.query(
+                "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1 OR funktion ILIKE '%Admin%'",
+                [emailLower]
+            );
+            if (memberResult.rows.length > 0) {
+                const member = memberResult.rows[0];
+                memberName = `${member.vorname} ${member.nachname}`;
+                if (member.funktion && member.funktion.toLowerCase().includes('admin')) {
+                    role = 'admin';
+                    groups = ['vorstand', 'admin'];
+                }
+            }
+        } catch (_) {}
+
+        const jwtToken = jwt.sign(
+            { email: emailLower, role, groups, type: 'vorstand' },
+            process.env.JWT_SECRET || 'fwv-raura-secret-key',
+            { expiresIn: '8h' }
+        );
+
+        await logAudit(pool, 'QR_LOGIN_SUCCESS', null, emailLower, clientIp, { token_id: tokenId, role });
+
+        res.json({
+            success: true,
+            token: jwtToken,
+            user: { email: emailLower, role, name: memberName }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
 // AUTHENTIK AUTO-SYNC HELPERS
 // DEUTSCH: Hilfsfunktionen zur automatischen Synchronisierung von Mitgliedern mit Authentik (SSO)
 // ============================================
