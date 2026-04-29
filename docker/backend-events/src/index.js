@@ -886,6 +886,7 @@ Feuerwehrverein Raura
 
         res.status(201).json(newEvent);
     } catch (error) {
+        logError('POST /events failed', { error: error.message, code: error.code, detail: error.detail, body_keys: Object.keys(req.body || {}) });
         res.status(500).json({ error: error.message });
     }
 });
@@ -1371,6 +1372,11 @@ app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (re
     try {
         const { event_id, name, description, date, start_time, end_time, needed, bereich } = req.body;
 
+        // Pflichtfelder pruefen
+        if (!event_id) return res.status(400).json({ error: 'event_id ist ein Pflichtfeld' });
+        if (!name) return res.status(400).json({ error: 'name ist ein Pflichtfeld' });
+        if (!date) return res.status(400).json({ error: 'date ist ein Pflichtfeld' });
+
         const result = await pool.query(`
             INSERT INTO shifts (event_id, name, description, date, start_time, end_time, needed, bereich)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -1379,6 +1385,7 @@ app.post('/shifts', authenticateAny, requireRole('vorstand', 'admin'), async (re
 
         res.status(201).json(result.rows[0]);
     } catch (error) {
+        console.error('POST /shifts error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
