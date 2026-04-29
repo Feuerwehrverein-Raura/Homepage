@@ -897,12 +897,12 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             ];
             const isVorstand = vorstandEmails.some(ve => newOrgEmail.toLowerCase() === ve.toLowerCase());
 
-            // Fuer Nicht-Vorstand: Event-Zugang erstellen
+            // Fuer Nicht-Vorstand: Event-Zugang erstellen oder bei Organisator-Wechsel neues Passwort generieren
             let eventPassword = null;
-            if (!isVorstand && !updatedEvent.event_email) {
+            if (!isVorstand) {
                 eventPassword = crypto.randomBytes(6).toString('base64').replace(/[+/=]/g, '').substring(0, 12);
                 const eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
-                const eventEmail = `${updatedEvent.slug}@fwv-raura.ch`;
+                const eventEmail = updatedEvent.event_email || `${updatedEvent.slug}@fwv-raura.ch`;
                 const endDate = updatedEvent.end_date ? new Date(updatedEvent.end_date) : new Date(updatedEvent.start_date);
                 const accessExpires = new Date(endDate);
                 accessExpires.setMonth(accessExpires.getMonth() + 3);
@@ -912,7 +912,9 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
                     [eventEmail, eventPasswordHash, accessExpires, id]
                 );
                 updatedEvent.event_email = eventEmail;
-                console.log(`Event-Zugang erstellt: ${eventEmail}`);
+                updatedEvent.event_access_expires = accessExpires;
+                const action = oldOrgEmail ? 'Organisator-Wechsel: neues Passwort generiert' : 'Event-Zugang erstellt';
+                console.log(`${action}: ${eventEmail}`);
             }
 
             try {
