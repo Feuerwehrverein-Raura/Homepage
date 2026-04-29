@@ -72,15 +72,24 @@ class QrScannerActivity : AppCompatActivity() {
     }
 
     private fun startScan() {
-        barcodeScannerView.decodeContinuous(object : BarcodeCallback {
-            override fun barcodeResult(result: BarcodeResult?) {
-                val raw = result?.text ?: return
-                if (processing) return
-                processing = true
-                handlePayload(raw)
+        // post() stellt sicher, dass die View-Hierarchie fertig gemessen/layoutet ist,
+        // bevor wir die Kamera starten — sonst kann es bei manchen Geraeten crashen.
+        barcodeScannerView.post {
+            try {
+                barcodeScannerView.decodeContinuous(object : BarcodeCallback {
+                    override fun barcodeResult(result: BarcodeResult?) {
+                        val raw = result?.text ?: return
+                        if (processing) return
+                        processing = true
+                        handlePayload(raw)
+                    }
+                })
+                barcodeScannerView.resume()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Kamera konnte nicht gestartet werden: ${e.message}", Toast.LENGTH_LONG).show()
+                finish()
             }
-        })
-        barcodeScannerView.resume()
+        }
     }
 
     private fun handlePayload(raw: String) {
@@ -145,16 +154,20 @@ class QrScannerActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // resume() nur, wenn die Activity bereits einen Decoder konfiguriert hat
+        // (sonst macht onCreate -> startScan -> resume das schon selber).
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
         ) {
-            barcodeScannerView.resume()
+            barcodeScannerView.post {
+                try { barcodeScannerView.resume() } catch (_: Exception) { }
+            }
         }
     }
 
     override fun onPause() {
         super.onPause()
-        barcodeScannerView.pauseAndWait()
+        try { barcodeScannerView.pauseAndWait() } catch (_: Exception) { }
     }
 
     private data class QrPayload(
