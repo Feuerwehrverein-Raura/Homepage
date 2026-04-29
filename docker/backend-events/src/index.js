@@ -749,13 +749,34 @@ app.get('/events/:id', async (req, res, next) => {
 // DEUTSCH: Neues Event erstellen (nur Vorstand/Admin). Generiert optional Event-Zugang fuer Organisatoren
 app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
-        const {
+        let {
             slug, title, subtitle, description, start_date, end_date,
             location, category, registration_required,
             registration_deadline, max_participants, cost, status, image_url, tags,
             organizer_name, organizer_email, create_access,
             meal_options, pdf_attachment, pdf_filename
         } = req.body;
+
+        // Pflichtfelder pruefen, sonst 400 statt undurchschaubarem 500
+        if (!title || !title.trim()) {
+            return res.status(400).json({ error: 'title ist ein Pflichtfeld' });
+        }
+        if (!start_date) {
+            return res.status(400).json({ error: 'start_date ist ein Pflichtfeld' });
+        }
+
+        // Slug automatisch aus Titel generieren falls keiner mitgeliefert (z.B. von der App).
+        // Zusatz "-<6Hex>" verhindert Kollisionen mit bestehenden Events.
+        if (!slug) {
+            const base = title
+                .toLowerCase()
+                .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+                .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .substring(0, 80) || 'event';
+            slug = `${base}-${crypto.randomBytes(3).toString('hex')}`;
+        }
 
         // Event-Zugang generieren falls gewuenscht
         let eventEmail = null;
