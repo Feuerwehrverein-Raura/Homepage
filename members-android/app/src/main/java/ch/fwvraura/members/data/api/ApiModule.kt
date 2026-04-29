@@ -28,4 +28,5 @@ object ApiModule {
     }
 
     val authApi: AuthApi by lazy { retrofit.create(AuthApi::class.java) }
+    val eventsApi: EventsApi by lazy { retrofit.create(EventsApi::class.java) }
 }

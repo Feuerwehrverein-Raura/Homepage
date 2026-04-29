@@ -17,4 +17,12 @@
     <string name="cancel">Abbrechen</string>
     <string name="logout">Abmelden</string>
     <string name="placeholder_main">Willkommen im FWV-Mitgliederbereich. Funktionen kommen Schritt für Schritt.</string>
+    <string name="nav_events">Anlässe</string>
+    <string name="nav_profile">Profil</string>
+    <string name="nav_organizer">Organisator</string>
+    <string name="events_loading">Anlässe werden geladen…</string>
+    <string name="events_empty">Keine Anlässe gefunden.</string>
+    <string name="events_error">Fehler beim Laden: %1$s</string>
+    <string name="profile_placeholder">Profil-Funktionen kommen in der nächsten Version.</string>
+    <string name="organizer_placeholder">Organisator-Dashboard kommt in der nächsten Version.</string>
 </resources>
