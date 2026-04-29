@@ -33,6 +33,11 @@
             android:name=".MainActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ui.events.EventDetailActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
         <!-- AppAuth: empfaengt OIDC-Redirect von Authentik -->
         <activity
             android:name="net.openid.appauth.RedirectUriReceiverActivity"

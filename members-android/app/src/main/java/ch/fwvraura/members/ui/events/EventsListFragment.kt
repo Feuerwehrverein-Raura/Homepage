@@ -1,5 +1,6 @@
 package ch.fwvraura.members.ui.events
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -73,8 +74,9 @@ class EventsListFragment : Fragment() {
     }
 
     private fun openEventDetail(event: Event) {
-        // Detail-Screen folgt in Phase 1b Schritt 2
-        Toast.makeText(requireContext(), event.title, Toast.LENGTH_SHORT).show()
+        val intent = Intent(requireContext(), EventDetailActivity::class.java)
+            .putExtra(EventDetailActivity.EXTRA_EVENT_ID, event.id)
+        startActivity(intent)
     }
 
     private fun showError(msg: String) {
