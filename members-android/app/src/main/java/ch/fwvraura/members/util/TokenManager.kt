@@ -69,6 +69,11 @@ class TokenManager(context: Context) {
         get() = prefs.getBoolean(KEY_CONTACTS_SYNC_ENABLED, false)
         set(value) { prefs.edit().putBoolean(KEY_CONTACTS_SYNC_ENABLED, value).commit() }
 
+    /** FCM-Geraetetoken — wird beim ersten Boot/Token-Refresh von Firebase geliefert. */
+    var fcmToken: String?
+        get() = prefs.getString(KEY_FCM_TOKEN, null)
+        set(value) { prefs.edit().putString(KEY_FCM_TOKEN, value).commit() }
+
     val isLoggedIn: Boolean
         get() = !token.isNullOrEmpty()
 
@@ -83,5 +88,6 @@ class TokenManager(context: Context) {
         private const val KEY_EVENT_ID = "event_id"
         private const val KEY_CONTACTS_SYNC_ASKED = "contacts_sync_asked"
         private const val KEY_CONTACTS_SYNC_ENABLED = "contacts_sync_enabled"
+        private const val KEY_FCM_TOKEN = "fcm_token"
     }
 }

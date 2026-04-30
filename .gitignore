@@ -48,3 +48,14 @@ HISTORY.md
 fwv-raura-play-*.json
 play-service-account*.json
 *-play-publisher-*.json
+
+# Firebase Admin SDK Service-Account-JSON — DARF NIE COMMITTET WERDEN
+firebase-admin*.json
+fwv-raura-mitglieder-*.json
+*firebase-adminsdk*.json
+
+# Versehentlich heruntergeladene Build-Artefakte aus GitHub-Releases
+members-*.aab
+members-*.apk
+vorstand-*.aab
+vorstand-*.apk

@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.github.triplet.play")
+    id("com.google.gms.google-services")
 }
 
 // Version aus Git-Tag ableiten (members-v1.2.0 -> 1.2.0).
@@ -143,4 +144,9 @@ dependencies {
 
     // QR-Code-Scanner (kein ML Kit -> 16 KB Page-Size-kompatibel)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
+    // Firebase Cloud Messaging — Push-Notifications.
+    // BoM legt Versionen aller Firebase-Libs konsistent fest.
+    implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 }

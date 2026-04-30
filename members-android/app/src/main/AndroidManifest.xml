@@ -80,6 +80,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Firebase Cloud Messaging — Push-Empfang -->
+        <service
+            android:name=".notifications.FwvFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="fwv_general" />
+
         <!-- FileProvider fuer Kamera-Aufnahmen: speichert Fotos temporaer in cache/photos/ und gibt der Kamera-App eine sichere content://-URI -->
         <provider
             android:name="androidx.core.content.FileProvider"

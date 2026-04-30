@@ -52,6 +52,12 @@ interface MembersApi {
         @Body body: ch.fwvraura.members.data.model.NotificationsUpdateRequest
     ): Response<List<ch.fwvraura.members.data.model.NotificationPreference>>
 
+    /** FCM-Geraete-Token registrieren (fuer Push-Notifications). */
+    @POST("members/me/fcm-token")
+    suspend fun registerFcmToken(
+        @Body body: ch.fwvraura.members.data.model.FcmTokenRegistration
+    ): Response<Unit>
+
     /** System-Zugaenge, Nextcloud-Ordner, Funktions-E-Mails und Service-Accounts. */
     @GET("members/me/accesses")
     suspend fun getAccesses(): Response<ch.fwvraura.members.data.model.AccessesResponse>

@@ -15,3 +15,10 @@ data class NotificationPreference(
 data class NotificationsUpdateRequest(
     val preferences: List<NotificationPreference>
 )
+
+/** Body fuer POST /members/me/fcm-token (Geraete-Token-Registrierung). */
+data class FcmTokenRegistration(
+    val token: String,
+    @SerializedName("device_id") val deviceId: String? = null,
+    val platform: String = "android"
+)

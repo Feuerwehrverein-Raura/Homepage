@@ -4218,6 +4218,60 @@ app.get('/members/me/notifications', authenticateToken, async (req, res) => {
     }
 });
 
+// DEUTSCH: FCM-Token-Registrierung — Mitglieder-App ruft das beim Login + bei
+// Token-Refresh auf, damit der Server Push-Notifications an dieses Geraet senden kann.
+//
+// Tabelle wird inline angelegt (idempotent), damit kein separates Migration-File
+// noetig ist. UNIQUE(member_id, token) → Re-Login speichert nichts doppelt.
+app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
+    try {
+        const { token, device_id, platform } = req.body || {};
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ error: 'token erforderlich' });
+        }
+
+        // Get member ID from email
+        const memberResult = await pool.query(
+            'SELECT id FROM members WHERE email = $1',
+            [req.user.email]
+        );
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Member profile not found' });
+        }
+        const memberId = memberResult.rows[0].id;
+
+        // Tabelle anlegen falls noch nicht vorhanden (idempotent)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS fcm_tokens (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+                token TEXT NOT NULL,
+                device_id VARCHAR(255),
+                platform VARCHAR(20) DEFAULT 'android',
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(member_id, token)
+            );
+            CREATE INDEX IF NOT EXISTS idx_fcm_tokens_member ON fcm_tokens(member_id);
+        `);
+
+        // Upsert: gleicher token + member_id => updated_at refresh
+        await pool.query(`
+            INSERT INTO fcm_tokens (member_id, token, device_id, platform)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (member_id, token) DO UPDATE
+              SET device_id = COALESCE($3, fcm_tokens.device_id),
+                  platform = COALESCE($4, fcm_tokens.platform),
+                  updated_at = NOW()
+        `, [memberId, token, device_id || null, platform || 'android']);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('/members/me/fcm-token error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Update notification preferences
 // DEUTSCH: Eigene Benachrichtigungseinstellungen aktualisieren
 app.put('/members/me/notifications', authenticateToken, async (req, res) => {

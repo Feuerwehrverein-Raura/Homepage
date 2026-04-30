@@ -171,8 +171,19 @@ class LoginActivity : AppCompatActivity() {
                         .joinToString(" ").ifBlank { null }
                 }
             } catch (_: Exception) { /* nicht kritisch */ }
+            registerFcmTokenIfPresent(tm)
             handleContactsSyncAfterLogin()
         }
+    }
+
+    /** FCM-Token (falls Firebase ihn schon geliefert hat) ans Backend pushen. */
+    private suspend fun registerFcmTokenIfPresent(tm: ch.fwvraura.members.util.TokenManager) {
+        val token = tm.fcmToken ?: return
+        try {
+            ApiModule.membersApi.registerFcmToken(
+                ch.fwvraura.members.data.model.FcmTokenRegistration(token = token)
+            )
+        } catch (_: Exception) { /* nicht kritisch — Service registriert ihn beim naechsten Refresh */ }
     }
 
     /**
