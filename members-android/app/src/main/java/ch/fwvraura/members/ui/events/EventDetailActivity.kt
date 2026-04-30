@@ -32,6 +32,8 @@ class EventDetailActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        @Suppress("DEPRECATION")
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, true)
         binding = ActivityEventDetailBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

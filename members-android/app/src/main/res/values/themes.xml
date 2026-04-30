@@ -23,8 +23,15 @@
         <item name="colorOnSurface">@color/on_surface</item>
         <item name="colorError">@color/error</item>
         <item name="android:statusBarColor">@color/primary</item>
+        <item name="android:navigationBarColor">@color/surface</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
         <item name="android:windowBackground">@color/background</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <!-- Verhindert dass die App auf Android 15+ unter Status-/Navigation-Bar
+             gezeichnet wird; einzelne Layouts setzen fitsSystemWindows fuers Inset-Padding. -->
+        <item name="android:enforceStatusBarContrast" tools:targetApi="q">false</item>
+        <item name="android:enforceNavigationBarContrast" tools:targetApi="q">false</item>
         <item name="materialCardViewStyle">@style/Widget.FWVMembers.CardView</item>
         <item name="bottomNavigationStyle">@style/Widget.FWVMembers.BottomNav</item>
     </style>
@@ -44,6 +51,8 @@
     <style name="Theme.FWVMembers.Login" parent="Theme.FWVMembers">
         <item name="android:windowBackground">@color/login_background</item>
         <item name="android:statusBarColor">@color/login_background</item>
+        <item name="android:navigationBarColor">@color/login_background</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">false</item>
     </style>
 
 </resources>

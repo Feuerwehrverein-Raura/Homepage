@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.members.MainActivity
 import ch.fwvraura.members.MembersApp
@@ -56,6 +57,8 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        @Suppress("DEPRECATION")
+        WindowCompat.setDecorFitsSystemWindows(window, true)
 
         if (MembersApp.instance.tokenManager.isLoggedIn) {
             navigateToMain()
