@@ -23,6 +23,45 @@ const SERVICE_NAME = 'api-events';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+/**
+ * DEUTSCH: Push-Benachrichtigung ueber api-members verschicken.
+ * api-members hat das Firebase-Admin-SDK + die fcm_tokens-Tabelle;
+ * wir delegieren via internem HTTP-Call.
+ */
+async function pushToMember(memberId, notificationType, title, body, data = {}) {
+    if (!memberId) return;
+    const url = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/push-to-member';
+    const key = process.env.INTERNAL_API_KEY;
+    if (!key) {
+        console.warn('INTERNAL_API_KEY not set — skipping push');
+        return;
+    }
+    try {
+        await axios.post(url, { memberId, notificationType, title, body, data },
+            { headers: { 'X-Internal-Key': key }, timeout: 5000 });
+    } catch (err) {
+        console.error('pushToMember failed:', err.message);
+    }
+}
+
+async function memberIdByEmail(email) {
+    if (!email) return null;
+    const url = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/member-id-by-email';
+    const key = process.env.INTERNAL_API_KEY;
+    if (!key) return null;
+    try {
+        const resp = await axios.get(url, {
+            params: { email },
+            headers: { 'X-Internal-Key': key },
+            timeout: 5000
+        });
+        return resp.data.memberId || null;
+    } catch (err) {
+        console.error('memberIdByEmail failed:', err.message);
+        return null;
+    }
+}
+
 // Dispatch API für E-Mails
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 
@@ -1907,6 +1946,17 @@ app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, 
             req.user.email || req.user.name || 'organizer'
         ]);
         res.json({ success: true, registration: result.rows[0] });
+
+        // Push an betroffenes Mitglied (falls Mitglied und nicht Self-Registration)
+        if (member_id && req.user.email) {
+            const ev = await pool.query('SELECT title FROM events WHERE id=$1', [id]);
+            pushToMember(
+                member_id, 'event_update',
+                `Anmeldung: ${ev.rows[0]?.title || 'Event'}`,
+                'Du wurdest zu einer Veranstaltung angemeldet.',
+                { eventId: id }
+            ).catch(() => {});
+        }
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

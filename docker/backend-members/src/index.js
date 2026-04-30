@@ -3663,6 +3663,49 @@ app.get('/members/emails/alias-config', authenticateAny, requireRole('vorstand',
 // Allowed senders for mitglieder@ alias (for Rspamd sender restriction)
 // DEUTSCH: Erlaubte Absender für mitglieder@fwv-raura.ch - wird von Rspamd als HTTP-Map abgefragt
 // Authentifizierung via INTERNAL_API_KEY Query-Parameter (kein JWT nötig, da Rspamd die URL direkt abruft)
+// DEUTSCH: Interner Endpoint fuer andere Backends (api-events, api-dispatch),
+// um Push-Notifications an ein Mitglied zu senden. Authentifiziert per
+// INTERNAL_API_KEY (Header X-Internal-Key oder ?key=). Body:
+// { memberId, notificationType, title, body, data? }
+app.post('/internal/push-to-member', async (req, res) => {
+    const apiKey = process.env.INTERNAL_API_KEY;
+    const provided = req.headers['x-internal-key'] || req.query.key;
+    if (!apiKey || provided !== apiKey) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    const { memberId, notificationType, title, body, data } = req.body || {};
+    if (!memberId || !notificationType || !title) {
+        return res.status(400).json({ error: 'memberId, notificationType, title required' });
+    }
+    try {
+        await sendPushToMember(memberId, notificationType, title, body || '', data || {});
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Internal push failed:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: Lookup memberId per E-Mail — fuer Backends, die nur die Mailadresse haben.
+app.get('/internal/member-id-by-email', async (req, res) => {
+    const apiKey = process.env.INTERNAL_API_KEY;
+    const provided = req.headers['x-internal-key'] || req.query.key;
+    if (!apiKey || provided !== apiKey) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    const email = (req.query.email || '').toString().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'email required' });
+    try {
+        const result = await pool.query(
+            'SELECT id FROM members WHERE LOWER(email) = $1 LIMIT 1',
+            [email]
+        );
+        res.json({ memberId: result.rows[0]?.id || null });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/internal/allowed-senders', async (req, res) => {
     const apiKey = process.env.INTERNAL_API_KEY;
     if (!apiKey || req.query.key !== apiKey) {
