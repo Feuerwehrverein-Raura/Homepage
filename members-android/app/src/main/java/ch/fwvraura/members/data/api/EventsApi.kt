@@ -81,4 +81,8 @@ interface EventsApi {
     /** Eigene Anmeldungen des eingeloggten Users (mit Event-Details). */
     @GET("registrations/mine")
     suspend fun listMyRegistrations(): Response<List<MyRegistration>>
+
+    /** Aggregierte Kalender-Eintraege (events + Beitraege + Dispatches). */
+    @GET("calendar/items")
+    suspend fun listCalendarItems(): Response<List<ch.fwvraura.members.data.model.CalendarItem>>
 }

@@ -12,9 +12,11 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
+import ch.fwvraura.members.data.model.CalendarItem
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.databinding.FragmentEventsBinding
 import ch.fwvraura.members.databinding.ItemCalendarDayBinding
+import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
 import com.kizitonwose.calendar.core.CalendarDay
 import com.kizitonwose.calendar.core.DayPosition
@@ -34,11 +36,12 @@ class EventsListFragment : Fragment() {
     private val binding get() = _binding!!
 
     private lateinit var listAdapter: EventsAdapter
-    private lateinit var dayAdapter: EventsAdapter
+    private lateinit var calendarAdapter: CalendarItemsAdapter
 
-    private var allEvents: List<Event> = emptyList()
-    private var eventsByDay: Map<LocalDate, List<Event>> = emptyMap()
+    private var calendarItems: List<CalendarItem> = emptyList()
+    private var itemsByDay: Map<LocalDate, List<CalendarItem>> = emptyMap()
     private var selectedDay: LocalDate? = null
+    private var calendarLoaded = false
     private val monthLabelFormatter = DateTimeFormatter.ofPattern("LLLL yyyy", Locale.GERMAN)
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -50,11 +53,11 @@ class EventsListFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         listAdapter = EventsAdapter { event -> openEventDetail(event) }
-        dayAdapter = EventsAdapter { event -> openEventDetail(event) }
+        calendarAdapter = CalendarItemsAdapter { item -> onCalendarItemClick(item) }
         binding.eventsRecycler.layoutManager = LinearLayoutManager(requireContext())
         binding.eventsRecycler.adapter = listAdapter
         binding.calendarDayEvents.layoutManager = LinearLayoutManager(requireContext())
-        binding.calendarDayEvents.adapter = dayAdapter
+        binding.calendarDayEvents.adapter = calendarAdapter
 
         binding.swipeRefresh.setOnRefreshListener { loadEvents() }
         binding.fabSubscribe.setOnClickListener { showSubscribeDialog() }
@@ -69,9 +72,25 @@ class EventsListFragment : Fragment() {
         loadEvents()
     }
 
+    private fun onCalendarItemClick(item: CalendarItem) {
+        when (item.type) {
+            "event", "board_meeting" -> item.refId?.let { id ->
+                startActivity(
+                    Intent(requireContext(), EventDetailActivity::class.java)
+                        .putExtra(EventDetailActivity.EXTRA_EVENT_ID, id)
+                )
+            }
+            else -> {
+                val msg = item.description ?: item.subtitle ?: item.title
+                Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun switchTab(position: Int) {
         binding.swipeRefresh.visibility = if (position == 0) View.VISIBLE else View.GONE
         binding.paneCalendar.visibility = if (position == 1) View.VISIBLE else View.GONE
+        if (position == 1 && !calendarLoaded) loadCalendarItems()
     }
 
     private fun setupCalendar() {
@@ -88,7 +107,7 @@ class EventsListFragment : Fragment() {
                 container.bind(
                     data,
                     isSelected = data.date == selectedDay,
-                    hasEvents = eventsByDay.containsKey(data.date)
+                    hasEvents = itemsByDay.containsKey(data.date)
                 )
             }
         }
@@ -114,10 +133,10 @@ class EventsListFragment : Fragment() {
         previous?.let { binding.calendarView.notifyDateChanged(it) }
         binding.calendarView.notifyDateChanged(date)
 
-        val events = eventsByDay[date].orEmpty()
-        dayAdapter.submitList(events)
-        binding.calendarDayEmpty.visibility = if (events.isEmpty()) View.VISIBLE else View.GONE
-        binding.calendarDayEvents.visibility = if (events.isEmpty()) View.GONE else View.VISIBLE
+        val items = itemsByDay[date].orEmpty()
+        calendarAdapter.submitList(items)
+        binding.calendarDayEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+        binding.calendarDayEvents.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
     }
 
     /** Zeigt drei Optionen: in Kalender-App oeffnen, Webcal-Link oder ICS-Datei teilen. */
@@ -167,17 +186,12 @@ class EventsListFragment : Fragment() {
                 val response = ApiModule.eventsApi.listEvents()
                 if (response.isSuccessful) {
                     val all = response.body().orEmpty().filter { it.status != "cancelled" }
-                    allEvents = all
                     val now = System.currentTimeMillis()
                     val upcoming = all
                         .filter { isUpcoming(it.startDate, it.endDate, now) }
                         .sortedBy { it.startDate }
                     listAdapter.submitList(upcoming)
                     binding.emptyText.visibility = if (upcoming.isEmpty()) View.VISIBLE else View.GONE
-
-                    eventsByDay = bucketByDay(all)
-                    binding.calendarView.notifyCalendarChanged()
-                    selectDay(selectedDay ?: LocalDate.now())
                 } else {
                     showError(getString(R.string.events_error, "HTTP ${response.code()}"))
                 }
@@ -192,17 +206,29 @@ class EventsListFragment : Fragment() {
         }
     }
 
-    private fun bucketByDay(events: List<Event>): Map<LocalDate, List<Event>> {
-        val map = mutableMapOf<LocalDate, MutableList<Event>>()
-        for (e in events) {
-            val start = parseDate(e.startDate) ?: continue
-            val end = parseDate(e.endDate) ?: start
-            var day = start
-            // Mehrtaegige Events werden auf jeden Tag des Zeitraums gemarkt.
-            while (!day.isAfter(end)) {
-                map.getOrPut(day) { mutableListOf() }.add(e)
-                day = day.plusDays(1)
-            }
+    /** Laedt aggregierte Kalender-Items (events + Beitraege + Briefe) fuer den Kalender-Tab. */
+    private fun loadCalendarItems() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.eventsApi.listCalendarItems()
+                if (response.isSuccessful) {
+                    calendarItems = response.body().orEmpty()
+                    itemsByDay = bucketItemsByDay(calendarItems)
+                    calendarLoaded = true
+                    binding.calendarView.notifyCalendarChanged()
+                    selectDay(selectedDay ?: LocalDate.now())
+                }
+            } catch (_: CancellationException) {
+                throw kotlin.coroutines.cancellation.CancellationException()
+            } catch (_: Exception) { /* Snackbar wuerde stoeren — Tab bleibt leer, Pull-to-refresh-aequivalent */ }
+        }
+    }
+
+    private fun bucketItemsByDay(items: List<CalendarItem>): Map<LocalDate, List<CalendarItem>> {
+        val map = mutableMapOf<LocalDate, MutableList<CalendarItem>>()
+        for (it in items) {
+            val day = parseDate(it.date) ?: continue
+            map.getOrPut(day) { mutableListOf() }.add(it)
         }
         return map
     }
