@@ -60,3 +60,7 @@ export async function setReference(id: string, referenceNr: string): Promise<Mem
 export async function sendEmailBulk(year: number): Promise<SendEmailBulkResponse> {
   return await apiClient.post<SendEmailBulkResponse>(`/membership-fees/send-email-bulk`, { year });
 }
+
+export async function sendPostBulk(year: number): Promise<SendEmailBulkResponse> {
+  return await apiClient.post<SendEmailBulkResponse>(`/membership-fees/send-post-bulk`, { year });
+}

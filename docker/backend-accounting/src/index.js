@@ -537,7 +537,7 @@ app.patch('/membership-fees/payments/:id/reference', async (req, res) => {
 // Auth: authenticateAny (Vorstand-JWT oder Authentik-JWT mit Vorstand-Gruppe).
 const axios = require('axios');
 const { authenticateAny, requireRole } = require('./auth-middleware');
-const { buildBeitragEmailForPayment, getKassier } = require('./beitrag-helpers');
+const { buildBeitragEmailForPayment, buildBeitragLetterForPayment, getKassier } = require('./beitrag-helpers');
 
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 
@@ -617,6 +617,95 @@ app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorst
         });
     } catch (error) {
         logError('send-email-bulk error', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: POST /membership-fees/send-post-bulk?year=YYYY — Beitragsbrief per Pingen-Post
+// an alle offenen, beitragspflichtigen Mitglieder mit Zustellpraeferenz Post.
+//
+// Pro Mitglied:
+//  1. QR-Code generieren
+//  2. A4-HTML rendern (strikte Pingen-Zonen: Adressfenster X=118mm Y=60mm)
+//  3. POST /dispatch/send-post an api-dispatch mit { html, recipient, member_id }
+app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const year = parseInt(req.body?.year || req.query?.year);
+        if (!year) return res.status(400).json({ error: 'year erforderlich' });
+
+        const [settingsRes, paymentsRes, kassiersRes] = await Promise.all([
+            pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [year]),
+            pool.query(`
+                SELECT p.*, m.id as m_id, m.vorname, m.nachname, m.email, m.strasse, m.plz, m.ort,
+                       m.status as member_status, m.zustellung_post
+                FROM membership_fee_payments p
+                JOIN members m ON p.member_id = m.id
+                WHERE p.year = $1
+            `, [year]),
+            pool.query("SELECT vorname, nachname, strasse, plz, ort, telefon, mobile, funktion FROM members WHERE funktion ILIKE '%kassier%'")
+        ]);
+
+        if (settingsRes.rows.length === 0) {
+            return res.status(400).json({ error: `Keine Einstellungen fuer ${year} hinterlegt` });
+        }
+        const settings = settingsRes.rows[0];
+        const kassier = getKassier(kassiersRes.rows);
+
+        const candidates = paymentsRes.rows.filter(r =>
+            r.status === 'offen' &&
+            r.zustellung_post === true &&
+            (r.strasse || '').trim() !== '' &&
+            (r.plz || '').trim() !== '' &&
+            (r.ort || '').trim() !== '' &&
+            (r.member_status || '') !== 'Ehrenmitglied' &&
+            (r.reference_nr || '').replace(/\D/g, '').length > 0
+        );
+
+        const dispatchUrl = `${DISPATCH_API}/dispatch/send-post`;
+        const dispatchHeaders = { 'x-api-key': process.env.API_KEY };
+
+        let success = 0;
+        let failed = 0;
+        const failures = [];
+
+        for (const r of candidates) {
+            try {
+                const html = await buildBeitragLetterForPayment({
+                    member: { vorname: r.vorname, nachname: r.nachname, strasse: r.strasse, plz: r.plz, ort: r.ort },
+                    payment: { reference_nr: r.reference_nr, amount: r.amount },
+                    settings,
+                    kassier
+                });
+                await axios.post(dispatchUrl, {
+                    html,
+                    recipient: {
+                        name: `${r.vorname || ''} ${r.nachname || ''}`.trim(),
+                        street: r.strasse,
+                        zip: r.plz,
+                        city: r.ort,
+                        country: 'CH'
+                    },
+                    member_id: r.member_id
+                }, { headers: dispatchHeaders, timeout: 60000 });
+                success++;
+            } catch (e) {
+                failed++;
+                failures.push({ member_id: r.member_id, name: `${r.vorname || ''} ${r.nachname || ''}`.trim(), error: e.message });
+            }
+        }
+
+        logInfo('Membership fee bulk post sent', { year, candidates: candidates.length, success, failed });
+
+        res.json({
+            year,
+            candidates: candidates.length,
+            success,
+            failed,
+            skipped: paymentsRes.rows.length - candidates.length,
+            failures: failures.slice(0, 20)
+        });
+    } catch (error) {
+        logError('send-post-bulk error', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });

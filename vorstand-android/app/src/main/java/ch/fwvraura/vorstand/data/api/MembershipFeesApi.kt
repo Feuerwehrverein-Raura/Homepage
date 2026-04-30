@@ -60,4 +60,9 @@ interface MembershipFeesApi {
     @POST("membership-fees/send-email-bulk")
     suspend fun sendEmailBulk(@Body body: ch.fwvraura.vorstand.data.model.SendEmailBulkRequest):
         Response<ch.fwvraura.vorstand.data.model.SendEmailBulkResponse>
+
+    /** Beitragsbrief per Pingen-Post an alle offenen Zustellpraeferenz-Post-Mitglieder. */
+    @POST("membership-fees/send-post-bulk")
+    suspend fun sendPostBulk(@Body body: ch.fwvraura.vorstand.data.model.SendEmailBulkRequest):
+        Response<ch.fwvraura.vorstand.data.model.SendEmailBulkResponse>
 }

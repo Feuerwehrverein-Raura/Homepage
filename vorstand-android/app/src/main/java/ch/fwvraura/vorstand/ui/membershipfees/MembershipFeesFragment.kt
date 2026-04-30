@@ -74,7 +74,8 @@ class MembershipFeesFragment : Fragment() {
         }
 
         binding.btnGenerate.setOnClickListener { onGenerateClicked() }
-        binding.btnSendEmailBulk.setOnClickListener { onSendEmailBulkClicked() }
+        binding.btnSendEmailBulk.setOnClickListener { onSendBulkClicked(channel = "email") }
+        binding.btnSendPostBulk.setOnClickListener { onSendBulkClicked(channel = "post") }
 
         load()
     }
@@ -276,23 +277,30 @@ class MembershipFeesFragment : Fragment() {
         }
     }
 
-    /** E-Mail-Massenversand: zaehlt zuerst Kandidaten, fragt um Bestaetigung, ruft dann Endpoint. */
-    private fun onSendEmailBulkClicked() {
+    /** Massenversand: zaehlt zuerst Kandidaten, fragt um Bestaetigung, ruft dann Endpoint.
+     *  channel = "email" oder "post". */
+    private fun onSendBulkClicked(channel: String) {
+        val isEmail = channel == "email"
         val candidates = allPayments.count { p ->
             p.status == "offen" &&
-                !p.email.isNullOrBlank() &&
                 !p.referenceNr.isNullOrBlank() &&
-                p.memberStatus != "Ehrenmitglied"
+                p.memberStatus != "Ehrenmitglied" && (
+                    if (isEmail) !p.email.isNullOrBlank()
+                    else !p.strasse.isNullOrBlank() && !p.plz.isNullOrBlank() && !p.ort.isNullOrBlank()
+                )
         }
         val withoutRef = allPayments.count { p ->
             p.status == "offen" && p.memberStatus != "Ehrenmitglied" &&
                 p.referenceNr.isNullOrBlank()
         }
 
+        val channelLabel = if (isEmail) "E-Mail" else "Brief (Pingen)"
+        val prefLabel = if (isEmail) "Zustellpräferenz E-Mail" else "Zustellpräferenz Post + vollständige Adresse"
+
         if (candidates == 0) {
             AlertDialog.Builder(requireContext())
                 .setTitle("Keine Empfänger")
-                .setMessage("Keine offenen Beiträge mit E-Mail-Adresse und Referenznummer für $selectedYear.")
+                .setMessage("Keine offenen Beiträge für $channelLabel-Versand in $selectedYear (Filter: $prefLabel + Ref-Nr).")
                 .setPositiveButton("OK", null)
                 .show()
             return
@@ -302,20 +310,28 @@ class MembershipFeesFragment : Fragment() {
             "\n\n⚠ $withoutRef weitere Mitglieder haben keine Referenznummer und werden NICHT versendet (QR-Rechnung wäre unbrauchbar)."
         else ""
 
+        val extraPostHint = if (!isEmail)
+            "\n\nKostenpunkt: ca. CHF 1.– pro Brief via Pingen."
+        else ""
+
         AlertDialog.Builder(requireContext())
-            .setTitle("E-Mail an $candidates Mitglieder?")
-            .setMessage("Beitragsbrief für $selectedYear wird per E-Mail an alle offenen Mitglieder mit Zustellpräferenz E-Mail versendet. Ehrenmitglieder ausgenommen.$warning")
-            .setPositiveButton("Senden") { _, _ -> doSendEmailBulk() }
+            .setTitle("$channelLabel an $candidates Mitglieder?")
+            .setMessage("Beitragsbrief für $selectedYear wird via $channelLabel an alle offenen Mitglieder mit $prefLabel versendet. Ehrenmitglieder ausgenommen.$warning$extraPostHint")
+            .setPositiveButton("Senden") { _, _ -> doSendBulk(channel) }
             .setNegativeButton("Abbrechen", null)
             .show()
     }
 
-    private fun doSendEmailBulk() {
+    private fun doSendBulk(channel: String) {
+        val isEmail = channel == "email"
         binding.btnSendEmailBulk.isEnabled = false
+        binding.btnSendPostBulk.isEnabled = false
         binding.progress.visibility = View.VISIBLE
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val resp = ApiModule.membershipFeesApi.sendEmailBulk(SendEmailBulkRequest(year = selectedYear))
+                val req = SendEmailBulkRequest(year = selectedYear)
+                val resp = if (isEmail) ApiModule.membershipFeesApi.sendEmailBulk(req)
+                else ApiModule.membershipFeesApi.sendPostBulk(req)
                 if (resp.isSuccessful) {
                     val r = resp.body()
                     val msg = if (r != null)
@@ -323,7 +339,7 @@ class MembershipFeesFragment : Fragment() {
                     else
                         "Versand abgeschlossen."
                     AlertDialog.Builder(requireContext())
-                        .setTitle("E-Mail-Versand abgeschlossen")
+                        .setTitle(if (isEmail) "E-Mail-Versand abgeschlossen" else "Brief-Versand abgeschlossen")
                         .setMessage(msg)
                         .setPositiveButton("OK", null)
                         .show()
@@ -334,6 +350,7 @@ class MembershipFeesFragment : Fragment() {
                 showError("Netzwerkfehler: ${e.message}")
             } finally {
                 binding.btnSendEmailBulk.isEnabled = true
+                binding.btnSendPostBulk.isEnabled = true
                 binding.progress.visibility = View.GONE
             }
         }

@@ -15,6 +15,7 @@ import {
   Settings as SettingsIcon,
   PlayCircle,
   Mail,
+  Send,
 } from "lucide-react";
 import { FeeSettingsDialog } from "./FeeSettingsDialog";
 
@@ -46,6 +47,7 @@ export function MembershipFeesPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendingPost, setSendingPost] = useState(false);
   /** Lokal getrackte Ref-Drafts pro Zahlungs-ID — werden beim Blur gespeichert. */
   const [refDrafts, setRefDrafts] = useState<Record<string, string>>({});
   const [refSavingId, setRefSavingId] = useState<string | null>(null);
@@ -118,6 +120,50 @@ export function MembershipFeesPage() {
       setError(err instanceof Error ? err.message : "Fehler beim Speichern der Referenz");
     } finally {
       setRefSavingId(null);
+    }
+  };
+
+  const handleSendPostBulk = async () => {
+    const candidates = payments.filter((p) =>
+      p.status === "offen" &&
+      (p.strasse ?? "").trim() !== "" &&
+      (p.plz ?? "").trim() !== "" &&
+      (p.ort ?? "").trim() !== "" &&
+      (p.reference_nr ?? "").trim() !== "" &&
+      p.member_status !== "Ehrenmitglied"
+    );
+    const withoutRef = payments.filter((p) =>
+      p.status === "offen" &&
+      p.member_status !== "Ehrenmitglied" &&
+      (p.reference_nr ?? "").trim() === ""
+    );
+    if (candidates.length === 0) {
+      alert(`Keine offenen Beiträge für Brief-Versand in ${year} (Filter: vollständige Adresse + Ref-Nr).`);
+      return;
+    }
+    const warning = withoutRef.length > 0
+      ? `\n\n⚠ ${withoutRef.length} weitere Mitglieder haben keine Referenznummer und werden NICHT versendet.`
+      : "";
+    const ok = confirm(
+      `Brief-Versand via Pingen an ${candidates.length} Mitglieder?\n\n` +
+      `Beitragsbrief für ${year} wird per Post an alle offenen Mitglieder mit Zustellpräferenz Post versendet. Ehrenmitglieder ausgenommen.${warning}\n\n` +
+      `Kostenpunkt: ca. CHF 1.– pro Brief.`
+    );
+    if (!ok) return;
+
+    setSendingPost(true);
+    setError(null);
+    try {
+      const r = await feesApi.sendPostBulk(year);
+      alert(
+        `Brief-Versand abgeschlossen.\n\n` +
+        `${r.success} versendet, ${r.failed} fehlgeschlagen (von ${r.candidates} Empfängern).`
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Brief-Versand");
+    } finally {
+      setSendingPost(false);
     }
   };
 
@@ -215,7 +261,7 @@ export function MembershipFeesPage() {
           <button
             onClick={handleSendEmailBulk}
             disabled={sendingEmail}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-50"
           >
             {sendingEmail ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -223,6 +269,18 @@ export function MembershipFeesPage() {
               <Mail className="h-4 w-4" />
             )}
             E-Mail-Versand
+          </button>
+          <button
+            onClick={handleSendPostBulk}
+            disabled={sendingPost}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 disabled:opacity-50"
+          >
+            {sendingPost ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            Brief-Versand
           </button>
         </div>
       </div>
