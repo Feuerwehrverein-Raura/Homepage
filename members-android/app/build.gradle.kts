@@ -95,7 +95,11 @@ play {
     enabled.set(!keyFile.isNullOrBlank())
     track.set("internal")               // erst Internal Testing, manuell Promote zu Closed/Production
     defaultToAppBundles.set(true)        // .aab statt .apk hochladen
-    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
+    // DRAFT statt COMPLETED — Bundle wird hochgeladen, aber NICHT automatisch
+    // verteilt. Der Vorstand klickt manuell auf "Roll out" in der Play Console.
+    // Pflicht solange die App noch nie veroeffentlicht wurde (Status "Entwurf"
+    // in der Console).
+    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.DRAFT)
 }
 
 dependencies {
