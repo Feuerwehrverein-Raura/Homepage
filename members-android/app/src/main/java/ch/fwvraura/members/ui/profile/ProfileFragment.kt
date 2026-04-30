@@ -48,6 +48,10 @@ class ProfileFragment : Fragment() {
             startActivity(Intent(requireContext(),
                 ch.fwvraura.members.ui.notifications.NotificationsActivity::class.java))
         }
+        binding.btnAccesses.setOnClickListener {
+            startActivity(Intent(requireContext(),
+                ch.fwvraura.members.ui.accesses.AccessesActivity::class.java))
+        }
         binding.btnAustritt.setOnClickListener { showAustrittDialog() }
         setupContactsSyncSwitch()
 

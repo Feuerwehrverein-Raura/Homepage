@@ -51,4 +51,8 @@ interface MembersApi {
     suspend fun updateNotifications(
         @Body body: ch.fwvraura.members.data.model.NotificationsUpdateRequest
     ): Response<List<ch.fwvraura.members.data.model.NotificationPreference>>
+
+    /** System-Zugaenge, Nextcloud-Ordner, Funktions-E-Mails und Service-Accounts. */
+    @GET("members/me/accesses")
+    suspend fun getAccesses(): Response<ch.fwvraura.members.data.model.AccessesResponse>
 }
