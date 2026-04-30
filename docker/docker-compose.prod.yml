@@ -69,9 +69,12 @@ services:
       VAULTWARDEN_SYNC_PASSWORD: ${VAULTWARDEN_SYNC_PASSWORD}
       VAULTWARDEN_ORG_ID: dbc02839-7b9c-4003-8285-1b64cb1d521a
       VAULTWARDEN_COLLECTION_ID: 62cec13c-7300-4637-b5f6-bd9f9f1e02f6
+      # DEUTSCH: Firebase Admin SDK fuer FCM-Push-Notifications an die Mitglieder-App
+      FIREBASE_ADMIN_CREDENTIALS_PATH: /run/secrets/firebase-admin.json
     volumes:
       - ./data/uploads:/app/uploads    # DEUTSCH: Persistenter Speicher für hochgeladene Mitglieder-Fotos
       - /opt/docker/data/smb-credentials.json:/app/smb-credentials.json:ro  # DEUTSCH: SMB-Passwörter für Mitglieder-Dashboard
+      - /opt/docker/secrets/firebase-admin.json:/run/secrets/firebase-admin.json:ro  # DEUTSCH: Firebase-Service-Account fuer FCM
     depends_on:
       postgres:
         condition: service_healthy

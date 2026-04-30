@@ -11,9 +11,93 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
+const admin = require('firebase-admin');
 // DEUTSCH: Authentifizierungs-Middleware importieren (Token-Prüfung, Rollen-Prüfung)
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
+
+// DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
+// Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
+let fcmInitialized = false;
+try {
+    const credPath = process.env.FIREBASE_ADMIN_CREDENTIALS_PATH;
+    const credJson = process.env.FIREBASE_ADMIN_JSON;
+    let serviceAccount = null;
+    if (credPath && fs.existsSync(credPath)) {
+        serviceAccount = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+    } else if (credJson) {
+        serviceAccount = JSON.parse(credJson);
+    }
+    if (serviceAccount) {
+        admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+        fcmInitialized = true;
+        console.log('Firebase Admin SDK initialized (project:', serviceAccount.project_id + ')');
+    } else {
+        console.warn('Firebase Admin SDK NOT initialized — FIREBASE_ADMIN_CREDENTIALS_PATH/FIREBASE_ADMIN_JSON not set; pushes disabled');
+    }
+} catch (err) {
+    console.error('Firebase Admin init failed:', err.message);
+}
+
+/**
+ * DEUTSCH: Push-Benachrichtigung an alle Geraete eines Mitglieds senden.
+ * Respektiert notification_preferences (wenn dieser Typ disabled ist, kein Push).
+ * Putzt ungueltige Tokens automatisch aus der DB.
+ *
+ * @param {string} memberId         UUID des Mitglieds
+ * @param {string} notificationType 'event_update' | 'shift_reminder' | 'newsletter' | 'general'
+ * @param {string} title            Notification-Titel
+ * @param {string} body             Notification-Body
+ * @param {object} data             Optionale Key/Value-Strings fuer App-Routing
+ */
+async function sendPushToMember(memberId, notificationType, title, body, data = {}) {
+    if (!fcmInitialized) return;
+    try {
+        const pref = await pool.query(
+            'SELECT enabled FROM notification_preferences WHERE member_id=$1 AND notification_type=$2',
+            [memberId, notificationType]
+        );
+        if (pref.rows.length > 0 && pref.rows[0].enabled === false) {
+            return; // User hat diesen Typ deaktiviert
+        }
+        const tokens = await pool.query(
+            'SELECT token FROM fcm_tokens WHERE member_id=$1',
+            [memberId]
+        );
+        if (tokens.rows.length === 0) return;
+
+        const stringData = Object.fromEntries(
+            Object.entries({ notificationType, ...data }).map(([k, v]) => [k, String(v)])
+        );
+        const message = {
+            notification: { title, body },
+            data: stringData,
+            tokens: tokens.rows.map(r => r.token)
+        };
+        const response = await admin.messaging().sendEachForMulticast(message);
+        const invalidTokens = [];
+        response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+                const code = resp.error && resp.error.code;
+                if (code === 'messaging/registration-token-not-registered' ||
+                    code === 'messaging/invalid-registration-token' ||
+                    code === 'messaging/invalid-argument') {
+                    invalidTokens.push(tokens.rows[idx].token);
+                }
+            }
+        });
+        if (invalidTokens.length > 0) {
+            await pool.query(
+                'DELETE FROM fcm_tokens WHERE token = ANY($1::text[])',
+                [invalidTokens]
+            );
+            console.log(`FCM: cleaned up ${invalidTokens.length} invalid tokens for member ${memberId}`);
+        }
+        console.log(`FCM push to member ${memberId} (${notificationType}): ${response.successCount}/${tokens.rows.length} delivered`);
+    } catch (err) {
+        console.error('sendPushToMember failed:', err.message);
+    }
+}
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -1373,8 +1457,10 @@ async function getAktuarName() {
 }
 
 // Send notification email helper - sends to member AND aktuar
-// DEUTSCH: Sendet eine Benachrichtigungs-E-Mail an das Mitglied (wenn E-Mail-Zustellung aktiv) und immer an den Aktuar
-async function sendNotificationEmail(memberId, templateName, variables = {}) {
+// DEUTSCH: Sendet eine Benachrichtigungs-E-Mail an das Mitglied (wenn E-Mail-Zustellung aktiv) und immer an den Aktuar.
+// Optionale Push-Notification: wenn pushType angegeben, wird zusaetzlich ein FCM-Push verschickt
+// (respektiert notification_preferences). pushTitle/pushBody sind Defaults aus templateName.
+async function sendNotificationEmail(memberId, templateName, variables = {}, pushType = null, pushTitle = null, pushBody = null) {
     try {
         const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
         const AKTUAR_EMAIL = process.env.AKTUAR_EMAIL || 'aktuar@fwv-raura.ch';
@@ -1427,6 +1513,12 @@ async function sendNotificationEmail(memberId, templateName, variables = {}) {
         });
         console.log(`Notification email '${templateName}' sent to Aktuar ${AKTUAR_EMAIL}`);
 
+        // Push-Notification ans Mitglied, wenn pushType gesetzt — Aktuar erhaelt nur E-Mail.
+        if (pushType) {
+            const title = pushTitle || templateName;
+            const body = pushBody || (template.subject || templateName);
+            await sendPushToMember(memberId, pushType, title, body, { template: templateName });
+        }
     } catch (error) {
         console.error(`Failed to send notification email:`, error.message);
     }
@@ -2264,7 +2356,9 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             ).join('\n');
             sendNotificationEmail(memberId, 'Datenänderung bestätigt', {
                 changed_fields: changedFieldsList
-            }).catch(err => console.error('Email notification failed:', err));
+            }, 'general', 'Datenänderung bestätigt',
+               `Deine Profil-Änderung wurde uebernommen (${changedFields.length} Feld${changedFields.length > 1 ? 'er' : ''}).`
+            ).catch(err => console.error('Email notification failed:', err));
 
             // Write audit log with real client IP
             const clientIp = getClientIp(req);
@@ -2295,7 +2389,8 @@ app.get('/members/directory', authenticateToken, async (req, res) => {
         );
         res.json(result.rows);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('GET /members/directory failed:', err);
+        res.status(500).json({ error: err.message, code: err.code });
     }
 });
 
@@ -2562,7 +2657,9 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
 
             sendNotificationEmail(id, 'Datenänderung bestätigt', {
                 changed_fields: changedFieldsList
-            }).catch(err => console.error('Email notification failed:', err));
+            }, 'general', 'Datenänderung bestätigt',
+               `Der Vorstand hat deine Daten aktualisiert (${actualChangedFields.length} Feld${actualChangedFields.length > 1 ? 'er' : ''}).`
+            ).catch(err => console.error('Email notification failed:', err));
         }
 
         res.json(result.rows[0]);
@@ -3358,7 +3455,9 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
                 status: memberStatus,
                 eintrittsdatum: today,
                 aktuar_name: aktuarName
-            }).catch(err => console.error('Welcome email failed:', err));
+            }, 'general', 'Willkommen beim FWV Raura!',
+               'Deine Mitgliedschaft wurde bestaetigt.'
+            ).catch(err => console.error('Welcome email failed:', err));
         }).catch(err => console.error('getAktuarName failed:', err));
 
         res.json({
