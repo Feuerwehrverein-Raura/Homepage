@@ -65,4 +65,11 @@ interface MembershipFeesApi {
     @POST("membership-fees/send-post-bulk")
     suspend fun sendPostBulk(@Body body: ch.fwvraura.vorstand.data.model.SendEmailBulkRequest):
         Response<ch.fwvraura.vorstand.data.model.SendEmailBulkResponse>
+
+    /** Einzelversand fuer eine Zahlung (channel = "email" oder "post"). */
+    @POST("membership-fees/payments/{id}/send")
+    suspend fun sendSingle(
+        @Path("id") id: String,
+        @Body body: ch.fwvraura.vorstand.data.model.SendSingleRequest
+    ): Response<ch.fwvraura.vorstand.data.model.SendSingleResponse>
 }

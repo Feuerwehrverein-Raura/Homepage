@@ -70,6 +70,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:text="Ref." />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/feeSendBtn"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:text="Senden" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

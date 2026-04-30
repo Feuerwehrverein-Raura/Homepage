@@ -64,3 +64,7 @@ export async function sendEmailBulk(year: number): Promise<SendEmailBulkResponse
 export async function sendPostBulk(year: number): Promise<SendEmailBulkResponse> {
   return await apiClient.post<SendEmailBulkResponse>(`/membership-fees/send-post-bulk`, { year });
 }
+
+export async function sendSingle(id: string, channel: "email" | "post"): Promise<{ success: boolean }> {
+  return await apiClient.post<{ success: boolean }>(`/membership-fees/payments/${id}/send`, { channel });
+}

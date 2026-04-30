@@ -19,6 +19,7 @@ import ch.fwvraura.vorstand.data.model.GeneratePaymentsRequest
 import ch.fwvraura.vorstand.data.model.MarkFeePaidRequest
 import ch.fwvraura.vorstand.data.model.MembershipFeePayment
 import ch.fwvraura.vorstand.data.model.SendEmailBulkRequest
+import ch.fwvraura.vorstand.data.model.SendSingleRequest
 import ch.fwvraura.vorstand.data.model.SetReferenceRequest
 import ch.fwvraura.vorstand.databinding.FragmentMembershipFeesBinding
 import com.google.android.material.snackbar.Snackbar
@@ -44,7 +45,8 @@ class MembershipFeesFragment : Fragment() {
 
     private val adapter = FeePaymentsAdapter(
         onTogglePaid = ::onTogglePayment,
-        onEditReference = ::onEditReference
+        onEditReference = ::onEditReference,
+        onSend = ::onSendSingle
     )
     private var allPayments: List<MembershipFeePayment> = emptyList()
     private var selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR)
@@ -352,6 +354,52 @@ class MembershipFeesFragment : Fragment() {
                 binding.btnSendEmailBulk.isEnabled = true
                 binding.btnSendPostBulk.isEnabled = true
                 binding.progress.visibility = View.GONE
+            }
+        }
+    }
+
+    /** Einzelversand: Auswahl-Dialog mit "E-Mail" oder "Brief" und dann API-Call. */
+    private fun onSendSingle(p: MembershipFeePayment) {
+        val name = listOfNotNull(p.vorname, p.nachname).joinToString(" ").ifBlank { "Mitglied" }
+        val hasEmail = !p.email.isNullOrBlank()
+        val hasAddress = !p.strasse.isNullOrBlank() && !p.plz.isNullOrBlank() && !p.ort.isNullOrBlank()
+
+        val options = mutableListOf<Pair<String, String>>() // label -> channel
+        if (hasEmail) options.add("E-Mail an ${p.email}" to "email")
+        if (hasAddress) options.add("Brief via Pingen (~CHF 1.–)" to "post")
+
+        if (options.isEmpty()) {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Versand nicht möglich")
+                .setMessage("$name hat weder E-Mail-Adresse noch vollständige Postadresse hinterlegt.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Versand an $name")
+            .setItems(options.map { it.first }.toTypedArray()) { _, which ->
+                doSendSingle(p, options[which].second)
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun doSendSingle(p: MembershipFeePayment, channel: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val resp = ApiModule.membershipFeesApi.sendSingle(p.id, SendSingleRequest(channel))
+                if (resp.isSuccessful && resp.body()?.success == true) {
+                    val name = listOfNotNull(p.vorname, p.nachname).joinToString(" ").ifBlank { "Mitglied" }
+                    val label = if (channel == "email") "E-Mail" else "Brief"
+                    Snackbar.make(binding.root, "$label an $name versendet.", Snackbar.LENGTH_SHORT).show()
+                } else {
+                    val err = resp.body()?.error ?: resp.errorBody()?.string() ?: "Fehler ${resp.code()}"
+                    showError(err)
+                }
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
             }
         }
     }

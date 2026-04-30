@@ -16,6 +16,7 @@ import {
   PlayCircle,
   Mail,
   Send,
+  MoreHorizontal,
 } from "lucide-react";
 import { FeeSettingsDialog } from "./FeeSettingsDialog";
 
@@ -48,6 +49,8 @@ export function MembershipFeesPage() {
   const [generating, setGenerating] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [sendingPost, setSendingPost] = useState(false);
+  const [singleSendId, setSingleSendId] = useState<string | null>(null);
+  const [singleMenuId, setSingleMenuId] = useState<string | null>(null);
   /** Lokal getrackte Ref-Drafts pro Zahlungs-ID — werden beim Blur gespeichert. */
   const [refDrafts, setRefDrafts] = useState<Record<string, string>>({});
   const [refSavingId, setRefSavingId] = useState<string | null>(null);
@@ -120,6 +123,22 @@ export function MembershipFeesPage() {
       setError(err instanceof Error ? err.message : "Fehler beim Speichern der Referenz");
     } finally {
       setRefSavingId(null);
+    }
+  };
+
+  const handleSendSingle = async (p: MembershipFeePayment, channel: "email" | "post") => {
+    setSingleMenuId(null);
+    setSingleSendId(p.id);
+    setError(null);
+    try {
+      await feesApi.sendSingle(p.id, channel);
+      const name = [p.vorname, p.nachname].filter(Boolean).join(" ") || "Mitglied";
+      const label = channel === "email" ? "E-Mail" : "Brief";
+      alert(`${label} an ${name} versendet.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Versand fehlgeschlagen");
+    } finally {
+      setSingleSendId(null);
     }
   };
 
@@ -425,26 +444,71 @@ export function MembershipFeesPage() {
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{paidDate}</td>
                     <td className="px-4 py-2 text-right">
-                      <button
-                        onClick={() => handleToggle(p)}
-                        disabled={actionId === p.id}
-                        className={cn(
-                          "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium",
-                          isPaid
-                            ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                            : "bg-green-600 text-white hover:bg-green-700",
-                          "disabled:opacity-50"
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => handleToggle(p)}
+                          disabled={actionId === p.id}
+                          className={cn(
+                            "inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium",
+                            isPaid
+                              ? "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                              : "bg-green-600 text-white hover:bg-green-700",
+                            "disabled:opacity-50"
+                          )}
+                        >
+                          {actionId === p.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : isPaid ? (
+                            <RotateCcw className="h-3 w-3" />
+                          ) : (
+                            <CheckCircle className="h-3 w-3" />
+                          )}
+                          {isPaid ? "Zurücksetzen" : "Bezahlt"}
+                        </button>
+
+                        {!isPaid && (p.reference_nr ?? "").trim() !== "" && (
+                          <div className="relative">
+                            <button
+                              onClick={() => setSingleMenuId(singleMenuId === p.id ? null : p.id)}
+                              disabled={singleSendId === p.id}
+                              className="p-1 rounded-md hover:bg-accent disabled:opacity-50"
+                              title="Einzelversand"
+                            >
+                              {singleSendId === p.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <MoreHorizontal className="h-4 w-4" />
+                              )}
+                            </button>
+                            {singleMenuId === p.id && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-10"
+                                  onClick={() => setSingleMenuId(null)}
+                                />
+                                <div className="absolute right-0 mt-1 w-44 rounded-md border bg-popover shadow-md z-20 py-1 text-sm">
+                                  <button
+                                    onClick={() => handleSendSingle(p, "email")}
+                                    disabled={!(p.email ?? "").trim()}
+                                    className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <Mail className="h-3 w-3" />
+                                    E-Mail senden
+                                  </button>
+                                  <button
+                                    onClick={() => handleSendSingle(p, "post")}
+                                    disabled={!(p.strasse ?? "").trim() || !(p.plz ?? "").trim() || !(p.ort ?? "").trim()}
+                                    className="flex items-center gap-2 w-full px-3 py-1.5 hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    <Send className="h-3 w-3" />
+                                    Brief senden
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
-                      >
-                        {actionId === p.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : isPaid ? (
-                          <RotateCcw className="h-3 w-3" />
-                        ) : (
-                          <CheckCircle className="h-3 w-3" />
-                        )}
-                        {isPaid ? "Zurücksetzen" : "Bezahlt"}
-                      </button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -621,6 +621,86 @@ app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorst
     }
 });
 
+// DEUTSCH: POST /membership-fees/payments/:id/send — Einzelversand fuer eine Zahlung.
+// Body: { channel: 'email' | 'post' }
+// Validiert Mitgliederdaten je nach Kanal (E-Mail vorhanden / Adresse vollstaendig).
+app.post('/membership-fees/payments/:id/send', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { channel } = req.body || {};
+        if (channel !== 'email' && channel !== 'post') {
+            return res.status(400).json({ error: 'channel muss "email" oder "post" sein' });
+        }
+
+        const paymentRes = await pool.query(`
+            SELECT p.*, m.id as m_id, m.vorname, m.nachname, m.email, m.strasse, m.plz, m.ort,
+                   m.status as member_status
+            FROM membership_fee_payments p
+            JOIN members m ON p.member_id = m.id
+            WHERE p.id = $1
+        `, [req.params.id]);
+        if (paymentRes.rows.length === 0) {
+            return res.status(404).json({ error: 'Zahlung nicht gefunden' });
+        }
+        const r = paymentRes.rows[0];
+
+        if ((r.reference_nr || '').replace(/\D/g, '').length === 0) {
+            return res.status(400).json({ error: 'Keine Referenznummer hinterlegt — QR-Rechnung waere unbrauchbar.' });
+        }
+        if ((r.member_status || '') === 'Ehrenmitglied') {
+            return res.status(400).json({ error: 'Ehrenmitglieder sind beitragsbefreit.' });
+        }
+        if (channel === 'email' && !(r.email || '').trim()) {
+            return res.status(400).json({ error: 'Mitglied hat keine E-Mail-Adresse.' });
+        }
+        if (channel === 'post' && (!(r.strasse || '').trim() || !(r.plz || '').trim() || !(r.ort || '').trim())) {
+            return res.status(400).json({ error: 'Mitglied hat keine vollstaendige Adresse.' });
+        }
+
+        const settingsRes = await pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [r.year]);
+        if (settingsRes.rows.length === 0) {
+            return res.status(400).json({ error: `Keine Einstellungen fuer ${r.year} hinterlegt` });
+        }
+        const settings = settingsRes.rows[0];
+        const kassiersRes = await pool.query("SELECT vorname, nachname, strasse, plz, ort, telefon, mobile, funktion FROM members WHERE funktion ILIKE '%kassier%'");
+        const kassier = getKassier(kassiersRes.rows);
+
+        const member = { vorname: r.vorname, nachname: r.nachname, strasse: r.strasse, plz: r.plz, ort: r.ort };
+        const payment = { reference_nr: r.reference_nr, amount: r.amount };
+        const dispatchHeaders = { 'x-api-key': process.env.API_KEY };
+
+        if (channel === 'email') {
+            const html = await buildBeitragEmailForPayment({ member, payment, settings, kassier });
+            await axios.post(`${DISPATCH_API}/email/bulk`, {
+                member_ids: [r.member_id],
+                subject: `Mitgliederbeitrag ${r.year} - Feuerwehrverein Raura`,
+                body: '',
+                html,
+                attachments: [],
+                exclude_honored: true
+            }, { headers: dispatchHeaders, timeout: 20000 });
+        } else {
+            const html = await buildBeitragLetterForPayment({ member, payment, settings, kassier });
+            await axios.post(`${DISPATCH_API}/dispatch/send-post`, {
+                html,
+                recipient: {
+                    name: `${r.vorname || ''} ${r.nachname || ''}`.trim(),
+                    street: r.strasse,
+                    zip: r.plz,
+                    city: r.ort,
+                    country: 'CH'
+                },
+                member_id: r.member_id
+            }, { headers: dispatchHeaders, timeout: 60000 });
+        }
+
+        logInfo('Membership fee single-send', { id: r.id, channel });
+        res.json({ success: true, channel });
+    } catch (error) {
+        logError('single-send error', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: POST /membership-fees/send-post-bulk?year=YYYY — Beitragsbrief per Pingen-Post
 // an alle offenen, beitragspflichtigen Mitglieder mit Zustellpraeferenz Post.
 //

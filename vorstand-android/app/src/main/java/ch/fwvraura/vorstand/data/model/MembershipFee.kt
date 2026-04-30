@@ -102,3 +102,13 @@ data class SendFailure(
     val name: String? = null,
     val error: String? = null
 )
+
+/** Body fuer POST /membership-fees/payments/:id/send (Einzelversand). */
+data class SendSingleRequest(val channel: String)
+
+/** Antwort von Einzelversand. */
+data class SendSingleResponse(
+    val success: Boolean = false,
+    val channel: String? = null,
+    val error: String? = null
+)

@@ -12,7 +12,8 @@ import ch.fwvraura.vorstand.databinding.ItemFeePaymentBinding
 
 class FeePaymentsAdapter(
     private val onTogglePaid: (MembershipFeePayment) -> Unit,
-    private val onEditReference: (MembershipFeePayment) -> Unit
+    private val onEditReference: (MembershipFeePayment) -> Unit,
+    private val onSend: (MembershipFeePayment) -> Unit
 ) : ListAdapter<MembershipFeePayment, FeePaymentsAdapter.VH>(DIFF) {
 
     inner class VH(val b: ItemFeePaymentBinding) : RecyclerView.ViewHolder(b.root)
@@ -48,6 +49,11 @@ class FeePaymentsAdapter(
         b.feeRefBtn.visibility = if (isPaid) View.GONE else View.VISIBLE
         b.feeRefBtn.text = if (p.referenceNr.isNullOrBlank()) "Ref." else "Ref. ändern"
         b.feeRefBtn.setOnClickListener { onEditReference(p) }
+
+        // Senden-Button: nur sichtbar wenn offen + Ref vorhanden
+        val canSend = !isPaid && !p.referenceNr.isNullOrBlank()
+        b.feeSendBtn.visibility = if (canSend) View.VISIBLE else View.GONE
+        b.feeSendBtn.setOnClickListener { onSend(p) }
     }
 
     private fun formatAmount(raw: String): String = try {
