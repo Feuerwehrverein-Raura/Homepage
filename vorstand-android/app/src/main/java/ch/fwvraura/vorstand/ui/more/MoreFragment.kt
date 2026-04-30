@@ -79,6 +79,11 @@ class MoreFragment : Fragment() {
             findNavController().navigate(R.id.action_more_to_membership_fees)
         }
 
+        // Geplante Aufgaben (Scheduled Jobs)
+        binding.cardScheduledJobs.setOnClickListener {
+            findNavController().navigate(R.id.action_more_to_scheduled_jobs)
+        }
+
         // Einstellungen
         binding.cardSettings.setOnClickListener {
             findNavController().navigate(R.id.action_more_to_settings)

@@ -12,6 +12,7 @@ import {
   KeyRound,
   FileUp,
   Wallet,
+  Clock,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -29,6 +30,7 @@ const navItems = [
   { path: "/vault", label: "Tresor", icon: KeyRound },
   { path: "/mass-pdf", label: "Massen-PDF", icon: FileUp },
   { path: "/membership-fees", label: "Beitraege", icon: Wallet },
+  { path: "/scheduled-jobs", label: "Geplant", icon: Clock },
   { path: "/settings", label: "Einstellungen", icon: Settings },
 ];
 

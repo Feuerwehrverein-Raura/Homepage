@@ -120,6 +120,9 @@ object ApiModule {
     /** Mitgliedschaftsbeitraege (api-accounting unter /membership-fees). */
     val membershipFeesApi: MembershipFeesApi by lazy { retrofit!!.create(MembershipFeesApi::class.java) }
 
+    /** Geplante Hintergrund-Jobs (api-dispatch unter /scheduled-jobs). */
+    val scheduledJobsApi: ScheduledJobsApi by lazy { retrofit!!.create(ScheduledJobsApi::class.java) }
+
     // ============================================
     // VAULTWARDEN (separates Retrofit, eigene Base URL, kein AuthInterceptor)
     // ============================================

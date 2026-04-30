@@ -4452,6 +4452,54 @@ app.post('/dispatch/preview-pdf', authenticateAny, async (req, res) => {
     }
 });
 
+// ============================================
+// SCHEDULED JOBS — zeitgesteuerter Hintergrund-Worker
+// ============================================
+const scheduledJobs = require('./scheduled-jobs');
+
+// Auth-Wrapper: erlaubt vorstand-/admin-Zugriff.
+const requireVorstand = [authenticateAny, requireRole('vorstand', 'admin')];
+
+// Action-Handler registrieren — jeweils axios-Aufruf an den entsprechenden Backend-Endpoint
+// mit X-API-Key, damit der Worker authentifiziert ist (kein User-Token vorhanden).
+const ACCOUNTING_API = process.env.ACCOUNTING_API_URL || 'http://api-accounting:3000';
+const internalHeaders = () => ({ 'x-api-key': process.env.API_KEY });
+
+scheduledJobs.registerHandler('membership_fees_email_bulk', async (payload) => {
+    const year = parseInt(payload.year);
+    if (!year) throw new Error('payload.year erforderlich');
+    const resp = await axios.post(
+        `${ACCOUNTING_API}/membership-fees/send-email-bulk`,
+        { year },
+        { headers: internalHeaders(), timeout: 600000 }
+    );
+    return resp.data;
+});
+
+scheduledJobs.registerHandler('membership_fees_post_bulk', async (payload) => {
+    const year = parseInt(payload.year);
+    if (!year) throw new Error('payload.year erforderlich');
+    const resp = await axios.post(
+        `${ACCOUNTING_API}/membership-fees/send-post-bulk`,
+        { year },
+        { headers: internalHeaders(), timeout: 600000 }
+    );
+    return resp.data;
+});
+
+// Tabelle anlegen + Worker starten + Endpoints mounten.
+(async () => {
+    try {
+        await scheduledJobs.createTableIfNeeded(pool);
+        scheduledJobs.startWorker(pool, { intervalMs: 60_000 });
+        console.log('[scheduled-jobs] worker started (60s tick)');
+    } catch (e) {
+        console.error('[scheduled-jobs] init failed:', e.message);
+    }
+})();
+
+scheduledJobs.mountEndpoints(app, pool, requireVorstand);
+
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 app.listen(PORT, () => {
     console.log(`API-Dispatch running on port ${PORT}`);

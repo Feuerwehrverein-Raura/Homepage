@@ -125,6 +125,9 @@
         <action
             android:id="@+id/action_more_to_membership_fees"
             app:destination="@id/membershipFeesFragment" />
+        <action
+            android:id="@+id/action_more_to_scheduled_jobs"
+            app:destination="@id/scheduledJobsFragment" />
     </fragment>
 
     <!-- Mitgliedsbeitraege -->
@@ -132,6 +135,12 @@
         android:id="@+id/membershipFeesFragment"
         android:name="ch.fwvraura.vorstand.ui.membershipfees.MembershipFeesFragment"
         android:label="Mitgliedsbeiträge" />
+
+    <!-- Geplante Aufgaben -->
+    <fragment
+        android:id="@+id/scheduledJobsFragment"
+        android:name="ch.fwvraura.vorstand.ui.scheduledjobs.ScheduledJobsFragment"
+        android:label="Geplante Aufgaben" />
 
     <!-- Mailcow (E-Mail Verwaltung) -->
     <fragment

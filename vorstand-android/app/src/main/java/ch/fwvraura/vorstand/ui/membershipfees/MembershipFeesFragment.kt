@@ -18,6 +18,7 @@ import ch.fwvraura.vorstand.data.api.ApiModule
 import ch.fwvraura.vorstand.data.model.GeneratePaymentsRequest
 import ch.fwvraura.vorstand.data.model.MarkFeePaidRequest
 import ch.fwvraura.vorstand.data.model.MembershipFeePayment
+import ch.fwvraura.vorstand.data.model.ScheduledJobCreate
 import ch.fwvraura.vorstand.data.model.SendEmailBulkRequest
 import ch.fwvraura.vorstand.data.model.SendSingleRequest
 import ch.fwvraura.vorstand.data.model.SetReferenceRequest
@@ -78,6 +79,9 @@ class MembershipFeesFragment : Fragment() {
         binding.btnGenerate.setOnClickListener { onGenerateClicked() }
         binding.btnSendEmailBulk.setOnClickListener { onSendBulkClicked(channel = "email") }
         binding.btnSendPostBulk.setOnClickListener { onSendBulkClicked(channel = "post") }
+        // Long-Press: stattdessen planen statt sofort senden.
+        binding.btnSendEmailBulk.setOnLongClickListener { onScheduleBulk("email"); true }
+        binding.btnSendPostBulk.setOnLongClickListener { onScheduleBulk("post"); true }
 
         load()
     }
@@ -397,6 +401,64 @@ class MembershipFeesFragment : Fragment() {
                 } else {
                     val err = resp.body()?.error ?: resp.errorBody()?.string() ?: "Fehler ${resp.code()}"
                     showError(err)
+                }
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
+            }
+        }
+    }
+
+    /** Massenversand stattdessen planen — Datum + Uhrzeit auswaehlen, dann Job erstellen. */
+    private fun onScheduleBulk(channel: String) {
+        val isEmail = channel == "email"
+        val channelLabel = if (isEmail) "E-Mail" else "Brief"
+        val now = java.util.Calendar.getInstance().apply { add(java.util.Calendar.DAY_OF_YEAR, 1); set(java.util.Calendar.HOUR_OF_DAY, 9); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0) }
+
+        val datePicker = com.google.android.material.datepicker.MaterialDatePicker.Builder.datePicker()
+            .setTitleText("$channelLabel-Versand planen — Datum")
+            .setSelection(now.timeInMillis)
+            .build()
+        datePicker.addOnPositiveButtonClickListener { ms ->
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = ms }
+            val timePicker = com.google.android.material.timepicker.MaterialTimePicker.Builder()
+                .setHour(9).setMinute(0)
+                .setTitleText("$channelLabel-Versand planen — Uhrzeit")
+                .setTimeFormat(com.google.android.material.timepicker.TimeFormat.CLOCK_24H)
+                .build()
+            timePicker.addOnPositiveButtonClickListener {
+                cal.set(java.util.Calendar.HOUR_OF_DAY, timePicker.hour)
+                cal.set(java.util.Calendar.MINUTE, timePicker.minute)
+                cal.set(java.util.Calendar.SECOND, 0)
+                cal.set(java.util.Calendar.MILLISECOND, 0)
+                doScheduleBulk(channel, cal.time)
+            }
+            timePicker.show(parentFragmentManager, "schedule_time")
+        }
+        datePicker.show(parentFragmentManager, "schedule_date")
+    }
+
+    private fun doScheduleBulk(channel: String, runAt: java.util.Date) {
+        val isEmail = channel == "email"
+        val isoFmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.US)
+        val isoStr = isoFmt.format(runAt)
+        val action = if (isEmail) "membership_fees_email_bulk" else "membership_fees_post_bulk"
+        val label = (if (isEmail) "Beitrag E-Mail-Versand" else "Beitrag Brief-Versand") + " $selectedYear"
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val resp = ApiModule.scheduledJobsApi.create(
+                    ScheduledJobCreate(
+                        action = action,
+                        payload = mapOf("year" to selectedYear),
+                        label = label,
+                        scheduledAt = isoStr
+                    )
+                )
+                if (resp.isSuccessful) {
+                    val swiss = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.GERMAN).format(runAt)
+                    Snackbar.make(binding.root, "Geplant für $swiss.", Snackbar.LENGTH_LONG).show()
+                } else {
+                    showError("Fehler ${resp.code()}")
                 }
             } catch (e: Exception) {
                 showError("Netzwerkfehler: ${e.message}")

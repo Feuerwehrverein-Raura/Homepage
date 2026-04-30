@@ -17,7 +17,9 @@ import {
   Mail,
   Send,
   MoreHorizontal,
+  Clock,
 } from "lucide-react";
+import * as scheduledJobsApi from "@/lib/api/scheduled-jobs";
 import { FeeSettingsDialog } from "./FeeSettingsDialog";
 
 const statusFilters = [
@@ -123,6 +125,48 @@ export function MembershipFeesPage() {
       setError(err instanceof Error ? err.message : "Fehler beim Speichern der Referenz");
     } finally {
       setRefSavingId(null);
+    }
+  };
+
+  const handleScheduleBulk = async (channel: "email" | "post") => {
+    const channelLabel = channel === "email" ? "E-Mail" : "Brief";
+    // Browser-prompt fuer ISO-DateTime — Default = morgen 09:00.
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    const tzOffset = -tomorrow.getTimezoneOffset();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const defaultLocal =
+      `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T` +
+      `${pad(tomorrow.getHours())}:${pad(tomorrow.getMinutes())}`;
+    const input = prompt(
+      `${channelLabel}-Versand für ${year} planen.\n\nWann soll gesendet werden? (Format YYYY-MM-DDTHH:MM, lokale Zeit)`,
+      defaultLocal
+    );
+    if (!input) return;
+    let scheduledAt: string;
+    try {
+      const d = new Date(input);
+      if (isNaN(d.getTime())) throw new Error("Ungültiges Datum");
+      // ISO mit Timezone-Offset bauen
+      const sign = tzOffset >= 0 ? "+" : "-";
+      const off = Math.abs(tzOffset);
+      const tzStr = `${sign}${pad(Math.floor(off / 60))}:${pad(off % 60)}`;
+      scheduledAt = input.length === 16 ? `${input}:00${tzStr}` : d.toISOString();
+    } catch (err) {
+      alert(`Ungültiges Datum: ${err instanceof Error ? err.message : ""}`);
+      return;
+    }
+    try {
+      await scheduledJobsApi.createJob({
+        action: channel === "email" ? "membership_fees_email_bulk" : "membership_fees_post_bulk",
+        payload: { year },
+        label: `Beitrag ${channelLabel}-Versand ${year}`,
+        scheduled_at: scheduledAt,
+      });
+      alert(`${channelLabel}-Versand für ${year} geplant.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Planen fehlgeschlagen");
     }
   };
 
@@ -301,6 +345,19 @@ export function MembershipFeesPage() {
             )}
             Brief-Versand
           </button>
+          <div className="relative">
+            <button
+              onClick={() => {
+                const choice = prompt('Welcher Versand soll geplant werden? "email" oder "post"', "email");
+                if (choice === "email" || choice === "post") handleScheduleBulk(choice);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent"
+              title="Versand planen statt sofort senden"
+            >
+              <Clock className="h-4 w-4" />
+              Planen
+            </button>
+          </div>
         </div>
       </div>
 
