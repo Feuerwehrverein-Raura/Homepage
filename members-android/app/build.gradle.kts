@@ -146,7 +146,9 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
     // Firebase Cloud Messaging — Push-Notifications.
-    // BoM legt Versionen aller Firebase-Libs konsistent fest.
+    // BoM legt Versionen aller Firebase-Libs konsistent fest. Seit BoM 33+ sind
+    // die -ktx-Module deprecated — die Kotlin-Extensions sind ins Haupt-Modul
+    // gemerged.
     implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
-    implementation("com.google.firebase:firebase-messaging-ktx")
+    implementation("com.google.firebase:firebase-messaging")
 }
