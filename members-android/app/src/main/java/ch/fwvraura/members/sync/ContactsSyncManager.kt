@@ -31,11 +31,31 @@ object ContactsSyncManager {
         ContentResolver.addPeriodicSync(acc, AUTHORITY, Bundle.EMPTY, 24 * 60 * 60L)
     }
 
-    /** Deaktiviert den Sync und entfernt das Konto (was die FWV-Kontakte mitnimmt). */
+    /**
+     * Deaktiviert den Sync, loescht alle FWV-RawContacts hart (kein Tombstone)
+     * und entfernt anschliessend das Konto.
+     *
+     * Wichtig: ohne CALLER_IS_SYNCADAPTER haengen "deleted=1"-Tombstones zurueck;
+     * mit removeAccountExplicitly allein kommt es vor, dass Android die Kontakte
+     * erst nach Stunden wirklich aufraeumt. Diese Funktion stellt sicher dass
+     * die FWV-Kontakte sofort und komplett vom Geraet verschwinden.
+     */
     fun disableSync(context: Context) {
         val am = AccountManager.get(context)
+        val syncerUri = ContactsContract.RawContacts.CONTENT_URI.buildUpon()
+            .appendQueryParameter(ContactsContract.CALLER_IS_SYNCADAPTER, "true")
+            .build()
         for (acc in am.getAccountsByType(ACCOUNT_TYPE)) {
             ContentResolver.setSyncAutomatically(acc, AUTHORITY, false)
+            ContentResolver.cancelSync(acc, AUTHORITY)
+            try {
+                context.contentResolver.delete(
+                    syncerUri,
+                    "${ContactsContract.RawContacts.ACCOUNT_TYPE}=? AND " +
+                            "${ContactsContract.RawContacts.ACCOUNT_NAME}=?",
+                    arrayOf(ACCOUNT_TYPE, acc.name)
+                )
+            } catch (_: SecurityException) { /* WRITE_CONTACTS evtl. weg — Account-Removal raeumt dann auf */ }
             am.removeAccountExplicitly(acc)
         }
     }
