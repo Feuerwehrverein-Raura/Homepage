@@ -56,4 +56,26 @@ object ContactsSyncManager {
         val am = AccountManager.get(context)
         return am.getAccountsByType(ACCOUNT_TYPE).isNotEmpty()
     }
+
+    /**
+     * Loescht alle "Tombstones" (vom User geloeschte FWV-RawContacts mit DELETED=1).
+     * Beim naechsten Sync werden alle Mitglieder wieder neu angelegt — rueckgaengig
+     * fuer versehentliche Loeschungen.
+     *
+     * Gibt die Anzahl der entfernten Tombstones zurueck.
+     */
+    fun restoreDeletedContacts(context: Context): Int {
+        val syncerUri = ContactsContract.RawContacts.CONTENT_URI.buildUpon()
+            .appendQueryParameter(ContactsContract.CALLER_IS_SYNCADAPTER, "true")
+            .build()
+        val deleted = context.contentResolver.delete(
+            syncerUri,
+            "${ContactsContract.RawContacts.ACCOUNT_TYPE}=? AND " +
+                    "${ContactsContract.RawContacts.ACCOUNT_NAME}=? AND " +
+                    "${ContactsContract.RawContacts.DELETED}=1",
+            arrayOf(ACCOUNT_TYPE, ACCOUNT_NAME)
+        )
+        requestSyncNow(context)
+        return deleted
+    }
 }

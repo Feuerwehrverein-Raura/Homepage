@@ -154,6 +154,17 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnRestoreContacts"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Versehentlich gelöschte Mitglieder wiederherstellen"
+                android:textSize="12sp"
+                android:textColor="@color/primary"
+                android:visibility="gone" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

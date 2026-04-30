@@ -147,6 +147,7 @@ class ProfileFragment : Fragment() {
     private fun setupContactsSyncSwitch() {
         val tm = MembersApp.instance.tokenManager
         binding.switchContactsSync.isChecked = tm.contactsSyncEnabled
+        binding.btnRestoreContacts.visibility = if (tm.contactsSyncEnabled) View.VISIBLE else View.GONE
         binding.switchContactsSync.setOnCheckedChangeListener { _, checked ->
             if (checked == tm.contactsSyncEnabled) return@setOnCheckedChangeListener
             tm.contactsSyncAsked = true
@@ -158,10 +159,19 @@ class ProfileFragment : Fragment() {
             } else {
                 tm.contactsSyncEnabled = false
                 ContactsSyncManager.disableSync(requireContext())
+                binding.btnRestoreContacts.visibility = View.GONE
                 Snackbar.make(binding.root,
                     "Adressbuch-Sync deaktiviert. FWV-Kontakte wurden vom Telefon entfernt.",
                     Snackbar.LENGTH_LONG).show()
             }
+        }
+        binding.btnRestoreContacts.setOnClickListener {
+            val removed = ContactsSyncManager.restoreDeletedContacts(requireContext())
+            val msg = if (removed > 0)
+                "$removed gelöschte Mitglieder werden wiederhergestellt — Sync läuft."
+            else
+                "Keine gelöschten FWV-Kontakte gefunden. Sync wird trotzdem ausgelöst."
+            Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
         }
     }
 
