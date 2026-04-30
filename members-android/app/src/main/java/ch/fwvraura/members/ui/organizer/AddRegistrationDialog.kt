@@ -63,18 +63,8 @@ class AddRegistrationDialog : DialogFragment() {
         })
 
         binding.memberPicker.setOnItemClickListener { _, _, position, _ ->
-            val label = binding.memberPicker.adapter.getItem(position) as String
-            selectedMemberId = members.firstOrNull { displayName(it) == label }?.id
+            selectedMemberId = members.getOrNull(position)?.id
         }
-        binding.memberPicker.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                // Wenn der User den Text manuell ändert, Auswahl invalidieren
-                val match = members.firstOrNull { displayName(it) == s?.toString() }
-                selectedMemberId = match?.id
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
     }
 
     private fun loadDirectory() {
@@ -82,7 +72,10 @@ class AddRegistrationDialog : DialogFragment() {
             try {
                 val resp = ApiModule.membersApi.getDirectory()
                 if (resp.isSuccessful) {
-                    members = resp.body().orEmpty().sortedBy { (it.nachname ?: "") + " " + (it.vorname ?: "") }
+                    val collator = java.text.Collator.getInstance(java.util.Locale.GERMAN)
+                    members = resp.body().orEmpty().sortedWith(
+                        compareBy(collator) { (it.nachname ?: "") + " " + (it.vorname ?: "") }
+                    )
                     val labels = members.map(::displayName)
                     val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, labels)
                     binding.memberPicker.setAdapter(adapter)
@@ -92,7 +85,7 @@ class AddRegistrationDialog : DialogFragment() {
     }
 
     private fun displayName(e: DirectoryEntry): String =
-        listOfNotNull(e.vorname, e.nachname).joinToString(" ").ifBlank { e.email.orEmpty() }
+        listOfNotNull(e.nachname, e.vorname).joinToString(", ").ifBlank { e.email.orEmpty() }
 
     private fun submit(dlg: AlertDialog) {
         val isMemberMode = binding.addRegTabs.selectedTabPosition == 0
