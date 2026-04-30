@@ -21,7 +21,7 @@ import androidx.appcompat.app.AlertDialog
 import com.google.android.material.tabs.TabLayout
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
@@ -197,13 +197,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private suspend fun requestFcmToken(): String? = try {
-        suspendCancellableCoroutine { cont ->
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                if (cont.isActive) {
-                    cont.resume(if (task.isSuccessful) task.result else null) { _, _, _ -> }
-                }
-            }
-        }
+        FirebaseMessaging.getInstance().token.await()
     } catch (e: Exception) {
         Log.w("LoginActivity", "FirebaseMessaging.getToken failed: ${e.message}")
         null

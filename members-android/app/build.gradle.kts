@@ -137,6 +137,8 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // Task.await() für Firebase/Play-Services Tasks
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     // Encrypted Token-Storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
