@@ -7,8 +7,10 @@ import ch.fwvraura.members.data.model.PublicRegistrationRequest
 import ch.fwvraura.members.data.model.PublicRegistrationResponse
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface EventsApi {
@@ -60,6 +62,21 @@ interface EventsApi {
         @Path("id") eventId: String,
         @Body body: ch.fwvraura.members.data.model.OrganizerAddRegistrationRequest
     ): Response<PublicRegistrationResponse>
+
+    /** Anmeldung als Organisator bearbeiten (Name, E-Mail, Telefon, Personen, Notiz, Status). */
+    @PUT("events/{eventId}/registrations/{regId}/as-organizer")
+    suspend fun editAsOrganizer(
+        @Path("eventId") eventId: String,
+        @Path("regId") regId: String,
+        @Body body: ch.fwvraura.members.data.model.OrganizerEditRegistrationRequest
+    ): Response<Unit>
+
+    /** Anmeldung als Organisator loeschen. */
+    @DELETE("events/{eventId}/registrations/{regId}/as-organizer")
+    suspend fun deleteAsOrganizer(
+        @Path("eventId") eventId: String,
+        @Path("regId") regId: String
+    ): Response<Unit>
 
     /** Eigene Anmeldungen des eingeloggten Users (mit Event-Details). */
     @GET("registrations/mine")
