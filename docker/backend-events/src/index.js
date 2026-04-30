@@ -1655,6 +1655,26 @@ app.post('/registrations/public', async (req, res) => {
             JSON.stringify({ phone, participants, shifts, notes, meal_selection: meal_selection || null, allergies: allergies || null })
         ]);
 
+        // DEUTSCH: Audit-Eintrag damit die Vorstand-App eine Push-Notification anzeigen kann.
+        // Spiegelt den E-Mail-Versand: jede neue Anmeldung erzeugt einen EVENT_REGISTRATION-Eintrag.
+        try {
+            await pool.query(`
+                INSERT INTO audit_log (action, entity_type, email, new_values, created_at)
+                VALUES ('EVENT_REGISTRATION', 'registration', $1, $2, NOW())
+            `, [
+                email || null,
+                JSON.stringify({
+                    name,
+                    eventTitle: event.rows[0].title,
+                    eventId: event.rows[0].id,
+                    type: type || 'participant',
+                    isMember
+                })
+            ]);
+        } catch (auditError) {
+            console.error('Audit-Log fuer Anmeldung fehlgeschlagen:', auditError.message);
+        }
+
         // DEUTSCH: Menü-Info für E-Mails aufbereiten
         let mealInfo = '';
         if (meal_selection) {

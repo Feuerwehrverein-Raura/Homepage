@@ -31,11 +31,13 @@ class AuditNotificationWorker(
     // Andere Aktionen wie AUDIT_VIEW oder LOGIN werden ignoriert,
     // da sie fuer den Vorstand nicht relevant sind.
     private val relevantActions = setOf(
-        "MEMBER_CREATE",            // Neues Mitglied wurde erstellt
-        "MEMBER_DELETE",            // Mitglied wurde geloescht (direkt in DB)
-        "MEMBER_DELETE_REQUESTED",  // Loeschantrag wurde gestellt (4-Augen-Prinzip)
-        "MEMBER_UPDATE",            // Mitgliederdaten wurden geaendert
-        "MEMBER_REGISTRATION"       // Neuer Mitgliedschaftsantrag eingegangen
+        "MEMBER_CREATE",                // Neues Mitglied wurde erstellt
+        "MEMBER_DELETE",                // Mitglied wurde geloescht (direkt in DB)
+        "MEMBER_DELETE_REQUESTED",      // Loeschantrag wurde gestellt (4-Augen-Prinzip)
+        "MEMBER_UPDATE",                // Mitgliederdaten wurden geaendert
+        "MEMBER_REGISTRATION",          // Neuer Mitgliedschaftsantrag eingegangen
+        "EVENT_REGISTRATION",           // Neue Anmeldung zu einer Veranstaltung
+        "member_austritt_request"       // Austritts-Antrag eines Mitglieds
     )
 
     /**
@@ -133,23 +135,36 @@ class AuditNotificationWorker(
             } else ""
         } catch (_: Exception) { "" } // Bei Fehler leeren String zurueckgeben
 
+        // EVENT_REGISTRATION-Spezifika (Anmelder + Event-Titel) zusaetzlich extrahieren
+        val (regName, eventTitle) = try {
+            val values = entry.newValues
+            if (values is Map<*, *>) {
+                @Suppress("UNCHECKED_CAST")
+                val map = values as Map<String, Any?>
+                (map["name"]?.toString() ?: "") to (map["eventTitle"]?.toString() ?: "")
+            } else "" to ""
+        } catch (_: Exception) { "" to "" }
+
         // Je nach Aktion den passenden Text aus strings.xml laden
         return when (entry.action) {
             "MEMBER_CREATE" ->
                 ctx.getString(R.string.notification_member_created, name.ifEmpty { "?" })
-                // z.B. "Neues Mitglied: Max Muster"
             "MEMBER_DELETE", "MEMBER_DELETE_REQUESTED" ->
                 ctx.getString(R.string.notification_member_deleted, name.ifEmpty { "?" })
-                // z.B. "Mitglied geloescht: Max Muster"
             "MEMBER_UPDATE" ->
                 ctx.getString(R.string.notification_member_updated, name.ifEmpty { "?" })
-                // z.B. "Mitglied aktualisiert: Max Muster"
             "MEMBER_REGISTRATION" ->
                 ctx.getString(R.string.notification_registration)
-                // "Neuer Mitgliedschaftsantrag"
+            "EVENT_REGISTRATION" ->
+                ctx.getString(
+                    R.string.notification_event_registration,
+                    regName.ifEmpty { "?" },
+                    eventTitle.ifEmpty { "?" }
+                )
+            "member_austritt_request" ->
+                ctx.getString(R.string.notification_austritt, name.ifEmpty { entry.email ?: "?" })
             else ->
                 ctx.getString(R.string.notification_multiple, 1)
-                // Fallback: "1 neue Aenderungen"
         }
     }
 }

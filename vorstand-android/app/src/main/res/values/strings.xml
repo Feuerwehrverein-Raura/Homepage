@@ -157,6 +157,8 @@
     <string name="notification_member_deleted">Mitglied gelöscht: %1$s</string>
     <string name="notification_member_updated">Mitglied aktualisiert: %1$s</string>
     <string name="notification_registration">Neuer Mitgliedschaftsantrag</string>
+    <string name="notification_event_registration">Neue Anmeldung: %1$s — %2$s</string>
+    <string name="notification_austritt">Austritts-Antrag: %1$s</string>
     <string name="notification_multiple">%1$d neue Änderungen</string>
 
     <!-- Dispatch -->
