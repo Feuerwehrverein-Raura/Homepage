@@ -70,13 +70,13 @@ class EventDetailActivity : AppCompatActivity() {
             e.description?.takeIf { it.isNotBlank() }?.let {
                 intent.putExtra(android.provider.CalendarContract.Events.DESCRIPTION, it)
             }
-            // Start- und Endzeit aus ISO-Strings parsen
+            // Start- und Endzeit aus ISO-Strings parsen — die offiziellen
+            // CalendarContract-Extras werden vom System-Insert akzeptiert.
             parseEventTime(e.startDate)?.let { ms ->
-                intent.putExtra(android.content.Intent.EXTRA_FROM, ms.first)
-                intent.putExtra("beginTime", ms.first)
+                intent.putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, ms.first)
             }
             parseEventTime(e.endDate)?.let { ms ->
-                intent.putExtra("endTime", ms.first)
+                intent.putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, ms.first)
             }
             startActivity(intent)
         } catch (ex: Exception) {
