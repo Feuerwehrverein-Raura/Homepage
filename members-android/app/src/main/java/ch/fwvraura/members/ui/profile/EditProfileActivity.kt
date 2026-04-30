@@ -181,7 +181,7 @@ class EditProfileActivity : AppCompatActivity() {
         val dir = File(cacheDir, "photos").apply { mkdirs() }
         val file = File.createTempFile("capture_", ".jpg", dir)
         pendingCameraFile = file
-        val uri = FileProvider.getUriForFile(this, "ch.fwvraura.members.fileprovider", file)
+        val uri = FileProvider.getUriForFile(this, "com.fwv.members.fileprovider", file)
         cameraLauncher.launch(uri)
     }
 

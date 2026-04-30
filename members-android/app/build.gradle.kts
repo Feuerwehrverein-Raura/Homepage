@@ -31,14 +31,14 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "ch.fwvraura.members"
+        applicationId = "com.fwv.members"
         minSdk = 26
         targetSdk = 35
         versionCode = getVersionCode()
         versionName = getVersionFromTag()
 
         // AppAuth-Redirect-URI Scheme (fuer Authentik-OIDC)
-        manifestPlaceholders["appAuthRedirectScheme"] = "ch.fwvraura.members"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.fwv.members"
     }
 
     signingConfigs {

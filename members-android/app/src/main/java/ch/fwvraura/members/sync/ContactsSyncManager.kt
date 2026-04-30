@@ -11,7 +11,7 @@ import android.provider.ContactsContract
  * Hilfsmethoden um den FWV-Adressbuch-Sync ein-/auszuschalten und manuell zu triggern.
  */
 object ContactsSyncManager {
-    const val ACCOUNT_TYPE = "ch.fwvraura.members"
+    const val ACCOUNT_TYPE = "com.fwv.members"
     const val ACCOUNT_NAME = "FWV Raura"
     private const val AUTHORITY = ContactsContract.AUTHORITY
 

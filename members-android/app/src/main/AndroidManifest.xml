@@ -83,7 +83,7 @@
         <!-- FileProvider fuer Kamera-Aufnahmen: speichert Fotos temporaer in cache/photos/ und gibt der Kamera-App eine sichere content://-URI -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="ch.fwvraura.members.fileprovider"
+            android:authorities="com.fwv.members.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
