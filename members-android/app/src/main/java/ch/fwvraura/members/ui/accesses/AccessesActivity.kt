@@ -126,9 +126,67 @@ class AccessesActivity : AppCompatActivity() {
                 f.imapPort?.let { append("  IMAP: $it") }
                 f.smtpPort?.let { append("  SMTP: $it") }
             }
-            wireCredentialButtons(card, username = f.email, password = f.password, webUrl = f.webmail, webButtonLabel = "Webmail öffnen")
+            wireCredentialButtons(
+                card,
+                username = f.email,
+                password = f.password,
+                webUrl = f.webmail,
+                webButtonLabel = "Webmail öffnen",
+                onChangePassword = { showChangePasswordDialog(f.email) }
+            )
             binding.functionEmailsList.addView(card.root)
         }
+    }
+
+    /** Dialog mit zwei Passwort-Feldern. Speichern -> PUT /members/me/function-email-password. */
+    private fun showChangePasswordDialog(email: String) {
+        val dialogBinding = ch.fwvraura.members.databinding.DialogChangePasswordBinding
+            .inflate(layoutInflater)
+        dialogBinding.dialogPwHint.text = "Neues Passwort für $email setzen. Mailcow + lokal verschlüsselt gespeichert."
+
+        val dlg = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Passwort ändern")
+            .setView(dialogBinding.root)
+            .setPositiveButton("Speichern", null)
+            .setNegativeButton("Abbrechen", null)
+            .create()
+        dlg.setOnShowListener {
+            dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val pw = dialogBinding.inputPassword.text?.toString().orEmpty()
+                val pw2 = dialogBinding.inputPasswordConfirm.text?.toString().orEmpty()
+                if (pw.length < 8) {
+                    dialogBinding.inputPassword.error = "Mindestens 8 Zeichen"
+                    return@setOnClickListener
+                }
+                if (pw != pw2) {
+                    dialogBinding.inputPasswordConfirm.error = "Stimmt nicht überein"
+                    return@setOnClickListener
+                }
+                dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                lifecycleScope.launch {
+                    try {
+                        val resp = ApiModule.membersApi.changeFunctionEmailPassword(
+                            ch.fwvraura.members.data.model.ChangeFunctionEmailPasswordRequest(
+                                email = email, password = pw
+                            )
+                        )
+                        if (resp.isSuccessful) {
+                            Snackbar.make(binding.root, "Passwort für $email aktualisiert.", Snackbar.LENGTH_LONG).show()
+                            dlg.dismiss()
+                            load()
+                        } else {
+                            val err = resp.errorBody()?.string() ?: "Fehler ${resp.code()}"
+                            Snackbar.make(binding.root, err, Snackbar.LENGTH_LONG).show()
+                            dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                        }
+                    } catch (e: Exception) {
+                        Snackbar.make(binding.root, "Netzwerkfehler: ${e.message}", Snackbar.LENGTH_LONG).show()
+                        dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                    }
+                }
+            }
+        }
+        dlg.show()
     }
 
     private fun renderServiceAccounts(items: List<ServiceAccount>) {
@@ -148,18 +206,19 @@ class AccessesActivity : AppCompatActivity() {
             val rotation = sa.nextRotation?.substring(0, minOf(10, sa.nextRotation.length))
             card.credExtra.text = if (rotation != null) "Nächste Rotation: $rotation" else ""
             card.credExtra.visibility = if (card.credExtra.text.isBlank()) View.GONE else View.VISIBLE
-            wireCredentialButtons(card, username = sa.username, password = sa.password, webUrl = null, webButtonLabel = null)
+            wireCredentialButtons(card, username = sa.username, password = sa.password, webUrl = null, webButtonLabel = null, onChangePassword = null)
             binding.serviceAccountsList.addView(card.root)
         }
     }
 
-    /** Verkabelt die Copy-/Show-/Web-Buttons in einer Credential-Karte. */
+    /** Verkabelt die Copy-/Show-/Web-/Passwort-Buttons in einer Credential-Karte. */
     private fun wireCredentialButtons(
         card: ItemAccessCredentialBinding,
         username: String,
         password: String?,
         webUrl: String?,
-        webButtonLabel: String?
+        webButtonLabel: String?,
+        onChangePassword: (() -> Unit)?
     ) {
         card.btnCopyUser.setOnClickListener { copyToClipboard("Username", username) }
         if (!password.isNullOrBlank()) {
@@ -182,6 +241,10 @@ class AccessesActivity : AppCompatActivity() {
             card.btnOpenWeb.visibility = View.VISIBLE
             card.btnOpenWeb.text = webButtonLabel
             card.btnOpenWeb.setOnClickListener { openUrl(webUrl) }
+        }
+        if (onChangePassword != null) {
+            card.btnChangePassword.visibility = View.VISIBLE
+            card.btnChangePassword.setOnClickListener { onChangePassword.invoke() }
         }
     }
 

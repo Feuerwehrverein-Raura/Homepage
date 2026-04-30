@@ -55,4 +55,10 @@ interface MembersApi {
     /** System-Zugaenge, Nextcloud-Ordner, Funktions-E-Mails und Service-Accounts. */
     @GET("members/me/accesses")
     suspend fun getAccesses(): Response<ch.fwvraura.members.data.model.AccessesResponse>
+
+    /** Passwort fuer eine Funktions-E-Mail aendern (nur eigene). */
+    @PUT("members/me/function-email-password")
+    suspend fun changeFunctionEmailPassword(
+        @Body body: ch.fwvraura.members.data.model.ChangeFunctionEmailPasswordRequest
+    ): Response<Unit>
 }

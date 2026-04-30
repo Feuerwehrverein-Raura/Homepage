@@ -35,6 +35,12 @@ data class FunctionEmail(
     val webmail: String? = null
 )
 
+/** Body fuer PUT /members/me/function-email-password. */
+data class ChangeFunctionEmailPasswordRequest(
+    val email: String,
+    val password: String
+)
+
 /** Service-Account fuer geteilte Logins (z.B. Kasse, KDS). */
 data class ServiceAccount(
     val accountName: String? = null,
