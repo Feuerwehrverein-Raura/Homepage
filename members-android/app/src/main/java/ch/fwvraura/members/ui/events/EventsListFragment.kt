@@ -13,6 +13,7 @@ import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.databinding.FragmentEventsBinding
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class EventsListFragment : Fragment() {
@@ -54,6 +55,9 @@ class EventsListFragment : Fragment() {
                 } else {
                     showError(getString(R.string.events_error, "HTTP ${response.code()}"))
                 }
+            } catch (_: CancellationException) {
+                // Fragment wurde beendet bevor der Request fertig war — kein Fehler.
+                throw kotlin.coroutines.cancellation.CancellationException()
             } catch (e: Exception) {
                 showError(getString(R.string.events_error, e.message ?: ""))
             } finally {

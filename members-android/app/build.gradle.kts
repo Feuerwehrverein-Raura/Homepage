@@ -3,6 +3,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.github.triplet.play")
 }
 
 // Version aus Git-Tag ableiten (members-v1.2.0 -> 1.2.0).
@@ -81,6 +82,20 @@ android {
     kotlinOptions { jvmTarget = "17" }
 
     buildFeatures { viewBinding = true }
+}
+
+// Gradle Play Publisher — laed das App-Bundle (.aab) in den Play Store.
+// Aktiv nur wenn die Service-Account-JSON ueber Env-Var bereitgestellt wird;
+// lokal/PR-Builds bleiben ohne Play-Upload.
+play {
+    val keyFile = System.getenv("PLAY_SERVICE_ACCOUNT_JSON_PATH")
+    if (!keyFile.isNullOrBlank()) {
+        serviceAccountCredentials.set(file(keyFile))
+    }
+    enabled.set(!keyFile.isNullOrBlank())
+    track.set("internal")               // erst Internal Testing, manuell Promote zu Closed/Production
+    defaultToAppBundles.set(true)        // .aab statt .apk hochladen
+    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
 }
 
 dependencies {

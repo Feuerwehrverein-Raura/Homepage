@@ -22,6 +22,18 @@ data class MemberProfile(
     @SerializedName("zustellung_post") val zustellungPost: Boolean? = null
 )
 
+/** Body fuer POST /members/me/austritt. Loest einen Austritts-Antrag aus,
+ *  loescht keine Daten — der Vorstand bearbeitet den Antrag manuell. */
+data class AustrittRequest(
+    val reason: String? = null,
+    val austrittsdatum: String? = null
+)
+
+data class AustrittResponse(
+    val success: Boolean = false,
+    val message: String? = null
+)
+
 /** Body fuer PUT /members/me — nur die Felder die ein Mitglied selbst aendern darf. */
 data class MemberProfileUpdate(
     val anrede: String? = null,

@@ -1,0 +1,26 @@
+Die offizielle Vereins-App des Feuerwehrvereins Raura aus Kaiseraugst.
+
+Mit der App hast du als Mitglied jederzeit Zugriff auf alle kommenden Anlässe, kannst dich direkt anmelden und dein Profil pflegen.
+
+FUNKTIONEN
+
+• Anlässe ansehen: Spaghetti-Plausch, Generalversammlung, Dorffest, Ausflüge und mehr — mit Datum, Ort und Beschreibung.
+• Anmelden in einem Klick: Direkt aus der App, mit Vorbelegung deiner Daten.
+• Schicht-Anmeldung: Bei grossen Anlässen kannst du wählen, in welchen Schichten (Bar, Küche, Aufbau …) du mithilfst.
+• Meine Anmeldungen: Übersicht über alle deine Registrierungen mit Status (Bestätigt, Wartend, Abgelehnt).
+• Profil bearbeiten: Adresse, Telefon, E-Mail und weitere Angaben selbst pflegen — sofort im Vereinsverzeichnis aktualisiert.
+• Organisator-Modus: Wer ein Event organisiert, sieht zusätzlich die Anmeldungen und kann sie genehmigen oder ablehnen.
+
+ANMELDUNG
+
+Login per Vereins-Account (auth.fwv-raura.ch) oder per QR-Code, den du vom Vorstand erhältst.
+
+DATENSCHUTZ
+
+Alle Daten bleiben auf eigenen Servern in Deutschland (Hetzner). Es gibt keine Werbung und keine Tracking-Frameworks. Datenschutzerklärung: https://www.fwv-raura.ch/datenschutz-app.html
+
+KONTAKT
+
+Bei Fragen oder Problemen wende dich an den Vorstand:
+vorstand@fwv-raura.ch
+www.fwv-raura.ch

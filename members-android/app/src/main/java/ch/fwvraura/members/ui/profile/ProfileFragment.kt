@@ -6,16 +6,23 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.LinearLayout
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.data.api.ApiModule
+import ch.fwvraura.members.data.model.AustrittRequest
 import ch.fwvraura.members.data.model.MemberProfile
 import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.databinding.FragmentProfileBinding
 import ch.fwvraura.members.databinding.ItemMyRegistrationBinding
+import ch.fwvraura.members.ui.login.LoginActivity
 import ch.fwvraura.members.util.DateUtils
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.launch
 
 class ProfileFragment : Fragment() {
@@ -34,6 +41,7 @@ class ProfileFragment : Fragment() {
         binding.btnEdit.setOnClickListener {
             startActivity(Intent(requireContext(), EditProfileActivity::class.java))
         }
+        binding.btnAustritt.setOnClickListener { showAustrittDialog() }
 
         // Sofort die in TokenManager gespeicherten Daten anzeigen
         val tm = MembersApp.instance.tokenManager
@@ -120,6 +128,64 @@ class ProfileFragment : Fragment() {
         } else {
             row.visibility = View.VISIBLE
             text.text = value
+        }
+    }
+
+    private fun showAustrittDialog() {
+        val context = requireContext()
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 0)
+        }
+        val info = android.widget.TextView(context).apply {
+            text = "Möchtest du wirklich aus dem Feuerwehrverein Raura austreten? " +
+                    "Der Vorstand wird deinen Antrag gemäss Statuten bearbeiten und sich bei dir melden. " +
+                    "Deine Daten werden nicht sofort gelöscht."
+            textSize = 14f
+            setPadding(0, 0, 0, 16)
+        }
+        val reasonEdit = EditText(context).apply {
+            hint = "Begründung (optional)"
+            isSingleLine = false
+            maxLines = 4
+        }
+        container.addView(info)
+        container.addView(reasonEdit)
+
+        AlertDialog.Builder(context)
+            .setTitle("Austritt beantragen")
+            .setView(container)
+            .setPositiveButton("Antrag senden") { _, _ ->
+                submitAustritt(reasonEdit.text?.toString()?.trim().orEmpty())
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun submitAustritt(reason: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.membersApi.requestAustritt(
+                    AustrittRequest(reason = reason.ifBlank { null })
+                )
+                if (response.isSuccessful && response.body()?.success == true) {
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("Austritts-Antrag gesendet")
+                        .setMessage("Der Vorstand wurde benachrichtigt und meldet sich bei dir. Du wirst nun ausgeloggt.")
+                        .setPositiveButton("OK") { _, _ ->
+                            MembersApp.instance.tokenManager.clear()
+                            startActivity(Intent(requireContext(), LoginActivity::class.java))
+                            requireActivity().finish()
+                        }
+                        .setCancelable(false)
+                        .show()
+                } else {
+                    val msg = response.body()?.message ?: "Fehler ${response.code()}"
+                    Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Snackbar.make(binding.root, "Netzwerkfehler: ${e.message}", Snackbar.LENGTH_LONG).show()
+            }
         }
     }
 

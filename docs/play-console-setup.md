@@ -111,8 +111,99 @@ Die App wird folgende Daten verarbeiten:
 
 - **Mitglied-Login** (Authentik OIDC): E-Mail, Name, Funktion
 - **Veranstaltungs-Anmeldungen**: Name, E-Mail, Telefon, Allergien (optional)
-- **Organisator-Login**: Event-spezifische E-Mail/Passwort
+- **Organisator-Modus**: Anmeldungen zu Events die der eingeloggte User
+  als Organisator hinterlegt ist (E-Mail-Match)
 - **Geräte-Token (FCM, Phase 2)**: anonym, für Push-Benachrichtigungen
 
 Keine Drittanbieter-Tracking, keine Werbung, keine Analytics-Frameworks.
 Daten bleiben auf eigenen Servern (`api.fwv-raura.ch`, `auth.fwv-raura.ch`).
+
+## 8. Google-Play-Compliance-Checkliste
+
+### 8.1 Pflicht-Punkte (sonst Reject im Review)
+
+| Anforderung | Status | Wo erledigt |
+|-------------|--------|-------------|
+| Privacy Policy | ✅ | <https://www.fwv-raura.ch/datenschutz-app.html> |
+| Account-Lösch-Möglichkeit (in-App + Web) | ✅ | App: Profil → "Aus dem Verein austreten"<br>Web: <https://www.fwv-raura.ch/account-loeschen.html> |
+| Data Safety Form ausgefüllt | ⏳ | Du in Play Console (siehe 8.2) |
+| Content Rating (IARC) | ⏳ | Du in Play Console |
+| targetSdk ≥ 35 | ✅ | `members-android/app/build.gradle.kts` |
+| Berechtigungen sparsam | ✅ | nur INTERNET + CAMERA |
+| Keine Werbung / Tracking | ✅ | – |
+| App-Icon 512×512 | ⏳ | siehe 8.3 |
+| Mind. 2 Screenshots | ⏳ | siehe 8.3 |
+
+### 8.2 Data Safety Form — die richtigen Antworten
+
+**Sammelt die App Nutzerdaten?** Ja
+
+**Wird gesammelt:**
+
+| Datentyp | Optional? | Geteilt? | Verwendet für | Verschlüsselt? | Löschbar? |
+|----------|-----------|----------|---------------|----------------|-----------|
+| Name | Nein | Nein | App-Funktionalität, Account-Verwaltung | Ja (TLS) | Ja |
+| E-Mail-Adresse | Nein | Nein | Account-Verwaltung, Kommunikation | Ja (TLS) | Ja |
+| Telefonnummer | Ja | Nein | App-Funktionalität (Kontakt bei Anmeldung) | Ja (TLS) | Ja |
+| Adresse | Ja | Nein | Mitglieder-Verzeichnis | Ja (TLS) | Ja |
+| Geburtstag | Ja | Nein | Mitglieder-Verzeichnis | Ja (TLS) | Ja |
+| Foto (Profil) | Ja | Nein | Mitglieder-Verzeichnis | Ja (TLS) | Ja |
+| App-Aktivität (Anmeldungen) | Nein | Nein | App-Funktionalität | Ja (TLS) | Ja |
+
+**Werden Daten an Dritte weitergegeben?** Nein.
+**Werden Daten verschlüsselt übertragen?** Ja (TLS 1.2+).
+**Können Nutzer eine Datenlöschung anfordern?** Ja, in-App (Profil → Austritt) oder Web (`account-loeschen.html`).
+
+### 8.3 Listing-Assets (Pflicht)
+
+Was du in die Play Console hochlädst:
+
+| Asset | Format | Wo |
+|-------|--------|-----|
+| App-Icon | 512×512 PNG | Play Console → Listing |
+| Feature-Graphic | 1024×500 PNG | Play Console → Listing |
+| Screenshots Smartphone | mind. 2, 16:9 oder 9:16 | Play Console → Listing |
+| Beschreibung (kurz) | max. 80 Zeichen | aus `play/listings/de-CH/short-description.txt` |
+| Beschreibung (lang) | max. 4000 Zeichen | aus `play/listings/de-CH/full-description.txt` |
+| App-Titel | max. 30 Zeichen | aus `play/listings/de-CH/title.txt` |
+
+Die `play/listings/de-CH/*` Dateien werden nach dem ersten manuellen
+Hochladen automatisch über das Gradle Play Publisher Plugin synchronisiert
+(siehe `members-android/app/build.gradle.kts`).
+
+### 8.4 Closed Testing — neue Developer-Account-Regel
+
+Seit November 2023 verlangt Google für **neu erstellte Developer-Accounts**:
+
+> Vor der ersten Production-Veröffentlichung müssen mindestens
+> **12 Tester** über **mindestens 14 Tage** im Closed-Testing-Track aktiv
+> sein.
+
+Pragmatisch für den FWV:
+
+1. **Sofort starten:** Internal Testing (max. 100 Tester, kein Review,
+   sofort verfügbar). Hier können wir 1–2 Wochen mit dem Vorstand testen.
+2. **Promotion zu Closed Testing:** mit den ersten ~12 Mitgliedern als
+   offiziellen Testern, 14 Tage laufen lassen.
+3. **Erst danach:** Promotion zu Production / Open Testing möglich.
+
+Solange wir nur im **Closed Testing** bleiben (bis 100 Tester gratis),
+brauchen wir die 14-Tage-Regel **nicht** zu erfüllen — sie greift erst
+bei Promotion zu Production.
+
+### 8.5 Was du selbst tun musst
+
+| Schritt | Wann |
+|---------|------|
+| In Play Console "App erstellen" | jetzt (du hast Account) |
+| Google Cloud → Service Account "fwv-play-publisher" anlegen | jetzt |
+| Service-Account-JSON herunterladen | jetzt |
+| GitHub Secret `PLAY_SERVICE_ACCOUNT_JSON` hinterlegen | jetzt |
+| Play Console → API access → Service Account verlinken + Berechtigung "Releases → Manage testing track releases" | jetzt |
+| Listing in Play Console: Privacy Policy + Account-Lösch-URL eintragen | nach erstem Upload |
+| Data Safety Form ausfüllen (Tabelle 8.2) | nach erstem Upload |
+| Content Rating Form ausfüllen | nach erstem Upload |
+| Tester-E-Mails sammeln und in Play Console eintragen | parallel |
+
+Sobald `PLAY_SERVICE_ACCOUNT_JSON` als Secret gesetzt ist, lädt der
+nächste `members-v*` Tag die App automatisch ins Internal Testing Track.

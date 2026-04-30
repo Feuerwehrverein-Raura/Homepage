@@ -2178,6 +2178,89 @@ app.put('/members/me', authenticateToken, async (req, res) => {
     }
 });
 
+// DEUTSCH: Austritt aus dem Verein beantragen (self-service in der Mitglieder-App).
+// Loescht NICHT sofort — setzt nur Status auf 'Austritt_beantragt' und benachrichtigt
+// den Vorstand per E-Mail. Vorstand entscheidet ueber tatsaechlichen Austritt gemaess Statuten.
+app.post('/members/me/austritt', authenticateToken, async (req, res) => {
+    try {
+        const { reason, austrittsdatum } = req.body || {};
+        const memberResult = await pool.query(
+            'SELECT id, vorname, nachname, email, status FROM members WHERE LOWER(email) = LOWER($1)',
+            [req.user.email]
+        );
+        if (memberResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        }
+        const member = memberResult.rows[0];
+
+        if (member.status === 'Austritt_beantragt' || member.status === 'Ausgetreten') {
+            return res.status(409).json({ error: 'Austritt wurde bereits beantragt oder ist erfolgt.' });
+        }
+
+        await pool.query(
+            `UPDATE members
+             SET status = 'Austritt_beantragt',
+                 bemerkungen = COALESCE(bemerkungen, '') ||
+                     E'\n[' || TO_CHAR(NOW(), 'DD.MM.YYYY') || '] Austritt beantragt via App' ||
+                     CASE WHEN $1::text IS NOT NULL THEN ': ' || $1 ELSE '' END ||
+                     CASE WHEN $2::text IS NOT NULL THEN ' (Wunsch-Datum: ' || $2 || ')' ELSE '' END,
+                 updated_at = NOW()
+             WHERE id = $3`,
+            [reason || null, austrittsdatum || null, member.id]
+        );
+
+        // Audit-Log
+        await logAudit(pool, 'member_austritt_request', member.id, req.user.email, getClientIp(req), {
+            reason: reason || null, austrittsdatum: austrittsdatum || null
+        });
+
+        // E-Mail an Vorstand
+        try {
+            await axios.post(`${process.env.DISPATCH_API_URL || 'http://api-dispatch:3000'}/email/send`, {
+                to: 'vorstand@fwv-raura.ch',
+                subject: `Austritts-Antrag: ${member.vorname} ${member.nachname}`,
+                body: `Hallo Vorstand
+
+${member.vorname} ${member.nachname} (${member.email}) hat über die Mitglieder-App einen Austritt aus dem Verein beantragt.
+
+${austrittsdatum ? `Wunsch-Austrittsdatum: ${austrittsdatum}\n` : ''}${reason ? `Begruendung:\n${reason}\n` : ''}
+Der Mitglieder-Status wurde auf "Austritt_beantragt" gesetzt. Bitte den Austritt gemaess Statuten bearbeiten und das Mitglied entsprechend benachrichtigen.
+
+Vorstand-Portal: https://fwv-raura.ch/vorstand.html
+
+Freundliche Gruesse
+FWV Raura System`
+            }, { headers: { 'x-api-key': process.env.API_KEY || '' } });
+        } catch (emailErr) {
+            console.error('Austritts-Benachrichtigung fehlgeschlagen:', emailErr.message);
+        }
+
+        // Bestaetigung an das Mitglied
+        try {
+            await axios.post(`${process.env.DISPATCH_API_URL || 'http://api-dispatch:3000'}/email/send`, {
+                to: member.email,
+                subject: 'Austritts-Antrag erhalten',
+                body: `Hallo ${member.vorname}
+
+Wir haben deinen Austritts-Antrag erhalten. Der Vorstand wird ihn gemaess unseren Statuten bearbeiten und sich bei dir melden.
+
+${austrittsdatum ? `Du hast als Wunsch-Datum den ${austrittsdatum} angegeben.\n` : ''}
+Solange dein Austritt noch nicht offiziell beschlossen ist, kannst du dich weiterhin in der App und im Mitgliederbereich einloggen.
+
+Bei Fragen wende dich an vorstand@fwv-raura.ch.
+
+Freundliche Gruesse
+Feuerwehrverein Raura`
+            }, { headers: { 'x-api-key': process.env.API_KEY || '' } });
+        } catch (_) {}
+
+        res.json({ success: true, message: 'Austritts-Antrag wurde an den Vorstand gesendet.' });
+    } catch (error) {
+        console.error('POST /members/me/austritt error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Upload own photo (self-service)
 // DEUTSCH: Eigenes Profilfoto hochladen (ersetzt vorheriges Foto)
 app.post('/members/me/photo', authenticateToken, upload.single('photo'), async (req, res) => {
