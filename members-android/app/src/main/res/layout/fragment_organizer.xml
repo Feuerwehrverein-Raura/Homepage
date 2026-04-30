@@ -10,12 +10,17 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/regsRecycler"
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:padding="8dp"
-            android:clipToPadding="false" />
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:id="@+id/eventsContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="16dp" />
+        </androidx.core.widget.NestedScrollView>
 
         <TextView
             android:id="@+id/emptyText"
@@ -24,7 +29,7 @@
             android:layout_gravity="center"
             android:padding="32dp"
             android:gravity="center"
-            android:text="Noch keine Anmeldungen."
+            android:text="Du organisierst aktuell kein Event."
             android:textColor="@color/text_secondary"
             android:visibility="gone" />
 
