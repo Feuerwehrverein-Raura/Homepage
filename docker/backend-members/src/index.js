@@ -2156,6 +2156,26 @@ app.get('/members/pdf/telefonliste', authenticateAny, requireRole('vorstand', 'a
     }
 });
 
+// DEUTSCH: Mitglieder-Verzeichnis fuer App-Picker (z.B. AddRegistrationDialog).
+// MUSS vor /members/:id stehen, sonst faengt der :id-Handler "directory" als
+// Member-ID ab und schlaegt mit invalid-UUID-Fehler fehl.
+app.get('/members/directory', authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, vorname, nachname, email, mobile, telefon, funktion
+             FROM members
+             WHERE COALESCE(status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
+               AND COALESCE(vorname, '') <> ''
+               AND COALESCE(nachname, '') <> ''
+             ORDER BY nachname, vorname`
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('GET /members/directory failed:', err);
+        res.status(500).json({ error: err.message, code: err.code });
+    }
+});
+
 // Get single member (MUST come after /members/me)
 // DEUTSCH: Einzelnes Mitglied anhand der ID abrufen
 app.get('/members/:id', authenticateAny, async (req, res) => {
@@ -2377,23 +2397,6 @@ app.put('/members/me', authenticateToken, async (req, res) => {
 // DEUTSCH: Mitglieder-Verzeichnis fuer den Adressbuch-Sync der Mitglieder-App.
 // Liefert Name, Telefonnummern, E-Mail und Funktion aller aktiven Mitglieder
 // (ohne ausgetretene und ohne anstehende Austritts-Antraege).
-app.get('/members/directory', authenticateToken, async (req, res) => {
-    try {
-        const result = await pool.query(
-            `SELECT id, vorname, nachname, email, mobile, telefon, funktion
-             FROM members
-             WHERE COALESCE(status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
-               AND COALESCE(vorname, '') <> ''
-               AND COALESCE(nachname, '') <> ''
-             ORDER BY nachname, vorname`
-        );
-        res.json(result.rows);
-    } catch (err) {
-        console.error('GET /members/directory failed:', err);
-        res.status(500).json({ error: err.message, code: err.code });
-    }
-});
-
 // DEUTSCH: Austritt aus dem Verein beantragen (self-service in der Mitglieder-App).
 // Loescht NICHT sofort — setzt nur Status auf 'Austritt_beantragt' und benachrichtigt
 // den Vorstand per E-Mail. Vorstand entscheidet ueber tatsaechlichen Austritt gemaess Statuten.
