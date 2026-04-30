@@ -177,13 +177,14 @@ class ProfileFragment : Fragment() {
         tm.contactsSyncEnabled = true
         ContactsSyncManager.enableSync(requireContext())
         ContactsSyncManager.requestSyncNow(requireContext())
+        binding.syncControlsRow.visibility = View.VISIBLE
         Snackbar.make(binding.root, "Mitglieder werden ins Adressbuch synchronisiert.", Snackbar.LENGTH_SHORT).show()
     }
 
     private fun setupContactsSyncSwitch() {
         val tm = MembersApp.instance.tokenManager
         binding.switchContactsSync.isChecked = tm.contactsSyncEnabled
-        binding.btnRestoreContacts.visibility = if (tm.contactsSyncEnabled) View.VISIBLE else View.GONE
+        binding.syncControlsRow.visibility = if (tm.contactsSyncEnabled) View.VISIBLE else View.GONE
         binding.switchContactsSync.setOnCheckedChangeListener { _, checked ->
             if (checked == tm.contactsSyncEnabled) return@setOnCheckedChangeListener
             tm.contactsSyncAsked = true
@@ -195,11 +196,16 @@ class ProfileFragment : Fragment() {
             } else {
                 tm.contactsSyncEnabled = false
                 ContactsSyncManager.disableSync(requireContext())
-                binding.btnRestoreContacts.visibility = View.GONE
+                binding.syncControlsRow.visibility = View.GONE
                 Snackbar.make(binding.root,
                     "Adressbuch-Sync deaktiviert. FWV-Kontakte wurden vom Telefon entfernt.",
                     Snackbar.LENGTH_LONG).show()
             }
+        }
+        binding.btnSyncNow.setOnClickListener {
+            ContactsSyncManager.requestSyncNow(requireContext())
+            Snackbar.make(binding.root, "Sync angestossen — kann ein paar Sekunden dauern.",
+                Snackbar.LENGTH_SHORT).show()
         }
         binding.btnRestoreContacts.setOnClickListener {
             val removed = ContactsSyncManager.restoreDeletedContacts(requireContext())
