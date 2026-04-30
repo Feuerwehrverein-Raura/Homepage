@@ -96,6 +96,19 @@ class ProfileFragment : Fragment() {
             }
             item.regStatus.text = label
             item.regStatus.setTextColor(color)
+
+            val shiftLabels = r.shifts.orEmpty().mapNotNull { s ->
+                val name = s.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val time = listOfNotNull(s.startTime?.take(5), s.endTime?.take(5))
+                    .joinToString("–")
+                if (time.isNotBlank()) "$name ($time)" else name
+            }
+            if (shiftLabels.isNotEmpty()) {
+                item.regShifts.text = "Schichten: " + shiftLabels.joinToString(", ")
+                item.regShifts.visibility = View.VISIBLE
+            } else {
+                item.regShifts.visibility = View.GONE
+            }
             binding.myRegsList.addView(item.root)
         }
     }
