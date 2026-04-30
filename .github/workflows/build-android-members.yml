@@ -104,15 +104,19 @@ jobs:
         working-directory: members-android
         run: gradle publishReleaseBundle --stacktrace
 
-      - name: Rename APKs
+      - name: Rename APKs and AAB
         run: |
           DEBUG_APK=$(find members-android -name "*debug*.apk" -type f | head -1)
           RELEASE_APK=$(find members-android -name "*release*.apk" -type f | head -1)
+          RELEASE_AAB=$(find members-android -name "*release*.aab" -type f | head -1)
           if [ -n "$DEBUG_APK" ]; then
             cp "$DEBUG_APK" "members-${VERSION}-debug.apk"
           fi
           if [ -n "$RELEASE_APK" ]; then
             cp "$RELEASE_APK" "members-${VERSION}-release.apk"
+          fi
+          if [ -n "$RELEASE_AAB" ]; then
+            cp "$RELEASE_AAB" "members-${VERSION}-release.aab"
           fi
 
       - name: Upload Debug APK
@@ -131,6 +135,14 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
+      - name: Upload Release AAB (Play Store Bundle)
+        uses: actions/upload-artifact@v4
+        with:
+          name: members-release-aab
+          path: members-*-release.aab
+          retention-days: 30
+          if-no-files-found: ignore
+
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true
         uses: softprops/action-gh-release@v2
@@ -141,6 +153,7 @@ jobs:
           files: |
             members-*-debug.apk
             members-*-release.apk
+            members-*-release.aab
           body: |
             ## FWV Raura Mitglieder-App
 
