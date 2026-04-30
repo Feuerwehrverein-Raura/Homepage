@@ -2405,28 +2405,48 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             }
         }
 
-        // Update allowed fields only
+        // DEUTSCH: Felder direkt setzen (kein COALESCE), damit der User Felder aktiv
+        // loeschen kann. Der Update-Body kommt von der Members-App, die alle Felder
+        // immer mitsendet (Gson serializeNulls). Falls ein Feld undefined ist (Body
+        // explizit ohne diese Property), bleibt es dank der || currentMember[field]-
+        // Brueckung erhalten.
+        const v = (val, fallback) => (val === undefined ? fallback : val);
         const result = await pool.query(`
             UPDATE members SET
-                telefon = COALESCE($1, telefon),
-                mobile = COALESCE($2, mobile),
-                email = COALESCE($3, email),
-                versand_email = COALESCE($4, versand_email),
-                strasse = COALESCE($5, strasse),
-                adresszusatz = COALESCE($6, adresszusatz),
-                plz = COALESCE($7, plz),
-                ort = COALESCE($8, ort),
-                iban = COALESCE($9, iban),
-                bemerkungen = COALESCE($10, bemerkungen),
-                vorname = COALESCE($11, vorname),
-                nachname = COALESCE($12, nachname),
-                geburtstag = COALESCE($13, geburtstag),
-                anrede = COALESCE($14, anrede),
+                telefon = $1,
+                mobile = $2,
+                email = $3,
+                versand_email = $4,
+                strasse = $5,
+                adresszusatz = $6,
+                plz = $7,
+                ort = $8,
+                iban = $9,
+                bemerkungen = $10,
+                vorname = $11,
+                nachname = $12,
+                geburtstag = $13,
+                anrede = $14,
                 updated_at = NOW()
             WHERE id = $15
             RETURNING *
-        `, [telefon, mobile, email, versand_email, strasse, adresszusatz, plz, ort, iban, bemerkungen,
-            vorname, nachname, geburtstag, anrede, memberId]);
+        `, [
+            v(telefon, currentMember.telefon),
+            v(mobile, currentMember.mobile),
+            v(email, currentMember.email),
+            v(versand_email, currentMember.versand_email),
+            v(strasse, currentMember.strasse),
+            v(adresszusatz, currentMember.adresszusatz),
+            v(plz, currentMember.plz),
+            v(ort, currentMember.ort),
+            v(iban, currentMember.iban),
+            v(bemerkungen, currentMember.bemerkungen),
+            v(vorname, currentMember.vorname),
+            v(nachname, currentMember.nachname),
+            v(geburtstag, currentMember.geburtstag),
+            v(anrede, currentMember.anrede),
+            memberId
+        ]);
 
         console.log('Profile updated successfully for:', req.user.email);
 
