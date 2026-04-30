@@ -2405,19 +2405,7 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             }, 'general', 'Datenänderung bestätigt', pushBody
             ).catch(err => console.error('Email notification failed:', err));
 
-            // Vorstand benachrichtigen: Mitglied X hat Profil geaendert (mit Old/New)
-            const memberInfo = await pool.query(
-                'SELECT vorname, nachname FROM members WHERE id = $1', [memberId]
-            ).catch(() => ({ rows: [{ vorname: '', nachname: '' }] }));
-            const memberName = `${memberInfo.rows[0]?.vorname || ''} ${memberInfo.rows[0]?.nachname || ''}`.trim()
-                || req.user.email;
-            pushToVorstand('general',
-                `${memberName}: Datenaenderung`,
-                pushBody,
-                { memberId, kind: 'member_self_update' }
-            ).catch(() => {});
-
-            // Audit log mit Old/New Werten — nicht nur Labels
+            // Audit log mit Old/New Werten — Vorstand-Frontend kann das im Audit-Log anzeigen
             const clientIp = getClientIp(req);
             logAudit(pool, 'member_self_update', memberId, req.user.email, clientIp, {
                 updated_fields: changedFields.map(f => f.label),
