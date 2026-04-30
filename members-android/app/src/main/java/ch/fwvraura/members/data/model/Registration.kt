@@ -29,7 +29,16 @@ data class MyRegistration(
     @SerializedName("event_location") val eventLocation: String? = null,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("shift_ids") val shiftIds: List<String>? = null,
+    val shifts: List<RegistrationShift>? = null,
     @SerializedName("parsed_notes") val parsedNotes: ParsedNotes? = null
+)
+
+/** Schicht-Details, die das Backend in /registrations/mine mitliefert. */
+data class RegistrationShift(
+    val id: String,
+    val name: String? = null,
+    @SerializedName("start_time") val startTime: String? = null,
+    @SerializedName("end_time") val endTime: String? = null
 )
 
 data class PublicRegistrationResponse(

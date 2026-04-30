@@ -201,7 +201,13 @@ class AccessesActivity : AppCompatActivity() {
             card.credTitle.text = sa.displayName ?: sa.accountName ?: sa.username
             card.credSubtitle.text = sa.description.orEmpty()
             card.credSubtitle.visibility = if (sa.description.isNullOrBlank()) View.GONE else View.VISIBLE
-            card.credUser.text = sa.username
+            // Username-Zeile + Copy-Button verstecken wenn kein User noetig (z.B. Kassensystem)
+            if (sa.username.isBlank()) {
+                card.credUser.visibility = View.GONE
+                card.btnCopyUser.visibility = View.GONE
+            } else {
+                card.credUser.text = sa.username
+            }
             card.credPassword.text = "•".repeat(sa.password?.length?.coerceAtMost(12) ?: 8)
             val rotation = sa.nextRotation?.substring(0, minOf(10, sa.nextRotation.length))
             card.credExtra.text = if (rotation != null) "Nächste Rotation: $rotation" else ""

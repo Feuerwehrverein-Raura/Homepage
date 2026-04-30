@@ -1836,10 +1836,27 @@ app.get('/registrations/mine', authenticateAny, async (req, res) => {
              ORDER BY e.start_date DESC`,
             [email]
         );
+        // Schicht-Namen fuer alle vorkommenden shift_ids in einer einzigen Query holen
+        const allShiftIds = Array.from(new Set(
+            result.rows.flatMap(r => Array.isArray(r.shift_ids) ? r.shift_ids : [])
+        ));
+        const shiftMap = {};
+        if (allShiftIds.length > 0) {
+            const shifts = await pool.query(
+                `SELECT id, name, start_time, end_time FROM shifts WHERE id = ANY($1::uuid[])`,
+                [allShiftIds]
+            );
+            for (const s of shifts.rows) {
+                shiftMap[s.id] = { id: s.id, name: s.name, start_time: s.start_time, end_time: s.end_time };
+            }
+        }
         for (const reg of result.rows) {
             if (reg.notes) {
                 try { reg.parsed_notes = JSON.parse(reg.notes); } catch (_) {}
             }
+            reg.shifts = (Array.isArray(reg.shift_ids) ? reg.shift_ids : [])
+                .map(id => shiftMap[id])
+                .filter(Boolean);
         }
         res.json(result.rows);
     } catch (error) {
