@@ -11,6 +11,7 @@ import {
   Mail,
   KeyRound,
   FileUp,
+  Wallet,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -27,6 +28,7 @@ const navItems = [
   { path: "/mailcow", label: "E-Mail", icon: Mail },
   { path: "/vault", label: "Tresor", icon: KeyRound },
   { path: "/mass-pdf", label: "Massen-PDF", icon: FileUp },
+  { path: "/membership-fees", label: "Beitraege", icon: Wallet },
   { path: "/settings", label: "Einstellungen", icon: Settings },
 ];
 

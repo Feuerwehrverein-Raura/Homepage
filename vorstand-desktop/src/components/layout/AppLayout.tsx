@@ -17,6 +17,7 @@ import { AuditPage } from "@/pages/admin/AuditPage";
 import { MailcowPage } from "@/pages/mailcow/MailcowPage";
 import { VaultPage } from "@/pages/vault/VaultPage";
 import { MassPdfPage } from "@/pages/masspdf/MassPdfPage";
+import { MembershipFeesPage } from "@/pages/membership-fees/MembershipFeesPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 
 export function AppLayout() {
@@ -49,6 +50,7 @@ export function AppLayout() {
             <Route path="mailcow" element={<MailcowPage />} />
             <Route path="vault" element={<VaultPage />} />
             <Route path="mass-pdf" element={<MassPdfPage />} />
+            <Route path="membership-fees" element={<MembershipFeesPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Routes>
         </div>
