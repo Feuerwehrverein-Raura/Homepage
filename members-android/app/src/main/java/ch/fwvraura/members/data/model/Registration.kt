@@ -49,6 +49,17 @@ data class OrganizerAddRegistrationRequest(
     val notes: String? = null
 )
 
+/** Body fuer PUT /events/:eventId/registrations/:regId/as-organizer.
+ *  Felder die null sind, werden serverseitig nicht ueberschrieben. */
+data class OrganizerEditRegistrationRequest(
+    @SerializedName("guest_name") val guestName: String? = null,
+    @SerializedName("guest_email") val guestEmail: String? = null,
+    @SerializedName("guest_phone") val guestPhone: String? = null,
+    val participants: Int? = null,
+    val notes: String? = null,
+    val status: String? = null
+)
+
 /** Eine Anmeldung im Organisator-Dashboard. */
 data class EventRegistration(
     val id: String,

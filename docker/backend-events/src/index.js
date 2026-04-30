@@ -1912,6 +1912,88 @@ app.post('/events/:eventId/registrations/:regId/reject-as-organizer', authentica
     return organizerActOnRegistration(req, res, 'rejected');
 });
 
+// DEUTSCH: Hilfs-Funktion fuer organisator-auth (E-Mail-Match auf event.organizer_email
+// oder Vorstand/Admin). Setzt req.event als Side-Effect.
+async function ensureOrganizerAccess(req, res, eventId) {
+    const userEmail = (req.user?.email || '').toLowerCase();
+    const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+    const event = await pool.query('SELECT id, title, organizer_email FROM events WHERE id = $1', [eventId]);
+    if (event.rows.length === 0) { res.status(404).json({ error: 'Event nicht gefunden' }); return null; }
+    const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+    if (!isPrivileged && !isOrganizer) {
+        res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
+        return null;
+    }
+    return event.rows[0];
+}
+
+// DEUTSCH: Anmeldung als Event-Organisator bearbeiten.
+// Erlaubt: guest_name, guest_email, guest_phone, participants, notes, status.
+// Felder die nicht im Body sind, bleiben unveraendert.
+app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { eventId, regId } = req.params;
+        const event = await ensureOrganizerAccess(req, res, eventId);
+        if (!event) return;
+
+        const existing = await pool.query(
+            'SELECT * FROM registrations WHERE id = $1 AND event_id = $2',
+            [regId, eventId]
+        );
+        if (existing.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
+        const reg = existing.rows[0];
+
+        const { guest_name, guest_email, guest_phone, participants, notes, status } = req.body || {};
+
+        // notes ist JSON {phone, participants, notes} — wir mergen
+        let notesJson = {};
+        try { notesJson = typeof reg.notes === 'string' ? JSON.parse(reg.notes) : (reg.notes || {}); } catch (_) { notesJson = {}; }
+        if (guest_phone !== undefined) notesJson.phone = guest_phone;
+        if (participants !== undefined) notesJson.participants = participants;
+        if (notes !== undefined) notesJson.notes = notes;
+
+        const result = await pool.query(`
+            UPDATE registrations SET
+                guest_name  = COALESCE($1, guest_name),
+                guest_email = COALESCE($2, guest_email),
+                notes       = $3,
+                status      = COALESCE($4, status)
+            WHERE id = $5 AND event_id = $6
+            RETURNING *
+        `, [
+            guest_name ?? null,
+            guest_email ?? null,
+            JSON.stringify(notesJson),
+            status ?? null,
+            regId, eventId
+        ]);
+
+        res.json({ success: true, registration: result.rows[0] });
+    } catch (error) {
+        console.error('PUT registrations as-organizer failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Anmeldung als Event-Organisator loeschen.
+app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { eventId, regId } = req.params;
+        const event = await ensureOrganizerAccess(req, res, eventId);
+        if (!event) return;
+
+        const result = await pool.query(
+            'DELETE FROM registrations WHERE id = $1 AND event_id = $2 RETURNING id',
+            [regId, eventId]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
+        res.json({ success: true, deleted_id: result.rows[0].id });
+    } catch (error) {
+        console.error('DELETE registrations as-organizer failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Anmeldung als Event-Organisator (per E-Mail-Match) hinzufuegen.
 // Fuer Gaeste die telefonisch / persoenlich gemeldet haben — Status direkt 'approved'.
 app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, res) => {

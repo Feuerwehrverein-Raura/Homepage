@@ -5,6 +5,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.PopupMenu
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.members.MembersApp
@@ -161,12 +163,60 @@ class OrganizerDashboardFragment : Fragment() {
         item.regMeta.text = metaParts.joinToString("\n")
         item.regMeta.visibility = if (metaParts.isEmpty()) View.GONE else View.VISIBLE
 
+        item.btnRegMenu.setOnClickListener { v -> showRegMenu(v, r) }
+    }
+
+    private fun showRegMenu(anchor: View, r: EventRegistration) {
+        val popup = PopupMenu(requireContext(), anchor)
+        // Genehmigen/Ablehnen nur bei pending. Bearbeiten/Loeschen nur fuer Member-Mode-Organisatoren
+        // (Single-Event-Organisatoren haben keine Event-ID -> /as-organizer-Endpoint geht nicht).
+        val canEdit = isMemberMode() && regToEventId.containsKey(r.id)
         if (r.status == "pending") {
-            item.regActions.visibility = View.VISIBLE
-            item.btnApprove.setOnClickListener { approve(r) }
-            item.btnReject.setOnClickListener { reject(r) }
-        } else {
-            item.regActions.visibility = View.GONE
+            popup.menu.add(0, MENU_APPROVE, 0, "Genehmigen")
+            popup.menu.add(0, MENU_REJECT, 1, "Ablehnen")
+        }
+        if (canEdit) {
+            popup.menu.add(0, MENU_EDIT, 2, "Bearbeiten")
+            popup.menu.add(0, MENU_DELETE, 3, "Löschen")
+        }
+        popup.setOnMenuItemClickListener { mi ->
+            when (mi.itemId) {
+                MENU_APPROVE -> { approve(r); true }
+                MENU_REJECT -> { reject(r); true }
+                MENU_EDIT -> { editRegistration(r); true }
+                MENU_DELETE -> { confirmDelete(r); true }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    private fun editRegistration(reg: EventRegistration) {
+        val eventId = regToEventId[reg.id] ?: return
+        EditRegistrationDialog.newInstance(eventId, reg).apply {
+            onSaved = { load() }
+        }.show(parentFragmentManager, "edit-reg")
+    }
+
+    private fun confirmDelete(reg: EventRegistration) {
+        val eventId = regToEventId[reg.id] ?: return
+        val name = listOfNotNull(reg.memberVorname, reg.memberNachname)
+            .joinToString(" ").ifBlank { reg.guestName ?: "diese Anmeldung" }
+        AlertDialog.Builder(requireContext())
+            .setTitle("Anmeldung löschen?")
+            .setMessage("Möchtest du die Anmeldung von \"$name\" wirklich löschen?")
+            .setPositiveButton("Löschen") { _, _ -> performDelete(eventId, reg.id) }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun performDelete(eventId: String, regId: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.eventsApi.deleteAsOrganizer(eventId, regId)
+                if (response.isSuccessful) load()
+                else showError("Fehler ${response.code()}")
+            } catch (e: Exception) { showError("Netzwerkfehler: ${e.message}") }
         }
     }
 
@@ -207,5 +257,12 @@ class OrganizerDashboardFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    companion object {
+        private const val MENU_APPROVE = 1
+        private const val MENU_REJECT = 2
+        private const val MENU_EDIT = 3
+        private const val MENU_DELETE = 4
     }
 }
