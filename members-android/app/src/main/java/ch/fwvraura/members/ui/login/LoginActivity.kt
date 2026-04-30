@@ -149,6 +149,7 @@ class LoginActivity : AppCompatActivity() {
         }
         val tm = MembersApp.instance.tokenManager
         tm.token = token
+        tm.refreshToken = tokenResp.refreshToken
         tm.accountType = "member"
         // Profil im Hintergrund laden, um Name/E-Mail anzuzeigen
         lifecycleScope.launch {

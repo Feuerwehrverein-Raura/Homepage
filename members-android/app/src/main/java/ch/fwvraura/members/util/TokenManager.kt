@@ -36,6 +36,11 @@ class TokenManager(context: Context) {
         get() = prefs.getString(KEY_TOKEN, null)
         set(value) { prefs.edit().putString(KEY_TOKEN, value).commit() }
 
+    /** OIDC-Refresh-Token — gueltig bis 30 Tage nach letzter Nutzung (Authentik rotiert ihn). */
+    var refreshToken: String?
+        get() = prefs.getString(KEY_REFRESH_TOKEN, null)
+        set(value) { prefs.edit().putString(KEY_REFRESH_TOKEN, value).commit() }
+
     /** "member", "organizer" oder "qr" */
     var accountType: String?
         get() = prefs.getString(KEY_ACCOUNT_TYPE, null)
@@ -61,6 +66,7 @@ class TokenManager(context: Context) {
 
     companion object {
         private const val KEY_TOKEN = "auth_token"
+        private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_ACCOUNT_TYPE = "account_type"
         private const val KEY_EMAIL = "user_email"
         private const val KEY_NAME = "user_name"
