@@ -19,7 +19,9 @@ import ch.fwvraura.members.sync.ContactsSyncManager
 import ch.fwvraura.members.util.OidcConstants
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.tabs.TabLayout
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
@@ -176,14 +178,35 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    /** FCM-Token (falls Firebase ihn schon geliefert hat) ans Backend pushen. */
+    /**
+     * FCM-Token nach dem Login ans Backend pushen. Falls noch keiner gecached ist
+     * (z.B. erster Start nach Install — onNewToken kann verzoegert kommen),
+     * holen wir ihn aktiv von FirebaseMessaging.
+     */
     private suspend fun registerFcmTokenIfPresent(tm: ch.fwvraura.members.util.TokenManager) {
-        val token = tm.fcmToken ?: return
+        val token = tm.fcmToken ?: requestFcmToken() ?: return
+        tm.fcmToken = token
         try {
             ApiModule.membersApi.registerFcmToken(
                 ch.fwvraura.members.data.model.FcmTokenRegistration(token = token)
             )
-        } catch (_: Exception) { /* nicht kritisch — Service registriert ihn beim naechsten Refresh */ }
+            Log.d("LoginActivity", "FCM token registered with backend (len=${token.length})")
+        } catch (e: Exception) {
+            Log.w("LoginActivity", "FCM token registration failed: ${e.message}")
+        }
+    }
+
+    private suspend fun requestFcmToken(): String? = try {
+        suspendCancellableCoroutine { cont ->
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (cont.isActive) {
+                    cont.resume(if (task.isSuccessful) task.result else null) { _, _, _ -> }
+                }
+            }
+        }
+    } catch (e: Exception) {
+        Log.w("LoginActivity", "FirebaseMessaging.getToken failed: ${e.message}")
+        null
     }
 
     /**
