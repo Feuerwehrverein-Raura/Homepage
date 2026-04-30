@@ -1289,113 +1289,6 @@ async function syncMemberAvatarToAuthentik(authentikUserId, fotoPath) {
     }
 }
 
-// Sync Authentik user profile to member database
-// DEUTSCH: Synchronisiert Authentik-Profildaten zurück in die Mitglieder-Datenbank (Reverse-Sync)
-async function syncAuthentikToMember(pool, authentikUserId) {
-    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
-    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
-
-    if (!AUTHENTIK_API_TOKEN || !authentikUserId) {
-        return null;
-    }
-
-    try {
-        // Get Authentik user data
-        const userResponse = await axios.get(
-            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/`,
-            { headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` } }
-        );
-
-        const authentikUser = userResponse.data;
-        const attributes = authentikUser.attributes || {};
-
-        // Find member by authentik_user_id
-        const memberResult = await pool.query(
-            'SELECT * FROM members WHERE authentik_user_id = $1',
-            [authentikUserId.toString()]
-        );
-
-        if (memberResult.rows.length === 0) {
-            return null;
-        }
-
-        const member = memberResult.rows[0];
-
-        // Schutz vor Race-Condition: wenn der Member-Datensatz in den letzten
-        // 5 Minuten lokal aktualisiert wurde, NICHT mit Authentik-Daten ueberschreiben.
-        // (Authentik bekommt unsere Aenderung gleich per syncMemberToAuthentik gepusht.)
-        if (member.updated_at) {
-            const ageMs = Date.now() - new Date(member.updated_at).getTime();
-            if (ageMs < 5 * 60 * 1000) {
-                return { member_id: member.id, changes: [], skipped: 'recent_local_update' };
-            }
-        }
-        const updates = {};
-        const changes = [];
-
-        // Check for changes (Authentik → Website)
-        // Only sync if Authentik has the data and it differs
-        if (attributes.phone && attributes.phone !== member.telefon) {
-            updates.telefon = attributes.phone;
-            changes.push('telefon');
-        }
-        if (attributes.mobile && attributes.mobile !== member.mobile) {
-            updates.mobile = attributes.mobile;
-            changes.push('mobile');
-        }
-        if (attributes.street && attributes.street !== member.strasse) {
-            updates.strasse = attributes.street;
-            changes.push('strasse');
-        }
-        if (attributes.postal_code && attributes.postal_code !== member.plz) {
-            updates.plz = attributes.postal_code;
-            changes.push('plz');
-        }
-        if (attributes.city && attributes.city !== member.ort) {
-            updates.ort = attributes.city;
-            changes.push('ort');
-        }
-
-        // Parse name if changed
-        if (authentikUser.name) {
-            const nameParts = authentikUser.name.trim().split(' ');
-            if (nameParts.length >= 2) {
-                const vorname = nameParts[0];
-                const nachname = nameParts.slice(1).join(' ');
-                if (vorname !== member.vorname) {
-                    updates.vorname = vorname;
-                    changes.push('vorname');
-                }
-                if (nachname !== member.nachname) {
-                    updates.nachname = nachname;
-                    changes.push('nachname');
-                }
-            }
-        }
-
-        if (changes.length === 0) {
-            return { member_id: member.id, changes: [] };
-        }
-
-        // Apply updates
-        const fields = Object.keys(updates);
-        const values = Object.values(updates);
-        const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
-        values.push(member.id);
-
-        await pool.query(
-            `UPDATE members SET ${setClause}, updated_at = NOW() WHERE id = $${values.length}`,
-            values
-        );
-
-        console.log(`Synced Authentik profile to member: ${member.vorname} ${member.nachname} - changed: ${changes.join(', ')}`);
-        return { member_id: member.id, changes };
-    } catch (error) {
-        console.error(`Failed to sync Authentik to member:`, error.response?.data || error.message);
-        return null;
-    }
-}
-
 // Audit logging helper
 // DEUTSCH: Schreibt einen Audit-Log-Eintrag in die Datenbank (Login, Mitglieder-Änderungen, Events)
 async function logAudit(pool, action, userId, email, ipAddress, details = {}) {
@@ -5201,8 +5094,14 @@ async function rotateServiceAccountPasswords() {
 
 // Periodic sync of Authentik groups and profiles (every hour)
 // DEUTSCH: Stündliche Synchronisation: Gruppen (Website->Authentik) und Profile (Authentik->Website)
+/**
+ * DEUTSCH: Periodischer Sync — nur noch Members->Authentik (Gruppen-Mitgliedschaften
+ * basierend auf der Funktion). Profil-Sync Authentik->Members wurde abgeschaltet:
+ * die Members-DB ist die alleinige Source of Truth fuer Profilfelder. Aenderungen
+ * gehen sofort beim PUT /members/me oder PUT /members/:id an Authentik.
+ */
 async function periodicAuthentikSync() {
-    console.log('Starting periodic Authentik sync (groups + profiles)...');
+    console.log('Starting periodic Authentik group sync...');
     try {
         const result = await pool.query(`
             SELECT id, vorname, nachname, funktion, authentik_user_id
@@ -5211,26 +5110,16 @@ async function periodicAuthentikSync() {
         `);
 
         let groupsSynced = 0;
-        let profilesUpdated = 0;
-
         for (const member of result.rows) {
             try {
-                // Sync groups (Website → Authentik)
                 await syncMemberAuthentikGroups(member.authentik_user_id, member.funktion);
                 groupsSynced++;
-
-                // Sync profiles (Authentik → Website) - check for changes made in Authentik/Nextcloud
-                const profileResult = await syncAuthentikToMember(pool, member.authentik_user_id);
-                if (profileResult && profileResult.changes && profileResult.changes.length > 0) {
-                    profilesUpdated++;
-                    console.log(`  Profile updated from Authentik: ${member.vorname} ${member.nachname} - ${profileResult.changes.join(', ')}`);
-                }
             } catch (error) {
-                console.error(`Periodic sync failed for ${member.vorname} ${member.nachname}:`, error.message);
+                console.error(`Group sync failed for ${member.vorname} ${member.nachname}:`, error.message);
             }
         }
 
-        console.log(`Periodic Authentik sync completed: ${groupsSynced}/${result.rows.length} groups synced, ${profilesUpdated} profiles updated from Authentik`);
+        console.log(`Periodic Authentik group sync completed: ${groupsSynced}/${result.rows.length}`);
     } catch (error) {
         console.error('Periodic Authentik sync error:', error.message);
     }
