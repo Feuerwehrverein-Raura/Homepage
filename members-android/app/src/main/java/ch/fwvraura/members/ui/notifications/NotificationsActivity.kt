@@ -46,6 +46,14 @@ class NotificationsActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { finish() }
         binding.btnSave.setOnClickListener { save() }
 
+        // Profil-E-Mail vorausfuellen, damit der haeufigste Use-Case (eigene
+        // Mail-Adresse vom Newsletter abmelden) ein Tap weniger ist.
+        ch.fwvraura.members.MembersApp.instance.tokenManager.userEmail?.let {
+            binding.inputNewsletterEmail.setText(it)
+        }
+        binding.btnNewsletterSubscribe.setOnClickListener { newsletterAction(subscribe = true) }
+        binding.btnNewsletterUnsubscribe.setOnClickListener { newsletterAction(subscribe = false) }
+
         // Vier Karten in den Container inflaten — jeder Notification-Typ eine.
         for ((type, title, subtitle) in TYPES) {
             val item = ItemNotificationPrefBinding.inflate(layoutInflater, binding.prefsContainer, false)
@@ -80,6 +88,31 @@ class NotificationsActivity : AppCompatActivity() {
                 Snackbar.make(binding.root, "Netzwerkfehler: ${e.message}", Snackbar.LENGTH_LONG).show()
             } finally {
                 binding.progress.visibility = View.GONE
+            }
+        }
+    }
+
+    /** An- oder abmelden vom oeffentlichen Newsletter. */
+    private fun newsletterAction(subscribe: Boolean) {
+        val email = binding.inputNewsletterEmail.text?.toString()?.trim().orEmpty()
+        if (email.isBlank() || !email.contains("@")) {
+            binding.inputNewsletterEmail.error = "Ungültige E-Mail-Adresse"
+            return
+        }
+        val req = ch.fwvraura.members.data.model.NewsletterEmailRequest(email)
+        binding.btnNewsletterSubscribe.isEnabled = false
+        binding.btnNewsletterUnsubscribe.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val resp = if (subscribe) ApiModule.newsletterApi.subscribe(req)
+                else ApiModule.newsletterApi.unsubscribe(req)
+                val msg = resp.body()?.message ?: if (resp.isSuccessful) "OK" else "Fehler ${resp.code()}"
+                Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Snackbar.make(binding.root, "Netzwerkfehler: ${e.message}", Snackbar.LENGTH_LONG).show()
+            } finally {
+                binding.btnNewsletterSubscribe.isEnabled = true
+                binding.btnNewsletterUnsubscribe.isEnabled = true
             }
         }
     }
