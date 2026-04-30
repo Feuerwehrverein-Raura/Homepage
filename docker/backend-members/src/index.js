@@ -50,6 +50,28 @@ try {
  * @param {string} body             Notification-Body
  * @param {object} data             Optionale Key/Value-Strings fuer App-Routing
  */
+/**
+ * DEUTSCH: Push an alle Vorstand-Mitglieder schicken (Präsident, Aktuar, Kassier,
+ * Materialwart, Beisitzer). Genutzt um Vorstand ueber Mitglieder-Selbst-Aenderungen
+ * zu informieren.
+ */
+async function pushToVorstand(notificationType, title, body, data = {}) {
+    try {
+        const result = await pool.query(`
+            SELECT id FROM members
+            WHERE status = 'Aktivmitglied'
+              AND (funktion ILIKE '%Präsident%' OR funktion ILIKE '%Aktuar%'
+                OR funktion ILIKE '%Kassier%' OR funktion ILIKE '%Materialwart%'
+                OR funktion ILIKE '%Beisitzer%')
+        `);
+        for (const row of result.rows) {
+            sendPushToMember(row.id, notificationType, title, body, data).catch(() => {});
+        }
+    } catch (err) {
+        console.error('pushToVorstand failed:', err.message);
+    }
+}
+
 async function sendPushToMember(memberId, notificationType, title, body, data = {}) {
     if (!fcmInitialized) return;
     try {
@@ -2383,10 +2405,27 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             }, 'general', 'Datenänderung bestätigt', pushBody
             ).catch(err => console.error('Email notification failed:', err));
 
-            // Write audit log with real client IP
+            // Vorstand benachrichtigen: Mitglied X hat Profil geaendert (mit Old/New)
+            const memberInfo = await pool.query(
+                'SELECT vorname, nachname FROM members WHERE id = $1', [memberId]
+            ).catch(() => ({ rows: [{ vorname: '', nachname: '' }] }));
+            const memberName = `${memberInfo.rows[0]?.vorname || ''} ${memberInfo.rows[0]?.nachname || ''}`.trim()
+                || req.user.email;
+            pushToVorstand('general',
+                `${memberName}: Datenaenderung`,
+                pushBody,
+                { memberId, kind: 'member_self_update' }
+            ).catch(() => {});
+
+            // Audit log mit Old/New Werten — nicht nur Labels
             const clientIp = getClientIp(req);
             logAudit(pool, 'member_self_update', memberId, req.user.email, clientIp, {
-                updated_fields: changedFields.map(f => f.label)
+                updated_fields: changedFields.map(f => f.label),
+                changes: changedFields.map(f => ({
+                    field: f.label,
+                    old_value: f.oldValue,
+                    new_value: f.newValue
+                }))
             });
         }
 
