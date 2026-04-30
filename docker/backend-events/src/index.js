@@ -1853,6 +1853,45 @@ app.post('/events/:eventId/registrations/:regId/reject-as-organizer', authentica
     return organizerActOnRegistration(req, res, 'rejected');
 });
 
+// DEUTSCH: Anmeldung als Event-Organisator (per E-Mail-Match) hinzufuegen.
+// Fuer Gaeste die telefonisch / persoenlich gemeldet haben — Status direkt 'approved'.
+app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userEmail = (req.user?.email || '').toLowerCase();
+        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+
+        const event = await pool.query('SELECT id, organizer_email FROM events WHERE id = $1', [id]);
+        if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
+
+        const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        if (!isPrivileged && !isOrganizer) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
+        }
+
+        const { member_id, guest_name, guest_email, guest_phone, participants, notes } = req.body || {};
+        if (!member_id && !guest_name) {
+            return res.status(400).json({ error: 'Mitglied oder Gastname erforderlich' });
+        }
+
+        const result = await pool.query(`
+            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status, approved_by, approved_at)
+            VALUES ($1, $2, $3, $4, NULL, $5, 'approved', $6, NOW())
+            RETURNING *
+        `, [
+            id,
+            member_id || null,
+            guest_name || '',
+            guest_email || '',
+            JSON.stringify({ phone: guest_phone, participants: participants || 1, notes }),
+            req.user.email || req.user.name || 'organizer'
+        ]);
+        res.json({ success: true, registration: result.rows[0] });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 async function organizerActOnRegistration(req, res, newStatus) {
     try {
         const { eventId, regId } = req.params;

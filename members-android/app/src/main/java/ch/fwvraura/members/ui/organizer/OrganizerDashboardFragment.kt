@@ -98,6 +98,19 @@ class OrganizerDashboardFragment : Fragment() {
         card.orgEventLocation.text = event.location.orEmpty()
         card.orgEventLocation.visibility = if (event.location.isNullOrBlank()) View.GONE else View.VISIBLE
 
+        // Im organizer-Mode (Single-Event-Login) gibt es keine echte Event-ID — Hinzufuegen
+        // unterstuetzen wir nur fuer Member-Mode.
+        if (isMemberMode()) {
+            card.orgEventAddBtn.visibility = View.VISIBLE
+            card.orgEventAddBtn.setOnClickListener {
+                AddRegistrationDialog.newInstance(event.id).apply {
+                    onAdded = { load() }
+                }.show(parentFragmentManager, "add-reg")
+            }
+        } else {
+            card.orgEventAddBtn.visibility = View.GONE
+        }
+
         val pending = regs.count { it.status == "pending" }
         val approved = regs.count { it.status == "approved" }
         card.orgEventStatPending.text = "$pending wartend"

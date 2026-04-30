@@ -39,6 +39,16 @@ data class PublicRegistrationResponse(
     val isMember: Boolean? = null
 )
 
+/** Body fuer POST /events/:id/registrations-as-organizer (Organisator fuegt manuell hinzu). */
+data class OrganizerAddRegistrationRequest(
+    @SerializedName("member_id") val memberId: String? = null,
+    @SerializedName("guest_name") val guestName: String? = null,
+    @SerializedName("guest_email") val guestEmail: String? = null,
+    @SerializedName("guest_phone") val guestPhone: String? = null,
+    val participants: Int? = null,
+    val notes: String? = null
+)
+
 /** Eine Anmeldung im Organisator-Dashboard. */
 data class EventRegistration(
     val id: String,

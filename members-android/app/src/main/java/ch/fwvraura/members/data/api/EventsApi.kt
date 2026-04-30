@@ -54,6 +54,13 @@ interface EventsApi {
         @Path("regId") regId: String
     ): Response<Unit>
 
+    /** Anmeldung als Organisator manuell hinzufuegen (z.B. fuer telefonisch gemeldete Gaeste). */
+    @POST("events/{id}/registrations-as-organizer")
+    suspend fun addRegistrationAsOrganizer(
+        @Path("id") eventId: String,
+        @Body body: ch.fwvraura.members.data.model.OrganizerAddRegistrationRequest
+    ): Response<PublicRegistrationResponse>
+
     /** Eigene Anmeldungen des eingeloggten Users (mit Event-Details). */
     @GET("registrations/mine")
     suspend fun listMyRegistrations(): Response<List<MyRegistration>>
