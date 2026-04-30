@@ -6,6 +6,7 @@ import type {
   MembershipFeeSettings,
   FeeSettingsUpsert,
   GeneratePaymentsResponse,
+  SendEmailBulkResponse,
 } from "@/lib/types/membership-fee";
 
 export async function listPayments(year: number): Promise<MembershipFeePayment[]> {
@@ -54,4 +55,8 @@ export async function setReference(id: string, referenceNr: string): Promise<Mem
   return await apiClient.patch<MembershipFeePayment>(`/membership-fees/payments/${id}/reference`, {
     reference_nr: referenceNr,
   });
+}
+
+export async function sendEmailBulk(year: number): Promise<SendEmailBulkResponse> {
+  return await apiClient.post<SendEmailBulkResponse>(`/membership-fees/send-email-bulk`, { year });
 }

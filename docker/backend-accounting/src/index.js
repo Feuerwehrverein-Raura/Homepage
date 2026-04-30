@@ -525,6 +525,102 @@ app.patch('/membership-fees/payments/:id/reference', async (req, res) => {
     }
 });
 
+// DEUTSCH: POST /membership-fees/send-email-bulk?year=YYYY — Beitragsbrief per E-Mail
+// an alle offenen, beitragspflichtigen Mitglieder mit Zustellpraeferenz E-Mail.
+// Body: { year } — siehe auch query-Parameter.
+//
+// Pro Mitglied:
+//  1. QR-Code generieren (qrcode-Lib, Swiss QR-Bill SPC v0200)
+//  2. HTML-Brief rendern (Helper portiert aus vorstand.html)
+//  3. POST /email/bulk an dispatch-Service mit member_ids: [m.id]
+//
+// Auth: authenticateAny (Vorstand-JWT oder Authentik-JWT mit Vorstand-Gruppe).
+const axios = require('axios');
+const { authenticateAny, requireRole } = require('./auth-middleware');
+const { buildBeitragEmailForPayment, getKassier } = require('./beitrag-helpers');
+
+const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+
+app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const year = parseInt(req.body?.year || req.query?.year);
+        if (!year) return res.status(400).json({ error: 'year erforderlich' });
+
+        // Settings, Zahlungen + Mitglieder + Kassier laden (alles aus der gemeinsamen DB)
+        const [settingsRes, paymentsRes, kassiersRes] = await Promise.all([
+            pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [year]),
+            pool.query(`
+                SELECT p.*, m.id as m_id, m.vorname, m.nachname, m.email, m.strasse, m.plz, m.ort,
+                       m.status as member_status, m.zustellung_email
+                FROM membership_fee_payments p
+                JOIN members m ON p.member_id = m.id
+                WHERE p.year = $1
+            `, [year]),
+            pool.query("SELECT vorname, nachname, strasse, plz, ort, telefon, mobile, funktion FROM members WHERE funktion ILIKE '%kassier%'")
+        ]);
+
+        if (settingsRes.rows.length === 0) {
+            return res.status(400).json({ error: `Keine Einstellungen fuer ${year} hinterlegt` });
+        }
+        const settings = settingsRes.rows[0];
+        const kassier = getKassier(kassiersRes.rows);
+
+        // Filtern: offen + Email-Praeferenz + email vorhanden + nicht-Ehren + Ref vorhanden
+        const candidates = paymentsRes.rows.filter(r =>
+            r.status === 'offen' &&
+            r.zustellung_email === true &&
+            (r.email || '').trim() !== '' &&
+            (r.member_status || '') !== 'Ehrenmitglied' &&
+            (r.reference_nr || '').replace(/\D/g, '').length > 0
+        );
+
+        const subject = `Mitgliederbeitrag ${year} - Feuerwehrverein Raura`;
+        const dispatchUrl = `${DISPATCH_API}/email/bulk`;
+        const dispatchHeaders = { 'x-api-key': process.env.API_KEY };
+
+        let success = 0;
+        let failed = 0;
+        const failures = [];
+
+        for (const r of candidates) {
+            try {
+                const html = await buildBeitragEmailForPayment({
+                    member: { vorname: r.vorname, nachname: r.nachname, strasse: r.strasse, plz: r.plz, ort: r.ort },
+                    payment: { reference_nr: r.reference_nr, amount: r.amount },
+                    settings,
+                    kassier
+                });
+                await axios.post(dispatchUrl, {
+                    member_ids: [r.member_id],
+                    subject,
+                    body: '',
+                    html,
+                    attachments: [],
+                    exclude_honored: true
+                }, { headers: dispatchHeaders, timeout: 20000 });
+                success++;
+            } catch (e) {
+                failed++;
+                failures.push({ member_id: r.member_id, name: `${r.vorname || ''} ${r.nachname || ''}`.trim(), error: e.message });
+            }
+        }
+
+        logInfo('Membership fee bulk email sent', { year, candidates: candidates.length, success, failed });
+
+        res.json({
+            year,
+            candidates: candidates.length,
+            success,
+            failed,
+            skipped: paymentsRes.rows.length - candidates.length,
+            failures: failures.slice(0, 20)
+        });
+    } catch (error) {
+        logError('send-email-bulk error', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: GET /membership-fees/summary?year=YYYY — Zusammenfassung: bezahlt/offen/Gesamtbetrag
 app.get('/membership-fees/summary', async (req, res) => {
     try {

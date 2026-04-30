@@ -60,3 +60,12 @@ export interface GeneratePaymentsResponse {
   skipped: number;
   total: number;
 }
+
+export interface SendEmailBulkResponse {
+  year: number;
+  candidates: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  failures: Array<{ member_id?: string; name?: string; error?: string }>;
+}

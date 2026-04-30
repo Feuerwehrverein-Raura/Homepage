@@ -70,6 +70,14 @@
                         android:text="Beitragslauf" />
                 </LinearLayout>
 
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSendEmailBulk"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="E-Mail-Versand an alle Offenen"
+                    app:icon="@android:drawable/ic_dialog_email" />
+
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

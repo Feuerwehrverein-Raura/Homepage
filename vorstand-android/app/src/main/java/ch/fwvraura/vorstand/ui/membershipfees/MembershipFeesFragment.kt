@@ -18,6 +18,7 @@ import ch.fwvraura.vorstand.data.api.ApiModule
 import ch.fwvraura.vorstand.data.model.GeneratePaymentsRequest
 import ch.fwvraura.vorstand.data.model.MarkFeePaidRequest
 import ch.fwvraura.vorstand.data.model.MembershipFeePayment
+import ch.fwvraura.vorstand.data.model.SendEmailBulkRequest
 import ch.fwvraura.vorstand.data.model.SetReferenceRequest
 import ch.fwvraura.vorstand.databinding.FragmentMembershipFeesBinding
 import com.google.android.material.snackbar.Snackbar
@@ -73,6 +74,7 @@ class MembershipFeesFragment : Fragment() {
         }
 
         binding.btnGenerate.setOnClickListener { onGenerateClicked() }
+        binding.btnSendEmailBulk.setOnClickListener { onSendEmailBulkClicked() }
 
         load()
     }
@@ -270,6 +272,69 @@ class MembershipFeesFragment : Fragment() {
                 else showError("Fehler ${resp.code()}")
             } catch (e: Exception) {
                 showError("Netzwerkfehler: ${e.message}")
+            }
+        }
+    }
+
+    /** E-Mail-Massenversand: zaehlt zuerst Kandidaten, fragt um Bestaetigung, ruft dann Endpoint. */
+    private fun onSendEmailBulkClicked() {
+        val candidates = allPayments.count { p ->
+            p.status == "offen" &&
+                !p.email.isNullOrBlank() &&
+                !p.referenceNr.isNullOrBlank() &&
+                p.memberStatus != "Ehrenmitglied"
+        }
+        val withoutRef = allPayments.count { p ->
+            p.status == "offen" && p.memberStatus != "Ehrenmitglied" &&
+                p.referenceNr.isNullOrBlank()
+        }
+
+        if (candidates == 0) {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Keine Empfänger")
+                .setMessage("Keine offenen Beiträge mit E-Mail-Adresse und Referenznummer für $selectedYear.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        val warning = if (withoutRef > 0)
+            "\n\n⚠ $withoutRef weitere Mitglieder haben keine Referenznummer und werden NICHT versendet (QR-Rechnung wäre unbrauchbar)."
+        else ""
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("E-Mail an $candidates Mitglieder?")
+            .setMessage("Beitragsbrief für $selectedYear wird per E-Mail an alle offenen Mitglieder mit Zustellpräferenz E-Mail versendet. Ehrenmitglieder ausgenommen.$warning")
+            .setPositiveButton("Senden") { _, _ -> doSendEmailBulk() }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun doSendEmailBulk() {
+        binding.btnSendEmailBulk.isEnabled = false
+        binding.progress.visibility = View.VISIBLE
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val resp = ApiModule.membershipFeesApi.sendEmailBulk(SendEmailBulkRequest(year = selectedYear))
+                if (resp.isSuccessful) {
+                    val r = resp.body()
+                    val msg = if (r != null)
+                        "${r.success} versendet, ${r.failed} fehlgeschlagen (von ${r.candidates} Empfängern)."
+                    else
+                        "Versand abgeschlossen."
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("E-Mail-Versand abgeschlossen")
+                        .setMessage(msg)
+                        .setPositiveButton("OK", null)
+                        .show()
+                } else {
+                    showError("Fehler ${resp.code()}")
+                }
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
+            } finally {
+                binding.btnSendEmailBulk.isEnabled = true
+                binding.progress.visibility = View.GONE
             }
         }
     }

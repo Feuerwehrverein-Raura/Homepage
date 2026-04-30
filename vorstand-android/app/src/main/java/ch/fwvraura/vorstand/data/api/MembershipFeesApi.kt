@@ -55,4 +55,9 @@ interface MembershipFeesApi {
         @Path("id") id: String,
         @Body body: SetReferenceRequest
     ): Response<MembershipFeePayment>
+
+    /** Beitragsbrief per E-Mail an alle offenen Zustellpraeferenz-E-Mail-Mitglieder. */
+    @POST("membership-fees/send-email-bulk")
+    suspend fun sendEmailBulk(@Body body: ch.fwvraura.vorstand.data.model.SendEmailBulkRequest):
+        Response<ch.fwvraura.vorstand.data.model.SendEmailBulkResponse>
 }

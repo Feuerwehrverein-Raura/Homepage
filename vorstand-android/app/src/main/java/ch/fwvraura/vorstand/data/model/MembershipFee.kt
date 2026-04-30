@@ -83,3 +83,22 @@ data class GeneratePaymentsResponse(
 data class SetReferenceRequest(
     @SerializedName("reference_nr") val referenceNr: String
 )
+
+/** Body fuer POST /membership-fees/send-email-bulk */
+data class SendEmailBulkRequest(val year: Int)
+
+/** Antwort von POST /membership-fees/send-email-bulk */
+data class SendEmailBulkResponse(
+    val year: Int = 0,
+    val candidates: Int = 0,
+    val success: Int = 0,
+    val failed: Int = 0,
+    val skipped: Int = 0,
+    val failures: List<SendFailure> = emptyList()
+)
+
+data class SendFailure(
+    @SerializedName("member_id") val memberId: String? = null,
+    val name: String? = null,
+    val error: String? = null
+)
