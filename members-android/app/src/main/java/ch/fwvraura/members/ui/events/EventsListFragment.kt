@@ -47,9 +47,10 @@ class EventsListFragment : Fragment() {
             "ICS-Link teilen / kopieren",
             "ICS-Datei im Browser öffnen"
         )
+        // setMessage + setItems gleichzeitig laesst Android die Items unterdruecken —
+        // Beschreibung deshalb in den Titel eingebaut.
         androidx.appcompat.app.AlertDialog.Builder(requireContext())
-            .setTitle("Kalender abonnieren")
-            .setMessage("Alle FWV-Anlässe als Abo in deine Kalender-App. Aktualisiert sich automatisch wenn neue Events angelegt werden.")
+            .setTitle("Kalender abonnieren\n\nAlle FWV-Anlässe als Abo in deine Kalender-App. Aktualisiert sich automatisch wenn neue Events angelegt werden.")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> openExternal(webcalUrl)
