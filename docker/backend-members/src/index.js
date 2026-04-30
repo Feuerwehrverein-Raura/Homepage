@@ -1167,14 +1167,16 @@ async function syncMemberToAuthentik(authentikUserId, member) {
             }
         };
 
-        // Contact info
-        if (member.telefon) attributes.phone = member.telefon;
-        if (member.mobile) attributes.mobile = member.mobile;
+        // Contact info — leere Strings explizit als null an Authentik schicken,
+        // damit Loeschungen ankommen (sonst behaelt Authentik den alten Wert
+        // und ueberschreibt damit beim naechsten Authentik->Members-Sync).
+        attributes.phone = member.telefon || null;
+        attributes.mobile = member.mobile || null;
 
         // Address
-        if (member.strasse) attributes.street = member.strasse;
-        if (member.plz) attributes.postal_code = member.plz;
-        if (member.ort) attributes.city = member.ort;
+        attributes.street = member.strasse || null;
+        attributes.postal_code = member.plz || null;
+        attributes.city = member.ort || null;
 
         // Other profile fields
         if (member.geburtstag) attributes.birthdate = member.geburtstag;
@@ -1318,6 +1320,16 @@ async function syncAuthentikToMember(pool, authentikUserId) {
         }
 
         const member = memberResult.rows[0];
+
+        // Schutz vor Race-Condition: wenn der Member-Datensatz in den letzten
+        // 5 Minuten lokal aktualisiert wurde, NICHT mit Authentik-Daten ueberschreiben.
+        // (Authentik bekommt unsere Aenderung gleich per syncMemberToAuthentik gepusht.)
+        if (member.updated_at) {
+            const ageMs = Date.now() - new Date(member.updated_at).getTime();
+            if (ageMs < 5 * 60 * 1000) {
+                return { member_id: member.id, changes: [], skipped: 'recent_local_update' };
+            }
+        }
         const updates = {};
         const changes = [];
 
@@ -2390,6 +2402,14 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             vorname, nachname, geburtstag, anrede, memberId]);
 
         console.log('Profile updated successfully for:', req.user.email);
+
+        // Aenderungen sofort an Authentik pushen — sonst ueberschreibt der periodische
+        // Authentik->Members-Sync die frischen Werte mit den alten aus Authentik.
+        const updatedMember = result.rows[0];
+        if (updatedMember.authentik_user_id) {
+            syncMemberToAuthentik(updatedMember.authentik_user_id, updatedMember)
+                .catch(err => console.error('Authentik sync after self-update failed:', err.message));
+        }
 
         // Send notification email if fields changed
         if (changedFields.length > 0) {
