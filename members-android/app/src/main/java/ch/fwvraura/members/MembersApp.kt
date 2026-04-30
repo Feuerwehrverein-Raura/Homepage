@@ -1,6 +1,7 @@
 package ch.fwvraura.members
 
 import android.app.Application
+import android.util.Log
 import ch.fwvraura.members.data.api.ApiModule
 import ch.fwvraura.members.data.model.FcmTokenRegistration
 import ch.fwvraura.members.util.TokenManager
@@ -9,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class MembersApp : Application() {
     lateinit var tokenManager: TokenManager
@@ -25,21 +27,16 @@ class MembersApp : Application() {
         if (tokenManager.isLoggedIn) {
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 try {
-                    val token = tokenManager.fcmToken ?: FirebaseMessaging.getInstance()
-                        .token.let { task ->
-                            kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-                                task.addOnCompleteListener { t ->
-                                    if (cont.isActive) cont.resume(
-                                        if (t.isSuccessful) t.result else null
-                                    ) { _, _, _ -> }
-                                }
-                            }
-                        }
+                    val token = tokenManager.fcmToken
+                        ?: FirebaseMessaging.getInstance().token.await()
                     if (!token.isNullOrBlank()) {
                         tokenManager.fcmToken = token
                         ApiModule.membersApi.registerFcmToken(FcmTokenRegistration(token = token))
+                        Log.d("MembersApp", "FCM token (re)registered with backend")
                     }
-                } catch (_: Exception) { /* nicht kritisch — Service registriert beim naechsten Refresh */ }
+                } catch (e: Exception) {
+                    Log.w("MembersApp", "FCM token push failed: ${e.message}")
+                }
             }
         }
     }
