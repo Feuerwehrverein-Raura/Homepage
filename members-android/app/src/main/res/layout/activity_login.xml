@@ -9,12 +9,12 @@
 
     <ImageView
         android:id="@+id/logoImage"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="180dp"
+        android:layout_height="180dp"
         android:contentDescription="FWV Logo"
-        android:src="@mipmap/ic_launcher"
+        android:src="@drawable/logo_mitglieder"
         app:layout_constraintTop_toTopOf="parent"
-        android:layout_marginTop="48dp"
+        android:layout_marginTop="32dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
