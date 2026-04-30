@@ -149,6 +149,9 @@ dependencies {
     // QR-Code-Scanner (kein ML Kit -> 16 KB Page-Size-kompatibel)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 
+    // Monats-Kalender fuer Events-Tab
+    implementation("com.kizitonwose.calendar:view:2.6.0")
+
     // Firebase Cloud Messaging — Push-Notifications.
     // BoM legt Versionen aller Firebase-Libs konsistent fest. Seit BoM 33+ sind
     // die -ktx-Module deprecated — die Kotlin-Extensions sind ins Haupt-Modul
