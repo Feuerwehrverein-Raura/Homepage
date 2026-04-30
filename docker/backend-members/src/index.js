@@ -4218,8 +4218,9 @@ app.get('/members/me/notifications', authenticateToken, async (req, res) => {
     }
 });
 
-// DEUTSCH: FCM-Token-Registrierung — Mitglieder-App ruft das beim Login + bei
-// Token-Refresh auf, damit der Server Push-Notifications an dieses Geraet senden kann.
+// DEUTSCH: FCM-Token-Registrierung (api-members v0.23.0+) — Mitglieder-App
+// ruft das beim Login + bei Token-Refresh auf, damit der Server Push-
+// Notifications an dieses Geraet senden kann.
 //
 // Tabelle wird inline angelegt (idempotent), damit kein separates Migration-File
 // noetig ist. UNIQUE(member_id, token) → Re-Login speichert nichts doppelt.
