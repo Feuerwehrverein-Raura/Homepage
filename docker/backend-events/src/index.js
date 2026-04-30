@@ -652,8 +652,9 @@ app.get('/events/:id/pdf', async (req, res) => {
 
 // DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
 app.get('/events/:id', async (req, res, next) => {
-    // "my-event" und "login" sind eigene Routen — weiterleiten
-    if (req.params.id === 'my-event' || req.params.id === 'login') return next();
+    // Reservierte IDs sind eigene Routen — weiterleiten, damit Express
+    // den spezifischeren Handler findet (sonst 404 weil dies hier matcht).
+    if (['my-event', 'login', 'organized-by-me'].includes(req.params.id)) return next();
     try {
         const { id } = req.params;
 
