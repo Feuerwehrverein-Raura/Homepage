@@ -22,4 +22,8 @@ interface MembersApi {
     /** Austritt aus dem Verein beantragen. Loescht keine Daten — Vorstand entscheidet. */
     @POST("members/me/austritt")
     suspend fun requestAustritt(@Body request: AustrittRequest): Response<AustrittResponse>
+
+    /** Mitglieder-Verzeichnis fuer Adressbuch-Sync. */
+    @GET("members/directory")
+    suspend fun getDirectory(): Response<List<ch.fwvraura.members.data.model.DirectoryEntry>>
 }

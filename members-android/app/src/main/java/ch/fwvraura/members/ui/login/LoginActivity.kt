@@ -15,7 +15,9 @@ import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
 import ch.fwvraura.members.databinding.ActivityLoginBinding
+import ch.fwvraura.members.sync.ContactsSyncManager
 import ch.fwvraura.members.util.OidcConstants
+import androidx.appcompat.app.AlertDialog
 import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.launch
 import net.openid.appauth.AuthorizationException
@@ -161,8 +163,59 @@ class LoginActivity : AppCompatActivity() {
                         .joinToString(" ").ifBlank { null }
                 }
             } catch (_: Exception) { /* nicht kritisch */ }
+            handleContactsSyncAfterLogin()
+        }
+    }
+
+    /**
+     * Beim ersten Login fragen wir den Mitglieder-Sync an. Bei spaeteren Logins:
+     * wenn der Sync aktiviert ist, sofort einen Sync triggern damit das Adressbuch
+     * aktuell bleibt.
+     */
+    private fun handleContactsSyncAfterLogin() {
+        val tm = MembersApp.instance.tokenManager
+        if (!tm.contactsSyncAsked) {
+            AlertDialog.Builder(this)
+                .setTitle("Mitglieder-Verzeichnis")
+                .setMessage(
+                    "Möchtest du die FWV-Mitglieder als Adressbuch-Konto auf deinem Telefon hinzufügen?\n\n" +
+                            "So siehst du bei eingehenden Anrufen automatisch den Namen, wenn ein Mitglied " +
+                            "dich anruft. Das Konto wird im Adressbuch unter \"FWV Raura\" angezeigt; du " +
+                            "kannst einzelne Kontakte löschen oder den Sync später unter Profil deaktivieren."
+                )
+                .setPositiveButton("Ja, hinzufügen") { _, _ ->
+                    tm.contactsSyncAsked = true
+                    tm.contactsSyncEnabled = true
+                    enableContactsSyncWithPermission()
+                }
+                .setNegativeButton("Nein, danke") { _, _ ->
+                    tm.contactsSyncAsked = true
+                    tm.contactsSyncEnabled = false
+                    navigateToMain()
+                }
+                .setCancelable(false)
+                .show()
+        } else {
+            if (tm.contactsSyncEnabled) ContactsSyncManager.requestSyncNow(this)
             navigateToMain()
         }
+    }
+
+    private val contactsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        // Permissions akzeptiert oder nicht — wir versuchen den Sync trotzdem zu starten;
+        // ohne WRITE_CONTACTS schreibt der SyncAdapter halt nichts.
+        ContactsSyncManager.enableSync(this)
+        ContactsSyncManager.requestSyncNow(this)
+        navigateToMain()
+    }
+
+    private fun enableContactsSyncWithPermission() {
+        contactsPermissionLauncher.launch(arrayOf(
+            android.Manifest.permission.READ_CONTACTS,
+            android.Manifest.permission.WRITE_CONTACTS
+        ))
     }
 
     private fun showError(msg: String) {

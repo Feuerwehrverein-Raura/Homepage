@@ -2280,6 +2280,25 @@ app.put('/members/me', authenticateToken, async (req, res) => {
     }
 });
 
+// DEUTSCH: Mitglieder-Verzeichnis fuer den Adressbuch-Sync der Mitglieder-App.
+// Liefert Name, Telefonnummern, E-Mail und Funktion aller aktiven Mitglieder
+// (ohne ausgetretene und ohne anstehende Austritts-Antraege).
+app.get('/members/directory', authenticateToken, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, vorname, nachname, email, mobile, telefon, funktion
+             FROM members
+             WHERE COALESCE(status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
+               AND COALESCE(vorname, '') <> ''
+               AND COALESCE(nachname, '') <> ''
+             ORDER BY nachname, vorname`
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // DEUTSCH: Austritt aus dem Verein beantragen (self-service in der Mitglieder-App).
 // Loescht NICHT sofort — setzt nur Status auf 'Austritt_beantragt' und benachrichtigt
 // den Vorstand per E-Mail. Vorstand entscheidet ueber tatsaechlichen Austritt gemaess Statuten.

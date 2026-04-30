@@ -59,6 +59,16 @@ class TokenManager(context: Context) {
         get() = prefs.getString(KEY_EVENT_ID, null)
         set(value) { prefs.edit().putString(KEY_EVENT_ID, value).commit() }
 
+    /** Hat der User die Frage "Adressbuch-Sync?" schon einmal beantwortet? */
+    var contactsSyncAsked: Boolean
+        get() = prefs.getBoolean(KEY_CONTACTS_SYNC_ASKED, false)
+        set(value) { prefs.edit().putBoolean(KEY_CONTACTS_SYNC_ASKED, value).commit() }
+
+    /** Hat der User den Adressbuch-Sync aktiviert? */
+    var contactsSyncEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CONTACTS_SYNC_ENABLED, false)
+        set(value) { prefs.edit().putBoolean(KEY_CONTACTS_SYNC_ENABLED, value).commit() }
+
     val isLoggedIn: Boolean
         get() = !token.isNullOrEmpty()
 
@@ -71,5 +81,7 @@ class TokenManager(context: Context) {
         private const val KEY_EMAIL = "user_email"
         private const val KEY_NAME = "user_name"
         private const val KEY_EVENT_ID = "event_id"
+        private const val KEY_CONTACTS_SYNC_ASKED = "contacts_sync_asked"
+        private const val KEY_CONTACTS_SYNC_ENABLED = "contacts_sync_enabled"
     }
 }

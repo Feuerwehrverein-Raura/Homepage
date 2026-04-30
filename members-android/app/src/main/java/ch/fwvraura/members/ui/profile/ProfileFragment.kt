@@ -18,7 +18,9 @@ import ch.fwvraura.members.data.model.MemberProfile
 import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.databinding.FragmentProfileBinding
 import ch.fwvraura.members.databinding.ItemMyRegistrationBinding
+import ch.fwvraura.members.sync.ContactsSyncManager
 import ch.fwvraura.members.ui.login.LoginActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import ch.fwvraura.members.util.DateUtils
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
@@ -42,6 +44,7 @@ class ProfileFragment : Fragment() {
             startActivity(Intent(requireContext(), EditProfileActivity::class.java))
         }
         binding.btnAustritt.setOnClickListener { showAustrittDialog() }
+        setupContactsSyncSwitch()
 
         // Sofort die in TokenManager gespeicherten Daten anzeigen
         val tm = MembersApp.instance.tokenManager
@@ -128,6 +131,37 @@ class ProfileFragment : Fragment() {
         } else {
             row.visibility = View.VISIBLE
             text.text = value
+        }
+    }
+
+    private val contactsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ ->
+        val tm = MembersApp.instance.tokenManager
+        tm.contactsSyncEnabled = true
+        ContactsSyncManager.enableSync(requireContext())
+        ContactsSyncManager.requestSyncNow(requireContext())
+        Snackbar.make(binding.root, "Mitglieder werden ins Adressbuch synchronisiert.", Snackbar.LENGTH_SHORT).show()
+    }
+
+    private fun setupContactsSyncSwitch() {
+        val tm = MembersApp.instance.tokenManager
+        binding.switchContactsSync.isChecked = tm.contactsSyncEnabled
+        binding.switchContactsSync.setOnCheckedChangeListener { _, checked ->
+            if (checked == tm.contactsSyncEnabled) return@setOnCheckedChangeListener
+            tm.contactsSyncAsked = true
+            if (checked) {
+                contactsPermissionLauncher.launch(arrayOf(
+                    android.Manifest.permission.READ_CONTACTS,
+                    android.Manifest.permission.WRITE_CONTACTS
+                ))
+            } else {
+                tm.contactsSyncEnabled = false
+                ContactsSyncManager.disableSync(requireContext())
+                Snackbar.make(binding.root,
+                    "Adressbuch-Sync deaktiviert. FWV-Kontakte wurden vom Telefon entfernt.",
+                    Snackbar.LENGTH_LONG).show()
+            }
         }
     }
 
