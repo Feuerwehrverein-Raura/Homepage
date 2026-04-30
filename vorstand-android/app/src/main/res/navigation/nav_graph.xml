@@ -122,7 +122,16 @@
         <action
             android:id="@+id/action_more_to_about"
             app:destination="@id/aboutFragment" />
+        <action
+            android:id="@+id/action_more_to_membership_fees"
+            app:destination="@id/membershipFeesFragment" />
     </fragment>
+
+    <!-- Mitgliedsbeitraege -->
+    <fragment
+        android:id="@+id/membershipFeesFragment"
+        android:name="ch.fwvraura.vorstand.ui.membershipfees.MembershipFeesFragment"
+        android:label="Mitgliedsbeiträge" />
 
     <!-- Mailcow (E-Mail Verwaltung) -->
     <fragment

@@ -117,6 +117,9 @@ object ApiModule {
 
     val mailcowApi: MailcowApi by lazy { retrofit!!.create(MailcowApi::class.java) }
 
+    /** Mitgliedschaftsbeitraege (api-accounting unter /membership-fees). */
+    val membershipFeesApi: MembershipFeesApi by lazy { retrofit!!.create(MembershipFeesApi::class.java) }
+
     // ============================================
     // VAULTWARDEN (separates Retrofit, eigene Base URL, kein AuthInterceptor)
     // ============================================

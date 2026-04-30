@@ -74,6 +74,11 @@ class MoreFragment : Fragment() {
             findNavController().navigate(R.id.action_more_to_mass_pdf)
         }
 
+        // Mitgliedsbeitraege
+        binding.cardMembershipFees.setOnClickListener {
+            findNavController().navigate(R.id.action_more_to_membership_fees)
+        }
+
         // Einstellungen
         binding.cardSettings.setOnClickListener {
             findNavController().navigate(R.id.action_more_to_settings)
