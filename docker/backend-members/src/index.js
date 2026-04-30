@@ -2374,10 +2374,13 @@ app.put('/members/me', authenticateToken, async (req, res) => {
             const changedFieldsList = changedFields.map(f =>
                 `- ${f.label}: ${f.oldValue} → ${f.newValue}`
             ).join('\n');
+            // Push-Body zeigt die geaenderten Felder mit Werten — Android BigTextStyle macht's umbrechen-bar
+            const pushBody = changedFields
+                .map(f => `${f.label}: ${f.oldValue || '–'} → ${f.newValue || '–'}`)
+                .join('\n');
             sendNotificationEmail(memberId, 'Datenänderung bestätigt', {
                 changed_fields: changedFieldsList
-            }, 'general', 'Datenänderung bestätigt',
-               `Deine Profil-Änderung wurde uebernommen (${changedFields.length} Feld${changedFields.length > 1 ? 'er' : ''}).`
+            }, 'general', 'Datenänderung bestätigt', pushBody
             ).catch(err => console.error('Email notification failed:', err));
 
             // Write audit log with real client IP
@@ -2657,11 +2660,16 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
                 const newVal = updates[f] || '(leer)';
                 return `- ${label}: ${oldVal} → ${newVal}`;
             }).join('\n');
+            const pushBody = actuallyChangedFields.map(f => {
+                const label = fieldLabels[f] || f;
+                const oldVal = oldMember[f] || '–';
+                const newVal = updates[f] || '–';
+                return `${label}: ${oldVal} → ${newVal}`;
+            }).join('\n');
 
             sendNotificationEmail(id, 'Datenänderung bestätigt', {
                 changed_fields: changedFieldsList
-            }, 'general', 'Datenänderung bestätigt',
-               `Der Vorstand hat deine Daten aktualisiert (${actualChangedFields.length} Feld${actualChangedFields.length > 1 ? 'er' : ''}).`
+            }, 'general', 'Datenänderung durch Vorstand', pushBody
             ).catch(err => console.error('Email notification failed:', err));
         }
 
