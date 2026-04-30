@@ -1,6 +1,7 @@
 package ch.fwvraura.members.data.api
 
 import ch.fwvraura.members.MembersApp
+import com.google.gson.GsonBuilder
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -20,10 +21,15 @@ object ApiModule {
     }
 
     private val retrofit: Retrofit by lazy {
+        // serializeNulls(): Felder mit null-Wert kommen als JSON null durch (statt
+        // weggelassen zu werden). Wichtig fuer Profil-Updates — sonst kann der User
+        // ein Feld nicht aktiv loeschen, weil das Backend "Feld fehlt im Body" als
+        // "Wert beibehalten" interpretiert.
+        val gson = GsonBuilder().serializeNulls().create()
         Retrofit.Builder()
             .baseUrl(API_BASE)
             .client(client)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 
