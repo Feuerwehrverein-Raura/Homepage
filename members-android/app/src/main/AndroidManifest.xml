@@ -65,6 +65,17 @@
             </intent-filter>
         </activity>
 
+        <!-- FileProvider fuer Kamera-Aufnahmen: speichert Fotos temporaer in cache/photos/ und gibt der Kamera-App eine sichere content://-URI -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="ch.fwvraura.members.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Adressbuch-Sync: FWV-Konto im System anlegen -->
         <service
             android:name=".sync.FwvAuthenticatorService"

@@ -27,6 +27,56 @@
             android:orientation="vertical"
             android:padding="20dp">
 
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/editProfilePhoto"
+                android:layout_width="140dp"
+                android:layout_height="140dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="12dp"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_person"
+                android:background="@color/divider"
+                app:shapeAppearanceOverlay="@style/CircleImageView"
+                app:strokeColor="@color/divider"
+                app:strokeWidth="1dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPhotoCamera"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:text="Aufnehmen" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPhotoGallery"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="3dp"
+                    android:text="Galerie" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPhotoDelete"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:textColor="@color/error"
+                    app:strokeColor="@color/error"
+                    android:text="Entfernen" />
+            </LinearLayout>
+
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

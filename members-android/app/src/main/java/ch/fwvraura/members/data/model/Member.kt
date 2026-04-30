@@ -34,6 +34,12 @@ data class AustrittResponse(
     val message: String? = null
 )
 
+/** Antwort von POST /members/me/photo. */
+data class PhotoUploadResponse(
+    val success: Boolean = false,
+    @SerializedName("photo_url") val photoUrl: String? = null
+)
+
 /** Body fuer PUT /members/me — nur die Felder die ein Mitglied selbst aendern darf. */
 data class MemberProfileUpdate(
     val anrede: String? = null,

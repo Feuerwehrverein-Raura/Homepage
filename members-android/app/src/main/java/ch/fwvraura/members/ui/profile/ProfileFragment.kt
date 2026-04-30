@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.data.api.ApiModule
+import coil.load
 import ch.fwvraura.members.data.model.AustrittRequest
 import ch.fwvraura.members.data.model.MemberProfile
 import ch.fwvraura.members.data.model.MyRegistration
@@ -116,6 +117,20 @@ class ProfileFragment : Fragment() {
         binding.profileFunktion.text = p.funktion.orEmpty()
         binding.profileFunktion.visibility = if (p.funktion.isNullOrBlank()) View.GONE else View.VISIBLE
         binding.profileEmail.text = p.email.orEmpty()
+
+        // Profilfoto laden — relative Pfade vom Backend (z.B. "/uploads/photo-xxx.jpg")
+        // werden mit der API-Base zu einer absoluten URL zusammengesetzt.
+        val photoUrl = p.foto?.let { rel ->
+            if (rel.startsWith("http")) rel else "https://api.fwv-raura.ch" + rel
+        }
+        if (!photoUrl.isNullOrBlank()) {
+            binding.profilePhoto.load(photoUrl) {
+                placeholder(ch.fwvraura.members.R.drawable.ic_person)
+                error(ch.fwvraura.members.R.drawable.ic_person)
+            }
+        } else {
+            binding.profilePhoto.setImageResource(ch.fwvraura.members.R.drawable.ic_person)
+        }
 
         bindRow(binding.rowMobile, binding.profileMobile, p.mobile)
         bindRow(binding.rowTelefon, binding.profileTelefon, p.telefon)

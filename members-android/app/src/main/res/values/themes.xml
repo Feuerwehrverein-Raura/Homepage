@@ -48,6 +48,12 @@
         <item name="itemTextColor">@color/primary</item>
     </style>
 
+    <!-- Vollkreis-Maske fuer ShapeableImageView (Profilfoto). -->
+    <style name="CircleImageView">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
     <style name="Theme.FWVMembers.Login" parent="Theme.FWVMembers">
         <item name="android:windowBackground">@color/login_background</item>
         <item name="android:statusBarColor">@color/login_background</item>
