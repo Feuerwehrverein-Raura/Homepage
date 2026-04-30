@@ -13,6 +13,7 @@ import {
   FileUp,
   Wallet,
   Clock,
+  QrCode,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -31,6 +32,7 @@ const navItems = [
   { path: "/mass-pdf", label: "Massen-PDF", icon: FileUp },
   { path: "/membership-fees", label: "Beitraege", icon: Wallet },
   { path: "/scheduled-jobs", label: "Geplant", icon: Clock },
+  { path: "/app-tokens", label: "App-QR", icon: QrCode },
   { path: "/settings", label: "Einstellungen", icon: Settings },
 ];
 

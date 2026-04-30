@@ -20,6 +20,7 @@ import { MassPdfPage } from "@/pages/masspdf/MassPdfPage";
 import { MembershipFeesPage } from "@/pages/membership-fees/MembershipFeesPage";
 import { ScheduledJobsPage } from "@/pages/scheduled-jobs/ScheduledJobsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
+import { AppTokensPage } from "@/pages/app-tokens/AppTokensPage";
 
 export function AppLayout() {
   const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
@@ -53,6 +54,7 @@ export function AppLayout() {
             <Route path="mass-pdf" element={<MassPdfPage />} />
             <Route path="membership-fees" element={<MembershipFeesPage />} />
             <Route path="scheduled-jobs" element={<ScheduledJobsPage />} />
+            <Route path="app-tokens" element={<AppTokensPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Routes>
         </div>
