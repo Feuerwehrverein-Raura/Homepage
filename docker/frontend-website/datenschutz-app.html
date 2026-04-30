@@ -59,7 +59,7 @@
                 <li>Keine Werbe-IDs</li>
                 <li>Keine Tracking-/Analyse-Frameworks</li>
                 <li>Keine Kontaktliste, Fotos oder andere Geräte-Inhalte</li>
-                <li>Kamera nur, wenn du den QR-Login-Scanner aktiv öffnest — keine Hintergrund-Aufnahmen</li>
+                <li>Kamera nur, wenn du den QR-Login-Scanner oder die Profilfoto-Aufnahme aktiv öffnest — keine Hintergrund-Aufnahmen</li>
             </ul>
         </section>
 
@@ -88,8 +88,17 @@
             <h2 class="text-xl font-bold mb-3">5. Berechtigungen der App</h2>
             <ul class="list-disc list-inside ml-2 space-y-1">
                 <li><strong>Internet</strong> — für die Kommunikation mit den FWV-Servern</li>
-                <li><strong>Kamera</strong> — nur beim Öffnen des QR-Login-Scanners</li>
-                <li><strong>Benachrichtigungen</strong> — optional für Push-Mitteilungen über neue Anlässe</li>
+                <li><strong>Kamera</strong> — ausschliesslich für zwei Funktionen, die du selbst startest:
+                    <ul class="list-disc list-inside ml-6 mt-1 space-y-1">
+                        <li>QR-Login-Scanner: Einlesen eines vom Vorstand erzeugten Login-QR-Codes</li>
+                        <li>Profilfoto-Aufnahme: Einmaliges Aufnehmen eines Fotos für dein Mitgliederprofil — wird verschlüsselt zum FWV-Server hochgeladen</li>
+                    </ul>
+                    Es findet keine Hintergrund-Nutzung der Kamera statt. Aufgenommene Fotos werden nicht ohne dein Zutun verarbeitet oder geteilt.
+                </li>
+                <li><strong>Foto-/Mediathek-Zugriff (Photo Picker)</strong> — wenn du ein vorhandenes Bild aus der Galerie als Profilfoto wählst. Es wird ausschliesslich das von dir gewählte Bild verarbeitet.</li>
+                <li><strong>Kontakte (lesen/schreiben)</strong> — optional, nur wenn du den FWV-Adressbuch-Sync aktivierst. Erstellt ein eigenes Konto „FWV Raura" im Telefon-Adressbuch und legt die Mitglieder als Kontakte unter diesem Konto an. Beim Deaktivieren des Sync werden alle FWV-Kontakte vom Gerät entfernt.</li>
+                <li><strong>Konten (Sync-Adapter)</strong> — verwaltet das vorgenannte FWV-Raura-Konto im Adressbuch. Kein Zugriff auf andere Konten auf dem Gerät.</li>
+                <li><strong>Benachrichtigungen</strong> — optional für Push-Mitteilungen über neue Anlässe oder Änderungen.</li>
             </ul>
         </section>
 
