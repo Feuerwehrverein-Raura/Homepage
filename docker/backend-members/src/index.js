@@ -3686,6 +3686,70 @@ app.post('/internal/push-to-member', async (req, res) => {
     }
 });
 
+/**
+ * DEUTSCH: Push-Broadcast an alle aktiven Mitglieder, die diesen Notification-Type
+ * nicht explizit deaktiviert haben. FCM multicast in 500er-Batches.
+ */
+app.post('/internal/push-broadcast', async (req, res) => {
+    const apiKey = process.env.INTERNAL_API_KEY;
+    const provided = req.headers['x-internal-key'] || req.query.key;
+    if (!apiKey || provided !== apiKey) return res.status(403).json({ error: 'Forbidden' });
+
+    const { notificationType, title, body, data } = req.body || {};
+    if (!notificationType || !title) {
+        return res.status(400).json({ error: 'notificationType, title required' });
+    }
+    if (!fcmInitialized) return res.json({ success: true, sent: 0, note: 'FCM not initialized' });
+
+    try {
+        const tokens = await pool.query(`
+            SELECT t.token FROM fcm_tokens t
+            JOIN members m ON t.member_id = m.id
+            LEFT JOIN notification_preferences p
+              ON p.member_id = m.id AND p.notification_type = $1
+            WHERE m.status = 'Aktivmitglied'
+              AND (p.enabled IS NULL OR p.enabled = true)
+        `, [notificationType]);
+        const allTokens = tokens.rows.map(r => r.token);
+        if (allTokens.length === 0) return res.json({ success: true, sent: 0 });
+
+        const stringData = Object.fromEntries(
+            Object.entries({ notificationType, ...(data || {}) }).map(([k, v]) => [k, String(v)])
+        );
+        let sent = 0;
+        const invalid = [];
+        for (let i = 0; i < allTokens.length; i += 500) {
+            const batch = allTokens.slice(i, i + 500);
+            const message = { notification: { title, body }, data: stringData, tokens: batch };
+            try {
+                const resp = await admin.messaging().sendEachForMulticast(message);
+                sent += resp.successCount;
+                resp.responses.forEach((r, idx) => {
+                    if (!r.success) {
+                        const code = r.error && r.error.code;
+                        if (code === 'messaging/registration-token-not-registered' ||
+                            code === 'messaging/invalid-registration-token' ||
+                            code === 'messaging/invalid-argument') {
+                            invalid.push(batch[idx]);
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('push-broadcast batch failed:', e.message);
+            }
+        }
+        if (invalid.length) {
+            await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [invalid]);
+            console.log(`push-broadcast: cleaned up ${invalid.length} invalid tokens`);
+        }
+        console.log(`push-broadcast (${notificationType}): ${sent}/${allTokens.length} delivered`);
+        res.json({ success: true, sent, total: allTokens.length });
+    } catch (err) {
+        console.error('push-broadcast failed:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // DEUTSCH: Lookup memberId per E-Mail — fuer Backends, die nur die Mailadresse haben.
 app.get('/internal/member-id-by-email', async (req, res) => {
     const apiKey = process.env.INTERNAL_API_KEY;

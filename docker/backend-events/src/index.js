@@ -72,6 +72,71 @@ const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
  *
  * action: 'added' | 'approved' | 'rejected' | 'updated' | 'deleted'
  */
+/**
+ * DEUTSCH: Wenn ein 'approved'-Eintrag entfernt/abgelehnt wurde, pruefen ob das Event
+ * vorher voll war. Wenn ja: Mail + Push an alle Mitglieder.
+ *  - Vor Anmeldeschluss: "Anmeldung wieder offen"
+ *  - Nach Anmeldeschluss: "Platz frei geworden"
+ */
+async function notifySlotFreed({ eventId, prevStatus }) {
+    if (prevStatus !== 'approved') return;
+    try {
+        const ev = await pool.query(
+            `SELECT id, title, slug, max_participants, registration_deadline
+             FROM events WHERE id = $1`, [eventId]
+        );
+        if (ev.rows.length === 0) return;
+        const event = ev.rows[0];
+        if (!event.max_participants) return; // ohne Kapazitaetslimit kein Broadcast
+
+        // approved-Anzahl JETZT (nach DELETE/UPDATE)
+        const cnt = await pool.query(
+            `SELECT COUNT(*)::int AS c FROM registrations
+             WHERE event_id = $1 AND status = 'approved'`, [eventId]
+        );
+        const approvedNow = cnt.rows[0].c;
+        // Vor unserer Aenderung war approved+1 — wir checken ob's damals voll war
+        const wasFull = (approvedNow + 1) >= event.max_participants;
+        if (!wasFull) return;
+        if (approvedNow >= event.max_participants) return; // immer noch voll
+
+        const deadlinePassed = event.registration_deadline
+            && new Date(event.registration_deadline) < new Date();
+        const subject = deadlinePassed
+            ? `Platz frei geworden: ${event.title}`
+            : `Anmeldung wieder offen: ${event.title}`;
+        const body = deadlinePassed
+            ? `Bei "${event.title}" ist ein Platz frei geworden. Falls du nachtraeglich teilnehmen moechtest, melde dich beim Vorstand.`
+            : `Bei "${event.title}" gibt es wieder freie Plaetze. Du kannst dich jetzt wieder anmelden.`;
+
+        // E-Mail an Mitglieder-Alias (alle aktiven Mitglieder mit zustellung_email=true)
+        try {
+            await axios.post(`${DISPATCH_API}/email/send`, {
+                to: 'mitglieder@fwv-raura.ch',
+                subject,
+                body,
+                event_id: eventId
+            });
+        } catch (e) { console.error('notifySlotFreed email failed:', e.message); }
+
+        // Push-Broadcast an alle Mitglieder (ueber api-members)
+        try {
+            const membersUrl = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/push-broadcast';
+            await axios.post(membersUrl, {
+                notificationType: 'event_update',
+                title: subject,
+                body,
+                data: { eventId }
+            }, {
+                headers: { 'X-Internal-Key': process.env.INTERNAL_API_KEY },
+                timeout: 10000
+            });
+        } catch (e) { console.error('notifySlotFreed push failed:', e.message); }
+    } catch (err) {
+        console.error('notifySlotFreed failed:', err.message);
+    }
+}
+
 async function notifyRegistrationChange({ eventId, eventTitle, memberId, guestName, guestEmail, action }) {
     const titles = {
         added:    `Anmeldung: ${eventTitle}`,
@@ -1724,6 +1789,32 @@ app.post('/registrations/public', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Event nicht gefunden' });
         }
 
+        // DEUTSCH: Anmeldeschluss + Kapazitaetslimit pruefen.
+        // Hinweis: Organisator/Vorstand nutzen die /events/:id/registrations-as-organizer
+        // bzw. /registrations Endpoints und werden von dieser Pruefung NICHT betroffen.
+        const ev = event.rows[0];
+        if (ev.registration_deadline && new Date(ev.registration_deadline) < new Date()) {
+            return res.status(409).json({
+                success: false,
+                message: 'Der Anmeldeschluss fuer dieses Event ist bereits vorbei.',
+                code: 'deadline_passed'
+            });
+        }
+        if (ev.max_participants) {
+            const cnt = await pool.query(
+                `SELECT COUNT(*)::int AS c FROM registrations
+                 WHERE event_id = $1 AND status IN ('approved', 'pending')`,
+                [ev.id]
+            );
+            if (cnt.rows[0].c >= ev.max_participants) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Das Event ist bereits voll. Bitte wende dich an den Organisator.',
+                    code: 'event_full'
+                });
+            }
+        }
+
         // Registrierung speichern (mit member_id falls Mitglied erkannt)
         const registration = await pool.query(`
             INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
@@ -2048,6 +2139,10 @@ app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, a
             memberId: updated?.member_id, guestName: updated?.guest_name, guestEmail: updated?.guest_email,
             action
         }).catch(() => {});
+        // Status-Wechsel approved -> nicht-approved kann Platz freimachen
+        if (statusChanged && existing.rows[0].status === 'approved' && status !== 'approved') {
+            notifySlotFreed({ eventId, prevStatus: 'approved' }).catch(() => {});
+        }
     } catch (error) {
         console.error('PUT registrations as-organizer failed:', error);
         res.status(500).json({ error: error.message });
@@ -2063,7 +2158,7 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
 
         // Vor dem DELETE Member-/Guest-Daten holen — nach dem DELETE haben wir nichts mehr.
         const before = await pool.query(
-            'SELECT member_id, guest_name, guest_email FROM registrations WHERE id = $1 AND event_id = $2',
+            'SELECT member_id, guest_name, guest_email, status FROM registrations WHERE id = $1 AND event_id = $2',
             [regId, eventId]
         );
         if (before.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
@@ -2080,6 +2175,7 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
             guestName: before.rows[0].guest_name, guestEmail: before.rows[0].guest_email,
             action: 'deleted'
         }).catch(() => {});
+        notifySlotFreed({ eventId, prevStatus: before.rows[0].status }).catch(() => {});
     } catch (error) {
         console.error('DELETE registrations as-organizer failed:', error);
         res.status(500).json({ error: error.message });
@@ -2148,6 +2244,13 @@ async function organizerActOnRegistration(req, res, newStatus) {
             return res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
         }
 
+        // Vorherigen Status fuer Slot-Freed-Erkennung mitnehmen
+        const prevStatusQ = await pool.query(
+            'SELECT status FROM registrations WHERE id = $1 AND event_id = $2',
+            [regId, eventId]
+        );
+        const prevStatus = prevStatusQ.rows[0]?.status;
+
         const result = await pool.query(
             `UPDATE registrations SET status = $1, approved_by = $2, approved_at = NOW()
              WHERE id = $3 AND event_id = $4
@@ -2162,6 +2265,9 @@ async function organizerActOnRegistration(req, res, newStatus) {
             memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
             action: newStatus === 'approved' ? 'approved' : 'rejected'
         }).catch(() => {});
+        if (prevStatus === 'approved' && newStatus !== 'approved') {
+            notifySlotFreed({ eventId, prevStatus }).catch(() => {});
+        }
 
         res.json({ success: true, registration: reg });
     } catch (error) {
