@@ -43,3 +43,8 @@ memory/servers/*
 memory/custom-rules/*
 !memory/custom-rules/.gitkeep
 HISTORY.md
+
+# Google Play Service-Account-Credentials — DARF NIE COMMITTET WERDEN
+fwv-raura-play-*.json
+play-service-account*.json
+*-play-publisher-*.json
