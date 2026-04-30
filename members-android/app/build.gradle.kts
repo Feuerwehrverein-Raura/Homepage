@@ -58,7 +58,9 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
+            // Kein applicationIdSuffix — sonst sucht Firebase eine eigene Debug-App in
+            // google-services.json, die wir nicht angelegt haben. Wir installieren
+            // Debug-Builds einfach ueber Release-Builds.
             versionNameSuffix = "-debug"
         }
         release {
