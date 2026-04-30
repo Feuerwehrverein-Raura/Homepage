@@ -2507,6 +2507,162 @@ app.delete('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin
 // DEUTSCH: iCal-Feed fuer Kalender-Abonnement (Google Calendar, Apple, etc.)
 // ============================================
 
+/**
+ * DEUTSCH: Aggregierter Kalender fuer die Mitglieder-App.
+ * Liefert events + Mitgliederbeitrags-Faelligkeiten + bezahlte Beitraege +
+ * Briefe/E-Mails (aus dispatch_log).
+ *
+ * Sichtbarkeitsregeln:
+ *  - Mitglieder: events (alle, Titel/Ort/Zeit), eigene Beitraege/Dispatches.
+ *    Vorstandsitzungen sehen Mitglieder NUR mit Titel + Datum
+ *    (ohne Ort/Zeit/Beschreibung).
+ *  - Vorstand/Admin: zusaetzlich alle Beitragszahlungen + alle Dispatches +
+ *    volle Vorstandsitzungs-Details.
+ *
+ * Query-Params: from=YYYY-MM-DD&to=YYYY-MM-DD (default: -12M / +24M).
+ */
+app.get('/calendar/items', authenticateAny, async (req, res) => {
+    try {
+        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+        const today = new Date();
+        const defaultFrom = new Date(today); defaultFrom.setMonth(defaultFrom.getMonth() - 12);
+        const defaultTo   = new Date(today); defaultTo.setMonth(defaultTo.getMonth() + 24);
+        const from = req.query.from || defaultFrom.toISOString().substring(0, 10);
+        const to   = req.query.to   || defaultTo.toISOString().substring(0, 10);
+
+        const myEmail = (req.user?.email || '').toLowerCase();
+        let myId = null;
+        if (myEmail) {
+            try {
+                const m = await pool.query('SELECT id FROM members WHERE LOWER(email) = $1 LIMIT 1', [myEmail]);
+                myId = m.rows[0]?.id || null;
+            } catch (_) {}
+        }
+
+        const items = [];
+
+        // 1) Events — alle nicht-abgesagten. Vorstandsitzungs-Details fuer Mitglieder zensieren.
+        try {
+            const ev = await pool.query(
+                `SELECT id, title, category, description, start_date, end_date, start_time, location
+                 FROM events
+                 WHERE COALESCE(end_date, start_date)::date >= $1::date
+                   AND start_date::date <= $2::date
+                   AND COALESCE(status, '') <> 'cancelled'`,
+                [from, to]
+            );
+            for (const e of ev.rows) {
+                if (!e.start_date) continue;
+                const isBoardMeeting = (e.category || '').toLowerCase().includes('vorstand');
+                const subtitle = (() => {
+                    if (isBoardMeeting && !isPrivileged) return null;
+                    const parts = [];
+                    if (e.start_time) parts.push(String(e.start_time).substring(0, 5));
+                    if (e.location) parts.push(e.location);
+                    return parts.join(' · ') || null;
+                })();
+                const description = (isBoardMeeting && !isPrivileged) ? null : e.description;
+                items.push({
+                    id: 'event:' + e.id,
+                    type: isBoardMeeting ? 'board_meeting' : 'event',
+                    date: String(e.start_date).substring(0, 10),
+                    title: e.title || 'Anlass',
+                    subtitle,
+                    description: description || null,
+                    refId: e.id
+                });
+            }
+        } catch (err) { console.error('calendar events query failed:', err.message); }
+
+        // 2) Mitgliederbeitrag-Faelligkeiten
+        try {
+            const settings = await pool.query(
+                `SELECT year, due_date, amount FROM membership_fee_settings
+                 WHERE due_date BETWEEN $1::date AND $2::date`,
+                [from, to]
+            );
+            for (const s of settings.rows) {
+                items.push({
+                    id: 'fee_due:' + s.year,
+                    type: 'fee_due',
+                    date: String(s.due_date).substring(0, 10),
+                    title: `Mitgliederbeitrag ${s.year} faellig`,
+                    subtitle: `CHF ${Number(s.amount).toFixed(2)}`,
+                    refId: String(s.year)
+                });
+            }
+        } catch (_) {}
+
+        // 3) Bezahlte Beitraege
+        try {
+            const paidParams = [from, to];
+            let paidWhere = `p.paid_date BETWEEN $1::date AND $2::date AND p.status = 'paid'`;
+            if (!isPrivileged) {
+                if (!myId) return res.json(items);
+                paidWhere += ' AND p.member_id = $3';
+                paidParams.push(myId);
+            }
+            const paid = await pool.query(
+                `SELECT p.year, p.paid_date, p.amount, p.member_id, m.vorname, m.nachname
+                 FROM membership_fee_payments p
+                 LEFT JOIN members m ON p.member_id = m.id
+                 WHERE ${paidWhere}`,
+                paidParams
+            );
+            for (const p of paid.rows) {
+                const name = `${p.vorname || ''} ${p.nachname || ''}`.trim();
+                items.push({
+                    id: 'fee_paid:' + p.year + ':' + p.member_id,
+                    type: 'fee_paid',
+                    date: String(p.paid_date).substring(0, 10),
+                    title: isPrivileged && name
+                        ? `${name}: Beitrag ${p.year} bezahlt`
+                        : `Beitrag ${p.year} bezahlt`,
+                    subtitle: `CHF ${Number(p.amount).toFixed(2)}`,
+                    refId: String(p.year)
+                });
+            }
+        } catch (_) {}
+
+        // 4) Versendete Briefe / E-Mails
+        try {
+            const dispParams = [from, to];
+            let dispWhere = `d.sent_at::date BETWEEN $1::date AND $2::date AND d.status = 'sent'`;
+            if (!isPrivileged) {
+                if (!myId) return res.json(items);
+                dispWhere += ' AND d.member_id = $3';
+                dispParams.push(myId);
+            }
+            const disp = await pool.query(
+                `SELECT d.id, d.type, d.subject, d.sent_at, d.member_id, m.vorname, m.nachname
+                 FROM dispatch_log d
+                 LEFT JOIN members m ON d.member_id = m.id
+                 WHERE ${dispWhere}
+                 ORDER BY d.sent_at`,
+                dispParams
+            );
+            for (const d of disp.rows) {
+                const name = `${d.vorname || ''} ${d.nachname || ''}`.trim();
+                const isLetter = d.type === 'letter';
+                const subj = d.subject || (isLetter ? 'Brief versendet' : 'E-Mail versendet');
+                items.push({
+                    id: 'dispatch:' + d.id,
+                    type: isLetter ? 'letter' : 'email',
+                    date: String(d.sent_at).substring(0, 10),
+                    title: subj,
+                    subtitle: isPrivileged && name ? `→ ${name}` : (isLetter ? 'Brief' : 'E-Mail'),
+                    refId: d.id
+                });
+            }
+        } catch (_) {}
+
+        res.json(items);
+    } catch (error) {
+        console.error('GET /calendar/items failed:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Generiert ICS-Kalender-Datei mit allen nicht-abgesagten Events
 app.get('/calendar/ics', async (req, res) => {
     try {
