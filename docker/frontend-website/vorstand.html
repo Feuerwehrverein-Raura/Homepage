@@ -376,13 +376,20 @@
         <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div class="p-6 print:p-0">
                 <div class="flex justify-between items-center mb-4 print:hidden">
-                    <h3 class="text-xl font-bold text-gray-800">QR-Code für Vorstand-App</h3>
+                    <h3 class="text-xl font-bold text-gray-800">QR-Code für FWV-App</h3>
                     <button id="app-qr-close" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
 
-                <!-- Liste der bestehenden Tokens -->
+                <!-- Tab-Auswahl: Vorstand vs Mitglied -->
+                <div id="app-qr-tabs" class="flex border-b border-gray-200 mb-3 print:hidden">
+                    <button data-tab="vorstand" class="app-qr-tab px-4 py-2 text-sm font-medium border-b-2 border-fire-500 text-fire-600">Vorstand-App</button>
+                    <button data-tab="member" class="app-qr-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800">Mitglieder-App</button>
+                </div>
+
+                <!-- Liste der bestehenden Tokens (Vorstand) -->
                 <div id="app-qr-list-section" class="mb-4 print:hidden">
-                    <p class="text-sm text-gray-600 mb-3">Generiere einen persistenten QR-Code, um dich (oder ein anderes Vorstandsmitglied) in der Android-App per Scan einzuloggen. Der Code kann ausgedruckt und übergeben werden.</p>
+                    <p id="app-qr-help-vorstand" class="text-sm text-gray-600 mb-3">Generiere einen persistenten QR-Code, um dich (oder ein anderes Vorstandsmitglied) in der Vorstand-Android-App per Scan einzuloggen. Der Code kann ausgedruckt und übergeben werden.</p>
+                    <p id="app-qr-help-member" class="text-sm text-gray-600 mb-3 hidden">Erstelle einen QR-Code für ein Mitglied, damit es sich ohne Authentik-Konto in der Mitglieder-App einloggen kann (z.B. für ältere Mitglieder ohne E-Mail).</p>
                     <div id="app-qr-list" class="space-y-2 mb-3"></div>
                     <div class="space-y-2 border-t pt-3">
                         <div id="app-qr-target-row" class="hidden">
@@ -393,6 +400,12 @@
                                 <option value="kassier@fwv-raura.ch">Kassier (kassier@fwv-raura.ch)</option>
                                 <option value="materialwart@fwv-raura.ch">Materialwart (materialwart@fwv-raura.ch)</option>
                                 <option value="beisitzer@fwv-raura.ch">Beisitzer (beisitzer@fwv-raura.ch)</option>
+                            </select>
+                        </div>
+                        <div id="app-qr-member-row" class="hidden">
+                            <label class="block text-xs text-gray-600 mb-1">Für welches Mitglied?</label>
+                            <select id="app-qr-target-member" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm">
+                                <option value="">Mitglied wählen…</option>
                             </select>
                         </div>
                         <div class="flex gap-2">
@@ -409,16 +422,16 @@
                             <img src="images/logo.png" alt="FWV Raura" style="height:50px;" onerror="this.style.display='none'">
                             <div class="text-left">
                                 <div class="text-lg font-bold">Feuerwehrverein Raura</div>
-                                <div class="text-sm text-gray-600">Vorstand-App Login</div>
+                                <div id="app-qr-info-target-app" class="text-sm text-gray-600">Vorstand-App Login</div>
                             </div>
                         </div>
                         <div id="app-qr-image" class="flex justify-center mb-4"></div>
                         <div class="text-sm text-gray-700 space-y-1">
-                            <div><span class="font-semibold">Funktion:</span> <span id="app-qr-info-email"></span></div>
+                            <div><span id="app-qr-info-label" class="font-semibold">Funktion:</span> <span id="app-qr-info-email"></span></div>
                             <div><span class="font-semibold">Bezeichnung:</span> <span id="app-qr-info-desc"></span></div>
                             <div><span class="font-semibold">Erstellt am:</span> <span id="app-qr-info-date"></span></div>
                         </div>
-                        <p class="mt-4 text-xs text-gray-500">In der FWV-Vorstand-App den QR-Login starten und diesen Code scannen.<br>Bei Verlust diesen Code in der Vorstand-Webseite widerrufen.</p>
+                        <p id="app-qr-info-footer" class="mt-4 text-xs text-gray-500">In der FWV-Vorstand-App den QR-Login starten und diesen Code scannen.<br>Bei Verlust diesen Code in der Vorstand-Webseite widerrufen.</p>
                     </div>
                     <div class="flex justify-end gap-2 mt-4 print:hidden">
                         <button id="app-qr-back-btn" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm">Zurück</button>
@@ -9929,14 +9942,48 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         });
         document.getElementById('app-qr-print-btn').addEventListener('click', () => window.print());
 
+        // Aktiver QR-Tab: 'vorstand' (Default) oder 'member'
+        let appQrMode = 'vorstand';
+
         async function openAppQrModal() {
             document.getElementById('app-qr-modal').classList.remove('hidden');
             document.getElementById('app-qr-display').classList.add('hidden');
             document.getElementById('app-qr-list-section').classList.remove('hidden');
             document.getElementById('app-qr-description').value = '';
-            // E-Mail-Auswahl ist fuer alle Vorstandsmitglieder sichtbar
-            document.getElementById('app-qr-target-row').classList.remove('hidden');
-            await loadAppQrTokens();
+            switchAppQrTab(appQrMode);
+        }
+
+        function switchAppQrTab(mode) {
+            appQrMode = mode;
+            document.querySelectorAll('.app-qr-tab').forEach(b => {
+                const active = b.dataset.tab === mode;
+                b.classList.toggle('border-fire-500', active);
+                b.classList.toggle('text-fire-600', active);
+                b.classList.toggle('border-transparent', !active);
+                b.classList.toggle('text-gray-600', !active);
+            });
+            document.getElementById('app-qr-help-vorstand').classList.toggle('hidden', mode !== 'vorstand');
+            document.getElementById('app-qr-help-member').classList.toggle('hidden', mode !== 'member');
+            document.getElementById('app-qr-target-row').classList.toggle('hidden', mode !== 'vorstand');
+            document.getElementById('app-qr-member-row').classList.toggle('hidden', mode !== 'member');
+            if (mode === 'member') {
+                populateMemberDropdown();
+                loadAppQrTokensMember();
+            } else {
+                loadAppQrTokens();
+            }
+        }
+
+        function populateMemberDropdown() {
+            const sel = document.getElementById('app-qr-target-member');
+            const collator = new Intl.Collator('de-CH');
+            const opts = (members || [])
+                .filter(m => m.status !== 'Ausgetreten' && m.status !== 'Austritt_beantragt')
+                .slice()
+                .sort((a, b) => collator.compare((a.nachname || '') + a.vorname, (b.nachname || '') + b.vorname));
+            sel.innerHTML = '<option value="">Mitglied wählen…</option>' + opts.map(m =>
+                `<option value="${m.id}">${escapeHtml(m.nachname || '')}, ${escapeHtml(m.vorname || '')}</option>`
+            ).join('');
         }
 
         async function loadAppQrTokens() {
@@ -9956,11 +10003,41 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                             <div class="font-medium">${escapeHtml(t.description || '(ohne Bezeichnung)')}</div>
                             <div class="text-xs text-gray-500">${escapeHtml(t.email)} · erstellt ${new Date(t.created_at).toLocaleDateString('de-CH')}${t.last_used_at ? ' · zuletzt benutzt ' + new Date(t.last_used_at).toLocaleDateString('de-CH') : ' · nie benutzt'}</div>
                         </div>
-                        <button data-token-id="${t.id}" class="app-qr-revoke-btn text-red-600 hover:text-red-700 text-xs">Widerrufen</button>
+                        <button data-token-id="${t.id}" data-kind="vorstand" class="app-qr-revoke-btn text-red-600 hover:text-red-700 text-xs">Widerrufen</button>
                     </div>
                 `).join('');
                 list.querySelectorAll('.app-qr-revoke-btn').forEach(btn => {
-                    btn.addEventListener('click', () => revokeAppQrToken(btn.dataset.tokenId));
+                    btn.addEventListener('click', () => revokeAppQrToken(btn.dataset.tokenId, btn.dataset.kind));
+                });
+            } catch (e) {
+                list.innerHTML = `<div class="text-sm text-red-600">Fehler: ${e.message}</div>`;
+            }
+        }
+
+        async function loadAppQrTokensMember() {
+            const list = document.getElementById('app-qr-list');
+            list.innerHTML = '<div class="text-sm text-gray-500">Lade...</div>';
+            try {
+                const r = await fetch(`${API_BASE}/auth/member/app-tokens`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const tokens = await r.json();
+                if (tokens.length === 0) {
+                    list.innerHTML = '<div class="text-sm text-gray-500 italic">Noch keine Mitglieder-QR-Codes erstellt.</div>';
+                    return;
+                }
+                list.innerHTML = tokens.map(t => {
+                    const name = `${t.vorname || ''} ${t.nachname || ''}`.trim() || t.email;
+                    return `
+                    <div class="flex justify-between items-center p-2 border border-gray-200 rounded text-sm">
+                        <div>
+                            <div class="font-medium">${escapeHtml(name)} — ${escapeHtml(t.description || '(ohne Bezeichnung)')}</div>
+                            <div class="text-xs text-gray-500">erstellt ${new Date(t.created_at).toLocaleDateString('de-CH')}${t.last_used_at ? ' · zuletzt benutzt ' + new Date(t.last_used_at).toLocaleDateString('de-CH') : ' · nie benutzt'}</div>
+                        </div>
+                        <button data-token-id="${t.id}" data-kind="member" class="app-qr-revoke-btn text-red-600 hover:text-red-700 text-xs">Widerrufen</button>
+                    </div>`;
+                }).join('');
+                list.querySelectorAll('.app-qr-revoke-btn').forEach(btn => {
+                    btn.addEventListener('click', () => revokeAppQrToken(btn.dataset.tokenId, btn.dataset.kind));
                 });
             } catch (e) {
                 list.innerHTML = `<div class="text-sm text-red-600">Fehler: ${e.message}</div>`;
@@ -9969,53 +10046,78 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 
         async function createAppQrToken() {
             const description = document.getElementById('app-qr-description').value.trim();
-            const body = {
-                description,
-                email: document.getElementById('app-qr-target-email').value
-            };
             try {
-                const r = await fetch(`${API_BASE}/auth/vorstand/app-tokens`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
-                if (!r.ok) {
-                    const err = await r.json().catch(() => ({}));
-                    throw new Error(err.error || 'HTTP ' + r.status);
+                if (appQrMode === 'vorstand') {
+                    const body = { description, email: document.getElementById('app-qr-target-email').value };
+                    const r = await fetch(`${API_BASE}/auth/vorstand/app-tokens`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error || 'HTTP ' + r.status); }
+                    showAppQrCode(await r.json(), 'vorstand');
+                } else {
+                    const memberId = document.getElementById('app-qr-target-member').value;
+                    if (!memberId) { alert('Bitte ein Mitglied auswählen.'); return; }
+                    const r = await fetch(`${API_BASE}/auth/member/app-tokens`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ member_id: memberId, description })
+                    });
+                    if (!r.ok) { const err = await r.json().catch(() => ({})); throw new Error(err.error || 'HTTP ' + r.status); }
+                    showAppQrCode(await r.json(), 'member');
                 }
-                const data = await r.json();
-                showAppQrCode(data);
             } catch (e) {
                 alert('Fehler: ' + e.message);
             }
         }
 
-        function showAppQrCode(data) {
-            const payload = JSON.stringify({ v: 1, type: 'fwv-vorstand-login', email: data.email, token: data.token });
+        function showAppQrCode(data, kind) {
+            const payload = kind === 'member'
+                ? JSON.stringify({ v: 1, type: 'fwv-member-login', token: data.token })
+                : JSON.stringify({ v: 1, type: 'fwv-vorstand-login', email: data.email, token: data.token });
             const qr = qrcode(0, 'M');
             qr.addData(payload);
             qr.make();
             document.getElementById('app-qr-image').innerHTML = qr.createImgTag(6, 0);
-            document.getElementById('app-qr-info-email').textContent = data.email;
+            if (kind === 'member') {
+                const name = data.member ? `${data.member.vorname || ''} ${data.member.nachname || ''}`.trim() : '(unbekannt)';
+                document.getElementById('app-qr-info-target-app').textContent = 'Mitglieder-App Login';
+                document.getElementById('app-qr-info-label').textContent = 'Mitglied:';
+                document.getElementById('app-qr-info-email').textContent = name;
+                document.getElementById('app-qr-info-footer').innerHTML =
+                    'In der FWV-Mitglieder-App auf der Login-Seite den QR-Login starten und diesen Code scannen.<br>Bei Verlust diesen Code in der Vorstand-Webseite widerrufen.';
+            } else {
+                document.getElementById('app-qr-info-target-app').textContent = 'Vorstand-App Login';
+                document.getElementById('app-qr-info-label').textContent = 'Funktion:';
+                document.getElementById('app-qr-info-email').textContent = data.email;
+                document.getElementById('app-qr-info-footer').innerHTML =
+                    'In der FWV-Vorstand-App den QR-Login starten und diesen Code scannen.<br>Bei Verlust diesen Code in der Vorstand-Webseite widerrufen.';
+            }
             document.getElementById('app-qr-info-desc').textContent = data.description || '(ohne Bezeichnung)';
             document.getElementById('app-qr-info-date').textContent = new Date(data.created_at).toLocaleDateString('de-CH');
             document.getElementById('app-qr-list-section').classList.add('hidden');
             document.getElementById('app-qr-display').classList.remove('hidden');
         }
 
-        async function revokeAppQrToken(id) {
+        async function revokeAppQrToken(id, kind) {
             if (!confirm('QR-Code wirklich widerrufen? Wer ihn besitzt, kann sich danach nicht mehr einloggen.')) return;
+            const url = kind === 'member'
+                ? `${API_BASE}/auth/member/app-tokens/${id}`
+                : `${API_BASE}/auth/vorstand/app-tokens/${id}`;
             try {
-                const r = await fetch(`${API_BASE}/auth/vorstand/app-tokens/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                const r = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
-                await loadAppQrTokens();
+                if (kind === 'member') await loadAppQrTokensMember(); else await loadAppQrTokens();
             } catch (e) {
                 alert('Fehler: ' + e.message);
             }
         }
+
+        // Tab-Listener
+        document.querySelectorAll('.app-qr-tab').forEach(b => {
+            b.addEventListener('click', () => switchAppQrTab(b.dataset.tab));
+        });
 
         function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 

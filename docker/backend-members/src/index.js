@@ -799,6 +799,140 @@ app.delete('/auth/vorstand/app-tokens/:id', authenticateVorstand, async (req, re
     }
 });
 
+// ============================================
+// MEMBER APP-TOKEN (QR-Login fuer Mitglieder-Android-App)
+// DEUTSCH: Wie Vorstand-App-Token, aber fuer einzelne Mitglieder ohne Authentik-Account
+// (z.B. aeltere Mitglieder die keine E-Mail nutzen). Token wird im Vorstand erstellt
+// und als QR ausgedruckt; bei Scan loggt sich die App per Member-JWT ein.
+// ============================================
+
+// DEUTSCH: Liste aller Member-App-Tokens. Vorstand sieht alle.
+app.get('/auth/member/app-tokens', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS member_app_tokens (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+                token TEXT NOT NULL UNIQUE,
+                description VARCHAR(200),
+                created_at TIMESTAMP DEFAULT NOW(),
+                created_by VARCHAR(200),
+                last_used_at TIMESTAMP,
+                revoked_at TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_member_app_tokens_member ON member_app_tokens(member_id);
+        `);
+        const result = await pool.query(`
+            SELECT t.id, t.member_id, t.description, t.created_at, t.created_by, t.last_used_at,
+                   m.vorname, m.nachname, m.email
+            FROM member_app_tokens t
+            JOIN members m ON t.member_id = m.id
+            WHERE t.revoked_at IS NULL
+            ORDER BY m.nachname, m.vorname, t.created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: Neuen Member-App-Token erstellen (nur Vorstand). Ein Token gilt fuer ein Mitglied.
+app.post('/auth/member/app-tokens', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { member_id, description } = req.body || {};
+        if (!member_id) return res.status(400).json({ error: 'member_id erforderlich' });
+
+        const m = await pool.query('SELECT id, email, vorname, nachname FROM members WHERE id = $1', [member_id]);
+        if (m.rows.length === 0) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS member_app_tokens (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+                token TEXT NOT NULL UNIQUE,
+                description VARCHAR(200),
+                created_at TIMESTAMP DEFAULT NOW(),
+                created_by VARCHAR(200),
+                last_used_at TIMESTAMP,
+                revoked_at TIMESTAMP
+            );
+        `);
+        const token = 'fwv-member-' + crypto.randomBytes(32).toString('base64url');
+        const result = await pool.query(
+            `INSERT INTO member_app_tokens (member_id, token, description, created_by)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, member_id, description, created_at`,
+            [member_id, token, (description || '').substring(0, 200) || null, req.user.email || null]
+        );
+        await logAudit(pool, 'MEMBER_APP_TOKEN_CREATED', null, req.user.email, getClientIp(req), {
+            token_id: result.rows[0].id, member_id, description: result.rows[0].description
+        });
+        res.status(201).json({ ...result.rows[0], token, member: m.rows[0] });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: Member-App-Token widerrufen (nur Vorstand).
+app.delete('/auth/member/app-tokens/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const result = await pool.query(
+            `UPDATE member_app_tokens SET revoked_at = NOW()
+             WHERE id = $1 AND revoked_at IS NULL
+             RETURNING id, member_id`,
+            [req.params.id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Token nicht gefunden' });
+        await logAudit(pool, 'MEMBER_APP_TOKEN_REVOKED', null, req.user.email, getClientIp(req), {
+            token_id: req.params.id, member_id: result.rows[0].member_id
+        });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: QR-Login Mitglied — tauscht Token gegen Member-JWT (HS256, type='member', 8h gueltig).
+app.post('/auth/member/qr-login', async (req, res) => {
+    const clientIp = getClientIp(req);
+    try {
+        const { token } = req.body || {};
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ error: 'Token fehlt' });
+        }
+        const result = await pool.query(`
+            SELECT t.id, t.member_id, m.email, m.vorname, m.nachname
+            FROM member_app_tokens t
+            JOIN members m ON t.member_id = m.id
+            WHERE t.token = $1 AND t.revoked_at IS NULL
+        `, [token]);
+        if (result.rows.length === 0) {
+            await logAudit(pool, 'MEMBER_QR_LOGIN_FAILED', null, null, clientIp, { reason: 'Invalid token' });
+            return res.status(401).json({ error: 'Ungueltiger oder widerrufener Token' });
+        }
+        const { id: tokenId, member_id, email, vorname, nachname } = result.rows[0];
+        await pool.query('UPDATE member_app_tokens SET last_used_at = NOW() WHERE id = $1', [tokenId]);
+
+        const jwtToken = jwt.sign(
+            {
+                sub: member_id, member_id, email,
+                name: `${vorname || ''} ${nachname || ''}`.trim(),
+                type: 'member', groups: []
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: '8h' }
+        );
+        await logAudit(pool, 'MEMBER_QR_LOGIN_SUCCESS', member_id, email, clientIp, { token_id: tokenId });
+        res.json({
+            success: true,
+            token: jwtToken,
+            user: { id: member_id, email, name: `${vorname || ''} ${nachname || ''}`.trim() }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // DEUTSCH: QR-Login: tauscht Token gegen JWT (kein Auth-Header noetig - der Token IST die Auth)
 app.post('/auth/vorstand/qr-login', async (req, res) => {
     const clientIp = getClientIp(req);
