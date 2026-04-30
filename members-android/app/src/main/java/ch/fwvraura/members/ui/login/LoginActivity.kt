@@ -25,6 +25,7 @@ import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
 import net.openid.appauth.AuthorizationServiceConfiguration
+import net.openid.appauth.NoClientAuthentication
 import net.openid.appauth.ResponseTypeValues
 import net.openid.appauth.TokenResponse
 
@@ -130,7 +131,14 @@ class LoginActivity : AppCompatActivity() {
     private fun exchangeAuthCode(authResponse: AuthorizationResponse) {
         binding.loginProgress.visibility = View.VISIBLE
         binding.errorText.visibility = View.GONE
-        authService.performTokenRequest(authResponse.createTokenExchangeRequest()) { tokenResp, ex ->
+        // Authentik-Discovery listet 'none' nicht in token_endpoint_auth_methods_supported,
+        // obwohl der Mobile-App-Provider als public konfiguriert ist. Ohne expliziten
+        // NoClientAuthentication versucht AppAuth client_secret_post zu senden — hat aber
+        // keinen Secret und scheitert mit "no client authentication included".
+        authService.performTokenRequest(
+            authResponse.createTokenExchangeRequest(),
+            NoClientAuthentication.INSTANCE
+        ) { tokenResp, ex ->
             runOnUiThread {
                 binding.loginProgress.visibility = View.GONE
                 if (tokenResp != null) {
