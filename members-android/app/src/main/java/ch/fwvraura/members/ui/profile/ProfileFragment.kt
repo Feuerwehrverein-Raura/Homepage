@@ -44,6 +44,10 @@ class ProfileFragment : Fragment() {
         binding.btnEdit.setOnClickListener {
             startActivity(Intent(requireContext(), EditProfileActivity::class.java))
         }
+        binding.btnNotifications.setOnClickListener {
+            startActivity(Intent(requireContext(),
+                ch.fwvraura.members.ui.notifications.NotificationsActivity::class.java))
+        }
         binding.btnAustritt.setOnClickListener { showAustrittDialog() }
         setupContactsSyncSwitch()
 

@@ -40,4 +40,15 @@ interface MembersApi {
     /** Eigenes Profilfoto loeschen. */
     @DELETE("members/me/photo")
     suspend fun deletePhoto(): Response<Unit>
+
+    /** Benachrichtigungs-Einstellungen abrufen. */
+    @GET("members/me/notifications")
+    suspend fun getNotifications():
+        Response<List<ch.fwvraura.members.data.model.NotificationPreference>>
+
+    /** Benachrichtigungs-Einstellungen speichern (alle 4 Typen auf einmal). */
+    @PUT("members/me/notifications")
+    suspend fun updateNotifications(
+        @Body body: ch.fwvraura.members.data.model.NotificationsUpdateRequest
+    ): Response<List<ch.fwvraura.members.data.model.NotificationPreference>>
 }
