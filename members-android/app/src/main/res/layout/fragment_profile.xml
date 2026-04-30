@@ -186,16 +186,32 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnRestoreContacts"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:id="@+id/syncControlsRow"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:orientation="horizontal"
                 android:layout_marginTop="4dp"
-                android:text="Versehentlich gelöschte Mitglieder wiederherstellen"
-                android:textSize="12sp"
-                android:textColor="@color/primary"
-                android:visibility="gone" />
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSyncNow"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Jetzt synchronisieren"
+                    android:textSize="12sp"
+                    android:layout_marginEnd="6dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRestoreContacts"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Gelöschte wiederherstellen"
+                    android:textSize="12sp"
+                    android:textColor="@color/primary" />
+            </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
