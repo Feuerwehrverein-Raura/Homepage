@@ -75,6 +75,9 @@ class MainActivity : AppCompatActivity() {
 
         binding.toolbar.setOnMenuItemClickListener { item ->
             if (item.itemId == R.id.action_logout) {
+                // Adressbuch-Sync deaktivieren — FWV-Kontakte sollen nicht zurueckbleiben
+                // wenn jemand anders sich auf demselben Geraet einloggt.
+                ch.fwvraura.members.sync.ContactsSyncManager.disableSync(this)
                 tm.clear()
                 startActivity(Intent(this, LoginActivity::class.java))
                 finish()
