@@ -13,25 +13,38 @@ const jwksClient = require('jwks-rsa');
 // DEUTSCH: URL des Authentik Identity Providers
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 
-// DEUTSCH: JWKS-Client konfigurieren — holt öffentliche RS256-Schlüssel von Authentik
-// Cache: 10 Min, max 10 Anfragen/Min
-const client = jwksClient({
-    jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members/jwks/`,
-    cache: true,
-    cacheMaxAge: 600000,
-    rateLimit: true,
-    jwksRequestsPerMinute: 10
-});
+// DEUTSCH: Wir akzeptieren Tokens von zwei Authentik-Providern:
+//  - fwv-members      -> Web-Frontend (confidential client mit Backend-Exchange)
+//  - fwv-members-app  -> Native Android-App (public client, PKCE-Flow)
+const ISSUERS = [
+    `${AUTHENTIK_URL}/application/o/fwv-members/`,
+    `${AUTHENTIK_URL}/application/o/fwv-members-app/`
+];
 
-// DEUTSCH: Holt den passenden öffentlichen Schlüssel anhand der Key-ID (kid) im Token-Header
+const jwksClients = {
+    'fwv-members': jwksClient({
+        jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members/jwks/`,
+        cache: true, cacheMaxAge: 600000, rateLimit: true, jwksRequestsPerMinute: 10
+    }),
+    'fwv-members-app': jwksClient({
+        jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members-app/jwks/`,
+        cache: true, cacheMaxAge: 600000, rateLimit: true, jwksRequestsPerMinute: 10
+    })
+};
+
+// DEUTSCH: Holt den passenden öffentlichen Schlüssel — versucht beide JWKS-Endpoints,
+// da wir nicht im Voraus wissen welcher Provider den Token ausgegeben hat.
 function getKey(header, callback) {
-    client.getSigningKey(header.kid, (err, key) => {
-        if (err) {
-            return callback(err);
-        }
-        const signingKey = key.getPublicKey();
-        callback(null, signingKey);
-    });
+    const tryClient = (slug, fallback) => {
+        jwksClients[slug].getSigningKey(header.kid, (err, key) => {
+            if (err) {
+                if (fallback) return tryClient(fallback, null);
+                return callback(err);
+            }
+            callback(null, key.getPublicKey());
+        });
+    };
+    tryClient('fwv-members', 'fwv-members-app');
 }
 
 /**
@@ -48,7 +61,7 @@ function authenticateToken(req, res, next) {
 
     jwt.verify(token, getKey, {
         algorithms: ['RS256'],
-        issuer: `${AUTHENTIK_URL}/application/o/fwv-members/`
+        issuer: ISSUERS
     }, (err, decoded) => {
         if (err) {
             console.error('Token verification failed:', err.message);

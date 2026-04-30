@@ -16,6 +16,8 @@
         <item name="colorSurfaceContainerHigh">@color/surface</item>
         <item name="colorSurfaceContainerHighest">@color/surface</item>
         <item name="colorSurfaceVariant">@color/surface</item>
+        <!-- Elevation-Overlay deaktiviert, sonst tönt Material 3 Cards rosa wegen colorPrimary=rot -->
+        <item name="elevationOverlayEnabled">false</item>
         <item name="android:colorBackground">@color/background</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/on_surface</item>
@@ -23,6 +25,20 @@
         <item name="android:statusBarColor">@color/primary</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="android:windowBackground">@color/background</item>
+        <item name="materialCardViewStyle">@style/Widget.FWVMembers.CardView</item>
+        <item name="bottomNavigationStyle">@style/Widget.FWVMembers.BottomNav</item>
+    </style>
+
+    <style name="Widget.FWVMembers.CardView" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/surface</item>
+        <item name="cardForegroundColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Widget.FWVMembers.BottomNav" parent="Widget.Material3.BottomNavigationView">
+        <item name="backgroundTint">@color/surface</item>
+        <item name="android:background">@color/surface</item>
+        <item name="itemIconTint">@color/primary</item>
+        <item name="itemTextColor">@color/primary</item>
     </style>
 
     <style name="Theme.FWVMembers.Login" parent="Theme.FWVMembers">
