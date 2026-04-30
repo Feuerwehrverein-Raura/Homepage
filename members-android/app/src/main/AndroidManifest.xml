@@ -24,7 +24,7 @@
         android:usesCleartextTraffic="false">
 
         <activity
-            android:name=".ui.login.LoginActivity"
+            android:name=".ui.splash.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.FWVMembers.Login">
             <intent-filter>
@@ -32,6 +32,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.login.LoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FWVMembers.Login" />
 
         <activity
             android:name=".ui.login.QrScannerActivity"
