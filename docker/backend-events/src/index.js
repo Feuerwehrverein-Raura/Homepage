@@ -2544,7 +2544,7 @@ app.get('/calendar/items', authenticateAny, async (req, res) => {
         // 1) Events — alle nicht-abgesagten. Vorstandsitzungs-Details fuer Mitglieder zensieren.
         try {
             const ev = await pool.query(
-                `SELECT id, title, category, description, start_date, end_date, start_time, location
+                `SELECT id, title, category, description, start_date, end_date, location
                  FROM events
                  WHERE COALESCE(end_date, start_date)::date >= $1::date
                    AND start_date::date <= $2::date
@@ -2557,7 +2557,10 @@ app.get('/calendar/items', authenticateAny, async (req, res) => {
                 const subtitle = (() => {
                     if (isBoardMeeting && !isPrivileged) return null;
                     const parts = [];
-                    if (e.start_time) parts.push(String(e.start_time).substring(0, 5));
+                    // start_date ist ein timestamp — Uhrzeit extrahieren wenn nicht 00:00
+                    const ts = String(e.start_date);
+                    const match = ts.match(/T(\d{2}:\d{2})/) || ts.match(/ (\d{2}:\d{2})/);
+                    if (match && match[1] !== '00:00') parts.push(match[1]);
                     if (e.location) parts.push(e.location);
                     return parts.join(' · ') || null;
                 })();
