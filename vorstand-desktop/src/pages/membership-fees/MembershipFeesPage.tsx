@@ -12,7 +12,10 @@ import {
   CheckCircle,
   RotateCcw,
   Search,
+  Settings as SettingsIcon,
+  PlayCircle,
 } from "lucide-react";
+import { FeeSettingsDialog } from "./FeeSettingsDialog";
 
 const statusFilters = [
   { value: "", label: "Alle" },
@@ -39,6 +42,11 @@ export function MembershipFeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  /** Lokal getrackte Ref-Drafts pro Zahlungs-ID — werden beim Blur gespeichert. */
+  const [refDrafts, setRefDrafts] = useState<Record<string, string>>({});
+  const [refSavingId, setRefSavingId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -50,6 +58,10 @@ export function MembershipFeesPage() {
       ]);
       setPayments(paymentsData);
       setSummary(summaryData);
+      // Drafts mit den frischen Server-Werten initialisieren
+      const drafts: Record<string, string> = {};
+      paymentsData.forEach((p) => { drafts[p.id] = p.reference_nr ?? ""; });
+      setRefDrafts(drafts);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Laden");
     } finally {
@@ -92,9 +104,73 @@ export function MembershipFeesPage() {
     }
   };
 
+  const handleRefBlur = async (p: MembershipFeePayment) => {
+    const value = (refDrafts[p.id] ?? "").trim();
+    if (value === (p.reference_nr ?? "")) return; // unveraendert
+    setRefSavingId(p.id);
+    try {
+      await feesApi.setReference(p.id, value);
+      // Lokal sofort aktualisieren ohne reload
+      setPayments((prev) => prev.map((x) => x.id === p.id ? { ...x, reference_nr: value } : x));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Speichern der Referenz");
+    } finally {
+      setRefSavingId(null);
+    }
+  };
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const settings = await feesApi.getSettings(year);
+      if (!settings || !settings.amount) {
+        setError(`Für ${year} sind noch keine Beitragseinstellungen gespeichert. Zuerst über "Einstellungen" Betrag und Datum festlegen.`);
+        return;
+      }
+      const ok = confirm(
+        `Beitragslauf für ${year} erstellen?\n\n` +
+        `Erstellt für jedes Aktiv-/Passivmitglied einen Eintrag mit CHF ${formatChf(settings.amount)}. ` +
+        `Bestehende Einträge bleiben unverändert. Ehrenmitglieder werden ausgenommen.`
+      );
+      if (!ok) return;
+      const r = await feesApi.generatePayments(year, settings.amount);
+      alert(`${r.created} neu, ${r.skipped} bestehend (von ${r.total} Mitgliedern).`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Erstellen des Beitragslaufs");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Mitgliedsbeiträge</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Mitgliedsbeiträge</h1>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent"
+          >
+            <SettingsIcon className="h-4 w-4" />
+            Einstellungen
+          </button>
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 disabled:opacity-50"
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <PlayCircle className="h-4 w-4" />
+            )}
+            Beitragslauf
+          </button>
+        </div>
+      </div>
 
       {/* Jahr-Picker */}
       <div className="flex items-center gap-2 mb-4">
@@ -201,7 +277,6 @@ export function MembershipFeesPage() {
               {filtered.map((p) => {
                 const isPaid = p.status === "bezahlt";
                 const name = [p.nachname, p.vorname].filter(Boolean).join(", ") || "(unbekannt)";
-                const refTail = p.reference_nr ? `…${p.reference_nr.slice(-6)}` : "—";
                 const paidDate = p.paid_date ? p.paid_date.substring(0, 10) : "—";
                 return (
                   <tr key={p.id} className="border-t hover:bg-muted/20">
@@ -210,7 +285,28 @@ export function MembershipFeesPage() {
                       {p.email && <div className="text-xs text-muted-foreground">{p.email}</div>}
                     </td>
                     <td className="px-4 py-2">CHF {formatChf(p.amount)}</td>
-                    <td className="px-4 py-2 font-mono text-xs">{refTail}</td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={refDrafts[p.id] ?? ""}
+                          onChange={(e) =>
+                            setRefDrafts((d) => ({ ...d, [p.id]: e.target.value }))
+                          }
+                          onBlur={() => handleRefBlur(p)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          }}
+                          disabled={isPaid}
+                          placeholder="—"
+                          className="w-44 font-mono text-xs px-2 py-1 rounded-md border border-input bg-background disabled:opacity-50"
+                        />
+                        {refSavingId === p.id && (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2">
                       <FeeStatusBadge status={p.status} />
                     </td>
@@ -243,6 +339,16 @@ export function MembershipFeesPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {settingsOpen && (
+        <FeeSettingsDialog
+          year={year}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => {
+            setSettingsOpen(false);
+          }}
+        />
       )}
     </div>
   );

@@ -37,3 +37,26 @@ export interface MarkFeePaidRequest {
   payment_method?: string;
   notes?: string;
 }
+
+export interface MembershipFeeSettings {
+  id: string | null;
+  year: number;
+  amount: string | null;
+  gv_date: string | null;
+  due_date: string | null;
+  description: string | null;
+}
+
+export interface FeeSettingsUpsert {
+  year: number;
+  amount: string;
+  gv_date?: string | null;
+  due_date?: string | null;
+  description?: string | null;
+}
+
+export interface GeneratePaymentsResponse {
+  created: number;
+  skipped: number;
+  total: number;
+}
