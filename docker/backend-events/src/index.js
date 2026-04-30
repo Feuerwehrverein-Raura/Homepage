@@ -65,6 +65,64 @@ async function memberIdByEmail(email) {
 // Dispatch API für E-Mails
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
 
+/**
+ * DEUTSCH: Einheitlich Push + E-Mail an einen Anmelder schicken.
+ * - Mitglied (member_id gesetzt): Push via api-members + E-Mail an die in members.email gespeicherte Adresse.
+ * - Gast (guest_email gesetzt, kein member_id): nur E-Mail an guest_email.
+ *
+ * action: 'added' | 'approved' | 'rejected' | 'updated' | 'deleted'
+ */
+async function notifyRegistrationChange({ eventId, eventTitle, memberId, guestName, guestEmail, action }) {
+    const titles = {
+        added:    `Anmeldung: ${eventTitle}`,
+        approved: `Anmeldung bestaetigt: ${eventTitle}`,
+        rejected: `Anmeldung abgelehnt: ${eventTitle}`,
+        updated:  `Anmeldung aktualisiert: ${eventTitle}`,
+        deleted:  `Anmeldung entfernt: ${eventTitle}`
+    };
+    const bodies = {
+        added:    'Du wurdest zu einer Veranstaltung angemeldet.',
+        approved: 'Deine Anmeldung wurde bestaetigt.',
+        rejected: 'Deine Anmeldung wurde abgelehnt.',
+        updated:  'Deine Anmeldung wurde bearbeitet.',
+        deleted:  'Deine Anmeldung wurde geloescht.'
+    };
+    const title = titles[action] || `Anmeldung: ${eventTitle}`;
+    const body  = bodies[action] || 'Deine Anmeldung wurde aktualisiert.';
+
+    // Push (nur fuer Mitglieder)
+    if (memberId) {
+        pushToMember(memberId, 'event_update', title, body, { eventId }).catch(() => {});
+    }
+
+    // E-Mail-Empfaenger ermitteln: Member-E-Mail bevorzugt vor guest_email
+    let targetEmail = guestEmail || null;
+    let targetName  = guestName || '';
+    if (memberId) {
+        try {
+            const m = await pool.query('SELECT vorname, nachname, email FROM members WHERE id = $1', [memberId]);
+            if (m.rows[0]) {
+                targetEmail = m.rows[0].email || targetEmail;
+                targetName = `${m.rows[0].vorname || ''} ${m.rows[0].nachname || ''}`.trim() || targetName;
+            }
+        } catch (_) {}
+    }
+    if (!targetEmail) return;
+
+    const greeting = targetName ? `Guten Tag ${targetName}` : 'Guten Tag';
+    const emailBody = `${greeting},\n\n${title}\n\n${body}\n\nMit freundlichen Gruessen\nFeuerwehrverein Raura`;
+    try {
+        await axios.post(`${DISPATCH_API}/email/send`, {
+            to: targetEmail,
+            subject: title,
+            body: emailBody,
+            event_id: eventId
+        });
+    } catch (e) {
+        console.error('notifyRegistrationChange email failed:', e.message);
+    }
+}
+
 // DEUTSCH: Axios-Interceptor — fügt automatisch den API-Key bei Dispatch-Calls hinzu
 axios.interceptors.request.use((config) => {
     if (config.url && config.url.startsWith(DISPATCH_API) && process.env.API_KEY) {
@@ -1201,19 +1259,12 @@ app.post('/events/my-event/registrations/:id/approve', authenticateEventOrganize
 
         const reg = result.rows[0];
 
-        // Bestätigungs-E-Mail senden
-        if (reg.guest_email) {
-            const event = await pool.query('SELECT title FROM events WHERE id = $1', [eventId]);
-            try {
-                await axios.post(`${DISPATCH_API}/email/send`, {
-                    to: reg.guest_email,
-                    subject: `Ihre Anmeldung wurde bestätigt - ${event.rows[0]?.title}`,
-                    body: `Guten Tag ${reg.guest_name},\n\nIhre Anmeldung für "${event.rows[0]?.title}" wurde bestätigt.\n\nWir freuen uns auf Sie!\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
-                });
-            } catch (emailErr) {
-                console.error('Approval email failed:', emailErr.message);
-            }
-        }
+        const event = await pool.query('SELECT title FROM events WHERE id = $1', [eventId]);
+        notifyRegistrationChange({
+            eventId, eventTitle: event.rows[0]?.title || 'Event',
+            memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            action: 'approved'
+        }).catch(() => {});
 
         // Prüfen ob Arbeitsplan versendet werden kann
         checkAndSendArbeitsplan(eventId).then(result => {
@@ -1258,19 +1309,12 @@ app.post('/events/my-event/registrations/:id/reject', authenticateEventOrganizer
 
         const reg = result.rows[0];
 
-        // Ablehnungs-E-Mail senden
-        if (reg.guest_email) {
-            const event = await pool.query('SELECT title FROM events WHERE id = $1', [eventId]);
-            try {
-                await axios.post(`${DISPATCH_API}/email/send`, {
-                    to: reg.guest_email,
-                    subject: `Ihre Anmeldung - ${event.rows[0]?.title}`,
-                    body: `Guten Tag ${reg.guest_name},\n\nLeider können wir Ihre Anmeldung für "${event.rows[0]?.title}" nicht berücksichtigen.\n\n${reason ? `Grund: ${reason}\n\n` : ''}Bei Fragen kontaktieren Sie uns bitte.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
-                });
-            } catch (emailErr) {
-                console.error('Rejection email failed:', emailErr.message);
-            }
-        }
+        const event = await pool.query('SELECT title FROM events WHERE id = $1', [eventId]);
+        notifyRegistrationChange({
+            eventId, eventTitle: event.rows[0]?.title || 'Event',
+            memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            action: 'rejected'
+        }).catch(() => {});
 
         res.json({ success: true, registration: reg });
     } catch (error) {
@@ -1986,6 +2030,17 @@ app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, a
         ]);
 
         res.json({ success: true, registration: result.rows[0] });
+
+        const updated = result.rows[0];
+        const statusChanged = status && status !== existing.rows[0].status;
+        const action = statusChanged
+            ? (status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'updated')
+            : 'updated';
+        notifyRegistrationChange({
+            eventId, eventTitle: event.title,
+            memberId: updated?.member_id, guestName: updated?.guest_name, guestEmail: updated?.guest_email,
+            action
+        }).catch(() => {});
     } catch (error) {
         console.error('PUT registrations as-organizer failed:', error);
         res.status(500).json({ error: error.message });
@@ -1999,12 +2054,25 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
         const event = await ensureOrganizerAccess(req, res, eventId);
         if (!event) return;
 
-        const result = await pool.query(
-            'DELETE FROM registrations WHERE id = $1 AND event_id = $2 RETURNING id',
+        // Vor dem DELETE Member-/Guest-Daten holen — nach dem DELETE haben wir nichts mehr.
+        const before = await pool.query(
+            'SELECT member_id, guest_name, guest_email FROM registrations WHERE id = $1 AND event_id = $2',
             [regId, eventId]
         );
-        if (result.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
-        res.json({ success: true, deleted_id: result.rows[0].id });
+        if (before.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
+
+        await pool.query(
+            'DELETE FROM registrations WHERE id = $1 AND event_id = $2',
+            [regId, eventId]
+        );
+        res.json({ success: true, deleted_id: regId });
+
+        notifyRegistrationChange({
+            eventId, eventTitle: event.title,
+            memberId: before.rows[0].member_id,
+            guestName: before.rows[0].guest_name, guestEmail: before.rows[0].guest_email,
+            action: 'deleted'
+        }).catch(() => {});
     } catch (error) {
         console.error('DELETE registrations as-organizer failed:', error);
         res.status(500).json({ error: error.message });
@@ -2046,16 +2114,14 @@ app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, 
         ]);
         res.json({ success: true, registration: result.rows[0] });
 
-        // Push an betroffenes Mitglied (falls Mitglied und nicht Self-Registration)
-        if (member_id && req.user.email) {
-            const ev = await pool.query('SELECT title FROM events WHERE id=$1', [id]);
-            pushToMember(
-                member_id, 'event_update',
-                `Anmeldung: ${ev.rows[0]?.title || 'Event'}`,
-                'Du wurdest zu einer Veranstaltung angemeldet.',
-                { eventId: id }
-            ).catch(() => {});
-        }
+        const ev = await pool.query('SELECT title FROM events WHERE id=$1', [id]);
+        const newReg = result.rows[0];
+        notifyRegistrationChange({
+            eventId: id, eventTitle: ev.rows[0]?.title || 'Event',
+            memberId: newReg.member_id,
+            guestName: newReg.guest_name, guestEmail: newReg.guest_email,
+            action: 'added'
+        }).catch(() => {});
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2084,17 +2150,11 @@ async function organizerActOnRegistration(req, res, newStatus) {
         if (result.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
 
         const reg = result.rows[0];
-        if (reg.guest_email) {
-            const subject = newStatus === 'approved'
-                ? `Ihre Anmeldung wurde bestätigt - ${event.rows[0].title}`
-                : `Ihre Anmeldung wurde abgelehnt - ${event.rows[0].title}`;
-            const body = newStatus === 'approved'
-                ? `Guten Tag ${reg.guest_name},\n\nIhre Anmeldung für "${event.rows[0].title}" wurde bestätigt.\n\nWir freuen uns auf Sie!\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
-                : `Guten Tag ${reg.guest_name},\n\nLeider müssen wir Ihre Anmeldung für "${event.rows[0].title}" ablehnen.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`;
-            try {
-                await axios.post(`${DISPATCH_API}/email/send`, { to: reg.guest_email, subject, body });
-            } catch (e) { console.error('Email-Versand fehlgeschlagen:', e.message); }
-        }
+        notifyRegistrationChange({
+            eventId, eventTitle: event.rows[0].title,
+            memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            action: newStatus === 'approved' ? 'approved' : 'rejected'
+        }).catch(() => {});
 
         res.json({ success: true, registration: reg });
     } catch (error) {
@@ -2171,19 +2231,12 @@ app.post('/registrations/:id/approve', authenticateAny, requireRole('vorstand', 
 
         const reg = result.rows[0];
 
-        // Send approval email
-        if (reg.guest_email) {
-            const event = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
-            try {
-                await axios.post(`${DISPATCH_API}/email/send`, {
-                    to: reg.guest_email,
-                    subject: `Ihre Anmeldung wurde bestätigt - ${event.rows[0]?.title}`,
-                    body: `Guten Tag ${reg.guest_name},\n\nIhre Anmeldung für "${event.rows[0]?.title}" wurde bestätigt.\n\nWir freuen uns auf Sie!\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
-                });
-            } catch (emailErr) {
-                console.error('Approval email failed:', emailErr.message);
-            }
-        }
+        const ev = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
+        notifyRegistrationChange({
+            eventId: reg.event_id, eventTitle: ev.rows[0]?.title || 'Event',
+            memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            action: 'approved'
+        }).catch(() => {});
 
         // Prüfen ob Arbeitsplan versendet werden kann (async, nicht blockierend)
         checkAndSendArbeitsplan(reg.event_id).then(result => {
@@ -2217,19 +2270,12 @@ app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', '
 
         const reg = result.rows[0];
 
-        // Send rejection email
-        if (reg.guest_email) {
-            const event = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
-            try {
-                await axios.post(`${DISPATCH_API}/email/send`, {
-                    to: reg.guest_email,
-                    subject: `Ihre Anmeldung - ${event.rows[0]?.title}`,
-                    body: `Guten Tag ${reg.guest_name},\n\nLeider können wir Ihre Anmeldung für "${event.rows[0]?.title}" nicht berücksichtigen.\n\n${reason ? `Grund: ${reason}\n\n` : ''}Bei Fragen kontaktieren Sie uns bitte.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`
-                });
-            } catch (emailErr) {
-                console.error('Rejection email failed:', emailErr.message);
-            }
-        }
+        const ev = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
+        notifyRegistrationChange({
+            eventId: reg.event_id, eventTitle: ev.rows[0]?.title || 'Event',
+            memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            action: 'rejected'
+        }).catch(() => {});
 
         res.json({ success: true, registration: result.rows[0] });
     } catch (error) {
