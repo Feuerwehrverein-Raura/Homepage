@@ -53,6 +53,58 @@ class EventDetailActivity : AppCompatActivity() {
                 else showRegisterDialog(e)
             }
         }
+        binding.btnAddToCalendar.setOnClickListener {
+            event?.let { addToCalendar(it) }
+        }
+    }
+
+    /** Oeffnet den Android-Kalender mit vorausgefuelltem Event-Insert. */
+    private fun addToCalendar(e: Event) {
+        try {
+            val intent = android.content.Intent(android.content.Intent.ACTION_INSERT)
+                .setData(android.provider.CalendarContract.Events.CONTENT_URI)
+                .putExtra(android.provider.CalendarContract.Events.TITLE, e.title)
+            e.location?.takeIf { it.isNotBlank() }?.let {
+                intent.putExtra(android.provider.CalendarContract.Events.EVENT_LOCATION, it)
+            }
+            e.description?.takeIf { it.isNotBlank() }?.let {
+                intent.putExtra(android.provider.CalendarContract.Events.DESCRIPTION, it)
+            }
+            // Start- und Endzeit aus ISO-Strings parsen
+            parseEventTime(e.startDate)?.let { ms ->
+                intent.putExtra(android.content.Intent.EXTRA_FROM, ms.first)
+                intent.putExtra("beginTime", ms.first)
+            }
+            parseEventTime(e.endDate)?.let { ms ->
+                intent.putExtra("endTime", ms.first)
+            }
+            startActivity(intent)
+        } catch (ex: Exception) {
+            android.widget.Toast.makeText(this,
+                "Keine Kalender-App gefunden: ${ex.message}",
+                android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /** Wandelt ISO-Datums-Strings in Millisekunden um (Pair: ms, hadTime). */
+    private fun parseEventTime(iso: String?): Pair<Long, Boolean>? {
+        if (iso.isNullOrBlank()) return null
+        val s = iso.removeSuffix("Z").substringBefore('+').substringBefore('.')
+        val formats = listOf(
+            "yyyy-MM-dd'T'HH:mm:ss" to true,
+            "yyyy-MM-dd'T'HH:mm" to true,
+            "yyyy-MM-dd HH:mm:ss" to true,
+            "yyyy-MM-dd" to false
+        )
+        for ((pattern, hasTime) in formats) {
+            try {
+                val sdf = java.text.SimpleDateFormat(pattern, java.util.Locale.US)
+                sdf.timeZone = java.util.TimeZone.getDefault()
+                val d = sdf.parse(s) ?: continue
+                return d.time to hasTime
+            } catch (_: Exception) { /* nächstes Format probieren */ }
+        }
+        return null
     }
 
     private fun renderShifts(shifts: List<Shift>) {

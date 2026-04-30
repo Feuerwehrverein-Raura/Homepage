@@ -35,5 +35,15 @@
             android:layout_gravity="center"
             android:indeterminate="true"
             android:visibility="gone" />
+
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/fabSubscribe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="20dp"
+            android:contentDescription="Kalender abonnieren"
+            android:text="Kalender abonnieren"
+            app:icon="@android:drawable/ic_menu_my_calendar" />
     </FrameLayout>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

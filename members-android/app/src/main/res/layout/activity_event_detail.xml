@@ -126,6 +126,16 @@
                 android:text="Anmelden"
                 app:cornerRadius="12dp" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddToCalendar"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Zu meinem Kalender hinzufügen"
+                app:icon="@android:drawable/ic_menu_my_calendar"
+                app:cornerRadius="12dp" />
+
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 

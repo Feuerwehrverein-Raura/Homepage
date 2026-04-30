@@ -34,7 +34,48 @@ class EventsListFragment : Fragment() {
         binding.eventsRecycler.layoutManager = LinearLayoutManager(requireContext())
         binding.eventsRecycler.adapter = adapter
         binding.swipeRefresh.setOnRefreshListener { loadEvents() }
+        binding.fabSubscribe.setOnClickListener { showSubscribeDialog() }
         loadEvents()
+    }
+
+    /** Zeigt drei Optionen: in Kalender-App oeffnen, Webcal-Link oder ICS-Datei teilen. */
+    private fun showSubscribeDialog() {
+        val httpsUrl = "https://api.fwv-raura.ch/calendar/ics"
+        val webcalUrl = "webcal://api.fwv-raura.ch/calendar/ics"
+        val options = arrayOf(
+            "In Kalender-App öffnen (webcal://)",
+            "ICS-Link teilen / kopieren",
+            "ICS-Datei im Browser öffnen"
+        )
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("Kalender abonnieren")
+            .setMessage("Alle FWV-Anlässe als Abo in deine Kalender-App. Aktualisiert sich automatisch wenn neue Events angelegt werden.")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> openExternal(webcalUrl)
+                    1 -> shareLink(httpsUrl)
+                    2 -> openExternal(httpsUrl)
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun openExternal(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (_: Exception) {
+            Toast.makeText(requireContext(), "Keine App zum Öffnen gefunden", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun shareLink(url: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, url)
+            putExtra(Intent.EXTRA_SUBJECT, "FWV Raura Kalender-Abo")
+        }
+        startActivity(Intent.createChooser(intent, "Kalender-Link teilen"))
     }
 
     private fun loadEvents() {
