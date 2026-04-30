@@ -1,0 +1,12 @@
+Erste Veröffentlichung der FWV-Raura-Mitglieder-App.
+
+Funktionen:
+• Anlässe ansehen und sich anmelden (auch zu einzelnen Schichten)
+• Eigene Anmeldungen verfolgen
+• Profil mit Foto verwalten (Kamera oder Galerie)
+• Adressbuch-Sync mit FWV-Mitgliedern
+• Mitgliedsbeiträge — Status sehen
+• Kalender-Abo aller Anlässe
+• Benachrichtigungs-Einstellungen pro E-Mail-Typ
+• Zugänge zu Cloud, geteilten Konten und Funktions-Mails
+• Für Organisatoren: Anmeldungen verwalten, manuell hinzufügen
