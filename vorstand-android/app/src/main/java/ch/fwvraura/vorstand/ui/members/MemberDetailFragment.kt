@@ -127,6 +127,8 @@ class MemberDetailFragment : Fragment() {
         binding.btnDelete.setOnClickListener { confirmDelete() }
         // Foto-Bereich: Zeigt Optionen zum Aendern/Aufnehmen/Loeschen des Fotos
         binding.photoContainer.setOnClickListener { showPhotoOptions() }
+        // Cloud-Permissions: Sync-Button
+        binding.btnSyncCloudPermissions.setOnClickListener { syncCloudPermissions() }
 
         loadMember()
     }
@@ -361,6 +363,90 @@ class MemberDetailFragment : Fragment() {
         binding.detailStatus.text = "Status: ${m.status ?: "-"}"
         binding.detailBirthday.text = "Geburtstag: ${DateUtils.formatDate(m.geburtstag)}"
         binding.detailEntry.text = "Eintrittsdatum: ${DateUtils.formatDate(m.eintrittsdatum)}"
+
+        // Cloud-Permissions laden (Nextcloud-Admin, Vorstand-Gruppe, Social-Media-Gruppe)
+        loadCloudPermissions()
+    }
+
+    /** Laedt parallel den Status der drei Authentik-Gruppen. */
+    private fun loadCloudPermissions() {
+        binding.cloudPermissionsCard.visibility = View.VISIBLE
+        binding.cloudPermissionsStatus.text = "Lade Berechtigungen…"
+        binding.permNextcloudAdmin.text = "⏳"
+        binding.permVorstandGroup.text = "⏳"
+        binding.permSocialMediaGroup.text = "⏳"
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            val id = memberId ?: return@launch
+            try {
+                val ncResp = ApiModule.membersApi.getNextcloudAdmin(id)
+                if (!ncResp.isSuccessful) {
+                    binding.cloudPermissionsStatus.text = "Fehler beim Laden"
+                    return@launch
+                }
+                val nc = ncResp.body()
+                if (nc?.hasAuthentik != true) {
+                    binding.cloudPermissionsStatus.text = "Kein Authentik-Account vorhanden"
+                    binding.permNextcloudAdmin.text = "❌"
+                    binding.permVorstandGroup.text = "❌"
+                    binding.permSocialMediaGroup.text = "❌"
+                    return@launch
+                }
+                binding.permNextcloudAdmin.text = if (nc.nextcloudAdmin) "✅" else "❌"
+
+                val vsResp = ApiModule.membersApi.getVorstandGroup(id)
+                binding.permVorstandGroup.text =
+                    if (vsResp.isSuccessful && vsResp.body()?.vorstandGroup == true) "✅" else "❌"
+
+                val smResp = ApiModule.membersApi.getSocialMediaGroup(id)
+                binding.permSocialMediaGroup.text =
+                    if (smResp.isSuccessful && smResp.body()?.socialMediaGroup == true) "✅" else "❌"
+
+                binding.cloudPermissionsStatus.text = ""
+            } catch (e: Exception) {
+                binding.cloudPermissionsStatus.text = "Fehler: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Synchronisiert Cloud-Berechtigungen basierend auf den Funktionen des Mitglieds:
+     *  - "Admin" → Nextcloud-Admin-Gruppe
+     *  - eine der Vorstand-Rollen (Praesident, Vize, Aktuar, Kassier, Materialwart, Beisitzer) → Vorstand-Gruppe
+     *  - "Social Media" → Social-Media-Gruppe
+     * Ruft alle drei POST-Endpoints und laedt anschliessend den Status neu.
+     */
+    private fun syncCloudPermissions() {
+        val m = member ?: return
+        val funktionen = (m.funktion ?: "").split(",").map { it.trim() }
+        val vorstandRoles = setOf("Präsident", "Praesident", "Vizepräsident", "Vizepraesident",
+            "Aktuar", "Kassier", "Materialwart", "Beisitzer")
+        val isAdmin = funktionen.any { it.equals("Admin", ignoreCase = true) }
+        val isVorstand = funktionen.any { it in vorstandRoles }
+        val isSocialMedia = funktionen.any { it.equals("Social Media", ignoreCase = true) }
+
+        binding.cloudPermissionsStatus.text = "Synchronisiere…"
+        binding.btnSyncCloudPermissions.isEnabled = false
+        viewLifecycleOwner.lifecycleScope.launch {
+            val id = memberId ?: return@launch
+            try {
+                ApiModule.membersApi.setNextcloudAdmin(
+                    id, ch.fwvraura.vorstand.data.model.CloudPermissionUpdate(isAdmin)
+                )
+                ApiModule.membersApi.setVorstandGroup(
+                    id, ch.fwvraura.vorstand.data.model.CloudPermissionUpdate(isVorstand)
+                )
+                ApiModule.membersApi.setSocialMediaGroup(
+                    id, ch.fwvraura.vorstand.data.model.CloudPermissionUpdate(isSocialMedia)
+                )
+                binding.cloudPermissionsStatus.text = "Synchronisiert."
+                loadCloudPermissions()
+            } catch (e: Exception) {
+                binding.cloudPermissionsStatus.text = "Fehler: ${e.message}"
+            } finally {
+                binding.btnSyncCloudPermissions.isEnabled = true
+            }
+        }
     }
 
     /**

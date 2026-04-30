@@ -156,4 +156,44 @@ interface MembersApi {
      */
     @DELETE("members/{id}/photo")
     suspend fun deletePhoto(@Path("id") id: String): Response<Unit>
+
+    // ============================================
+    // CLOUD-PERMISSIONS (Nextcloud Admin / Authentik-Gruppen)
+    // ============================================
+
+    /** Status: ist Mitglied Nextcloud-Admin (Authentik-Gruppe "admin")? */
+    @GET("members/{id}/nextcloud-admin")
+    suspend fun getNextcloudAdmin(@Path("id") id: String):
+        Response<ch.fwvraura.vorstand.data.model.NextcloudAdminStatus>
+
+    /** Setzt Nextcloud-Admin-Status (Body: {enabled}). */
+    @POST("members/{id}/nextcloud-admin")
+    suspend fun setNextcloudAdmin(
+        @Path("id") id: String,
+        @Body body: ch.fwvraura.vorstand.data.model.CloudPermissionUpdate
+    ): Response<Unit>
+
+    /** Status: ist Mitglied in der Vorstand-Authentik-Gruppe? */
+    @GET("members/{id}/vorstand-group")
+    suspend fun getVorstandGroup(@Path("id") id: String):
+        Response<ch.fwvraura.vorstand.data.model.VorstandGroupStatus>
+
+    /** Setzt Vorstand-Gruppen-Mitgliedschaft. */
+    @POST("members/{id}/vorstand-group")
+    suspend fun setVorstandGroup(
+        @Path("id") id: String,
+        @Body body: ch.fwvraura.vorstand.data.model.CloudPermissionUpdate
+    ): Response<Unit>
+
+    /** Status: ist Mitglied in der Social-Media-Authentik-Gruppe? */
+    @GET("members/{id}/social-media-group")
+    suspend fun getSocialMediaGroup(@Path("id") id: String):
+        Response<ch.fwvraura.vorstand.data.model.SocialMediaGroupStatus>
+
+    /** Setzt Social-Media-Gruppen-Mitgliedschaft. */
+    @POST("members/{id}/social-media-group")
+    suspend fun setSocialMediaGroup(
+        @Path("id") id: String,
+        @Body body: ch.fwvraura.vorstand.data.model.CloudPermissionUpdate
+    ): Response<Unit>
 }
