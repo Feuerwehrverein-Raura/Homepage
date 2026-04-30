@@ -33,5 +33,17 @@ data class Shift(
     @SerializedName("start_time") val startTime: String? = null,
     @SerializedName("end_time") val endTime: String? = null,
     val needed: Int? = null,
-    val bereich: String? = null
+    val bereich: String? = null,
+    /** Aus /events/:id: Liste der bereits angemeldeten Helfer (approved + pending). */
+    val registrations: ShiftRegistrations? = null
+)
+
+data class ShiftRegistrations(
+    val approved: List<ShiftRegistrationEntry> = emptyList(),
+    val pending: List<ShiftRegistrationEntry> = emptyList()
+)
+
+data class ShiftRegistrationEntry(
+    val id: String? = null,
+    val name: String? = null
 )

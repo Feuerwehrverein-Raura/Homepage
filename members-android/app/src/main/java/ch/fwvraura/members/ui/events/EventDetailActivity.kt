@@ -114,14 +114,68 @@ class EventDetailActivity : AppCompatActivity() {
         for (s in shifts) {
             val card = ItemShiftChoiceBinding.inflate(layoutInflater, binding.shiftsList, false)
             card.shiftCheck.visibility = View.GONE
-            card.shiftName.text = listOfNotNull(s.bereich, s.name).joinToString(" – ")
-            val parts = mutableListOf<String>()
-            if (!s.date.isNullOrBlank()) parts.add(DateUtils.formatDate(s.date))
-            val time = listOfNotNull(s.startTime, s.endTime).joinToString(" - ")
-            if (time.isNotBlank()) parts.add(time)
-            if (s.needed != null) parts.add("${s.needed} Helfer")
-            card.shiftDetails.text = parts.joinToString(" · ")
+            decorateShiftCard(card, s, includeCapacity = true, includeHelpers = true)
             binding.shiftsList.addView(card.root)
+        }
+    }
+
+    /** Befuellt eine Schicht-Karte mit allen verfuegbaren Details (genutzt von Detail-Liste + Anmelde-Dialog). */
+    private fun decorateShiftCard(
+        card: ItemShiftChoiceBinding,
+        s: Shift,
+        includeCapacity: Boolean,
+        includeHelpers: Boolean
+    ) {
+        card.shiftName.text = listOfNotNull(s.bereich, s.name).joinToString(" – ")
+
+        val parts = mutableListOf<String>()
+        if (!s.date.isNullOrBlank()) parts.add(DateUtils.formatDate(s.date))
+        val time = listOfNotNull(s.startTime, s.endTime).joinToString(" - ")
+        if (time.isNotBlank()) parts.add(time)
+        card.shiftDetails.text = parts.joinToString(" · ")
+
+        // Belegungs-Status-Badge: "X / Y belegt" — gruen wenn voll, gelb sonst
+        val approved = s.registrations?.approved?.size ?: 0
+        val pending = s.registrations?.pending?.size ?: 0
+        val needed = s.needed
+        if (includeCapacity && needed != null) {
+            val full = approved >= needed
+            card.shiftCapacity.visibility = View.VISIBLE
+            card.shiftCapacity.text = if (pending > 0) "$approved+$pending / $needed" else "$approved / $needed"
+            card.shiftCapacity.setTextColor(
+                if (full) android.graphics.Color.parseColor("#0F7A2D")
+                else android.graphics.Color.parseColor("#A05A00")
+            )
+        } else if (includeCapacity && needed != null) {
+            card.shiftCapacity.visibility = View.GONE
+        } else {
+            card.shiftCapacity.visibility = View.GONE
+        }
+
+        // Beschreibung anzeigen wenn vorhanden
+        if (!s.description.isNullOrBlank()) {
+            card.shiftDescription.visibility = View.VISIBLE
+            card.shiftDescription.text = s.description
+        } else {
+            card.shiftDescription.visibility = View.GONE
+        }
+
+        // Liste der bereits angemeldeten Helfer (max 5 sichtbar, Rest gekuerzt)
+        if (includeHelpers && s.registrations != null) {
+            val names = mutableListOf<String>()
+            s.registrations.approved.mapNotNull { it.name?.takeIf { n -> n.isNotBlank() } }.forEach { names.add(it) }
+            s.registrations.pending.mapNotNull { it.name?.takeIf { n -> n.isNotBlank() } }
+                .forEach { names.add("$it (wartend)") }
+            if (names.isNotEmpty()) {
+                card.shiftHelpers.visibility = View.VISIBLE
+                val display = if (names.size > 5) names.take(5).joinToString(", ") + " · +${names.size - 5}"
+                else names.joinToString(", ")
+                card.shiftHelpers.text = "Angemeldet: $display"
+            } else {
+                card.shiftHelpers.visibility = View.GONE
+            }
+        } else {
+            card.shiftHelpers.visibility = View.GONE
         }
     }
 
@@ -134,12 +188,7 @@ class EventDetailActivity : AppCompatActivity() {
         val checkBoxes = mutableMapOf<String, MaterialCheckBox>()
         for (s in e.shifts.orEmpty()) {
             val item = ItemShiftChoiceBinding.inflate(layoutInflater, dialogBinding.shiftsContainer, false)
-            item.shiftName.text = listOfNotNull(s.bereich, s.name).joinToString(" – ")
-            val parts = mutableListOf<String>()
-            if (!s.date.isNullOrBlank()) parts.add(DateUtils.formatDate(s.date))
-            val time = listOfNotNull(s.startTime, s.endTime).joinToString(" - ")
-            if (time.isNotBlank()) parts.add(time)
-            item.shiftDetails.text = parts.joinToString(" · ")
+            decorateShiftCard(item, s, includeCapacity = true, includeHelpers = false)
             checkBoxes[s.id] = item.shiftCheck
             item.root.setOnClickListener { item.shiftCheck.isChecked = !item.shiftCheck.isChecked }
             dialogBinding.shiftsContainer.addView(item.root)
