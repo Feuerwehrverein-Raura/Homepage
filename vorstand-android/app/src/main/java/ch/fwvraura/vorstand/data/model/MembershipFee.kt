@@ -46,3 +46,40 @@ data class MarkFeePaidRequest(
     @SerializedName("payment_method") val paymentMethod: String? = null,
     val notes: String? = null
 )
+
+/** Eintrag aus membership_fee_settings — Jahres-Einstellung (Betrag, GV, Faelligkeit). */
+data class MembershipFeeSettings(
+    val id: String? = null,
+    val year: Int,
+    val amount: String? = null,
+    @SerializedName("gv_date") val gvDate: String? = null,
+    @SerializedName("due_date") val dueDate: String? = null,
+    val description: String? = null
+)
+
+/** Body fuer POST /membership-fees/settings (Upsert). */
+data class FeeSettingsUpsert(
+    val year: Int,
+    val amount: String,
+    @SerializedName("gv_date") val gvDate: String? = null,
+    @SerializedName("due_date") val dueDate: String? = null,
+    val description: String? = null
+)
+
+/** Body fuer POST /membership-fees/payments/generate */
+data class GeneratePaymentsRequest(
+    val year: Int,
+    val amount: String
+)
+
+/** Antwort von POST /membership-fees/payments/generate */
+data class GeneratePaymentsResponse(
+    val created: Int = 0,
+    val skipped: Int = 0,
+    val total: Int = 0
+)
+
+/** Body fuer PATCH /membership-fees/payments/:id/reference */
+data class SetReferenceRequest(
+    @SerializedName("reference_nr") val referenceNr: String
+)

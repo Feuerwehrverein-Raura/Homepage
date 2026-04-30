@@ -12,9 +12,13 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import android.text.InputType
+import android.widget.EditText
 import ch.fwvraura.vorstand.data.api.ApiModule
+import ch.fwvraura.vorstand.data.model.GeneratePaymentsRequest
 import ch.fwvraura.vorstand.data.model.MarkFeePaidRequest
 import ch.fwvraura.vorstand.data.model.MembershipFeePayment
+import ch.fwvraura.vorstand.data.model.SetReferenceRequest
 import ch.fwvraura.vorstand.databinding.FragmentMembershipFeesBinding
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
@@ -37,7 +41,10 @@ class MembershipFeesFragment : Fragment() {
     private var _binding: FragmentMembershipFeesBinding? = null
     private val binding get() = _binding!!
 
-    private val adapter = FeePaymentsAdapter(::onTogglePayment)
+    private val adapter = FeePaymentsAdapter(
+        onTogglePaid = ::onTogglePayment,
+        onEditReference = ::onEditReference
+    )
     private var allPayments: List<MembershipFeePayment> = emptyList()
     private var selectedYear: Int = Calendar.getInstance().get(Calendar.YEAR)
 
@@ -56,6 +63,17 @@ class MembershipFeesFragment : Fragment() {
 
         setupYearPicker()
         setupFilters()
+
+        binding.btnSettings.setOnClickListener {
+            FeeSettingsDialog.newInstance(selectedYear).apply {
+                onSaved = {
+                    Snackbar.make(binding.root, "Einstellungen gespeichert.", Snackbar.LENGTH_SHORT).show()
+                }
+            }.show(parentFragmentManager, "fee_settings")
+        }
+
+        binding.btnGenerate.setOnClickListener { onGenerateClicked() }
+
         load()
     }
 
@@ -162,6 +180,92 @@ class MembershipFeesFragment : Fragment() {
                     ApiModule.membershipFeesApi.markUnpaid(p.id)
                 else
                     ApiModule.membershipFeesApi.markPaid(p.id, MarkFeePaidRequest())
+                if (resp.isSuccessful) load()
+                else showError("Fehler ${resp.code()}")
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
+            }
+        }
+    }
+
+    /** Beitragslauf erstellen — laedt zuerst Settings, fragt User um Bestaetigung, ruft dann generate. */
+    private fun onGenerateClicked() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val settings = try {
+                ApiModule.membershipFeesApi.getSettings(selectedYear).body()
+            } catch (_: Exception) { null }
+
+            if (settings == null || settings.amount.isNullOrBlank()) {
+                AlertDialog.Builder(requireContext())
+                    .setTitle("Einstellungen fehlen")
+                    .setMessage("Für $selectedYear sind noch keine Beitragseinstellungen gespeichert. Bitte zuerst über \"Einstellungen\" Betrag und Datum festlegen.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@launch
+            }
+
+            val amountFmt = formatChf(settings.amount)
+            AlertDialog.Builder(requireContext())
+                .setTitle("Beitragslauf für $selectedYear?")
+                .setMessage("Erstellt für jedes Aktiv-/Passivmitglied einen Eintrag mit CHF $amountFmt. Bestehende Einträge werden nicht überschrieben (Ehrenmitglieder ausgenommen).")
+                .setPositiveButton("Erstellen") { _, _ -> doGenerate(settings.amount) }
+                .setNegativeButton("Abbrechen", null)
+                .show()
+        }
+    }
+
+    private fun doGenerate(amount: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val resp = ApiModule.membershipFeesApi.generatePayments(
+                    GeneratePaymentsRequest(year = selectedYear, amount = amount)
+                )
+                if (resp.isSuccessful) {
+                    val r = resp.body()
+                    val msg = if (r != null)
+                        "${r.created} neu, ${r.skipped} bestehend (von ${r.total} Mitgliedern)."
+                    else
+                        "Beitragslauf erstellt."
+                    Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
+                    load()
+                } else {
+                    showError("Fehler ${resp.code()}")
+                }
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
+            }
+        }
+    }
+
+    private fun onEditReference(p: MembershipFeePayment) {
+        val ctx = requireContext()
+        val input = EditText(ctx).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            hint = "Referenznummer (Bank)"
+            setText(p.referenceNr.orEmpty())
+        }
+        val container = android.widget.FrameLayout(ctx).apply {
+            val pad = (resources.displayMetrics.density * 20).toInt()
+            setPadding(pad, 0, pad, 0)
+            addView(input)
+        }
+        val name = listOfNotNull(p.vorname, p.nachname).joinToString(" ").ifBlank { "Mitglied" }
+        AlertDialog.Builder(ctx)
+            .setTitle("Referenz für $name")
+            .setMessage("Die Bank-Referenznummer (i.d.R. 27-stellig) eintragen.")
+            .setView(container)
+            .setPositiveButton("Speichern") { _, _ ->
+                val value = input.text?.toString()?.trim().orEmpty()
+                sendReference(p, value)
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    private fun sendReference(p: MembershipFeePayment, value: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val resp = ApiModule.membershipFeesApi.setReference(p.id, SetReferenceRequest(value))
                 if (resp.isSuccessful) load()
                 else showError("Fehler ${resp.code()}")
             } catch (e: Exception) {

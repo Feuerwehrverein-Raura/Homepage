@@ -2,6 +2,7 @@ package ch.fwvraura.vorstand.ui.membershipfees
 
 import android.graphics.Color
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -10,7 +11,8 @@ import ch.fwvraura.vorstand.data.model.MembershipFeePayment
 import ch.fwvraura.vorstand.databinding.ItemFeePaymentBinding
 
 class FeePaymentsAdapter(
-    private val onToggle: (MembershipFeePayment) -> Unit
+    private val onTogglePaid: (MembershipFeePayment) -> Unit,
+    private val onEditReference: (MembershipFeePayment) -> Unit
 ) : ListAdapter<MembershipFeePayment, FeePaymentsAdapter.VH>(DIFF) {
 
     inner class VH(val b: ItemFeePaymentBinding) : RecyclerView.ViewHolder(b.root)
@@ -33,12 +35,19 @@ class FeePaymentsAdapter(
         if (!p.referenceNr.isNullOrBlank()) {
             val short = p.referenceNr.takeLast(6)
             meta.add("Ref. …$short")
+        } else {
+            meta.add("Ref. fehlt")
         }
-        if (isPaid) p.paidDate?.takeIf { it.isNotBlank() }?.let { meta.add("Bezahlt am ${it.substring(0, minOf(10, it.length))}") }
+        if (isPaid) p.paidDate?.takeIf { it.isNotBlank() }
+            ?.let { meta.add("Bezahlt am ${it.substring(0, minOf(10, it.length))}") }
         b.feeMeta.text = meta.joinToString(" · ")
 
-        b.feeActionBtn.text = if (isPaid) "Zurücksetzen auf offen" else "Als bezahlt markieren"
-        b.feeActionBtn.setOnClickListener { onToggle(p) }
+        b.feeMarkPaidBtn.text = if (isPaid) "Zurücksetzen" else "Als bezahlt markieren"
+        b.feeMarkPaidBtn.setOnClickListener { onTogglePaid(p) }
+
+        b.feeRefBtn.visibility = if (isPaid) View.GONE else View.VISIBLE
+        b.feeRefBtn.text = if (p.referenceNr.isNullOrBlank()) "Ref." else "Ref. ändern"
+        b.feeRefBtn.setOnClickListener { onEditReference(p) }
     }
 
     private fun formatAmount(raw: String): String = try {
