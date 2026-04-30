@@ -113,6 +113,7 @@ class QrScannerActivity : AppCompatActivity() {
                     }
                     val tokenManager = VorstandApp.instance.tokenManager
                     tokenManager.token = body.token
+                    tokenManager.refreshToken = body.refreshToken
                     tokenManager.userEmail = body.user.email
                     tokenManager.userRole = body.user.role
                     tokenManager.userName = body.user.name

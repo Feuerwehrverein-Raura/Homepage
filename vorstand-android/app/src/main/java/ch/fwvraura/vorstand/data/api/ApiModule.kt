@@ -22,7 +22,7 @@ object ApiModule {
      * Basis-URL der Backend-API.
      * Alle API-Endpoints werden relativ zu dieser URL aufgeloest.
      */
-    private const val BASE_URL = "https://api.fwv-raura.ch/"
+    const val BASE_URL = "https://api.fwv-raura.ch/"
 
     /**
      * Retrofit-Instanz — wird in init() erstellt und von allen API-Properties gemeinsam genutzt.

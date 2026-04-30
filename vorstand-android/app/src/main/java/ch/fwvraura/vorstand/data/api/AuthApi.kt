@@ -42,6 +42,10 @@ interface AuthApi {
     @POST("auth/vorstand/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
+    /** Refresh-Token gegen neuen JWT tauschen (7 Tage rolling). */
+    @POST("auth/vorstand/refresh")
+    suspend fun refresh(@Body request: ch.fwvraura.vorstand.data.model.RefreshRequest): Response<LoginResponse>
+
     /**
      * QR-Login-Endpunkt. Tauscht einen persistenten App-Token (aus dem QR-Code)
      * gegen einen JWT. Kein Auth-Header noetig — der Token IST die Authentifizierung.

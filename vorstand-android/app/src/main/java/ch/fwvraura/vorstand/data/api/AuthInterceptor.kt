@@ -4,6 +4,7 @@ import android.content.Intent
 import ch.fwvraura.vorstand.VorstandApp
 import ch.fwvraura.vorstand.util.TokenManager
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.Response
 
 /**
@@ -49,57 +50,82 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
      * @return Die HTTP-Response vom Server.
      */
     override fun intercept(chain: Interceptor.Chain): Response {
-        // Schritt 1: Den originalen Request aus der Chain holen
         val original = chain.request()
-
-        // Schritt 2: Den gespeicherten JWT-Token aus dem TokenManager auslesen
         val token = tokenManager.token
 
-        // Schritt 3: Falls ein Token vorhanden ist, einen neuen Request mit dem
-        // Authorization-Header erstellen. "Bearer" ist das Standard-Praefix fuer JWT-Tokens.
-        // Falls kein Token vorhanden ist (null oder leer), wird der originale Request
-        // ohne Aenderung verwendet.
-        val request = if (!token.isNullOrEmpty()) {
-            original.newBuilder()
-                .header("Authorization", "Bearer $token")
-                .build()
-        } else {
-            original
+        val firstRequest = if (!token.isNullOrEmpty())
+            original.newBuilder().header("Authorization", "Bearer $token").build()
+        else original
+
+        val firstResponse = chain.proceed(firstRequest)
+
+        // Login- und Refresh-Endpoints duerfen nicht refresh-trigger sein.
+        val path = original.url.encodedPath
+        val isAuthEndpoint = path.contains("login") || path.contains("/refresh")
+        val needsRefresh = (firstResponse.code == 401 || firstResponse.code == 403) && !isAuthEndpoint
+
+        if (!needsRefresh) return firstResponse
+
+        // Versuche mit dem gespeicherten Refresh-Token einen neuen JWT zu holen.
+        val refresh = tokenManager.refreshToken
+        if (refresh.isNullOrBlank()) {
+            firstResponse.close()
+            forceReLogin()
+            return chain.proceed(firstRequest)
         }
 
-        // Schritt 4: Den (ggf. modifizierten) Request ausfuehren und die Response erhalten.
-        // chain.proceed() leitet den Request an den naechsten Interceptor oder an das
-        // Netzwerk weiter und gibt die Server-Antwort zurueck.
-        val response = chain.proceed(request)
+        val newAccess = synchronized(tokenManager) {
+            val current = tokenManager.token
+            if (!current.isNullOrEmpty() && current != token) current
+            else doRefresh(refresh)
+        }
 
-        // Schritt 5: Pruefen, ob der Server mit 401 oder 403 geantwortet hat.
-        // 401 = kein Token vorhanden, 403 = Token ungueltig/abgelaufen.
-        // Das Backend (authenticateVorstand) gibt 403 bei abgelaufenen JWTs zurueck.
-        // Die zusaetzliche Pruefung "!original.url.encodedPath.contains("login")" stellt
-        // sicher, dass ein fehlgeschlagener Login-Versuch NICHT zur automatischen
-        // Weiterleitung fuehrt - nur abgelaufene/ungueltige Tokens bei anderen Requests
-        // loesen die Weiterleitung aus.
-        if ((response.code == 401 || response.code == 403) && !original.url.encodedPath.contains("login")) {
-            // Token loeschen, da er ungueltig oder abgelaufen ist
-            tokenManager.clear()
+        if (newAccess.isNullOrBlank()) {
+            firstResponse.close()
+            forceReLogin()
+            return chain.proceed(firstRequest)
+        }
 
-            // Die Application-Instanz als Context verwenden, um die App neu zu starten
-            val context = VorstandApp.instance
+        firstResponse.close()
+        val retried = original.newBuilder()
+            .header("Authorization", "Bearer $newAccess")
+            .build()
+        return chain.proceed(retried)
+    }
 
-            // Die Launch-Activity der App ermitteln (normalerweise die LoginActivity)
-            val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            if (intent != null) {
-                // FLAG_ACTIVITY_NEW_TASK: Startet eine neue Task (noetig, da wir von
-                //   ausserhalb einer Activity starten, naemlich aus einem Interceptor).
-                // FLAG_ACTIVITY_CLEAR_TASK: Loescht alle bisherigen Activities vom Stack,
-                //   damit der Benutzer nicht mit "Zurueck" zu einer geschuetzten Seite
-                //   navigieren kann.
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                context.startActivity(intent)
+    /** Synchroner POST /auth/vorstand/refresh — gibt neuen Access-Token zurueck oder null. */
+    private fun doRefresh(refresh: String): String? {
+        val baseUrl = ch.fwvraura.vorstand.data.api.ApiModule.BASE_URL
+        val tokenUrl = baseUrl.removeSuffix("/") + "/auth/vorstand/refresh"
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val body = okhttp3.RequestBody.create(
+            "application/json".toMediaTypeOrNull(),
+            "{\"refresh_token\":\"$refresh\"}"
+        )
+        val req = okhttp3.Request.Builder().url(tokenUrl).post(body).build()
+        return try {
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val json = org.json.JSONObject(resp.body?.string() ?: return null)
+                val newAccess = json.optString("token").takeIf { it.isNotBlank() } ?: return null
+                val newRefresh = json.optString("refresh_token").takeIf { it.isNotBlank() }
+                tokenManager.token = newAccess
+                if (!newRefresh.isNullOrBlank()) tokenManager.refreshToken = newRefresh
+                newAccess
             }
-        }
+        } catch (_: Exception) { null }
+    }
 
-        // Schritt 6: Die Response zurueckgeben (an Retrofit/den Aufrufer)
-        return response
+    private fun forceReLogin() {
+        tokenManager.clear()
+        try {
+            val ctx = VorstandApp.instance
+            val intent = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName) ?: return
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            ctx.startActivity(intent)
+        } catch (_: Exception) { /* swallow */ }
     }
 }

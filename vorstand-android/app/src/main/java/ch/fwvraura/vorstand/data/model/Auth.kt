@@ -27,7 +27,15 @@ data class QrLoginRequest(
 data class LoginResponse(
     val success: Boolean,  // true wenn Login erfolgreich
     val token: String,     // JWT-Token (HS256, 8h gueltig) — wird fuer alle weiteren API-Aufrufe benoetigt
+    @com.google.gson.annotations.SerializedName("refresh_token")
+    val refreshToken: String? = null, // Refresh-Token (7 Tage rolling, fuer App-Persistenz)
     val user: UserInfo     // Informationen ueber den eingeloggten User
+)
+
+/** Body fuer POST /auth/vorstand/refresh. */
+data class RefreshRequest(
+    @com.google.gson.annotations.SerializedName("refresh_token")
+    val refreshToken: String
 )
 
 /**

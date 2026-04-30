@@ -472,6 +472,16 @@ app.post('/auth/vorstand/login', async (req, res) => {
             // Log successful login
             await logAudit(pool, 'LOGIN_SUCCESS', null, emailLower, clientIp, { role });
 
+            // Refresh-Token fuer die Vorstand-App ausgeben (7 Tage rolling).
+            // Web-Login schickt den Refresh-Token zwar auch mit, nutzt ihn aber nicht aktiv.
+            const refreshToken = 'fwv-vr-' + crypto.randomBytes(32).toString('base64url');
+            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            await pool.query(
+                `INSERT INTO vorstand_refresh_tokens (email, token, expires_at)
+                 VALUES ($1, $2, $3)`,
+                [emailLower, refreshToken, expiresAt]
+            );
+
             // Set cookie for cross-subdomain auth
             res.cookie('vorstand_token', token, {
                 domain: '.fwv-raura.ch',
@@ -484,6 +494,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
             res.json({
                 success: true,
                 token: token,
+                refresh_token: refreshToken,
                 user: {
                     email: emailLower,
                     role: role,
@@ -502,6 +513,86 @@ app.post('/auth/vorstand/login', async (req, res) => {
         console.error('Vorstand login error:', error);
         await logAudit(pool, 'LOGIN_ERROR', null, email, clientIp, { error: error.message });
         res.status(500).json({ error: 'Authentication service error' });
+    }
+});
+
+// DEUTSCH: Refresh-Token gegen einen neuen JWT tauschen (Rolling-Refresh).
+// Beim Erfolg: alter Refresh-Token wird invalidiert, neuer wird ausgestellt
+// (mit 7 Tagen Lebensdauer ab jetzt). So bleibt der User eingeloggt solange
+// die App spaetestens alle 7 Tage einmal benutzt wird.
+app.post('/auth/vorstand/refresh', async (req, res) => {
+    const clientIp = getClientIp(req);
+    try {
+        const { refresh_token } = req.body || {};
+        if (!refresh_token || typeof refresh_token !== 'string') {
+            return res.status(400).json({ error: 'refresh_token fehlt' });
+        }
+
+        const tokenRow = await pool.query(
+            `SELECT id, email, expires_at FROM vorstand_refresh_tokens
+             WHERE token = $1 AND revoked_at IS NULL`,
+            [refresh_token]
+        );
+        if (tokenRow.rows.length === 0) {
+            await logAudit(pool, 'VORSTAND_REFRESH_FAILED', null, null, clientIp, { reason: 'unknown_token' });
+            return res.status(401).json({ error: 'Refresh-Token ungueltig' });
+        }
+        const row = tokenRow.rows[0];
+        if (new Date(row.expires_at).getTime() < Date.now()) {
+            await pool.query('UPDATE vorstand_refresh_tokens SET revoked_at = NOW() WHERE id = $1', [row.id]);
+            await logAudit(pool, 'VORSTAND_REFRESH_FAILED', null, row.email, clientIp, { reason: 'expired' });
+            return res.status(401).json({ error: 'Refresh-Token abgelaufen' });
+        }
+
+        const emailLower = row.email.toLowerCase();
+        const emailPrefix = emailLower.split('@')[0];
+        let role = emailPrefix;
+        let groups = ['vorstand'];
+        let memberName = getRoleName(role);
+        try {
+            const memberResult = await pool.query(
+                "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1 OR funktion ILIKE '%Admin%'",
+                [emailLower]
+            );
+            if (memberResult.rows.length > 0) {
+                const m = memberResult.rows[0];
+                memberName = `${m.vorname} ${m.nachname}`;
+                if (m.funktion && m.funktion.toLowerCase().includes('admin')) {
+                    role = 'admin';
+                    groups = ['vorstand', 'admin'];
+                }
+            }
+        } catch (_) {}
+
+        const newJwt = jwt.sign(
+            { email: emailLower, role, groups, type: 'vorstand' },
+            process.env.JWT_SECRET || 'fwv-raura-secret-key',
+            { expiresIn: '8h' }
+        );
+
+        // Alten Refresh-Token invalidieren, neuen ausstellen (rolling)
+        const newRefresh = 'fwv-vr-' + crypto.randomBytes(32).toString('base64url');
+        const newExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await pool.query(
+            `UPDATE vorstand_refresh_tokens SET revoked_at = NOW(), used_at = NOW() WHERE id = $1`,
+            [row.id]
+        );
+        await pool.query(
+            `INSERT INTO vorstand_refresh_tokens (email, token, expires_at) VALUES ($1, $2, $3)`,
+            [emailLower, newRefresh, newExpires]
+        );
+
+        await logAudit(pool, 'VORSTAND_REFRESH_SUCCESS', null, emailLower, clientIp, { role });
+
+        res.json({
+            success: true,
+            token: newJwt,
+            refresh_token: newRefresh,
+            user: { email: emailLower, role, name: memberName }
+        });
+    } catch (error) {
+        console.error('Vorstand refresh error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -651,11 +742,22 @@ app.post('/auth/vorstand/qr-login', async (req, res) => {
             { expiresIn: '8h' }
         );
 
+        // Refresh-Token (7 Tage rolling) auch beim QR-Login, damit die App
+        // den User nach 8h JWT-Ablauf nicht ausloggt.
+        const refreshToken = 'fwv-vr-' + crypto.randomBytes(32).toString('base64url');
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await pool.query(
+            `INSERT INTO vorstand_refresh_tokens (email, token, expires_at)
+             VALUES ($1, $2, $3)`,
+            [emailLower, refreshToken, expiresAt]
+        );
+
         await logAudit(pool, 'QR_LOGIN_SUCCESS', null, emailLower, clientIp, { token_id: tokenId, role });
 
         res.json({
             success: true,
             token: jwtToken,
+            refresh_token: refreshToken,
             user: { email: emailLower, role, name: memberName }
         });
     } catch (err) {
