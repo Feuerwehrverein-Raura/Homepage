@@ -1813,6 +1813,13 @@ Feuerwehrverein Raura
             console.error('Bestätigungs-E-Mail konnte nicht gesendet werden:', emailError.message);
         }
 
+        // Push parallel — falls die anmelde-E-Mail einem Mitglied gehoert (memberId oben gesetzt)
+        if (memberId) {
+            pushToMember(memberId, 'event_update', confirmSubject,
+                'Wir haben deine Anmeldung erhalten und melden uns bei dir.',
+                { eventId }).catch(() => {});
+        }
+
         // Benachrichtigung an Organisator
         const orgSubject = `Neue Anmeldung für ${eventTitle}`;
         const orgBody = `
@@ -2362,6 +2369,16 @@ Feuerwehrverein Raura`;
             subject: `Alternative Schicht vorgeschlagen - ${eventTitle}`,
             body: emailBody
         });
+
+        // Push parallel — falls Anmeldung von einem Mitglied stammt
+        if (reg.member_id) {
+            pushToMember(
+                reg.member_id, 'shift_reminder',
+                `Neue Schicht vorgeschlagen: ${eventTitle}`,
+                `Schicht: ${shiftLabel}. Bitte in der App oder per E-Mail bestaetigen.`,
+                { eventId: reg.event_id }
+            ).catch(() => {});
+        }
 
         logInfo('Alternative shift suggested', {
             registrationId: id,
@@ -3715,6 +3732,11 @@ Feuerwehrverein Raura
                         body: body,
                         event_id: shift.event_id
                     });
+                    if (reg.member_id) {
+                        pushToMember(reg.member_id, 'shift_reminder', subject,
+                            `${shift.event_title} · ${dateStr} ${timeStr}`,
+                            { eventId: shift.event_id }).catch(() => {});
+                    }
                     sentCount++;
                 } catch (error) {
                     console.error(`Failed to send reminder to ${email}:`, error.message);
@@ -3812,6 +3834,11 @@ Feuerwehrverein Raura
                     }, {
                         headers: { 'x-api-key': process.env.API_KEY }
                     });
+                    if (reg.member_id) {
+                        pushToMember(reg.member_id, 'shift_reminder', subject,
+                            `${shift.event_title} · ${dateStr} ${timeStr}`,
+                            { eventId: shift.event_id }).catch(() => {});
+                    }
                     sentCount++;
                 } catch (error) {
                     console.error(`Failed to send reminder to ${email}:`, error.message);
@@ -4271,6 +4298,11 @@ Feuerwehrverein Raura
                         body: body,
                         event_id: shift.event_id
                     });
+                    if (reg.member_id) {
+                        pushToMember(reg.member_id, 'shift_reminder', subject,
+                            `${shift.event_title} · ${dateFormatted} ${startTime}-${endTime}`,
+                            { eventId: shift.event_id }).catch(() => {});
+                    }
 
                     totalSent++;
                     logInfo('Reminder sent', {
