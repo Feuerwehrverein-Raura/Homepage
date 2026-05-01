@@ -193,7 +193,7 @@ services:
       API_KEY: ${API_KEY}
       AUTHENTIK_URL: https://auth.fwv-raura.ch
       # DEUTSCH: Empfaenger des taeglichen Backup-XLSX (03:00 Europe/Zurich)
-      BACKUP_EMAIL: ${BACKUP_EMAIL:-aktuar@fwv-raura.ch,kassier@fwv-raura.ch}
+      BACKUP_EMAIL: ${BACKUP_EMAIL:-vorstand@fwv-raura.ch}
       ENABLE_DAILY_BACKUP: ${ENABLE_DAILY_BACKUP:-true}
     depends_on:
       postgres:
