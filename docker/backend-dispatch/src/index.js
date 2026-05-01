@@ -772,6 +772,16 @@ app.post('/email/send', authenticateAny, async (req, res) => {
         if (cc) {
             mailOptions.cc = cc;
         }
+        // Attachments durchreichen (z.B. fuer den taeglichen Backup-Export).
+        // Format: [{ filename, content (Buffer oder base64-String), contentType }, ...]
+        if (Array.isArray(req.body.attachments) && req.body.attachments.length > 0) {
+            mailOptions.attachments = req.body.attachments.map(a => {
+                const content = typeof a.content === 'string'
+                    ? Buffer.from(a.content, 'base64')
+                    : a.content;
+                return { filename: a.filename, content, contentType: a.contentType };
+            });
+        }
         const info = await transporter.sendMail(mailOptions);
 
         // Log
@@ -4501,6 +4511,23 @@ scheduledJobs.registerHandler('membership_fees_post_bulk', async (payload) => {
 scheduledJobs.mountEndpoints(app, pool, requireVorstand);
 
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
+// Taeglicher Backup-Export: Mitglieder, Beitraege, Rechnungen etc. als XLSX
+// per E-Mail an BACKUP_EMAIL (default vorstand@fwv-raura.ch). Laeuft taeglich
+// um 03:00 Europe/Zurich. ENABLE_DAILY_BACKUP=false deaktiviert.
+const { scheduleNext: scheduleDailyBackup, runDailyBackup } = require('./backup-export');
+if (process.env.ENABLE_DAILY_BACKUP !== 'false') {
+    scheduleDailyBackup(pool);
+}
+
+// Manueller Trigger fuer Backup-Test (nur Vorstand/Admin).
+app.post('/internal/run-backup-now', authenticateAny, async (req, res) => {
+    if (!req.user?.groups?.some(g => ['vorstand', 'admin'].includes(g))) {
+        return res.status(403).json({ error: 'Vorstand/Admin only' });
+    }
+    res.json({ success: true, message: 'Backup gestartet — landet in der Inbox in 1-2 Minuten.' });
+    runDailyBackup(pool).catch(err => console.error('Manual backup trigger failed:', err.message));
+});
+
 app.listen(PORT, () => {
     console.log(`API-Dispatch running on port ${PORT}`);
 });
