@@ -72,6 +72,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signing-Keys fuer Auto-Updater. tauri-action nutzt sie automatisch
+          # zum Erzeugen der signierten Bundles + latest.json (siehe pubkey in
+          # tauri.conf.json -> plugins.updater).
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: vorstand-desktop
           tagName: ${{ github.ref_name || format('vorstand-desktop-v{0}', inputs.version) }}
