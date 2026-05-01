@@ -4022,31 +4022,44 @@
                     break;
             }
 
-            // Alle Felder fuer Serienbriefe
+            // Vollstaendiger Export — alle relevanten Mitgliederdaten
             const headers = [
-                'Anrede', 'Vorname', 'Nachname',
+                'Anrede', 'Vorname', 'Nachname', 'Geschlecht',
+                'Geburtstag', 'Eintrittsdatum', 'Austrittsdatum',
                 'Strasse', 'Adresszusatz', 'PLZ', 'Ort',
-                'E-Mail', 'Telefon', 'Mobile',
+                'E-Mail', 'Versand-E-Mail', 'Telefon', 'Mobile',
                 'Status', 'Funktion', 'Feuerwehr-Zugehoerigkeit',
-                'Geburtstag', 'Eintrittsdatum'
+                'T-Shirt-Groesse', 'IBAN',
+                'Zustellung E-Mail', 'Zustellung Post',
+                'Bemerkungen'
             ];
+
+            const yesNo = (v) => v === true ? 'ja' : v === false ? 'nein' : '';
 
             const rows = filteredMembers.map(m => [
                 escapeCSV(m.anrede),
                 escapeCSV(m.vorname),
                 escapeCSV(m.nachname),
+                escapeCSV(m.geschlecht),
+                escapeCSV(m.geburtstag),
+                escapeCSV(m.eintrittsdatum),
+                escapeCSV(m.austrittsdatum),
                 escapeCSV(m.strasse),
                 escapeCSV(m.adresszusatz),
                 escapeCSV(m.plz),
                 escapeCSV(m.ort),
                 escapeCSV(m.email),
+                escapeCSV(m.versand_email),
                 escapeCSV(m.telefon),
                 escapeCSV(m.mobile),
                 escapeCSV(m.status),
                 escapeCSV(m.funktion),
                 escapeCSV(m.feuerwehr_zugehoerigkeit),
-                escapeCSV(m.geburtstag),
-                escapeCSV(m.eintrittsdatum)
+                escapeCSV(m.tshirt_groesse),
+                escapeCSV(m.iban),
+                escapeCSV(yesNo(m.zustellung_email)),
+                escapeCSV(yesNo(m.zustellung_post)),
+                escapeCSV(m.bemerkungen)
             ].join(';'));  // Semikolon fuer bessere Excel-Kompatibilitaet
 
             // BOM fuer UTF-8 (damit Excel Umlaute richtig anzeigt)
