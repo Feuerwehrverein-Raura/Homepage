@@ -872,6 +872,57 @@
                     <button id="email-tab-zustellung" class="email-tab-btn py-3 px-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                         📧 Zustellliste
                     </button>
+                    <button id="email-tab-inbox" class="email-tab-btn py-3 px-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                        ✉️ Posteingang
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Inbox Panel: 3-Pane Webmail-Reader -->
+        <section id="inbox-panel" class="py-6 hidden">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden" style="height: calc(100vh - 240px); min-height: 500px;">
+                    <div class="flex h-full">
+                        <!-- Mail-Liste -->
+                        <div class="w-2/5 border-r border-gray-200 flex flex-col">
+                            <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+                                <select id="inbox-account" class="px-2 py-1 text-sm border border-gray-300 rounded"></select>
+                                <select id="inbox-folder" class="px-2 py-1 text-sm border border-gray-300 rounded flex-1"></select>
+                                <button id="inbox-refresh-btn" class="px-2 py-1 text-sm text-gray-600 hover:bg-gray-200 rounded" title="Aktualisieren">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                </button>
+                            </div>
+                            <div id="inbox-list" class="flex-1 overflow-y-auto"></div>
+                            <div id="inbox-status" class="px-4 py-2 text-xs text-gray-500 border-t border-gray-200 bg-gray-50"></div>
+                        </div>
+                        <!-- Detail-Pane -->
+                        <div class="w-3/5 flex flex-col">
+                            <div id="inbox-detail-empty" class="flex-1 flex items-center justify-center text-gray-400 text-sm">
+                                Keine Nachricht ausgewählt
+                            </div>
+                            <div id="inbox-detail" class="hidden flex-1 flex flex-col">
+                                <div class="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                                    <div class="flex justify-between items-start gap-2">
+                                        <div class="flex-1 min-w-0">
+                                            <h3 id="inbox-subject" class="text-base font-bold text-gray-900 truncate"></h3>
+                                            <div class="text-xs text-gray-600 mt-1">
+                                                <div><strong>Von:</strong> <span id="inbox-from"></span></div>
+                                                <div><strong>An:</strong> <span id="inbox-to"></span></div>
+                                                <div><strong>Datum:</strong> <span id="inbox-date"></span></div>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-1 shrink-0">
+                                            <button id="inbox-mark-unread-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Als ungelesen markieren">●</button>
+                                            <button id="inbox-delete-btn" class="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50" title="In Papierkorb">🗑️</button>
+                                        </div>
+                                    </div>
+                                    <div id="inbox-attachments" class="mt-2 flex flex-wrap gap-1"></div>
+                                </div>
+                                <div id="inbox-body" class="flex-1 overflow-y-auto p-4 text-sm"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -8730,6 +8781,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         document.getElementById('email-tab-aliases').addEventListener('click', () => switchEmailTab('aliases'));
         document.getElementById('email-tab-quota').addEventListener('click', () => switchEmailTab('quota'));
         document.getElementById('email-tab-zustellung').addEventListener('click', () => switchEmailTab('zustellung'));
+        document.getElementById('email-tab-inbox').addEventListener('click', () => switchEmailTab('inbox'));
 
         // Zustellung Emails
         document.getElementById('copy-emails-btn').addEventListener('click', copyZustellungEmails);
@@ -9110,6 +9162,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             document.getElementById('aliases-panel').classList.add('hidden');
             document.getElementById('quota-panel').classList.add('hidden');
             document.getElementById('zustellung-panel').classList.add('hidden');
+            document.getElementById('inbox-panel').classList.add('hidden');
 
             if (tab === 'mailboxes') {
                 document.getElementById('email-tab-mailboxes').classList.add('border-fire-500', 'text-fire-600');
@@ -9127,8 +9180,177 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 document.getElementById('email-tab-zustellung').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('zustellung-panel').classList.remove('hidden');
                 loadZustellungEmails();
+            } else if (tab === 'inbox') {
+                document.getElementById('email-tab-inbox').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('inbox-panel').classList.remove('hidden');
+                openInbox();
             }
         }
+
+        // ============================================
+        // POSTEINGANG (IMAP-Webmail-Reader)
+        // ============================================
+
+        let inboxState = { account: null, folder: 'INBOX', uid: null, messages: [] };
+
+        async function openInbox() {
+            try {
+                const r = await fetch(`${API_BASE}/imap/accounts`, { headers: { Authorization: `Bearer ${authToken}` } });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                const sel = document.getElementById('inbox-account');
+                sel.innerHTML = data.accounts.map(a => `<option value="${a}">${a}</option>`).join('');
+                if (data.missing && data.missing.length > 0 && data.accounts.length === 0) {
+                    document.getElementById('inbox-list').innerHTML =
+                        `<div class="p-4 text-sm text-gray-600">Fuer ${data.missing.join(', ')} ist noch kein Passwort gesetzt. Bitte unter <a href="mein.html" class="text-fire-600 underline">Mein Profil</a> setzen.</div>`;
+                    return;
+                }
+                if (data.accounts.length === 0) {
+                    document.getElementById('inbox-list').innerHTML = '<div class="p-4 text-sm text-gray-500">Keine Postfaecher verfuegbar.</div>';
+                    return;
+                }
+                inboxState.account = data.accounts[0];
+                await loadInboxFolders();
+            } catch (e) {
+                document.getElementById('inbox-list').innerHTML = `<div class="p-4 text-sm text-red-600">Fehler: ${e.message}</div>`;
+            }
+        }
+
+        async function loadInboxFolders() {
+            const r = await fetch(`${API_BASE}/imap/folders?account=${encodeURIComponent(inboxState.account)}`, {
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+            if (!r.ok) {
+                document.getElementById('inbox-list').innerHTML = `<div class="p-4 text-sm text-red-600">Folder-Fehler ${r.status}</div>`;
+                return;
+            }
+            const folders = await r.json();
+            const order = ['\\Inbox', '\\Sent', '\\Drafts', '\\Junk', '\\Trash', '\\Archive'];
+            folders.sort((a, b) => (order.indexOf(a.specialUse) + 99) - (order.indexOf(b.specialUse) + 99));
+            const sel = document.getElementById('inbox-folder');
+            sel.innerHTML = folders.map(f => `<option value="${f.path}">${f.name}</option>`).join('');
+            sel.value = inboxState.folder = 'INBOX';
+            await loadInboxMessages();
+        }
+
+        async function loadInboxMessages() {
+            document.getElementById('inbox-list').innerHTML = '<div class="p-4 text-sm text-gray-500">Lade…</div>';
+            try {
+                const url = `${API_BASE}/imap/messages?account=${encodeURIComponent(inboxState.account)}&folder=${encodeURIComponent(inboxState.folder)}&limit=100`;
+                const r = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                inboxState.messages = data.messages;
+                document.getElementById('inbox-status').textContent = `${data.total} Nachrichten · ${data.unseen} ungelesen`;
+                if (data.messages.length === 0) {
+                    document.getElementById('inbox-list').innerHTML = '<div class="p-4 text-sm text-gray-500">Keine Nachrichten</div>';
+                    return;
+                }
+                document.getElementById('inbox-list').innerHTML = data.messages.map(m => {
+                    const fromShort = (m.from || '').replace(/<[^>]*>/, '').replace(/"/g, '').trim() || m.from;
+                    const dateStr = new Date(m.date).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' });
+                    return `
+                    <div class="inbox-row border-b border-gray-100 px-4 py-2 cursor-pointer hover:bg-gray-50 ${m.seen ? '' : 'font-semibold bg-blue-50'}" data-uid="${m.uid}">
+                        <div class="flex justify-between items-baseline gap-2">
+                            <div class="text-sm truncate flex-1">${escapeHtml(fromShort)}</div>
+                            <div class="text-xs text-gray-500 shrink-0">${dateStr}</div>
+                        </div>
+                        <div class="text-sm text-gray-700 truncate">${escapeHtml(m.subject)}</div>
+                    </div>`;
+                }).join('');
+                document.querySelectorAll('.inbox-row').forEach(row => {
+                    row.addEventListener('click', () => loadInboxMessage(parseInt(row.dataset.uid, 10)));
+                });
+            } catch (e) {
+                document.getElementById('inbox-list').innerHTML = `<div class="p-4 text-sm text-red-600">Fehler: ${e.message}</div>`;
+            }
+        }
+
+        async function loadInboxMessage(uid) {
+            inboxState.uid = uid;
+            document.getElementById('inbox-detail-empty').classList.add('hidden');
+            document.getElementById('inbox-detail').classList.remove('hidden');
+            document.getElementById('inbox-body').innerHTML = '<div class="text-gray-500">Lade…</div>';
+            const url = `${API_BASE}/imap/messages/${uid}?account=${encodeURIComponent(inboxState.account)}&folder=${encodeURIComponent(inboxState.folder)}`;
+            const r = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+            if (!r.ok) {
+                document.getElementById('inbox-body').innerHTML = `<div class="text-red-600">Fehler ${r.status}</div>`;
+                return;
+            }
+            const m = await r.json();
+            document.getElementById('inbox-subject').textContent = m.subject;
+            document.getElementById('inbox-from').textContent = m.from;
+            document.getElementById('inbox-to').textContent = m.to;
+            document.getElementById('inbox-date').textContent = new Date(m.date).toLocaleString('de-CH');
+            // Attachments
+            const att = document.getElementById('inbox-attachments');
+            att.innerHTML = (m.attachments || []).map(a =>
+                `<a href="${API_BASE}/imap/messages/${uid}/attachments/${a.index}?account=${encodeURIComponent(inboxState.account)}&folder=${encodeURIComponent(inboxState.folder)}"
+                    class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded inline-flex items-center gap-1"
+                    onclick="downloadAttachmentWithAuth(event, this)">📎 ${escapeHtml(a.filename)}</a>`
+            ).join('');
+            // Body — html bevorzugt mit sandbox iframe, sonst text
+            if (m.html) {
+                const blob = new Blob([m.html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                document.getElementById('inbox-body').innerHTML =
+                    `<iframe sandbox="allow-same-origin" srcdoc="${m.html.replace(/"/g, '&quot;')}" class="w-full h-full border-0" style="min-height: 400px;"></iframe>`;
+            } else {
+                document.getElementById('inbox-body').innerHTML =
+                    `<pre class="whitespace-pre-wrap font-sans text-sm">${escapeHtml(m.text || '(Kein Inhalt)')}</pre>`;
+            }
+            // Lokale Liste auf "gelesen" setzen
+            const idx = inboxState.messages.findIndex(x => x.uid === uid);
+            if (idx >= 0) {
+                inboxState.messages[idx].seen = true;
+                const row = document.querySelector(`.inbox-row[data-uid="${uid}"]`);
+                if (row) row.classList.remove('font-semibold', 'bg-blue-50');
+            }
+        }
+
+        async function downloadAttachmentWithAuth(e, link) {
+            e.preventDefault();
+            const url = link.href;
+            const r = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+            if (!r.ok) { alert('Download fehlgeschlagen'); return; }
+            const blob = await r.blob();
+            const filename = link.textContent.replace(/^📎\s*/, '');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+        }
+
+        document.getElementById('inbox-account').addEventListener('change', (e) => {
+            inboxState.account = e.target.value;
+            loadInboxFolders();
+        });
+        document.getElementById('inbox-folder').addEventListener('change', (e) => {
+            inboxState.folder = e.target.value;
+            loadInboxMessages();
+        });
+        document.getElementById('inbox-refresh-btn').addEventListener('click', () => loadInboxMessages());
+        document.getElementById('inbox-mark-unread-btn').addEventListener('click', async () => {
+            if (!inboxState.uid) return;
+            await fetch(`${API_BASE}/imap/messages/${inboxState.uid}/flags?account=${encodeURIComponent(inboxState.account)}&folder=${encodeURIComponent(inboxState.folder)}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ remove: ['\\Seen'] })
+            });
+            loadInboxMessages();
+        });
+        document.getElementById('inbox-delete-btn').addEventListener('click', async () => {
+            if (!inboxState.uid) return;
+            if (!confirm('Nachricht in den Papierkorb verschieben?')) return;
+            await fetch(`${API_BASE}/imap/messages/${inboxState.uid}?account=${encodeURIComponent(inboxState.account)}&folder=${encodeURIComponent(inboxState.folder)}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+            document.getElementById('inbox-detail').classList.add('hidden');
+            document.getElementById('inbox-detail-empty').classList.remove('hidden');
+            inboxState.uid = null;
+            loadInboxMessages();
+        });
 
         // Laedt alle Mailboxen von der Mailcow-API und rendert die Tabelle.
         async function loadMailboxes() {
