@@ -4707,7 +4707,10 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
 
         const mailcowResponse = await fetch(`${DISPATCH_API}/mailcow/mailboxes/${encodeURIComponent(functionEmail)}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.API_KEY || ''
+            },
             body: JSON.stringify({ password })
         });
 
