@@ -21,6 +21,7 @@ import { MembershipFeesPage } from "@/pages/membership-fees/MembershipFeesPage";
 import { ScheduledJobsPage } from "@/pages/scheduled-jobs/ScheduledJobsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { AppTokensPage } from "@/pages/app-tokens/AppTokensPage";
+import { MailPage } from "@/pages/mail/MailPage";
 
 export function AppLayout() {
   const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
@@ -50,6 +51,7 @@ export function AppLayout() {
             <Route path="registrations" element={<RegistrationsPage />} />
             <Route path="audit" element={<AuditPage />} />
             <Route path="mailcow" element={<MailcowPage />} />
+            <Route path="mail" element={<MailPage />} />
             <Route path="vault" element={<VaultPage />} />
             <Route path="mass-pdf" element={<MassPdfPage />} />
             <Route path="membership-fees" element={<MembershipFeesPage />} />
