@@ -6,7 +6,7 @@ on:
       - 'vorstand-desktop-v*'
   pull_request:
     paths:
-      - 'vorstand-desktop/**'
+      - 'apps/vorstand-desktop/**'
   workflow_dispatch:
     inputs:
       version:
@@ -44,7 +44,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: 'vorstand-desktop/src-tauri -> target'
+          workspaces: 'apps/vorstand-desktop/src-tauri -> target'
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -53,7 +53,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsecret-1-dev
 
       - name: Install frontend dependencies
-        working-directory: vorstand-desktop
+        working-directory: apps/vorstand-desktop
         run: npm ci
 
       - name: Determine version
@@ -78,7 +78,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          projectPath: vorstand-desktop
+          projectPath: apps/vorstand-desktop
           tagName: ${{ github.ref_name || format('vorstand-desktop-v{0}', inputs.version) }}
           releaseName: 'Vorstand Desktop ${{ steps.version.outputs.value }}'
           releaseBody: |

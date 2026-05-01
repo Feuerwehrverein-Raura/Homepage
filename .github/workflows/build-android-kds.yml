@@ -3,14 +3,14 @@ name: Build Android Kitchen Display
 on:
   push:
     paths:
-      - 'simple-order-system/kitchen-display-android/**'
+      - 'apps/order-system/kitchen-display-android/**'
     branches:
       - main
     tags:
       - 'kds-v*'  # Release bei Tag wie kds-v1.0.0
   pull_request:
     paths:
-      - 'simple-order-system/kitchen-display-android/**'
+      - 'apps/order-system/kitchen-display-android/**'
   workflow_dispatch:
     inputs:
       create_release:
@@ -45,33 +45,33 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Build Debug APK
-        working-directory: simple-order-system/kitchen-display-android
+        working-directory: apps/order-system/kitchen-display-android
         run: gradle assembleDebug
 
       - name: Build Release APK
-        working-directory: simple-order-system/kitchen-display-android
+        working-directory: apps/order-system/kitchen-display-android
         run: gradle assembleRelease
 
       - name: Rename APKs
         run: |
           VERSION="${{ inputs.version || '1.0.0' }}"
-          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/app-debug.apk \
-             simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/kitchen-display-${VERSION}-debug.apk
-          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/release/app-release-unsigned.apk \
-             simple-order-system/kitchen-display-android/app/build/outputs/apk/release/kitchen-display-${VERSION}-release.apk
+          mv apps/order-system/kitchen-display-android/app/build/outputs/apk/debug/app-debug.apk \
+             apps/order-system/kitchen-display-android/app/build/outputs/apk/debug/kitchen-display-${VERSION}-debug.apk
+          mv apps/order-system/kitchen-display-android/app/build/outputs/apk/release/app-release-unsigned.apk \
+             apps/order-system/kitchen-display-android/app/build/outputs/apk/release/kitchen-display-${VERSION}-release.apk
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: kitchen-display-debug
-          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
+          path: apps/order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
           retention-days: 30
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: kitchen-display-release
-          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+          path: apps/order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
           retention-days: 30
 
       - name: Create Release
@@ -99,7 +99,7 @@ jobs:
             - Audio-Benachrichtigungen
             - Automatischer Reconnect
           files: |
-            simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
-            simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+            apps/order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
+            apps/order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
           draft: false
           prerelease: false
