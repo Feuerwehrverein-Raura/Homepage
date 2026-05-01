@@ -4511,6 +4511,11 @@ scheduledJobs.registerHandler('membership_fees_post_bulk', async (payload) => {
 scheduledJobs.mountEndpoints(app, pool, requireVorstand);
 
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
+// IMAP-Webmail-Endpoints fuer Vorstand (lesen, markieren, loeschen, Anhaenge)
+const { mountImap } = require('./imap-mail');
+const authVorstandMail = [authenticateAny, requireRole('vorstand', 'admin')];
+mountImap(app, pool, authVorstandMail);
+
 // Taeglicher Backup-Export: Mitglieder, Beitraege, Rechnungen etc. als XLSX
 // per E-Mail an BACKUP_EMAIL (default vorstand@fwv-raura.ch). Laeuft taeglich
 // um 03:00 Europe/Zurich. ENABLE_DAILY_BACKUP=false deaktiviert.

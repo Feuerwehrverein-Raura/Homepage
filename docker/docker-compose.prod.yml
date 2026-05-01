@@ -195,6 +195,11 @@ services:
       # DEUTSCH: Empfaenger des taeglichen Backup-XLSX (03:00 Europe/Zurich)
       BACKUP_EMAIL: ${BACKUP_EMAIL:-vorstand@fwv-raura.ch}
       ENABLE_DAILY_BACKUP: ${ENABLE_DAILY_BACKUP:-true}
+      # DEUTSCH: Webmail-Funktion (api-dispatch /imap/*) — entschluesselt shared_mailbox_passwords
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      IMAP_HOST: ${IMAP_HOST:-mail.test.juroct.net}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      MAIL_DOMAIN: ${MAIL_DOMAIN:-fwv-raura.ch}
     depends_on:
       postgres:
         condition: service_healthy
@@ -208,7 +213,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.api-dispatch.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/email`) || PathPrefix(`/pingen`) || PathPrefix(`/sms`) || PathPrefix(`/templates`) || PathPrefix(`/letters`) || PathPrefix(`/contact`) || PathPrefix(`/newsletter`) || PathPrefix(`/dispatch-log`) || PathPrefix(`/mailcow`) || PathPrefix(`/pdf-templates`) || PathPrefix(`/organisation-settings`) || PathPrefix(`/dispatch`) || PathPrefix(`/scheduled-jobs`))
+      - traefik.http.routers.api-dispatch.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/email`) || PathPrefix(`/pingen`) || PathPrefix(`/sms`) || PathPrefix(`/templates`) || PathPrefix(`/letters`) || PathPrefix(`/contact`) || PathPrefix(`/newsletter`) || PathPrefix(`/dispatch-log`) || PathPrefix(`/mailcow`) || PathPrefix(`/pdf-templates`) || PathPrefix(`/organisation-settings`) || PathPrefix(`/dispatch`) || PathPrefix(`/scheduled-jobs`) || PathPrefix(`/imap`))
       - traefik.http.routers.api-dispatch.entrypoints=https
       - traefik.http.routers.api-dispatch.tls=true
       - traefik.http.routers.api-dispatch.tls.certresolver=letsencrypt

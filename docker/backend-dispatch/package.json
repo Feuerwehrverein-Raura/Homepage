@@ -19,6 +19,8 @@
     "swissqrbill": "^4.0.0",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.1.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "imapflow": "^1.0.162",
+    "mailparser": "^3.7.1"
   }
 }
