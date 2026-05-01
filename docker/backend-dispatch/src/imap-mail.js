@@ -11,10 +11,14 @@
 
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const nodemailer = require('nodemailer');
+const MailComposer = require('nodemailer/lib/mail-composer');
 const crypto = require('crypto');
 
 const IMAP_HOST = process.env.IMAP_HOST || 'mail.test.juroct.net';
 const IMAP_PORT = parseInt(process.env.IMAP_PORT || '993', 10);
+const SMTP_HOST = process.env.SMTP_HOST || IMAP_HOST;
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '';
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 const MAIL_DOMAIN = process.env.MAIL_DOMAIN || 'fwv-raura.ch';
@@ -299,6 +303,111 @@ function mountImap(app, pool, authVorstand) {
             res.status(500).json({ error: err.message });
         } finally {
             if (client) await client.logout().catch(() => {});
+        }
+    });
+
+    // Helper: holt entschluesseltes Passwort fuer einen Account oder wirft.
+    async function getAccountPassword(account) {
+        const r = await pool.query(
+            'SELECT encrypted_password FROM shared_mailbox_passwords WHERE email = $1',
+            [account]
+        );
+        if (r.rows.length === 0) throw new Error('Kein Passwort hinterlegt');
+        const pw = decryptPassword(r.rows[0].encrypted_password);
+        if (!pw) throw new Error('Passwort konnte nicht entschluesselt werden');
+        return pw;
+    }
+
+    // Helper: Mail-Body bauen (text + attachments). attachments-Format:
+    // [{ filename, content (base64), contentType }]
+    function buildMailData({ account, to, cc, bcc, subject, body, html, inReplyTo, references, attachments }) {
+        const headers = {};
+        if (inReplyTo) headers['In-Reply-To'] = inReplyTo;
+        if (references) headers['References'] = references;
+        return {
+            from: account, to, cc: cc || undefined, bcc: bcc || undefined,
+            subject, text: body || '', html: html || undefined, headers,
+            attachments: Array.isArray(attachments) && attachments.length > 0
+                ? attachments.map(a => ({
+                    filename: a.filename,
+                    content: typeof a.content === 'string' ? Buffer.from(a.content, 'base64') : a.content,
+                    contentType: a.contentType
+                }))
+                : undefined
+        };
+    }
+
+    function buildRaw(mailData) {
+        return new Promise((resolve, reject) => {
+            new MailComposer(mailData).compile().build((err, msg) => err ? reject(err) : resolve(msg));
+        });
+    }
+
+    async function appendToSpecialFolder(imapClient, specialUse, fallbackName, raw, flags) {
+        const list = await imapClient.list();
+        const path = list.find(f => f.specialUse === specialUse)?.path
+            || list.find(f => new RegExp(fallbackName, 'i').test(f.name))?.path
+            || fallbackName;
+        await imapClient.append(path, raw, flags);
+    }
+
+    // E-Mail versenden (Neu / Antwort / Weiterleitung).
+    // Body: { account, to, cc, bcc, subject, body, html, inReplyTo, references, attachments }
+    app.post('/imap/send', authVorstand, async (req, res) => {
+        const account = (req.body?.account || '').toLowerCase();
+        if (!allowedAccounts(req).includes(account)) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Postfach' });
+        }
+        if (!req.body?.to || !req.body?.subject) {
+            return res.status(400).json({ error: 'to + subject erforderlich' });
+        }
+        let imapClient;
+        try {
+            const password = await getAccountPassword(account);
+            const mailData = buildMailData({ account, ...req.body });
+
+            // SMTP-Versand mit Account-Credentials (STARTTLS auf 587)
+            const transporter = nodemailer.createTransport({
+                host: SMTP_HOST, port: SMTP_PORT, secure: false, requireTLS: true,
+                auth: { user: account, pass: password }
+            });
+            const info = await transporter.sendMail(mailData);
+
+            // Kopie in Sent ablegen
+            try {
+                const raw = await buildRaw(mailData);
+                imapClient = await connectImap(pool, account);
+                await appendToSpecialFolder(imapClient, '\\Sent', 'sent|gesendet', raw, ['\\Seen']);
+            } catch (e) { console.warn('[IMAP] Sent-folder append failed:', e.message); }
+
+            res.json({ success: true, messageId: info.messageId });
+        } catch (err) {
+            console.error('[IMAP] /send failed:', err.message);
+            res.status(500).json({ error: err.message });
+        } finally {
+            if (imapClient) await imapClient.logout().catch(() => {});
+        }
+    });
+
+    // Entwurf in Drafts-Ordner speichern (nicht senden).
+    app.post('/imap/draft', authVorstand, async (req, res) => {
+        const account = (req.body?.account || '').toLowerCase();
+        if (!allowedAccounts(req).includes(account)) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Postfach' });
+        }
+        let imapClient;
+        try {
+            await getAccountPassword(account); // existence check
+            const mailData = buildMailData({ account, ...req.body });
+            const raw = await buildRaw(mailData);
+            imapClient = await connectImap(pool, account);
+            await appendToSpecialFolder(imapClient, '\\Drafts', 'drafts|entwuerfe', raw, ['\\Draft']);
+            res.json({ success: true });
+        } catch (err) {
+            console.error('[IMAP] /draft failed:', err.message);
+            res.status(500).json({ error: err.message });
+        } finally {
+            if (imapClient) await imapClient.logout().catch(() => {});
         }
     });
 

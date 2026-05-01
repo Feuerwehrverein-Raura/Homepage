@@ -879,6 +879,40 @@
             </div>
         </section>
 
+        <!-- Compose-Modal: Neu / Antwort / Weiterleiten -->
+        <div id="compose-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
+                <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                    <h3 id="compose-title" class="text-lg font-bold">Neue E-Mail</h3>
+                    <button id="compose-close" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div class="px-4 py-3 space-y-2 overflow-y-auto flex-1">
+                    <div class="grid grid-cols-[80px_1fr] items-center gap-2">
+                        <label class="text-sm text-gray-600">Von:</label>
+                        <span id="compose-from" class="text-sm font-mono"></span>
+                        <label class="text-sm text-gray-600">An:</label>
+                        <input id="compose-to" type="text" placeholder="empfaenger@example.com (mehrere mit Komma)" class="px-2 py-1 text-sm border border-gray-300 rounded">
+                        <label class="text-sm text-gray-600">CC:</label>
+                        <input id="compose-cc" type="text" placeholder="optional" class="px-2 py-1 text-sm border border-gray-300 rounded">
+                        <label class="text-sm text-gray-600">BCC:</label>
+                        <input id="compose-bcc" type="text" placeholder="optional" class="px-2 py-1 text-sm border border-gray-300 rounded">
+                        <label class="text-sm text-gray-600">Betreff:</label>
+                        <input id="compose-subject" type="text" class="px-2 py-1 text-sm border border-gray-300 rounded">
+                    </div>
+                    <textarea id="compose-body" rows="14" class="w-full px-2 py-2 text-sm border border-gray-300 rounded font-sans" placeholder="Nachricht..."></textarea>
+                    <div>
+                        <label class="text-sm text-gray-600">Anhänge:</label>
+                        <input id="compose-attachments" type="file" multiple class="block text-sm mt-1">
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-t border-gray-200 flex justify-end gap-2">
+                    <button id="compose-draft-btn" class="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">Entwurf speichern</button>
+                    <button id="compose-cancel-btn" class="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
+                    <button id="compose-send-btn" class="px-4 py-1.5 text-sm bg-fire-500 text-white rounded hover:bg-fire-600">Senden</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Inbox Panel: 3-Pane Webmail-Reader -->
         <section id="inbox-panel" class="py-6 hidden">
             <div class="container mx-auto px-4">
@@ -887,6 +921,7 @@
                         <!-- Mail-Liste -->
                         <div class="w-2/5 border-r border-gray-200 flex flex-col">
                             <div class="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center gap-2">
+                                <button id="inbox-compose-btn" class="px-3 py-1 text-sm bg-fire-500 text-white rounded hover:bg-fire-600 whitespace-nowrap">✏️ Neu</button>
                                 <select id="inbox-account" class="px-2 py-1 text-sm border border-gray-300 rounded"></select>
                                 <select id="inbox-folder" class="px-2 py-1 text-sm border border-gray-300 rounded flex-1"></select>
                                 <button id="inbox-refresh-btn" class="px-2 py-1 text-sm text-gray-600 hover:bg-gray-200 rounded" title="Aktualisieren">
@@ -913,6 +948,9 @@
                                             </div>
                                         </div>
                                         <div class="flex gap-1 shrink-0">
+                                            <button id="inbox-reply-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Antworten">↩️ Antw.</button>
+                                            <button id="inbox-reply-all-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Allen antworten">↩↩</button>
+                                            <button id="inbox-forward-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Weiterleiten">➡️ Weiter</button>
                                             <button id="inbox-mark-unread-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Als ungelesen markieren">●</button>
                                             <button id="inbox-delete-btn" class="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50" title="In Papierkorb">🗑️</button>
                                         </div>
@@ -9351,6 +9389,157 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             inboxState.uid = null;
             loadInboxMessages();
         });
+
+        // ============================================
+        // COMPOSE (Neu / Antwort / Weiterleiten)
+        // ============================================
+
+        let composeContext = { inReplyTo: null, references: null };
+
+        function openCompose({ to = '', cc = '', bcc = '', subject = '', body = '', inReplyTo = null, references = null, title = 'Neue E-Mail' }) {
+            document.getElementById('compose-title').textContent = title;
+            document.getElementById('compose-from').textContent = inboxState.account || '';
+            document.getElementById('compose-to').value = to;
+            document.getElementById('compose-cc').value = cc;
+            document.getElementById('compose-bcc').value = bcc;
+            document.getElementById('compose-subject').value = subject;
+            document.getElementById('compose-body').value = body;
+            document.getElementById('compose-attachments').value = '';
+            composeContext = { inReplyTo, references };
+            document.getElementById('compose-modal').classList.remove('hidden');
+        }
+
+        function closeCompose() {
+            document.getElementById('compose-modal').classList.add('hidden');
+        }
+
+        function quoteBody(m) {
+            const dateStr = new Date(m.date).toLocaleString('de-CH');
+            const lines = (m.text || '').split('\n').map(l => '> ' + l).join('\n');
+            return `\n\n--- Original-Nachricht ---\nVon: ${m.from}\nDatum: ${dateStr}\nBetreff: ${m.subject}\n\n${lines}`;
+        }
+
+        function extractEmailAddresses(headerString) {
+            // Extract list of email addresses from comma-separated "Name <addr>" string
+            return (headerString || '').split(',').map(s => {
+                const m = s.match(/<([^>]+)>/);
+                return (m ? m[1] : s).trim();
+            }).filter(Boolean);
+        }
+
+        async function fetchCurrentMessage() {
+            if (!inboxState.uid) return null;
+            const r = await fetch(`${API_BASE}/imap/messages/${inboxState.uid}?account=${encodeURIComponent(inboxState.account)}&folder=${encodeURIComponent(inboxState.folder)}`, {
+                headers: { Authorization: `Bearer ${authToken}` }
+            });
+            if (!r.ok) return null;
+            return r.json();
+        }
+
+        document.getElementById('inbox-compose-btn').addEventListener('click', () => {
+            openCompose({});
+        });
+        document.getElementById('inbox-reply-btn').addEventListener('click', async () => {
+            const m = await fetchCurrentMessage();
+            if (!m) return;
+            openCompose({
+                title: 'Antwort',
+                to: extractEmailAddresses(m.from)[0] || '',
+                subject: m.subject.startsWith('Re: ') ? m.subject : 'Re: ' + m.subject,
+                body: quoteBody(m),
+                inReplyTo: m.messageId,
+                references: m.messageId
+            });
+        });
+        document.getElementById('inbox-reply-all-btn').addEventListener('click', async () => {
+            const m = await fetchCurrentMessage();
+            if (!m) return;
+            const fromAddr = extractEmailAddresses(m.from)[0] || '';
+            const allTo = [...extractEmailAddresses(m.to), ...extractEmailAddresses(m.cc)]
+                .filter(a => a.toLowerCase() !== inboxState.account.toLowerCase()
+                    && a.toLowerCase() !== fromAddr.toLowerCase());
+            openCompose({
+                title: 'Allen antworten',
+                to: fromAddr,
+                cc: allTo.join(', '),
+                subject: m.subject.startsWith('Re: ') ? m.subject : 'Re: ' + m.subject,
+                body: quoteBody(m),
+                inReplyTo: m.messageId,
+                references: m.messageId
+            });
+        });
+        document.getElementById('inbox-forward-btn').addEventListener('click', async () => {
+            const m = await fetchCurrentMessage();
+            if (!m) return;
+            openCompose({
+                title: 'Weiterleiten',
+                subject: m.subject.startsWith('Fwd: ') ? m.subject : 'Fwd: ' + m.subject,
+                body: quoteBody(m)
+            });
+        });
+
+        document.getElementById('compose-close').addEventListener('click', closeCompose);
+        document.getElementById('compose-cancel-btn').addEventListener('click', closeCompose);
+
+        async function readAttachments() {
+            const files = document.getElementById('compose-attachments').files;
+            const result = [];
+            for (const f of files) {
+                const buffer = await f.arrayBuffer();
+                const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+                result.push({ filename: f.name, content: base64, contentType: f.type || 'application/octet-stream' });
+            }
+            return result;
+        }
+
+        async function submitCompose(endpoint, btn) {
+            const account = inboxState.account;
+            const to = document.getElementById('compose-to').value.trim();
+            const subject = document.getElementById('compose-subject').value.trim();
+            if (endpoint === '/imap/send' && (!to || !subject)) {
+                alert('Empfänger und Betreff sind erforderlich.');
+                return;
+            }
+            const orig = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = endpoint === '/imap/draft' ? 'Speichere…' : 'Sende…';
+            try {
+                const attachments = await readAttachments();
+                const r = await fetch(`${API_BASE}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        account, to,
+                        cc: document.getElementById('compose-cc').value.trim() || undefined,
+                        bcc: document.getElementById('compose-bcc').value.trim() || undefined,
+                        subject,
+                        body: document.getElementById('compose-body').value,
+                        inReplyTo: composeContext.inReplyTo,
+                        references: composeContext.references,
+                        attachments
+                    })
+                });
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({}));
+                    throw new Error(err.error || 'HTTP ' + r.status);
+                }
+                closeCompose();
+                if (endpoint === '/imap/send') {
+                    alert('E-Mail gesendet.');
+                } else {
+                    alert('Entwurf gespeichert.');
+                }
+                loadInboxMessages();
+            } catch (e) {
+                alert('Fehler: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = orig;
+            }
+        }
+
+        document.getElementById('compose-send-btn').addEventListener('click', (e) => submitCompose('/imap/send', e.currentTarget));
+        document.getElementById('compose-draft-btn').addEventListener('click', (e) => submitCompose('/imap/draft', e.currentTarget));
 
         // Laedt alle Mailboxen von der Mailcow-API und rendert die Tabelle.
         async function loadMailboxes() {
