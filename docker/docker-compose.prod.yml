@@ -69,6 +69,9 @@ services:
       VAULTWARDEN_SYNC_PASSWORD: ${VAULTWARDEN_SYNC_PASSWORD}
       VAULTWARDEN_ORG_ID: dbc02839-7b9c-4003-8285-1b64cb1d521a
       VAULTWARDEN_COLLECTION_ID: 62cec13c-7300-4637-b5f6-bd9f9f1e02f6
+      # DEUTSCH: Mailcow-API fuer Funktions-Passwort-Aenderungen + Alias-Sync
+      MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}
+      MAILCOW_API_KEY: ${MAILCOW_API_KEY}
       # DEUTSCH: Firebase Admin SDK fuer FCM-Push-Notifications an die Mitglieder-App
       FIREBASE_ADMIN_CREDENTIALS_PATH: /run/secrets/firebase-admin.json
     volumes:
