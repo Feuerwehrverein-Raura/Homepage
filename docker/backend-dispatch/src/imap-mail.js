@@ -39,19 +39,28 @@ function decryptPassword(encryptedData) {
 
 /**
  * Welche Funktions-Postfaecher darf der eingeloggte User sehen?
- * - Sein eigenes (aus role)
- * - Optional: vorstand@ (geteilt)
+ * Nur das eigene Funktions-Postfach (aus JWT role -> mailbox-prefix). Andere
+ * Mailboxen sind privacy-relevant (Aktuar muss nicht in Mails von Kassier).
+ * Sollten geteilte Postfaecher noetig sein, separate Whitelist pflegen.
  */
 function allowedAccounts(req) {
     const role = (req.user?.role || '').toLowerCase();
-    const own = role && role !== 'admin' ? `${role}@${MAIL_DOMAIN}` : null;
-    const list = [];
-    if (own) list.push(own);
-    // Alle Vorstand-User koennen auch das geteilte vorstand@ einsehen
-    if (req.user?.groups?.includes('vorstand') || req.user?.groups?.includes('admin')) {
-        list.push(`vorstand@${MAIL_DOMAIN}`);
-    }
-    return [...new Set(list)];
+    if (!role || role === 'admin' || role === 'api') return [];
+    return [`${role}@${MAIL_DOMAIN}`];
+}
+
+/**
+ * Async-Variante: Liste der Postfaecher, die der User sehen DARF
+ * UND die ein hinterlegtes Passwort haben.
+ */
+async function availableAccounts(pool, req) {
+    const allowed = allowedAccounts(req);
+    if (allowed.length === 0) return [];
+    const result = await pool.query(
+        `SELECT email FROM shared_mailbox_passwords WHERE email = ANY($1::text[])`,
+        [allowed]
+    );
+    return result.rows.map(r => r.email);
 }
 
 async function connectImap(pool, account) {
@@ -92,9 +101,17 @@ function decodeAddress(addr) {
  */
 function mountImap(app, pool, authVorstand) {
 
-    // Liste der Postfaecher die der User einsehen darf
-    app.get('/imap/accounts', authVorstand, (req, res) => {
-        res.json({ accounts: allowedAccounts(req) });
+    // Liste der Postfaecher die der User einsehen darf UND fuer die ein
+    // entschluesselbares Passwort hinterlegt ist (sonst klappt der IMAP-Login eh nicht).
+    app.get('/imap/accounts', authVorstand, async (req, res) => {
+        try {
+            const accounts = await availableAccounts(pool, req);
+            const allowed = allowedAccounts(req);
+            const missing = allowed.filter(a => !accounts.includes(a));
+            res.json({ accounts, missing });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     });
 
     // Liste der Ordner eines Postfachs
