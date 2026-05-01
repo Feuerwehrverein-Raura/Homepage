@@ -997,6 +997,8 @@
                                             <button id="inbox-reply-all-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Allen antworten">↩↩</button>
                                             <button id="inbox-forward-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Weiterleiten">➡️ Weiter</button>
                                             <button id="inbox-mark-unread-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Als ungelesen markieren">●</button>
+                                            <button id="inbox-archive-btn" class="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100" title="Archivieren">📦 Archiv</button>
+                                            <button id="inbox-spam-btn" class="px-2 py-1 text-xs border border-orange-300 text-orange-700 rounded hover:bg-orange-50" title="Als Spam markieren">🚫 Spam</button>
                                             <button id="inbox-delete-btn" class="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50" title="In Papierkorb">🗑️</button>
                                         </div>
                                     </div>
@@ -9435,19 +9437,39 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${authToken}` }
             });
+            clearDetailAndReload();
+        });
+
+        async function moveCurrentTo(target) {
+            if (!inboxState.uid) return;
+            await fetch(`${API_BASE}/imap/messages/${inboxState.uid}/move?account=${encodeURIComponent(inboxState.account)}&folder=${encodeURIComponent(inboxState.folder)}`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target })
+            });
+            clearDetailAndReload();
+        }
+
+        function clearDetailAndReload() {
             document.getElementById('inbox-detail').classList.add('hidden');
             document.getElementById('inbox-detail-empty').classList.remove('hidden');
             inboxState.uid = null;
             loadInboxMessages();
+        }
+
+        document.getElementById('inbox-archive-btn').addEventListener('click', () => moveCurrentTo('Archive'));
+        document.getElementById('inbox-spam-btn').addEventListener('click', () => {
+            if (!confirm('Nachricht als Spam markieren? Der Sender wird aus dem Adressbuch-Auto-Erkennung entfernt.')) return;
+            moveCurrentTo('Junk');
         });
 
         // ============================================
         // COMPOSE (Neu / Antwort / Weiterleiten)
         // ============================================
 
-        let composeContext = { inReplyTo: null, references: null };
+        let composeContext = { inReplyTo: null, references: null, originalUid: null, originalFolder: null };
 
-        function openCompose({ to = '', cc = '', bcc = '', subject = '', body = '', inReplyTo = null, references = null, title = 'Neue E-Mail' }) {
+        function openCompose({ to = '', cc = '', bcc = '', subject = '', body = '', inReplyTo = null, references = null, originalUid = null, originalFolder = null, title = 'Neue E-Mail' }) {
             document.getElementById('compose-title').textContent = title;
             document.getElementById('compose-from').textContent = inboxState.account || '';
             document.getElementById('compose-to').value = to;
@@ -9456,7 +9478,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             document.getElementById('compose-subject').value = subject;
             document.getElementById('compose-body').value = body;
             document.getElementById('compose-attachments').value = '';
-            composeContext = { inReplyTo, references };
+            composeContext = { inReplyTo, references, originalUid, originalFolder };
             document.getElementById('compose-modal').classList.remove('hidden');
         }
 
@@ -9499,7 +9521,9 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 subject: m.subject.startsWith('Re: ') ? m.subject : 'Re: ' + m.subject,
                 body: quoteBody(m),
                 inReplyTo: m.messageId,
-                references: m.messageId
+                references: m.messageId,
+                originalUid: inboxState.uid,
+                originalFolder: inboxState.folder
             });
         });
         document.getElementById('inbox-reply-all-btn').addEventListener('click', async () => {
@@ -9516,7 +9540,9 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 subject: m.subject.startsWith('Re: ') ? m.subject : 'Re: ' + m.subject,
                 body: quoteBody(m),
                 inReplyTo: m.messageId,
-                references: m.messageId
+                references: m.messageId,
+                originalUid: inboxState.uid,
+                originalFolder: inboxState.folder
             });
         });
         document.getElementById('inbox-forward-btn').addEventListener('click', async () => {
@@ -9525,7 +9551,9 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             openCompose({
                 title: 'Weiterleiten',
                 subject: m.subject.startsWith('Fwd: ') ? m.subject : 'Fwd: ' + m.subject,
-                body: quoteBody(m)
+                body: quoteBody(m),
+                originalUid: inboxState.uid,
+                originalFolder: inboxState.folder
             });
         });
 
@@ -9576,7 +9604,23 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 }
                 closeCompose();
                 if (endpoint === '/imap/send') {
-                    alert('E-Mail gesendet.');
+                    // Auto-Archivieren der Original-Nachricht nach Reply/Forward
+                    if (composeContext.originalUid && composeContext.originalFolder) {
+                        try {
+                            await fetch(`${API_BASE}/imap/messages/${composeContext.originalUid}/move?account=${encodeURIComponent(account)}&folder=${encodeURIComponent(composeContext.originalFolder)}`, {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ target: 'Archive' })
+                            });
+                            // Detail schliessen falls die Mail offen war
+                            if (inboxState.uid === composeContext.originalUid) {
+                                document.getElementById('inbox-detail').classList.add('hidden');
+                                document.getElementById('inbox-detail-empty').classList.remove('hidden');
+                                inboxState.uid = null;
+                            }
+                        } catch (_) {}
+                    }
+                    alert('E-Mail gesendet' + (composeContext.originalUid ? ' und Original archiviert.' : '.'));
                 } else {
                     alert('Entwurf gespeichert.');
                 }
@@ -9605,7 +9649,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 const r = await fetch(`${API_BASE}/contacts`, { headers: { Authorization: `Bearer ${authToken}` } });
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 const data = await r.json();
-                allContacts = [...(data.shared || []), ...(data.members || [])];
+                allContacts = [...(data.shared || []), ...(data.members || []), ...(data.discovered || [])];
                 renderContacts(allContacts);
             } catch (e) {
                 list.innerHTML = `<div class="p-4 text-sm text-red-600">Fehler: ${e.message}</div>`;
@@ -9620,22 +9664,29 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             }
             list.innerHTML = contacts.map(c => {
                 const isMember = c.source === 'member';
+                const isDiscovered = c.source === 'discovered';
+                const editable = c.source === 'shared';
+                const badge = isMember
+                    ? '<span class="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">Mitglied</span>'
+                    : isDiscovered
+                    ? '<span class="px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded">Auto-erkannt</span>'
+                    : '';
                 return `
                 <div class="flex items-center gap-3 px-2 py-2 hover:bg-gray-50">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
                             <span class="font-medium text-sm">${escapeHtml(c.name)}</span>
-                            ${isMember
-                                ? '<span class="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">Mitglied</span>'
-                                : ''}
+                            ${badge}
                             ${c.organisation ? `<span class="text-xs text-gray-500">${escapeHtml(c.organisation)}</span>` : ''}
                         </div>
                         <div class="text-xs text-gray-600 truncate">
                             ${escapeHtml(c.email)}${c.phone ? ' · ' + escapeHtml(c.phone) : ''}
                         </div>
+                        ${isDiscovered ? `<div class="text-xs text-gray-400 mt-0.5">${escapeHtml(c.notes || '')}</div>` : ''}
                     </div>
                     <button data-email="${escapeHtml(c.email)}" data-name="${escapeHtml(c.name)}" class="contact-mail-btn px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">Mail</button>
-                    ${!isMember ? `<button data-id="${c.id}" class="contact-edit-btn px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">Bearbeiten</button>` : ''}
+                    ${editable ? `<button data-id="${c.id}" class="contact-edit-btn px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">Bearbeiten</button>` : ''}
+                    ${isDiscovered ? `<button data-email="${escapeHtml(c.email)}" data-name="${escapeHtml(c.name)}" class="contact-promote-btn px-2 py-1 text-xs border border-green-300 text-green-700 rounded hover:bg-green-50" title="Als festen Kontakt speichern">Übernehmen</button>` : ''}
                 </div>`;
             }).join('');
             document.querySelectorAll('.contact-mail-btn').forEach(b => {
@@ -9647,6 +9698,11 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             });
             document.querySelectorAll('.contact-edit-btn').forEach(b => {
                 b.addEventListener('click', () => openContactEdit(allContacts.find(c => c.id === b.dataset.id)));
+            });
+            document.querySelectorAll('.contact-promote-btn').forEach(b => {
+                b.addEventListener('click', () => openContactEdit({
+                    name: b.dataset.name, email: b.dataset.email
+                }));
             });
         }
 

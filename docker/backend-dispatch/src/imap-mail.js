@@ -143,6 +143,49 @@ function mountImap(app, pool, authVorstand) {
         }
     });
 
+    // Helper: Absender-Adressen aus Listen-Result in discovered_contacts speichern.
+    // Wird nur fuer "echte" Inbox-Folder aufgerufen (nicht Junk/Trash/Sent).
+    async function discoverContactsFromList(messages, account, folder) {
+        const isJunkOrTrash = /junk|spam|trash|papierkorb|deleted|gel.scht/i.test(folder);
+        if (isJunkOrTrash) return;
+        try {
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS discovered_contacts (
+                    email VARCHAR(200) PRIMARY KEY,
+                    name VARCHAR(200),
+                    first_account VARCHAR(200),
+                    first_seen TIMESTAMP DEFAULT NOW(),
+                    last_seen TIMESTAMP DEFAULT NOW(),
+                    seen_count INT DEFAULT 1
+                );
+            `);
+        } catch (_) {}
+        for (const m of messages) {
+            const fromStr = m.from || '';
+            const match = fromStr.match(/(?:"?([^"<]+?)"?\s*)?<([^>]+@[^>]+)>/) || fromStr.match(/^([^@\s]+@[^\s]+)$/);
+            let email, name;
+            if (match) {
+                if (match.length >= 3) { name = (match[1] || '').trim(); email = match[2].trim().toLowerCase(); }
+                else { email = match[1].trim().toLowerCase(); name = ''; }
+            } else continue;
+            if (!email || !email.includes('@')) continue;
+            // Eigene Funktions-Adresse skip
+            if (email === account.toLowerCase()) continue;
+            // No-reply, mailer-daemon, etc. skip
+            if (/^(no.?reply|noreply|mailer-daemon|postmaster|bounce)/i.test(email)) continue;
+            try {
+                await pool.query(`
+                    INSERT INTO discovered_contacts (email, name, first_account, last_seen, seen_count)
+                    VALUES ($1, $2, $3, NOW(), 1)
+                    ON CONFLICT (email) DO UPDATE SET
+                        name = COALESCE(NULLIF($2, ''), discovered_contacts.name),
+                        last_seen = NOW(),
+                        seen_count = discovered_contacts.seen_count + 1
+                `, [email, name || null, account]);
+            } catch (_) {}
+        }
+    }
+
     // Liste der Nachrichten in einem Ordner (neueste zuerst)
     app.get('/imap/messages', authVorstand, async (req, res) => {
         const account = (req.query.account || '').toLowerCase();
@@ -181,6 +224,8 @@ function mountImap(app, pool, authVorstand) {
                     });
                 }
                 messages.sort((a, b) => (new Date(b.date) - new Date(a.date)));
+                // Auto-Discovery der Absender als Adressbuch-Eintraege (im Hintergrund)
+                discoverContactsFromList(messages, account, folder).catch(() => {});
                 res.json({ messages, total: status.messages, unseen: status.unseen });
             } finally {
                 lock.release();
@@ -411,6 +456,51 @@ function mountImap(app, pool, authVorstand) {
         }
     });
 
+    // Nachricht in beliebigen Folder verschieben. Wenn Target = Junk/Spam,
+    // wird der Sender aus discovered_contacts entfernt (User markiert ihn als Spam).
+    app.post('/imap/messages/:uid/move', authVorstand, async (req, res) => {
+        const account = (req.query.account || req.body?.account || '').toLowerCase();
+        const folder = req.query.folder || req.body?.folder || 'INBOX';
+        const target = req.body?.target;
+        const uid = parseInt(req.params.uid, 10);
+        if (!allowedAccounts(req).includes(account)) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Postfach' });
+        }
+        if (!target) return res.status(400).json({ error: 'target erforderlich' });
+        let client;
+        try {
+            client = await connectImap(pool, account);
+            const lock = await client.getMailboxLock(folder);
+            try {
+                // Sender extrahieren bevor wir verschieben (fuer Spam-Cleanup)
+                let senderEmail = null;
+                if (/junk|spam/i.test(target)) {
+                    try {
+                        const { content } = await client.download(uid, undefined, { uid: true });
+                        const buffers = [];
+                        for await (const chunk of content) buffers.push(chunk);
+                        const parsed = await simpleParser(Buffer.concat(buffers));
+                        if (parsed.from?.value?.[0]?.address) {
+                            senderEmail = parsed.from.value[0].address.toLowerCase();
+                        }
+                    } catch (_) {}
+                }
+                await client.messageMove(uid, target, { uid: true });
+                if (senderEmail) {
+                    try {
+                        await pool.query('DELETE FROM discovered_contacts WHERE email = $1', [senderEmail]);
+                    } catch (_) {}
+                }
+            } finally { lock.release(); }
+            res.json({ success: true });
+        } catch (err) {
+            console.error('[IMAP] /move failed:', err.message);
+            res.status(500).json({ error: err.message });
+        } finally {
+            if (client) await client.logout().catch(() => {});
+        }
+    });
+
     // Nachricht in Trash verschieben
     app.delete('/imap/messages/:uid', authVorstand, async (req, res) => {
         const account = (req.query.account || '').toLowerCase();
@@ -482,6 +572,22 @@ function mountContacts(app, pool, authVorstand) {
                   AND email IS NOT NULL AND email != ''
                 ORDER BY nachname, vorname
             `);
+            // Auto-discovered (aus eingehenden Mails) — nur die, die NICHT bereits in
+            // shared oder members vorkommen, sonst Doppel-Eintraege.
+            const knownEmails = new Set([
+                ...shared.rows.map(c => (c.email || '').toLowerCase()),
+                ...members.rows.map(m => (m.email || '').toLowerCase())
+            ]);
+            let discoveredRows = [];
+            try {
+                const r = await pool.query(`
+                    SELECT email, name, last_seen, seen_count
+                    FROM discovered_contacts
+                    ORDER BY seen_count DESC, last_seen DESC
+                `);
+                discoveredRows = r.rows.filter(d => !knownEmails.has((d.email || '').toLowerCase()));
+            } catch (_) {}
+
             res.json({
                 shared: shared.rows.map(c => ({ ...c, source: 'shared' })),
                 members: members.rows.map(m => ({
@@ -489,6 +595,12 @@ function mountContacts(app, pool, authVorstand) {
                     name: `${m.vorname || ''} ${m.nachname || ''}`.trim(),
                     email: m.email, phone: m.mobile || m.telefon || '',
                     organisation: m.funktion || 'FWV Raura', notes: ''
+                })),
+                discovered: discoveredRows.map(d => ({
+                    id: 'discovered:' + d.email, source: 'discovered',
+                    name: d.name || d.email.split('@')[0],
+                    email: d.email, phone: '', organisation: '',
+                    notes: `Automatisch erkannt — ${d.seen_count}× gesehen, zuletzt ${new Date(d.last_seen).toLocaleDateString('de-CH')}`
                 }))
             });
         } catch (err) {
