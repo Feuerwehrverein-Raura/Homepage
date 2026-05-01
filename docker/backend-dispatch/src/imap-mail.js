@@ -448,4 +448,95 @@ function mountImap(app, pool, authVorstand) {
     });
 }
 
-module.exports = { mountImap };
+/**
+ * Adressbuch-Endpoints. Liefert eine kombinierte Liste aus:
+ *  - shared_contacts (Vorstand-bearbeitbar)
+ *  - members (read-only — alle aktiven Mitglieder mit E-Mail)
+ * Auto-Vervollstaendigung im Compose-Dialog matcht gegen Name + Email.
+ */
+function mountContacts(app, pool, authVorstand) {
+    app.get('/contacts', authVorstand, async (req, res) => {
+        try {
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS shared_contacts (
+                    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                    name VARCHAR(200) NOT NULL,
+                    email VARCHAR(200) NOT NULL,
+                    phone VARCHAR(50),
+                    organisation VARCHAR(200),
+                    notes TEXT,
+                    created_by VARCHAR(200),
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_shared_contacts_email ON shared_contacts(email);
+            `);
+            const shared = await pool.query(
+                `SELECT id, name, email, phone, organisation, notes, created_by, updated_at
+                 FROM shared_contacts ORDER BY name`
+            );
+            const members = await pool.query(`
+                SELECT id, vorname, nachname, email, mobile, telefon, funktion
+                FROM members
+                WHERE COALESCE(status,'') NOT IN ('Ausgetreten','Verstorben','Austritt_beantragt')
+                  AND email IS NOT NULL AND email != ''
+                ORDER BY nachname, vorname
+            `);
+            res.json({
+                shared: shared.rows.map(c => ({ ...c, source: 'shared' })),
+                members: members.rows.map(m => ({
+                    id: 'member:' + m.id, source: 'member',
+                    name: `${m.vorname || ''} ${m.nachname || ''}`.trim(),
+                    email: m.email, phone: m.mobile || m.telefon || '',
+                    organisation: m.funktion || 'FWV Raura', notes: ''
+                }))
+            });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    app.post('/contacts', authVorstand, async (req, res) => {
+        const { name, email, phone, organisation, notes } = req.body || {};
+        if (!name || !email) return res.status(400).json({ error: 'name + email erforderlich' });
+        try {
+            const r = await pool.query(
+                `INSERT INTO shared_contacts (name, email, phone, organisation, notes, created_by)
+                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+                [name, email, phone || null, organisation || null, notes || null, req.user.email || null]
+            );
+            res.status(201).json(r.rows[0]);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    app.put('/contacts/:id', authVorstand, async (req, res) => {
+        const { name, email, phone, organisation, notes } = req.body || {};
+        try {
+            const r = await pool.query(
+                `UPDATE shared_contacts SET
+                    name = COALESCE($1, name), email = COALESCE($2, email),
+                    phone = $3, organisation = $4, notes = $5, updated_at = NOW()
+                 WHERE id = $6 RETURNING *`,
+                [name ?? null, email ?? null, phone ?? null, organisation ?? null, notes ?? null, req.params.id]
+            );
+            if (r.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
+            res.json(r.rows[0]);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    app.delete('/contacts/:id', authVorstand, async (req, res) => {
+        try {
+            const r = await pool.query('DELETE FROM shared_contacts WHERE id = $1 RETURNING id', [req.params.id]);
+            if (r.rows.length === 0) return res.status(404).json({ error: 'Nicht gefunden' });
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+}
+
+module.exports = { mountImap, mountContacts };

@@ -875,9 +875,54 @@
                     <button id="email-tab-inbox" class="email-tab-btn py-3 px-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                         ✉️ Posteingang
                     </button>
+                    <button id="email-tab-contacts" class="email-tab-btn py-3 px-2 font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                        📇 Adressbuch
+                    </button>
                 </div>
             </div>
         </section>
+
+        <!-- Adressbuch Panel -->
+        <section id="contacts-panel" class="py-6 hidden">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">Geteiltes Adressbuch</h2>
+                        <div class="flex gap-2">
+                            <input id="contacts-search" type="text" placeholder="Suchen..." class="px-3 py-1.5 text-sm border border-gray-300 rounded">
+                            <button id="contacts-add-btn" class="px-3 py-1.5 text-sm bg-fire-500 text-white rounded hover:bg-fire-600">+ Kontakt</button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-3">Kontakte mit Badge "Mitglied" sind nur lesbar — sie kommen automatisch aus der Mitgliederliste.</p>
+                    <div id="contacts-list" class="divide-y divide-gray-100"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Kontakt-Edit-Modal -->
+        <div id="contact-edit-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg w-full max-w-md">
+                <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                    <h3 id="contact-edit-title" class="text-lg font-bold">Kontakt</h3>
+                    <button id="contact-edit-close" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                </div>
+                <div class="p-4 space-y-3">
+                    <input type="hidden" id="contact-edit-id">
+                    <div><label class="text-xs text-gray-600">Name</label><input id="contact-edit-name" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"></div>
+                    <div><label class="text-xs text-gray-600">E-Mail</label><input id="contact-edit-email" type="email" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"></div>
+                    <div><label class="text-xs text-gray-600">Telefon</label><input id="contact-edit-phone" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"></div>
+                    <div><label class="text-xs text-gray-600">Organisation</label><input id="contact-edit-org" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"></div>
+                    <div><label class="text-xs text-gray-600">Notizen</label><textarea id="contact-edit-notes" rows="3" class="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"></textarea></div>
+                </div>
+                <div class="px-4 py-3 border-t border-gray-200 flex justify-between">
+                    <button id="contact-edit-delete-btn" class="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 hidden">Löschen</button>
+                    <div class="flex gap-2 ml-auto">
+                        <button id="contact-edit-cancel-btn" class="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50">Abbrechen</button>
+                        <button id="contact-edit-save-btn" class="px-3 py-1.5 text-sm bg-fire-500 text-white rounded hover:bg-fire-600">Speichern</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Compose-Modal: Neu / Antwort / Weiterleiten -->
         <div id="compose-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
@@ -8820,6 +8865,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         document.getElementById('email-tab-quota').addEventListener('click', () => switchEmailTab('quota'));
         document.getElementById('email-tab-zustellung').addEventListener('click', () => switchEmailTab('zustellung'));
         document.getElementById('email-tab-inbox').addEventListener('click', () => switchEmailTab('inbox'));
+        document.getElementById('email-tab-contacts').addEventListener('click', () => switchEmailTab('contacts'));
 
         // Zustellung Emails
         document.getElementById('copy-emails-btn').addEventListener('click', copyZustellungEmails);
@@ -9201,6 +9247,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             document.getElementById('quota-panel').classList.add('hidden');
             document.getElementById('zustellung-panel').classList.add('hidden');
             document.getElementById('inbox-panel').classList.add('hidden');
+            document.getElementById('contacts-panel').classList.add('hidden');
 
             if (tab === 'mailboxes') {
                 document.getElementById('email-tab-mailboxes').classList.add('border-fire-500', 'text-fire-600');
@@ -9222,6 +9269,10 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 document.getElementById('email-tab-inbox').classList.add('border-fire-500', 'text-fire-600');
                 document.getElementById('inbox-panel').classList.remove('hidden');
                 openInbox();
+            } else if (tab === 'contacts') {
+                document.getElementById('email-tab-contacts').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('contacts-panel').classList.remove('hidden');
+                loadContacts();
             }
         }
 
@@ -9540,6 +9591,182 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 
         document.getElementById('compose-send-btn').addEventListener('click', (e) => submitCompose('/imap/send', e.currentTarget));
         document.getElementById('compose-draft-btn').addEventListener('click', (e) => submitCompose('/imap/draft', e.currentTarget));
+
+        // ============================================
+        // ADRESSBUCH (geteilt + Mitglieder read-only)
+        // ============================================
+
+        let allContacts = []; // { id, name, email, phone, organisation, notes, source }
+
+        async function loadContacts() {
+            const list = document.getElementById('contacts-list');
+            list.innerHTML = '<div class="p-4 text-sm text-gray-500">Lade…</div>';
+            try {
+                const r = await fetch(`${API_BASE}/contacts`, { headers: { Authorization: `Bearer ${authToken}` } });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const data = await r.json();
+                allContacts = [...(data.shared || []), ...(data.members || [])];
+                renderContacts(allContacts);
+            } catch (e) {
+                list.innerHTML = `<div class="p-4 text-sm text-red-600">Fehler: ${e.message}</div>`;
+            }
+        }
+
+        function renderContacts(contacts) {
+            const list = document.getElementById('contacts-list');
+            if (contacts.length === 0) {
+                list.innerHTML = '<div class="p-4 text-sm text-gray-500 italic">Keine Kontakte.</div>';
+                return;
+            }
+            list.innerHTML = contacts.map(c => {
+                const isMember = c.source === 'member';
+                return `
+                <div class="flex items-center gap-3 px-2 py-2 hover:bg-gray-50">
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-sm">${escapeHtml(c.name)}</span>
+                            ${isMember
+                                ? '<span class="px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">Mitglied</span>'
+                                : ''}
+                            ${c.organisation ? `<span class="text-xs text-gray-500">${escapeHtml(c.organisation)}</span>` : ''}
+                        </div>
+                        <div class="text-xs text-gray-600 truncate">
+                            ${escapeHtml(c.email)}${c.phone ? ' · ' + escapeHtml(c.phone) : ''}
+                        </div>
+                    </div>
+                    <button data-email="${escapeHtml(c.email)}" data-name="${escapeHtml(c.name)}" class="contact-mail-btn px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">Mail</button>
+                    ${!isMember ? `<button data-id="${c.id}" class="contact-edit-btn px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">Bearbeiten</button>` : ''}
+                </div>`;
+            }).join('');
+            document.querySelectorAll('.contact-mail-btn').forEach(b => {
+                b.addEventListener('click', () => {
+                    const recipient = b.dataset.name ? `"${b.dataset.name}" <${b.dataset.email}>` : b.dataset.email;
+                    if (inboxState.account) openCompose({ to: recipient });
+                    else alert('Bitte zuerst den Posteingang oeffnen damit ein Account aktiv ist.');
+                });
+            });
+            document.querySelectorAll('.contact-edit-btn').forEach(b => {
+                b.addEventListener('click', () => openContactEdit(allContacts.find(c => c.id === b.dataset.id)));
+            });
+        }
+
+        document.getElementById('contacts-search').addEventListener('input', (e) => {
+            const q = e.target.value.toLowerCase().trim();
+            if (!q) { renderContacts(allContacts); return; }
+            renderContacts(allContacts.filter(c =>
+                (c.name || '').toLowerCase().includes(q)
+                || (c.email || '').toLowerCase().includes(q)
+                || (c.organisation || '').toLowerCase().includes(q)
+            ));
+        });
+
+        function openContactEdit(c) {
+            const isNew = !c;
+            document.getElementById('contact-edit-title').textContent = isNew ? 'Neuer Kontakt' : 'Kontakt bearbeiten';
+            document.getElementById('contact-edit-id').value = c?.id || '';
+            document.getElementById('contact-edit-name').value = c?.name || '';
+            document.getElementById('contact-edit-email').value = c?.email || '';
+            document.getElementById('contact-edit-phone').value = c?.phone || '';
+            document.getElementById('contact-edit-org').value = c?.organisation || '';
+            document.getElementById('contact-edit-notes').value = c?.notes || '';
+            document.getElementById('contact-edit-delete-btn').classList.toggle('hidden', isNew);
+            document.getElementById('contact-edit-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('contacts-add-btn').addEventListener('click', () => openContactEdit(null));
+        document.getElementById('contact-edit-close').addEventListener('click', () =>
+            document.getElementById('contact-edit-modal').classList.add('hidden'));
+        document.getElementById('contact-edit-cancel-btn').addEventListener('click', () =>
+            document.getElementById('contact-edit-modal').classList.add('hidden'));
+
+        document.getElementById('contact-edit-save-btn').addEventListener('click', async () => {
+            const id = document.getElementById('contact-edit-id').value;
+            const body = {
+                name: document.getElementById('contact-edit-name').value.trim(),
+                email: document.getElementById('contact-edit-email').value.trim(),
+                phone: document.getElementById('contact-edit-phone').value.trim() || null,
+                organisation: document.getElementById('contact-edit-org').value.trim() || null,
+                notes: document.getElementById('contact-edit-notes').value.trim() || null
+            };
+            if (!body.name || !body.email) { alert('Name und E-Mail sind erforderlich.'); return; }
+            const url = id ? `${API_BASE}/contacts/${id}` : `${API_BASE}/contacts`;
+            const r = await fetch(url, {
+                method: id ? 'PUT' : 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!r.ok) { alert('Fehler ' + r.status); return; }
+            document.getElementById('contact-edit-modal').classList.add('hidden');
+            loadContacts();
+        });
+
+        document.getElementById('contact-edit-delete-btn').addEventListener('click', async () => {
+            const id = document.getElementById('contact-edit-id').value;
+            if (!id || !confirm('Kontakt wirklich löschen?')) return;
+            await fetch(`${API_BASE}/contacts/${id}`, {
+                method: 'DELETE', headers: { Authorization: `Bearer ${authToken}` }
+            });
+            document.getElementById('contact-edit-modal').classList.add('hidden');
+            loadContacts();
+        });
+
+        // Auto-Complete-Loader: laedt Adressbuch wenn Compose geoeffnet wird
+        async function ensureContactsLoaded() {
+            if (allContacts.length > 0) return;
+            try {
+                const r = await fetch(`${API_BASE}/contacts`, { headers: { Authorization: `Bearer ${authToken}` } });
+                if (r.ok) { const d = await r.json(); allContacts = [...(d.shared || []), ...(d.members || [])]; }
+            } catch (_) {}
+        }
+
+        function setupAutocomplete(inputId) {
+            const input = document.getElementById(inputId);
+            const dropdown = document.createElement('div');
+            dropdown.className = 'absolute z-50 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto hidden';
+            dropdown.style.minWidth = '300px';
+            input.parentNode.style.position = 'relative';
+            input.parentNode.appendChild(dropdown);
+
+            input.addEventListener('input', () => {
+                const parts = input.value.split(',');
+                const last = parts[parts.length - 1].trim().toLowerCase();
+                if (last.length < 2) { dropdown.classList.add('hidden'); return; }
+                const matches = allContacts.filter(c =>
+                    (c.name || '').toLowerCase().includes(last)
+                    || (c.email || '').toLowerCase().includes(last)
+                ).slice(0, 8);
+                if (matches.length === 0) { dropdown.classList.add('hidden'); return; }
+                dropdown.innerHTML = matches.map(c => `
+                    <div class="ac-item px-3 py-1.5 text-sm hover:bg-blue-50 cursor-pointer" data-email="${escapeHtml(c.email)}" data-name="${escapeHtml(c.name)}">
+                        <div class="font-medium">${escapeHtml(c.name)}${c.source === 'member' ? ' <span class="text-xs text-blue-600">(Mitglied)</span>' : ''}</div>
+                        <div class="text-xs text-gray-500">${escapeHtml(c.email)}</div>
+                    </div>
+                `).join('');
+                dropdown.classList.remove('hidden');
+                dropdown.querySelectorAll('.ac-item').forEach(it => {
+                    it.addEventListener('click', () => {
+                        parts[parts.length - 1] = ` "${it.dataset.name}" <${it.dataset.email}>`;
+                        input.value = parts.join(',').replace(/^\s+/, '');
+                        dropdown.classList.add('hidden');
+                        input.focus();
+                    });
+                });
+            });
+            input.addEventListener('blur', () => setTimeout(() => dropdown.classList.add('hidden'), 200));
+        }
+
+        // Autocomplete einmal initialisieren wenn Compose oeffnet
+        const _origOpenCompose = openCompose;
+        window.openCompose = async function(opts) {
+            await ensureContactsLoaded();
+            _origOpenCompose(opts);
+            ['compose-to', 'compose-cc', 'compose-bcc'].forEach(id => {
+                if (!document.getElementById(id).dataset.acReady) {
+                    setupAutocomplete(id);
+                    document.getElementById(id).dataset.acReady = '1';
+                }
+            });
+        };
 
         // Laedt alle Mailboxen von der Mailcow-API und rendert die Tabelle.
         async function loadMailboxes() {
