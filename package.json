@@ -1,8 +1,22 @@
 {
-  "name": "fwv-raura-homepage",
+  "name": "fwv-platform",
   "version": "1.0.0",
-  "description": "Feuerwehrverein Raura Homepage with Event Management and PDF Generation",
+  "private": true,
+  "description": "Mono-Repo fuer alle Anwendungen des Feuerwehrvereins Raura (Backends, Frontends, Apps).",
   "main": "index.js",
+  "workspaces": [
+    "apps/backend-accounting",
+    "apps/backend-dispatch",
+    "apps/backend-events",
+    "apps/backend-members",
+    "apps/spam-manager",
+    "apps/vorstand-desktop",
+    "apps/order-system/backend",
+    "apps/order-system/frontend",
+    "apps/order-system/kitchen-display",
+    "apps/order-system/register-app",
+    "packages/*"
+  ],
   "scripts": {
     "generate-shifts": "node scripts/generate-shift-plans.js",
     "generate-ics": "node scripts/generate-ics.js",

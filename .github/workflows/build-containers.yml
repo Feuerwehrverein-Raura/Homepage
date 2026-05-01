@@ -87,33 +87,33 @@ jobs:
         with:
           filters: |
             backend-events:
-              - 'docker/backend-events/**'
+              - 'apps/backend-events/**'
             backend-members:
-              - 'docker/backend-members/**'
+              - 'apps/backend-members/**'
             backend-dispatch:
-              - 'docker/backend-dispatch/**'
+              - 'apps/backend-dispatch/**'
             backend-accounting:
-              - 'docker/backend-accounting/**'
+              - 'apps/backend-accounting/**'
             frontend-website:
-              - 'docker/frontend-website/**'
+              - 'apps/frontend-website/**'
             frontend-pdf-designer:
-              - 'docker/frontend-pdf-designer/**'
+              - 'apps/frontend-pdf-designer/**'
             wiki-docs:
-              - 'docker/wiki-docs/**'
+              - 'apps/wiki-docs/**'
             order-backend:
-              - 'simple-order-system/backend/**'
+              - 'apps/order-system/backend/**'
             order-frontend:
-              - 'simple-order-system/frontend/**'
+              - 'apps/order-system/frontend/**'
             order-kitchen:
-              - 'simple-order-system/kitchen-display/**'
+              - 'apps/order-system/kitchen-display/**'
             order-register:
-              - 'simple-order-system/register-app/**'
+              - 'apps/order-system/register-app/**'
             inventory-backend:
               - 'simple-inventory-system/backend/**'
             inventory-frontend:
               - 'simple-inventory-system/frontend/**'
             spam-manager:
-              - 'docker/spam-manager/**'
+              - 'apps/spam-manager/**'
 
   build-backend-events:
     needs: [release, detect-changes]
@@ -135,7 +135,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/backend-events
+          context: ./apps/backend-events
           push: true
           no-cache: true
           build-args: |
@@ -165,7 +165,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/backend-members
+          context: ./apps/backend-members
           push: true
           no-cache: true
           build-args: |
@@ -195,7 +195,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/backend-dispatch
+          context: ./apps/backend-dispatch
           push: true
           no-cache: true
           build-args: |
@@ -225,7 +225,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/backend-accounting
+          context: ./apps/backend-accounting
           push: true
           no-cache: true
           build-args: |
@@ -255,7 +255,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/frontend-website
+          context: ./apps/frontend-website
           push: true
           no-cache: true
           build-args: |
@@ -285,7 +285,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/frontend-pdf-designer
+          context: ./apps/frontend-pdf-designer
           push: true
           no-cache: true
           build-args: |
@@ -315,7 +315,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/wiki-docs
+          context: ./apps/wiki-docs
           push: true
           no-cache: true
           build-args: |
@@ -346,7 +346,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./simple-order-system/backend
+          context: ./apps/order-system/backend
           push: true
           no-cache: true
           build-args: |
@@ -376,7 +376,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./simple-order-system/frontend
+          context: ./apps/order-system/frontend
           push: true
           no-cache: true
           build-args: |
@@ -409,7 +409,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./simple-order-system/kitchen-display
+          context: ./apps/order-system/kitchen-display
           push: true
           no-cache: true
           build-args: |
@@ -440,7 +440,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./simple-order-system/register-app
+          context: ./apps/order-system/register-app
           push: true
           no-cache: true
           tags: |
@@ -531,7 +531,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/spam-manager
+          context: ./apps/spam-manager
           push: true
           no-cache: true
           build-args: |
