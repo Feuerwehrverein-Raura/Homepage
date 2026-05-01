@@ -19,6 +19,8 @@
     <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
     <!-- QR Code Generator fuer Swiss QR-Rechnung -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <!-- SheetJS fuer XLSX-Export mit mehreren Tabellenblaettern -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         /* Brief-Maske: editierbare Felder unsichtbar eingebettet */
         .brief-input {
@@ -315,6 +317,11 @@
                             </button>
                             <button id="export-email-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                 E-Mail-Zustellung (zustellung_email)
+                            </button>
+                            <hr class="my-1 border-gray-200">
+                            <button id="export-xlsx-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                <svg class="w-4 h-4 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M4 18h12V6h-4V2H4v16zm8-15.5L14.5 5H12V2.5zM2 0h10l4 4v16H2V0z"/></svg>
+                                Komplett (Excel: Mitglieder, Beitr&auml;ge, Rechnungen, Buchhaltung, Anmeldungen)
                             </button>
                             <hr class="my-1 border-gray-200">
                             <button id="export-pdf-telefonliste-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
@@ -4072,6 +4079,132 @@
             a.href = url;
             a.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
             a.click();
+        }
+
+        // Vollstaendiger XLSX-Export mit mehreren Tabellenblaettern fuer Vorstand-Buchhaltung.
+        // Sheets: Mitglieder, Beitraege, Rechnungen, Buchhaltung, Anmeldungen, Anlaesse, Versand
+        async function exportFullXLSX() {
+            const headers = { Authorization: `Bearer ${authToken}` };
+            const fetchJson = async (url) => {
+                try {
+                    const r = await fetch(url, { headers });
+                    if (!r.ok) return [];
+                    return await r.json();
+                } catch (_) { return []; }
+            };
+
+            const yesNo = (v) => v === true ? 'ja' : v === false ? 'nein' : '';
+            const memberMap = new Map();
+            (members || []).forEach(m => memberMap.set(m.id, `${m.vorname || ''} ${m.nachname || ''}`.trim()));
+            const memberLabel = (id) => memberMap.get(id) || '';
+
+            // Parallel-Loads
+            const [feePayments, invoices, transactions, regs, evs, dispatches] = await Promise.all([
+                fetchJson(`${API_BASE}/membership-fees/payments`),
+                fetchJson(`${API_BASE}/invoices`),
+                fetchJson(`${API_BASE}/transactions`),
+                fetchJson(`${API_BASE}/registrations/manage`),
+                fetchJson(`${API_BASE}/events`),
+                fetchJson(`${API_BASE}/dispatch-log`)
+            ]);
+
+            const eventMap = new Map();
+            (evs || []).forEach(e => eventMap.set(e.id, e.title));
+
+            const wb = XLSX.utils.book_new();
+
+            // Sheet 1: Mitglieder
+            const memberRows = (members || [])
+                .filter(m => m.status !== 'Ausgetreten' && m.status !== 'Verstorben')
+                .map(m => ({
+                    Anrede: m.anrede || '', Vorname: m.vorname || '', Nachname: m.nachname || '',
+                    Geschlecht: m.geschlecht || '', Geburtstag: m.geburtstag || '',
+                    Eintrittsdatum: m.eintrittsdatum || '', Austrittsdatum: m.austrittsdatum || '',
+                    Strasse: m.strasse || '', Adresszusatz: m.adresszusatz || '',
+                    PLZ: m.plz || '', Ort: m.ort || '',
+                    'E-Mail': m.email || '', 'Versand-E-Mail': m.versand_email || '',
+                    Telefon: m.telefon || '', Mobile: m.mobile || '',
+                    Status: m.status || '', Funktion: m.funktion || '',
+                    'Feuerwehr-Zugehoerigkeit': m.feuerwehr_zugehoerigkeit || '',
+                    'T-Shirt-Groesse': m.tshirt_groesse || '', IBAN: m.iban || '',
+                    'Zustellung E-Mail': yesNo(m.zustellung_email),
+                    'Zustellung Post': yesNo(m.zustellung_post),
+                    Bemerkungen: m.bemerkungen || ''
+                }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(memberRows), 'Mitglieder');
+
+            // Sheet 2: Beitraege
+            const feeRows = (feePayments || []).map(p => ({
+                Mitglied: memberLabel(p.member_id) || (`${p.vorname || ''} ${p.nachname || ''}`).trim(),
+                Jahr: p.year, Betrag: p.amount,
+                Status: p.status, 'Bezahlt am': p.paid_date || '',
+                Referenz: p.reference_nr || '', 'Bank-Referenz': p.bank_reference || '',
+                Zahlungsart: p.payment_method || '', Notizen: p.notes || ''
+            }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(feeRows), 'Beitraege');
+
+            // Sheet 3: Rechnungen
+            const invRows = (invoices || []).map(i => ({
+                Nummer: i.number, Mitglied: memberLabel(i.member_id),
+                Empfaenger: i.recipient_name || '',
+                Adresse: (i.recipient_address || '').replace(/\n/g, ', '),
+                Subtotal: i.subtotal, MwSt: i.tax, Total: i.total,
+                Status: i.status, Ausgestellt: i.issued_date || '',
+                Faellig: i.due_date || '', Bezahlt: i.paid_date || '',
+                Notizen: i.notes || ''
+            }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invRows), 'Rechnungen');
+
+            // Sheet 4: Buchhaltung
+            const txRows = (transactions || []).map(t => ({
+                Datum: t.date, Beschreibung: t.description, Betrag: t.amount,
+                Soll: t.debit_account_name || t.debit_account_id || '',
+                Haben: t.credit_account_name || t.credit_account_id || '',
+                Mitglied: memberLabel(t.member_id),
+                Anlass: eventMap.get(t.event_id) || '',
+                Beleg: t.receipt_url || ''
+            }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txRows), 'Buchhaltung');
+
+            // Sheet 5: Anmeldungen
+            const regRows = (regs || []).map(r => {
+                let parsedNotes = {};
+                try { parsedNotes = typeof r.notes === 'string' ? JSON.parse(r.notes) : (r.notes_data || {}); } catch (_) {}
+                return {
+                    Anlass: r.event_title || eventMap.get(r.event_id) || '',
+                    Mitglied: r.member_id ? memberLabel(r.member_id) || `${r.vorname || ''} ${r.nachname || ''}`.trim() : '',
+                    Gast: r.guest_name || '', 'Gast-Email': r.guest_email || '',
+                    Telefon: parsedNotes.phone || '', Personen: parsedNotes.participants || '',
+                    Status: r.status, Erstellt: r.created_at || '',
+                    Bestaetigt: r.approved_at || '', Notizen: parsedNotes.notes || ''
+                };
+            });
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(regRows), 'Anmeldungen');
+
+            // Sheet 6: Anlaesse
+            const evRows = (evs || []).map(e => ({
+                Titel: e.title, Kategorie: e.category || '',
+                Start: e.start_date || '', Ende: e.end_date || '',
+                Ort: e.location || '', Anmeldeschluss: e.registration_deadline || '',
+                'Max. Teilnehmer': e.max_participants || '',
+                Status: e.status || '', Organisator: e.organizer_email || ''
+            }));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(evRows), 'Anlaesse');
+
+            // Sheet 7: Versand-Historie (wenn dispatch_log verfuegbar)
+            if (Array.isArray(dispatches) && dispatches.length > 0) {
+                const dispRows = dispatches.map(d => ({
+                    Datum: d.sent_at || d.created_at || '',
+                    Typ: d.type, Status: d.status,
+                    Empfaenger: d.recipient_email || d.recipient_address || '',
+                    Mitglied: memberLabel(d.member_id),
+                    Betreff: d.subject || '', Fehler: d.error_message || ''
+                }));
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dispRows), 'Versand');
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `fwv-export-${today}.xlsx`);
         }
 
         // ============================================
@@ -8516,6 +8649,21 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         document.getElementById('export-email-btn').addEventListener('click', () => {
             exportCSV('email');
             exportDropdown.classList.add('hidden');
+        });
+        document.getElementById('export-xlsx-btn').addEventListener('click', async () => {
+            exportDropdown.classList.add('hidden');
+            const btn = document.getElementById('export-xlsx-btn');
+            const orig = btn.innerHTML;
+            btn.innerHTML = 'Lade Daten…';
+            btn.disabled = true;
+            try {
+                await exportFullXLSX();
+            } catch (e) {
+                alert('Export fehlgeschlagen: ' + e.message);
+            } finally {
+                btn.innerHTML = orig;
+                btn.disabled = false;
+            }
         });
         document.getElementById('export-pdf-telefonliste-btn').addEventListener('click', async () => {
             exportDropdown.classList.add('hidden');
