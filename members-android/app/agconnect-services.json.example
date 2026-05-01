@@ -1,0 +1,18 @@
+{
+  "_comment": "Beispiel/Stub fuer Huawei AppGallery Connect. Datei aus AppGallery Connect (Project Settings -> General Information) herunterladen und als 'agconnect-services.json' (ohne .example) ablegen, damit das com.huawei.agconnect Gradle-Plugin und die HMS Push-SDK echte Credentials erhalten. Ohne reale Datei wird der HMS-Codepfad zur Laufzeit geskippt; FCM-Builds bleiben unbeeintraechtigt.",
+  "agcgw": {
+    "backurl": "connect-drcn.dbankcloud.cn",
+    "url": "connect-drcn.hispace.hicloud.com"
+  },
+  "client": {
+    "cp_id": "0000000000000000000",
+    "product_id": "0000000000000000000",
+    "client_id": "000000000000000000",
+    "client_secret": "REPLACE_ME",
+    "project_id": "000000000000000000",
+    "app_id": "000000000",
+    "api_key": "REPLACE_ME",
+    "package_name": "com.fwv.members"
+  },
+  "configuration_version": "3.0"
+}

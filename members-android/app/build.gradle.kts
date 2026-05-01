@@ -7,6 +7,13 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Huawei AppGallery Connect Plugin nur anwenden, wenn agconnect-services.json
+// vorhanden ist — sonst bricht der Build auf reinen FCM-Dev-Setups (ohne HMS-
+// Credentials) ab. Ein Stub-File reicht; die echte Datei wird im CI eingespielt.
+if (file("agconnect-services.json").exists()) {
+    apply(plugin = "com.huawei.agconnect")
+}
+
 // Version aus Git-Tag ableiten (members-v1.2.0 -> 1.2.0).
 fun getVersionFromTag(): String {
     return try {
@@ -158,4 +165,11 @@ dependencies {
     // gemerged.
     implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
     implementation("com.google.firebase:firebase-messaging")
+
+    // Huawei Push Kit (HMS) — Push-Notifications fuer Geraete ohne Google-Services
+    // (Mate 30, P40, Mate 40, P50 und neuer). Der Provider wird zur Laufzeit per
+    // GoogleApiAvailability/HuaweiApiAvailability gewaehlt; es laufen nicht beide
+    // SDKs parallel.
+    implementation("com.huawei.hms:push:6.13.0.300")
+    implementation("com.huawei.hms:base:6.13.0.300")
 }

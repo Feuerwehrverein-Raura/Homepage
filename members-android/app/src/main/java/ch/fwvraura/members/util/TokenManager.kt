@@ -69,10 +69,20 @@ class TokenManager(context: Context) {
         get() = prefs.getBoolean(KEY_CONTACTS_SYNC_ENABLED, false)
         set(value) { prefs.edit().putBoolean(KEY_CONTACTS_SYNC_ENABLED, value).commit() }
 
-    /** FCM-Geraetetoken — wird beim ersten Boot/Token-Refresh von Firebase geliefert. */
+    /**
+     * Push-Geraetetoken — kommt entweder von Firebase (FCM) oder Huawei Push Kit (HMS).
+     * Welcher Provider ihn ausgestellt hat, steht in [pushProvider]. Der Key heisst aus
+     * historischen Gruenden weiter `fcm_token`, gespeichert wird hier aber je nach Geraet
+     * auch ein HMS-Token.
+     */
     var fcmToken: String?
         get() = prefs.getString(KEY_FCM_TOKEN, null)
         set(value) { prefs.edit().putString(KEY_FCM_TOKEN, value).commit() }
+
+    /** Provider des aktuell gespeicherten Tokens: `"fcm"` oder `"hms"`. */
+    var pushProvider: String?
+        get() = prefs.getString(KEY_PUSH_PROVIDER, null)
+        set(value) { prefs.edit().putString(KEY_PUSH_PROVIDER, value).commit() }
 
     val isLoggedIn: Boolean
         get() = !token.isNullOrEmpty()
@@ -89,5 +99,6 @@ class TokenManager(context: Context) {
         private const val KEY_CONTACTS_SYNC_ASKED = "contacts_sync_asked"
         private const val KEY_CONTACTS_SYNC_ENABLED = "contacts_sync_enabled"
         private const val KEY_FCM_TOKEN = "fcm_token"
+        private const val KEY_PUSH_PROVIDER = "push_provider"
     }
 }

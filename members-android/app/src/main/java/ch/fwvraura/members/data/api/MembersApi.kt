@@ -52,10 +52,14 @@ interface MembersApi {
         @Body body: ch.fwvraura.members.data.model.NotificationsUpdateRequest
     ): Response<List<ch.fwvraura.members.data.model.NotificationPreference>>
 
-    /** FCM-Geraete-Token registrieren (fuer Push-Notifications). */
+    /**
+     * Geraete-Token fuer Push-Notifications registrieren — sowohl FCM (Google) als
+     * auch HMS (Huawei). Provider wird im Body als `provider`-Feld mitgegeben.
+     * Endpoint-Pfad heisst aus historischen Gruenden weiterhin `fcm-token`.
+     */
     @POST("members/me/fcm-token")
     suspend fun registerFcmToken(
-        @Body body: ch.fwvraura.members.data.model.FcmTokenRegistration
+        @Body body: ch.fwvraura.members.data.model.PushTokenRegistration
     ): Response<Unit>
 
     /** System-Zugaenge, Nextcloud-Ordner, Funktions-E-Mails und Service-Accounts. */

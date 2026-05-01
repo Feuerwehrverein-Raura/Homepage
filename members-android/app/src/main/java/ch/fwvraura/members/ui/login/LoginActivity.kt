@@ -18,10 +18,10 @@ import ch.fwvraura.members.databinding.ActivityLoginBinding
 import ch.fwvraura.members.sync.ContactsSyncManager
 import ch.fwvraura.members.util.OidcConstants
 import androidx.appcompat.app.AlertDialog
+import ch.fwvraura.members.notifications.PushProviderResolver
+import ch.fwvraura.members.notifications.PushTokenRegistrar
 import com.google.android.material.tabs.TabLayout
-import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import net.openid.appauth.AuthorizationException
 import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
@@ -173,34 +173,31 @@ class LoginActivity : AppCompatActivity() {
                         .joinToString(" ").ifBlank { null }
                 }
             } catch (_: Exception) { /* nicht kritisch */ }
-            registerFcmTokenIfPresent(tm)
+            registerPushTokenIfPresent(tm)
             handleContactsSyncAfterLogin()
         }
     }
 
     /**
-     * FCM-Token nach dem Login ans Backend pushen. Falls noch keiner gecached ist
-     * (z.B. erster Start nach Install — onNewToken kann verzoegert kommen),
-     * holen wir ihn aktiv von FirebaseMessaging.
+     * Push-Token nach dem Login ans Backend pushen. Falls noch keiner gecached ist
+     * (z.B. erster Start nach Install — `onNewToken` kann verzoegert kommen), holen
+     * wir ihn aktiv vom passenden Provider (FCM via Firebase, HMS via Huawei).
      */
-    private suspend fun registerFcmTokenIfPresent(tm: ch.fwvraura.members.util.TokenManager) {
-        val token = tm.fcmToken ?: requestFcmToken() ?: return
-        tm.fcmToken = token
-        try {
-            ApiModule.membersApi.registerFcmToken(
-                ch.fwvraura.members.data.model.FcmTokenRegistration(token = token)
-            )
-            Log.d("LoginActivity", "FCM token registered with backend (len=${token.length})")
-        } catch (e: Exception) {
-            Log.w("LoginActivity", "FCM token registration failed: ${e.message}")
+    private suspend fun registerPushTokenIfPresent(tm: ch.fwvraura.members.util.TokenManager) {
+        val cached = tm.fcmToken
+        val cachedProvider = tm.pushProvider
+        if (cached != null && cachedProvider != null) {
+            val provider = ch.fwvraura.members.notifications.PushProvider.values()
+                .firstOrNull { it.wireName == cachedProvider }
+                ?: ch.fwvraura.members.notifications.PushProvider.FCM
+            PushTokenRegistrar.register(provider, cached)
+            return
         }
-    }
-
-    private suspend fun requestFcmToken(): String? = try {
-        FirebaseMessaging.getInstance().token.await()
-    } catch (e: Exception) {
-        Log.w("LoginActivity", "FirebaseMessaging.getToken failed: ${e.message}")
-        null
+        val (provider, token) = PushProviderResolver.fetchToken(this) ?: run {
+            Log.w("LoginActivity", "Kein Push-Provider verfuegbar (kein GMS, kein HMS)")
+            return
+        }
+        PushTokenRegistrar.register(provider, token)
     }
 
     /**

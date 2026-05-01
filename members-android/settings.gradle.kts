@@ -3,6 +3,8 @@ pluginManagement {
         google()
         mavenCentral()
         gradlePluginPortal()
+        // Huawei AppGallery Connect Plugin (com.huawei.agconnect)
+        maven { url = uri("https://developer.huawei.com/repo/") }
     }
 }
 
@@ -11,6 +13,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Huawei HMS-Artefakte (com.huawei.hms:push, agconnect-core, …)
+        maven { url = uri("https://developer.huawei.com/repo/") }
     }
 }
 

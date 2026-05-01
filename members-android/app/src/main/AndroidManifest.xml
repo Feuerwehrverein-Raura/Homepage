@@ -80,7 +80,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Firebase Cloud Messaging — Push-Empfang -->
+        <!-- Firebase Cloud Messaging — Push-Empfang (Geraete mit Google-Services) -->
         <service
             android:name=".notifications.FwvFirebaseMessagingService"
             android:exported="false">
@@ -91,6 +91,15 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="fwv_general" />
+
+        <!-- Huawei Push Kit — Push-Empfang (Geraete ohne Google-Services, ab P40/Mate 30) -->
+        <service
+            android:name=".notifications.FwvHmsMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.huawei.push.action.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <!-- FileProvider fuer Kamera-Aufnahmen: speichert Fotos temporaer in cache/photos/ und gibt der Kamera-App eine sichere content://-URI -->
         <provider

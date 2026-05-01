@@ -16,9 +16,16 @@ data class NotificationsUpdateRequest(
     val preferences: List<NotificationPreference>
 )
 
-/** Body fuer POST /members/me/fcm-token (Geraete-Token-Registrierung). */
-data class FcmTokenRegistration(
+/**
+ * Body fuer POST /members/me/fcm-token (Geraete-Token-Registrierung).
+ *
+ * `provider` unterscheidet den Push-Provider, der den Token ausgestellt hat —
+ * `"fcm"` (Firebase Cloud Messaging) oder `"hms"` (Huawei Push Kit). Backend
+ * waehlt anhand davon, ueber welchen Dienst es Pushes verschickt.
+ */
+data class PushTokenRegistration(
     val token: String,
+    val provider: String = "fcm",
     @SerializedName("device_id") val deviceId: String? = null,
     val platform: String = "android"
 )

@@ -12,6 +12,7 @@ const path = require('path');
 const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const admin = require('firebase-admin');
+const hmsPush = require('./hms-push');
 // DEUTSCH: Authentifizierungs-Middleware importieren (Token-Prüfung, Rollen-Prüfung)
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
@@ -38,6 +39,10 @@ try {
 } catch (err) {
     console.error('Firebase Admin init failed:', err.message);
 }
+
+// DEUTSCH: Huawei Push Kit initialisieren — fuer HMS-Pushes an Huawei-Geraete
+// ohne Google-Services. Nutzt die Push REST-API (kein offizielles Node-SDK).
+hmsPush.init();
 
 /**
  * DEUTSCH: Push-Benachrichtigung an alle Geraete eines Mitglieds senden.
@@ -73,7 +78,8 @@ async function pushToVorstand(notificationType, title, body, data = {}) {
 }
 
 async function sendPushToMember(memberId, notificationType, title, body, data = {}) {
-    if (!fcmInitialized) return;
+    // Mindestens ein Provider muss laufen — sonst erst gar nichts versuchen.
+    if (!fcmInitialized && !hmsPush.isInitialized()) return;
     try {
         const pref = await pool.query(
             'SELECT enabled FROM notification_preferences WHERE member_id=$1 AND notification_type=$2',
@@ -83,39 +89,63 @@ async function sendPushToMember(memberId, notificationType, title, body, data = 
             return; // User hat diesen Typ deaktiviert
         }
         const tokens = await pool.query(
-            'SELECT token FROM fcm_tokens WHERE member_id=$1',
+            'SELECT token, provider FROM fcm_tokens WHERE member_id=$1',
             [memberId]
         );
         if (tokens.rows.length === 0) return;
 
+        // Tokens nach Provider auftrennen — FCM und HMS sind nicht austauschbar.
+        const fcmTokens = tokens.rows.filter(r => (r.provider || 'fcm') === 'fcm').map(r => r.token);
+        const hmsTokens = tokens.rows.filter(r => r.provider === 'hms').map(r => r.token);
+
         const stringData = Object.fromEntries(
             Object.entries({ notificationType, ...data }).map(([k, v]) => [k, String(v)])
         );
-        const message = {
-            notification: { title, body },
-            data: stringData,
-            tokens: tokens.rows.map(r => r.token)
-        };
-        const response = await admin.messaging().sendEachForMulticast(message);
         const invalidTokens = [];
-        response.responses.forEach((resp, idx) => {
-            if (!resp.success) {
-                const code = resp.error && resp.error.code;
-                if (code === 'messaging/registration-token-not-registered' ||
-                    code === 'messaging/invalid-registration-token' ||
-                    code === 'messaging/invalid-argument') {
-                    invalidTokens.push(tokens.rows[idx].token);
+        let successCount = 0;
+
+        if (fcmTokens.length > 0 && fcmInitialized) {
+            const response = await admin.messaging().sendEachForMulticast({
+                notification: { title, body },
+                data: stringData,
+                tokens: fcmTokens
+            });
+            successCount += response.successCount;
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    const code = resp.error && resp.error.code;
+                    if (code === 'messaging/registration-token-not-registered' ||
+                        code === 'messaging/invalid-registration-token' ||
+                        code === 'messaging/invalid-argument') {
+                        invalidTokens.push(fcmTokens[idx]);
+                    }
                 }
-            }
-        });
+            });
+        }
+
+        if (hmsTokens.length > 0 && hmsPush.isInitialized()) {
+            const response = await hmsPush.sendMulticast({
+                tokens: hmsTokens,
+                title,
+                body,
+                data: stringData
+            });
+            successCount += response.successCount;
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success && resp.error && hmsPush.isInvalidTokenError(resp.error.code)) {
+                    invalidTokens.push(hmsTokens[idx]);
+                }
+            });
+        }
+
         if (invalidTokens.length > 0) {
             await pool.query(
                 'DELETE FROM fcm_tokens WHERE token = ANY($1::text[])',
                 [invalidTokens]
             );
-            console.log(`FCM: cleaned up ${invalidTokens.length} invalid tokens for member ${memberId}`);
+            console.log(`Push: cleaned up ${invalidTokens.length} invalid tokens for member ${memberId}`);
         }
-        console.log(`FCM push to member ${memberId} (${notificationType}): ${response.successCount}/${tokens.rows.length} delivered`);
+        console.log(`Push to member ${memberId} (${notificationType}): ${successCount}/${tokens.rows.length} delivered (fcm=${fcmTokens.length} hms=${hmsTokens.length})`);
     } catch (err) {
         console.error('sendPushToMember failed:', err.message);
     }
@@ -3801,51 +3831,87 @@ app.post('/internal/push-broadcast', async (req, res) => {
     if (!notificationType || !title) {
         return res.status(400).json({ error: 'notificationType, title required' });
     }
-    if (!fcmInitialized) return res.json({ success: true, sent: 0, note: 'FCM not initialized' });
+    if (!fcmInitialized && !hmsPush.isInitialized()) {
+        return res.json({ success: true, sent: 0, note: 'no push provider initialized' });
+    }
 
     try {
         const tokens = await pool.query(`
-            SELECT t.token FROM fcm_tokens t
+            SELECT t.token, t.provider FROM fcm_tokens t
             JOIN members m ON t.member_id = m.id
             LEFT JOIN notification_preferences p
               ON p.member_id = m.id AND p.notification_type = $1
             WHERE m.status = 'Aktivmitglied'
               AND (p.enabled IS NULL OR p.enabled = true)
         `, [notificationType]);
-        const allTokens = tokens.rows.map(r => r.token);
-        if (allTokens.length === 0) return res.json({ success: true, sent: 0 });
+
+        const fcmTokens = tokens.rows.filter(r => (r.provider || 'fcm') === 'fcm').map(r => r.token);
+        const hmsTokens = tokens.rows.filter(r => r.provider === 'hms').map(r => r.token);
+        const total = fcmTokens.length + hmsTokens.length;
+        if (total === 0) return res.json({ success: true, sent: 0 });
 
         const stringData = Object.fromEntries(
             Object.entries({ notificationType, ...(data || {}) }).map(([k, v]) => [k, String(v)])
         );
         let sent = 0;
         const invalid = [];
-        for (let i = 0; i < allTokens.length; i += 500) {
-            const batch = allTokens.slice(i, i + 500);
-            const message = { notification: { title, body }, data: stringData, tokens: batch };
-            try {
-                const resp = await admin.messaging().sendEachForMulticast(message);
-                sent += resp.successCount;
-                resp.responses.forEach((r, idx) => {
-                    if (!r.success) {
-                        const code = r.error && r.error.code;
-                        if (code === 'messaging/registration-token-not-registered' ||
-                            code === 'messaging/invalid-registration-token' ||
-                            code === 'messaging/invalid-argument') {
-                            invalid.push(batch[idx]);
+
+        // FCM-Batches
+        if (fcmInitialized) {
+            for (let i = 0; i < fcmTokens.length; i += 500) {
+                const batch = fcmTokens.slice(i, i + 500);
+                try {
+                    const resp = await admin.messaging().sendEachForMulticast({
+                        notification: { title, body },
+                        data: stringData,
+                        tokens: batch
+                    });
+                    sent += resp.successCount;
+                    resp.responses.forEach((r, idx) => {
+                        if (!r.success) {
+                            const code = r.error && r.error.code;
+                            if (code === 'messaging/registration-token-not-registered' ||
+                                code === 'messaging/invalid-registration-token' ||
+                                code === 'messaging/invalid-argument') {
+                                invalid.push(batch[idx]);
+                            }
                         }
-                    }
-                });
-            } catch (e) {
-                console.error('push-broadcast batch failed:', e.message);
+                    });
+                } catch (e) {
+                    console.error('push-broadcast FCM batch failed:', e.message);
+                }
             }
         }
+
+        // HMS-Batches
+        if (hmsPush.isInitialized()) {
+            for (let i = 0; i < hmsTokens.length; i += 500) {
+                const batch = hmsTokens.slice(i, i + 500);
+                try {
+                    const resp = await hmsPush.sendMulticast({
+                        tokens: batch,
+                        title,
+                        body,
+                        data: stringData
+                    });
+                    sent += resp.successCount;
+                    resp.responses.forEach((r, idx) => {
+                        if (!r.success && r.error && hmsPush.isInvalidTokenError(r.error.code)) {
+                            invalid.push(batch[idx]);
+                        }
+                    });
+                } catch (e) {
+                    console.error('push-broadcast HMS batch failed:', e.message);
+                }
+            }
+        }
+
         if (invalid.length) {
             await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [invalid]);
             console.log(`push-broadcast: cleaned up ${invalid.length} invalid tokens`);
         }
-        console.log(`push-broadcast (${notificationType}): ${sent}/${allTokens.length} delivered`);
-        res.json({ success: true, sent, total: allTokens.length });
+        console.log(`push-broadcast (${notificationType}): ${sent}/${total} delivered (fcm=${fcmTokens.length} hms=${hmsTokens.length})`);
+        res.json({ success: true, sent, total });
     } catch (err) {
         console.error('push-broadcast failed:', err);
         res.status(500).json({ error: err.message });
@@ -4529,18 +4595,21 @@ app.get('/members/me/notifications', authenticateToken, async (req, res) => {
     }
 });
 
-// DEUTSCH: FCM-Token-Registrierung (api-members v0.23.0+) — Mitglieder-App
-// ruft das beim Login + bei Token-Refresh auf, damit der Server Push-
-// Notifications an dieses Geraet senden kann.
+// DEUTSCH: Push-Token-Registrierung — Mitglieder-App ruft das beim Login + bei
+// Token-Refresh auf, damit der Server Push-Notifications an dieses Geraet senden
+// kann. Akzeptiert FCM- und HMS-Tokens; Provider wird im `provider`-Feld
+// uebergeben (`fcm` Default, `hms` fuer Huawei-Geraete ohne Google-Services).
 //
-// Tabelle wird inline angelegt (idempotent), damit kein separates Migration-File
-// noetig ist. UNIQUE(member_id, token) → Re-Login speichert nichts doppelt.
+// Tabelle wird inline angelegt/migriert (idempotent), damit kein separates
+// Migration-File noetig ist. UNIQUE(member_id, token) → Re-Login speichert
+// nichts doppelt. Endpoint-Pfad bleibt aus historischen Gruenden `fcm-token`.
 app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
     try {
-        const { token, device_id, platform } = req.body || {};
+        const { token, device_id, platform, provider } = req.body || {};
         if (!token || typeof token !== 'string') {
             return res.status(400).json({ error: 'token erforderlich' });
         }
+        const normalizedProvider = (provider === 'hms') ? 'hms' : 'fcm';
 
         // Get member ID from email
         const memberResult = await pool.query(
@@ -4552,7 +4621,7 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
         }
         const memberId = memberResult.rows[0].id;
 
-        // Tabelle anlegen falls noch nicht vorhanden (idempotent)
+        // Tabelle anlegen falls noch nicht vorhanden, sonst Spalte nachziehen.
         await pool.query(`
             CREATE TABLE IF NOT EXISTS fcm_tokens (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -4560,22 +4629,25 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
                 token TEXT NOT NULL,
                 device_id VARCHAR(255),
                 platform VARCHAR(20) DEFAULT 'android',
+                provider VARCHAR(10) DEFAULT 'fcm',
                 created_at TIMESTAMP DEFAULT NOW(),
                 updated_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE(member_id, token)
             );
+            ALTER TABLE fcm_tokens ADD COLUMN IF NOT EXISTS provider VARCHAR(10) DEFAULT 'fcm';
             CREATE INDEX IF NOT EXISTS idx_fcm_tokens_member ON fcm_tokens(member_id);
         `);
 
         // Upsert: gleicher token + member_id => updated_at refresh
         await pool.query(`
-            INSERT INTO fcm_tokens (member_id, token, device_id, platform)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO fcm_tokens (member_id, token, device_id, platform, provider)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (member_id, token) DO UPDATE
               SET device_id = COALESCE($3, fcm_tokens.device_id),
                   platform = COALESCE($4, fcm_tokens.platform),
+                  provider = $5,
                   updated_at = NOW()
-        `, [memberId, token, device_id || null, platform || 'android']);
+        `, [memberId, token, device_id || null, platform || 'android', normalizedProvider]);
 
         res.json({ success: true });
     } catch (error) {
