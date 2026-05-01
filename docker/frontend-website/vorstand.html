@@ -184,6 +184,7 @@
                     <a href="index.html" class="hover:text-fire-200 transition-colors">Website</a>
                     <a href="events.html" class="hover:text-fire-200 transition-colors">Veranstaltungen</a>
                     <button id="app-qr-btn" class="hover:text-fire-200 transition-colors" title="QR-Code für App-Login">App-QR</button>
+                    <button id="full-export-btn" class="hover:text-fire-200 transition-colors" title="Komplett-Export aller Vereinsdaten als Excel-Datei">Datenexport</button>
                     <button id="logout-btn" class="hover:text-fire-200 transition-colors">Abmelden</button>
                 </div>
             </div>
@@ -193,6 +194,7 @@
                 <a href="index.html" class="block py-2 px-2 rounded hover:bg-fire-600 touch-manipulation">Website</a>
                 <a href="events.html" class="block py-2 px-2 rounded hover:bg-fire-600 touch-manipulation">Veranstaltungen</a>
                 <button id="app-qr-btn-mobile" class="block w-full text-left py-2 px-2 rounded hover:bg-fire-600 touch-manipulation">App-QR</button>
+                <button id="full-export-btn-mobile" class="block w-full text-left py-2 px-2 rounded hover:bg-fire-600 touch-manipulation">Datenexport (Excel)</button>
                 <button id="logout-btn-mobile" class="block w-full text-left py-2 px-2 rounded hover:bg-fire-600 touch-manipulation">Abmelden</button>
             </div>
         </div>
@@ -317,11 +319,6 @@
                             </button>
                             <button id="export-email-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                 E-Mail-Zustellung (zustellung_email)
-                            </button>
-                            <hr class="my-1 border-gray-200">
-                            <button id="export-xlsx-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                                <svg class="w-4 h-4 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path d="M4 18h12V6h-4V2H4v16zm8-15.5L14.5 5H12V2.5zM2 0h10l4 4v16H2V0z"/></svg>
-                                Komplett (Excel: Mitglieder, Beitr&auml;ge, Rechnungen, Buchhaltung, Anmeldungen)
                             </button>
                             <hr class="my-1 border-gray-200">
                             <button id="export-pdf-telefonliste-btn" class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
@@ -8650,21 +8647,21 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             exportCSV('email');
             exportDropdown.classList.add('hidden');
         });
-        document.getElementById('export-xlsx-btn').addEventListener('click', async () => {
-            exportDropdown.classList.add('hidden');
-            const btn = document.getElementById('export-xlsx-btn');
-            const orig = btn.innerHTML;
-            btn.innerHTML = 'Lade Daten…';
+        const triggerFullExport = async (btn) => {
+            const orig = btn.textContent;
+            btn.textContent = 'Lade Daten…';
             btn.disabled = true;
             try {
                 await exportFullXLSX();
             } catch (e) {
                 alert('Export fehlgeschlagen: ' + e.message);
             } finally {
-                btn.innerHTML = orig;
+                btn.textContent = orig;
                 btn.disabled = false;
             }
-        });
+        };
+        document.getElementById('full-export-btn').addEventListener('click', (e) => triggerFullExport(e.currentTarget));
+        document.getElementById('full-export-btn-mobile').addEventListener('click', (e) => triggerFullExport(e.currentTarget));
         document.getElementById('export-pdf-telefonliste-btn').addEventListener('click', async () => {
             exportDropdown.classList.add('hidden');
             try {
