@@ -85,3 +85,27 @@ export const deleteMessage = (uid: number, account: string, folder: string) =>
 
 export const attachmentUrl = (uid: number, index: number, account: string, folder: string) =>
   `/imap/messages/${uid}/attachments/${index}?account=${encodeURIComponent(account)}&folder=${encodeURIComponent(folder)}`;
+
+export interface ComposeBody {
+  account: string;
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  body: string;
+  inReplyTo?: string | null;
+  references?: string | null;
+  attachments?: Array<{ filename: string; content: string; contentType: string }>;
+}
+
+export const sendMessage = (body: ComposeBody) =>
+  api.post<{ success: boolean; messageId: string }>("/imap/send", body);
+
+export const saveDraft = (body: ComposeBody) =>
+  api.post<{ success: boolean }>("/imap/draft", body);
+
+export const moveMessage = (uid: number, account: string, folder: string, target: string) =>
+  api.post<{ success: boolean }>(
+    `/imap/messages/${uid}/move?account=${encodeURIComponent(account)}&folder=${encodeURIComponent(folder)}`,
+    { target }
+  );

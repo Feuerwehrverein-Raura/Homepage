@@ -9380,12 +9380,14 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                     class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded inline-flex items-center gap-1"
                     onclick="downloadAttachmentWithAuth(event, this)">📎 ${escapeHtml(a.filename)}</a>`
             ).join('');
-            // Body — html bevorzugt mit sandbox iframe, sonst text
+            // Body — html bevorzugt mit sandbox iframe via blob-URL (XSS-safe).
+            // KEIN srcdoc — String-Escape von Quotes laesst sich umgehen
+            // (z.B. srcdoc="..."onload=...). blob + sandbox isoliert die Mail komplett.
             if (m.html) {
                 const blob = new Blob([m.html], { type: 'text/html' });
                 const url = URL.createObjectURL(blob);
                 document.getElementById('inbox-body').innerHTML =
-                    `<iframe sandbox="allow-same-origin" srcdoc="${m.html.replace(/"/g, '&quot;')}" class="w-full h-full border-0" style="min-height: 400px;"></iframe>`;
+                    `<iframe sandbox="allow-same-origin" src="${url}" class="w-full h-full border-0" style="min-height: 400px;"></iframe>`;
             } else {
                 document.getElementById('inbox-body').innerHTML =
                     `<pre class="whitespace-pre-wrap font-sans text-sm">${escapeHtml(m.text || '(Kein Inhalt)')}</pre>`;
