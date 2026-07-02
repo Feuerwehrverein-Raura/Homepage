@@ -125,3 +125,34 @@ WHERE r.name IN ('Carnitas','Pollo adobado','Salsa Roja','Salsa Verde',
                  'Guacamole','Pico de Gallo','Tortillas & Garnitur')
 ON CONFLICT (event_slug, recipe_id) DO UPDATE
   SET servings = EXCLUDED.servings;
+
+-- ============================================================
+-- Bezugsquellen-Empfehlungen (kostengünstig + lieferbar / Region Basel)
+-- Mexikanische Spezialzutaten: Chilin Limón (Arlesheim, Abholung + Online),
+-- Mi Adelita (CH-Tortillas), La Guadalupana ZH (online lieferbar).
+-- Grossgebinde: Cash & Carry Prodega/Transgourmet (Pratteln). Frisches:
+-- Grossverteiler Migros/Coop/Aldi/Lidl/Denner in der Region.
+-- ============================================================
+INSERT INTO event_shopping_status (event_slug, item_id, recommendation)
+SELECT 'taco-abend-2026', (SELECT id FROM items WHERE name = v.item), v.rec
+FROM (VALUES
+  ('Schweineschulter', 'Cash & Carry Prodega/Transgourmet (Pratteln) – Grossgebinde günstig; oder lokale Metzgerei'),
+  ('Pouletschenkel',   'Cash & Carry Prodega/Transgourmet (Pratteln) – Grossgebinde; oder lokale Metzgerei'),
+  ('Schweineschmalz',  'Metzgerei oder Grossverteiler (Region Basel)'),
+  ('Tomaten',          'Grossverteiler (Migros/Coop/Aldi/Lidl); günstig als Kiste bei Prodega Pratteln'),
+  ('Tomatillos',       'Chilin Limón Arlesheim (Abholung/Online) oder La Guadalupana ZH (online); Ersatz: grüne Tomaten + mehr Limette'),
+  ('Zwiebel weiss',    'Grossverteiler; Sackware günstig bei Prodega Pratteln'),
+  ('Zwiebel rot',      'Grossverteiler (Region Basel)'),
+  ('Knoblauchzehe',    'Grossverteiler (Region Basel)'),
+  ('Avocado',          'Grossverteiler (Aldi/Lidl oft günstig) – rechtzeitig reif kaufen'),
+  ('Jalapeño',         'Grossverteiler oder lateinamerik. Laden; alt. Chilin Limón Arlesheim'),
+  ('Limette',          'Grossverteiler (Region Basel)'),
+  ('Orange',           'Grossverteiler (Region Basel)'),
+  ('Koriander',        'Grossverteiler / Markt Basel; grosse Bunde im Asia-/Lateinamerika-Laden'),
+  ('Maistortilla',     'Mi Adelita (CH-Produzent) oder Chilin Limón Arlesheim (Abholung/Online) – rechtzeitig VORBESTELLEN!'),
+  ('Guajillo-Chili',   'Chilin Limón Arlesheim oder La Guadalupana ZH (online lieferbar)'),
+  ('Chipotle',         'Chilin Limón Arlesheim oder La Guadalupana ZH (getrocknet od. in Adobo, online)')
+) AS v(item, rec)
+WHERE (SELECT id FROM items WHERE name = v.item) IS NOT NULL
+ON CONFLICT (event_slug, item_id) DO UPDATE SET recommendation = EXCLUDED.recommendation;
+

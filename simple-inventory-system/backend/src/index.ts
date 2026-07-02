@@ -268,6 +268,25 @@ async function initDB() {
     )
   `);
 
+  // Einkaufs-Status pro Event & Zutat: "gekauft"-Markierung + Bezugsquellen-
+  // Empfehlung + Notiz. Reichert die dynamisch berechnete Einkaufsliste mit
+  // manuellen Annotationen an (getrennt von event_recipes).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_shopping_status (
+      id SERIAL PRIMARY KEY,
+      event_slug VARCHAR(100) NOT NULL,
+      item_id INTEGER REFERENCES items(id) ON DELETE CASCADE,
+      purchased BOOLEAN DEFAULT false,
+      purchased_by VARCHAR(255),
+      purchased_at TIMESTAMP,
+      recommendation TEXT,
+      note TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(event_slug, item_id)
+    )
+  `);
+
   // Indices
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_ean ON items(ean_code)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_custom ON items(custom_barcode)`);
@@ -283,6 +302,7 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipe_preparations_recipe ON recipe_preparations(recipe_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_slug ON event_recipes(event_slug)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_recipe ON event_recipes(recipe_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_shopping_status ON event_shopping_status(event_slug)`);
 
   console.log('Database initialized');
 }
@@ -994,23 +1014,33 @@ app.get('/api/events/:slug/shopping-list', async (req, res) => {
         SUM(ri.quantity * er.servings)::numeric AS needed,
         i.quantity AS in_stock,
         i.purchase_price,
-        i.supplier
+        i.supplier,
+        ess.purchased,
+        ess.purchased_by,
+        ess.purchased_at,
+        ess.recommendation,
+        ess.note
       FROM event_recipes er
       JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
       JOIN items i ON i.id = ri.item_id
+      LEFT JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
       WHERE er.event_slug = $1 AND i.active = true
-      GROUP BY i.id, i.name, COALESCE(ri.unit, i.unit), i.quantity, i.purchase_price, i.supplier
+      GROUP BY i.id, i.name, COALESCE(ri.unit, i.unit), i.quantity, i.purchase_price, i.supplier,
+               ess.purchased, ess.purchased_by, ess.purchased_at, ess.recommendation, ess.note
       ORDER BY i.name
     `, [slug]);
 
     let totalCost = 0;
+    let openCost = 0;
     const items = result.rows.map((row) => {
       const needed = parseFloat(row.needed) || 0;
       const inStock = parseFloat(row.in_stock) || 0;
       const toBuy = Math.max(0, needed - inStock);
       const price = parseFloat(row.purchase_price) || 0;
       const estimatedCost = Math.round(toBuy * price * 100) / 100;
+      const purchased = row.purchased || false;
       totalCost += estimatedCost;
+      if (!purchased) openCost += estimatedCost;
       return {
         item_id: row.item_id,
         item_name: row.item_name,
@@ -1020,7 +1050,12 @@ app.get('/api/events/:slug/shopping-list', async (req, res) => {
         to_buy: toBuy,
         purchase_price: price,
         supplier: row.supplier,
-        estimated_cost: estimatedCost
+        estimated_cost: estimatedCost,
+        purchased,
+        purchased_by: row.purchased_by || null,
+        purchased_at: row.purchased_at || null,
+        recommendation: row.recommendation || null,
+        note: row.note || null
       };
     });
 
@@ -1029,10 +1064,45 @@ app.get('/api/events/:slug/shopping-list', async (req, res) => {
       items,
       total_items: items.length,
       total_to_buy: items.filter((i) => i.to_buy > 0).length,
-      estimated_total_cost: Math.round(totalCost * 100) / 100
+      total_purchased: items.filter((i) => i.purchased).length,
+      estimated_total_cost: Math.round(totalCost * 100) / 100,
+      estimated_open_cost: Math.round(openCost * 100) / 100
     });
   } catch (error) {
     console.error('GET shopping-list error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// "Gekauft"-Status / Bezugsquellen-Empfehlung / Notiz einer Einkaufslisten-
+// Position setzen (Upsert pro Event & Zutat).
+app.patch('/api/events/:slug/shopping-list/:itemId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug, itemId } = req.params;
+    const { purchased, recommendation, note } = req.body;
+    const purchasedBy = purchased ? (req.user?.email || null) : null;
+    const purchasedAt = purchased ? new Date() : null;
+    const result = await pool.query(`
+      INSERT INTO event_shopping_status (event_slug, item_id, purchased, purchased_by, purchased_at, recommendation, note)
+      VALUES ($1, $2, COALESCE($3, false), $4, $5, $6, $7)
+      ON CONFLICT (event_slug, item_id) DO UPDATE SET
+        purchased = COALESCE($3, event_shopping_status.purchased),
+        purchased_by = CASE WHEN $3 IS TRUE THEN $4
+                            WHEN $3 IS FALSE THEN NULL
+                            ELSE event_shopping_status.purchased_by END,
+        purchased_at = CASE WHEN $3 IS TRUE THEN $5
+                            WHEN $3 IS FALSE THEN NULL
+                            ELSE event_shopping_status.purchased_at END,
+        recommendation = COALESCE($6, event_shopping_status.recommendation),
+        note = COALESCE($7, event_shopping_status.note),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [slug, itemId, purchased ?? null, purchasedBy, purchasedAt, recommendation ?? null, note ?? null]);
+
+    broadcast({ type: 'shopping_status_updated', event_slug: slug, item_id: parseInt(itemId) });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('PATCH shopping-status error:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });
