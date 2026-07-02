@@ -1365,15 +1365,13 @@ function authenticateOrderSystem(req: express.Request, res: express.Response, ne
 // DEUTSCH: Zugriff auf die Event-Rezept-/Einkaufs-Endpoints. Erlaubt:
 //  1. internen Aufruf per x-order-api-key (z.B. vom Events-Backend, das
 //     Vorstand/Organisator bereits geprueft hat), ODER
-//  2. eingeloggten Vorstand/Admin (Authentik-Gruppe) fuer das Inventar-Frontend.
+//  2. jeden eingeloggten Inventar-Nutzer (Authentik-Token) fuer das Inventar-Frontend.
 function authenticateEventAccess(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   const apiKey = req.headers['x-order-api-key'];
   if (apiKey && apiKey === ORDER_API_KEY) return next();
-  return authenticateToken(req, res, () => {
-    const groups = req.user?.groups || [];
-    if (groups.includes('vorstand') || groups.includes('admin')) return next();
-    return res.status(403).json({ error: 'Nur Vorstand oder interner Zugriff' });
-  });
+  // Jeder eingeloggte Inventar-Nutzer darf Event-Rezepte verwalten (nicht nur Vorstand).
+  // Die Beschraenkung auf Vorstand/Organisator gilt nur auf der oeffentlichen Eventseite (Events-Proxy).
+  return authenticateToken(req, res, next);
 }
 
 // Create item from order system (API key authentication)
