@@ -113,7 +113,38 @@ interface User {
   groups: string[];
 }
 
-type Tab = 'items' | 'scanner' | 'add' | 'low-stock' | 'reports' | 'kisten' | 'rezepte';
+type Tab = 'items' | 'scanner' | 'add' | 'low-stock' | 'reports' | 'kisten' | 'rezepte' | 'events';
+
+interface EventRecipe {
+  link_id: number;
+  recipe_id: number;
+  name: string;
+  servings: number;
+  available_portions?: number;
+  category_name?: string;
+}
+interface ShoppingItem {
+  item_id: number;
+  item_name: string;
+  unit: string;
+  needed: number;
+  in_stock: number;
+  to_buy: number;
+  purchase_price: number;
+  estimated_cost: number;
+  purchased: boolean;
+  recommendation?: string | null;
+  note?: string | null;
+}
+interface ShoppingList {
+  event_slug: string;
+  items: ShoppingItem[];
+  total_items: number;
+  total_to_buy: number;
+  total_purchased: number;
+  estimated_total_cost: number;
+  estimated_open_cost: number;
+}
 
 interface RecipeCategory {
   id: number;
@@ -570,7 +601,7 @@ function App() {
       {/* Desktop Tabs - hidden on mobile */}
       <nav className="bg-white shadow hidden sm:block">
         <div className="container mx-auto flex">
-          {(['items', 'scanner', 'add', 'low-stock', 'kisten', 'rezepte', 'reports'] as Tab[]).map((t) => (
+          {([...(['items', 'scanner', 'add', 'low-stock', 'kisten', 'rezepte'] as Tab[]), ...(user?.groups?.some((g) => ['vorstand', 'admin'].includes(g.toLowerCase())) ? (['events'] as Tab[]) : []), 'reports' as Tab] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); if (t !== 'scanner') stopScanner(); }}
@@ -584,6 +615,7 @@ function App() {
               {t === 'low-stock' && '⚠️ Niedrig'}
               {t === 'kisten' && '📦 Kisten'}
               {t === 'rezepte' && '🍳 Rezepte'}
+              {t === 'events' && '🌮 Events'}
               {t === 'reports' && '📊 Berichte'}
             </button>
           ))}
@@ -957,6 +989,11 @@ function App() {
             user={user}
             onLogin={login}
           />
+        )}
+
+        {/* Events Tab (nur Vorstand/Admin) */}
+        {tab === 'events' && (
+          <EventsView token={token} user={user} onLogin={login} />
         )}
 
         {/* Reports Tab */}
@@ -3456,6 +3493,261 @@ function PublicItemView({ code, onNavigateToApp }: { code: string; onNavigateToA
           Feuerwehrverein Raura - Lagerverwaltung
         </p>
       </main>
+    </div>
+  );
+}
+
+// Events-Tab: Rezepte an ein Event knüpfen + Einkaufsliste interaktiv abhaken.
+// Endpoints sind serverseitig auf internen Key ODER Vorstand/Admin beschränkt.
+function EventsView({ token, user, onLogin }: { token: string | null; user: User | null; onLogin: () => void }) {
+  const [slug, setSlug] = useState('taco-abend-2026');
+  const [loadedSlug, setLoadedSlug] = useState<string | null>(null);
+  const [eventRecipes, setEventRecipes] = useState<EventRecipe[]>([]);
+  const [shopping, setShopping] = useState<ShoppingList | null>(null);
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
+  const [addRecipeId, setAddRecipeId] = useState('');
+  const [addServings, setAddServings] = useState('30');
+  const [loading, setLoading] = useState(false);
+
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const loadShopping = async (s: string) => {
+    const res = await fetch(`${API_URL}/events/${encodeURIComponent(s)}/shopping-list`, { headers: authHeaders });
+    if (res.ok) setShopping(await res.json());
+  };
+
+  const load = async (s: string) => {
+    if (!s.trim()) return;
+    setLoading(true);
+    try {
+      const rRes = await fetch(`${API_URL}/events/${encodeURIComponent(s)}/recipes`, { headers: authHeaders });
+      if (rRes.status === 401 || rRes.status === 403) {
+        alert('Kein Zugriff auf dieses Event (nur Vorstand/Admin).');
+        setLoading(false);
+        return;
+      }
+      setEventRecipes(rRes.ok ? await rRes.json() : []);
+      await loadShopping(s);
+      setLoadedSlug(s);
+    } catch {
+      alert('Laden fehlgeschlagen.');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetch(`${API_URL}/recipes`, { headers: authHeaders })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setAllRecipes(d))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const addRecipe = async () => {
+    if (!loadedSlug || !addRecipeId) return;
+    const res = await fetch(`${API_URL}/events/${encodeURIComponent(loadedSlug)}/recipes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ recipe_id: Number(addRecipeId), servings: Number(addServings) || 1 }),
+    });
+    if (res.ok) {
+      setAddRecipeId('');
+      load(loadedSlug);
+    } else {
+      const e = await res.json().catch(() => ({}));
+      alert(e.error || 'Fehler beim Verknüpfen');
+    }
+  };
+
+  const changeServings = async (recipeId: number, servings: number) => {
+    if (!loadedSlug || !servings || servings < 1) return;
+    await fetch(`${API_URL}/events/${encodeURIComponent(loadedSlug)}/recipes/${recipeId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ servings }),
+    });
+    load(loadedSlug);
+  };
+
+  const removeRecipe = async (recipeId: number) => {
+    if (!loadedSlug) return;
+    await fetch(`${API_URL}/events/${encodeURIComponent(loadedSlug)}/recipes/${recipeId}`, {
+      method: 'DELETE',
+      headers: authHeaders,
+    });
+    load(loadedSlug);
+  };
+
+  const togglePurchased = async (it: ShoppingItem) => {
+    if (!loadedSlug) return;
+    await fetch(`${API_URL}/events/${encodeURIComponent(loadedSlug)}/shopping-list/${it.item_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ purchased: !it.purchased }),
+    });
+    loadShopping(loadedSlug);
+  };
+
+  const saveNote = async (it: ShoppingItem, note: string) => {
+    if (!loadedSlug) return;
+    await fetch(`${API_URL}/events/${encodeURIComponent(loadedSlug)}/shopping-list/${it.item_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+      body: JSON.stringify({ note }),
+    });
+  };
+
+  if (!user) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500 mb-4">Bitte anmelden, um Event-Rezepte zu verwalten.</p>
+        <button onClick={onLogin} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold">
+          Anmelden
+        </button>
+      </div>
+    );
+  }
+
+  const fmt = (n: number) => (n >= 10 ? String(Math.round(n)) : String(Math.round(n * 10) / 10));
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white p-4 rounded-xl shadow-md flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-sm font-medium mb-1">Event-Slug</label>
+          <input
+            value={slug}
+            onChange={(e) => setSlug(e.target.value)}
+            placeholder="z.B. taco-abend-2026"
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </div>
+        <button
+          onClick={() => load(slug)}
+          disabled={loading}
+          className="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold disabled:opacity-50"
+        >
+          {loading ? 'Lädt…' : 'Laden'}
+        </button>
+      </div>
+
+      {loadedSlug && (
+        <>
+          <div className="bg-white p-4 rounded-xl shadow-md">
+            <h3 className="font-semibold text-lg mb-3">🍳 Rezepte am Event „{loadedSlug}"</h3>
+            <div className="space-y-2 mb-4">
+              {eventRecipes.length === 0 && <p className="text-gray-400 text-sm">Noch keine Rezepte verknüpft.</p>}
+              {eventRecipes.map((er) => (
+                <div key={er.recipe_id} className="flex items-center gap-3 border-b pb-2">
+                  <span className="flex-1 font-medium">{er.name}</span>
+                  <label className="text-sm text-gray-500">Portionen</label>
+                  <input
+                    type="number"
+                    min={1}
+                    defaultValue={er.servings}
+                    onBlur={(e) => {
+                      const v = Number(e.target.value);
+                      if (v && v !== er.servings) changeServings(er.recipe_id, v);
+                    }}
+                    className="w-20 px-2 py-1 border rounded-lg"
+                  />
+                  <button onClick={() => removeRecipe(er.recipe_id)} className="text-red-500 hover:text-red-700 text-sm">
+                    Entfernen
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <select
+                value={addRecipeId}
+                onChange={(e) => setAddRecipeId(e.target.value)}
+                className="flex-1 min-w-[160px] px-3 py-2 border rounded-lg"
+              >
+                <option value="">Rezept wählen…</option>
+                {allRecipes
+                  .filter((r) => !eventRecipes.some((er) => er.recipe_id === r.id))
+                  .map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
+              </select>
+              <input
+                type="number"
+                min={1}
+                value={addServings}
+                onChange={(e) => setAddServings(e.target.value)}
+                className="w-24 px-3 py-2 border rounded-lg"
+                placeholder="Portionen"
+              />
+              <button
+                onClick={addRecipe}
+                disabled={!addRecipeId}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50"
+              >
+                + Verknüpfen
+              </button>
+            </div>
+          </div>
+
+          {shopping && (
+            <div className="bg-white p-4 rounded-xl shadow-md">
+              <div className="flex flex-wrap items-baseline justify-between mb-3 gap-2">
+                <h3 className="font-semibold text-lg">🛒 Einkaufsliste</h3>
+                <div className="text-sm text-gray-600">
+                  {shopping.total_purchased}/{shopping.total_items} erledigt · offen{' '}
+                  <strong>CHF {shopping.estimated_open_cost.toFixed(2)}</strong> · gesamt CHF{' '}
+                  {shopping.estimated_total_cost.toFixed(2)}
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-gray-500 uppercase border-b">
+                      <th className="py-2 pr-2">✓</th>
+                      <th className="py-2 pr-2">Zutat</th>
+                      <th className="py-2 px-2 text-right">Einkauf</th>
+                      <th className="py-2 pl-2">Bezugsquelle</th>
+                      <th className="py-2 pl-2">Notiz</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shopping.items.map((it) => (
+                      <tr key={it.item_id} className={`border-b ${it.purchased ? 'bg-green-50' : ''}`}>
+                        <td className="py-1.5 pr-2">
+                          <input
+                            type="checkbox"
+                            checked={it.purchased}
+                            onChange={() => togglePurchased(it)}
+                            className="w-4 h-4"
+                          />
+                        </td>
+                        <td className={`py-1.5 pr-2 ${it.purchased ? 'line-through text-gray-400' : 'font-medium'}`}>
+                          {it.item_name}
+                        </td>
+                        <td className="py-1.5 px-2 text-right whitespace-nowrap">
+                          {fmt(it.to_buy)} {it.unit}
+                        </td>
+                        <td className="py-1.5 pl-2 text-xs text-gray-500 max-w-[220px]">{it.recommendation || ''}</td>
+                        <td className="py-1.5 pl-2">
+                          <input
+                            defaultValue={it.note || ''}
+                            onBlur={(e) => {
+                              if ((e.target.value || '') !== (it.note || '')) saveNote(it, e.target.value);
+                            }}
+                            placeholder="…"
+                            className="w-32 px-2 py-1 border rounded text-xs"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
