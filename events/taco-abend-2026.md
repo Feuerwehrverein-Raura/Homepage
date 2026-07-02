@@ -19,7 +19,7 @@ tags: [Taco, Geselligkeit, Sommer, Essen]
 registrationRequired: true
 participantRegistration: true
 registrationDeadline: 2026-07-11T23:59:59
-maxParticipants: 50
+maxParticipants: 30
 ---
 
 # Taco-Abend 2026
@@ -43,7 +43,7 @@ Also raus aus dem Sommerloch, rein in den Roten Schopf – ¡vamos!
   genaue Ort wird rechtzeitig bekannt gegeben)*
 - **Kosten:** Kostenlos für Vereinsmitglieder
 - **Anmeldung:** Erforderlich bis spätestens 11. Juli 2026
-- **Teilnehmerzahl:** Begrenzt auf 50 Personen
+- **Teilnehmerzahl:** Begrenzt auf 30 Personen
 
 ## Anmeldung
 
