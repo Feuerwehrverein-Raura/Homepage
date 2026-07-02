@@ -218,6 +218,7 @@
     <script>
         // DEUTSCH: Authentifizierungs-Konfiguration fuer die Mitglieder-API und Authentik OIDC
         const API_BASE = 'https://api.fwv-raura.ch';      // DEUTSCH: Backend-API des Vereins
+        const INVENTORY_API = 'https://inventar.fwv-raura.ch';  // DEUTSCH: Lager-/Rezept-API (Rezepte & Einkaufsliste)
         const AUTHENTIK_URL = 'https://auth.fwv-raura.ch'; // DEUTSCH: Authentik Single Sign-On Server
         const CLIENT_ID = 'fwv-members';                   // DEUTSCH: OAuth2 Client-ID fuer Mitglieder-Login
 
@@ -1221,6 +1222,9 @@
                         </div>
                         ` : ''}
                         
+                        <!-- Rezepte & Einkaufsliste (async aus Inventar-API; bleibt leer, wenn keine Rezepte verknüpft) -->
+                        <div id="event-recipes-module"></div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-lg mb-6">
                             <div class="space-y-3">
                                 <h4 class="font-semibold text-gray-800 text-lg">📅 Termin</h4>
@@ -1353,6 +1357,85 @@
 
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
+
+                // Rezepte & Einkaufsliste aus dem Lager-System nachladen (nur wenn vorhanden)
+                this.loadEventRecipes(event.id);
+            }
+
+            // DEUTSCH: Laedt Rezepte + Einkaufsliste eines Events aus der Inventar-API
+            // und zeigt sie read-only im Modal an. Zeigt nichts, wenn keine Rezepte verknuepft sind.
+            async loadEventRecipes(slug) {
+                const box = document.getElementById('event-recipes-module');
+                if (!box || !slug) return;
+                // DEUTSCH: Rezepte & Einkauf nur für Vorstand oder den Organisator des Events
+                if (!this.canSeeRecipeModule(this.selectedEvent)) { box.innerHTML = ''; return; }
+                try {
+                    const [recRes, shopRes] = await Promise.all([
+                        fetch(`${INVENTORY_API}/api/events/${encodeURIComponent(slug)}/recipes`),
+                        fetch(`${INVENTORY_API}/api/events/${encodeURIComponent(slug)}/shopping-list`)
+                    ]);
+                    if (!recRes.ok || !shopRes.ok) return;
+                    const recipes = await recRes.json();
+                    const shop = await shopRes.json();
+                    if (!Array.isArray(recipes) || recipes.length === 0) return;
+
+                    const chips = recipes.map(r =>
+                        `<span class="px-2.5 py-1 bg-fire-100 text-fire-800 rounded-full text-xs font-medium">${this.escapeHtml(r.name)}</span>`
+                    ).join(' ');
+
+                    const rows = (shop.items || []).map(it => `
+                        <tr class="border-b border-amber-100 ${it.purchased ? 'opacity-60' : ''}">
+                            <td class="py-1.5 pr-2">${it.purchased ? '✅' : '⬜'}
+                                <span class="${it.purchased ? 'line-through text-gray-400' : 'font-medium text-gray-800'}">${this.escapeHtml(it.item_name)}</span></td>
+                            <td class="py-1.5 px-2 text-right whitespace-nowrap text-gray-700">${this.fmtQty(it.to_buy)} ${this.escapeHtml(it.unit || '')}</td>
+                            <td class="py-1.5 pl-2 text-xs text-gray-500">${it.recommendation ? this.escapeHtml(it.recommendation) : ''}</td>
+                        </tr>`).join('');
+
+                    box.innerHTML = `
+                        <div class="mb-6 p-5 bg-amber-50 border border-amber-200 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 text-lg mb-3">🌮 Rezepte &amp; Einkaufsliste</h4>
+                            <div class="flex flex-wrap gap-1.5 mb-4">${chips}</div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead><tr class="text-left text-xs text-gray-500 uppercase border-b border-amber-200">
+                                        <th class="py-1.5 pr-2">Zutat</th>
+                                        <th class="py-1.5 px-2 text-right">Einkauf</th>
+                                        <th class="py-1.5 pl-2">Bezugsquelle (Region Basel)</th>
+                                    </tr></thead>
+                                    <tbody>${rows}</tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3 text-sm text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
+                                <span><strong>${shop.total_to_buy || 0}</strong> Positionen zu kaufen</span>
+                                <span>Offen: <strong>CHF ${(Number(shop.estimated_open_cost) || 0).toFixed(2)}</strong></span>
+                                ${shop.total_purchased ? `<span class="text-green-600">${shop.total_purchased} erledigt</span>` : ''}
+                            </div>
+                            <p class="text-xs text-gray-400 mt-2">Mengen aus den verknüpften Rezepten berechnet · Abhaken &amp; Verwalten im Lager-System</p>
+                        </div>`;
+                } catch (e) {
+                    console.error('Rezeptmodul konnte nicht geladen werden:', e);
+                }
+            }
+
+            escapeHtml(s) {
+                return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+            }
+
+            fmtQty(n) {
+                n = Number(n) || 0;
+                return n >= 10 ? String(Math.round(n)) : String(Math.round(n * 10) / 10);
+            }
+
+            // DEUTSCH: Darf der aktuelle Nutzer das Rezepte-/Einkaufsmodul sehen?
+            // Sichtbar nur für Vorstandsmitglieder (per Funktion) oder den Organisator dieses Events.
+            canSeeRecipeModule(event) {
+                const m = this.memberData;
+                if (!m) return false;
+                const funktion = (m.funktion || '').toString();
+                const isVorstand = /Pr[äa]sident|Aktuar|Kassier|Materialwart|Beisitzer|Vorstand|Admin/i.test(funktion);
+                const isOrganizer = !!(event && event.email && m.email &&
+                    event.email.toLowerCase() === m.email.toLowerCase());
+                return isVorstand || isOrganizer;
             }
 
             // DEUTSCH: Zeigt das Schicht-Anmeldeformular fuer Helfer (z.B. bei Dorffest)
