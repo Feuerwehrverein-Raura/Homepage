@@ -601,7 +601,7 @@ function App() {
       {/* Desktop Tabs - hidden on mobile */}
       <nav className="bg-white shadow hidden sm:block">
         <div className="container mx-auto flex">
-          {([...(['items', 'scanner', 'add', 'low-stock', 'kisten', 'rezepte'] as Tab[]), ...(user?.groups?.some((g) => ['vorstand', 'admin'].includes(g.toLowerCase())) ? (['events'] as Tab[]) : []), 'reports' as Tab] as Tab[]).map((t) => (
+          {(['items', 'scanner', 'add', 'low-stock', 'kisten', 'rezepte', 'events', 'reports'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); if (t !== 'scanner') stopScanner(); }}
