@@ -812,6 +812,49 @@ app.get('/events/:id/pdf', async (req, res) => {
     }
 });
 
+// ============================================================
+// DEUTSCH: Proxy zur Inventar-API — Rezepte & Einkaufsliste eines Events.
+// Zugriff nur fuer Vorstand/Admin oder den Organisator des Events. Die
+// Inventar-API selbst ist per internem Key geschuetzt (x-order-api-key),
+// deshalb laeuft der Zugriff des Frontends ueber diesen Proxy.
+// ============================================================
+const INVENTORY_URL = process.env.INVENTORY_URL || 'https://inventar.fwv-raura.ch';
+const INVENTORY_KEY = process.env.INVENTORY_KEY || process.env.ORDER_API_KEY || '';
+
+async function requireEventRecipeAccess(req, res, next) {
+    try {
+        const userEmail = (req.user?.email || '').toLowerCase();
+        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+        const ev = await pool.query(
+            'SELECT slug, organizer_email FROM events WHERE slug = $1 OR id::text = $1 LIMIT 1',
+            [req.params.id]
+        );
+        if (ev.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
+        req.eventSlug = ev.rows[0].slug;
+        const isOrganizer = userEmail !== '' && (ev.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        if (isPrivileged || isOrganizer) return next();
+        return res.status(403).json({ error: 'Nur Vorstand oder Organisator' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
+async function proxyInventory(req, res, path) {
+    try {
+        const r = await axios.get(`${INVENTORY_URL}/api/events/${encodeURIComponent(req.eventSlug)}/${path}`, {
+            headers: { 'x-order-api-key': INVENTORY_KEY },
+            timeout: 8000
+        });
+        res.json(r.data);
+    } catch (error) {
+        console.error(`Inventar-Proxy (${path}) fehlgeschlagen:`, error.message);
+        res.status(502).json({ error: 'Inventar-API nicht erreichbar' });
+    }
+}
+
+app.get('/events/:id/recipes', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventory(req, res, 'recipes'));
+app.get('/events/:id/shopping-list', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventory(req, res, 'shopping-list'));
+
 // DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
 app.get('/events/:id', async (req, res, next) => {
     // Reservierte IDs sind eigene Routen — weiterleiten, damit Express
