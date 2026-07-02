@@ -9,7 +9,7 @@ organizer: Paola Meixueiro und Stefan Müller
 email: aktuar@fwv-raura.ch
 
 # === OPTIONALE FELDER ===
-subtitle: Geselliger Taco-Abend
+subtitle: Fiesta gegen das Sommerloch
 category: Gesellschaftsanlass
 cost: Kostenlos
 status: planned
@@ -24,10 +24,17 @@ maxParticipants: 50
 
 # Taco-Abend 2026
 
-Wir laden alle Vereinsmitglieder herzlich zu einem geselligen
-Taco-Abend ein! Bei selbstgemachten Tacos mit verschiedenen Füllungen,
-frischen Salsas und guter Stimmung lassen wir den Sommerabend gemütlich
-ausklingen.
+Das grosse Sommerloch: Die halbe Welt liegt am Strand, im Dorf herrscht
+gähnende Leere und der Grillrost wird langsam langweilig? Zeit für
+etwas Feuer! 🌮🔥
+
+Wir machen aus der Sommerflaute eine handfeste **Taco-Fiesta** im Roten
+Schopf: authentische Tacos auf weichen Maistortillas zum Selberfüllen –
+auténtico, kein Tex-Mex! Dazu feurige Salsas von mild bis „¡madre mía!",
+kühle Drinks und beste Vereinsstimmung. Ob Fleisch, vegi oder scharf –
+hier findet jede und jeder den Lieblings-Taco.
+
+Also raus aus dem Sommerloch, rein in den Roten Schopf – ¡vamos!
 
 ## Wichtige Informationen
 
