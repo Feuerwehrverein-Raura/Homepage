@@ -251,6 +251,23 @@ async function initDB() {
     )
   `);
 
+  // Event ↔ Recipe link (Rezepte an Vereins-Events knüpfen).
+  // event_slug ist ein loser Fremdschlüssel auf die Events-DB (fwv_raura),
+  // da diese in einer separaten Datenbank liegt – analog zur bestehenden
+  // Order↔Inventar-Kopplung via HTTP.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_recipes (
+      id SERIAL PRIMARY KEY,
+      event_slug VARCHAR(100) NOT NULL,
+      recipe_id INTEGER REFERENCES recipes(id) ON DELETE CASCADE,
+      servings INTEGER NOT NULL DEFAULT 1,
+      notes TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(event_slug, recipe_id)
+    )
+  `);
+
   // Indices
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_ean ON items(ean_code)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_items_custom ON items(custom_barcode)`);
@@ -264,6 +281,8 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_recipe ON recipe_ingredients(recipe_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipe_ingredients_item ON recipe_ingredients(item_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_recipe_preparations_recipe ON recipe_preparations(recipe_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_slug ON event_recipes(event_slug)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_recipe ON event_recipes(recipe_id)`);
 
   console.log('Database initialized');
 }
@@ -855,6 +874,166 @@ app.post('/api/recipes/:id/prepare', authenticateToken, async (req: Authenticate
     res.status(400).json({ error: error.message });
   } finally {
     client.release();
+  }
+});
+
+// ========================================
+// EVENT ↔ RECIPES (Rezepte an Vereins-Events knüpfen)
+// event_slug verweist lose auf die Events-DB (fwv_raura, separate DB).
+// ========================================
+
+// Alle Rezepte eines Events (inkl. aktuell herstellbarer Portionen)
+app.get('/api/events/:slug/recipes', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await pool.query(`
+      SELECT er.id AS link_id, er.servings, er.notes AS link_notes,
+             r.*, rc.name AS category_name
+      FROM event_recipes er
+      JOIN recipes r ON r.id = er.recipe_id
+      LEFT JOIN recipe_categories rc ON r.recipe_category_id = rc.id
+      WHERE er.event_slug = $1 AND r.active = true
+      ORDER BY rc.sort_order, r.name
+    `, [slug]);
+
+    const recipes = await Promise.all(
+      result.rows.map(async (row) => ({
+        ...row,
+        available_portions: await calculateRecipeAvailability(row.id)
+      }))
+    );
+    res.json(recipes);
+  } catch (error) {
+    console.error('GET event recipes error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Rezept mit Event verknüpfen (oder Portionen/Notiz aktualisieren)
+app.post('/api/events/:slug/recipes', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const { recipe_id, servings, notes } = req.body;
+    if (!recipe_id) {
+      return res.status(400).json({ error: 'recipe_id ist erforderlich' });
+    }
+    const recipe = await pool.query('SELECT id FROM recipes WHERE id = $1 AND active = true', [recipe_id]);
+    if (recipe.rows.length === 0) {
+      return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    }
+    const result = await pool.query(`
+      INSERT INTO event_recipes (event_slug, recipe_id, servings, notes)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (event_slug, recipe_id)
+      DO UPDATE SET servings = EXCLUDED.servings, notes = EXCLUDED.notes, updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [slug, recipe_id, servings || 1, notes || null]);
+
+    broadcast({ type: 'event_recipe_linked', event_slug: slug, recipe_id });
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('POST event recipe error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Portionen/Notiz einer Verknüpfung aktualisieren
+app.put('/api/events/:slug/recipes/:recipeId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug, recipeId } = req.params;
+    const { servings, notes } = req.body;
+    const result = await pool.query(`
+      UPDATE event_recipes
+      SET servings = COALESCE($3, servings),
+          notes = COALESCE($4, notes),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE event_slug = $1 AND recipe_id = $2
+      RETURNING *
+    `, [slug, recipeId, servings ?? null, notes ?? null]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Verknüpfung nicht gefunden' });
+    }
+    broadcast({ type: 'event_recipe_updated', event_slug: slug, recipe_id: parseInt(recipeId) });
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('PUT event recipe error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Verknüpfung lösen
+app.delete('/api/events/:slug/recipes/:recipeId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug, recipeId } = req.params;
+    const result = await pool.query(
+      'DELETE FROM event_recipes WHERE event_slug = $1 AND recipe_id = $2 RETURNING id',
+      [slug, recipeId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Verknüpfung nicht gefunden' });
+    }
+    broadcast({ type: 'event_recipe_unlinked', event_slug: slug, recipe_id: parseInt(recipeId) });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('DELETE event recipe error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Einkaufsliste für ein Event: summiert alle Rezept-Zutaten × Portionen
+// und rechnet gegen den aktuellen Lagerbestand → to_buy + geschätzte Kosten.
+// Ersetzt die bisherige statische XLSX/PDF-Einkaufsliste.
+app.get('/api/events/:slug/shopping-list', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await pool.query(`
+      SELECT
+        i.id AS item_id,
+        i.name AS item_name,
+        COALESCE(ri.unit, i.unit) AS unit,
+        SUM(ri.quantity * er.servings)::numeric AS needed,
+        i.quantity AS in_stock,
+        i.purchase_price,
+        i.supplier
+      FROM event_recipes er
+      JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+      JOIN items i ON i.id = ri.item_id
+      WHERE er.event_slug = $1 AND i.active = true
+      GROUP BY i.id, i.name, COALESCE(ri.unit, i.unit), i.quantity, i.purchase_price, i.supplier
+      ORDER BY i.name
+    `, [slug]);
+
+    let totalCost = 0;
+    const items = result.rows.map((row) => {
+      const needed = parseFloat(row.needed) || 0;
+      const inStock = parseFloat(row.in_stock) || 0;
+      const toBuy = Math.max(0, needed - inStock);
+      const price = parseFloat(row.purchase_price) || 0;
+      const estimatedCost = Math.round(toBuy * price * 100) / 100;
+      totalCost += estimatedCost;
+      return {
+        item_id: row.item_id,
+        item_name: row.item_name,
+        unit: row.unit,
+        needed,
+        in_stock: inStock,
+        to_buy: toBuy,
+        purchase_price: price,
+        supplier: row.supplier,
+        estimated_cost: estimatedCost
+      };
+    });
+
+    res.json({
+      event_slug: slug,
+      items,
+      total_items: items.length,
+      total_to_buy: items.filter((i) => i.to_buy > 0).length,
+      estimated_total_cost: Math.round(totalCost * 100) / 100
+    });
+  } catch (error) {
+    console.error('GET shopping-list error:', error);
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
