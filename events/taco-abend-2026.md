@@ -31,7 +31,7 @@ etwas Feuer! 🌮🔥
 Wir machen aus der Sommerflaute eine handfeste **Taco-Fiesta** im Roten
 Schopf: authentische Tacos auf weichen Maistortillas zum Selberfüllen –
 auténtico, kein Tex-Mex! Dazu feurige Salsas von mild bis „¡madre mía!",
-kühle Drinks und beste Vereinsstimmung. Ob Fleisch, vegi oder scharf –
+kühle Drinks und beste Vereinsstimmung. Ob mild oder richtig scharf –
 hier findet jede und jeder den Lieblings-Taco.
 
 Also raus aus dem Sommerloch, rein in den Roten Schopf – ¡vamos!
