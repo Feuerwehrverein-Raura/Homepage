@@ -903,7 +903,7 @@ app.post('/api/recipes/:id/prepare', authenticateToken, async (req: Authenticate
 // ========================================
 
 // Alle Rezepte eines Events (inkl. aktuell herstellbarer Portionen)
-app.get('/api/events/:slug/recipes', async (req, res) => {
+app.get('/api/events/:slug/recipes', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug } = req.params;
     const result = await pool.query(`
@@ -930,7 +930,7 @@ app.get('/api/events/:slug/recipes', async (req, res) => {
 });
 
 // Rezept mit Event verknüpfen (oder Portionen/Notiz aktualisieren)
-app.post('/api/events/:slug/recipes', authenticateToken, async (req: AuthenticatedRequest, res) => {
+app.post('/api/events/:slug/recipes', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug } = req.params;
     const { recipe_id, servings, notes } = req.body;
@@ -958,7 +958,7 @@ app.post('/api/events/:slug/recipes', authenticateToken, async (req: Authenticat
 });
 
 // Portionen/Notiz einer Verknüpfung aktualisieren
-app.put('/api/events/:slug/recipes/:recipeId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+app.put('/api/events/:slug/recipes/:recipeId', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug, recipeId } = req.params;
     const { servings, notes } = req.body;
@@ -982,7 +982,7 @@ app.put('/api/events/:slug/recipes/:recipeId', authenticateToken, async (req: Au
 });
 
 // Verknüpfung lösen
-app.delete('/api/events/:slug/recipes/:recipeId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+app.delete('/api/events/:slug/recipes/:recipeId', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug, recipeId } = req.params;
     const result = await pool.query(
@@ -1003,7 +1003,7 @@ app.delete('/api/events/:slug/recipes/:recipeId', authenticateToken, async (req:
 // Einkaufsliste für ein Event: summiert alle Rezept-Zutaten × Portionen
 // und rechnet gegen den aktuellen Lagerbestand → to_buy + geschätzte Kosten.
 // Ersetzt die bisherige statische XLSX/PDF-Einkaufsliste.
-app.get('/api/events/:slug/shopping-list', async (req, res) => {
+app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug } = req.params;
     const result = await pool.query(`
@@ -1076,7 +1076,7 @@ app.get('/api/events/:slug/shopping-list', async (req, res) => {
 
 // "Gekauft"-Status / Bezugsquellen-Empfehlung / Notiz einer Einkaufslisten-
 // Position setzen (Upsert pro Event & Zutat).
-app.patch('/api/events/:slug/shopping-list/:itemId', authenticateToken, async (req: AuthenticatedRequest, res) => {
+app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug, itemId } = req.params;
     const { purchased, recommendation, note } = req.body;
@@ -1360,6 +1360,20 @@ function authenticateOrderSystem(req: express.Request, res: express.Response, ne
     return res.status(401).json({ error: 'Invalid API key' });
   }
   next();
+}
+
+// DEUTSCH: Zugriff auf die Event-Rezept-/Einkaufs-Endpoints. Erlaubt:
+//  1. internen Aufruf per x-order-api-key (z.B. vom Events-Backend, das
+//     Vorstand/Organisator bereits geprueft hat), ODER
+//  2. eingeloggten Vorstand/Admin (Authentik-Gruppe) fuer das Inventar-Frontend.
+function authenticateEventAccess(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
+  const apiKey = req.headers['x-order-api-key'];
+  if (apiKey && apiKey === ORDER_API_KEY) return next();
+  return authenticateToken(req, res, () => {
+    const groups = req.user?.groups || [];
+    if (groups.includes('vorstand') || groups.includes('admin')) return next();
+    return res.status(403).json({ error: 'Nur Vorstand oder interner Zugriff' });
+  });
 }
 
 // Create item from order system (API key authentication)

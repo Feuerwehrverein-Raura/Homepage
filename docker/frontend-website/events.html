@@ -1370,9 +1370,11 @@
                 // DEUTSCH: Rezepte & Einkauf nur für Vorstand oder den Organisator des Events
                 if (!this.canSeeRecipeModule(this.selectedEvent)) { box.innerHTML = ''; return; }
                 try {
+                    // Über den Events-API-Proxy (prüft Vorstand/Organisator serverseitig) mit Mitglieds-Token
+                    const authHeaders = this.authToken ? { 'Authorization': `Bearer ${this.authToken}` } : {};
                     const [recRes, shopRes] = await Promise.all([
-                        fetch(`${INVENTORY_API}/api/events/${encodeURIComponent(slug)}/recipes`),
-                        fetch(`${INVENTORY_API}/api/events/${encodeURIComponent(slug)}/shopping-list`)
+                        fetch(`${API_BASE}/events/${encodeURIComponent(slug)}/recipes`, { headers: authHeaders }),
+                        fetch(`${API_BASE}/events/${encodeURIComponent(slug)}/shopping-list`, { headers: authHeaders })
                     ]);
                     if (!recRes.ok || !shopRes.ok) return;
                     const recipes = await recRes.json();
