@@ -65,8 +65,8 @@ WHERE NOT EXISTS (SELECT 1 FROM recipes r WHERE r.name = v.name);
 -- Rezept-Zutaten (Menge PRO PORTION = Batch-für-30 / 30)
 -- ============================================================
 INSERT INTO recipe_ingredients (recipe_id, item_id, quantity, unit)
-SELECT (SELECT id FROM recipes WHERE name = v.recipe),
-       (SELECT id FROM items   WHERE name = v.item),
+SELECT (SELECT id FROM recipes WHERE name = v.recipe LIMIT 1),
+       (SELECT id FROM items   WHERE name = v.item LIMIT 1),
        v.qty, v.unit
 FROM (VALUES
   -- Carnitas (für 30): 4kg Schwein, 2 Orangen, 1 Zwiebel, 6 Knoblauch, 200g Schmalz
@@ -134,7 +134,7 @@ ON CONFLICT (event_slug, recipe_id) DO UPDATE
 -- Grossverteiler Migros/Coop/Aldi/Lidl/Denner in der Region.
 -- ============================================================
 INSERT INTO event_shopping_status (event_slug, item_id, recommendation)
-SELECT 'taco-abend-2026', (SELECT id FROM items WHERE name = v.item), v.rec
+SELECT 'taco-abend-2026', (SELECT id FROM items WHERE name = v.item LIMIT 1), v.rec
 FROM (VALUES
   ('Schweineschulter', 'Cash & Carry Prodega/Transgourmet (Pratteln) – Grossgebinde günstig; oder lokale Metzgerei'),
   ('Pouletschenkel',   'Cash & Carry Prodega/Transgourmet (Pratteln) – Grossgebinde; oder lokale Metzgerei'),
@@ -153,6 +153,6 @@ FROM (VALUES
   ('Guajillo-Chili',   'Chilin Limón Arlesheim oder La Guadalupana ZH (online lieferbar)'),
   ('Chipotle',         'Chilin Limón Arlesheim oder La Guadalupana ZH (getrocknet od. in Adobo, online)')
 ) AS v(item, rec)
-WHERE (SELECT id FROM items WHERE name = v.item) IS NOT NULL
+WHERE (SELECT id FROM items WHERE name = v.item LIMIT 1) IS NOT NULL
 ON CONFLICT (event_slug, item_id) DO UPDATE SET recommendation = EXCLUDED.recommendation;
 
