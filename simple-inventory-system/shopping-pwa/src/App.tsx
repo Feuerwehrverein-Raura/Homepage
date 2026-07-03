@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import {
   getStoredToken, userFromToken, login, logout, handleCallback, clearToken, type User,
 } from './auth'
+import { BrowserMultiFormatReader } from '@zxing/browser'
 import {
   getEvents, getShoppingList, setPurchased, patchItem, flushOutbox, outboxCount, AuthError, WS_URL,
-  getReceipts, uploadReceipt, deleteReceipt, MEDIA_ORIGIN,
+  getReceipts, uploadReceipt, deleteReceipt, restock, lookupBarcode, MEDIA_ORIGIN,
   type EventSummary, type ShoppingItem, type ShoppingList, type Receipt,
 } from './api'
 
@@ -217,6 +218,9 @@ function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
   const [detail, setDetail] = useState<ShoppingItem | null>(null)
   const [showReceipts, setShowReceipts] = useState(false)
   const [receiptsVersion, setReceiptsVersion] = useState(0)
+  const [scanning, setScanning] = useState(false)
+  const [restockBusy, setRestockBusy] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
   const load = useCallback(async () => {
@@ -267,11 +271,31 @@ function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
     }
   }
 
+  // Toast automatisch ausblenden
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  const doRestock = async () => {
+    setRestockBusy(true)
+    try {
+      const r = await restock(slug, token)
+      setToast(r.restocked > 0 ? `${r.restocked} Positionen ins Lager gebucht ✓` : 'Nichts einzubuchen')
+      await load()
+    } catch (e) {
+      if (e instanceof AuthError) { onAuthError(); return }
+      setToast('Einbuchen fehlgeschlagen')
+    } finally { setRestockBusy(false) }
+  }
+
   if (error) return <p className="text-red-600 py-8 text-center">{error}</p>
   if (!list) return <p className="text-gray-400 py-8 text-center">Lädt…</p>
 
   const toBuy = list.items.filter((i) => i.to_buy > 0)
   const stocked = list.items.filter((i) => i.to_buy <= 0)
+  const restockable = list.items.filter((i) => i.purchased && !i.restocked).length
   const boughtCount = toBuy.filter((i) => i.purchased).length
   const progress = toBuy.length ? Math.round((boughtCount / toBuy.length) * 100) : 100
 
@@ -309,6 +333,13 @@ function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
           </div>
         )}
       </div>
+
+      {restockable > 0 && (
+        <button onClick={doRestock} disabled={restockBusy}
+          className="w-full mb-4 bg-cart-100 text-cart-800 rounded-xl p-3 font-medium flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.99]">
+          📦 {restockBusy ? 'Bucht ein…' : `${restockable} gekaufte Positionen ins Lager einbuchen`}
+        </button>
+      )}
 
       {toBuy.length === 0 && (
         <p className="text-gray-500 py-8 text-center">Alles im Lager – nichts einzukaufen. 🎉</p>
@@ -396,6 +427,89 @@ function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
           onSaved={() => { setDetail(null); load() }}
           onAuthError={onAuthError}
         />
+      )}
+
+      {/* Barcode-Scan (Artikel in der Liste finden) */}
+      <button onClick={() => setScanning(true)} aria-label="Barcode scannen"
+        className="fixed bottom-5 right-5 z-20 bg-cart-600 text-white shadow-lg rounded-full px-5 py-3 font-medium flex items-center gap-2 active:scale-95">
+        📷 Scan
+      </button>
+      {scanning && (
+        <Scanner
+          token={token}
+          onFound={(id) => {
+            setScanning(false)
+            const it = list.items.find((i) => i.item_id === id)
+            if (it) setDetail(it); else setToast('Artikel nicht in dieser Liste')
+          }}
+          onClose={() => setScanning(false)}
+        />
+      )}
+      {toast && (
+        <div className="fixed bottom-24 inset-x-0 z-30 flex justify-center px-4 pointer-events-none">
+          <span className="bg-gray-900 text-white text-sm rounded-full px-4 py-2 shadow-lg">{toast}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- Barcode-Scanner (zxing) ---------------------------------------------
+function Scanner({ token, onFound, onClose }: {
+  token: string; onFound: (itemId: number) => void; onClose: () => void
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const foundRef = useRef(onFound)
+  foundRef.current = onFound
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const reader = new BrowserMultiFormatReader()
+    const stop = () => {
+      const v = videoRef.current
+      if (v && v.srcObject) {
+        (v.srcObject as MediaStream).getTracks().forEach((t) => t.stop())
+        v.srcObject = null
+      }
+    }
+    ;(async () => {
+      try {
+        const devices = await BrowserMultiFormatReader.listVideoInputDevices()
+        if (devices.length === 0) { setMsg('Keine Kamera gefunden'); return }
+        const back = devices.find((d) => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1]
+        await reader.decodeFromVideoDevice(back.deviceId, videoRef.current!, async (result) => {
+          if (cancelled || !result) return
+          cancelled = true
+          const code = result.getText()
+          stop()
+          try {
+            const item = await lookupBarcode(code, token)
+            if (item) foundRef.current(item.id)
+            else setMsg(`Kein Artikel für „${code}"`)
+          } catch { setMsg('Suche fehlgeschlagen') }
+        })
+      } catch {
+        setMsg('Kamera nicht verfügbar')
+      }
+    })()
+    return () => { cancelled = true; stop() }
+  }, [token])
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black flex flex-col">
+      <div className="flex justify-between items-center p-4 text-white safe-area-inset-top">
+        <span className="font-medium">Barcode scannen</span>
+        <button onClick={onClose} className="text-3xl leading-none" aria-label="Schliessen">×</button>
+      </div>
+      <div className="flex-1 relative">
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
+        <div className="absolute inset-x-10 top-1/2 -translate-y-1/2 h-28 border-2 border-white/70 rounded-xl" />
+      </div>
+      {msg && (
+        <div className="bg-white text-center text-sm py-3 text-gray-700">
+          {msg} · <button onClick={onClose} className="text-cart-700 font-medium">Schliessen</button>
+        </div>
       )}
     </div>
   )

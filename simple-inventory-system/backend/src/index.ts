@@ -1265,6 +1265,61 @@ app.delete('/api/events/:slug/receipts/:id', authenticateEventAccess, async (req
   }
 });
 
+// ---- Nach dem Einkauf ins Lager einbuchen --------------------------------
+// Bucht alle gekauften, noch nicht eingebuchten Positionen dem Lagerbestand gut
+// (Ist-Menge falls erfasst, sonst Bedarf − Bestand) und markiert sie als eingebucht.
+app.post('/api/events/:slug/shopping-list/restock', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const { slug } = req.params;
+    const rows = await client.query(`
+      SELECT i.id AS item_id, i.name, i.quantity AS in_stock,
+             SUM(ri.quantity * er.servings)::numeric AS needed,
+             ess.actual_quantity, ess.id AS ess_id
+      FROM event_recipes er
+      JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+      JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+      JOIN items i ON i.id = ri.item_id
+      JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
+      WHERE er.event_slug = $1 AND i.active = true AND ess.purchased = true AND ess.restocked_at IS NULL
+      GROUP BY i.id, i.name, i.quantity, ess.actual_quantity, ess.id
+    `, [slug]);
+
+    if (rows.rows.length === 0) {
+      return res.json({ restocked: 0, items: [] });
+    }
+
+    await client.query('BEGIN');
+    const done: { item_id: number; name: string; quantity: number }[] = [];
+    for (const row of rows.rows) {
+      const needed = parseFloat(row.needed) || 0;
+      const inStock = parseFloat(row.in_stock) || 0;
+      const qty = row.actual_quantity != null ? parseFloat(row.actual_quantity) : Math.max(0, needed - inStock);
+      // Immer als eingebucht markieren (auch qty 0), damit nichts doppelt läuft.
+      if (qty > 0) {
+        const newStock = inStock + qty;
+        await client.query('UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newStock, row.item_id]);
+        await client.query(`
+          INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
+          VALUES ($1, 'in', $2, $3, $4, $5, $6)
+        `, [row.item_id, qty, inStock, newStock, `Einkauf eingebucht: ${slug}`, req.user?.email]);
+        done.push({ item_id: row.item_id, name: row.name, quantity: qty });
+      }
+      await client.query('UPDATE event_shopping_status SET restocked_at = NOW() WHERE id = $1', [row.ess_id]);
+    }
+    await client.query('COMMIT');
+
+    for (const d of done) broadcast({ type: 'stock_updated', item_id: d.item_id });
+    res.json({ restocked: done.length, items: done });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('restock error:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    client.release();
+  }
+});
+
 // ========================================
 // ITEMS
 // ========================================

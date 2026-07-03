@@ -197,3 +197,24 @@ export async function deleteReceipt(slug: string, id: number, token: string): Pr
   if (res.status === 401 || res.status === 403) throw new AuthError('Nicht angemeldet')
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }
+
+// ---- Lager-Integration ----------------------------------------------------
+export interface RestockResult {
+  restocked: number
+  items: { item_id: number; name: string; quantity: number }[]
+}
+
+/** Bucht alle gekauften, noch nicht eingebuchten Positionen ins Lager. */
+export async function restock(slug: string, token: string): Promise<RestockResult> {
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/shopping-list/restock`, {
+    method: 'POST', headers: authHeaders(token),
+  })
+  return handle<RestockResult>(res)
+}
+
+/** Sucht ein Inventar-Item per Barcode (EAN oder eigener Code). null wenn unbekannt. */
+export async function lookupBarcode(code: string, token: string): Promise<{ id: number; name: string } | null> {
+  const res = await fetch(`${API_URL}/items/barcode/${encodeURIComponent(code)}`, { headers: authHeaders(token) })
+  if (res.status === 404) return null
+  return handle<{ id: number; name: string }>(res)
+}
