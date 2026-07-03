@@ -937,6 +937,10 @@ app.post('/api/events/:slug/recipes', authenticateEventAccess, async (req: Authe
     if (!recipe_id) {
       return res.status(400).json({ error: 'recipe_id ist erforderlich' });
     }
+    const srv = servings === undefined || servings === null ? 1 : Number(servings);
+    if (!Number.isInteger(srv) || srv < 1 || srv > 2000000000) {
+      return res.status(400).json({ error: 'servings muss eine positive Ganzzahl sein' });
+    }
     const recipe = await pool.query('SELECT id FROM recipes WHERE id = $1 AND active = true', [recipe_id]);
     if (recipe.rows.length === 0) {
       return res.status(404).json({ error: 'Rezept nicht gefunden' });
@@ -947,7 +951,7 @@ app.post('/api/events/:slug/recipes', authenticateEventAccess, async (req: Authe
       ON CONFLICT (event_slug, recipe_id)
       DO UPDATE SET servings = EXCLUDED.servings, notes = EXCLUDED.notes, updated_at = CURRENT_TIMESTAMP
       RETURNING *
-    `, [slug, recipe_id, servings || 1, notes || null]);
+    `, [slug, recipe_id, srv, notes || null]);
 
     broadcast({ type: 'event_recipe_linked', event_slug: slug, recipe_id });
     res.status(201).json(result.rows[0]);
@@ -962,6 +966,14 @@ app.put('/api/events/:slug/recipes/:recipeId', authenticateEventAccess, async (r
   try {
     const { slug, recipeId } = req.params;
     const { servings, notes } = req.body;
+    const rid = parseInt(recipeId, 10);
+    if (isNaN(rid)) return res.status(400).json({ error: 'Ungültige recipeId' });
+    if (servings !== undefined && servings !== null) {
+      const srv = Number(servings);
+      if (!Number.isInteger(srv) || srv < 1 || srv > 2000000000) {
+        return res.status(400).json({ error: 'servings muss eine positive Ganzzahl sein' });
+      }
+    }
     const result = await pool.query(`
       UPDATE event_recipes
       SET servings = COALESCE($3, servings),
@@ -969,11 +981,11 @@ app.put('/api/events/:slug/recipes/:recipeId', authenticateEventAccess, async (r
           updated_at = CURRENT_TIMESTAMP
       WHERE event_slug = $1 AND recipe_id = $2
       RETURNING *
-    `, [slug, recipeId, servings ?? null, notes ?? null]);
+    `, [slug, rid, servings ?? null, notes ?? null]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Verknüpfung nicht gefunden' });
     }
-    broadcast({ type: 'event_recipe_updated', event_slug: slug, recipe_id: parseInt(recipeId) });
+    broadcast({ type: 'event_recipe_updated', event_slug: slug, recipe_id: rid });
     res.json(result.rows[0]);
   } catch (error) {
     console.error('PUT event recipe error:', error);
@@ -985,14 +997,16 @@ app.put('/api/events/:slug/recipes/:recipeId', authenticateEventAccess, async (r
 app.delete('/api/events/:slug/recipes/:recipeId', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug, recipeId } = req.params;
+    const rid = parseInt(recipeId, 10);
+    if (isNaN(rid)) return res.status(400).json({ error: 'Ungültige recipeId' });
     const result = await pool.query(
       'DELETE FROM event_recipes WHERE event_slug = $1 AND recipe_id = $2 RETURNING id',
-      [slug, recipeId]
+      [slug, rid]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Verknüpfung nicht gefunden' });
     }
-    broadcast({ type: 'event_recipe_unlinked', event_slug: slug, recipe_id: parseInt(recipeId) });
+    broadcast({ type: 'event_recipe_unlinked', event_slug: slug, recipe_id: rid });
     res.json({ success: true });
   } catch (error) {
     console.error('DELETE event recipe error:', error);
@@ -1010,7 +1024,7 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
       SELECT
         i.id AS item_id,
         i.name AS item_name,
-        COALESCE(ri.unit, i.unit) AS unit,
+        COALESCE(MAX(NULLIF(ri.unit, '')), i.unit) AS unit,
         SUM(ri.quantity * er.servings)::numeric AS needed,
         i.quantity AS in_stock,
         i.purchase_price,
@@ -1021,11 +1035,12 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
         ess.recommendation,
         ess.note
       FROM event_recipes er
+      JOIN recipes r ON r.id = er.recipe_id AND r.active = true
       JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
       JOIN items i ON i.id = ri.item_id
       LEFT JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
       WHERE er.event_slug = $1 AND i.active = true
-      GROUP BY i.id, i.name, COALESCE(ri.unit, i.unit), i.quantity, i.purchase_price, i.supplier,
+      GROUP BY i.id, i.name, i.unit, i.quantity, i.purchase_price, i.supplier,
                ess.purchased, ess.purchased_by, ess.purchased_at, ess.recommendation, ess.note
       ORDER BY i.name
     `, [slug]);
@@ -1080,6 +1095,8 @@ app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, as
   try {
     const { slug, itemId } = req.params;
     const { purchased, recommendation, note } = req.body;
+    const iid = parseInt(itemId, 10);
+    if (isNaN(iid)) return res.status(400).json({ error: 'Ungültige itemId' });
     const purchasedBy = purchased ? (req.user?.email || null) : null;
     const purchasedAt = purchased ? new Date() : null;
     const result = await pool.query(`
@@ -1097,9 +1114,9 @@ app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, as
         note = COALESCE($7, event_shopping_status.note),
         updated_at = CURRENT_TIMESTAMP
       RETURNING *
-    `, [slug, itemId, purchased ?? null, purchasedBy, purchasedAt, recommendation ?? null, note ?? null]);
+    `, [slug, iid, purchased ?? null, purchasedBy, purchasedAt, recommendation ?? null, note ?? null]);
 
-    broadcast({ type: 'shopping_status_updated', event_slug: slug, item_id: parseInt(itemId) });
+    broadcast({ type: 'shopping_status_updated', event_slug: slug, item_id: iid });
     res.json(result.rows[0]);
   } catch (error) {
     console.error('PATCH shopping-status error:', error);

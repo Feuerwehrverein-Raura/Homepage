@@ -1010,8 +1010,8 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
         if (create_access && organizer_email && !isVorstandMember) {
             // Event-spezifische E-Mail generieren
             eventEmail = `${slug}@fwv-raura.ch`;
-            // Zufaelliges Passwort generieren (12 Zeichen)
-            eventPassword = crypto.randomBytes(6).toString('base64').replace(/[+/=]/g, '').substring(0, 12);
+            // Zufaelliges Passwort generieren (16 Zeichen, base64url)
+            eventPassword = crypto.randomBytes(12).toString('base64url').slice(0, 16);
             // Passwort hashen (einfaches SHA256 - fuer Produktionsumgebung bcrypt empfohlen)
             eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
             // Ablaufdatum: 3 Monate nach Event-Ende
@@ -1164,7 +1164,7 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
                 if (!eventPassword) {
                     // Kein altes Passwort vorhanden (oder Entschluesselung fehlgeschlagen):
                     // neues generieren und verschluesselt + gehasht ablegen
-                    eventPassword = crypto.randomBytes(6).toString('base64').replace(/[+/=]/g, '').substring(0, 12);
+                    eventPassword = crypto.randomBytes(12).toString('base64url').slice(0, 16);
                     const eventPasswordHash = crypto.createHash('sha256').update(eventPassword).digest('hex');
                     const encrypted = encryptPassword(eventPassword);
                     const eventEmail = updatedEvent.event_email || `${updatedEvent.slug}@fwv-raura.ch`;
