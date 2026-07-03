@@ -345,7 +345,8 @@ function App() {
   };
 
   const connectWebSocket = () => {
-    const ws = new WebSocket(WS_URL);
+    // Token als Query-Param anhaengen (Browser koennen keinen WS-Header setzen).
+    const ws = new WebSocket(sessionToken ? `${WS_URL}?token=${encodeURIComponent(sessionToken)}` : WS_URL);
 
     ws.onopen = () => {
       console.log('WebSocket connected');

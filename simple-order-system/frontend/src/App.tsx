@@ -377,7 +377,9 @@ function App() {
     if (!token) return;
 
     const connectWebSocket = () => {
-      const ws = new WebSocket(WS_URL);
+      // Token als Query-Param anhaengen — Browser koennen bei WebSockets keinen
+      // Authorization-Header setzen; der Server prueft es in verifyClient.
+      const ws = new WebSocket(token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL);
 
       ws.onopen = () => {
         console.log('WebSocket connected');

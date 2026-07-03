@@ -54,6 +54,11 @@ services:
       AUTHENTIK_CLIENT_ID_ORDER: ${AUTHENTIK_CLIENT_ID_ORDER}
       AUTHENTIK_CLIENT_SECRET_ORDER: ${AUTHENTIK_CLIENT_SECRET_ORDER}
       AUTHENTIK_API_TOKEN: ${AUTHENTIK_API_TOKEN}
+      # DEUTSCH: Interner Zugriff aufs order-backend, um das rotierende Kassen-/
+      # Kuechen-Passwort fuer "meine Zugaenge" abzufragen. ORDER_API_KEY MUSS mit
+      # dem Wert im simple-order-system uebereinstimmen (gleicher Shared-Key).
+      ORDER_API_KEY: ${ORDER_API_KEY}
+      ORDER_INTERNAL_URL: ${ORDER_INTERNAL_URL:-http://order-backend:3000}
       IMAP_HOST: ${IMAP_HOST:-mail.test.juroct.net}
       IMAP_PORT: ${IMAP_PORT:-993}
       VORSTAND_EMAILS: ${VORSTAND_EMAILS:-praesident@fwv-raura.ch,aktuar@fwv-raura.ch,kassier@fwv-raura.ch,materialwart@fwv-raura.ch,beisitzer@fwv-raura.ch}
