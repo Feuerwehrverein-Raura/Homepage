@@ -114,6 +114,10 @@ services:
       AUTHENTIK_URL: https://auth.fwv-raura.ch
       MEMBERS_API_URL: http://api-members:3000
       DISPATCH_API_URL: http://api-dispatch:3000
+      # Inventar-Proxy (Rezepte/Einkaufsliste). INVENTORY_KEY MUSS im Deploy-.env
+      # gesetzt sein (kein hartkodierter Default) — sonst 502 statt stillem Bruch.
+      INVENTORY_URL: https://inventar.fwv-raura.ch
+      INVENTORY_KEY: ${INVENTORY_KEY}
     depends_on:
       postgres:
         condition: service_healthy
