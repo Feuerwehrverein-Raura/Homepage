@@ -4249,11 +4249,16 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
 // daher kein Adress-Embedding oder Deckblatt noetig - auto_send mit address_position=right
 app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
     try {
-        const { html, recipient, member_id, subject, staging = false } = req.body;
+        const { html, recipient, member_id, subject, staging = false, pdf_margin } = req.body;
 
         if (!html || !recipient) {
             return res.status(400).json({ error: 'html und recipient erforderlich' });
         }
+        // Optionaler Seitenrand pro Brieftyp (z.B. Event-Einladung: 15mm oben fuer sichere
+        // Folgeseiten). Default wie bisher, damit andere Brieftypen unveraendert bleiben.
+        const letterMargin = (pdf_margin && typeof pdf_margin === 'object')
+            ? pdf_margin
+            : { top: '0', right: '0', bottom: '20mm', left: '0' };
 
         const PINGEN_API = getPingenApi(staging);
 
@@ -4267,7 +4272,7 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: '0', right: '0', bottom: '20mm', left: '0' },
+            margin: letterMargin,
             displayHeaderFooter: true,
             headerTemplate: '<div></div>',
             footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
