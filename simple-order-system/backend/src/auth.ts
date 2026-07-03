@@ -114,16 +114,8 @@ function verifyAuthentikToken(token: string): Promise<any> {
       issuer: `${AUTHENTIK_URL}/application/o/order-system/`
     }, (err, decoded) => {
       if (err) {
-        // If both fail, try without issuer validation as last resort
-        try {
-          const decoded = jwt.decode(token) as any;
-          if (decoded && decoded.exp && decoded.exp * 1000 > Date.now()) {
-            console.log('Using decoded token without full verification (for development)');
-            return resolve(decoded);
-          }
-        } catch (e) {
-          // Ignore
-        }
+        // Fail-closed (Audit HIGH): kein unsigniertes jwt.decode-Fallback mehr —
+        // nur gueltig per JWKS (RS256) bzw. HS256 signierte Tokens werden akzeptiert.
         return reject(err);
       }
       resolve(decoded);
@@ -145,6 +137,10 @@ export interface AuthenticatedRequest extends Request {
  * Includes rate limiting: blocks IP for 24h after 3 failed attempts
  */
 export function localLogin(req: Request, res: Response) {
+  // Passwort-Login nur im lokalen Dev-Modus (Audit HIGH). In Produktion via Authentik-OIDC.
+  if (!LOCAL_MODE) {
+    return res.status(403).json({ error: 'Passwort-Login in Produktion deaktiviert — bitte via Authentik anmelden.' });
+  }
   const ip = getClientIp(req);
   const { password } = req.body;
 

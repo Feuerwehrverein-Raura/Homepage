@@ -49,6 +49,10 @@ export interface AuthenticatedRequest extends Request {
  * Local mode login - returns JWT token for simple password auth
  */
 export function localLogin(req: Request, res: Response) {
+  // Passwort-Login nur im lokalen Dev-Modus (Audit HIGH). In Produktion via Authentik-OIDC.
+  if (!LOCAL_MODE) {
+    return res.status(403).json({ error: 'Passwort-Login in Produktion deaktiviert — bitte via Authentik anmelden.' });
+  }
   const { password } = req.body;
 
   if (password !== ADMIN_PASSWORD) {
