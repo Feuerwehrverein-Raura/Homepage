@@ -44,6 +44,11 @@ services:
       SYNC_SECRET: ${SYNC_SECRET}
       # Uploads directory
       UPLOAD_DIR: /app/uploads
+      # Web-Push (optional): Erinnerungen sind erst aktiv, wenn VAPID-Keys gesetzt sind
+      # (erzeugen mit: npx web-push generate-vapid-keys)
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:vorstand@fwv-raura.ch}
     volumes:
       - ./data/uploads:/app/uploads
     depends_on:
@@ -76,6 +81,23 @@ services:
       - traefik.http.routers.inventory-frontend.tls=true
       - traefik.http.routers.inventory-frontend.tls.certresolver=letsencrypt
       - traefik.http.services.inventory-frontend.loadbalancer.server.port=80
+      - com.centurylinklabs.watchtower.enable=true
+
+  # Einkaufs-PWA (einkauf.fwv-raura.ch) — nutzt das Inventar-Backend (inventar.fwv-raura.ch/api)
+  einkauf-frontend:
+    image: ghcr.io/feuerwehrverein-raura/einkauf-frontend:latest
+    container_name: einkauf-frontend
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.einkauf-frontend.rule=Host(`einkauf.fwv-raura.ch`)
+      - traefik.http.routers.einkauf-frontend.entrypoints=https
+      - traefik.http.routers.einkauf-frontend.tls=true
+      - traefik.http.routers.einkauf-frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.einkauf-frontend.loadbalancer.server.port=80
       - com.centurylinklabs.watchtower.enable=true
 
 networks:
