@@ -9,7 +9,12 @@ import SumUpTerminal from './terminal.js';
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
-import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp } from './auth.js';
+import crypto from 'crypto';
+import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
+
+// Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
+// ist LOCAL_MODE aus -> dann wird Authentifizierung erzwungen.
+const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 
 // Nextcloud configuration
 const NEXTCLOUD_URL = process.env.NEXTCLOUD_URL || 'https://nextcloud.fwv-raura.ch';
@@ -32,7 +37,29 @@ const upload = multer({
 
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ server, path: '/ws' });
+// WebSocket nur mit gueltigem Token. Browser (PWA/Web-Kueche) haengen es als
+// ?token= an, die native App schickt es als Authorization-Header. Im Vor-Ort-LAN
+// (LOCAL_MODE) bleibt /ws offen wie bisher.
+const wss = new WebSocketServer({
+  server,
+  path: '/ws',
+  verifyClient: (info, cb) => {
+    if (LOCAL_MODE) return cb(true);
+    try {
+      const url = new URL(info.req.url || '', 'http://localhost');
+      const qToken = url.searchParams.get('token');
+      const authHeader = info.req.headers['authorization'];
+      const hToken = authHeader && authHeader.split(' ')[1];
+      const token = qToken || hToken;
+      if (!token) return cb(false, 401, 'No token');
+      verifyAnyToken(token)
+        .then(() => cb(true))
+        .catch(() => cb(false, 403, 'Invalid token'));
+    } catch {
+      cb(false, 400, 'Bad request');
+    }
+  }
+});
 
 // Trust reverse proxy (Traefik) for X-Forwarded-* headers
 app.set('trust proxy', true);
@@ -75,6 +102,26 @@ app.use('/api', (req: AuthenticatedRequest, res, next) => {
   });
 
   next();
+});
+
+// Zentrale Auth-Schranke: im Cloud-Betrieb muss (fast) jeder /api-Zugriff ein
+// gueltiges Token tragen (Authentik-OIDC ODER signiertes Kassen-/App-Token).
+// Oeffentlich bleiben nur Health, Auth-Login, Provider-Webhooks, Sync (eigener
+// x-sync-key) und interne Endpoints (eigener API-Key). Im Vor-Ort-LAN (LOCAL_MODE)
+// bleibt alles offen wie bisher, damit der Festbetrieb offline weiterlaeuft.
+const OPEN_API_PATHS = [
+  /^\/health/,
+  /^\/auth\/(mode|login)/,
+  /^\/webhooks\//,
+  /^\/sync\//,
+  /^\/internal\//,
+  /^\/uploads\//,
+];
+app.use('/api', (req: AuthenticatedRequest, res, next) => {
+  if (LOCAL_MODE) return next();
+  if (req.method === 'OPTIONS') return next();
+  if (OPEN_API_PATHS.some((re) => re.test(req.path))) return next();
+  return (authenticateToken as express.RequestHandler)(req, res, next);
 });
 
 // Auth routes
@@ -329,6 +376,18 @@ async function initDB() {
   // Create index for faster queries on audit_log
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_timestamp ON audit_log(timestamp DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_log_ip ON audit_log(ip)`);
+
+  // Gemeinsames Kassen-/Kuechen-Passwort (eine Zeile). Wird woechentlich rotiert
+  // und unter "meine Zugaenge" angezeigt. Nur ueber den internen, API-Key-
+  // geschuetzten Endpoint auslesbar — nie ueber eine oeffentliche Route.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pos_credentials (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      password TEXT NOT NULL,
+      rotated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT pos_credentials_single_row CHECK (id = 1)
+    )
+  `);
 
   console.log('Database initialized');
 }
@@ -599,6 +658,67 @@ if (!ORDER_API_KEY) {
   console.error('FATAL: ORDER_API_KEY nicht gesetzt — interne API-Authentifizierung waere unsicher. Abbruch.');
   process.exit(1);
 }
+
+// ============================================
+// GEMEINSAMES KASSEN-/KUECHEN-PASSWORT (woechentliche Rotation)
+// ============================================
+const POS_ROTATION_DAYS = parseInt(process.env.POS_ROTATION_DAYS || '7', 10);
+
+// Starkes, gut lesbares Passwort ohne mehrdeutige Zeichen (0/O, 1/l/I).
+function generatePosPassword(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(16);
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out.match(/.{1,4}/g)!.join('-'); // Format: xxxx-xxxx-xxxx-xxxx
+}
+
+// Laedt das aktuelle Passwort, legt es beim ersten Start an und rotiert bei
+// Faelligkeit. Im LOCAL_MODE (Vor-Ort-Pi) keine eigene Rotation — dort gilt
+// ADMIN_PASSWORD, damit Cloud und Offline nicht auseinanderlaufen.
+async function loadOrRotatePosPassword(): Promise<void> {
+  if (LOCAL_MODE) return;
+  try {
+    const r = await pool.query('SELECT password, rotated_at FROM pos_credentials WHERE id = 1');
+    if (r.rows.length === 0) {
+      const pw = generatePosPassword();
+      await pool.query('INSERT INTO pos_credentials (id, password, rotated_at) VALUES (1, $1, NOW())', [pw]);
+      setSharedPassword(pw);
+      console.log('POS shared password initialized');
+      return;
+    }
+    const { password, rotated_at } = r.rows[0];
+    const ageDays = (Date.now() - new Date(rotated_at).getTime()) / 86400000;
+    if (ageDays >= POS_ROTATION_DAYS) {
+      const pw = generatePosPassword();
+      await pool.query('UPDATE pos_credentials SET password = $1, rotated_at = NOW() WHERE id = 1', [pw]);
+      setSharedPassword(pw);
+      console.log(`POS shared password rotated (age ${Math.floor(ageDays)}d)`);
+    } else {
+      setSharedPassword(password);
+    }
+  } catch (e: any) {
+    console.error('POS password load/rotate error:', e.message);
+  }
+}
+
+// Interner Endpoint: aktuelles Passwort fuer die Anzeige unter "meine Zugaenge".
+// Nur mit gueltigem X-Order-API-Key (Container-zu-Container), nie oeffentlich.
+app.get('/api/internal/pos-credential', async (req, res) => {
+  const key = req.headers['x-order-api-key'];
+  if (key !== ORDER_API_KEY) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+  try {
+    const r = await pool.query('SELECT password, rotated_at FROM pos_credentials WHERE id = 1');
+    if (r.rows.length === 0) return res.status(404).json({ error: 'not initialized' });
+    const { password, rotated_at } = r.rows[0];
+    const next = new Date(new Date(rotated_at).getTime() + POS_ROTATION_DAYS * 86400000);
+    res.json({ password, rotated_at, next_rotation: next.toISOString(), rotation_days: POS_ROTATION_DAYS });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // Routes: Items (ONLY from Inventory system)
 app.get('/api/items', async (req, res) => {
@@ -2503,7 +2623,11 @@ app.get('/health', (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 initDB()
-  .then(() => {
+  .then(async () => {
+    // Gemeinsames Kassen-/Kuechen-Passwort laden bzw. initial anlegen und in die
+    // Auth-Schicht setzen; danach regelmaessig auf faellige Rotation pruefen.
+    await loadOrRotatePosPassword();
+    setInterval(loadOrRotatePosPassword, 6 * 60 * 60 * 1000);
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

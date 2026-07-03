@@ -5070,6 +5070,34 @@ app.get('/members/me/accesses', authenticateToken, async (req, res) => {
             console.error('Error loading service account credentials:', saErr.message);
         }
 
+        // DEUTSCH: Live-Passwort fuer Kasse (PWA) und Kueche (Android-App) vom
+        // order-backend holen. Dort wird es woechentlich rotiert. Ersetzt einen evtl.
+        // noch vorhandenen statischen 'order-system'-Eintrag aus der DB.
+        try {
+            const ORDER_INTERNAL_URL = process.env.ORDER_INTERNAL_URL || 'http://order-backend:3000';
+            const ORDER_API_KEY = process.env.ORDER_API_KEY;
+            if (ORDER_API_KEY) {
+                const posResp = await axios.get(`${ORDER_INTERNAL_URL}/api/internal/pos-credential`, {
+                    headers: { 'X-Order-API-Key': ORDER_API_KEY },
+                    timeout: 4000
+                });
+                const pos = posResp.data;
+                serviceAccounts = serviceAccounts.filter(sa => sa.accountName !== 'order-system');
+                serviceAccounts.push({
+                    accountName: 'order-system',
+                    username: '',
+                    displayName: 'Kasse & Kueche (gemeinsames Passwort)',
+                    password: pos.password,
+                    description: `Passwort fuer Kasse (order.fwv-raura.ch, PWA) und Kuechen-App. Rotiert automatisch alle ${pos.rotation_days || 7} Tage.`,
+                    rotationDays: pos.rotation_days || 7,
+                    updatedAt: pos.rotated_at,
+                    nextRotation: pos.next_rotation
+                });
+            }
+        } catch (posErr) {
+            console.error('Error loading POS credential from order-backend:', posErr.message);
+        }
+
         res.json({
             functionEmails,
             nextcloudFolders,
@@ -5211,39 +5239,9 @@ async function rotateServiceAccountPasswords() {
             }
         }
 
-        // DEUTSCH: Kassensystem/KDS-Passwort (ADMIN_PASSWORD) als Service-Account speichern
-        const orderPassword = process.env.ADMIN_PASSWORD;
-        if (orderPassword) {
-            const orderExisting = await pool.query(
-                'SELECT id, encrypted_password FROM service_account_credentials WHERE account_name = $1',
-                ['order-system']
-            );
-
-            const encOrderPw = encryptPassword(orderPassword);
-
-            if (orderExisting.rows.length === 0) {
-                console.log('Creating service account entry for order-system...');
-                await pool.query(
-                    `INSERT INTO service_account_credentials (account_name, username, display_name, encrypted_password, description, rotation_days)
-                     VALUES ($1, $2, $3, $4, $5, $6)`,
-                    ['order-system', '', 'Kassensystem / KDS App',
-                     encOrderPw,
-                     'Passwort fuer Kasse (order.fwv-raura.ch) und KDS Android App. Kein Benutzername noetig.',
-                     0]
-                );
-                console.log('Service account order-system created');
-            } else {
-                // DEUTSCH: Passwort aktualisieren falls es sich geaendert hat
-                const storedPw = decryptPassword(orderExisting.rows[0].encrypted_password);
-                if (storedPw !== orderPassword) {
-                    console.log('Order system password changed, updating DB...');
-                    await pool.query(
-                        'UPDATE service_account_credentials SET encrypted_password = $1, updated_at = NOW() WHERE account_name = $2',
-                        [encOrderPw, 'order-system']
-                    );
-                }
-            }
-        }
+        // DEUTSCH: Das Kassen-/Kuechen-Passwort ('order-system') wird nicht mehr hier
+        // verwaltet. Es lebt jetzt im order-backend, rotiert dort woechentlich und wird
+        // im accesses-Endpoint live abgefragt (GET /api/internal/pos-credential).
     } catch (error) {
         console.error('Service account password rotation error:', error.message);
     }

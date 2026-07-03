@@ -8,12 +8,41 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
+import crypto from 'crypto';
 
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 const AUTHENTIK_CLIENT_SECRET = process.env.AUTHENTIK_CLIENT_SECRET || '';
 const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fwv2026';
+// ADMIN_PASSWORD dient nur noch als Fallback im Offline-/LOCAL_MODE (Vor-Ort-Pi).
+// Kein oeffentlicher Default mehr (Audit HIGH: 'fwv2026' entfernt).
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+
+// JWT_SECRET signiert die Kassen-/Kuechen-Tokens, die Zugriff gewaehren. In Produktion
+// MUSS es gesetzt und ausreichend lang sein — mit dem alten oeffentlichen Default liesse
+// sich sonst ein gueltiges Token faelschen. Fail-closed statt unsicherem Default.
+if (!LOCAL_MODE && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16)) {
+  console.error('FATAL: JWT_SECRET fehlt oder ist zu kurz (>=16 Zeichen erforderlich). Abbruch.');
+  process.exit(1);
+}
 export const JWT_SECRET = process.env.JWT_SECRET || 'local-order-system-secret';
+
+// Token-Lebensdauer der Passwort-Logins. Grosszuegig, damit Kiosk-Geraete (Kuechen-
+// Display) nicht mitten im Fest ausloggen. Rotation des Passworts sperrt kuenftige
+// Logins, macht aber bereits ausgestellte Tokens nicht ungueltig.
+const POS_TOKEN_TTL: jwt.SignOptions['expiresIn'] = (process.env.POS_TOKEN_TTL as any) || '30d';
+
+// Gemeinsames, woechentlich rotierendes Kassen-/Kuechen-Passwort. index.ts laedt bzw.
+// rotiert es aus der DB und setzt es hier via setSharedPassword().
+let sharedPassword: string | null = null;
+export function setSharedPassword(pw: string | null): void { sharedPassword = pw; }
+
+// Timing-sicherer Vergleich — verhindert, dass die Antwortzeit das Passwort verraet.
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 // Rate limiting for failed login attempts
 const MAX_FAILED_ATTEMPTS = 3;
@@ -104,7 +133,8 @@ function verifyAuthentikToken(token: string): Promise<any> {
         });
         return resolve(decoded);
       } catch (hs256Error) {
-        console.log('HS256 verification failed, trying RS256...');
+        // Erwartungsgemaess bei RS256-Tokens (id_token) -> still auf JWKS/RS256 weiter.
+        // Kein Log: laeuft jetzt bei jedem Request und wuerde die Logs fluten.
       }
     }
 
@@ -133,14 +163,43 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Local mode login - returns JWT token for simple password auth
- * Includes rate limiting: blocks IP for 24h after 3 failed attempts
+ * Verifiziert ein Token sicher. Reihenfolge:
+ *  1) Eigenes signiertes Kassen-/App-Token (HS256, JWT_SECRET) — schnell, offline.
+ *  2) Sonst Authentik-OIDC-Token (JWKS RS256 / HS256 Client-Secret) — nur online.
+ * Beide Wege sind kryptographisch geprueft; kein unsigniertes Fallback (Audit HIGH).
+ */
+export function verifyAnyToken(token: string): Promise<{ id: string; email: string; name: string; groups: string[] }> {
+  return new Promise((resolve, reject) => {
+    // 1) Eigenes signiertes Token (Kasse/Kueche via Passwort-Login)
+    try {
+      const d = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as any;
+      return resolve({ id: d.id, email: d.email, name: d.name, groups: d.groups || [] });
+    } catch {
+      // kein eigenes Token -> ggf. Authentik pruefen
+    }
+    if (LOCAL_MODE) {
+      return reject(new Error('Invalid local token'));
+    }
+    // 2) Authentik-OIDC (Browser: PWA / Web-Kueche)
+    verifyAuthentikToken(token)
+      .then((d: any) => resolve({
+        id: d.sub || d.id,
+        email: d.email,
+        name: d.name || d.preferred_username,
+        groups: d.groups || []
+      }))
+      .catch(reject);
+  });
+}
+
+/**
+ * Passwort-Login fuer Kasse (PWA) und Kueche (Android-App).
+ * Prueft gegen das gemeinsame, woechentlich rotierende Shared-Passwort und gibt ein
+ * signiertes Token zurueck. Aktiv in Produktion UND im Offline-/LOCAL_MODE (dort
+ * Fallback auf ADMIN_PASSWORD, falls kein Shared-Passwort gesetzt ist).
+ * Rate-Limit: 3 Fehlversuche -> IP fuer 24h gesperrt.
  */
 export function localLogin(req: Request, res: Response) {
-  // Passwort-Login nur im lokalen Dev-Modus (Audit HIGH). In Produktion via Authentik-OIDC.
-  if (!LOCAL_MODE) {
-    return res.status(403).json({ error: 'Passwort-Login in Produktion deaktiviert — bitte via Authentik anmelden.' });
-  }
   const ip = getClientIp(req);
   const { password } = req.body;
 
@@ -154,7 +213,13 @@ export function localLogin(req: Request, res: Response) {
     });
   }
 
-  if (password !== ADMIN_PASSWORD) {
+  const expected = sharedPassword || (LOCAL_MODE ? ADMIN_PASSWORD : '');
+  if (!expected) {
+    // Kein Passwort konfiguriert -> Login sicher verweigern statt offen lassen.
+    return res.status(503).json({ error: 'Kassen-Login noch nicht konfiguriert.' });
+  }
+
+  if (typeof password !== 'string' || !safeEqual(password, expected)) {
     recordFailedAttempt(ip);
     const attempt = failedAttempts.get(ip);
     const remaining = MAX_FAILED_ATTEMPTS - (attempt?.count || 0);
@@ -175,16 +240,16 @@ export function localLogin(req: Request, res: Response) {
 
   const token = jwt.sign(
     {
-      id: 'local-admin',
-      email: 'admin@local',
-      name: 'Admin',
-      groups: ['admin']
+      id: 'pos-shared',
+      email: 'kasse@fwv-raura.ch',
+      name: 'Kasse/Kueche',
+      groups: ['pos']
     },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: POS_TOKEN_TTL }
   );
 
-  res.json({ token, mode: 'local' });
+  res.json({ token, mode: LOCAL_MODE ? 'local' : 'shared' });
 }
 
 /**
@@ -198,33 +263,8 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
     return res.status(401).json({ error: 'No token provided' });
   }
 
-  // Local mode: verify with JWT_SECRET
-  if (LOCAL_MODE) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      req.user = {
-        id: decoded.id,
-        email: decoded.email,
-        name: decoded.name,
-        groups: decoded.groups || []
-      };
-      return next();
-    } catch (err) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-  }
-
-  // Online mode: verify with Authentik (HS256 or RS256)
-  verifyAuthentikToken(token)
-    .then((decoded: any) => {
-      req.user = {
-        id: decoded.sub || decoded.id,
-        email: decoded.email,
-        name: decoded.name || decoded.preferred_username,
-        groups: decoded.groups || []
-      };
-      next();
-    })
+  verifyAnyToken(token)
+    .then((user) => { req.user = user; next(); })
     .catch((err) => {
       console.error('Token verification failed:', err.message);
       return res.status(403).json({ error: 'Invalid token' });
@@ -262,36 +302,9 @@ export function optionalAuth(req: AuthenticatedRequest, res: Response, next: Nex
     return next();
   }
 
-  if (LOCAL_MODE) {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      req.user = {
-        id: decoded.id,
-        email: decoded.email,
-        name: decoded.name,
-        groups: decoded.groups || []
-      };
-    } catch (err) {
-      // Invalid token, continue without user
-    }
-    return next();
-  }
-
-  // Online mode: verify with Authentik (HS256 or RS256)
-  verifyAuthentikToken(token)
-    .then((decoded: any) => {
-      req.user = {
-        id: decoded.sub || decoded.id,
-        email: decoded.email,
-        name: decoded.name || decoded.preferred_username,
-        groups: decoded.groups || []
-      };
-      next();
-    })
-    .catch(() => {
-      // Invalid token, continue without user
-      next();
-    });
+  verifyAnyToken(token)
+    .then((user) => { req.user = user; next(); })
+    .catch(() => next());
 }
 
 /**
