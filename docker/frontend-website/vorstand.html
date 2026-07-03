@@ -8015,9 +8015,15 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             const bodyContent = buildEventInvitationBody(event, intro);
 
             return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
+<html><head><meta charset="UTF-8"><style>
+  @page { size: A4; margin: 0; }
+  body { margin: 0; padding: 0; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
+</style></head>
 <body>
-<div style="width:210mm;height:297mm;position:relative;box-sizing:border-box;background:white;font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.4;color:#000;">
+<!-- Kopfbereich (Seite 1): absolut positioniert. Das Adressfenster liegt exakt in der
+     Pingen-Rechts-Zone (60mm von oben / 118mm von links). Reserviert oben 100mm Hoehe,
+     damit der Text erst darunter beginnt. -->
+<div style="position:relative;height:100mm;">
     <div style="position:absolute;top:15mm;left:25mm;width:35mm;">
         <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
     </div>
@@ -8032,8 +8038,11 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         <div>${plzOrt}</div>
     </div>
     <div style="position:absolute;top:92mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
-    <div style="position:absolute;top:103mm;left:25mm;right:25mm;">${bodyContent}</div>
 </div>
+<!-- Body im normalen Textfluss: bricht bei langem Inhalt sauber auf Folgeseiten um und
+     respektiert den 20mm-Unterrand (Puppeteer) — laeuft also nicht mehr in Pingens
+     nicht-bedruckbare Sperrzone. -->
+<div style="padding:0 25mm 5mm 25mm;">${bodyContent}</div>
 </body></html>`;
         }
 
