@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* iOS Safe Area */
+.safe-area-inset-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+.safe-area-inset-top { padding-top: env(safe-area-inset-top, 0); }
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* Grössere Touch-Ziele auf dem Handy (Einkauf mit Handschuhen/unterwegs) */
+@media (max-width: 640px) {
+  button, a, input, select, textarea { min-height: 44px; }
+}
+
+/* Kein Blau-Highlight beim Tippen */
+* { -webkit-tap-highlight-color: transparent; }

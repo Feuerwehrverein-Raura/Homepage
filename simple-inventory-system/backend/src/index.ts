@@ -902,6 +902,37 @@ app.post('/api/recipes/:id/prepare', authenticateToken, async (req: Authenticate
 // event_slug verweist lose auf die Events-DB (fwv_raura, separate DB).
 // ========================================
 
+// Liste aller Events mit hinterlegten Rezepten (für die Event-Auswahl in der
+// Einkaufs-PWA). Liefert pro Event Zusammenfassung: Rezepte, Zutaten, gekauft.
+app.get('/api/events', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        er.event_slug AS slug,
+        COUNT(DISTINCT er.recipe_id) AS recipe_count,
+        COUNT(DISTINCT ri.item_id) AS item_count,
+        COUNT(DISTINCT ess.item_id) FILTER (WHERE ess.purchased) AS purchased_count,
+        MAX(er.updated_at) AS updated_at
+      FROM event_recipes er
+      LEFT JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+      LEFT JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+      LEFT JOIN event_shopping_status ess ON ess.event_slug = er.event_slug
+      GROUP BY er.event_slug
+      ORDER BY MAX(er.updated_at) DESC NULLS LAST
+    `);
+    res.json(result.rows.map((r) => ({
+      slug: r.slug,
+      recipe_count: parseInt(r.recipe_count, 10) || 0,
+      item_count: parseInt(r.item_count, 10) || 0,
+      purchased_count: parseInt(r.purchased_count, 10) || 0,
+      updated_at: r.updated_at
+    })));
+  } catch (error) {
+    console.error('GET /api/events error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Alle Rezepte eines Events (inkl. aktuell herstellbarer Portionen)
 app.get('/api/events/:slug/recipes', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
