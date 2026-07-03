@@ -6835,6 +6835,12 @@
                         ? generateEventInvitationEmailHTML(evt, sourceHtml, null)
                         : generateDispatchEmailHTML(sourceHtml, subject, null);
 
+                    // Event-Platzhalter ({{event_title}} etc.) im Betreff und Text-Fallback aufloesen.
+                    // Das Body-HTML macht das bereits in buildEventInvitationBody; Mitglieder-
+                    // Platzhalter ({{vorname}} ...) ersetzt das Backend pro Empfaenger.
+                    const emailSubject = evt ? replaceEventPlaceholders(subject, evt) : subject;
+                    const emailBodyText = evt ? replaceEventPlaceholders(content.text || '', evt) : content.text;
+
                     const response = await fetch(`${API_BASE}/email/bulk`, {
                         method: 'POST',
                         headers: {
@@ -6844,8 +6850,8 @@
                         body: JSON.stringify({
                             member_ids: emailRecipients.map(m => m.id),
                             template_id: templateId || null,
-                            subject,
-                            body: content.text,
+                            subject: emailSubject,
+                            body: emailBodyText,
                             html: wrappedHtml,
                             variables: {},
                             attachments: []
