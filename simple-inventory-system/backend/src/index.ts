@@ -304,6 +304,29 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_recipe ON event_recipes(recipe_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_shopping_status ON event_shopping_status(event_slug)`);
 
+  // Einkaufs-PWA Phase 2/3: Ist-Kosten, Zahler, Lager-Einbuchung pro Position.
+  await pool.query(`
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS actual_price NUMERIC;
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS actual_quantity NUMERIC;
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS paid_by VARCHAR(255);
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS restocked_at TIMESTAMP;
+  `);
+
+  // Belege (Kassenzettel-Fotos) pro Event — ein Einkauf = ein Beleg über mehrere Positionen.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_receipts (
+      id SERIAL PRIMARY KEY,
+      event_slug VARCHAR(100) NOT NULL,
+      image_url TEXT NOT NULL,
+      amount NUMERIC,
+      paid_by VARCHAR(255),
+      note TEXT,
+      uploaded_by VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_receipts_slug ON event_receipts(event_slug)`);
+
   console.log('Database initialized');
 }
 
@@ -1064,7 +1087,11 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
         ess.purchased_by,
         ess.purchased_at,
         ess.recommendation,
-        ess.note
+        ess.note,
+        ess.actual_price,
+        ess.actual_quantity,
+        ess.paid_by,
+        ess.restocked_at
       FROM event_recipes er
       JOIN recipes r ON r.id = er.recipe_id AND r.active = true
       JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
@@ -1072,12 +1099,15 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
       LEFT JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
       WHERE er.event_slug = $1 AND i.active = true
       GROUP BY i.id, i.name, i.unit, i.quantity, i.purchase_price, i.supplier,
-               ess.purchased, ess.purchased_by, ess.purchased_at, ess.recommendation, ess.note
+               ess.purchased, ess.purchased_by, ess.purchased_at, ess.recommendation, ess.note,
+               ess.actual_price, ess.actual_quantity, ess.paid_by, ess.restocked_at
       ORDER BY i.name
     `, [slug]);
 
     let totalCost = 0;
     let openCost = 0;
+    let actualTotal = 0;
+    const byPayer: Record<string, number> = {};
     const items = result.rows.map((row) => {
       const needed = parseFloat(row.needed) || 0;
       const inStock = parseFloat(row.in_stock) || 0;
@@ -1085,8 +1115,14 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
       const price = parseFloat(row.purchase_price) || 0;
       const estimatedCost = Math.round(toBuy * price * 100) / 100;
       const purchased = row.purchased || false;
+      const actualPrice = row.actual_price != null ? parseFloat(row.actual_price) : null;
+      const paidBy = row.paid_by || null;
       totalCost += estimatedCost;
       if (!purchased) openCost += estimatedCost;
+      if (purchased && actualPrice != null) {
+        actualTotal += actualPrice;
+        if (paidBy) byPayer[paidBy] = Math.round(((byPayer[paidBy] || 0) + actualPrice) * 100) / 100;
+      }
       return {
         item_id: row.item_id,
         item_name: row.item_name,
@@ -1101,7 +1137,11 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
         purchased_by: row.purchased_by || null,
         purchased_at: row.purchased_at || null,
         recommendation: row.recommendation || null,
-        note: row.note || null
+        note: row.note || null,
+        actual_price: actualPrice,
+        actual_quantity: row.actual_quantity != null ? parseFloat(row.actual_quantity) : null,
+        paid_by: paidBy,
+        restocked: !!row.restocked_at
       };
     });
 
@@ -1112,7 +1152,9 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
       total_to_buy: items.filter((i) => i.to_buy > 0).length,
       total_purchased: items.filter((i) => i.purchased).length,
       estimated_total_cost: Math.round(totalCost * 100) / 100,
-      estimated_open_cost: Math.round(openCost * 100) / 100
+      estimated_open_cost: Math.round(openCost * 100) / 100,
+      actual_total_cost: Math.round(actualTotal * 100) / 100,
+      by_payer: Object.entries(byPayer).map(([email, amount]) => ({ email, amount }))
     });
   } catch (error) {
     console.error('GET shopping-list error:', error);
@@ -1125,14 +1167,23 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
 app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug, itemId } = req.params;
-    const { purchased, recommendation, note } = req.body;
+    const { purchased, recommendation, note, actual_price, actual_quantity, paid_by } = req.body;
     const iid = parseInt(itemId, 10);
     if (isNaN(iid)) return res.status(400).json({ error: 'Ungültige itemId' });
     const purchasedBy = purchased ? (req.user?.email || null) : null;
     const purchasedAt = purchased ? new Date() : null;
+    const toNum = (v: any) => {
+      if (v === undefined || v === null || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const ap = toNum(actual_price);
+    const aq = toNum(actual_quantity);
+    // Zahler: explizit übergeben -> nutzen; sonst beim Abhaken der/die Einkäufer*in.
+    const paidByVal = paid_by !== undefined ? (paid_by || null) : (purchased ? (req.user?.email || null) : null);
     const result = await pool.query(`
-      INSERT INTO event_shopping_status (event_slug, item_id, purchased, purchased_by, purchased_at, recommendation, note)
-      VALUES ($1, $2, COALESCE($3, false), $4, $5, $6, $7)
+      INSERT INTO event_shopping_status (event_slug, item_id, purchased, purchased_by, purchased_at, recommendation, note, actual_price, actual_quantity, paid_by)
+      VALUES ($1, $2, COALESCE($3, false), $4, $5, $6, $7, $8, $9, $10)
       ON CONFLICT (event_slug, item_id) DO UPDATE SET
         purchased = COALESCE($3, event_shopping_status.purchased),
         purchased_by = CASE WHEN $3 IS TRUE THEN $4
@@ -1143,14 +1194,73 @@ app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, as
                             ELSE event_shopping_status.purchased_at END,
         recommendation = COALESCE($6, event_shopping_status.recommendation),
         note = COALESCE($7, event_shopping_status.note),
+        actual_price = COALESCE($8, event_shopping_status.actual_price),
+        actual_quantity = COALESCE($9, event_shopping_status.actual_quantity),
+        paid_by = CASE WHEN $3 IS FALSE THEN NULL ELSE COALESCE($10, event_shopping_status.paid_by) END,
         updated_at = CURRENT_TIMESTAMP
       RETURNING *
-    `, [slug, iid, purchased ?? null, purchasedBy, purchasedAt, recommendation ?? null, note ?? null]);
+    `, [slug, iid, purchased ?? null, purchasedBy, purchasedAt, recommendation ?? null, note ?? null, ap, aq, paidByVal]);
 
     broadcast({ type: 'shopping_status_updated', event_slug: slug, item_id: iid });
     res.json(result.rows[0]);
   } catch (error) {
     console.error('PATCH shopping-status error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ---- Belege (Kassenzettel-Fotos) pro Event -------------------------------
+app.get('/api/events/:slug/receipts', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const r = await pool.query(
+      'SELECT id, image_url, amount, paid_by, note, uploaded_by, created_at FROM event_receipts WHERE event_slug = $1 ORDER BY created_at DESC',
+      [slug]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('GET receipts error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/events/:slug/receipts', authenticateEventAccess, upload.single('image'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'Kein Beleg-Foto' });
+    const imageUrl = `/api/uploads/${req.file.filename}`;
+    const amountRaw = req.body.amount;
+    const amount = amountRaw != null && amountRaw !== '' && Number.isFinite(Number(amountRaw)) ? Number(amountRaw) : null;
+    const r = await pool.query(
+      `INSERT INTO event_receipts (event_slug, image_url, amount, paid_by, note, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [slug, imageUrl, amount, req.body.paid_by || req.user?.email || null, req.body.note || null, req.user?.email || null]
+    );
+    broadcast({ type: 'receipt_updated', event_slug: slug });
+    res.status(201).json(r.rows[0]);
+  } catch (e) {
+    console.error('POST receipt error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/api/events/:slug/receipts/:id', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug, id } = req.params;
+    const rid = parseInt(id, 10);
+    if (isNaN(rid)) return res.status(400).json({ error: 'Ungültige id' });
+    const r = await pool.query('SELECT image_url FROM event_receipts WHERE id = $1 AND event_slug = $2', [rid, slug]);
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Beleg nicht gefunden' });
+    const url: string = r.rows[0].image_url;
+    if (url && url.startsWith('/api/uploads/')) {
+      const p = path.join(uploadDir, url.replace('/api/uploads/', ''));
+      if (fs.existsSync(p)) { try { fs.unlinkSync(p); } catch { /* ignore */ } }
+    }
+    await pool.query('DELETE FROM event_receipts WHERE id = $1', [rid]);
+    broadcast({ type: 'receipt_updated', event_slug: slug });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('DELETE receipt error:', e);
     res.status(500).json({ error: 'Database error' });
   }
 });

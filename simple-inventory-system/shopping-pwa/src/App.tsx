@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   getStoredToken, userFromToken, login, logout, handleCallback, clearToken, type User,
 } from './auth'
 import {
-  getEvents, getShoppingList, setPurchased, flushOutbox, outboxCount, AuthError, WS_URL,
-  type EventSummary, type ShoppingItem, type ShoppingList,
+  getEvents, getShoppingList, setPurchased, patchItem, flushOutbox, outboxCount, AuthError, WS_URL,
+  getReceipts, uploadReceipt, deleteReceipt, MEDIA_ORIGIN,
+  type EventSummary, type ShoppingItem, type ShoppingList, type Receipt,
 } from './api'
 
 // ---- Helpers --------------------------------------------------------------
@@ -20,6 +21,9 @@ const qty = (n: number) => {
 }
 
 const storeOf = (i: ShoppingItem) => i.recommendation || i.supplier || 'Ohne Laden-Zuordnung'
+
+const shortName = (email: string) =>
+  email.split('@')[0].split(/[._]/).filter(Boolean).map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') || email
 
 // ---- App ------------------------------------------------------------------
 export default function App() {
@@ -90,6 +94,7 @@ export default function App() {
           <ListView
             slug={slug}
             token={token}
+            userEmail={user.email}
             onAuthError={onAuthError}
             onPendingChange={setPending}
           />
@@ -203,12 +208,15 @@ function EventsView({ token, onAuthError, onOpen }: {
 }
 
 // ---- Einkaufsliste eines Events ------------------------------------------
-function ListView({ slug, token, onAuthError, onPendingChange }: {
-  slug: string; token: string; onAuthError: () => void; onPendingChange: (n: number) => void
+function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
+  slug: string; token: string; userEmail: string; onAuthError: () => void; onPendingChange: (n: number) => void
 }) {
   const [list, setList] = useState<ShoppingList | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showStocked, setShowStocked] = useState(false)
+  const [detail, setDetail] = useState<ShoppingItem | null>(null)
+  const [showReceipts, setShowReceipts] = useState(false)
+  const [receiptsVersion, setReceiptsVersion] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
 
   const load = useCallback(async () => {
@@ -222,7 +230,7 @@ function ListView({ slug, token, onAuthError, onPendingChange }: {
 
   useEffect(() => { load() }, [load])
 
-  // Live-Sync: Backend broadcastet shopping_status_updated / stock_updated
+  // Live-Sync: Backend broadcastet shopping_status_updated / stock_updated / receipt_updated
   useEffect(() => {
     let closed = false
     let reconnect: ReturnType<typeof setTimeout>
@@ -233,9 +241,8 @@ function ListView({ slug, token, onAuthError, onPendingChange }: {
       ws.onmessage = (ev) => {
         try {
           const msg = JSON.parse(ev.data)
-          if ((msg.type === 'shopping_status_updated' && msg.event_slug === slug) || msg.type === 'stock_updated') {
-            load()
-          }
+          if ((msg.type === 'shopping_status_updated' && msg.event_slug === slug) || msg.type === 'stock_updated') load()
+          if (msg.type === 'receipt_updated' && msg.event_slug === slug) setReceiptsVersion((v) => v + 1)
         } catch { /* ignore */ }
       }
       ws.onclose = () => { if (!closed) reconnect = setTimeout(connect, 3000) }
@@ -288,7 +295,19 @@ function ListView({ slug, token, onAuthError, onPendingChange }: {
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
           <div className="h-full bg-cart-500 transition-all" style={{ width: `${progress}%` }} />
         </div>
-        <div className="text-xs text-gray-400 mt-2">geschätzt gesamt {chf(list.estimated_total_cost)}</div>
+        <div className="flex justify-between text-xs text-gray-400 mt-2">
+          <span>geschätzt gesamt {chf(list.estimated_total_cost)}</span>
+          {list.actual_total_cost > 0 && <span>tatsächlich <strong className="text-gray-600">{chf(list.actual_total_cost)}</strong></span>}
+        </div>
+        {list.by_payer.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {list.by_payer.map((p) => (
+              <span key={p.email} className="text-xs bg-cart-50 text-cart-700 rounded-full px-2 py-1">
+                {shortName(p.email)}: {chf(p.amount)}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {toBuy.length === 0 && (
@@ -305,28 +324,29 @@ function ListView({ slug, token, onAuthError, onPendingChange }: {
               .slice()
               .sort((a, b) => Number(a.purchased) - Number(b.purchased) || a.item_name.localeCompare(b.item_name, 'de'))
               .map((i) => (
-                <li key={i.item_id}>
-                  <button
-                    onClick={() => toggle(i)}
-                    className="w-full flex items-center gap-3 p-3 text-left active:bg-gray-50"
-                  >
-                    <span className={`w-6 h-6 flex-shrink-0 rounded-md border-2 flex items-center justify-center text-sm
+                <li key={i.item_id} className="flex items-stretch">
+                  <button onClick={() => toggle(i)} aria-label="Abhaken" className="pl-3 pr-1 flex items-center active:bg-gray-50">
+                    <span className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm
                       ${i.purchased ? 'bg-cart-600 border-cart-600 text-white' : 'border-gray-300'}`}>
                       {i.purchased ? '✓' : ''}
                     </span>
+                  </button>
+                  <button onClick={() => setDetail(i)} className="flex-1 min-w-0 flex items-center gap-3 py-3 pr-3 text-left active:bg-gray-50">
                     <span className="flex-1 min-w-0">
-                      <span className={`font-medium ${i.purchased ? 'line-through text-gray-400' : ''}`}>
-                        {i.item_name}
-                      </span>
-                      {i.note && <span className="block text-xs text-gray-400 truncate">{i.note}</span>}
+                      <span className={`font-medium ${i.purchased ? 'line-through text-gray-400' : ''}`}>{i.item_name}</span>
+                      {(i.note || i.paid_by) && (
+                        <span className="block text-xs text-gray-400 truncate">
+                          {i.paid_by ? `bezahlt: ${shortName(i.paid_by)}` : ''}{i.paid_by && i.note ? ' · ' : ''}{i.note || ''}
+                        </span>
+                      )}
                     </span>
                     <span className="text-right flex-shrink-0">
                       <span className={`font-semibold ${i.purchased ? 'text-gray-300' : 'text-gray-700'}`}>
                         {qty(i.to_buy)} {i.unit}
                       </span>
-                      {i.estimated_cost > 0 && (
-                        <span className="block text-xs text-gray-400">{chf(i.estimated_cost)}</span>
-                      )}
+                      <span className="block text-xs text-gray-400">
+                        {i.actual_price != null ? chf(i.actual_price) : (i.estimated_cost > 0 ? `~${chf(i.estimated_cost)}` : '')}
+                      </span>
                     </span>
                   </button>
                 </li>
@@ -335,8 +355,21 @@ function ListView({ slug, token, onAuthError, onPendingChange }: {
         </section>
       ))}
 
+      {/* Belege */}
+      <div className="mt-2 mb-4">
+        <button onClick={() => setShowReceipts((s) => !s)} className="text-sm text-cart-700 font-medium">
+          🧾 Belege {showReceipts ? 'ausblenden' : 'anzeigen'}
+        </button>
+        {showReceipts && (
+          <ReceiptsPanel
+            slug={slug} token={token} userEmail={userEmail} version={receiptsVersion}
+            onAuthError={onAuthError} onChange={() => setReceiptsVersion((v) => v + 1)}
+          />
+        )}
+      </div>
+
       {stocked.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-2">
           <button
             onClick={() => setShowStocked((s) => !s)}
             className="text-sm text-gray-500 underline"
@@ -355,6 +388,156 @@ function ListView({ slug, token, onAuthError, onPendingChange }: {
           )}
         </div>
       )}
+
+      {detail && (
+        <DetailSheet
+          item={detail} slug={slug} token={token} userEmail={userEmail}
+          onClose={() => setDetail(null)}
+          onSaved={() => { setDetail(null); load() }}
+          onAuthError={onAuthError}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---- Detail-Sheet (Ist-Preis / Zahler / Notiz einer Position) -------------
+function DetailSheet({ item, slug, token, userEmail, onClose, onSaved, onAuthError }: {
+  item: ShoppingItem; slug: string; token: string; userEmail: string
+  onClose: () => void; onSaved: () => void; onAuthError: () => void
+}) {
+  const [purchased, setPurchasedState] = useState(item.purchased)
+  const [price, setPrice] = useState(item.actual_price != null ? String(item.actual_price) : '')
+  const [paidBy, setPaidBy] = useState(item.paid_by || '')
+  const [note, setNote] = useState(item.note || '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const save = async () => {
+    setBusy(true); setErr(null)
+    try {
+      await patchItem(slug, item.item_id, {
+        purchased,
+        actual_price: price === '' ? null : Number(price),
+        paid_by: paidBy || null,
+        note: note || null,
+      }, token)
+      onSaved()
+    } catch (e) {
+      if (e instanceof AuthError) { onAuthError(); return }
+      setErr('Speichern fehlgeschlagen.')
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white w-full max-w-2xl rounded-t-2xl p-5 pb-8 safe-area-inset-bottom" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-semibold text-lg truncate">{item.item_name}</h3>
+          <button onClick={onClose} className="text-gray-400 text-3xl leading-none -mt-1" aria-label="Schliessen">×</button>
+        </div>
+        <p className="text-sm text-gray-500 mb-3">Benötigt: {qty(item.to_buy)} {item.unit} · geschätzt {chf(item.estimated_cost)}</p>
+
+        <label className="flex items-center gap-3 py-3 border-t border-gray-100">
+          <input type="checkbox" checked={purchased} onChange={(e) => setPurchasedState(e.target.checked)} className="w-5 h-5 accent-cart-600" />
+          <span className="font-medium">Gekauft</span>
+        </label>
+
+        <div className="grid grid-cols-2 gap-3 py-1">
+          <label className="text-sm">
+            <span className="block text-gray-500 mb-1">Bezahlt (CHF)</span>
+            <input type="number" inputMode="decimal" step="0.05" value={price} onChange={(e) => setPrice(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="0.00" />
+          </label>
+          <label className="text-sm">
+            <span className="block text-gray-500 mb-1">Wer hat ausgelegt</span>
+            <div className="flex gap-1">
+              <input value={paidBy} onChange={(e) => setPaidBy(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 min-w-0" placeholder="Name/E-Mail" />
+              <button type="button" onClick={() => setPaidBy(userEmail)} className="text-xs text-cart-700 px-2 whitespace-nowrap">ich</button>
+            </div>
+          </label>
+        </div>
+
+        <label className="text-sm block py-2">
+          <span className="block text-gray-500 mb-1">Notiz</span>
+          <input value={note} onChange={(e) => setNote(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="z.B. Marke, Ersatzprodukt…" />
+        </label>
+
+        {err && <p className="text-red-600 text-sm py-1">{err}</p>}
+        <button onClick={save} disabled={busy}
+          className="w-full bg-cart-600 text-white font-semibold py-3 rounded-xl mt-3 disabled:opacity-50 active:scale-[0.99]">
+          {busy ? 'Speichert…' : 'Speichern'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---- Belege-Panel (Kassenzettel-Fotos) ------------------------------------
+function ReceiptsPanel({ slug, token, userEmail, version, onAuthError, onChange }: {
+  slug: string; token: string; userEmail: string; version: number; onAuthError: () => void; onChange: () => void
+}) {
+  const [receipts, setReceipts] = useState<Receipt[] | null>(null)
+  const [amount, setAmount] = useState('')
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const load = useCallback(async () => {
+    try { setReceipts(await getReceipts(slug, token)) }
+    catch (e) { if (e instanceof AuthError) onAuthError() }
+  }, [slug, token, onAuthError])
+  useEffect(() => { load() }, [load, version])
+
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBusy(true)
+    try {
+      await uploadReceipt(slug, file, amount, userEmail, '', token)
+      setAmount(''); if (fileRef.current) fileRef.current.value = ''
+      onChange(); await load()
+    } catch (err) {
+      if (err instanceof AuthError) onAuthError()
+    } finally { setBusy(false) }
+  }
+
+  const remove = async (id: number) => {
+    try { await deleteReceipt(slug, id, token); onChange(); await load() }
+    catch (e) { if (e instanceof AuthError) onAuthError() }
+  }
+
+  return (
+    <div className="mt-3 bg-white rounded-xl border border-gray-100 p-4">
+      <div className="flex gap-2 items-end mb-3">
+        <label className="text-sm flex-1">
+          <span className="block text-gray-500 mb-1">Betrag (CHF)</span>
+          <input type="number" inputMode="decimal" step="0.05" value={amount} onChange={(e) => setAmount(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="optional" />
+        </label>
+        <button type="button" onClick={() => fileRef.current?.click()} disabled={busy}
+          className="bg-cart-600 text-white font-medium px-4 py-2 rounded-lg disabled:opacity-50 whitespace-nowrap">
+          {busy ? '…' : '📷 Beleg'}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden" />
+      </div>
+      {!receipts ? <p className="text-sm text-gray-400">Lädt…</p>
+        : receipts.length === 0 ? <p className="text-sm text-gray-400">Noch keine Belege.</p>
+        : (
+          <ul className="grid grid-cols-3 gap-2">
+            {receipts.map((r) => (
+              <li key={r.id} className="relative">
+                <a href={`${MEDIA_ORIGIN}${r.image_url}`} target="_blank" rel="noreferrer">
+                  <img src={`${MEDIA_ORIGIN}${r.image_url}`} alt="Beleg" className="w-full h-24 object-cover rounded-lg border border-gray-100" />
+                </a>
+                {r.amount != null && <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white rounded px-1">{chf(r.amount)}</span>}
+                <button onClick={() => remove(r.id)} aria-label="Beleg löschen"
+                  className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 text-gray-600 text-sm shadow">×</button>
+              </li>
+            ))}
+          </ul>
+        )}
     </div>
   )
 }

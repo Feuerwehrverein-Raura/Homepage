@@ -2,6 +2,8 @@
 
 export const API_URL = import.meta.env.VITE_API_URL || 'https://inventar.fwv-raura.ch/api'
 export const WS_URL = import.meta.env.VITE_WS_URL || 'wss://inventar.fwv-raura.ch/ws'
+// Basis für Bild-URLs (Belege): API_URL ohne "/api" -> Origin des Inventar-Backends.
+export const MEDIA_ORIGIN = API_URL.replace(/\/api\/?$/, '')
 
 export interface EventSummary {
   slug: string
@@ -26,6 +28,20 @@ export interface ShoppingItem {
   purchased_at: string | null
   recommendation: string | null
   note: string | null
+  actual_price: number | null
+  actual_quantity: number | null
+  paid_by: string | null
+  restocked: boolean
+}
+
+export interface Receipt {
+  id: number
+  image_url: string
+  amount: number | null
+  paid_by: string | null
+  note: string | null
+  uploaded_by: string | null
+  created_at: string
 }
 
 export interface ShoppingList {
@@ -36,6 +52,8 @@ export interface ShoppingList {
   total_purchased: number
   estimated_total_cost: number
   estimated_open_cost: number
+  actual_total_cost: number
+  by_payer: { email: string; amount: number }[]
 }
 
 function authHeaders(token: string): HeadersInit {
@@ -136,4 +154,46 @@ export async function flushOutbox(token: string): Promise<number> {
   ops = readOutbox().slice(sent)
   writeOutbox(ops)
   return sent
+}
+
+// ---- Detail-Bearbeitung (Ist-Preis / Menge / Zahler / Notiz) --------------
+// Online-Aktion (kein Outbox-Queueing — Detaildaten werden bewusst online erfasst).
+export async function patchItem(
+  slug: string, itemId: number,
+  body: Partial<{ purchased: boolean; actual_price: number | null; actual_quantity: number | null; paid_by: string | null; note: string | null }>,
+  token: string
+): Promise<void> {
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/shopping-list/${itemId}`, {
+    method: 'PATCH', headers: authHeaders(token), body: JSON.stringify(body),
+  })
+  if (res.status === 401 || res.status === 403) throw new AuthError('Nicht angemeldet')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+// ---- Belege ---------------------------------------------------------------
+export async function getReceipts(slug: string, token: string): Promise<Receipt[]> {
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/receipts`, { headers: authHeaders(token) })
+  return handle<Receipt[]>(res)
+}
+
+export async function uploadReceipt(
+  slug: string, file: File, amount: string, paidBy: string, note: string, token: string
+): Promise<Receipt> {
+  const fd = new FormData()
+  fd.append('image', file)
+  if (amount) fd.append('amount', amount)
+  if (paidBy) fd.append('paid_by', paidBy)
+  if (note) fd.append('note', note)
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/receipts`, {
+    method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd,
+  })
+  return handle<Receipt>(res)
+}
+
+export async function deleteReceipt(slug: string, id: number, token: string): Promise<void> {
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/receipts/${id}`, {
+    method: 'DELETE', headers: authHeaders(token),
+  })
+  if (res.status === 401 || res.status === 403) throw new AuthError('Nicht angemeldet')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }
