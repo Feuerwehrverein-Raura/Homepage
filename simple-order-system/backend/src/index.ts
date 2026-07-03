@@ -592,7 +592,13 @@ setTimeout(autoCancelOldOrders, 30000);
 
 // Inventory API integration
 const INVENTORY_API_URL = process.env.INVENTORY_API_URL || 'http://inventory-backend:3000';
-const ORDER_API_KEY = process.env.ORDER_API_KEY || 'order-system-secret';
+// Fail-closed (Audit CRITICAL): kein hartkodierter Default mehr. Fehlt der Key,
+// bricht der Prozess ab, statt still mit dem oeffentlich bekannten Wert zu laufen.
+const ORDER_API_KEY = process.env.ORDER_API_KEY;
+if (!ORDER_API_KEY) {
+  console.error('FATAL: ORDER_API_KEY nicht gesetzt — interne API-Authentifizierung waere unsicher. Abbruch.');
+  process.exit(1);
+}
 
 // Routes: Items (ONLY from Inventory system)
 app.get('/api/items', async (req, res) => {
