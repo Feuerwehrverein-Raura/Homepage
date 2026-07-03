@@ -26,6 +26,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Push-/Notification-Handler in den generierten SW einbinden
+        importScripts: ['/push-handler.js'],
         runtimeCaching: [
           {
             // Einkaufslisten offline verfügbar halten (zuletzt geladener Stand).

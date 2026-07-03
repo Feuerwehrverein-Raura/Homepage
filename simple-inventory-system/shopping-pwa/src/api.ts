@@ -11,6 +11,12 @@ export interface EventSummary {
   item_count: number
   purchased_count: number
   updated_at: string | null
+  deadline: string | null
+}
+
+export interface EventMeta {
+  deadline: string | null
+  budget: number | null
 }
 
 export interface ShoppingItem {
@@ -56,8 +62,22 @@ export interface ShoppingList {
   by_payer: { email: string; amount: number }[]
 }
 
+// Teilen-Modus: statt Authentik-Token wird ein Share-Token als Header gesendet.
+let _share: string | null = null
+export function setShareToken(t: string | null): void { _share = t }
+
 function authHeaders(token: string): HeadersInit {
-  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+  const h: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) h['Authorization'] = `Bearer ${token}`
+  if (_share) h['x-share-token'] = _share
+  return h
+}
+
+function multipartHeaders(token: string): HeadersInit {
+  const h: Record<string, string> = {}
+  if (token) h['Authorization'] = `Bearer ${token}`
+  if (_share) h['x-share-token'] = _share
+  return h
 }
 
 export class AuthError extends Error {}
@@ -185,7 +205,7 @@ export async function uploadReceipt(
   if (paidBy) fd.append('paid_by', paidBy)
   if (note) fd.append('note', note)
   const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/receipts`, {
-    method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: fd,
+    method: 'POST', headers: multipartHeaders(token), body: fd,
   })
   return handle<Receipt>(res)
 }
@@ -217,4 +237,46 @@ export async function lookupBarcode(code: string, token: string): Promise<{ id: 
   const res = await fetch(`${API_URL}/items/barcode/${encodeURIComponent(code)}`, { headers: authHeaders(token) })
   if (res.status === 404) return null
   return handle<{ id: number; name: string }>(res)
+}
+
+// ---- Meta / Teilen / Push (Phase 4) --------------------------------------
+export async function getMeta(slug: string, token: string): Promise<EventMeta> {
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/meta`, { headers: authHeaders(token) })
+  return handle<EventMeta>(res)
+}
+
+export async function putMeta(
+  slug: string, meta: { deadline?: string | null; budget?: number | null }, token: string
+): Promise<EventMeta> {
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/meta`, {
+    method: 'PUT', headers: authHeaders(token), body: JSON.stringify(meta),
+  })
+  return handle<EventMeta>(res)
+}
+
+/** Erzeugt einen Teilen-Link-Token für ein Event (nur eingeloggte Nutzer). */
+export async function createShare(
+  slug: string, token: string, opts?: { canWrite?: boolean; days?: number }
+): Promise<{ token: string }> {
+  const res = await fetch(`${API_URL}/events/${encodeURIComponent(slug)}/share`, {
+    method: 'POST', headers: authHeaders(token),
+    body: JSON.stringify({ can_write: opts?.canWrite ?? true, days: opts?.days }),
+  })
+  return handle<{ token: string }>(res)
+}
+
+/** VAPID-Public-Key holen; null, wenn Push serverseitig nicht konfiguriert ist. */
+export async function getVapidKey(token: string): Promise<string | null> {
+  const res = await fetch(`${API_URL}/push/vapid-public-key`, { headers: authHeaders(token) })
+  if (res.status === 503) return null
+  const d = await handle<{ key: string }>(res)
+  return d.key
+}
+
+export async function subscribePush(subscription: PushSubscriptionJSON, token: string): Promise<void> {
+  const res = await fetch(`${API_URL}/push/subscribe`, {
+    method: 'POST', headers: authHeaders(token), body: JSON.stringify({ subscription }),
+  })
+  if (res.status === 401 || res.status === 403) throw new AuthError('Nicht angemeldet')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }

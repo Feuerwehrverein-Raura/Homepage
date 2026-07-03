@@ -6,7 +6,8 @@ import { BrowserMultiFormatReader } from '@zxing/browser'
 import {
   getEvents, getShoppingList, setPurchased, patchItem, flushOutbox, outboxCount, AuthError, WS_URL,
   getReceipts, uploadReceipt, deleteReceipt, restock, lookupBarcode, MEDIA_ORIGIN,
-  type EventSummary, type ShoppingItem, type ShoppingList, type Receipt,
+  setShareToken, createShare, getMeta, putMeta, getVapidKey, subscribePush,
+  type EventSummary, type ShoppingItem, type ShoppingList, type Receipt, type EventMeta,
 } from './api'
 
 // ---- Helpers --------------------------------------------------------------
@@ -26,6 +27,33 @@ const storeOf = (i: ShoppingItem) => i.recommendation || i.supplier || 'Ohne Lad
 const shortName = (email: string) =>
   email.split('@')[0].split(/[._]/).filter(Boolean).map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') || email
 
+// VAPID-Public-Key (base64url) -> Uint8Array für PushManager.subscribe
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(b64)
+  const arr = new Uint8Array(raw.length)
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
+  return arr
+}
+
+const daysUntil = (dateStr: string | null): number | null => {
+  if (!dateStr) return null
+  const d = new Date(dateStr); d.setHours(0, 0, 0, 0)
+  const now = new Date(); now.setHours(0, 0, 0, 0)
+  return Math.round((d.getTime() - now.getTime()) / 86400000)
+}
+
+const deadlineLabel = (dateStr: string): string => {
+  const d = daysUntil(dateStr)
+  const date = new Date(dateStr).toLocaleDateString('de-CH')
+  if (d === null) return date
+  if (d < 0) return `${date} (vorbei)`
+  if (d === 0) return `${date} (heute)`
+  if (d === 1) return `${date} (morgen)`
+  return `${date} (in ${d} Tg.)`
+}
+
 // ---- App ------------------------------------------------------------------
 export default function App() {
   const [token, setToken] = useState<string | null>(getStoredToken())
@@ -34,6 +62,14 @@ export default function App() {
   const [slug, setSlug] = useState<string | null>(null)
   const [online, setOnline] = useState(navigator.onLine)
   const [pending, setPending] = useState(outboxCount())
+  // Teilen-Modus: geöffnet über ?share=<token>&event=<slug> — ohne Login.
+  const [share] = useState<{ slug: string } | null>(() => {
+    const p = new URLSearchParams(window.location.search)
+    const s = p.get('share'); const e = p.get('event')
+    if (s && e) { setShareToken(s); return { slug: e } }
+    return null
+  })
+  const [shareError, setShareError] = useState(false)
 
   // OIDC-Callback + Token-Validierung
   useEffect(() => {
@@ -76,6 +112,23 @@ export default function App() {
       window.removeEventListener('offline', goOffline)
     }
   }, [token, onAuthError])
+
+  // Teilen-Modus geht vor dem Login-Gate: geteilte Liste direkt anzeigen.
+  if (share) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900">
+        <Header user={{ name: 'Geteilte Liste', email: '', groups: [] }} title={prettySlug(share.slug)}
+          online={online} pending={0} guest />
+        {!online && <OfflineBanner pending={0} />}
+        <main className="max-w-2xl mx-auto p-4 pb-24">
+          {shareError
+            ? <p className="text-red-600 py-10 text-center">Link ungültig oder abgelaufen.</p>
+            : <ListView slug={share.slug} token="" userEmail="" guest
+                onAuthError={() => setShareError(true)} onPendingChange={setPending} />}
+        </main>
+      </div>
+    )
+  }
 
   if (authLoading) return <Splash text="Anmeldung läuft…" />
   if (!token || !user) return <LoginScreen />
@@ -132,8 +185,8 @@ function LoginScreen() {
   )
 }
 
-function Header({ user, title, online, pending, onBack }: {
-  user: User; title: string; online: boolean; pending: number; onBack?: () => void
+function Header({ user, title, online, pending, onBack, guest }: {
+  user: User; title: string; online: boolean; pending: number; onBack?: () => void; guest?: boolean
 }) {
   return (
     <header className="sticky top-0 z-10 bg-cart-600 text-white shadow safe-area-inset-top">
@@ -151,7 +204,9 @@ function Header({ user, title, online, pending, onBack }: {
             {pending} offen
           </span>
         )}
-        <button onClick={() => logout()} className="text-white/80 text-sm" title={user.email}>Abmelden</button>
+        {guest
+          ? <span className="text-xs bg-white/20 rounded-full px-2 py-0.5">🔗 geteilt</span>
+          : <button onClick={() => logout()} className="text-white/80 text-sm" title={user.email}>Abmelden</button>}
       </div>
     </header>
   )
@@ -200,6 +255,11 @@ function EventsView({ token, onAuthError, onOpen }: {
                 {e.recipe_count} Rezepte · {e.item_count} Zutaten
                 {e.item_count > 0 && ` · ${e.purchased_count}/${e.item_count} gekauft`}
               </div>
+              {e.deadline && (
+                <span className={`inline-block mt-2 text-xs rounded-full px-2 py-0.5 ${(daysUntil(e.deadline) ?? 99) <= 2 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                  ⏰ {deadlineLabel(e.deadline)}
+                </span>
+              )}
             </button>
           </li>
         )
@@ -209,8 +269,9 @@ function EventsView({ token, onAuthError, onOpen }: {
 }
 
 // ---- Einkaufsliste eines Events ------------------------------------------
-function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
-  slug: string; token: string; userEmail: string; onAuthError: () => void; onPendingChange: (n: number) => void
+function ListView({ slug, token, userEmail, guest, onAuthError, onPendingChange }: {
+  slug: string; token: string; userEmail: string; guest?: boolean
+  onAuthError: () => void; onPendingChange: (n: number) => void
 }) {
   const [list, setList] = useState<ShoppingList | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -221,7 +282,10 @@ function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
   const [scanning, setScanning] = useState(false)
   const [restockBusy, setRestockBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [meta, setMeta] = useState<EventMeta | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
+
+  useEffect(() => { getMeta(slug, token).then(setMeta).catch(() => {}) }, [slug, token])
 
   const load = useCallback(async () => {
     try {
@@ -290,6 +354,41 @@ function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
     } finally { setRestockBusy(false) }
   }
 
+  const shareLink = async () => {
+    try {
+      const r = await createShare(slug, token)
+      const url = `${window.location.origin}/?share=${r.token}&event=${encodeURIComponent(slug)}`
+      if (navigator.share) await navigator.share({ title: `Einkauf ${prettySlug(slug)}`, url })
+      else { await navigator.clipboard.writeText(url); setToast('Link kopiert') }
+    } catch (e) {
+      if (e instanceof AuthError) { onAuthError(); return }
+      if ((e as any)?.name !== 'AbortError') setToast('Teilen fehlgeschlagen')
+    }
+  }
+
+  const enablePush = async () => {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) { setToast('Push nicht unterstützt'); return }
+      const key = await getVapidKey(token)
+      if (!key) { setToast('Push (noch) nicht konfiguriert'); return }
+      const perm = await Notification.requestPermission()
+      if (perm !== 'granted') { setToast('Benachrichtigungen abgelehnt'); return }
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) as unknown as BufferSource })
+      await subscribePush(sub.toJSON(), token)
+      setToast('Erinnerungen aktiviert 🔔')
+    } catch (e) {
+      if (e instanceof AuthError) { onAuthError(); return }
+      setToast('Push fehlgeschlagen')
+    }
+  }
+
+  const changeDeadline = async (value: string) => {
+    setMeta((m) => ({ deadline: value || null, budget: m?.budget ?? null }))
+    try { await putMeta(slug, { deadline: value || null }, token) }
+    catch (e) { if (e instanceof AuthError) onAuthError() }
+  }
+
   if (error) return <p className="text-red-600 py-8 text-center">{error}</p>
   if (!list) return <p className="text-gray-400 py-8 text-center">Lädt…</p>
 
@@ -332,7 +431,24 @@ function ListView({ slug, token, userEmail, onAuthError, onPendingChange }: {
             ))}
           </div>
         )}
+        {meta?.deadline && (
+          <div className={`text-xs mt-2 ${(daysUntil(meta.deadline) ?? 99) <= 2 ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
+            ⏰ Deadline {deadlineLabel(meta.deadline)}
+          </div>
+        )}
       </div>
+
+      {!guest && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <button onClick={shareLink} className="text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 active:bg-gray-50">🔗 Teilen</button>
+          <button onClick={enablePush} className="text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 active:bg-gray-50">🔔 Erinnerung</button>
+          <label className="text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2">
+            <span className="text-gray-500">Deadline</span>
+            <input type="date" value={meta?.deadline ? meta.deadline.slice(0, 10) : ''}
+              onChange={(e) => changeDeadline(e.target.value)} className="outline-none bg-transparent" />
+          </label>
+        </div>
+      )}
 
       {restockable > 0 && (
         <button onClick={doRestock} disabled={restockBusy}

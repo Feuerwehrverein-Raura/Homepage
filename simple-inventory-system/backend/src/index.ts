@@ -7,6 +7,8 @@ import bwipjs from 'bwip-js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import webpush from 'web-push';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
 import { generateQRCodeWithLogo, getItemUrl } from './qrcode.js';
@@ -26,6 +28,15 @@ if (!fs.existsSync(uploadDir)) {
 
 // Serve uploaded images
 app.use('/api/uploads', express.static(uploadDir));
+
+// Web-Push (VAPID) — optional; nur aktiv, wenn Keys in der Env gesetzt sind.
+const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
+const PUSH_ENABLED = !!(VAPID_PUBLIC && VAPID_PRIVATE);
+if (PUSH_ENABLED) {
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:vorstand@fwv-raura.ch', VAPID_PUBLIC, VAPID_PRIVATE);
+  console.log('Web-Push aktiviert');
+}
 
 // Multer configuration for image uploads
 const storage = multer.diskStorage({
@@ -326,6 +337,38 @@ async function initDB() {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_receipts_slug ON event_receipts(event_slug)`);
+
+  // Einkaufs-PWA Phase 4: Event-Meta (Deadline/Budget), Teilen-Tokens, Push-Abos.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_shopping_meta (
+      event_slug VARCHAR(100) PRIMARY KEY,
+      deadline DATE,
+      budget NUMERIC,
+      reminded_on DATE,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_share_tokens (
+      token VARCHAR(64) PRIMARY KEY,
+      event_slug VARCHAR(100) NOT NULL,
+      can_write BOOLEAN DEFAULT true,
+      created_by VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_share_tokens_slug ON event_share_tokens(event_slug)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id SERIAL PRIMARY KEY,
+      endpoint TEXT UNIQUE NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_email VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
   console.log('Database initialized');
 }
@@ -935,11 +978,13 @@ app.get('/api/events', authenticateEventAccess, async (req: AuthenticatedRequest
         COUNT(DISTINCT er.recipe_id) AS recipe_count,
         COUNT(DISTINCT ri.item_id) AS item_count,
         COUNT(DISTINCT ess.item_id) FILTER (WHERE ess.purchased) AS purchased_count,
-        MAX(er.updated_at) AS updated_at
+        MAX(er.updated_at) AS updated_at,
+        MAX(m.deadline) AS deadline
       FROM event_recipes er
       LEFT JOIN recipes r ON r.id = er.recipe_id AND r.active = true
       LEFT JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
       LEFT JOIN event_shopping_status ess ON ess.event_slug = er.event_slug
+      LEFT JOIN event_shopping_meta m ON m.event_slug = er.event_slug
       GROUP BY er.event_slug
       ORDER BY MAX(er.updated_at) DESC NULLS LAST
     `);
@@ -948,7 +993,8 @@ app.get('/api/events', authenticateEventAccess, async (req: AuthenticatedRequest
       recipe_count: parseInt(r.recipe_count, 10) || 0,
       item_count: parseInt(r.item_count, 10) || 0,
       purchased_count: parseInt(r.purchased_count, 10) || 0,
-      updated_at: r.updated_at
+      updated_at: r.updated_at,
+      deadline: r.deadline
     })));
   } catch (error) {
     console.error('GET /api/events error:', error);
@@ -1320,6 +1366,148 @@ app.post('/api/events/:slug/shopping-list/restock', authenticateEventAccess, asy
   }
 });
 
+// ---- Teilen (Share-Link) --------------------------------------------------
+// Erzeugt einen Token, mit dem auch Nicht-Mitglieder die Einkaufsliste eines
+// Events sehen (und optional bearbeiten) können — ohne Login.
+app.post('/api/events/:slug/share', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const canWrite = req.body?.can_write !== false;
+    const days = parseInt(req.body?.days, 10);
+    const expiresAt = Number.isFinite(days) && days > 0 ? new Date(Date.now() + days * 86400000) : null;
+    const token = crypto.randomBytes(24).toString('base64url');
+    await pool.query(
+      'INSERT INTO event_share_tokens (token, event_slug, can_write, created_by, expires_at) VALUES ($1,$2,$3,$4,$5)',
+      [token, slug, canWrite, req.user?.email || null, expiresAt]
+    );
+    res.status(201).json({ token, event_slug: slug, can_write: canWrite, expires_at: expiresAt });
+  } catch (e) {
+    console.error('POST share error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ---- Event-Meta (Deadline / Budget) --------------------------------------
+app.get('/api/events/:slug/meta', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const r = await pool.query('SELECT deadline, budget FROM event_shopping_meta WHERE event_slug = $1', [slug]);
+    res.json(r.rows[0] || { deadline: null, budget: null });
+  } catch (e) {
+    console.error('GET meta error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.put('/api/events/:slug/meta', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const deadline = req.body?.deadline || null;
+    const budgetRaw = req.body?.budget;
+    const budget = budgetRaw != null && budgetRaw !== '' && Number.isFinite(Number(budgetRaw)) ? Number(budgetRaw) : null;
+    const r = await pool.query(`
+      INSERT INTO event_shopping_meta (event_slug, deadline, budget, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (event_slug) DO UPDATE SET deadline = $2, budget = $3, updated_at = NOW()
+      RETURNING deadline, budget
+    `, [slug, deadline, budget]);
+    res.json(r.rows[0]);
+  } catch (e) {
+    console.error('PUT meta error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ---- Web-Push (Abo + Erinnerungen) ---------------------------------------
+app.get('/api/push/vapid-public-key', (req, res) => {
+  if (!PUSH_ENABLED) return res.status(503).json({ error: 'Push nicht konfiguriert' });
+  res.json({ key: VAPID_PUBLIC });
+});
+
+app.post('/api/push/subscribe', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  if (!PUSH_ENABLED) return res.status(503).json({ error: 'Push nicht konfiguriert' });
+  try {
+    const sub = req.body?.subscription;
+    if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+      return res.status(400).json({ error: 'Ungültiges Abo' });
+    }
+    await pool.query(`
+      INSERT INTO push_subscriptions (endpoint, p256dh, auth, user_email)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (endpoint) DO UPDATE SET p256dh = $2, auth = $3, user_email = $4
+    `, [sub.endpoint, sub.keys.p256dh, sub.keys.auth, req.user?.email || null]);
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error('subscribe error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Erinnerungs-Job: Events mit Deadline in <=3 Tagen und offenen Positionen ->
+// einmal täglich Push an alle Abos. reminded_on verhindert Mehrfachversand.
+async function sendShoppingReminders() {
+  if (!PUSH_ENABLED) return;
+  try {
+    const events = await pool.query(`
+      SELECT event_slug, deadline FROM event_shopping_meta
+      WHERE deadline IS NOT NULL
+        AND deadline >= CURRENT_DATE
+        AND deadline <= CURRENT_DATE + INTERVAL '3 days'
+        AND (reminded_on IS NULL OR reminded_on < CURRENT_DATE)
+    `);
+    if (events.rows.length === 0) return;
+    const subs = await pool.query('SELECT endpoint, p256dh, auth FROM push_subscriptions');
+    if (subs.rows.length === 0) return;
+
+    for (const ev of events.rows) {
+      const openRes = await pool.query(`
+        SELECT COUNT(*)::int AS open FROM (
+          SELECT i.id
+          FROM event_recipes er
+          JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+          JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+          JOIN items i ON i.id = ri.item_id
+          LEFT JOIN event_shopping_status ess ON ess.event_slug = er.event_slug AND ess.item_id = i.id
+          WHERE er.event_slug = $1 AND i.active = true
+          GROUP BY i.id, i.quantity
+          HAVING SUM(ri.quantity * er.servings) > i.quantity
+             AND bool_or(COALESCE(ess.purchased, false)) = false
+        ) t
+      `, [ev.event_slug]);
+      const open = openRes.rows[0]?.open || 0;
+      if (open === 0) continue;
+
+      const payload = JSON.stringify({
+        title: 'Einkauf offen',
+        body: `${prettyEventName(ev.event_slug)}: noch ${open} Positionen offen (Deadline ${new Date(ev.deadline).toLocaleDateString('de-CH')})`,
+        url: `/?event=${encodeURIComponent(ev.event_slug)}`
+      });
+      for (const s of subs.rows) {
+        try {
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
+        } catch (err: any) {
+          if (err?.statusCode === 404 || err?.statusCode === 410) {
+            await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [s.endpoint]).catch(() => {});
+          }
+        }
+      }
+      await pool.query('UPDATE event_shopping_meta SET reminded_on = CURRENT_DATE WHERE event_slug = $1', [ev.event_slug]);
+    }
+  } catch (e) {
+    console.error('reminder job error:', e);
+  }
+}
+
+function prettyEventName(slug: string): string {
+  return slug.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+if (PUSH_ENABLED) {
+  // alle 12h prüfen (reminded_on begrenzt auf 1x/Tag pro Event)
+  setInterval(sendShoppingReminders, 12 * 60 * 60 * 1000);
+  setTimeout(sendShoppingReminders, 30 * 1000); // kurz nach Start einmal
+}
+
 // ========================================
 // ITEMS
 // ========================================
@@ -1585,9 +1773,31 @@ function authenticateOrderSystem(req: express.Request, res: express.Response, ne
 //  1. internen Aufruf per x-order-api-key (z.B. vom Events-Backend, das
 //     Vorstand/Organisator bereits geprueft hat), ODER
 //  2. jeden eingeloggten Inventar-Nutzer (Authentik-Token) fuer das Inventar-Frontend.
-function authenticateEventAccess(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
+async function authenticateEventAccess(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   const apiKey = req.headers['x-order-api-key'];
   if (apiKey && apiKey === ORDER_API_KEY) return next();
+
+  // Teilen-Link: gültiger Share-Token für genau dieses Event erlaubt Zugriff ohne Login.
+  const shareToken = (req.headers['x-share-token'] as string) || (req.query.share as string);
+  if (shareToken) {
+    try {
+      const r = await pool.query(
+        'SELECT event_slug, can_write, expires_at FROM event_share_tokens WHERE token = $1',
+        [shareToken]
+      );
+      const row = r.rows[0];
+      if (row && row.event_slug === req.params.slug &&
+          (!row.expires_at || new Date(row.expires_at) > new Date())) {
+        if (!row.can_write && req.method !== 'GET') {
+          return res.status(403).json({ error: 'Nur-Lese-Freigabe' });
+        }
+        req.user = { id: 'share', email: 'geteilter-link', name: 'Geteilter Link', groups: [] };
+        return next();
+      }
+    } catch (e) {
+      // fällt auf normale Token-Prüfung zurück
+    }
+  }
   // Jeder eingeloggte Inventar-Nutzer darf Event-Rezepte verwalten (nicht nur Vorstand).
   // Die Beschraenkung auf Vorstand/Organisator gilt nur auf der oeffentlichen Eventseite (Events-Proxy).
   return authenticateToken(req, res, next);
