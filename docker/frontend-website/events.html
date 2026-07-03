@@ -1183,6 +1183,8 @@
                 this.selectedEvent = event;
                 const modal = document.getElementById('event-modal');
                 const content = document.getElementById('modal-content');
+                // Direktlink zu diesem Event (dasselbe Format wie der URL-Parameter beim Öffnen)
+                const directLink = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(event.slug || event.id);
 
                 content.innerHTML = `
                     <div class="p-6">
@@ -1248,6 +1250,20 @@
                             </div>
                         </div>
                         
+                        <!-- Direktlink zu diesem Event (zum Teilen/Kopieren) -->
+                        <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-2 text-sm">🔗 Direktlink</h4>
+                            <div class="flex gap-2">
+                                <input id="event-direct-link" type="text" readonly value="${directLink}" onclick="this.select()"
+                                       class="flex-1 min-w-0 text-sm bg-white border border-gray-300 rounded px-3 py-2 text-gray-700">
+                                <button type="button"
+                                        onclick="navigator.clipboard.writeText(document.getElementById('event-direct-link').value).then(() => { this.textContent = 'Kopiert ✓'; setTimeout(() => this.textContent = 'Kopieren', 1500); })"
+                                        class="bg-fire-600 hover:bg-fire-700 text-white text-sm font-medium px-4 py-2 rounded whitespace-nowrap">
+                                    Kopieren
+                                </button>
+                            </div>
+                        </div>
+
                         ${event.tags && event.tags.length > 0 ? `
                             <div class="mb-6">
                                 <h4 class="font-semibold text-gray-800 mb-2">Tags:</h4>
