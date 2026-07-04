@@ -1,6 +1,6 @@
 [package]
 name = "vorstand-desktop"
-version = "1.8.0"
+version = "1.9.0"
 description = "FWV Vorstand Desktop App"
 authors = ["FWV Raura"]
 edition = "2021"
