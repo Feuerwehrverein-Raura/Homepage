@@ -59,3 +59,26 @@ export async function createRegistration(
 ): Promise<void> {
   await apiClient.post("/registrations", data);
 }
+
+export interface AlternativeShiftSuggestion {
+  newShiftId: string;
+  shiftInfo: {
+    id?: string;
+    bereich?: string | null;
+    name: string;
+    date?: string | null;
+    time?: string;
+  };
+  comment?: string;
+  email: string;
+}
+
+export async function suggestAlternativeShift(
+  registrationId: string,
+  data: AlternativeShiftSuggestion
+): Promise<void> {
+  await apiClient.post(
+    `/registrations/${registrationId}/suggest-alternative`,
+    data
+  );
+}

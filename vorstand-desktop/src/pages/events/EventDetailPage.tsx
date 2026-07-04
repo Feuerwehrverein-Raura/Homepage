@@ -1,8 +1,21 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEventsStore } from "@/stores/events-store";
+import { useAuthStore } from "@/stores/auth-store";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { formatSwissDate, formatTime } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
+import {
+  suggestAlternativeShift,
+  createRegistration,
+  updateRegistration,
+} from "@/lib/api/events";
+import type {
+  Event,
+  Shift,
+  EventRegistration,
+  DirectRegistrations,
+} from "@/lib/types/event";
 import {
   ArrowLeft,
   Pencil,
@@ -15,7 +28,75 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  FileText,
+  Paperclip,
+  ArrowLeftRight,
+  UserPlus,
+  X,
+  Send,
 } from "lucide-react";
+
+const API_BASE = "https://api.fwv-raura.ch";
+
+const DEFAULT_SUGGEST_COMMENT =
+  "Leider ist die von dir gewaehlte Schicht bereits voll besetzt. Waerst du bereit, stattdessen die folgende Schicht zu uebernehmen?";
+
+// Loesst den Anzeigenamen einer Anmeldung robust auf. Schicht-Anmeldungen
+// liefern vom Backend nur { id, name }, direkte Anmeldungen zusaetzlich
+// vorname/nachname/guest_name.
+function regDisplayName(r: {
+  name?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  guest_name?: string | null;
+}): string {
+  if (r.name) return r.name;
+  const full = [r.vorname, r.nachname].filter(Boolean).join(" ").trim();
+  return full || r.guest_name || "Unbekannt";
+}
+
+function shiftDisplayLabel(s: Shift): string {
+  const head = `${s.bereich ? s.bereich + " - " : ""}${s.name}`;
+  const bits: string[] = [];
+  if (s.date) bits.push(formatSwissDate(s.date));
+  if (s.start_time || s.end_time)
+    bits.push(`${formatTime(s.start_time)}-${formatTime(s.end_time)}`);
+  return bits.length ? `${head} (${bits.join(" ")})` : head;
+}
+
+// Laedt ein PDF binaer ueber den Tauri-HTTP-Client (analog MailPage) und
+// startet den Download ueber einen Blob-URL.
+async function downloadPdf(path: string, filename: string): Promise<void> {
+  const token = useAuthStore.getState().token;
+  const res = await tauriFetch(`${API_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const body = await res.text();
+      if (body) {
+        try {
+          msg = JSON.parse(body).error || body;
+        } catch {
+          msg = body;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +113,35 @@ export function EventDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<"shifts" | "registrations">("shifts");
+  const [notice, setNotice] = useState<{
+    type: "error" | "success";
+    text: string;
+  } | null>(null);
+  const [pdfLoading, setPdfLoading] = useState<"aushang" | "teilnehmer" | null>(
+    null
+  );
+
+  // E2 — Alternative Schicht vorschlagen
+  const [suggestReg, setSuggestReg] = useState<{
+    id: string;
+    name: string;
+    currentShift: string;
+  } | null>(null);
+  const [suggestShiftId, setSuggestShiftId] = useState("");
+  const [suggestEmail, setSuggestEmail] = useState("");
+  const [suggestComment, setSuggestComment] = useState(DEFAULT_SUGGEST_COMMENT);
+  const [suggestSending, setSuggestSending] = useState(false);
+
+  // E4 — Anmeldung anlegen / bearbeiten
+  const [regModal, setRegModal] = useState<
+    | { mode: "create"; shiftId: string | null; shiftLabel: string }
+    | { mode: "edit"; regId: string; shiftLabel: string }
+    | null
+  >(null);
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regSaving, setRegSaving] = useState(false);
 
   useEffect(() => {
     if (id) fetchEvent(id);
@@ -56,6 +166,157 @@ export function EventDetailPage() {
     await rejectRegistration(regId);
   };
 
+  const handleAushangPdf = async () => {
+    if (!event) return;
+    setNotice(null);
+    setPdfLoading("aushang");
+    try {
+      const name =
+        (event as Event & { pdf_filename?: string | null }).pdf_filename ||
+        `${event.title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`;
+      await downloadPdf(`/events/${event.id}/pdf`, name);
+    } catch (e) {
+      setNotice({
+        type: "error",
+        text: e instanceof Error ? e.message : "Fehler beim Laden des PDF",
+      });
+    } finally {
+      setPdfLoading(null);
+    }
+  };
+
+  const handleTeilnehmerlistePdf = async () => {
+    if (!event) return;
+    setNotice(null);
+    setPdfLoading("teilnehmer");
+    try {
+      const safe = event.title.replace(/[^a-zA-Z0-9]/g, "_");
+      await downloadPdf(
+        `/events/${event.id}/pdf/teilnehmerliste`,
+        `Teilnehmerliste_${safe}.pdf`
+      );
+    } catch (e) {
+      setNotice({
+        type: "error",
+        text:
+          e instanceof Error ? e.message : "Fehler beim Erstellen der Liste",
+      });
+    } finally {
+      setPdfLoading(null);
+    }
+  };
+
+  const openSuggest = (reg: EventRegistration, currentShift: string) => {
+    setNotice(null);
+    setSuggestReg({
+      id: reg.id,
+      name: regDisplayName(reg),
+      currentShift,
+    });
+    setSuggestShiftId("");
+    setSuggestEmail(
+      reg.guest_email || (reg as { email?: string | null }).email || ""
+    );
+    setSuggestComment(DEFAULT_SUGGEST_COMMENT);
+  };
+
+  const handleSendSuggestion = async () => {
+    if (!suggestReg || !event) return;
+    if (!suggestShiftId) {
+      setNotice({ type: "error", text: "Bitte eine alternative Schicht waehlen" });
+      return;
+    }
+    if (!suggestEmail.trim()) {
+      setNotice({ type: "error", text: "Bitte eine E-Mail-Adresse angeben" });
+      return;
+    }
+    const shift = event.shifts?.find((s) => s.id === suggestShiftId);
+    if (!shift) return;
+    setSuggestSending(true);
+    try {
+      await suggestAlternativeShift(suggestReg.id, {
+        newShiftId: shift.id,
+        shiftInfo: {
+          id: shift.id,
+          bereich: shift.bereich || "",
+          name: shift.name,
+          date: shift.date,
+          time: `${shift.start_time || ""}-${shift.end_time || ""}`,
+        },
+        comment: suggestComment,
+        email: suggestEmail.trim(),
+      });
+      setSuggestReg(null);
+      setNotice({ type: "success", text: "Vorschlag wurde per E-Mail gesendet" });
+      if (id) fetchEvent(id);
+    } catch (e) {
+      setNotice({
+        type: "error",
+        text: e instanceof Error ? e.message : "Fehler beim Senden",
+      });
+    } finally {
+      setSuggestSending(false);
+    }
+  };
+
+  const openCreateReg = (shiftId: string | null, shiftLabel: string) => {
+    setNotice(null);
+    setRegName("");
+    setRegEmail("");
+    setRegPhone("");
+    setRegModal({ mode: "create", shiftId, shiftLabel });
+  };
+
+  const openEditReg = (reg: EventRegistration, shiftLabel: string) => {
+    setNotice(null);
+    setRegName(regDisplayName(reg));
+    setRegEmail(
+      reg.guest_email || (reg as { email?: string | null }).email || ""
+    );
+    setRegPhone(reg.phone || "");
+    setRegModal({ mode: "edit", regId: reg.id, shiftLabel });
+  };
+
+  const handleSaveReg = async () => {
+    if (!regModal || !event) return;
+    if (!regName.trim()) {
+      setNotice({ type: "error", text: "Name ist erforderlich" });
+      return;
+    }
+    setRegSaving(true);
+    try {
+      if (regModal.mode === "create") {
+        const payload: Record<string, unknown> = {
+          event_id: event.id,
+          shift_ids: regModal.shiftId ? [regModal.shiftId] : null,
+          status: "approved",
+          guest_name: regName.trim(),
+          guest_email: regEmail.trim(),
+        };
+        if (regPhone.trim()) {
+          payload.notes = JSON.stringify({ phone: regPhone.trim() });
+        }
+        await createRegistration(payload);
+        setNotice({ type: "success", text: "Person hinzugefuegt" });
+      } else {
+        const payload: Record<string, unknown> = { guest_name: regName.trim() };
+        if (regEmail.trim()) payload.guest_email = regEmail.trim();
+        if (regPhone.trim()) payload.phone = regPhone.trim();
+        await updateRegistration(regModal.regId, payload);
+        setNotice({ type: "success", text: "Anmeldung aktualisiert" });
+      }
+      setRegModal(null);
+      if (id) fetchEvent(id);
+    } catch (e) {
+      setNotice({
+        type: "error",
+        text: e instanceof Error ? e.message : "Fehler beim Speichern",
+      });
+    } finally {
+      setRegSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -72,14 +333,47 @@ export function EventDetailPage() {
     );
   }
 
+  // pdf_filename kommt vom Backend (…event), ist aber nicht im Event-Typ.
+  const pdfFilename =
+    (event as Event & { pdf_filename?: string | null }).pdf_filename ?? null;
+
+  // Direkte Anmeldungen: Backend liefert camelCase (directRegistrations).
+  const directRegs =
+    event.direct_registrations ??
+    (event as Event & { directRegistrations?: DirectRegistrations | null })
+      .directRegistrations ??
+    null;
+
   const allRegistrations = [
     ...(event.shifts || []).flatMap((s) => [
-      ...(s.registrations?.approved || []).map((r) => ({ ...r, shiftName: s.name, type: "shift" as const })),
-      ...(s.registrations?.pending || []).map((r) => ({ ...r, shiftName: s.name, type: "shift" as const })),
+      ...(s.registrations?.approved || []).map((r) => ({
+        ...r,
+        status: "approved",
+        shiftName: shiftDisplayLabel(s),
+        type: "shift" as const,
+      })),
+      ...(s.registrations?.pending || []).map((r) => ({
+        ...r,
+        status: "pending",
+        shiftName: shiftDisplayLabel(s),
+        type: "shift" as const,
+      })),
     ]),
-    ...(event.direct_registrations?.approved || []).map((r) => ({ ...r, shiftName: "Direkt", type: "direct" as const })),
-    ...(event.direct_registrations?.pending || []).map((r) => ({ ...r, shiftName: "Direkt", type: "direct" as const })),
+    ...(directRegs?.approved || []).map((r) => ({
+      ...r,
+      status: "approved",
+      shiftName: "Direkt",
+      type: "direct" as const,
+    })),
+    ...(directRegs?.pending || []).map((r) => ({
+      ...r,
+      status: "pending",
+      shiftName: "Direkt",
+      type: "direct" as const,
+    })),
   ];
+
+  const hasShifts = (event.shifts?.length || 0) > 0;
 
   return (
     <div>
@@ -97,6 +391,21 @@ export function EventDetailPage() {
             <p className="text-sm text-muted-foreground">{event.subtitle}</p>
           )}
         </div>
+        {pdfFilename && (
+          <button
+            onClick={handleAushangPdf}
+            disabled={pdfLoading === "aushang"}
+            className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors disabled:opacity-50"
+            title={pdfFilename}
+          >
+            {pdfLoading === "aushang" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Paperclip className="h-4 w-4" />
+            )}
+            Aushang
+          </button>
+        )}
         <button
           onClick={() => navigate(`/events/${id}/edit`)}
           className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
@@ -112,6 +421,31 @@ export function EventDetailPage() {
           Loeschen
         </button>
       </div>
+
+      {/* Notice */}
+      {notice && (
+        <div
+          className={cn(
+            "flex items-center gap-2 p-3 mb-4 rounded-md text-sm",
+            notice.type === "error"
+              ? "bg-destructive/10 text-destructive"
+              : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+          )}
+        >
+          {notice.type === "error" ? (
+            <AlertCircle className="h-4 w-4 shrink-0" />
+          ) : (
+            <CheckCircle className="h-4 w-4 shrink-0" />
+          )}
+          {notice.text}
+          <button
+            onClick={() => setNotice(null)}
+            className="ml-auto opacity-70 hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Event Info Card */}
       <div className="grid grid-cols-2 gap-6 mb-6">
@@ -187,9 +521,21 @@ export function EventDetailPage() {
             <div key={shift.id} className="rounded-lg border bg-card p-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-semibold">{shift.name}</h4>
-                <span className="text-xs text-muted-foreground">
-                  {shift.filled || 0} / {shift.needed || "?"} besetzt
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">
+                    {shift.filled || 0} / {shift.needed || "?"} besetzt
+                  </span>
+                  <button
+                    onClick={() =>
+                      openCreateReg(shift.id, shiftDisplayLabel(shift))
+                    }
+                    className="flex items-center gap-1 px-2 py-1 rounded-md border text-xs hover:bg-muted transition-colors"
+                    title="Person hinzufuegen"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Person
+                  </button>
+                </div>
               </div>
               {shift.description && (
                 <p className="text-sm text-muted-foreground mb-2">{shift.description}</p>
@@ -212,14 +558,14 @@ export function EventDetailPage() {
                 )}
               </div>
               {/* Shift registrations */}
-              {shift.registrations && (shift.registrations.approved_count > 0 || shift.registrations.pending_count > 0) && (
+              {shift.registrations && (shift.registrations.approved.length > 0 || shift.registrations.pending.length > 0) && (
                 <div className="mt-3 border-t pt-2">
                   <p className="text-xs font-medium mb-1">
-                    {shift.registrations.approved_count} genehmigt, {shift.registrations.pending_count} ausstehend
+                    {shift.registrations.approved.length} genehmigt, {shift.registrations.pending.length} ausstehend
                   </p>
                   {shift.registrations.pending.map((reg) => (
                     <div key={reg.id} className="flex items-center justify-between py-1 text-sm">
-                      <span>{reg.vorname} {reg.nachname}{reg.guest_name ? ` (Gast: ${reg.guest_name})` : ""}</span>
+                      <span>{regDisplayName(reg)}</span>
                       <div className="flex gap-1">
                         <button
                           onClick={() => handleApprove(reg.id)}
@@ -227,6 +573,15 @@ export function EventDetailPage() {
                           title="Genehmigen"
                         >
                           <CheckCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            openSuggest(reg, shiftDisplayLabel(shift))
+                          }
+                          className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                          title="Alternative Schicht vorschlagen"
+                        >
+                          <ArrowLeftRight className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleReject(reg.id)}
@@ -248,6 +603,31 @@ export function EventDetailPage() {
       {/* Registrations Tab */}
       {activeTab === "registrations" && (
         <div>
+          <div className="flex items-center justify-end gap-2 mb-3">
+            {!hasShifts && (
+              <button
+                onClick={() => openCreateReg(null, "Direkt (ohne Schicht)")}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
+              >
+                <UserPlus className="h-4 w-4" />
+                Person hinzufuegen
+              </button>
+            )}
+            {allRegistrations.length > 0 && (
+              <button
+                onClick={handleTeilnehmerlistePdf}
+                disabled={pdfLoading === "teilnehmer"}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                {pdfLoading === "teilnehmer" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                Teilnehmerliste (PDF)
+              </button>
+            )}
+          </div>
           {allRegistrations.length === 0 && (
             <div className="py-8 text-center text-muted-foreground">
               Keine Anmeldungen vorhanden
@@ -268,12 +648,7 @@ export function EventDetailPage() {
                 <tbody>
                   {allRegistrations.map((reg) => (
                     <tr key={reg.id} className="border-b last:border-0">
-                      <td className="px-4 py-3">
-                        {reg.vorname} {reg.nachname}
-                        {reg.guest_name && (
-                          <span className="text-xs text-muted-foreground ml-1">(Gast: {reg.guest_name})</span>
-                        )}
-                      </td>
+                      <td className="px-4 py-3">{regDisplayName(reg)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{reg.shiftName}</td>
                       <td className="px-4 py-3">
                         <RegistrationStatusBadge status={reg.status} />
@@ -282,24 +657,42 @@ export function EventDetailPage() {
                         {reg.notes || "-"}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {reg.status === "pending" && (
-                          <div className="flex justify-end gap-1">
-                            <button
-                              onClick={() => handleApprove(reg.id)}
-                              className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600"
-                              title="Genehmigen"
-                            >
-                              <CheckCircle className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleReject(reg.id)}
-                              className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600"
-                              title="Ablehnen"
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => openEditReg(reg, reg.shiftName)}
+                            className="p-1 rounded hover:bg-muted text-muted-foreground"
+                            title="Bearbeiten"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          {reg.status === "pending" && (
+                            <>
+                              <button
+                                onClick={() => handleApprove(reg.id)}
+                                className="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600"
+                                title="Genehmigen"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </button>
+                              {reg.type === "shift" && (
+                                <button
+                                  onClick={() => openSuggest(reg, reg.shiftName)}
+                                  className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600"
+                                  title="Alternative Schicht vorschlagen"
+                                >
+                                  <ArrowLeftRight className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleReject(reg.id)}
+                                className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600"
+                                title="Ablehnen"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -307,6 +700,178 @@ export function EventDetailPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Suggest Alternative Modal */}
+      {suggestReg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border rounded-lg p-6 max-w-lg w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-lg">
+                Alternative Schicht vorschlagen
+              </h3>
+              <button
+                onClick={() => setSuggestReg(null)}
+                className="p-1 rounded-md hover:bg-muted"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="rounded-md bg-muted/50 p-3">
+                <p className="text-xs text-muted-foreground">Anmeldung von:</p>
+                <p className="font-semibold">{suggestReg.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  Aktuelle Schicht: {suggestReg.currentShift}
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  E-Mail-Adresse *
+                </label>
+                <input
+                  type="email"
+                  value={suggestEmail}
+                  onChange={(e) => setSuggestEmail(e.target.value)}
+                  placeholder="empfaenger@example.ch"
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  Alternative Schicht *
+                </label>
+                <select
+                  value={suggestShiftId}
+                  onChange={(e) => setSuggestShiftId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="">Bitte waehlen...</option>
+                  {event.shifts?.map((shift) => {
+                    const approvedCount =
+                      shift.registrations?.approved?.length ?? 0;
+                    const capacity = shift.needed ?? null;
+                    const isFull =
+                      capacity != null && approvedCount >= capacity;
+                    const free =
+                      capacity != null
+                        ? ` (${Math.max(capacity - approvedCount, 0)}/${capacity} frei)`
+                        : "";
+                    return (
+                      <option key={shift.id} value={shift.id}>
+                        {shiftDisplayLabel(shift)}
+                        {free}
+                        {isFull ? " [VOLL]" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  Nachricht an die Person
+                </label>
+                <textarea
+                  rows={4}
+                  value={suggestComment}
+                  onChange={(e) => setSuggestComment(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <button
+                onClick={() => setSuggestReg(null)}
+                className="px-4 py-2 rounded-md border text-sm hover:bg-muted"
+                disabled={suggestSending}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSendSuggestion}
+                disabled={suggestSending}
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 disabled:opacity-50"
+              >
+                {suggestSending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Vorschlag senden
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create / Edit Registration Modal */}
+      {regModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-lg">
+                {regModal.mode === "create"
+                  ? "Person hinzufuegen"
+                  : "Anmeldung bearbeiten"}
+              </h3>
+              <button
+                onClick={() => setRegModal(null)}
+                className="p-1 rounded-md hover:bg-muted"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              Schicht: {regModal.shiftLabel}
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">E-Mail</label>
+                <input
+                  type="email"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Telefon</label>
+                <input
+                  type="tel"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <button
+                onClick={() => setRegModal(null)}
+                className="px-4 py-2 rounded-md border text-sm hover:bg-muted"
+                disabled={regSaving}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSaveReg}
+                disabled={regSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm hover:bg-primary/90 disabled:opacity-50"
+              >
+                {regSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Speichern
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

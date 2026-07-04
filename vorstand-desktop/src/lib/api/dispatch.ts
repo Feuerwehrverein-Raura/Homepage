@@ -26,6 +26,33 @@ export async function getTemplates(type?: string): Promise<EmailTemplate[]> {
   return await apiClient.get<EmailTemplate[]>(`/templates${qs}`);
 }
 
+export interface TemplateInput {
+  name: string;
+  type: string;
+  subject: string;
+  body: string;
+  variables?: string[] | null;
+}
+
+export async function createTemplate(data: TemplateInput): Promise<EmailTemplate> {
+  return await apiClient.post<EmailTemplate>("/templates", data);
+}
+
+export async function updateTemplate(
+  id: string,
+  data: TemplateInput
+): Promise<EmailTemplate> {
+  return await apiClient.put<EmailTemplate>(`/templates/${id}`, data);
+}
+
+export async function deleteTemplate(
+  id: string
+): Promise<{ success: boolean; deleted: string }> {
+  return await apiClient.delete<{ success: boolean; deleted: string }>(
+    `/templates/${id}`
+  );
+}
+
 // Email
 export async function sendEmail(
   data: SendEmailRequest
@@ -114,10 +141,14 @@ export async function getPingenLetterStatus(
 export async function sendPingenManual(
   data: PingenSendManualRequest
 ): Promise<PingenSendResponse> {
-  return await apiClient.post<PingenSendResponse>(
-    "/pingen/send-manual",
-    data
-  );
+  // Backend erwartet snake_case (member_id/event_id) — Mapping hier.
+  return await apiClient.post<PingenSendResponse>("/pingen/send-manual", {
+    member_id: data.memberId,
+    event_id: data.eventId,
+    subject: data.subject,
+    body: data.body,
+    staging: data.staging,
+  });
 }
 
 export async function getPostMembers(): Promise<PostMembersResponse> {
