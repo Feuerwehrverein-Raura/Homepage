@@ -1836,6 +1836,14 @@ app.post('/registrations/public', async (req, res) => {
         // Hinweis: Organisator/Vorstand nutzen die /events/:id/registrations-as-organizer
         // bzw. /registrations Endpoints und werden von dieser Pruefung NICHT betroffen.
         const ev = event.rows[0];
+        // DEUTSCH: Abgesagte Events - keine Anmeldung moeglich.
+        if ((ev.status || '') === 'cancelled') {
+            return res.status(409).json({
+                success: false,
+                message: 'Dieses Event wurde abgesagt – eine Anmeldung ist nicht möglich.',
+                code: 'event_cancelled'
+            });
+        }
         if (ev.registration_deadline && new Date(ev.registration_deadline) < new Date()) {
             return res.status(409).json({
                 success: false,

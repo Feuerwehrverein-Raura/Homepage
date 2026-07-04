@@ -1105,6 +1105,14 @@
             // DEUTSCH: Dorffest: Schicht-Anmeldung + Arbeitsplan, Ausflug: keine Buttons,
             // DEUTSCH: Aufbau/Abbau/Ausflug mit Anmeldung: Teilnehmer-Anmeldung, Sonstiges: Fallback
             getRegistrationButtons(event) {
+                // DEUTSCH: Abgesagte Events - keine Anmelde-Buttons, stattdessen Hinweis.
+                if (event.status === 'cancelled') {
+                    return `
+                        <div class="flex-1 min-w-[200px] bg-red-50 border border-red-200 text-red-800 px-6 py-3 rounded-lg text-center font-medium">
+                            ❌ Dieses Event wurde abgesagt – eine Anmeldung ist nicht möglich.
+                        </div>
+                    `;
+                }
                 const category = event.category || '';
                 let buttons = '';
                 if (category === 'Dorffest') {
