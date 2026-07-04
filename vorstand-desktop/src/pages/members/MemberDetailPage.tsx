@@ -21,6 +21,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+type GroupKey = "nextcloud" | "vorstand" | "social";
+
 export function MemberDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -32,9 +34,86 @@ export function MemberDetailPage() {
   const [passwordResult, setPasswordResult] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // Gruppen & Rollen (Authentik)
+  const [groupsLoading, setGroupsLoading] = useState(true);
+  const [groupsError, setGroupsError] = useState<string | null>(null);
+  const [hasAuthentik, setHasAuthentik] = useState(true);
+  const [nextcloudAdmin, setNextcloudAdmin] = useState(false);
+  const [vorstandGroup, setVorstandGroup] = useState(false);
+  const [socialMediaGroup, setSocialMediaGroup] = useState(false);
+  const [togglingKey, setTogglingKey] = useState<GroupKey | null>(null);
+
   useEffect(() => {
     if (id) fetchMember(id);
   }, [id, fetchMember]);
+
+  // Berechtigungen beim Oeffnen der Detailseite laden. Zuerst der
+  // Nextcloud-Admin-Status, der auch verraet, ob ueberhaupt ein
+  // Authentik-Account existiert; nur dann werden die weiteren Gruppen geladen.
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      setGroupsLoading(true);
+      setGroupsError(null);
+      try {
+        const nc = await membersApi.getNextcloudAdmin(id);
+        if (cancelled) return;
+        setHasAuthentik(nc.has_authentik);
+        setNextcloudAdmin(nc.nextcloud_admin);
+        if (!nc.has_authentik) {
+          setVorstandGroup(false);
+          setSocialMediaGroup(false);
+          return;
+        }
+        const [vs, sm] = await Promise.all([
+          membersApi.getVorstandGroup(id),
+          membersApi.getSocialMediaGroup(id),
+        ]);
+        if (cancelled) return;
+        setVorstandGroup(vs.vorstand_group);
+        setSocialMediaGroup(sm.social_media_group);
+      } catch (err) {
+        if (!cancelled) {
+          setGroupsError(
+            err instanceof Error
+              ? err.message
+              : "Fehler beim Laden der Berechtigungen"
+          );
+        }
+      } finally {
+        if (!cancelled) setGroupsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const handleToggleGroup = async (key: GroupKey, current: boolean) => {
+    if (!id) return;
+    const next = !current;
+    setTogglingKey(key);
+    setGroupsError(null);
+    try {
+      if (key === "nextcloud") {
+        await membersApi.setNextcloudAdmin(id, next);
+        setNextcloudAdmin(next);
+      } else if (key === "vorstand") {
+        await membersApi.setVorstandGroup(id, next);
+        setVorstandGroup(next);
+      } else {
+        await membersApi.setSocialMediaGroup(id, next);
+        setSocialMediaGroup(next);
+      }
+    } catch (err) {
+      setGroupsError(
+        err instanceof Error ? err.message : "Fehler beim Aendern der Gruppe"
+      );
+    } finally {
+      setTogglingKey(null);
+    }
+  };
 
   const handleDelete = async () => {
     if (!id) return;
@@ -248,6 +327,58 @@ export function MemberDetailPage() {
             />
           </div>
 
+          {/* Groups & Roles */}
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="font-semibold text-sm">Gruppen &amp; Rollen</h3>
+            {groupsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Berechtigungen werden geladen...
+              </div>
+            ) : !hasAuthentik ? (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-muted-foreground text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                Kein Authentik-Account vorhanden — Gruppen koennen nicht
+                verwaltet werden.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <GroupToggleRow
+                  label="Nextcloud-Admin"
+                  hint="Admin-Funktion"
+                  enabled={nextcloudAdmin}
+                  busy={togglingKey === "nextcloud"}
+                  disabled={togglingKey !== null}
+                  onToggle={() => handleToggleGroup("nextcloud", nextcloudAdmin)}
+                />
+                <GroupToggleRow
+                  label="Vorstand-Gruppe"
+                  hint="Vorstand-Funktionen"
+                  enabled={vorstandGroup}
+                  busy={togglingKey === "vorstand"}
+                  disabled={togglingKey !== null}
+                  onToggle={() => handleToggleGroup("vorstand", vorstandGroup)}
+                />
+                <GroupToggleRow
+                  label="Social-Media-Gruppe"
+                  hint="Social Media-Funktion"
+                  enabled={socialMediaGroup}
+                  busy={togglingKey === "social"}
+                  disabled={togglingKey !== null}
+                  onToggle={() =>
+                    handleToggleGroup("social", socialMediaGroup)
+                  }
+                />
+              </div>
+            )}
+            {groupsError && (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {groupsError}
+              </div>
+            )}
+          </div>
+
           {/* Password Management */}
           <div className="rounded-lg border bg-card p-4 space-y-3">
             <h3 className="font-semibold text-sm">Passwort-Verwaltung</h3>
@@ -350,6 +481,55 @@ function InfoRow({
       <div className="min-w-0">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-sm truncate">{value || "-"}</p>
+      </div>
+    </div>
+  );
+}
+
+function GroupToggleRow({
+  label,
+  hint,
+  enabled,
+  busy,
+  disabled,
+  onToggle,
+}: {
+  label: string;
+  hint?: string;
+  enabled: boolean;
+  busy: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm">{label}</p>
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      </div>
+      <div className="flex items-center gap-2">
+        {busy && (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        )}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label={label}
+          onClick={onToggle}
+          disabled={disabled}
+          className={cn(
+            "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+            enabled ? "bg-primary" : "bg-input"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+              enabled ? "translate-x-5" : "translate-x-0.5"
+            )}
+          />
+        </button>
       </div>
     </div>
   );

@@ -1,4 +1,6 @@
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { apiClient } from "./client";
+import { useAuthStore } from "@/stores/auth-store";
 import type { Member, MemberCreate, MemberStats } from "@/lib/types/member";
 
 export async function getMembers(params?: {
@@ -72,4 +74,107 @@ export async function setPassword(
     `/members/${id}/set-password`,
     { password }
   );
+}
+
+// ---------------------------------------------------------------------------
+// Gruppen & Rollen (Authentik-Gruppenzugehoerigkeit)
+// ---------------------------------------------------------------------------
+
+export interface NextcloudAdminStatus {
+  has_authentik: boolean;
+  nextcloud_admin: boolean;
+}
+
+export interface VorstandGroupStatus {
+  has_authentik: boolean;
+  vorstand_group: boolean;
+}
+
+export interface SocialMediaGroupStatus {
+  has_authentik: boolean;
+  social_media_group: boolean;
+}
+
+export interface GroupToggleResult {
+  success: boolean;
+  member_id: string;
+  message: string;
+  nextcloud_admin?: boolean;
+  vorstand_group?: boolean;
+  social_media_group?: boolean;
+}
+
+export async function getNextcloudAdmin(
+  id: string
+): Promise<NextcloudAdminStatus> {
+  return await apiClient.get<NextcloudAdminStatus>(
+    `/members/${id}/nextcloud-admin`
+  );
+}
+
+export async function setNextcloudAdmin(
+  id: string,
+  enabled: boolean
+): Promise<GroupToggleResult> {
+  return await apiClient.post<GroupToggleResult>(
+    `/members/${id}/nextcloud-admin`,
+    { enabled }
+  );
+}
+
+export async function getVorstandGroup(
+  id: string
+): Promise<VorstandGroupStatus> {
+  return await apiClient.get<VorstandGroupStatus>(
+    `/members/${id}/vorstand-group`
+  );
+}
+
+export async function setVorstandGroup(
+  id: string,
+  enabled: boolean
+): Promise<GroupToggleResult> {
+  return await apiClient.post<GroupToggleResult>(
+    `/members/${id}/vorstand-group`,
+    { enabled }
+  );
+}
+
+export async function getSocialMediaGroup(
+  id: string
+): Promise<SocialMediaGroupStatus> {
+  return await apiClient.get<SocialMediaGroupStatus>(
+    `/members/${id}/social-media-group`
+  );
+}
+
+export async function setSocialMediaGroup(
+  id: string,
+  enabled: boolean
+): Promise<GroupToggleResult> {
+  return await apiClient.post<GroupToggleResult>(
+    `/members/${id}/social-media-group`,
+    { enabled }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Telefonliste als PDF
+// ---------------------------------------------------------------------------
+
+// Laedt die Telefonliste als PDF und liefert sie als Blob zurueck. Nutzt
+// tauriFetch direkt (statt apiClient), da die Antwort binaer ist und nicht
+// als JSON geparst werden darf.
+export async function downloadTelefonlistePdf(status?: string): Promise<Blob> {
+  const token = useAuthStore.getState().token;
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  const res = await tauriFetch(
+    `https://api.fwv-raura.ch/members/pdf/telefonliste${qs}`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return await res.blob();
 }

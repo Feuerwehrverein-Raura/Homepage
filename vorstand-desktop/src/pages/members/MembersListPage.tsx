@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMembersStore } from "@/stores/members-store";
+import * as membersApi from "@/lib/api/members";
 import { formatSwissDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
 import {
@@ -12,6 +13,7 @@ import {
   Search,
   Loader2,
   AlertCircle,
+  FileDown,
 } from "lucide-react";
 
 const statusFilters = [
@@ -36,6 +38,8 @@ export function MembersListPage() {
   } = useMembersStore();
 
   const [searchInput, setSearchInput] = useState("");
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
@@ -49,19 +53,61 @@ export function MembersListPage() {
     debounceRef.current = setTimeout(() => setSearch(value), 300);
   };
 
+  const handleDownloadTelefonliste = async () => {
+    setPdfLoading(true);
+    setPdfError(null);
+    try {
+      const blob = await membersApi.downloadTelefonlistePdf();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Telefonliste_Mitglieder.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setPdfError(
+        err instanceof Error ? err.message : "Fehler beim Erstellen der PDF"
+      );
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Mitglieder</h1>
-        <button
-          onClick={() => navigate("/members/new")}
-          className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Neues Mitglied
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadTelefonliste}
+            disabled={pdfLoading}
+            className="flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {pdfLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            Telefonliste (PDF)
+          </button>
+          <button
+            onClick={() => navigate("/members/new")}
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            Neues Mitglied
+          </button>
+        </div>
       </div>
+
+      {/* PDF Error */}
+      {pdfError && (
+        <div className="flex items-center gap-2 p-3 mb-4 rounded-md bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {pdfError}
+        </div>
+      )}
 
       {/* Stats Cards */}
       {stats && (

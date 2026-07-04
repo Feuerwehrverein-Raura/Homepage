@@ -24,6 +24,10 @@ import {
   AlertCircle,
   RefreshCw,
   Zap,
+  Plus,
+  Save,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 type Tab = "send" | "templates" | "pingen" | "log";
@@ -486,77 +490,185 @@ function SendTab() {
   );
 }
 
-/* ========== Templates Tab ========== */
+/* ========== Templates Tab (CRUD) ========== */
+interface TemplateForm {
+  id: string | null;
+  name: string;
+  type: string;
+  subject: string;
+  body: string;
+  variables: string;
+}
+
 function TemplatesTab() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<TemplateForm | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
     dispatchApi
       .getTemplates()
       .then(setTemplates)
       .catch((err) => setError(err instanceof Error ? err.message : "Fehler"))
       .finally(() => setLoading(false));
+  };
+  useEffect(() => {
+    load();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const openNew = () =>
+    setForm({ id: null, name: "", type: "email", subject: "", body: "", variables: "" });
+  const openEdit = (t: EmailTemplate) =>
+    setForm({
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      subject: t.subject,
+      body: t.body,
+      variables: (t.variables || []).join(", "),
+    });
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-        <AlertCircle className="h-4 w-4" />
-        {error}
-      </div>
-    );
-  }
+  const handleSave = async () => {
+    if (!form || !form.name.trim()) {
+      setError("Name erforderlich");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const payload = {
+      name: form.name.trim(),
+      type: form.type.trim() || "email",
+      subject: form.subject,
+      body: form.body,
+      variables: form.variables
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean),
+    };
+    try {
+      if (form.id) await dispatchApi.updateTemplate(form.id, payload);
+      else await dispatchApi.createTemplate(payload);
+      setForm(null);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  if (templates.length === 0) {
-    return (
-      <div className="py-12 text-center text-muted-foreground">
-        <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>Keine Vorlagen vorhanden</p>
-      </div>
-    );
-  }
+  const handleDelete = async (t: EmailTemplate) => {
+    if (!window.confirm(`Vorlage "${t.name}" loeschen?`)) return;
+    try {
+      await dispatchApi.deleteTemplate(t.id);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Loeschen fehlgeschlagen");
+    }
+  };
+
+  const inputCls =
+    "w-full px-2 py-1.5 text-sm rounded-md border border-input bg-background";
 
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="text-left px-4 py-3 font-medium">Name</th>
-            <th className="text-left px-4 py-3 font-medium">Typ</th>
-            <th className="text-left px-4 py-3 font-medium">Betreff</th>
-            <th className="text-left px-4 py-3 font-medium">Variablen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {templates.map((t) => (
-            <tr key={t.id} className="border-b last:border-0">
-              <td className="px-4 py-3 font-medium">{t.name}</td>
-              <td className="px-4 py-3 text-muted-foreground">{t.type}</td>
-              <td className="px-4 py-3 text-muted-foreground">{t.subject}</td>
-              <td className="px-4 py-3">
-                {t.variables?.map((v) => (
-                  <span
-                    key={v}
-                    className="inline-flex mr-1 px-1.5 py-0.5 rounded bg-muted text-xs"
-                  >
-                    {v}
-                  </span>
-                ))}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Vorlagen</h3>
+        <button
+          onClick={openNew}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4" /> Neu
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="h-4 w-4" />
+          {error}
+        </div>
+      )}
+
+      {form && (
+        <div className="space-y-3 p-4 border rounded-lg bg-card">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Name</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Typ</label>
+              <input value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} placeholder="email / brief / ..." className={inputCls} />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">Betreff</label>
+            <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">Inhalt</label>
+            <textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={5} className={cn(inputCls, "resize-y")} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">Variablen (kommagetrennt)</label>
+            <input value={form.variables} onChange={(e) => setForm({ ...form, variables: e.target.value })} placeholder="vorname, nachname" className={inputCls} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Speichern
+            </button>
+            <button onClick={() => setForm(null)} className="px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80">
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : templates.length === 0 ? (
+        <div className="py-12 text-center text-muted-foreground">
+          <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p>Keine Vorlagen vorhanden</p>
+        </div>
+      ) : (
+        <div className="border rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="text-left px-4 py-3 font-medium">Name</th>
+                <th className="text-left px-4 py-3 font-medium">Typ</th>
+                <th className="text-left px-4 py-3 font-medium">Betreff</th>
+                <th className="text-right px-4 py-3 font-medium">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {templates.map((t) => (
+                <tr key={t.id} className="border-b last:border-0">
+                  <td className="px-4 py-3 font-medium">{t.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{t.type}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{t.subject}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => openEdit(t)} className="p-1 rounded hover:bg-muted" title="Bearbeiten">
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => handleDelete(t)} className="p-1 rounded hover:bg-muted text-destructive" title="Loeschen">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -568,13 +680,21 @@ function PingenTab() {
   const [letters, setLetters] = useState<PingenLetter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [staging, setStaging] = useState(false);
+  // Einzelbrief (manueller Versand an ein Mitglied)
+  const [members, setMembers] = useState<Member[]>([]);
+  const [singleMember, setSingleMember] = useState("");
+  const [singleSubject, setSingleSubject] = useState("");
+  const [singleBody, setSingleBody] = useState("");
+  const [singleSending, setSingleSending] = useState(false);
+  const [singleResult, setSingleResult] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = async (stg = staging) => {
     setLoading(true);
     setError(null);
     try {
       const [acc, st, lt] = await Promise.all([
-        dispatchApi.getPingenAccount(),
+        dispatchApi.getPingenAccount(stg),
         dispatchApi.getPingenStats(),
         dispatchApi.getPingenLetters({ limit: 50 }),
       ]);
@@ -590,7 +710,56 @@ function PingenTab() {
 
   useEffect(() => {
     load();
+    membersApi.getMembers().then(setMembers).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const toggleStaging = () => {
+    const next = !staging;
+    setStaging(next);
+    load(next);
+  };
+
+  const handleSingleSend = async () => {
+    if (!singleMember) {
+      setError("Bitte Mitglied auswaehlen");
+      return;
+    }
+    setSingleSending(true);
+    setError(null);
+    setSingleResult(null);
+    try {
+      const res = await dispatchApi.sendPingenManual({
+        memberId: singleMember,
+        subject: singleSubject || "Brief",
+        body: singleBody,
+        staging,
+      });
+      setSingleResult(
+        `Brief erstellt${res.letterId ? ` (${res.letterId})` : ""}${staging ? " – Staging" : ""}`
+      );
+      setSingleBody("");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Versand fehlgeschlagen");
+    } finally {
+      setSingleSending(false);
+    }
+  };
+
+  const refreshStatus = async (letterId: string) => {
+    try {
+      const s = await dispatchApi.getPingenLetterStatus(letterId);
+      setLetters((prev) =>
+        prev.map((l) => (l.id === letterId ? { ...l, status: s.status } : l))
+      );
+    } catch {
+      // Status-Refresh still ignorieren
+    }
+  };
+
+  const inputCls =
+    "w-full px-2 py-1.5 text-sm rounded-md border border-input bg-background";
 
   if (loading) {
     return (
@@ -600,18 +769,26 @@ function PingenTab() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-        <AlertCircle className="h-4 w-4" />
-        {error}
-        <button onClick={load} className="ml-auto text-xs underline">Erneut</button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
+      {/* Staging-Umschalter + Fehler */}
+      <div className="flex items-center justify-between">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={staging} onChange={toggleStaging} className="rounded border-input" />
+          Staging-Konto anzeigen
+        </label>
+        <button onClick={() => load()} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <RefreshCw className="h-3 w-3" /> Aktualisieren
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
       {/* Account & Stats */}
       <div className="grid grid-cols-2 gap-4">
         {account && (
@@ -643,12 +820,40 @@ function PingenTab() {
         )}
       </div>
 
+      {/* Einzelbrief senden (manuell an ein Mitglied) */}
+      <div className="rounded-lg border bg-card p-4 space-y-3">
+        <h3 className="font-semibold text-sm">Einzelbrief senden</h3>
+        <div className="grid grid-cols-2 gap-3">
+          <select value={singleMember} onChange={(e) => setSingleMember(e.target.value)} className={inputCls}>
+            <option value="">Mitglied waehlen…</option>
+            {members
+              .filter((m) => m.strasse && m.plz && m.ort)
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.vorname} {m.nachname}
+                </option>
+              ))}
+          </select>
+          <input value={singleSubject} onChange={(e) => setSingleSubject(e.target.value)} placeholder="Betreff" className={inputCls} />
+        </div>
+        <textarea value={singleBody} onChange={(e) => setSingleBody(e.target.value)} rows={4} placeholder="Nachricht…" className={cn(inputCls, "resize-y")} />
+        {singleResult && (
+          <div className="p-2 rounded-md bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 text-sm">
+            {singleResult}
+          </div>
+        )}
+        <button onClick={handleSingleSend} disabled={singleSending} className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+          {singleSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Brief senden{staging ? " (Staging)" : ""}
+        </button>
+      </div>
+
       {/* Letters */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold">Briefe</h3>
           <button
-            onClick={load}
+            onClick={() => load()}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
             <RefreshCw className="h-3 w-3" />
@@ -674,7 +879,12 @@ function PingenTab() {
                     <td className="px-4 py-3 font-medium">{l.subject}</td>
                     <td className="px-4 py-3 text-muted-foreground">{l.member_name || "-"}</td>
                     <td className="px-4 py-3">
-                      <PingenStatusBadge status={l.status} />
+                      <div className="flex items-center gap-2">
+                        <PingenStatusBadge status={l.status} />
+                        <button onClick={() => refreshStatus(l.id)} title="Status aktualisieren" className="p-0.5 rounded hover:bg-muted text-muted-foreground">
+                          <RefreshCw className="h-3 w-3" />
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{formatSwissDateTime(l.created_at)}</td>
                   </tr>
