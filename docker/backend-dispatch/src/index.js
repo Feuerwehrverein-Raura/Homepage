@@ -4259,6 +4259,8 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
         const letterMargin = (pdf_margin && typeof pdf_margin === 'object')
             ? pdf_margin
             : { top: '0', right: '0', bottom: '20mm', left: '0' };
+        // Diagnose: sehen, ob das Frontend pdf_margin mitschickt (Cache-/Layout-Debug).
+        logInfo('send-post pdf_margin', { has: !!pdf_margin, top: letterMargin.top, recipient: recipient?.name });
 
         const PINGEN_API = getPingenApi(staging);
 
