@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import { InstallPrompt } from './InstallPrompt';
 
 // Offline Banner Component
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
@@ -216,47 +217,10 @@ function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [lookupResult, setLookupResult] = useState<any | null>(null); // External barcode lookup result
   const [prefillData, setPrefillData] = useState<any | null>(null); // Prefill data for new item form
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
   const [publicItemCode, setPublicItemCode] = useState<string | null>(null); // For public QR code scans
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-
-  // PWA Install prompt
-  useEffect(() => {
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
-    }
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-
-    const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setInstallPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setInstallPrompt(null);
-    }
-  };
 
   // Check for /item/:code URL path (QR code scans from external devices)
   useEffect(() => {
@@ -553,6 +517,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <InstallPrompt appName="Inventar" />
       {/* Offline Warning Banner */}
       <OfflineBanner apiUrl={API_URL} />
 
@@ -568,15 +533,6 @@ function App() {
             <h1 className="text-lg sm:text-xl font-bold">Lagerverwaltung</h1>
           </div>
           <div className="flex items-center gap-2">
-            {/* Install Button */}
-            {installPrompt && !isInstalled && (
-              <button
-                onClick={handleInstallClick}
-                className="text-sm bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded flex items-center gap-1"
-              >
-                📲 Installieren
-              </button>
-            )}
             {user && <span className="text-sm hidden sm:inline">Hallo, {user.name}</span>}
             {user ? (
               <button

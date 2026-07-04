@@ -9,6 +9,7 @@ import {
   setShareToken, createShare, getMeta, putMeta, getVapidKey, subscribePush,
   type EventSummary, type ShoppingItem, type ShoppingList, type Receipt, type EventMeta,
 } from './api'
+import { InstallPrompt } from './InstallPrompt';
 
 // ---- Helpers --------------------------------------------------------------
 const chf = (n: number) =>
@@ -135,6 +136,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
+      <InstallPrompt appName="Einkauf" />
       <Header
         user={user}
         online={online}
