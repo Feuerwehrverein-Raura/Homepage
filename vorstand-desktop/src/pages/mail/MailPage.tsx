@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   RefreshCw, Trash2, MailOpen, Paperclip, Pencil, Reply, ReplyAll,
-  Forward, Archive, Ban, X, Send, Save,
+  Forward, Archive, Ban, X, Send, Save, Star, FolderInput,
 } from "lucide-react";
 import {
   listAccounts, listFolders, listMessages, getMessage, setFlags,
@@ -25,12 +25,15 @@ interface ComposeState {
   references: string | null;
   originalUid: number | null;
   originalFolder: string | null;
+  draftSourceUid: number | null;
+  draftSourceFolder: string | null;
   attachments: File[];
 }
 
 const emptyCompose = (): ComposeState => ({
   open: false, title: "Neue E-Mail", to: "", cc: "", bcc: "", subject: "", body: "",
-  inReplyTo: null, references: null, originalUid: null, originalFolder: null, attachments: [],
+  inReplyTo: null, references: null, originalUid: null, originalFolder: null,
+  draftSourceUid: null, draftSourceFolder: null, attachments: [],
 });
 
 function extractEmails(s: string): string[] {
@@ -147,6 +150,29 @@ export function MailPage() {
     await deleteMessage(selectedUid, account, folder).catch(() => {});
     clearSelection();
   };
+  // Stern/Flag umschalten (nutzt IMAP \\Flagged; optimistisch in der Liste updaten)
+  const onToggleFlag = async () => {
+    if (!selectedUid) return;
+    const isFlagged = messages.find(m => m.uid === selectedUid)?.flagged;
+    await setFlags(selectedUid, account, folder, isFlagged ? [] : ["\\Flagged"], isFlagged ? ["\\Flagged"] : []).catch(() => {});
+    setMessages(prev => prev.map(x => (x.uid === selectedUid ? { ...x, flagged: !isFlagged } : x)));
+  };
+  // In einen beliebigen Ordner verschieben (Backend akzeptiert den Ordnerpfad direkt)
+  const onMoveTo = async (target: string) => {
+    if (!selectedUid || !target) return;
+    await moveMessage(selectedUid, account, folder, target).catch(e => setError((e as Error).message));
+    clearSelection();
+  };
+  // Entwurf zum Weiterbearbeiten in das Compose-Fenster laden (alter Entwurf wird beim
+  // Senden/Speichern entfernt, damit kein Duplikat im Entwuerfe-Ordner bleibt)
+  const onEditDraft = () => {
+    if (!message) return;
+    openCompose({
+      title: "Entwurf bearbeiten", to: message.to, cc: message.cc,
+      subject: message.subject, body: message.text,
+      draftSourceUid: selectedUid, draftSourceFolder: folder,
+    });
+  };
 
   const openCompose = (init: Partial<ComposeState>) => setCompose({ ...emptyCompose(), open: true, ...init });
   const closeCompose = () => setCompose(emptyCompose());
@@ -207,6 +233,11 @@ export function MailPage() {
           alert("E-Mail gesendet.");
         }
       }
+      // Beim Bearbeiten eines Entwurfs den alten Entwurf entfernen (kein Duplikat).
+      if (compose.draftSourceUid && compose.draftSourceFolder) {
+        await deleteMessage(compose.draftSourceUid, account, compose.draftSourceFolder).catch(() => {});
+        if (selectedUid === compose.draftSourceUid) { setSelectedUid(null); setMessage(null); }
+      }
       closeCompose();
       refreshList();
     } catch (e) {
@@ -230,6 +261,9 @@ export function MailPage() {
     if (!compose.open) return [] as Contact[];
     return contacts;
   }, [contacts, compose.open]);
+
+  const isDrafts = folders.find(f => f.path === folder)?.specialUse === "\\Drafts";
+  const flaggedNow = messages.find(m => m.uid === selectedUid)?.flagged;
 
   if (accounts.length === 0 && missing.length > 0) {
     return (
@@ -285,7 +319,10 @@ export function MailPage() {
                     {new Date(m.date).toLocaleString("de-CH", { dateStyle: "short", timeStyle: "short" })}
                   </div>
                 </div>
-                <div className="text-sm text-muted-foreground truncate">{m.subject}</div>
+                <div className="text-sm text-muted-foreground truncate flex items-center gap-1">
+                  {m.flagged && <Star size={11} className="fill-yellow-400 text-yellow-500 shrink-0" />}
+                  <span className="truncate">{m.subject}</span>
+                </div>
               </div>
             );
           })}
@@ -311,6 +348,12 @@ export function MailPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1 shrink-0 max-w-[280px] justify-end">
+                    {isDrafts && (
+                      <button onClick={onEditDraft} title="Entwurf bearbeiten"
+                        className="px-2 py-1 text-xs border border-primary text-primary rounded hover:bg-primary/10 inline-flex items-center gap-1">
+                        <Pencil size={12} /> Bearbeiten
+                      </button>
+                    )}
                     <button onClick={onReply} title="Antworten" className="px-2 py-1 text-xs border border-border rounded hover:bg-muted inline-flex items-center gap-1">
                       <Reply size={12} /> Antw.
                     </button>
@@ -323,12 +366,26 @@ export function MailPage() {
                     <button onClick={onMarkUnread} title="Als ungelesen markieren" className="p-1.5 border border-border rounded hover:bg-muted">
                       <MailOpen size={14} />
                     </button>
+                    <button onClick={onToggleFlag} title={flaggedNow ? "Markierung entfernen" : "Markieren (Stern)"} className="p-1.5 border border-border rounded hover:bg-muted">
+                      <Star size={14} className={flaggedNow ? "fill-yellow-400 text-yellow-500" : ""} />
+                    </button>
                     <button onClick={onArchive} title="Archivieren" className="px-2 py-1 text-xs border border-border rounded hover:bg-muted inline-flex items-center gap-1">
                       <Archive size={12} /> Archiv
                     </button>
                     <button onClick={onSpam} title="Spam" className="px-2 py-1 text-xs border border-orange-300 text-orange-700 rounded hover:bg-orange-50 inline-flex items-center gap-1">
                       <Ban size={12} /> Spam
                     </button>
+                    <div className="relative inline-flex items-center">
+                      <FolderInput size={12} className="absolute left-1.5 pointer-events-none text-muted-foreground" />
+                      <select value="" onChange={e => { const t = e.target.value; e.target.value = ""; if (t) onMoveTo(t); }}
+                        title="Verschieben nach…"
+                        className="pl-6 pr-1 py-1 text-xs border border-border rounded bg-background hover:bg-muted appearance-none cursor-pointer">
+                        <option value="">Verschieben…</option>
+                        {folders.filter(f => f.path !== folder).map(f => (
+                          <option key={f.path} value={f.path}>{f.name}</option>
+                        ))}
+                      </select>
+                    </div>
                     <button onClick={onDelete} title="In Papierkorb" className="p-1.5 border border-red-300 text-red-600 rounded hover:bg-red-50">
                       <Trash2 size={14} />
                     </button>
