@@ -9,8 +9,7 @@ Diese Anleitung erklärt die Bestellaufnahme im Kassensystem Schritt für Schrit
 ## Anwendung starten
 
 1. Öffne [order.fwv-raura.ch](https://order.fwv-raura.ch) (Cloud) oder die lokale Adresse
-2. Falls IP-Whitelist aktiv: Registriere dein Gerät zuerst unter [register.fwv-raura.ch](https://register.fwv-raura.ch)
-3. Melde dich mit deinen Zugangsdaten an (falls erforderlich)
+2. Melde dich mit deinen Zugangsdaten an (falls erforderlich)
 
 ## Benutzeroberfläche
 

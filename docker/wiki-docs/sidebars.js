@@ -28,7 +28,6 @@ const sidebars = {
       items: [
         'kassensystem/uebersicht',
         'kassensystem/kitchen-display',
-        'kassensystem/ip-whitelist',
         'kassensystem/tagesbericht',
         'kassensystem/lokale-instanz',
       ],

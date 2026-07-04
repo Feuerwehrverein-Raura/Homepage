@@ -34,7 +34,6 @@ Das Portal ist in folgende Tabs unterteilt:
 | **Post** | Briefversand via Pingen, Massen-PDF, Staging-Modus | Vorstand |
 | **Buchhaltung** | Kontenplan, Buchungen, Rechnungen, Berichte | Vorstand |
 | **PDF-Vorlagen** | PDF-Vorlagen verwalten (verlinkt zum [PDF-Designer](https://pdf.fwv-raura.ch)) | Admin |
-| **IP-Whitelist** | Kassensystem-Zugriff einschränken | Admin |
 | **Einstellungen** | Organisations-Einstellungen konfigurieren | Admin |
 
 ## Berechtigungsstufen
@@ -55,7 +54,6 @@ Das Portal ist in folgende Tabs unterteilt:
 - Alle Vorstand-Rechte
 - Mitglieder löschen
 - E-Mail-Konten verwalten (Mailcow)
-- IP-Whitelist konfigurieren
 - Organisations-Einstellungen ändern
 - PDF-Vorlagen verwalten
 - Authentik-Synchronisierung auslösen

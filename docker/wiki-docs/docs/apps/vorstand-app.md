@@ -158,7 +158,6 @@ Folgende Features sind in Planung:
 | **Dispatch** | Nachrichten per E-Mail und Brief direkt aus der App versenden |
 | **E-Mail/Mailcow** | Mailcow-Postfächer und Aliases verwalten |
 | **Pingen** | Briefversand über Pingen-Integration |
-| **IP-Whitelist** | Kassensystem-Zugriff konfigurieren |
 | **Cloud-Berechtigungen** | Nextcloud-Zugriff verwalten |
 
 ---

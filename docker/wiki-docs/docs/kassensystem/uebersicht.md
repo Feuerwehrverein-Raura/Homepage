@@ -12,7 +12,6 @@ Das Kassensystem ermöglicht die professionelle Verwaltung von Bestellungen bei 
 |------------|-----|--------------|
 | **Kasse (Frontend)** | [order.fwv-raura.ch](https://order.fwv-raura.ch) | Hauptanwendung für Bestellaufnahme |
 | **Kitchen Display** | [kitchen.fwv-raura.ch](https://kitchen.fwv-raura.ch) | Echtzeit-Anzeige für Küche/Bar |
-| **IP-Registrierung** | [register.fwv-raura.ch](https://register.fwv-raura.ch) | Gerät für Zugriff freischalten |
 | **Cloud-Kasse** | [order.fwv-raura.ch](https://order.fwv-raura.ch) | Backup-System in der Cloud |
 
 ## Architektur
@@ -115,12 +114,6 @@ Der Bericht enthält:
 
 ## Zugriffskontrolle
 
-### IP-Whitelist
-Das System ist durch eine IP-Whitelist geschützt:
-- Nur freigeschaltete Geräte können zugreifen
-- Selbstregistrierung mit Admin-PIN möglich
-- 24h-Freischaltung oder permanent (durch Admin)
-
 ### Authentifizierung
 - **Vorstand-Login:** Für Einstellungen und Admin-Funktionen
 - **Kassen-Login:** Für normale Bestellaufnahme (optional)
@@ -151,8 +144,7 @@ Das lokale System auf dem Raspberry Pi:
 ### Vor dem Anlass
 1. Inventar prüfen und auffüllen
 2. Drucker testen (Einstellungen → Testdruck)
-3. IP-Whitelist konfigurieren
-4. Kitchen Display auf Tablets einrichten
+3. Kitchen Display auf Tablets einrichten
 
 ### Während des Anlasses
 1. System starten / Container hochfahren

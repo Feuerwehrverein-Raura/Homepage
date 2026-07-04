@@ -108,8 +108,7 @@ Homepage/
 │   ├── backend/                     # Express/TypeScript API + WebSocket
 │   ├── frontend/                    # React Kasse-UI
 │   ├── kitchen-display/             # React Kitchen Display (PWA)
-│   ├── kitchen-display-android/     # Android KDS App (Kotlin)
-│   └── register-app/                # Registrierungs-/Checkout-App
+│   └── kitchen-display-android/     # Android KDS App (Kotlin)
 │
 ├── simple-inventory-system/         # Inventarverwaltung
 │   ├── backend/                     # Express API
@@ -603,7 +602,6 @@ Container werden automatisch aktualisiert wenn neue Images auf ghcr.io verfügba
 | `build-order-backend` | `ghcr.io/.../order-backend` | `simple-order-system/backend/` |
 | `build-order-frontend` | `ghcr.io/.../order-frontend` | `simple-order-system/frontend/` |
 | `build-order-kitchen` | `ghcr.io/.../order-kitchen` | `simple-order-system/kitchen-display/` |
-| `build-order-register` | `ghcr.io/.../order-register` | `simple-order-system/register-app/` |
 | `build-inventory-backend` | `ghcr.io/.../inventory-backend` | `simple-inventory-system/backend/` |
 | `build-inventory-frontend` | `ghcr.io/.../inventory-frontend` | `simple-inventory-system/frontend/` |
 
