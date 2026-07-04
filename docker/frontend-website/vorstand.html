@@ -1282,6 +1282,15 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                             <span>Entwurf</span>
                         </button>
+                        <!-- Direkt-Versand nur an einen Kanal (setzt Modus + sendet in einem Klick) -->
+                        <button id="dispatch-send-email-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1 text-sm" title="Nur an E-Mail-Empfänger senden (Zustellpräferenz wird ignoriert)">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            <span>Nur E-Mail</span>
+                        </button>
+                        <button id="dispatch-send-post-btn" class="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-1 text-sm" title="Nur an Post-Empfänger senden (via Pingen, Zustellpräferenz wird ignoriert)">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                            <span>Nur Post</span>
+                        </button>
                         <button id="dispatch-send-btn-top" class="bg-fire-500 text-white px-5 py-2 rounded-lg hover:bg-fire-600 transition-colors flex items-center space-x-1 text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                             <span>Senden</span>
@@ -9035,6 +9044,16 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         // Event-Listener für neue Toolbar
         document.getElementById('dispatch-recipients-quick').addEventListener('change', (e) => applyDispatchRecipientsQuick(e.target.value));
         document.getElementById('dispatch-send-btn-top').addEventListener('click', () => document.getElementById('dispatch-send-btn').click());
+        // Direkt-Versand pro Kanal: Modus setzen, dann normalen Sende-Flow ausloesen
+        // (inkl. Bestaetigungsdialog "Nur X Empfaenger senden?" in sendDispatch()).
+        document.getElementById('dispatch-send-email-btn').addEventListener('click', () => {
+            switchDispatchMode('email');
+            document.getElementById('dispatch-send-btn').click();
+        });
+        document.getElementById('dispatch-send-post-btn').addEventListener('click', () => {
+            switchDispatchMode('post');
+            document.getElementById('dispatch-send-btn').click();
+        });
         document.getElementById('dispatch-draft-btn-top').addEventListener('click', () => document.getElementById('dispatch-save-draft-btn').click());
 
         // === Vorschau-Modal ===
