@@ -4422,18 +4422,30 @@ app.post('/dispatch/send-pdf-post', authenticateAny, async (req, res) => {
 // Query-Param ?zones=1 fuegt Pingen-Zonen-Overlay (Frankier/Adressbereich) hinzu
 app.post('/dispatch/preview-pdf', authenticateAny, async (req, res) => {
     try {
-        const { html } = req.body;
+        const { html, pdf_margin } = req.body;
         const showZones = req.query.zones === '1';
         if (!html) return res.status(400).json({ error: 'html erforderlich' });
 
-        // Zonen-Overlay vor </body> injizieren (nur auf Seite 1)
+        // Gleiche Rand-Logik wie /dispatch/send-post, damit die Vorschau 1:1 dem
+        // echten Brief entspricht (z.B. Event-Einladung: 15mm Oberrand).
+        const previewMargin = (pdf_margin && typeof pdf_margin === 'object')
+            ? pdf_margin
+            : { top: '0', right: '0', bottom: '20mm', left: '0' };
+        const mmOf = (v) => parseFloat(String(v || '0').replace('mm', '')) || 0;
+        const mTop = mmOf(previewMargin.top);
+        const mBottom = mmOf(previewMargin.bottom);
+
+        // Zonen-Overlay vor </body> injizieren (nur Seite 1). Die Zonen sind BLATT-
+        // Koordinaten: Container um den Oberrand nach oben verschieben (top: -mTop)
+        // und exakt an der Unterkante des Seiteninhalts kappen (height: 297-mBottom,
+        // overflow:hidden) — sonst fragmentiert das Overlay auf Seite 2 (rosa Streifen).
         let finalHtml = html;
         if (showZones) {
             const zoneOverlay = `
-<div style="position: absolute; top: 0; left: 0; width: 210mm; height: 297mm; pointer-events: none; z-index: 9999;">
-    <!-- Randsperrbereich 5mm rundum -->
+<div style="position: absolute; top: -${mTop}mm; left: 0; width: 210mm; height: ${297 - mBottom}mm; overflow: hidden; pointer-events: none; z-index: 9999;">
+    <!-- Randsperrbereich 5mm rundum (Blatt-Koordinaten) -->
     <div style="position: absolute; top: 0; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-bottom: 1px dashed rgba(239,68,68,0.6);"></div>
-    <div style="position: absolute; bottom: 0; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-top: 1px dashed rgba(239,68,68,0.6);"></div>
+    <div style="position: absolute; top: 292mm; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-top: 1px dashed rgba(239,68,68,0.6);"></div>
     <div style="position: absolute; top: 0; left: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
     <div style="position: absolute; top: 0; right: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
     <!-- Frankierbereich X=116, Y=40, W=89.5, H=47.5 -->
@@ -4453,7 +4465,7 @@ app.post('/dispatch/preview-pdf', authenticateAny, async (req, res) => {
         const pdfBuffer = await page.pdf({
             format: 'A4',
             printBackground: true,
-            margin: { top: '0', right: '0', bottom: '20mm', left: '0' },
+            margin: previewMargin,
             displayHeaderFooter: true,
             headerTemplate: '<div></div>',
             footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
