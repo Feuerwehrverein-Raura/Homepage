@@ -3,12 +3,16 @@
 Die PWA ist ein statisches Frontend, das das bestehende **Inventar-Backend**
 (`inventar.fwv-raura.ch/api`) nutzt. Kein eigenes Backend, keine eigene DB.
 
-## Automatisch (per CI)
+## Build (per CI)
 
-Bei Merge auf `main` baut die CI (`build-containers.yml`) das Image
-`ghcr.io/feuerwehrverein-raura/einkauf-frontend:latest`. Watchtower zieht es
-auf dem Server. Der Compose-Service `einkauf-frontend` liegt in
-`simple-inventory-system/docker-compose.prod.yml`.
+Bei Merge auf `main` baut die CI (`build-containers.yml`) **zwei** Images:
+`einkauf-frontend:latest` (die PWA) **und** `inventory-backend:latest` (das
+Backend hat neue Endpoints/Tabellen für die PWA bekommen). Der Compose-Service
+`einkauf-frontend` liegt in `simple-inventory-system/docker-compose.prod.yml`.
+
+> **Deploy ist manuell** — Watchtower zieht die App-Images **nicht** selbst.
+> Nach dem CI-Build immer per Hand `pull` + `up -d` (siehe Schritt 3), und zwar
+> **beide** Services (`inventory-backend` + `einkauf-frontend`).
 
 ## Einmalige manuelle Schritte (vor dem ersten Livegang)
 
@@ -20,12 +24,14 @@ auf dem Server. Der Compose-Service `einkauf-frontend` liegt in
    `https://einkauf.fwv-raura.ch/auth/callback`
    (Sonst schlägt der Login mit „invalid redirect_uri" fehl.)
 
-3. **Deploy** auf dem Server:
+3. **Deploy** auf dem Server (beide Services — das Backend hat neue Endpoints):
    ```
    cd /opt/docker/simple-inventory-system   # bzw. der Ablageort des Inventar-Stacks
-   docker compose -f docker-compose.prod.yml pull einkauf-frontend
-   docker compose -f docker-compose.prod.yml up -d einkauf-frontend
+   docker compose -f docker-compose.prod.yml pull inventory-backend einkauf-frontend
+   docker compose -f docker-compose.prod.yml up -d inventory-backend einkauf-frontend
    ```
+   Das `inventory-backend`-Update ist additiv (idempotente Migrationen), das
+   bestehende Inventar-Frontend bleibt unberührt.
 
 ## Optional: Push-Erinnerungen aktivieren
 

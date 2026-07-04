@@ -1788,8 +1788,21 @@ async function authenticateEventAccess(req: AuthenticatedRequest, res: express.R
       const row = r.rows[0];
       if (row && row.event_slug === req.params.slug &&
           (!row.expires_at || new Date(row.expires_at) > new Date())) {
-        if (!row.can_write && req.method !== 'GET') {
+        const isWrite = req.method !== 'GET';
+        if (isWrite && !row.can_write) {
           return res.status(403).json({ error: 'Nur-Lese-Freigabe' });
+        }
+        // Geteilte Links duerfen (auch mit Schreibrecht) NUR die Einkaufsliste abhaken
+        // und Belege verwalten - NICHT Rezepte/Meta/Restock am Event aendern.
+        if (isWrite) {
+          const p = req.path || '';
+          const allowed =
+            (req.method === 'PATCH'  && /\/shopping-list\/\d+$/.test(p)) ||
+            (req.method === 'POST'   && /\/receipts$/.test(p)) ||
+            (req.method === 'DELETE' && /\/receipts\/\d+$/.test(p));
+          if (!allowed) {
+            return res.status(403).json({ error: 'Für geteilte Links nicht erlaubt' });
+          }
         }
         req.user = { id: 'share', email: 'geteilter-link', name: 'Geteilter Link', groups: [] };
         return next();
