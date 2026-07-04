@@ -6293,7 +6293,11 @@
                         'Authorization': `Bearer ${authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ html: letterHtml })
+                    // Gleicher Rand wie beim echten Versand (Event-Einladung: 15mm oben)
+                    body: JSON.stringify({
+                        html: letterHtml,
+                        pdf_margin: event ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined
+                    })
                 });
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const blob = await response.blob();
@@ -6330,7 +6334,11 @@
                         'Authorization': `Bearer ${authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ html: letterHtml })
+                    // Gleicher Rand wie beim echten Versand (Event-Einladung: 15mm oben)
+                    body: JSON.stringify({
+                        html: letterHtml,
+                        pdf_margin: event ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined
+                    })
                 });
 
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
