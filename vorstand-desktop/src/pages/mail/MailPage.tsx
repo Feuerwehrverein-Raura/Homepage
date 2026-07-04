@@ -12,6 +12,7 @@ import {
 import { listContacts, type Contact } from "@/lib/api/contacts";
 import { useAuthStore } from "@/stores/auth-store";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { RichTextEditor } from "./RichTextEditor";
 
 interface ComposeState {
   open: boolean;
@@ -21,6 +22,7 @@ interface ComposeState {
   bcc: string;
   subject: string;
   body: string;
+  html: string;
   inReplyTo: string | null;
   references: string | null;
   originalUid: number | null;
@@ -31,7 +33,7 @@ interface ComposeState {
 }
 
 const emptyCompose = (): ComposeState => ({
-  open: false, title: "Neue E-Mail", to: "", cc: "", bcc: "", subject: "", body: "",
+  open: false, title: "Neue E-Mail", to: "", cc: "", bcc: "", subject: "", body: "", html: "",
   inReplyTo: null, references: null, originalUid: null, originalFolder: null,
   draftSourceUid: null, draftSourceFolder: null, attachments: [],
 });
@@ -258,6 +260,7 @@ export function MailPage() {
         account, to: compose.to,
         cc: compose.cc || undefined, bcc: compose.bcc || undefined,
         subject: compose.subject, body: compose.body,
+        html: compose.html || undefined,
         inReplyTo: compose.inReplyTo, references: compose.references,
         attachments,
       };
@@ -494,10 +497,11 @@ export function MailPage() {
                 <input value={compose.subject} onChange={e => setCompose({ ...compose, subject: e.target.value })}
                   className="px-2 py-1 text-sm border border-border rounded bg-background" />
               </div>
-              <textarea rows={14} value={compose.body}
-                onChange={e => setCompose({ ...compose, body: e.target.value })}
-                className="w-full px-2 py-2 text-sm border border-border rounded bg-background font-sans"
-                placeholder="Nachricht..." />
+              <RichTextEditor
+                initialHtml={compose.html}
+                initialText={compose.body}
+                onChange={(html, text) => setCompose(c => ({ ...c, html, body: text }))}
+              />
               <div>
                 <label className="text-sm text-muted-foreground">Anhänge:</label>
                 <input type="file" multiple
