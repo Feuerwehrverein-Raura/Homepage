@@ -5,6 +5,7 @@ export interface MailFolder {
   name: string;
   specialUse: string | null;
   flags: string[];
+  unseen?: number;
 }
 
 export interface MailListItem {
