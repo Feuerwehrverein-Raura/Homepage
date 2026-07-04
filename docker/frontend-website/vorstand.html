@@ -1283,11 +1283,11 @@
                             <span>Entwurf</span>
                         </button>
                         <!-- Direkt-Versand nur an einen Kanal (setzt Modus + sendet in einem Klick) -->
-                        <button id="dispatch-send-email-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1 text-sm" title="Nur an E-Mail-Empfänger senden (Zustellpräferenz wird ignoriert)">
+                        <button id="dispatch-send-email-btn" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1 text-sm" title="Nur an Empfänger mit Zustellpräferenz E-Mail senden">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                             <span>Nur E-Mail</span>
                         </button>
-                        <button id="dispatch-send-post-btn" class="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-1 text-sm" title="Nur an Post-Empfänger senden (via Pingen, Zustellpräferenz wird ignoriert)">
+                        <button id="dispatch-send-post-btn" class="bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-1 text-sm" title="Nur an Empfänger mit Zustellpräferenz Post senden (via Pingen)">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                             <span>Nur Post</span>
                         </button>
@@ -6741,6 +6741,15 @@
         async function sendDispatch() {
             const deliveryMethod = document.querySelector('input[name="delivery-method"]:checked').value;
             const recipientType = document.querySelector('input[name="recipient-type"]:checked').value;
+
+            // Direkt-Kanal-Buttons ("Nur E-Mail"/"Nur Post") setzen dieses Flag: nur an
+            // Empfaenger MIT der passenden Zustellpraeferenz senden. Sofort auslesen +
+            // zuruecksetzen, damit es nie an einen spaeteren normalen Klick "durchleckt"
+            // (auch nicht bei einem fruehen return). Das komplette Ignorieren der
+            // Praeferenz macht weiterhin der Modus-Umschalter E-Mail/Post.
+            const preferenceOnly = window.dispatchPreferenceOnly === true;
+            window.dispatchPreferenceOnly = false;
+
             const templateId = document.getElementById('dispatch-template').value;
             const subject = document.getElementById('dispatch-subject').value;
             const content = getDispatchContent();
@@ -6821,16 +6830,16 @@
                 message += `\n\nInsgesamt ${totalToSend} Empfänger`;
                 if (!confirm(message)) return;
             } else if (deliveryMethod === 'email') {
-                emailRecipients = recipients.filter(m => m.email);
+                emailRecipients = recipients.filter(m => m.email && (!preferenceOnly || m.zustellung_email));
                 const skipped = recipients.length - emailRecipients.length;
-                let message = `E-Mail an ${emailRecipients.length} Empfänger senden?`;
-                if (skipped > 0) message += `\n(${skipped} ohne E-Mail-Adresse werden übersprungen)`;
+                let message = `E-Mail an ${emailRecipients.length} Empfänger${preferenceOnly ? ' mit E-Mail-Präferenz' : ''} senden?`;
+                if (skipped > 0) message += `\n(${skipped} ${preferenceOnly ? 'ohne E-Mail-Präferenz oder -Adresse' : 'ohne E-Mail-Adresse'} werden übersprungen)`;
                 if (!confirm(message)) return;
             } else {
-                postRecipients = recipients.filter(m => m.strasse && m.plz && m.ort);
+                postRecipients = recipients.filter(m => m.strasse && m.plz && m.ort && (!preferenceOnly || m.zustellung_post));
                 const skipped = recipients.length - postRecipients.length;
-                let message = `Brief an ${postRecipients.length} Empfänger senden (via Pingen)?`;
-                if (skipped > 0) message += `\n(${skipped} ohne vollständige Adresse werden übersprungen)`;
+                let message = `Brief an ${postRecipients.length} Empfänger${preferenceOnly ? ' mit Post-Präferenz' : ''} senden (via Pingen)?`;
+                if (skipped > 0) message += `\n(${skipped} ${preferenceOnly ? 'ohne Post-Präferenz oder vollständige Adresse' : 'ohne vollständige Adresse'} werden übersprungen)`;
                 if (!confirm(message)) return;
             }
 
@@ -9048,10 +9057,12 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         // (inkl. Bestaetigungsdialog "Nur X Empfaenger senden?" in sendDispatch()).
         document.getElementById('dispatch-send-email-btn').addEventListener('click', () => {
             switchDispatchMode('email');
+            window.dispatchPreferenceOnly = true;  // nur Empfaenger mit E-Mail-Praeferenz
             document.getElementById('dispatch-send-btn').click();
         });
         document.getElementById('dispatch-send-post-btn').addEventListener('click', () => {
             switchDispatchMode('post');
+            window.dispatchPreferenceOnly = true;  // nur Empfaenger mit Post-Praeferenz
             document.getElementById('dispatch-send-btn').click();
         });
         document.getElementById('dispatch-draft-btn-top').addEventListener('click', () => document.getElementById('dispatch-save-draft-btn').click());
