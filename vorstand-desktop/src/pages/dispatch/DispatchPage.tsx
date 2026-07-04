@@ -3,6 +3,11 @@ import { cn } from "@/lib/utils";
 import { formatSwissDateTime } from "@/lib/utils/date";
 import * as dispatchApi from "@/lib/api/dispatch";
 import * as membersApi from "@/lib/api/members";
+import {
+  generateDispatchLetterHTML,
+  getAktuarAbsenderLine,
+  bodyTextToHtml,
+} from "@/lib/dispatch-letter";
 import type {
   EmailTemplate,
   PingenAccount,
@@ -66,7 +71,7 @@ export function DispatchPage() {
 
 /* ========== Send Tab ========== */
 function SendTab() {
-  const [mode, setMode] = useState<"email" | "smart">("email");
+  const [mode, setMode] = useState<"email" | "post" | "auto" | "smart">("email");
   const [members, setMembers] = useState<Member[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [recipientType, setRecipientType] = useState<"selected" | "all" | "filter">("selected");
@@ -75,6 +80,7 @@ function SendTab() {
   const [filterEmailPref, setFilterEmailPref] = useState(false);
   const [filterPostPref, setFilterPostPref] = useState(false);
   const [emailPreferenceOnly, setEmailPreferenceOnly] = useState(false);
+  const [postPreferenceOnly, setPostPreferenceOnly] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -132,52 +138,137 @@ function SendTab() {
     [baseRecipients, emailPreferenceOnly]
   );
 
-  const handleSend = async () => {
-    const effective = mode === "email" ? emailRecipients : baseRecipients;
-    if (effective.length === 0) {
-      setError(
-        mode === "email"
-          ? "Keine Empfaenger mit E-Mail-Adresse"
-          : "Bitte Empfaenger auswaehlen"
-      );
-      return;
-    }
-    const skippedEmail =
-      mode === "email" ? baseRecipients.length - emailRecipients.length : 0;
-    const confirmMsg =
-      mode === "email"
-        ? `E-Mail an ${effective.length} Empfaenger${emailPreferenceOnly ? " mit E-Mail-Praeferenz" : ""} senden?` +
-          (skippedEmail > 0
-            ? `\n(${skippedEmail} ohne ${emailPreferenceOnly ? "E-Mail-Praeferenz oder " : ""}E-Mail-Adresse werden uebersprungen)`
-            : "")
-        : `Smart Dispatch an ${effective.length} Empfaenger (Aufteilung E-Mail/Post nach Praeferenz durch den Server)?`;
-    if (!window.confirm(confirmMsg)) return;
+  // Fuer Post: nur mit vollstaendiger Adresse, optional nur Post-Praeferenz
+  const postRecipients = useMemo(
+    () =>
+      baseRecipients.filter(
+        (m) =>
+          m.strasse && m.plz && m.ort && (!postPreferenceOnly || m.zustellung_post)
+      ),
+    [baseRecipients, postPreferenceOnly]
+  );
 
-    setSending(true);
-    setError(null);
-    setResult(null);
-    try {
-      if (mode === "smart") {
+  const handleSend = async () => {
+    // Smart Dispatch: serverseitige Aufteilung (unveraendert)
+    if (mode === "smart") {
+      if (baseRecipients.length === 0) {
+        setError("Bitte Empfaenger auswaehlen");
+        return;
+      }
+      if (
+        !window.confirm(
+          `Smart Dispatch an ${baseRecipients.length} Empfaenger (Aufteilung E-Mail/Post nach Praeferenz durch den Server)?`
+        )
+      )
+        return;
+      setSending(true);
+      setError(null);
+      setResult(null);
+      try {
         const res = await dispatchApi.smartDispatch({
           templateGroup: selectedTemplate || "default",
-          memberIds: effective.map((m) => m.id),
+          memberIds: baseRecipients.map((m) => m.id),
           staging,
         });
         setResult(
           `Smart Dispatch: ${res.summary?.email || 0} E-Mails, ${res.summary?.briefCh || 0} Briefe CH, ${res.summary?.briefDe || 0} Briefe DE, ${res.summary?.skipped || 0} uebersprungen`
         );
-      } else {
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Fehler beim Senden");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // E-Mail / Post / Auto: clientseitige Aufteilung wie in der Web-Version
+    const doEmail = mode === "email" || mode === "auto";
+    const doPost = mode === "post" || mode === "auto";
+    // Auto-Modus: strikt nach individueller Zustellpraeferenz aufteilen
+    const emailR =
+      mode === "auto"
+        ? baseRecipients.filter((m) => m.email && m.zustellung_email)
+        : emailRecipients;
+    const postR =
+      mode === "auto"
+        ? baseRecipients.filter(
+            (m) => m.strasse && m.plz && m.ort && m.zustellung_post
+          )
+        : postRecipients;
+
+    if ((doEmail ? emailR.length : 0) + (doPost ? postR.length : 0) === 0) {
+      setError("Keine passenden Empfaenger");
+      return;
+    }
+
+    let confirmMsg: string;
+    if (mode === "auto") {
+      const covered = new Set([...emailR, ...postR].map((m) => m.id)).size;
+      const skipped = baseRecipients.length - covered;
+      confirmMsg =
+        `Versand nach Zustellpraeferenz:\n- ${emailR.length} per E-Mail\n- ${postR.length} per Post (Brief via Pingen${staging ? ", STAGING" : ""})` +
+        (skipped > 0 ? `\n- ${skipped} ohne Praeferenz/Adresse (uebersprungen)` : "");
+    } else if (mode === "email") {
+      confirmMsg = `E-Mail an ${emailR.length} Empfaenger${emailPreferenceOnly ? " mit E-Mail-Praeferenz" : ""} senden?`;
+    } else {
+      confirmMsg = `Brief an ${postR.length} Empfaenger${postPreferenceOnly ? " mit Post-Praeferenz" : ""} senden (via Pingen${staging ? ", STAGING" : ""})?`;
+    }
+    if (!window.confirm(confirmMsg)) return;
+
+    setSending(true);
+    setError(null);
+    setResult(null);
+    const parts: string[] = [];
+    try {
+      if (doEmail && emailR.length > 0) {
         const res = await dispatchApi.sendBulkEmail({
-          memberIds: effective.map((m) => m.id),
+          memberIds: emailR.map((m) => m.id),
           templateId: selectedTemplate || undefined,
           subject,
           body,
         });
-        setResult(
-          `${res.sent || 0} E-Mails gesendet, ${res.failed || 0} fehlgeschlagen` +
-            (skippedEmail > 0 ? `, ${skippedEmail} uebersprungen` : "")
+        parts.push(
+          `${res.sent || 0} E-Mails gesendet${res.failed ? `, ${res.failed} fehlgeschlagen` : ""}`
         );
       }
+      if (doPost && postR.length > 0) {
+        const senderLine = getAktuarAbsenderLine(members);
+        const sourceHtml = bodyTextToHtml(body);
+        let ok = 0;
+        let fail = 0;
+        for (let i = 0; i < postR.length; i++) {
+          const m = postR[i];
+          const letterHtml = generateDispatchLetterHTML(
+            sourceHtml,
+            subject,
+            m,
+            senderLine
+          );
+          try {
+            await dispatchApi.sendPost({
+              html: letterHtml,
+              recipient: {
+                name: `${m.vorname} ${m.nachname}`.trim(),
+                street: m.strasse,
+                zip: m.plz,
+                city: m.ort,
+                country: "CH",
+              },
+              member_id: m.id,
+              subject: subject || "Brief",
+              staging,
+            });
+            ok++;
+          } catch {
+            fail++;
+          }
+          setResult(`Briefe: ${i + 1}/${postR.length} verarbeitet…`);
+        }
+        parts.push(
+          `${ok} Briefe gesendet${fail ? `, ${fail} fehlgeschlagen` : ""}${staging ? " (Staging)" : ""}`
+        );
+      }
+      setResult(parts.join(" · ") || "Nichts gesendet");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Senden");
     } finally {
@@ -187,28 +278,28 @@ function SendTab() {
 
   return (
     <div className="space-y-4">
-      {/* Mode Toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setMode("email")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium",
-            mode === "email" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
-          )}
-        >
-          <Mail className="h-4 w-4" />
-          E-Mail
-        </button>
-        <button
-          onClick={() => setMode("smart")}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium",
-            mode === "smart" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
-          )}
-        >
-          <Zap className="h-4 w-4" />
-          Smart Dispatch
-        </button>
+      {/* Versandart */}
+      <div className="flex flex-wrap gap-2">
+        {([
+          ["email", "E-Mail", Mail],
+          ["post", "Post", FileText],
+          ["auto", "Auto (E-Mail + Post)", Send],
+          ["smart", "Smart", Zap],
+        ] as const).map(([val, lbl, Icon]) => (
+          <button
+            key={val}
+            onClick={() => setMode(val)}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium",
+              mode === val
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {lbl}
+          </button>
+        ))}
       </div>
 
       {/* Template Selection */}
@@ -226,8 +317,8 @@ function SendTab() {
         </select>
       </div>
 
-      {/* Email fields (only for email mode) */}
-      {mode === "email" && (
+      {/* Betreff + Nachricht: fuer E-Mail, Post und Auto (nicht Smart) */}
+      {mode !== "smart" && (
         <>
           <div>
             <label className="block text-sm font-medium mb-1">Betreff</label>
@@ -250,8 +341,8 @@ function SendTab() {
         </>
       )}
 
-      {/* Staging toggle for smart dispatch */}
-      {mode === "smart" && (
+      {/* Staging (Test): kein echter Brief-/Postversand — fuer Post/Auto/Smart */}
+      {mode !== "email" && (
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -259,7 +350,7 @@ function SendTab() {
             onChange={(e) => setStaging(e.target.checked)}
             className="rounded border-input"
           />
-          <span className="text-sm">Staging-Modus (keine echten Briefe)</span>
+          <span className="text-sm">Staging-Modus (Test, keine echten Briefe)</span>
         </label>
       )}
 
@@ -346,13 +437,27 @@ function SendTab() {
           </label>
         )}
 
+        {mode === "post" && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={postPreferenceOnly} onChange={(e) => setPostPreferenceOnly(e.target.checked)} className="rounded border-input" />
+            Nur an Empfaenger mit Post-Zustellpraeferenz senden
+          </label>
+        )}
+
         <p className="text-xs text-muted-foreground">
-          {mode === "email"
-            ? `${emailRecipients.length} Empfaenger per E-Mail` +
+          {mode === "email" &&
+            `${emailRecipients.length} per E-Mail` +
               (baseRecipients.length !== emailRecipients.length
                 ? ` (${baseRecipients.length - emailRecipients.length} ohne Adresse/Praeferenz uebersprungen)`
-                : "")
-            : `${baseRecipients.length} Empfaenger`}
+                : "")}
+          {mode === "post" &&
+            `${postRecipients.length} per Post` +
+              (baseRecipients.length !== postRecipients.length
+                ? ` (${baseRecipients.length - postRecipients.length} ohne Adresse/Praeferenz uebersprungen)`
+                : "")}
+          {mode === "auto" &&
+            `${baseRecipients.filter((m) => m.email && m.zustellung_email).length} per E-Mail, ${baseRecipients.filter((m) => m.strasse && m.plz && m.ort && m.zustellung_post).length} per Post (nach Praeferenz)`}
+          {mode === "smart" && `${baseRecipients.length} Empfaenger`}
         </p>
       </div>
 

@@ -49,6 +49,35 @@ export async function smartDispatch(
   );
 }
 
+// Post-Versand: fertiges Brief-HTML pro Empfaenger -> Puppeteer-PDF -> Pingen
+export interface DispatchPostRecipient {
+  name: string;
+  street: string | null;
+  zip: string | null;
+  city: string | null;
+  country: string;
+}
+
+export interface SendPostRequest {
+  html: string;
+  recipient: DispatchPostRecipient;
+  member_id?: string;
+  subject?: string;
+  staging?: boolean;
+  pdf_margin?: { top: string; right: string; bottom: string; left: string };
+}
+
+export interface SendPostResponse {
+  success: boolean;
+  letter_id?: string;
+}
+
+export async function sendPost(
+  data: SendPostRequest
+): Promise<SendPostResponse> {
+  return await apiClient.post<SendPostResponse>("/dispatch/send-post", data);
+}
+
 // Pingen
 export async function getPingenAccount(
   staging?: boolean
