@@ -128,12 +128,25 @@ function mountImap(app, pool, authVorstand) {
         try {
             client = await connectImap(pool, account);
             const list = await client.list();
-            const folders = list.map(f => ({
-                path: f.path,
-                name: f.name,
-                specialUse: f.specialUse || null,
-                flags: Array.from(f.flags || [])
-            }));
+            // Pro (auswaehlbarem) Ordner die Anzahl ungelesener Nachrichten holen (fuer Badges).
+            const folders = [];
+            for (const f of list) {
+                const flags = Array.from(f.flags || []);
+                let unseen = 0;
+                if (!flags.includes('\\Noselect')) {
+                    try {
+                        const st = await client.status(f.path, { unseen: true });
+                        unseen = st.unseen || 0;
+                    } catch { /* Ordner nicht abfragbar -> 0 */ }
+                }
+                folders.push({
+                    path: f.path,
+                    name: f.name,
+                    specialUse: f.specialUse || null,
+                    flags,
+                    unseen
+                });
+            }
             res.json(folders);
         } catch (err) {
             console.error('[IMAP] /folders failed:', err.message);

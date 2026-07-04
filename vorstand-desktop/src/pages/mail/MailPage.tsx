@@ -62,7 +62,7 @@ export function MailPage() {
   const [accounts, setAccounts] = useState<string[]>([]);
   const [missing, setMissing] = useState<string[]>([]);
   const [account, setAccount] = useState<string>("");
-  const [folders, setFolders] = useState<{ path: string; name: string; specialUse: string | null }[]>([]);
+  const [folders, setFolders] = useState<{ path: string; name: string; specialUse: string | null; unseen?: number }[]>([]);
   const [folder, setFolder] = useState<string>("INBOX");
   const [messages, setMessages] = useState<MailListItem[]>([]);
   const [stats, setStats] = useState<{ total: number; unseen: number }>({ total: 0, unseen: 0 });
@@ -198,12 +198,25 @@ export function MailPage() {
       originalUid: selectedUid, originalFolder: folder,
     });
   };
-  const onForward = () => {
-    if (!message) return;
+  const onForward = async () => {
+    if (!message || !selectedUid) return;
+    // Original-Anhaenge mitnehmen: Bytes laden und als File an den Entwurf haengen.
+    const token = useAuthStore.getState().token;
+    const files: File[] = [];
+    for (const a of message.attachments) {
+      try {
+        const r = await tauriFetch(`https://api.fwv-raura.ch${attachmentUrl(selectedUid, a.index, account, folder)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const blob = await r.blob();
+        files.push(new File([blob], a.filename, { type: a.contentType || "application/octet-stream" }));
+      } catch { /* Anhang ueberspringen */ }
+    }
     openCompose({
       title: "Weiterleiten",
       subject: message.subject.startsWith("Fwd: ") ? message.subject : "Fwd: " + message.subject,
       body: quoteBody(message), originalUid: selectedUid, originalFolder: folder,
+      attachments: files,
     });
   };
 
@@ -292,7 +305,7 @@ export function MailPage() {
         </select>
         <select value={folder} onChange={e => setFolder(e.target.value)}
           className="px-2 py-1 text-sm border border-border rounded bg-background flex-1 max-w-xs">
-          {folders.map(f => <option key={f.path} value={f.path}>{f.name}</option>)}
+          {folders.map(f => <option key={f.path} value={f.path}>{f.name}{f.unseen ? ` (${f.unseen})` : ""}</option>)}
         </select>
         <button onClick={refreshList} className="p-1.5 text-muted-foreground hover:bg-muted rounded">
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
