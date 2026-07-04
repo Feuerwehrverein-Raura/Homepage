@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMembersStore } from "@/stores/members-store";
+import * as membersApi from "@/lib/api/members";
 import { formatSwissDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +17,8 @@ import {
   Shield,
   CheckCircle,
   XCircle,
+  KeyRound,
+  AlertCircle,
 } from "lucide-react";
 
 export function MemberDetailPage() {
@@ -25,6 +28,9 @@ export function MemberDetailPage() {
     useMembersStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordResult, setPasswordResult] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) fetchMember(id);
@@ -38,6 +44,49 @@ export function MemberDetailPage() {
       navigate("/members");
     } catch {
       setDeleting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!id) return;
+    if (!confirm("Temporaeres Passwort generieren?")) return;
+    setPasswordBusy(true);
+    setPasswordError(null);
+    setPasswordResult(null);
+    try {
+      const res = await membersApi.resetPassword(id);
+      setPasswordResult(
+        `Temporaeres Passwort: ${res.tempPassword} — bitte dem Mitglied mitteilen. Es sollte beim naechsten Login geaendert werden.`
+      );
+    } catch (err) {
+      setPasswordError(
+        err instanceof Error ? err.message : "Fehler beim Zuruecksetzen"
+      );
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    if (!id) return;
+    const password = window.prompt("Neues Passwort (min. 8 Zeichen):");
+    if (password === null) return;
+    setPasswordError(null);
+    setPasswordResult(null);
+    if (password.length < 8) {
+      setPasswordError("Passwort muss mindestens 8 Zeichen lang sein");
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      await membersApi.setPassword(id, password);
+      setPasswordResult("Passwort erfolgreich gesetzt.");
+    } catch (err) {
+      setPasswordError(
+        err instanceof Error ? err.message : "Fehler beim Setzen"
+      );
+    } finally {
+      setPasswordBusy(false);
     }
   };
 
@@ -197,6 +246,44 @@ export function MemberDetailPage() {
               label="Zustellung per Post"
               value={member.zustellung_post}
             />
+          </div>
+
+          {/* Password Management */}
+          <div className="rounded-lg border bg-card p-4 space-y-3">
+            <h3 className="font-semibold text-sm">Passwort-Verwaltung</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleResetPassword}
+                disabled={passwordBusy}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                {passwordBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <KeyRound className="h-4 w-4" />
+                )}
+                Passwort zuruecksetzen
+              </button>
+              <button
+                onClick={handleSetPassword}
+                disabled={passwordBusy}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <KeyRound className="h-4 w-4" />
+                Passwort setzen
+              </button>
+            </div>
+            {passwordResult && (
+              <div className="p-3 rounded-md bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400 text-sm break-words">
+                {passwordResult}
+              </div>
+            )}
+            {passwordError && (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {passwordError}
+              </div>
+            )}
           </div>
 
           {/* Metadata */}

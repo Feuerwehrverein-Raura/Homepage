@@ -44,3 +44,32 @@ export async function uploadPhoto(id: string, file: File): Promise<void> {
 export async function deletePhoto(id: string): Promise<void> {
   await apiClient.delete(`/members/${id}/photo`);
 }
+
+export interface PasswordResetResult {
+  success: boolean;
+  tempPassword: string;
+  message: string;
+}
+
+export interface PasswordSetResult {
+  success: boolean;
+  message: string;
+}
+
+export async function resetPassword(
+  id: string
+): Promise<PasswordResetResult> {
+  return await apiClient.post<PasswordResetResult>(
+    `/members/${id}/reset-password`
+  );
+}
+
+export async function setPassword(
+  id: string,
+  password: string
+): Promise<PasswordSetResult> {
+  return await apiClient.post<PasswordSetResult>(
+    `/members/${id}/set-password`,
+    { password }
+  );
+}

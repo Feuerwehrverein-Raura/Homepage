@@ -13,12 +13,27 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+  const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
+
   useEffect(() => {
+    // Gespeicherten Login (Keyring) wiederherstellen, BEVOR ueber die
+    // geschuetzten Routen entschieden wird — sonst landet man trotz gueltigem
+    // 30-Tage-Token bei jedem Start auf /login.
+    loadFromStorage();
     // Beim Start auf Update pruefen (silent: keine Fehler-Popups bei offline).
-    // Erfolgreiche Updates fragen den User per confirm() und starten neu.
     // Kann in den Einstellungen abgeschaltet werden.
     if (useSettingsStore.getState().autoUpdate) checkForUpdates(true);
-  }, []);
+  }, [loadFromStorage]);
+
+  // Warten bis der gespeicherte Token geladen wurde (kein Redirect-Flackern).
+  if (!isHydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+        Lädt…
+      </div>
+    );
+  }
 
   return (
     <Routes>

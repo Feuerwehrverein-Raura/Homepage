@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
-import { useAuthStore } from "@/stores/auth-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
 // Page imports
@@ -25,13 +24,11 @@ import { MailPage } from "@/pages/mail/MailPage";
 import { ContactsPage } from "@/pages/contacts/ContactsPage";
 
 export function AppLayout() {
-  const loadFromStorage = useAuthStore((s) => s.loadFromStorage);
   const applyTheme = useSettingsStore((s) => s.applyTheme);
 
   useEffect(() => {
-    loadFromStorage();
     applyTheme();
-  }, [loadFromStorage, applyTheme]);
+  }, [applyTheme]);
 
   return (
     <div className="flex h-screen overflow-hidden">

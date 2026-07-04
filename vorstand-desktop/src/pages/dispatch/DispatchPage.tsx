@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { formatSwissDateTime } from "@/lib/utils/date";
 import * as dispatchApi from "@/lib/api/dispatch";
@@ -69,7 +69,12 @@ function SendTab() {
   const [mode, setMode] = useState<"email" | "smart">("email");
   const [members, setMembers] = useState<Member[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [recipientType, setRecipientType] = useState<"selected" | "all" | "filter">("selected");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterEmailPref, setFilterEmailPref] = useState(false);
+  const [filterPostPref, setFilterPostPref] = useState(false);
+  const [emailPreferenceOnly, setEmailPreferenceOnly] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -98,11 +103,56 @@ function SendTab() {
     );
   };
 
+  // Verfuegbare Status-Werte fuer den Praeferenz-Filter
+  const statusOptions = useMemo(
+    () => Array.from(new Set(members.map((m) => m.status).filter(Boolean))) as string[],
+    [members]
+  );
+
+  // Empfaenger je nach Auswahl-Modus: alle / Praeferenz-Filter / manuell
+  const baseRecipients = useMemo(() => {
+    if (recipientType === "all") return members;
+    if (recipientType === "filter") {
+      return members.filter((m) => {
+        if (filterStatus && m.status !== filterStatus) return false;
+        if (filterEmailPref && !m.zustellung_email) return false;
+        if (filterPostPref && !m.zustellung_post) return false;
+        return true;
+      });
+    }
+    return members.filter((m) => selectedMembers.includes(m.id));
+  }, [members, recipientType, filterStatus, filterEmailPref, filterPostPref, selectedMembers]);
+
+  // Fuer E-Mail: nur mit Adresse, optional nur mit E-Mail-Zustellpraeferenz
+  const emailRecipients = useMemo(
+    () =>
+      baseRecipients.filter(
+        (m) => m.email && (!emailPreferenceOnly || m.zustellung_email)
+      ),
+    [baseRecipients, emailPreferenceOnly]
+  );
+
   const handleSend = async () => {
-    if (selectedMembers.length === 0) {
-      setError("Bitte mindestens einen Empfaenger auswaehlen");
+    const effective = mode === "email" ? emailRecipients : baseRecipients;
+    if (effective.length === 0) {
+      setError(
+        mode === "email"
+          ? "Keine Empfaenger mit E-Mail-Adresse"
+          : "Bitte Empfaenger auswaehlen"
+      );
       return;
     }
+    const skippedEmail =
+      mode === "email" ? baseRecipients.length - emailRecipients.length : 0;
+    const confirmMsg =
+      mode === "email"
+        ? `E-Mail an ${effective.length} Empfaenger${emailPreferenceOnly ? " mit E-Mail-Praeferenz" : ""} senden?` +
+          (skippedEmail > 0
+            ? `\n(${skippedEmail} ohne ${emailPreferenceOnly ? "E-Mail-Praeferenz oder " : ""}E-Mail-Adresse werden uebersprungen)`
+            : "")
+        : `Smart Dispatch an ${effective.length} Empfaenger (Aufteilung E-Mail/Post nach Praeferenz durch den Server)?`;
+    if (!window.confirm(confirmMsg)) return;
+
     setSending(true);
     setError(null);
     setResult(null);
@@ -110,7 +160,7 @@ function SendTab() {
       if (mode === "smart") {
         const res = await dispatchApi.smartDispatch({
           templateGroup: selectedTemplate || "default",
-          memberIds: selectedMembers,
+          memberIds: effective.map((m) => m.id),
           staging,
         });
         setResult(
@@ -118,12 +168,15 @@ function SendTab() {
         );
       } else {
         const res = await dispatchApi.sendBulkEmail({
-          memberIds: selectedMembers,
+          memberIds: effective.map((m) => m.id),
           templateId: selectedTemplate || undefined,
           subject,
           body,
         });
-        setResult(`${res.sent || 0} E-Mails gesendet, ${res.failed || 0} fehlgeschlagen`);
+        setResult(
+          `${res.sent || 0} E-Mails gesendet, ${res.failed || 0} fehlgeschlagen` +
+            (skippedEmail > 0 ? `, ${skippedEmail} uebersprungen` : "")
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Senden");
@@ -210,44 +263,97 @@ function SendTab() {
         </label>
       )}
 
-      {/* Member Selection */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium">
-            Empfaenger ({selectedMembers.length} ausgewaehlt)
-          </label>
-          <div className="flex gap-2">
+      {/* Empfaenger-Auswahl: Modus + Filter + Liste */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Empfaenger</label>
+        <div className="flex gap-2">
+          {([
+            ["selected", "Ausgewaehlte"],
+            ["all", "Alle"],
+            ["filter", "Nach Praeferenz"],
+          ] as const).map(([val, lbl]) => (
             <button
-              onClick={() => setSelectedMembers(members.map((m) => m.id))}
-              className="text-xs text-primary hover:underline"
+              key={val}
+              onClick={() => setRecipientType(val)}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-sm font-medium",
+                recipientType === val
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              )}
             >
-              Alle
+              {lbl}
             </button>
-            <button
-              onClick={() => setSelectedMembers([])}
-              className="text-xs text-muted-foreground hover:underline"
-            >
-              Keine
-            </button>
-          </div>
-        </div>
-        <div className="border rounded-md max-h-48 overflow-y-auto">
-          {members.map((m) => (
-            <label
-              key={m.id}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted cursor-pointer text-sm"
-            >
-              <input
-                type="checkbox"
-                checked={selectedMembers.includes(m.id)}
-                onChange={() => toggleMember(m.id)}
-                className="rounded border-input"
-              />
-              {m.vorname} {m.nachname}
-              {m.email && <span className="text-xs text-muted-foreground ml-1">({m.email})</span>}
-            </label>
           ))}
         </div>
+
+        {recipientType === "filter" && (
+          <div className="space-y-2 p-3 border rounded-md">
+            <div className="flex items-center gap-2">
+              <label className="text-sm w-16 text-muted-foreground">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="flex-1 px-2 py-1 text-sm rounded-md border border-input bg-background"
+              >
+                <option value="">Alle</option>
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={filterEmailPref} onChange={(e) => setFilterEmailPref(e.target.checked)} className="rounded border-input" />
+              nur E-Mail-Praeferenz (zustellung_email)
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={filterPostPref} onChange={(e) => setFilterPostPref(e.target.checked)} className="rounded border-input" />
+              nur Post-Praeferenz (zustellung_post)
+            </label>
+          </div>
+        )}
+
+        {recipientType === "selected" && (
+          <>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setSelectedMembers(members.map((m) => m.id))} className="text-xs text-primary hover:underline">Alle</button>
+              <button onClick={() => setSelectedMembers([])} className="text-xs text-muted-foreground hover:underline">Keine</button>
+            </div>
+            <div className="border rounded-md max-h-48 overflow-y-auto">
+              {members.map((m) => (
+                <label
+                  key={m.id}
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-muted cursor-pointer text-sm"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedMembers.includes(m.id)}
+                    onChange={() => toggleMember(m.id)}
+                    className="rounded border-input"
+                  />
+                  {m.vorname} {m.nachname}
+                  {m.email && <span className="text-xs text-muted-foreground ml-1">({m.email})</span>}
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        {mode === "email" && (
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" checked={emailPreferenceOnly} onChange={(e) => setEmailPreferenceOnly(e.target.checked)} className="rounded border-input" />
+            Nur an Empfaenger mit E-Mail-Zustellpraeferenz senden
+          </label>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          {mode === "email"
+            ? `${emailRecipients.length} Empfaenger per E-Mail` +
+              (baseRecipients.length !== emailRecipients.length
+                ? ` (${baseRecipients.length - emailRecipients.length} ohne Adresse/Praeferenz uebersprungen)`
+                : "")
+            : `${baseRecipients.length} Empfaenger`}
+        </p>
       </div>
 
       {error && (
