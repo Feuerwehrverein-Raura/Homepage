@@ -174,7 +174,7 @@ function Splash({ text }: { text: string }) {
 function LoginScreen() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-cart-600 text-white p-6 text-center">
-      <div className="text-6xl mb-4">🛒</div>
+      <img src="/logo.png" alt="FWV Raura" className="w-24 h-24 mb-4 rounded-2xl bg-white p-1 shadow-lg" />
       <h1 className="text-2xl font-bold mb-1">Einkauf · FWV Raura</h1>
       <p className="text-cart-100 mb-8">Einkaufslisten für Vereins-Events</p>
       <button
@@ -196,6 +196,7 @@ function Header({ user, title, online, pending, onBack, guest }: {
         {onBack && (
           <button onClick={onBack} className="text-white/90 text-2xl leading-none -ml-1" aria-label="Zurück">‹</button>
         )}
+        <img src="/logo.png" alt="FWV Raura" className="h-9 w-9 rounded-full bg-white p-0.5 shrink-0" />
         <h1 className="font-semibold text-lg flex-1 truncate">{title}</h1>
         <span
           className={`w-2.5 h-2.5 rounded-full ${online ? 'bg-cart-200' : 'bg-yellow-300'}`}
