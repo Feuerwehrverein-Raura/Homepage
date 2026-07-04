@@ -482,7 +482,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
                 type: 'vorstand'
             },
             process.env.JWT_SECRET || 'fwv-raura-secret-key',
-            { expiresIn: '8h' }
+            { expiresIn: '30d' }
         );
 
         await logAudit(pool, 'LOGIN_SUCCESS', null, emailLower, clientIp, { role: 'admin', method: 'password' });
@@ -493,7 +493,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
             httpOnly: false, // Allow JS access for API calls
             secure: true,
             sameSite: 'lax',
-            maxAge: 8 * 60 * 60 * 1000 // 8 hours
+            maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
         });
 
         return res.json({
@@ -572,7 +572,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
                     type: 'vorstand'
                 },
                 process.env.JWT_SECRET || 'fwv-raura-secret-key',
-                { expiresIn: '8h' }
+                { expiresIn: '30d' }
             );
 
             // Log successful login
@@ -581,7 +581,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
             // Refresh-Token fuer die Vorstand-App ausgeben (7 Tage rolling).
             // Web-Login schickt den Refresh-Token zwar auch mit, nutzt ihn aber nicht aktiv.
             const refreshToken = 'fwv-vr-' + crypto.randomBytes(32).toString('base64url');
-            const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
             await pool.query(
                 `INSERT INTO vorstand_refresh_tokens (email, token, expires_at)
                  VALUES ($1, $2, $3)`,
@@ -594,7 +594,7 @@ app.post('/auth/vorstand/login', async (req, res) => {
                 httpOnly: false, // Allow JS access for API calls
                 secure: true,
                 sameSite: 'lax',
-                maxAge: 8 * 60 * 60 * 1000 // 8 hours
+                maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
             });
 
             res.json({
@@ -673,12 +673,12 @@ app.post('/auth/vorstand/refresh', async (req, res) => {
         const newJwt = jwt.sign(
             { email: emailLower, role, groups, type: 'vorstand' },
             process.env.JWT_SECRET || 'fwv-raura-secret-key',
-            { expiresIn: '8h' }
+            { expiresIn: '30d' }
         );
 
         // Alten Refresh-Token invalidieren, neuen ausstellen (rolling)
         const newRefresh = 'fwv-vr-' + crypto.randomBytes(32).toString('base64url');
-        const newExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const newExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         await pool.query(
             `UPDATE vorstand_refresh_tokens SET revoked_at = NOW(), used_at = NOW() WHERE id = $1`,
             [row.id]
@@ -979,13 +979,13 @@ app.post('/auth/vorstand/qr-login', async (req, res) => {
         const jwtToken = jwt.sign(
             { email: emailLower, role, groups, type: 'vorstand' },
             process.env.JWT_SECRET || 'fwv-raura-secret-key',
-            { expiresIn: '8h' }
+            { expiresIn: '30d' }
         );
 
         // Refresh-Token (7 Tage rolling) auch beim QR-Login, damit die App
         // den User nach 8h JWT-Ablauf nicht ausloggt.
         const refreshToken = 'fwv-vr-' + crypto.randomBytes(32).toString('base64url');
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         await pool.query(
             `INSERT INTO vorstand_refresh_tokens (email, token, expires_at)
              VALUES ($1, $2, $3)`,
