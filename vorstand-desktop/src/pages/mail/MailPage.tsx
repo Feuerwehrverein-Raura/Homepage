@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   RefreshCw, Trash2, MailOpen, Paperclip, Pencil, Reply, ReplyAll,
-  Forward, Archive, Ban, X, Send, Save, Star, FolderInput,
+  Forward, Archive, Ban, X, Send, Save, Star, FolderInput, Search,
 } from "lucide-react";
 import {
   listAccounts, listFolders, listMessages, getMessage, setFlags,
-  deleteMessage, attachmentUrl, sendMessage, saveDraft, moveMessage,
+  deleteMessage, attachmentUrl, sendMessage, saveDraft, moveMessage, searchMessages,
   type MailListItem, type MailMessage,
 } from "@/lib/api/mail";
 import { listContacts, type Contact } from "@/lib/api/contacts";
@@ -72,6 +72,8 @@ export function MailPage() {
   const [error, setError] = useState<string | null>(null);
   const [compose, setCompose] = useState<ComposeState>(emptyCompose());
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     listAccounts().then(r => {
@@ -94,9 +96,20 @@ export function MailPage() {
 
   useEffect(() => {
     if (!account || !folder) return;
+    setQuery(""); setSearching(false);
     refreshList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, folder]);
+
+  // Auto-Refresh: alle 60s neu laden (nicht waehrend Verfassen oder aktiver Suche).
+  useEffect(() => {
+    if (!account || !folder) return;
+    const id = setInterval(() => {
+      if (!compose.open && !searching) refreshList();
+    }, 60000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, folder, compose.open, searching]);
 
   // Compose-Initialwert aus URL ?to= (z.B. von Adressbuch -> Mail)
   useEffect(() => {
@@ -116,6 +129,21 @@ export function MailPage() {
       setLoading(false);
     }
   };
+
+  const doSearch = async () => {
+    if (!query.trim()) { setSearching(false); refreshList(); return; }
+    setLoading(true); setError(null); setSearching(true);
+    try {
+      const r = await searchMessages(account, folder, query.trim());
+      setMessages(r.messages);
+      setStats({ total: r.total, unseen: 0 });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const clearSearch = () => { setQuery(""); setSearching(false); refreshList(); };
 
   const onSelect = async (uid: number) => {
     setSelectedUid(uid); setMessage(null);
@@ -307,11 +335,24 @@ export function MailPage() {
           className="px-2 py-1 text-sm border border-border rounded bg-background flex-1 max-w-xs">
           {folders.map(f => <option key={f.path} value={f.path}>{f.name}{f.unseen ? ` (${f.unseen})` : ""}</option>)}
         </select>
+        <div className="relative">
+          <Search size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <input value={query} onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") doSearch(); }}
+            placeholder="Suchen…"
+            className="pl-7 pr-6 py-1 text-sm border border-border rounded bg-background w-36" />
+          {searching && (
+            <button onClick={clearSearch} title="Suche zurücksetzen"
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X size={13} />
+            </button>
+          )}
+        </div>
         <button onClick={refreshList} className="p-1.5 text-muted-foreground hover:bg-muted rounded">
           <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
         <span className="ml-auto text-xs text-muted-foreground">
-          {stats.total} Nachrichten · {stats.unseen} ungelesen
+          {searching ? `${stats.total} Treffer` : `${stats.total} Nachrichten · ${stats.unseen} ungelesen`}
         </span>
       </div>
 

@@ -251,6 +251,57 @@ function mountImap(app, pool, authVorstand) {
         }
     });
 
+    // Suche in einem Ordner (Betreff ODER Absender ODER Text). Liefert neueste Treffer.
+    app.get('/imap/search', authVorstand, async (req, res) => {
+        const account = (req.query.account || '').toLowerCase();
+        const folder = req.query.folder || 'INBOX';
+        const q = (req.query.q || '').trim();
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        if (!allowedAccounts(req).includes(account)) {
+            return res.status(403).json({ error: 'Kein Zugriff auf dieses Postfach' });
+        }
+        if (!q) return res.json({ messages: [], total: 0 });
+        let client;
+        try {
+            client = await connectImap(pool, account);
+            const lock = await client.getMailboxLock(folder);
+            try {
+                const uids = await client.search({ or: [{ subject: q }, { from: q }, { body: q }] }, { uid: true });
+                if (!uids || uids.length === 0) {
+                    return res.json({ messages: [], total: 0 });
+                }
+                const recent = uids.slice(-limit); // hoechste (neueste) UIDs begrenzen
+                const messages = [];
+                for await (const msg of client.fetch(recent, {
+                    envelope: true, flags: true, internalDate: true, size: true, uid: true
+                }, { uid: true })) {
+                    messages.push({
+                        uid: msg.uid,
+                        seq: msg.seq,
+                        subject: msg.envelope?.subject || '(ohne Betreff)',
+                        from: decodeAddress(msg.envelope?.from && { value: msg.envelope.from }),
+                        to: decodeAddress(msg.envelope?.to && { value: msg.envelope.to }),
+                        date: msg.envelope?.date || msg.internalDate,
+                        size: msg.size,
+                        seen: msg.flags?.has('\\Seen') || false,
+                        flagged: msg.flags?.has('\\Flagged') || false,
+                        answered: msg.flags?.has('\\Answered') || false,
+                        messageId: msg.envelope?.messageId
+                    });
+                }
+                messages.sort((a, b) => (new Date(b.date) - new Date(a.date)));
+                res.json({ messages, total: uids.length });
+            } finally {
+                lock.release();
+            }
+        } catch (err) {
+            console.error('[IMAP] /search failed:', err.message);
+            res.status(500).json({ error: err.message });
+        } finally {
+            if (client) await client.logout().catch(() => {});
+        }
+    });
+
     // Eine einzelne Nachricht (Body + Anhaenge)
     app.get('/imap/messages/:uid', authVorstand, async (req, res) => {
         const account = (req.query.account || '').toLowerCase();
