@@ -7791,6 +7791,31 @@
         }
 
         // Generiert einen allgemeinen Brief (fuer Nachrichten-Tab Post-Versand)
+        // Baut die Empfaenger-Adresszeilen fuer Fensterkuvert-Briefe (Pingen).
+        // Deutsche Empfaenger (PLZ mit "DE"-Praefix ODER 5-stellig) bekommen die PLZ OHNE
+        // "DE-"-Praefix plus eine eigene Laenderzeile "Deutschland" — sonst erkennt Pingen
+        // kein Ausland und flaggt den Brief als Schweiz (falsches Porto / action_required).
+        // Beweis: April-Batch mit "Deutschland"-Zeile -> country=DE; Juli ohne -> CH/haengt.
+        function isGermanRecipient(member) {
+            const plz = (member && member.plz ? String(member.plz) : '').trim();
+            return /^de/i.test(plz) || /^\d{5}/.test(plz);
+        }
+        function letterAddressLines(member) {
+            if (!member) return ['{{vorname}} {{nachname}}', '{{strasse}}', '{{plz}} {{ort}}'];
+            const name = `${member.vorname || ''} ${member.nachname || ''}`.trim();
+            const strasse = member.strasse || '';
+            const plzClean = String(member.plz || '').trim().replace(/^de[-\s]?/i, ''); // "DE-79618" -> "79618"
+            const plzOrt = `${plzClean} ${member.ort || ''}`.trim();
+            const lines = [name, strasse];
+            if (member.adresszusatz) lines.push(member.adresszusatz);
+            lines.push(plzOrt);
+            if (isGermanRecipient(member)) lines.push('Deutschland');
+            return lines;
+        }
+        function letterAddressBlockHtml(member) {
+            return letterAddressLines(member).map(l => `<div>${l}</div>`).join('\n        ');
+        }
+
         // Layout: Kopf wie Mitgliedsbeitrag (Logo+Titel+Absender+Empfaenger+Datum), ohne QR.
         // Inline-Styles damit Vorschau und PDF-Generierung konsistent sind.
         function generateDispatchLetterHTML(bodyHtml, subject, member) {
@@ -7842,9 +7867,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
     <div class="title">Feuerwehrverein Raura<br>Kaiseraugst</div>
     <div class="sender">${getAktuarAbsenderLine()}</div>
     <div class="recipient">
-        <div>${name}</div>
-        <div>${strasse}</div>
-        <div>${plzOrt}</div>
+        ${letterAddressBlockHtml(member)}
     </div>
     <div class="date">Kaiseraugst, ${datum}</div>
 </div>
@@ -7884,9 +7907,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
     <div style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">${getAktuarAbsenderLine()}</div>
     <!-- Empfaenger im Schweizer Adressfenster -->
     <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm;">
-        <div>${name}</div>
-        <div>${strasse}</div>
-        <div>${plzOrt}</div>
+        ${letterAddressBlockHtml(member)}
     </div>
     <!-- Datum -->
     <div style="position: absolute; top: 97mm; right: 25mm; text-align: right;">Kaiseraugst, ${datum}</div>
@@ -8062,9 +8083,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
     </div>
     <div style="position:absolute;top:20mm;left:118mm;font-size:8pt;color:#333;">${getAktuarAbsenderLine()}</div>
     <div style="position:absolute;top:45mm;left:118mm;width:85mm;">
-        <div>${name}</div>
-        <div>${strasse}</div>
-        <div>${plzOrt}</div>
+        ${letterAddressBlockHtml(member)}
     </div>
     <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
 </div>
