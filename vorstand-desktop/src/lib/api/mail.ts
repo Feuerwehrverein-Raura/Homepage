@@ -62,6 +62,11 @@ export const listMessages = (account: string, folder: string, limit = 100) =>
     `/imap/messages?account=${encodeURIComponent(account)}&folder=${encodeURIComponent(folder)}&limit=${limit}`
   );
 
+export const searchMessages = (account: string, folder: string, q: string, limit = 50) =>
+  api.get<{ messages: MailListItem[]; total: number }>(
+    `/imap/search?account=${encodeURIComponent(account)}&folder=${encodeURIComponent(folder)}&q=${encodeURIComponent(q)}&limit=${limit}`
+  );
+
 export const getMessage = (uid: number, account: string, folder: string) =>
   api.get<MailMessage>(
     `/imap/messages/${uid}?account=${encodeURIComponent(account)}&folder=${encodeURIComponent(folder)}`
