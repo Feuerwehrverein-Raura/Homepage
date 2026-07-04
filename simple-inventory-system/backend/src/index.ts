@@ -7,6 +7,8 @@ import bwipjs from 'bwip-js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import webpush from 'web-push';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
 import { generateQRCodeWithLogo, getItemUrl } from './qrcode.js';
@@ -26,6 +28,15 @@ if (!fs.existsSync(uploadDir)) {
 
 // Serve uploaded images
 app.use('/api/uploads', express.static(uploadDir));
+
+// Web-Push (VAPID) — optional; nur aktiv, wenn Keys in der Env gesetzt sind.
+const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY || '';
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || '';
+const PUSH_ENABLED = !!(VAPID_PUBLIC && VAPID_PRIVATE);
+if (PUSH_ENABLED) {
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:vorstand@fwv-raura.ch', VAPID_PUBLIC, VAPID_PRIVATE);
+  console.log('Web-Push aktiviert');
+}
 
 // Multer configuration for image uploads
 const storage = multer.diskStorage({
@@ -303,6 +314,61 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_slug ON event_recipes(event_slug)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_recipe ON event_recipes(recipe_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_shopping_status ON event_shopping_status(event_slug)`);
+
+  // Einkaufs-PWA Phase 2/3: Ist-Kosten, Zahler, Lager-Einbuchung pro Position.
+  await pool.query(`
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS actual_price NUMERIC;
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS actual_quantity NUMERIC;
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS paid_by VARCHAR(255);
+    ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS restocked_at TIMESTAMP;
+  `);
+
+  // Belege (Kassenzettel-Fotos) pro Event — ein Einkauf = ein Beleg über mehrere Positionen.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_receipts (
+      id SERIAL PRIMARY KEY,
+      event_slug VARCHAR(100) NOT NULL,
+      image_url TEXT NOT NULL,
+      amount NUMERIC,
+      paid_by VARCHAR(255),
+      note TEXT,
+      uploaded_by VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_receipts_slug ON event_receipts(event_slug)`);
+
+  // Einkaufs-PWA Phase 4: Event-Meta (Deadline/Budget), Teilen-Tokens, Push-Abos.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_shopping_meta (
+      event_slug VARCHAR(100) PRIMARY KEY,
+      deadline DATE,
+      budget NUMERIC,
+      reminded_on DATE,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_share_tokens (
+      token VARCHAR(64) PRIMARY KEY,
+      event_slug VARCHAR(100) NOT NULL,
+      can_write BOOLEAN DEFAULT true,
+      created_by VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      expires_at TIMESTAMP
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_share_tokens_slug ON event_share_tokens(event_slug)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id SERIAL PRIMARY KEY,
+      endpoint TEXT UNIQUE NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_email VARCHAR(255),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
 
   console.log('Database initialized');
 }
@@ -902,6 +968,40 @@ app.post('/api/recipes/:id/prepare', authenticateToken, async (req: Authenticate
 // event_slug verweist lose auf die Events-DB (fwv_raura, separate DB).
 // ========================================
 
+// Liste aller Events mit hinterlegten Rezepten (für die Event-Auswahl in der
+// Einkaufs-PWA). Liefert pro Event Zusammenfassung: Rezepte, Zutaten, gekauft.
+app.get('/api/events', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        er.event_slug AS slug,
+        COUNT(DISTINCT er.recipe_id) AS recipe_count,
+        COUNT(DISTINCT ri.item_id) AS item_count,
+        COUNT(DISTINCT ess.item_id) FILTER (WHERE ess.purchased) AS purchased_count,
+        MAX(er.updated_at) AS updated_at,
+        MAX(m.deadline) AS deadline
+      FROM event_recipes er
+      LEFT JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+      LEFT JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+      LEFT JOIN event_shopping_status ess ON ess.event_slug = er.event_slug
+      LEFT JOIN event_shopping_meta m ON m.event_slug = er.event_slug
+      GROUP BY er.event_slug
+      ORDER BY MAX(er.updated_at) DESC NULLS LAST
+    `);
+    res.json(result.rows.map((r) => ({
+      slug: r.slug,
+      recipe_count: parseInt(r.recipe_count, 10) || 0,
+      item_count: parseInt(r.item_count, 10) || 0,
+      purchased_count: parseInt(r.purchased_count, 10) || 0,
+      updated_at: r.updated_at,
+      deadline: r.deadline
+    })));
+  } catch (error) {
+    console.error('GET /api/events error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Alle Rezepte eines Events (inkl. aktuell herstellbarer Portionen)
 app.get('/api/events/:slug/recipes', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
@@ -1033,7 +1133,11 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
         ess.purchased_by,
         ess.purchased_at,
         ess.recommendation,
-        ess.note
+        ess.note,
+        ess.actual_price,
+        ess.actual_quantity,
+        ess.paid_by,
+        ess.restocked_at
       FROM event_recipes er
       JOIN recipes r ON r.id = er.recipe_id AND r.active = true
       JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
@@ -1041,12 +1145,15 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
       LEFT JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
       WHERE er.event_slug = $1 AND i.active = true
       GROUP BY i.id, i.name, i.unit, i.quantity, i.purchase_price, i.supplier,
-               ess.purchased, ess.purchased_by, ess.purchased_at, ess.recommendation, ess.note
+               ess.purchased, ess.purchased_by, ess.purchased_at, ess.recommendation, ess.note,
+               ess.actual_price, ess.actual_quantity, ess.paid_by, ess.restocked_at
       ORDER BY i.name
     `, [slug]);
 
     let totalCost = 0;
     let openCost = 0;
+    let actualTotal = 0;
+    const byPayer: Record<string, number> = {};
     const items = result.rows.map((row) => {
       const needed = parseFloat(row.needed) || 0;
       const inStock = parseFloat(row.in_stock) || 0;
@@ -1054,8 +1161,14 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
       const price = parseFloat(row.purchase_price) || 0;
       const estimatedCost = Math.round(toBuy * price * 100) / 100;
       const purchased = row.purchased || false;
+      const actualPrice = row.actual_price != null ? parseFloat(row.actual_price) : null;
+      const paidBy = row.paid_by || null;
       totalCost += estimatedCost;
       if (!purchased) openCost += estimatedCost;
+      if (purchased && actualPrice != null) {
+        actualTotal += actualPrice;
+        if (paidBy) byPayer[paidBy] = Math.round(((byPayer[paidBy] || 0) + actualPrice) * 100) / 100;
+      }
       return {
         item_id: row.item_id,
         item_name: row.item_name,
@@ -1070,7 +1183,11 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
         purchased_by: row.purchased_by || null,
         purchased_at: row.purchased_at || null,
         recommendation: row.recommendation || null,
-        note: row.note || null
+        note: row.note || null,
+        actual_price: actualPrice,
+        actual_quantity: row.actual_quantity != null ? parseFloat(row.actual_quantity) : null,
+        paid_by: paidBy,
+        restocked: !!row.restocked_at
       };
     });
 
@@ -1081,7 +1198,9 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
       total_to_buy: items.filter((i) => i.to_buy > 0).length,
       total_purchased: items.filter((i) => i.purchased).length,
       estimated_total_cost: Math.round(totalCost * 100) / 100,
-      estimated_open_cost: Math.round(openCost * 100) / 100
+      estimated_open_cost: Math.round(openCost * 100) / 100,
+      actual_total_cost: Math.round(actualTotal * 100) / 100,
+      by_payer: Object.entries(byPayer).map(([email, amount]) => ({ email, amount }))
     });
   } catch (error) {
     console.error('GET shopping-list error:', error);
@@ -1094,14 +1213,23 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
 app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
   try {
     const { slug, itemId } = req.params;
-    const { purchased, recommendation, note } = req.body;
+    const { purchased, recommendation, note, actual_price, actual_quantity, paid_by } = req.body;
     const iid = parseInt(itemId, 10);
     if (isNaN(iid)) return res.status(400).json({ error: 'Ungültige itemId' });
     const purchasedBy = purchased ? (req.user?.email || null) : null;
     const purchasedAt = purchased ? new Date() : null;
+    const toNum = (v: any) => {
+      if (v === undefined || v === null || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const ap = toNum(actual_price);
+    const aq = toNum(actual_quantity);
+    // Zahler: explizit übergeben -> nutzen; sonst beim Abhaken der/die Einkäufer*in.
+    const paidByVal = paid_by !== undefined ? (paid_by || null) : (purchased ? (req.user?.email || null) : null);
     const result = await pool.query(`
-      INSERT INTO event_shopping_status (event_slug, item_id, purchased, purchased_by, purchased_at, recommendation, note)
-      VALUES ($1, $2, COALESCE($3, false), $4, $5, $6, $7)
+      INSERT INTO event_shopping_status (event_slug, item_id, purchased, purchased_by, purchased_at, recommendation, note, actual_price, actual_quantity, paid_by)
+      VALUES ($1, $2, COALESCE($3, false), $4, $5, $6, $7, $8, $9, $10)
       ON CONFLICT (event_slug, item_id) DO UPDATE SET
         purchased = COALESCE($3, event_shopping_status.purchased),
         purchased_by = CASE WHEN $3 IS TRUE THEN $4
@@ -1112,9 +1240,12 @@ app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, as
                             ELSE event_shopping_status.purchased_at END,
         recommendation = COALESCE($6, event_shopping_status.recommendation),
         note = COALESCE($7, event_shopping_status.note),
+        actual_price = COALESCE($8, event_shopping_status.actual_price),
+        actual_quantity = COALESCE($9, event_shopping_status.actual_quantity),
+        paid_by = CASE WHEN $3 IS FALSE THEN NULL ELSE COALESCE($10, event_shopping_status.paid_by) END,
         updated_at = CURRENT_TIMESTAMP
       RETURNING *
-    `, [slug, iid, purchased ?? null, purchasedBy, purchasedAt, recommendation ?? null, note ?? null]);
+    `, [slug, iid, purchased ?? null, purchasedBy, purchasedAt, recommendation ?? null, note ?? null, ap, aq, paidByVal]);
 
     broadcast({ type: 'shopping_status_updated', event_slug: slug, item_id: iid });
     res.json(result.rows[0]);
@@ -1123,6 +1254,259 @@ app.patch('/api/events/:slug/shopping-list/:itemId', authenticateEventAccess, as
     res.status(500).json({ error: 'Database error' });
   }
 });
+
+// ---- Belege (Kassenzettel-Fotos) pro Event -------------------------------
+app.get('/api/events/:slug/receipts', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const r = await pool.query(
+      'SELECT id, image_url, amount, paid_by, note, uploaded_by, created_at FROM event_receipts WHERE event_slug = $1 ORDER BY created_at DESC',
+      [slug]
+    );
+    res.json(r.rows);
+  } catch (e) {
+    console.error('GET receipts error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/events/:slug/receipts', authenticateEventAccess, upload.single('image'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    if (!req.file) return res.status(400).json({ error: 'Kein Beleg-Foto' });
+    const imageUrl = `/api/uploads/${req.file.filename}`;
+    const amountRaw = req.body.amount;
+    const amount = amountRaw != null && amountRaw !== '' && Number.isFinite(Number(amountRaw)) ? Number(amountRaw) : null;
+    const r = await pool.query(
+      `INSERT INTO event_receipts (event_slug, image_url, amount, paid_by, note, uploaded_by)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [slug, imageUrl, amount, req.body.paid_by || req.user?.email || null, req.body.note || null, req.user?.email || null]
+    );
+    broadcast({ type: 'receipt_updated', event_slug: slug });
+    res.status(201).json(r.rows[0]);
+  } catch (e) {
+    console.error('POST receipt error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.delete('/api/events/:slug/receipts/:id', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug, id } = req.params;
+    const rid = parseInt(id, 10);
+    if (isNaN(rid)) return res.status(400).json({ error: 'Ungültige id' });
+    const r = await pool.query('SELECT image_url FROM event_receipts WHERE id = $1 AND event_slug = $2', [rid, slug]);
+    if (r.rows.length === 0) return res.status(404).json({ error: 'Beleg nicht gefunden' });
+    const url: string = r.rows[0].image_url;
+    if (url && url.startsWith('/api/uploads/')) {
+      const p = path.join(uploadDir, url.replace('/api/uploads/', ''));
+      if (fs.existsSync(p)) { try { fs.unlinkSync(p); } catch { /* ignore */ } }
+    }
+    await pool.query('DELETE FROM event_receipts WHERE id = $1', [rid]);
+    broadcast({ type: 'receipt_updated', event_slug: slug });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('DELETE receipt error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ---- Nach dem Einkauf ins Lager einbuchen --------------------------------
+// Bucht alle gekauften, noch nicht eingebuchten Positionen dem Lagerbestand gut
+// (Ist-Menge falls erfasst, sonst Bedarf − Bestand) und markiert sie als eingebucht.
+app.post('/api/events/:slug/shopping-list/restock', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  const client = await pool.connect();
+  try {
+    const { slug } = req.params;
+    const rows = await client.query(`
+      SELECT i.id AS item_id, i.name, i.quantity AS in_stock,
+             SUM(ri.quantity * er.servings)::numeric AS needed,
+             ess.actual_quantity, ess.id AS ess_id
+      FROM event_recipes er
+      JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+      JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+      JOIN items i ON i.id = ri.item_id
+      JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
+      WHERE er.event_slug = $1 AND i.active = true AND ess.purchased = true AND ess.restocked_at IS NULL
+      GROUP BY i.id, i.name, i.quantity, ess.actual_quantity, ess.id
+    `, [slug]);
+
+    if (rows.rows.length === 0) {
+      return res.json({ restocked: 0, items: [] });
+    }
+
+    await client.query('BEGIN');
+    const done: { item_id: number; name: string; quantity: number }[] = [];
+    for (const row of rows.rows) {
+      const needed = parseFloat(row.needed) || 0;
+      const inStock = parseFloat(row.in_stock) || 0;
+      const qty = row.actual_quantity != null ? parseFloat(row.actual_quantity) : Math.max(0, needed - inStock);
+      // Immer als eingebucht markieren (auch qty 0), damit nichts doppelt läuft.
+      if (qty > 0) {
+        const newStock = inStock + qty;
+        await client.query('UPDATE items SET quantity = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [newStock, row.item_id]);
+        await client.query(`
+          INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
+          VALUES ($1, 'in', $2, $3, $4, $5, $6)
+        `, [row.item_id, qty, inStock, newStock, `Einkauf eingebucht: ${slug}`, req.user?.email]);
+        done.push({ item_id: row.item_id, name: row.name, quantity: qty });
+      }
+      await client.query('UPDATE event_shopping_status SET restocked_at = NOW() WHERE id = $1', [row.ess_id]);
+    }
+    await client.query('COMMIT');
+
+    for (const d of done) broadcast({ type: 'stock_updated', item_id: d.item_id });
+    res.json({ restocked: done.length, items: done });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('restock error:', error);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    client.release();
+  }
+});
+
+// ---- Teilen (Share-Link) --------------------------------------------------
+// Erzeugt einen Token, mit dem auch Nicht-Mitglieder die Einkaufsliste eines
+// Events sehen (und optional bearbeiten) können — ohne Login.
+app.post('/api/events/:slug/share', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const canWrite = req.body?.can_write !== false;
+    const days = parseInt(req.body?.days, 10);
+    const expiresAt = Number.isFinite(days) && days > 0 ? new Date(Date.now() + days * 86400000) : null;
+    const token = crypto.randomBytes(24).toString('base64url');
+    await pool.query(
+      'INSERT INTO event_share_tokens (token, event_slug, can_write, created_by, expires_at) VALUES ($1,$2,$3,$4,$5)',
+      [token, slug, canWrite, req.user?.email || null, expiresAt]
+    );
+    res.status(201).json({ token, event_slug: slug, can_write: canWrite, expires_at: expiresAt });
+  } catch (e) {
+    console.error('POST share error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ---- Event-Meta (Deadline / Budget) --------------------------------------
+app.get('/api/events/:slug/meta', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const r = await pool.query('SELECT deadline, budget FROM event_shopping_meta WHERE event_slug = $1', [slug]);
+    res.json(r.rows[0] || { deadline: null, budget: null });
+  } catch (e) {
+    console.error('GET meta error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.put('/api/events/:slug/meta', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const deadline = req.body?.deadline || null;
+    const budgetRaw = req.body?.budget;
+    const budget = budgetRaw != null && budgetRaw !== '' && Number.isFinite(Number(budgetRaw)) ? Number(budgetRaw) : null;
+    const r = await pool.query(`
+      INSERT INTO event_shopping_meta (event_slug, deadline, budget, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (event_slug) DO UPDATE SET deadline = $2, budget = $3, updated_at = NOW()
+      RETURNING deadline, budget
+    `, [slug, deadline, budget]);
+    res.json(r.rows[0]);
+  } catch (e) {
+    console.error('PUT meta error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ---- Web-Push (Abo + Erinnerungen) ---------------------------------------
+app.get('/api/push/vapid-public-key', (req, res) => {
+  if (!PUSH_ENABLED) return res.status(503).json({ error: 'Push nicht konfiguriert' });
+  res.json({ key: VAPID_PUBLIC });
+});
+
+app.post('/api/push/subscribe', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  if (!PUSH_ENABLED) return res.status(503).json({ error: 'Push nicht konfiguriert' });
+  try {
+    const sub = req.body?.subscription;
+    if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) {
+      return res.status(400).json({ error: 'Ungültiges Abo' });
+    }
+    await pool.query(`
+      INSERT INTO push_subscriptions (endpoint, p256dh, auth, user_email)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (endpoint) DO UPDATE SET p256dh = $2, auth = $3, user_email = $4
+    `, [sub.endpoint, sub.keys.p256dh, sub.keys.auth, req.user?.email || null]);
+    res.status(201).json({ ok: true });
+  } catch (e) {
+    console.error('subscribe error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Erinnerungs-Job: Events mit Deadline in <=3 Tagen und offenen Positionen ->
+// einmal täglich Push an alle Abos. reminded_on verhindert Mehrfachversand.
+async function sendShoppingReminders() {
+  if (!PUSH_ENABLED) return;
+  try {
+    const events = await pool.query(`
+      SELECT event_slug, deadline FROM event_shopping_meta
+      WHERE deadline IS NOT NULL
+        AND deadline >= CURRENT_DATE
+        AND deadline <= CURRENT_DATE + INTERVAL '3 days'
+        AND (reminded_on IS NULL OR reminded_on < CURRENT_DATE)
+    `);
+    if (events.rows.length === 0) return;
+    const subs = await pool.query('SELECT endpoint, p256dh, auth FROM push_subscriptions');
+    if (subs.rows.length === 0) return;
+
+    for (const ev of events.rows) {
+      const openRes = await pool.query(`
+        SELECT COUNT(*)::int AS open FROM (
+          SELECT i.id
+          FROM event_recipes er
+          JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+          JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+          JOIN items i ON i.id = ri.item_id
+          LEFT JOIN event_shopping_status ess ON ess.event_slug = er.event_slug AND ess.item_id = i.id
+          WHERE er.event_slug = $1 AND i.active = true
+          GROUP BY i.id, i.quantity
+          HAVING SUM(ri.quantity * er.servings) > i.quantity
+             AND bool_or(COALESCE(ess.purchased, false)) = false
+        ) t
+      `, [ev.event_slug]);
+      const open = openRes.rows[0]?.open || 0;
+      if (open === 0) continue;
+
+      const payload = JSON.stringify({
+        title: 'Einkauf offen',
+        body: `${prettyEventName(ev.event_slug)}: noch ${open} Positionen offen (Deadline ${new Date(ev.deadline).toLocaleDateString('de-CH')})`,
+        url: `/?event=${encodeURIComponent(ev.event_slug)}`
+      });
+      for (const s of subs.rows) {
+        try {
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
+        } catch (err: any) {
+          if (err?.statusCode === 404 || err?.statusCode === 410) {
+            await pool.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [s.endpoint]).catch(() => {});
+          }
+        }
+      }
+      await pool.query('UPDATE event_shopping_meta SET reminded_on = CURRENT_DATE WHERE event_slug = $1', [ev.event_slug]);
+    }
+  } catch (e) {
+    console.error('reminder job error:', e);
+  }
+}
+
+function prettyEventName(slug: string): string {
+  return slug.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+if (PUSH_ENABLED) {
+  // alle 12h prüfen (reminded_on begrenzt auf 1x/Tag pro Event)
+  setInterval(sendShoppingReminders, 12 * 60 * 60 * 1000);
+  setTimeout(sendShoppingReminders, 30 * 1000); // kurz nach Start einmal
+}
 
 // ========================================
 // ITEMS
@@ -1389,9 +1773,44 @@ function authenticateOrderSystem(req: express.Request, res: express.Response, ne
 //  1. internen Aufruf per x-order-api-key (z.B. vom Events-Backend, das
 //     Vorstand/Organisator bereits geprueft hat), ODER
 //  2. jeden eingeloggten Inventar-Nutzer (Authentik-Token) fuer das Inventar-Frontend.
-function authenticateEventAccess(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
+async function authenticateEventAccess(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   const apiKey = req.headers['x-order-api-key'];
   if (apiKey && apiKey === ORDER_API_KEY) return next();
+
+  // Teilen-Link: gültiger Share-Token für genau dieses Event erlaubt Zugriff ohne Login.
+  const shareToken = (req.headers['x-share-token'] as string) || (req.query.share as string);
+  if (shareToken) {
+    try {
+      const r = await pool.query(
+        'SELECT event_slug, can_write, expires_at FROM event_share_tokens WHERE token = $1',
+        [shareToken]
+      );
+      const row = r.rows[0];
+      if (row && row.event_slug === req.params.slug &&
+          (!row.expires_at || new Date(row.expires_at) > new Date())) {
+        const isWrite = req.method !== 'GET';
+        if (isWrite && !row.can_write) {
+          return res.status(403).json({ error: 'Nur-Lese-Freigabe' });
+        }
+        // Geteilte Links duerfen (auch mit Schreibrecht) NUR die Einkaufsliste abhaken
+        // und Belege verwalten - NICHT Rezepte/Meta/Restock am Event aendern.
+        if (isWrite) {
+          const p = req.path || '';
+          const allowed =
+            (req.method === 'PATCH'  && /\/shopping-list\/\d+$/.test(p)) ||
+            (req.method === 'POST'   && /\/receipts$/.test(p)) ||
+            (req.method === 'DELETE' && /\/receipts\/\d+$/.test(p));
+          if (!allowed) {
+            return res.status(403).json({ error: 'Für geteilte Links nicht erlaubt' });
+          }
+        }
+        req.user = { id: 'share', email: 'geteilter-link', name: 'Geteilter Link', groups: [] };
+        return next();
+      }
+    } catch (e) {
+      // fällt auf normale Token-Prüfung zurück
+    }
+  }
   // Jeder eingeloggte Inventar-Nutzer darf Event-Rezepte verwalten (nicht nur Vorstand).
   // Die Beschraenkung auf Vorstand/Organisator gilt nur auf der oeffentlichen Eventseite (Events-Proxy).
   return authenticateToken(req, res, next);

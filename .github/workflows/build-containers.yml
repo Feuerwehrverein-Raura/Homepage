@@ -79,6 +79,7 @@ jobs:
       order-register: ${{ steps.filter.outputs.order-register }}
       inventory-backend: ${{ steps.filter.outputs.inventory-backend }}
       inventory-frontend: ${{ steps.filter.outputs.inventory-frontend }}
+      einkauf-frontend: ${{ steps.filter.outputs.einkauf-frontend }}
       spam-manager: ${{ steps.filter.outputs.spam-manager }}
     steps:
       - uses: actions/checkout@v4
@@ -112,6 +113,8 @@ jobs:
               - 'simple-inventory-system/backend/**'
             inventory-frontend:
               - 'simple-inventory-system/frontend/**'
+            einkauf-frontend:
+              - 'simple-inventory-system/shopping-pwa/**'
             spam-manager:
               - 'docker/spam-manager/**'
 
@@ -510,6 +513,39 @@ jobs:
             ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:latest
             ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:v${{ needs.release.outputs.version }}
             ${{ env.REGISTRY }}/feuerwehrverein-raura/inventory-frontend:${{ github.sha }}
+
+  build-einkauf-frontend:
+    needs: [release, detect-changes]
+    if: needs.detect-changes.outputs.einkauf-frontend == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./simple-inventory-system/shopping-pwa
+          push: true
+          no-cache: true
+          build-args: |
+            VITE_API_URL=https://inventar.fwv-raura.ch/api
+            VITE_WS_URL=wss://inventar.fwv-raura.ch/ws
+            VITE_AUTHENTIK_URL=https://auth.fwv-raura.ch
+            VITE_AUTHENTIK_CLIENT_ID=inventory-system
+          tags: |
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/einkauf-frontend:latest
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/einkauf-frontend:v${{ needs.release.outputs.version }}
+            ${{ env.REGISTRY }}/feuerwehrverein-raura/einkauf-frontend:${{ github.sha }}
 
   build-spam-manager:
     needs: [release, detect-changes]
