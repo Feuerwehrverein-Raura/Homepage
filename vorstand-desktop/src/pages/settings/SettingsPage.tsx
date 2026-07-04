@@ -1,20 +1,39 @@
-import { useSettingsStore } from "@/stores/settings-store";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import {
   Sun,
   Moon,
   Monitor,
-  Info,
+  RefreshCw,
 } from "lucide-react";
+import { useSettingsStore } from "@/stores/settings-store";
+import { checkForUpdates } from "@/lib/auto-updater";
 import { cn } from "@/lib/utils";
 
 export function SettingsPage() {
-  const { theme, setTheme } = useSettingsStore();
+  const { theme, setTheme, autoUpdate, setAutoUpdate } = useSettingsStore();
+  const [version, setVersion] = useState<string>("");
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => setVersion(""));
+  }, []);
 
   const themes = [
     { value: "system" as const, label: "System", icon: Monitor },
     { value: "light" as const, label: "Hell", icon: Sun },
     { value: "dark" as const, label: "Dunkel", icon: Moon },
   ];
+
+  const checkNow = async () => {
+    setChecking(true);
+    try {
+      // Nicht-silent: zeigt "schon aktuell" bzw. Fehler und den Update-Dialog.
+      await checkForUpdates(false);
+    } finally {
+      setChecking(false);
+    }
+  };
 
   return (
     <div>
@@ -43,6 +62,52 @@ export function SettingsPage() {
           </div>
         </div>
 
+        {/* Updates */}
+        <div className="rounded-lg border bg-card p-4">
+          <h3 className="font-semibold text-sm mb-3">Updates</h3>
+
+          <label className="flex items-center justify-between gap-3 cursor-pointer">
+            <span className="text-sm">
+              Beim Start automatisch nach Updates suchen
+              <span className="block text-xs text-muted-foreground">
+                Gefundene Updates werden vor der Installation bestätigt.
+              </span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoUpdate}
+              onClick={() => setAutoUpdate(!autoUpdate)}
+              className={cn(
+                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
+                autoUpdate ? "bg-primary" : "bg-input"
+              )}
+            >
+              <span
+                className={cn(
+                  "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+                  autoUpdate ? "translate-x-5" : "translate-x-0.5"
+                )}
+              />
+            </button>
+          </label>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              Installierte Version{version ? `: ${version}` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={checkNow}
+              disabled={checking}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 disabled:opacity-60"
+            >
+              <RefreshCw className={cn("h-4 w-4", checking && "animate-spin")} />
+              {checking ? "Suche…" : "Jetzt suchen"}
+            </button>
+          </div>
+        </div>
+
         {/* About */}
         <div className="rounded-lg border bg-card p-4">
           <h3 className="font-semibold text-sm mb-3">Info</h3>
@@ -59,15 +124,6 @@ export function SettingsPage() {
               <span className="text-muted-foreground">API</span>
               <span className="font-mono text-xs">api.fwv-raura.ch</span>
             </div>
-          </div>
-        </div>
-
-        {/* Auto-Update */}
-        <div className="rounded-lg border bg-card p-4">
-          <h3 className="font-semibold text-sm mb-3">Updates</h3>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Info className="h-4 w-4" />
-            <span>Auto-Update wird ueber Tauri Updater konfiguriert.</span>
           </div>
         </div>
       </div>

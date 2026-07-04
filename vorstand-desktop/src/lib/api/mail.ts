@@ -99,6 +99,7 @@ export interface ComposeBody {
   bcc?: string;
   subject: string;
   body: string;
+  html?: string;
   inReplyTo?: string | null;
   references?: string | null;
   attachments?: Array<{ filename: string; content: string; contentType: string }>;

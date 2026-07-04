@@ -5,14 +5,18 @@ type Theme = "system" | "light" | "dark";
 interface SettingsState {
   theme: Theme;
   sidebarCollapsed: boolean;
+  autoUpdate: boolean;
   setTheme: (theme: Theme) => void;
   toggleSidebar: () => void;
+  setAutoUpdate: (enabled: boolean) => void;
   applyTheme: () => void;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   theme: (localStorage.getItem("theme") as Theme) || "system",
   sidebarCollapsed: localStorage.getItem("sidebarCollapsed") === "true",
+  // Standard: an. Nur explizites "false" schaltet den Start-Check ab.
+  autoUpdate: localStorage.getItem("autoUpdate") !== "false",
 
   setTheme: (theme: Theme) => {
     localStorage.setItem("theme", theme);
@@ -24,6 +28,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const next = !get().sidebarCollapsed;
     localStorage.setItem("sidebarCollapsed", String(next));
     set({ sidebarCollapsed: next });
+  },
+
+  setAutoUpdate: (enabled: boolean) => {
+    localStorage.setItem("autoUpdate", String(enabled));
+    set({ autoUpdate: enabled });
   },
 
   applyTheme: () => {
