@@ -6902,7 +6902,9 @@
                                     html: letterHtml,
                                     recipient,
                                     member_id: member.id,
-                                    subject: postSubject
+                                    subject: postSubject,
+                                    // Event-Einladung: 15mm Oberrand, damit Folgeseiten nicht in Pingens Sperrzone laufen
+                                    pdf_margin: evtForPost ? { top: '15mm', right: '0', bottom: '20mm', left: '0' } : undefined
                                 })
                             });
                             if (response.ok) postSuccess++;
@@ -8016,32 +8018,32 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 
             return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
-  @page { size: A4; margin: 0; }
+  @page { size: A4; }
   body { margin: 0; padding: 0; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
 </style></head>
 <body>
-<!-- Kopfbereich (Seite 1): absolut positioniert. Das Adressfenster liegt exakt in der
-     Pingen-Rechts-Zone (60mm von oben / 118mm von links). Reserviert oben 100mm Hoehe,
-     damit der Text erst darunter beginnt. -->
-<div style="position:relative;height:100mm;">
-    <div style="position:absolute;top:15mm;left:25mm;width:35mm;">
+<!-- Kopfbereich (Seite 1): absolut positioniert. Puppeteer rendert diesen Brief mit 15mm
+     Oberrand (pdf_margin), damit auch FOLGESEITEN nicht in Pingens Sperrzone laufen.
+     Deshalb sind die Kopf-Koordinaten um 15mm nach oben verschoben -> das Adressfenster
+     landet exakt bei 60mm/118mm ab Blattrand (Pingen-Rechts-Zone). -->
+<div style="position:relative;height:85mm;">
+    <div style="position:absolute;top:0;left:25mm;width:35mm;">
         <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
     </div>
-    <div style="position:absolute;top:15mm;left:118mm;">
+    <div style="position:absolute;top:0;left:118mm;">
         <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
         <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
     </div>
-    <div style="position:absolute;top:35mm;left:118mm;font-size:8pt;color:#333;">${getAktuarAbsenderLine()}</div>
-    <div style="position:absolute;top:60mm;left:118mm;width:85mm;">
+    <div style="position:absolute;top:20mm;left:118mm;font-size:8pt;color:#333;">${getAktuarAbsenderLine()}</div>
+    <div style="position:absolute;top:45mm;left:118mm;width:85mm;">
         <div>${name}</div>
         <div>${strasse}</div>
         <div>${plzOrt}</div>
     </div>
-    <div style="position:absolute;top:92mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
+    <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
 </div>
-<!-- Body im normalen Textfluss: bricht bei langem Inhalt sauber auf Folgeseiten um und
-     respektiert den 20mm-Unterrand (Puppeteer) — laeuft also nicht mehr in Pingens
-     nicht-bedruckbare Sperrzone. -->
+<!-- Body im normalen Textfluss: bricht bei langem Inhalt sauber um; respektiert oben 15mm
+     und unten 20mm (Puppeteer-Raender) -> laeuft nicht mehr in die nicht-bedruckbare Zone. -->
 <div style="padding:0 25mm 5mm 25mm;">${bodyContent}</div>
 </body></html>`;
         }
