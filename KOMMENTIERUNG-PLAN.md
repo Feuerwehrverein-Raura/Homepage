@@ -167,7 +167,6 @@
 - [x] `simple-order-system/frontend/src/main.tsx`
 - [x] `simple-order-system/kitchen-display/src/App.tsx`
 - [x] `simple-order-system/kitchen-display/src/main.tsx`
-- [x] `simple-order-system/register-app/index.html`
 
 ---
 
