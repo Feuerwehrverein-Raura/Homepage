@@ -12,7 +12,7 @@ export default defineConfig({
         name: 'Einkauf - FWV Raura',
         short_name: 'Einkauf',
         description: 'Einkaufslisten für Vereins-Events — offline abhaken, live geteilt',
-        theme_color: '#16a34a',
+        theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait-primary',
