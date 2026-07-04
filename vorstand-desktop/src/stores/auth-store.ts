@@ -10,6 +10,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isHydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   loadFromStorage: () => Promise<void>;
@@ -21,6 +22,7 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  isHydrated: false,
 
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
@@ -73,6 +75,8 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
       }
     } catch {
       // No stored token
+    } finally {
+      set({ isHydrated: true });
     }
   },
 }));
