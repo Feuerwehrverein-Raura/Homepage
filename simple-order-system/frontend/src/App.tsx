@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { InstallPrompt } from './InstallPrompt';
 
 // Offline Banner Component
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
@@ -139,8 +140,6 @@ function App() {
   const [pendingOrder, setPendingOrder] = useState<{ id: number; total: number; tableNumber?: number } | null>(null);
   const [cashPayment, setCashPayment] = useState<{ orderId: number; total: number; received: string } | null>(null);
   const [cardPayment, setCardPayment] = useState<{ orderId: number; total: number } | null>(null);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
   const [orderConfirmation, setOrderConfirmation] = useState<{
     orderId: number;
     orderType: 'bar' | 'tisch';
@@ -163,40 +162,6 @@ function App() {
   // WebSocket state
   const wsRef = useRef<WebSocket | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
-
-  // PWA Install prompt
-  useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
-    }
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-
-    const handleAppInstalled = () => {
-      setIsInstalled(true);
-      setInstallPrompt(null);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setInstallPrompt(null);
-    }
-  };
 
   // Check session token on mount (Authentik OIDC via auth-callback.html)
   useEffect(() => {
@@ -864,6 +829,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <InstallPrompt appName="Kasse" />
       {/* Offline Warning Banner */}
       <OfflineBanner apiUrl={API_URL} />
 
@@ -907,15 +873,6 @@ function App() {
               <h1 className="text-lg sm:text-2xl font-bold">Kasse</h1>
             </div>
             <div className="flex items-center gap-2">
-              {/* Install Button */}
-              {installPrompt && !isInstalled && (
-                <button
-                  onClick={handleInstallClick}
-                  className="px-2 py-1 sm:px-3 sm:py-1.5 rounded bg-green-600 hover:bg-green-700 text-xs sm:text-sm min-h-[36px] sm:min-h-[40px] touch-manipulation flex items-center gap-1"
-                >
-                  📲 <span className="hidden sm:inline">Installieren</span>
-                </button>
-              )}
               {user && <span className="text-xs sm:text-sm">Hallo, {user.name}</span>}
               <button
                 onClick={logout}

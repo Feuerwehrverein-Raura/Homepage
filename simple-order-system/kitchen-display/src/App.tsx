@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { InstallPrompt } from './InstallPrompt';
 
 // Offline Banner Component
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
@@ -518,6 +519,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
+      <InstallPrompt appName="Küche" />
       {/* Offline Warning Banner */}
       <OfflineBanner apiUrl={API_URL} />
 
