@@ -21,7 +21,9 @@ export interface Event {
   meal_options?: string[] | null;
   pdf_filename?: string | null;
   shifts: Shift[];
-  direct_registrations: DirectRegistrations | null;
+  /** Backend sendet camelCase; snake_case bleibt fuer Abwaertskompat. der Reads. */
+  direct_registrations?: DirectRegistrations | null;
+  directRegistrations?: DirectRegistrations | null;
   created_at: string | null;
 }
 
@@ -82,6 +84,8 @@ export interface EventRegistration {
   member_id: string | null;
   guest_name: string | null;
   guest_email: string | null;
+  /** Aufgeloeste E-Mail (Mitglied oder Gast) — auch bei Schicht-Anmeldungen. */
+  email?: string | null;
   phone: string | null;
   notes: string | null;
   status: string;
@@ -90,17 +94,18 @@ export interface EventRegistration {
   nachname: string | null;
 }
 
+// Wire-Format vom Backend ist camelCase.
 export interface ShiftRegistrations {
   approved: EventRegistration[];
   pending: EventRegistration[];
-  approved_count: number;
-  pending_count: number;
-  spots_left: number | null;
+  approvedCount: number;
+  pendingCount: number;
+  spotsLeft: number | null;
 }
 
 export interface DirectRegistrations {
   approved: EventRegistration[];
   pending: EventRegistration[];
-  approved_count: number;
-  pending_count: number;
+  approvedCount: number;
+  pendingCount: number;
 }

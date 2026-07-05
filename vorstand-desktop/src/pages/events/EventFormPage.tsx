@@ -23,6 +23,15 @@ const CATEGORIES = [
 ];
 const STATUSES = ["planned", "confirmed", "cancelled", "completed"];
 
+// Kategorien, die (wie im Web) automatisch eine Anmeldung erfordern.
+const REG_REQUIRED_CATEGORIES = [
+  "Dorffest",
+  "GV",
+  "Aufbau",
+  "Abbau",
+  "Ausflug mit Anmeldung",
+];
+
 // Schicht-Bereiche wie im Web (SHIFT_TYPES) — als Vorschlagsliste (datalist).
 const SHIFT_BEREICHE = [
   "Allgemein",
@@ -84,6 +93,7 @@ export function EventFormPage() {
   const [mealOptionsText, setMealOptionsText] = useState("");
   const [createAccess, setCreateAccess] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [removePdf, setRemovePdf] = useState(false);
 
   useEffect(() => {
     if (isEdit && id) {
@@ -205,15 +215,25 @@ export function EventFormPage() {
     try {
       const payload: EventCreate = {
         ...form,
-        meal_options: mealOptionsText
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        // H1: registration_required aus der Kategorie ableiten (wie im Web) —
+        // sonst haetten GV/Dorffest/... trotz Anmelde-Charakter kein Anmeldeformular.
+        registration_required:
+          REG_REQUIRED_CATEGORIES.includes(form.category || "") ||
+          !!form.registration_required,
+        // N2: Menue-Optionen nur bei GV senden, sonst null (nicht "[]").
+        meal_options:
+          form.category === "GV"
+            ? mealOptionsText.split(",").map((s) => s.trim()).filter(Boolean)
+            : null,
         create_access: createAccess || undefined,
       };
       if (pdfFile) {
         payload.pdf_attachment = await readPdfBase64(pdfFile);
         payload.pdf_filename = pdfFile.name;
+      } else if (removePdf) {
+        // N3: bestehenden PDF-Aushang entfernen
+        payload.pdf_attachment = null;
+        payload.pdf_filename = null;
       }
       if (isEdit && id) {
         await updateEvent(id, payload);
@@ -333,15 +353,26 @@ export function EventFormPage() {
             value={form.cost || ""}
             onChange={(v) => handleChange("cost", v)}
           />
-          <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input
-              type="checkbox"
-              checked={!!form.registration_required}
-              onChange={(e) => setForm((p) => ({ ...p, registration_required: e.target.checked }))}
-              className="rounded border-input"
-            />
-            Anmeldung erforderlich
-          </label>
+          {(() => {
+            const autoRequired = REG_REQUIRED_CATEGORIES.includes(form.category || "");
+            return (
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoRequired || !!form.registration_required}
+                  disabled={autoRequired}
+                  onChange={(e) => setForm((p) => ({ ...p, registration_required: e.target.checked }))}
+                  className="rounded border-input"
+                />
+                Anmeldung erforderlich
+                {autoRequired && (
+                  <span className="text-xs text-muted-foreground">
+                    (durch Kategorie „{form.category}" automatisch)
+                  </span>
+                )}
+              </label>
+            );
+          })()}
           {form.category === "GV" && (
             <TextField
               label="Menue-Optionen (kommagetrennt, fuer die Essenswahl bei der Anmeldung)"
@@ -390,14 +421,26 @@ export function EventFormPage() {
         <fieldset className="rounded-lg border p-4 space-y-3">
           <legend className="px-2 text-sm font-semibold">PDF-Aushang</legend>
           {isEdit && selectedEvent?.pdf_filename && !pdfFile && (
-            <p className="text-sm text-muted-foreground">
-              Aktuell: {selectedEvent.pdf_filename} (neue Datei ersetzt den Anhang)
-            </p>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>Aktuell: {selectedEvent.pdf_filename} (neue Datei ersetzt den Anhang)</p>
+              <label className="flex items-center gap-2 cursor-pointer text-destructive">
+                <input
+                  type="checkbox"
+                  checked={removePdf}
+                  onChange={(e) => setRemovePdf(e.target.checked)}
+                  className="rounded border-input"
+                />
+                PDF-Aushang entfernen
+              </label>
+            </div>
           )}
           <input
             type="file"
             accept="application/pdf"
-            onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+            onChange={(e) => {
+              setPdfFile(e.target.files?.[0] || null);
+              if (e.target.files?.[0]) setRemovePdf(false);
+            }}
             className="block text-sm"
           />
           {pdfFile && (
