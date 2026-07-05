@@ -11,6 +11,7 @@ import {
   type DatasetResult,
 } from "@/lib/api/export";
 import { cn } from "@/lib/utils";
+import { openFile } from "@/lib/pdf";
 import {
   FileSpreadsheet,
   Download,
@@ -250,14 +251,7 @@ export function ExportPage() {
       const blob = new Blob([wbArray], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `fwv-export-${today}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await openFile(blob, `fwv-export-${today}.xlsx`);
 
       setSheets(results);
     } catch (err) {

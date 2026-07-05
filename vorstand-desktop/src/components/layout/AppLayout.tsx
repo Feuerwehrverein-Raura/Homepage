@@ -16,7 +16,6 @@ import { AuditPage } from "@/pages/admin/AuditPage";
 import { MailcowPage } from "@/pages/mailcow/MailcowPage";
 import { VaultPage } from "@/pages/vault/VaultPage";
 import { MembershipFeesPage } from "@/pages/membership-fees/MembershipFeesPage";
-import { ScheduledJobsPage } from "@/pages/scheduled-jobs/ScheduledJobsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { AppTokensPage } from "@/pages/app-tokens/AppTokensPage";
 import { MailPage } from "@/pages/mail/MailPage";
@@ -53,7 +52,6 @@ export function AppLayout() {
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="vault" element={<VaultPage />} />
             <Route path="membership-fees" element={<MembershipFeesPage />} />
-            <Route path="scheduled-jobs" element={<ScheduledJobsPage />} />
             <Route path="app-tokens" element={<AppTokensPage />} />
             <Route path="export" element={<ExportPage />} />
             <Route path="settings" element={<SettingsPage />} />

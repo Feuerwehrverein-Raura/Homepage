@@ -78,8 +78,6 @@ export function ScheduledJobsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Geplante Aufgaben</h1>
-
       {error && (
         <div className="flex items-center gap-2 p-3 mb-4 rounded-md bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />

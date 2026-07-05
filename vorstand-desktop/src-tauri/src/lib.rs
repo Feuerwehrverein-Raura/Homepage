@@ -1,6 +1,7 @@
 mod commands;
 
 use commands::auth;
+use commands::files;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -16,6 +17,7 @@ pub fn run() {
             auth::load_token,
             auth::clear_token,
             auth::check_token_expiry,
+            files::open_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

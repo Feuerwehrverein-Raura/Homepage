@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEventsStore } from "@/stores/events-store";
+import { openFile } from "@/lib/pdf";
 import { useAuthStore } from "@/stores/auth-store";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { formatSwissDate, formatTime } from "@/lib/utils/date";
@@ -88,14 +89,7 @@ async function downloadPdf(path: string, filename: string): Promise<void> {
     throw new Error(msg);
   }
   const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  await openFile(blob, filename);
 }
 
 export function EventDetailPage() {
