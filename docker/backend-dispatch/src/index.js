@@ -4313,7 +4313,9 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
-                        address_position: 'right'
+                        // DE: Fenster links (DIN 5008) + Land explizit; CH: rechts
+                        address_position: recipient?.country === 'DE' ? 'left' : 'right',
+                        country: recipient?.country || 'CH'
                     }
                 }
             },
@@ -4401,7 +4403,9 @@ app.post('/dispatch/send-pdf-post', authenticateAny, async (req, res) => {
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
-                        address_position: 'right'
+                        // DE: Fenster links (DIN 5008) + Land explizit; CH: rechts
+                        address_position: recipient?.country === 'DE' ? 'left' : 'right',
+                        country: recipient?.country || 'CH'
                     }
                 }
             },

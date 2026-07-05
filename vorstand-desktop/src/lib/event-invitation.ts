@@ -12,7 +12,10 @@
 // das Logo laedt der Server von www.fwv-raura.ch. Die Desktop-CSP gilt hier NICHT.
 
 import type { Member } from "@/lib/types/member";
-import { replacePlaceholders, letterAddressLines } from "@/lib/dispatch-letter";
+import {
+  replacePlaceholders,
+  buildLetterShell,
+} from "@/lib/dispatch-letter";
 
 /**
  * Die Event-Felder, die die Einladungs-Layouts tatsaechlich verwenden.
@@ -80,13 +83,6 @@ export function replaceEventPlaceholders(
 /** Oeffentliche Event-URL — Grundlage fuer den QR-Code (der Aufrufer rendert ihn). */
 export function eventInvitationUrl(event: EventInvitationData): string {
   return `https://www.fwv-raura.ch/events.html?event=${event.slug || event.id}`;
-}
-
-/** Empfaenger-Adressblock fuers Fensterkuvert (nutzt die geteilte DE/CH-Logik). */
-function letterAddressBlockHtml(member: Member): string {
-  return letterAddressLines(member)
-    .map((l) => `<div>${l}</div>`)
-    .join("\n        ");
 }
 
 /**
@@ -180,12 +176,6 @@ export function generateEventInvitationLetterHTML(
   organizerPhone: string,
   eventQrDataUrl?: string,
 ): string {
-  const datum = new Date().toLocaleDateString("de-CH", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-
   const intro = replacePlaceholders(bodyHtml || "", member);
   const bodyContent = buildEventInvitationBody(
     event,
@@ -196,35 +186,9 @@ export function generateEventInvitationLetterHTML(
     organizerPhone,
     eventQrDataUrl,
   );
-
-  return `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><style>
-  @page { size: A4; }
-  body { margin: 0; padding: 0; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
-</style></head>
-<body>
-<!-- Kopfbereich (Seite 1): absolut positioniert. Puppeteer rendert diesen Brief mit 15mm
-     Oberrand (pdf_margin), damit auch FOLGESEITEN nicht in Pingens Sperrzone laufen.
-     Deshalb sind die Kopf-Koordinaten um 15mm nach oben verschoben -> das Adressfenster
-     landet exakt bei 60mm/118mm ab Blattrand (Pingen-Rechts-Zone). -->
-<div style="position:relative;height:85mm;">
-    <div style="position:absolute;top:0;left:25mm;width:35mm;">
-        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
-    </div>
-    <div style="position:absolute;top:0;left:118mm;">
-        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
-        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
-    </div>
-    <div style="position:absolute;top:20mm;left:118mm;font-size:8pt;color:#333;">${senderLine}</div>
-    <div style="position:absolute;top:45mm;left:118mm;width:85mm;">
-        ${letterAddressBlockHtml(member)}
-    </div>
-    <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
-</div>
-<!-- Body im normalen Textfluss: bricht bei langem Inhalt sauber um; respektiert oben 15mm
-     und unten 20mm (Puppeteer-Raender) -> laeuft nicht mehr in die nicht-bedruckbare Zone. -->
-<div style="padding:0 25mm 5mm 25mm;">${bodyContent}</div>
-</body></html>`;
+  // Einheitliche Brief-Shell (Kopf/Adressfenster/Datum + 15mm-Oberrand) — identisch
+  // zum Standard-Post-Brief, da Pingen alle Briefe gleich annimmt.
+  return buildLetterShell(member, senderLine, bodyContent);
 }
 
 /**

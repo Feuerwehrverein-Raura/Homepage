@@ -8,6 +8,7 @@ import {
   generatePdfCoverHTML,
   getAktuarAbsenderLine,
   bodyTextToHtml,
+  recipientCountry,
 } from "@/lib/dispatch-letter";
 import {
   generateEventInvitationLetterHTML,
@@ -66,6 +67,10 @@ function memberFullNameByRole(members: Member[], re: RegExp): string {
   const m = members.find((x) => x.funktion && re.test(x.funktion));
   return m ? `${m.vorname || ""} ${m.nachname || ""}`.trim() : "";
 }
+
+// Einheitlicher Seitenrand fuer Briefe (Event-Vorlage): 15mm oben (Folgeseiten bleiben
+// aus Pingens Sperrzone), 20mm unten. Wird an /dispatch/send-post + Vorschau durchgereicht.
+const LETTER_MARGIN = { top: "15mm", right: "0", bottom: "20mm", left: "0" };
 
 export function DispatchPage() {
   const [activeTab, setActiveTab] = useState<Tab>("send");
@@ -263,7 +268,7 @@ function SendTab() {
                 street: m.strasse,
                 zip: m.plz,
                 city: m.ort,
-                country: "CH",
+                country: recipientCountry(m),
               },
               member_id: m.id,
               subject: subject || "Dokument",
@@ -387,11 +392,12 @@ function SendTab() {
                 street: m.strasse,
                 zip: m.plz,
                 city: m.ort,
-                country: "CH",
+                country: recipientCountry(m),
               },
               member_id: m.id,
               subject: subject || "Brief",
               staging,
+              pdf_margin: LETTER_MARGIN,
             });
             ok++;
           } catch {
@@ -431,7 +437,7 @@ function SendTab() {
         sample,
         senderLine
       );
-      const blob = await dispatchApi.previewLetterPdf(html);
+      const blob = await dispatchApi.previewLetterPdf(html, LETTER_MARGIN);
       openPdfBlob(blob, `Vorschau_${sample.nachname || "Brief"}.pdf`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vorschau fehlgeschlagen");
