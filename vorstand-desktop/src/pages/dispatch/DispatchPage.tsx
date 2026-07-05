@@ -17,6 +17,8 @@ import {
 import * as eventsApi from "@/lib/api/events";
 import type { Event } from "@/lib/types/event";
 import { MassPdfPage } from "@/pages/masspdf/MassPdfPage";
+import { ScheduledJobsPage } from "@/pages/scheduled-jobs/ScheduledJobsPage";
+import { openFile } from "@/lib/pdf";
 import type {
   EmailTemplate,
   PingenAccount,
@@ -40,9 +42,10 @@ import {
   Paperclip,
   Eye,
   FileUp,
+  Clock,
 } from "lucide-react";
 
-type Tab = "send" | "templates" | "pingen" | "masspdf" | "log";
+type Tab = "send" | "templates" | "pingen" | "masspdf" | "scheduled" | "log";
 
 // Datei als base64 (ohne data:-Prefix) lesen — fuer den PDF-Brief-Versand.
 function readFileBase64(file: File): Promise<string> {
@@ -54,14 +57,10 @@ function readFileBase64(file: File): Promise<string> {
   });
 }
 
-// PDF-Blob im Standard-Viewer oeffnen (Download-Weg, im Tauri-Webview zuverlaessig).
-function openPdfBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+// PDF-Blob im Standard-Viewer des Systems oeffnen (via Rust-Command, weil
+// <a download> im Tauri-Webview nicht funktioniert).
+async function openPdfBlob(blob: Blob, filename: string) {
+  await openFile(blob, filename);
 }
 
 // Vollname eines Mitglieds mit passender Funktion (z.B. Praesident/Aktuar).
@@ -82,6 +81,7 @@ export function DispatchPage() {
     { key: "templates", label: "Vorlagen", icon: FileText },
     { key: "pingen", label: "Post (Pingen)", icon: Mail },
     { key: "masspdf", label: "Massen-PDF", icon: FileUp },
+    { key: "scheduled", label: "Geplant", icon: Clock },
     { key: "log", label: "Verlauf", icon: RefreshCw },
   ];
 
@@ -112,6 +112,7 @@ export function DispatchPage() {
       {activeTab === "templates" && <TemplatesTab />}
       {activeTab === "pingen" && <PingenTab />}
       {activeTab === "masspdf" && <MassPdfPage />}
+      {activeTab === "scheduled" && <ScheduledJobsPage />}
       {activeTab === "log" && <LogTab />}
     </div>
   );
@@ -442,7 +443,7 @@ function SendTab() {
         senderLine
       );
       const blob = await dispatchApi.previewLetterPdf(html, LETTER_MARGIN);
-      openPdfBlob(blob, `Vorschau_${sample.nachname || "Brief"}.pdf`);
+      await openPdfBlob(blob, `Vorschau_${sample.nachname || "Brief"}.pdf`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vorschau fehlgeschlagen");
     } finally {

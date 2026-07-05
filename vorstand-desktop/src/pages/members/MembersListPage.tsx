@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMembersStore } from "@/stores/members-store";
+import { openFile } from "@/lib/pdf";
 import * as membersApi from "@/lib/api/members";
 import { formatSwissDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
@@ -58,12 +59,7 @@ export function MembersListPage() {
     setPdfError(null);
     try {
       const blob = await membersApi.downloadTelefonlistePdf();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "Telefonliste_Mitglieder.pdf";
-      a.click();
-      URL.revokeObjectURL(url);
+      await openFile(blob, "Telefonliste_Mitglieder.pdf");
     } catch (err) {
       setPdfError(
         err instanceof Error ? err.message : "Fehler beim Erstellen der PDF"

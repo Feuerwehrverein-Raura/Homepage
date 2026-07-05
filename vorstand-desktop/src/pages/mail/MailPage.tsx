@@ -10,6 +10,7 @@ import {
   type MailListItem, type MailMessage,
 } from "@/lib/api/mail";
 import { listContacts, type Contact } from "@/lib/api/contacts";
+import { openFile } from "@/lib/pdf";
 import { useAuthStore } from "@/stores/auth-store";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { RichTextEditor } from "./RichTextEditor";
@@ -296,8 +297,7 @@ export function MailPage() {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     const blob = await r.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+    await openFile(blob, filename);
   };
 
   // Auto-Complete-Suggestions
