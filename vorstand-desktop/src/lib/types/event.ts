@@ -15,6 +15,11 @@ export interface Event {
   cost: string | null;
   organizer_name: string | null;
   organizer_email: string | null;
+  /** Organisator-Zugang (Event-Dashboard): Login-E-Mail, falls eingerichtet. */
+  event_email?: string | null;
+  /** Menue-Optionen fuer GV-Events (Anmeldung mit Essenswahl). */
+  meal_options?: string[] | null;
+  pdf_filename?: string | null;
   shifts: Shift[];
   direct_registrations: DirectRegistrations | null;
   created_at: string | null;
@@ -30,10 +35,19 @@ export interface EventCreate {
   location?: string | null;
   description?: string | null;
   registration_deadline?: string | null;
+  registration_required?: boolean | null;
   max_participants?: number | null;
   cost?: string | null;
   organizer_name?: string | null;
   organizer_email?: string | null;
+  slug?: string | null;
+  /** Menue-Optionen fuer GV-Events. */
+  meal_options?: string[] | null;
+  /** Beim Erstellen/Bearbeiten: Organisator-Zugang (Event-Dashboard) einrichten. */
+  create_access?: boolean;
+  /** PDF-Aushang als base64 (data-URL-Inhalt ohne Prefix) + Dateiname. */
+  pdf_attachment?: string | null;
+  pdf_filename?: string | null;
 }
 
 export interface Shift {

@@ -3,13 +3,53 @@ import { useNavigate } from "react-router-dom";
 import { useEventsStore } from "@/stores/events-store";
 import { formatSwissDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils";
+import type { Event } from "@/lib/types/event";
 import {
   Calendar,
   Plus,
   Loader2,
   AlertCircle,
   MapPin,
+  Send,
+  Users,
 } from "lucide-react";
+
+// Zaehler je Event: offene (pending) Anmeldungen + Schicht-Besetzung.
+// Das Backend liefert je Schicht registrations{approved[],pending[]} bzw.
+// approvedCount/pendingCount (camelCase) und directRegistrations.
+function eventCounters(event: Event): {
+  pending: number;
+  approved: number;
+  needed: number;
+} {
+  let pending = 0;
+  let approved = 0;
+  let needed = 0;
+  for (const sh of event.shifts || []) {
+    const r = sh.registrations as
+      | { approved?: unknown[]; pending?: unknown[] }
+      | undefined;
+    const rc = sh as unknown as { approvedCount?: number; pendingCount?: number };
+    approved += Array.isArray(r?.approved)
+      ? r.approved.length
+      : typeof rc.approvedCount === "number"
+        ? rc.approvedCount
+        : 0;
+    pending += Array.isArray(r?.pending)
+      ? r.pending.length
+      : typeof rc.pendingCount === "number"
+        ? rc.pendingCount
+        : 0;
+    needed += sh.needed || 0;
+  }
+  const ext = event as Event & {
+    directRegistrations?: { approved?: unknown[]; pending?: unknown[] } | null;
+  };
+  const direct = event.direct_registrations ?? ext.directRegistrations ?? null;
+  pending += direct?.pending?.length ?? 0;
+  approved += direct?.approved?.length ?? 0;
+  return { pending, approved, needed };
+}
 
 export function EventsListPage() {
   const navigate = useNavigate();
@@ -72,7 +112,9 @@ export function EventsListPage() {
                 <th className="text-left px-4 py-3 font-medium">Kategorie</th>
                 <th className="text-left px-4 py-3 font-medium">Datum</th>
                 <th className="text-left px-4 py-3 font-medium">Ort</th>
+                <th className="text-left px-4 py-3 font-medium">Anmeldungen</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
+                <th className="text-right px-4 py-3 font-medium"></th>
               </tr>
             </thead>
             <tbody>
@@ -87,6 +129,11 @@ export function EventsListPage() {
                     {event.subtitle && (
                       <div className="text-xs text-muted-foreground">
                         {event.subtitle}
+                      </div>
+                    )}
+                    {event.organizer_name && (
+                      <div className="text-xs text-muted-foreground">
+                        Org: {event.organizer_name}
                       </div>
                     )}
                   </td>
@@ -110,7 +157,40 @@ export function EventsListPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
+                    {(() => {
+                      const c = eventCounters(event);
+                      if (c.pending === 0 && c.approved === 0 && c.needed === 0)
+                        return <span className="text-muted-foreground">-</span>;
+                      return (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <Users className="h-3 w-3" />
+                            {c.needed > 0 ? `${c.approved}/${c.needed}` : c.approved}
+                          </span>
+                          {c.pending > 0 && (
+                            <span className="inline-flex px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                              {c.pending} offen
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </td>
+                  <td className="px-4 py-3">
                     <EventStatusBadge status={event.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/dispatch?event=${event.id}`);
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs hover:bg-muted transition-colors"
+                      title="Einladung fuer diesen Anlass verschicken (Versand oeffnen)"
+                    >
+                      <Send className="h-3 w-3" />
+                      Einladung
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -123,9 +203,10 @@ export function EventsListPage() {
 }
 
 function EventStatusBadge({ status }: { status: string | null }) {
+  // Status-Werte wie im Web/Backend: planned/confirmed/cancelled/completed
   const colors: Record<string, string> = {
-    draft: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
-    published:
+    planned: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400",
+    confirmed:
       "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
     cancelled:
       "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
