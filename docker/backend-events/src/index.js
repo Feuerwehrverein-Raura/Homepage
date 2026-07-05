@@ -3503,9 +3503,12 @@ app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
             [id]
         );
 
-        // Load all registrations for this event
+        // Load all registrations for this event.
+        // Kein DISTINCT: r.id ist Primaerschluessel und der LEFT JOIN auf member_id
+        // liefert genau eine Zeile pro Anmeldung -> DISTINCT war ueberfluessig und
+        // brach an "ORDER BY COALESCE(...) muss in Select-Liste stehen".
         const regsResult = await pool.query(`
-            SELECT DISTINCT r.id, r.guest_name, r.guest_email, r.status, r.shift_ids, r.notes,
+            SELECT r.id, r.guest_name, r.guest_email, r.status, r.shift_ids, r.notes,
                    r.member_id, m.vorname, m.nachname, m.email as member_email
             FROM registrations r
             LEFT JOIN members m ON r.member_id = m.id
