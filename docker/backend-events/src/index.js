@@ -2366,6 +2366,125 @@ app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, 
     }
 });
 
+// ============================================================
+// DEUTSCH: Organisator-Endpunkte fuer Event- und Schicht-Verwaltung.
+// Autorisierung ueber ensureOrganizerAccess (E-Mail-Match auf
+// event.organizer_email oder Vorstand/Admin-Gruppe). Organisatoren duerfen den
+// INHALT ihres Events pflegen, aber NICHT Organisator/Zugang/Passwort/Slug.
+// ============================================================
+
+// Organisator: Event-Grunddaten bearbeiten (eingeschraenkte Feldliste).
+app.put('/events/:id/as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const event = await ensureOrganizerAccess(req, res, id);
+        if (!event) return; // 403/404 bereits gesendet
+
+        // Bewusst OHNE slug/organizer_*/event_email/event_password_hash/
+        // event_access_expires/image_url/tags — die bleiben Vorstand/Admin vorbehalten.
+        const allowedFields = [
+            'title', 'subtitle', 'description', 'start_date', 'end_date',
+            'location', 'category', 'registration_required', 'registration_deadline',
+            'max_participants', 'cost', 'status',
+            'meal_options', 'pdf_attachment', 'pdf_filename'
+        ];
+        const filteredUpdates = {};
+        for (const [key, value] of Object.entries(req.body || {})) {
+            if (allowedFields.includes(key)) filteredUpdates[key] = value;
+        }
+        const fields = Object.keys(filteredUpdates);
+        const values = Object.values(filteredUpdates);
+        if (fields.length === 0) {
+            return res.status(400).json({ error: 'Keine gueltigen Felder zum Aktualisieren' });
+        }
+        const setClause = fields.map((f, i) => `${f} = $${i + 1}`).join(', ');
+        values.push(id);
+        const result = await pool.query(`
+            UPDATE events SET ${setClause}, updated_at = NOW()
+            WHERE id = $${values.length}
+            RETURNING *
+        `, values);
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('PUT /events/:id/as-organizer error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Organisator: Schicht zu einem organisierten Event hinzufuegen.
+app.post('/events/:id/shifts-as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const event = await ensureOrganizerAccess(req, res, id);
+        if (!event) return;
+        const { name, description, date, start_time, end_time, needed, bereich } = req.body || {};
+        if (!name) return res.status(400).json({ error: 'name ist ein Pflichtfeld' });
+        if (!date) return res.status(400).json({ error: 'date ist ein Pflichtfeld' });
+        const result = await pool.query(`
+            INSERT INTO shifts (event_id, name, description, date, start_time, end_time, needed, bereich)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *
+        `, [id, name, description, date, start_time, end_time, needed, bereich || 'Allgemein']);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('POST /events/:id/shifts-as-organizer error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Organisator: Schicht eines organisierten Events bearbeiten (+ Registrierte benachrichtigen).
+app.put('/events/:eventId/shifts/:shiftId/as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { eventId, shiftId } = req.params;
+        const event = await ensureOrganizerAccess(req, res, eventId);
+        if (!event) return;
+        const oldShiftResult = await pool.query('SELECT * FROM shifts WHERE id = $1', [shiftId]);
+        if (oldShiftResult.rows.length === 0) return res.status(404).json({ error: 'Shift not found' });
+        const oldShift = oldShiftResult.rows[0];
+        if (oldShift.event_id !== eventId) return res.status(403).json({ error: 'Schicht gehoert nicht zu diesem Event' });
+        const { name, description, date, start_time, end_time, needed, bereich } = req.body || {};
+        const result = await pool.query(`
+            UPDATE shifts SET
+                name = COALESCE($1, name),
+                description = COALESCE($2, description),
+                date = COALESCE($3, date),
+                start_time = COALESCE($4, start_time),
+                end_time = COALESCE($5, end_time),
+                needed = COALESCE($6, needed),
+                bereich = COALESCE($7, bereich)
+            WHERE id = $8
+            RETURNING *
+        `, [name, description, date, start_time, end_time, needed, bereich, shiftId]);
+        const updatedShift = result.rows[0];
+        const evFull = await pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
+        const notificationResult = await notifyShiftRegistrations(updatedShift, evFull.rows[0], 'updated', oldShift);
+        res.json({ ...updatedShift, notifications: notificationResult });
+    } catch (error) {
+        console.error('PUT shift as-organizer error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Organisator: Schicht loeschen (+ Registrierte ueber Absage benachrichtigen).
+app.delete('/events/:eventId/shifts/:shiftId/as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { eventId, shiftId } = req.params;
+        const event = await ensureOrganizerAccess(req, res, eventId);
+        if (!event) return;
+        const shiftResult = await pool.query('SELECT * FROM shifts WHERE id = $1', [shiftId]);
+        if (shiftResult.rows.length === 0) return res.status(404).json({ error: 'Shift not found' });
+        const shift = shiftResult.rows[0];
+        if (shift.event_id !== eventId) return res.status(403).json({ error: 'Schicht gehoert nicht zu diesem Event' });
+        const evFull = await pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
+        const notificationResult = await notifyShiftRegistrations(shift, evFull.rows[0], 'deleted');
+        await pool.query('DELETE FROM shifts WHERE id = $1', [shiftId]);
+        res.json({ message: 'Shift deleted', notifications: notificationResult });
+    } catch (error) {
+        console.error('DELETE shift as-organizer error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 async function organizerActOnRegistration(req, res, newStatus) {
     try {
         const { eventId, regId } = req.params;
@@ -2533,57 +2652,56 @@ app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', '
 });
 
 // DEUTSCH: Alternative Schicht vorschlagen (Vorstand). Sendet E-Mail mit Link zur neuen Schicht
-app.post('/registrations/:id/suggest-alternative', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { newShiftId, shiftInfo, comment, email } = req.body;
+// Kern: schlaegt einer Anmeldung eine alternative Schicht vor (Notes-Update +
+// E-Mail mit Accept/Decline-Links + Push). Von Vorstand- und Organisator-Route
+// gemeinsam genutzt. `actor` ist die Kennung des Ausloesenden (fuer suggested_by).
+// `shiftInfo` darf ein Objekt ({bereich?,name,date,time}) ODER ein fertiges
+// Label (String) sein. Wirft { status, error } bei Validierungsfehlern.
+async function suggestAlternativeForRegistration(regId, payload, actor) {
+    const { newShiftId, shiftInfo, comment, email } = payload || {};
+    if (!newShiftId || !email) {
+        throw { status: 400, error: 'newShiftId and email are required' };
+    }
 
-        if (!newShiftId || !email) {
-            return res.status(400).json({ error: 'newShiftId and email are required' });
-        }
+    const regResult = await pool.query('SELECT * FROM registrations WHERE id = $1', [regId]);
+    if (regResult.rows.length === 0) {
+        throw { status: 404, error: 'Registration not found' };
+    }
+    const reg = regResult.rows[0];
 
-        // Get the registration
-        const regResult = await pool.query('SELECT * FROM registrations WHERE id = $1', [id]);
-        if (regResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Registration not found' });
-        }
-        const reg = regResult.rows[0];
+    const eventResult = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
+    const eventTitle = eventResult.rows[0]?.title || 'Event';
 
-        // Get event info
-        const eventResult = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
-        const eventTitle = eventResult.rows[0]?.title || 'Event';
+    const acceptToken = crypto.randomUUID();
+    const declineToken = crypto.randomUUID();
 
-        // Generate tokens for accept/decline
-        const acceptToken = crypto.randomUUID();
-        const declineToken = crypto.randomUUID();
+    const suggestionData = {
+        suggested_shift_id: newShiftId,
+        suggested_shift_info: shiftInfo,
+        accept_token: acceptToken,
+        decline_token: declineToken,
+        suggested_at: new Date().toISOString(),
+        suggested_by: actor
+    };
 
-        // Store the alternative suggestion in the registration notes
-        const suggestionData = {
-            suggested_shift_id: newShiftId,
-            suggested_shift_info: shiftInfo,
-            accept_token: acceptToken,
-            decline_token: declineToken,
-            suggested_at: new Date().toISOString(),
-            suggested_by: req.user.email || req.user.name
-        };
+    await pool.query(`
+        UPDATE registrations
+        SET notes = COALESCE(notes, '{}')::jsonb || $2::jsonb
+        WHERE id = $1
+    `, [regId, JSON.stringify({ alternative_suggestion: suggestionData })]);
 
-        await pool.query(`
-            UPDATE registrations
-            SET notes = COALESCE(notes, '{}')::jsonb || $2::jsonb
-            WHERE id = $1
-        `, [id, JSON.stringify({ alternative_suggestion: suggestionData })]);
-
-        // Format shift info for email
-        const shiftLabel = shiftInfo.bereich
+    // shiftInfo kann ein Objekt (Web/Desktop) oder ein fertiges Label (App) sein
+    const shiftLabel = (shiftInfo && typeof shiftInfo === 'object')
+        ? (shiftInfo.bereich
             ? `${shiftInfo.bereich} - ${shiftInfo.name} (${shiftInfo.date} ${shiftInfo.time})`
-            : `${shiftInfo.name} (${shiftInfo.date} ${shiftInfo.time})`;
+            : `${shiftInfo.name} (${shiftInfo.date} ${shiftInfo.time})`)
+        : (shiftInfo ? String(shiftInfo) : 'Alternative Schicht');
 
-        // Build email with accept/decline links
-        const baseUrl = process.env.BASE_URL || 'https://api.fwv-raura.ch';
-        const acceptUrl = `${baseUrl}/registrations/alternative-response/${acceptToken}`;
-        const declineUrl = `${baseUrl}/registrations/alternative-response/${declineToken}`;
+    const baseUrl = process.env.BASE_URL || 'https://api.fwv-raura.ch';
+    const acceptUrl = `${baseUrl}/registrations/alternative-response/${acceptToken}`;
+    const declineUrl = `${baseUrl}/registrations/alternative-response/${declineToken}`;
 
-        const emailBody = `Guten Tag ${reg.guest_name},
+    const emailBody = `Guten Tag ${reg.guest_name},
 
 ${comment || 'Wir haben einen alternativen Vorschlag fuer deine Anmeldung.'}
 
@@ -2605,33 +2723,53 @@ Bei Fragen kontaktiere uns bitte.
 Mit freundlichen Gruessen
 Feuerwehrverein Raura`;
 
-        // Send email via dispatch API
-        await axios.post(`${DISPATCH_API}/email/send`, {
-            to: email,
-            subject: `Alternative Schicht vorgeschlagen - ${eventTitle}`,
-            body: emailBody
-        });
+    await axios.post(`${DISPATCH_API}/email/send`, {
+        to: email,
+        subject: `Alternative Schicht vorgeschlagen - ${eventTitle}`,
+        body: emailBody
+    });
 
-        // Push parallel — falls Anmeldung von einem Mitglied stammt
-        if (reg.member_id) {
-            pushToMember(
-                reg.member_id, 'shift_reminder',
-                `Neue Schicht vorgeschlagen: ${eventTitle}`,
-                `Schicht: ${shiftLabel}. Bitte in der App oder per E-Mail bestaetigen.`,
-                { eventId: reg.event_id }
-            ).catch(() => {});
-        }
+    if (reg.member_id) {
+        pushToMember(
+            reg.member_id, 'shift_reminder',
+            `Neue Schicht vorgeschlagen: ${eventTitle}`,
+            `Schicht: ${shiftLabel}. Bitte in der App oder per E-Mail bestaetigen.`,
+            { eventId: reg.event_id }
+        ).catch(() => {});
+    }
 
-        logInfo('Alternative shift suggested', {
-            registrationId: id,
-            newShiftId,
-            email,
-            suggestedBy: req.user.email
-        });
+    logInfo('Alternative shift suggested', { registrationId: regId, newShiftId, email, suggestedBy: actor });
+    return { success: true, message: 'Vorschlag gesendet', eventId: reg.event_id };
+}
 
-        res.json({ success: true, message: 'Vorschlag gesendet' });
+// Vorstand/Admin: alternative Schicht vorschlagen.
+app.post('/registrations/:id/suggest-alternative', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const result = await suggestAlternativeForRegistration(req.params.id, req.body, req.user.email || req.user.name);
+        res.json({ success: result.success, message: result.message });
     } catch (error) {
+        if (error && error.status) return res.status(error.status).json({ error: error.error });
         logError('Error suggesting alternative', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Organisator (E-Mail-Match): alternative Schicht vorschlagen (event-scoped).
+app.post('/events/:eventId/registrations/:regId/suggest-alternative-as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const { eventId, regId } = req.params;
+        const event = await ensureOrganizerAccess(req, res, eventId);
+        if (!event) return; // 403/404 bereits gesendet
+        // Sicherstellen, dass die Anmeldung wirklich zu diesem Event gehoert
+        const chk = await pool.query('SELECT event_id FROM registrations WHERE id = $1', [regId]);
+        if (chk.rows.length === 0) return res.status(404).json({ error: 'Registration not found' });
+        if (chk.rows[0].event_id !== eventId) return res.status(403).json({ error: 'Anmeldung gehoert nicht zu diesem Event' });
+        const actor = req.user.email || req.user.name;
+        const result = await suggestAlternativeForRegistration(regId, req.body, actor);
+        res.json({ success: result.success, message: result.message });
+    } catch (error) {
+        if (error && error.status) return res.status(error.status).json({ error: error.error });
+        logError('Error suggesting alternative (organizer)', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -3498,68 +3636,91 @@ app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
 // mit zustellung_post + Adresse -> Brief via Pingen; sonst E-Mail (Gast-/
 // Mitglieds-Mail). Der Vorstand-JWT des Aufrufers wird an die Dispatch-Endpoints
 // weitergereicht. Mehrfach-Anmeldungen derselben Person -> nur EINE Nachricht.
+// Kern: benachrichtigt alle Angemeldeten (bestaetigt + wartend) eines Events per
+// E-Mail oder Brief (je nach Zustellpraeferenz). Von der Vorstand- und der
+// Organisator-Route gemeinsam genutzt. Wirft { status, error } bei
+// Validierungs-/Nicht-gefunden-Fehlern; res-Handling macht die jeweilige Route.
+async function notifyEventRegistrants(eventId, payload, authHeader) {
+    const { subject, message } = payload || {};
+    if (!message || !String(message).trim()) {
+        throw { status: 400, error: 'Nachricht (message) ist erforderlich' };
+    }
+    const ev = await pool.query('SELECT id, title, slug, start_date, location FROM events WHERE id = $1', [eventId]);
+    if (ev.rows.length === 0) throw { status: 404, error: 'Event nicht gefunden' };
+    const event = ev.rows[0];
+    const subj = (subject && String(subject).trim()) || `Änderung: ${event.title}`;
+    const fwd = authHeader ? { headers: { Authorization: authHeader } } : {};
+
+    const regs = await pool.query(`
+        SELECT r.id, r.guest_name, r.guest_email, r.member_id,
+               m.vorname, m.nachname, m.email AS member_email,
+               m.zustellung_email, m.zustellung_post, m.strasse, m.plz, m.ort
+        FROM registrations r
+        LEFT JOIN members m ON r.member_id = m.id
+        WHERE r.event_id = $1 AND r.status IN ('approved', 'pending')
+    `, [eventId]);
+
+    const seen = new Set();
+    let emailed = 0, posted = 0, skipped = 0;
+    const unreachable = [];
+
+    for (const r of regs.rows) {
+        const key = r.member_id || (r.guest_email || '').toLowerCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+
+        const name = r.member_id ? `${r.vorname || ''} ${r.nachname || ''}`.trim() : (r.guest_name || '');
+        const email = r.guest_email || r.member_email || null;
+        const postOk = r.member_id && r.zustellung_post && r.strasse && r.plz && r.ort;
+        const body = `${name ? `Hallo ${name},` : 'Hallo,'}\n\n${String(message).trim()}\n\nBetrifft: ${event.title}\n\nFreundliche Grüsse\nFeuerwehrverein Raura`;
+
+        try {
+            if (postOk) {
+                await axios.post(`${DISPATCH_API}/pingen/send-manual`, {
+                    member_id: r.member_id, event_id: eventId, subject: subj, body, staging: false
+                }, fwd);
+                posted++;
+            } else if (email) {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: email, subject: subj, body, event_id: eventId
+                }, fwd);
+                emailed++;
+            } else {
+                skipped++;
+                unreachable.push(name || key);
+            }
+        } catch (e) {
+            skipped++;
+            unreachable.push(`${name || key} (Fehler)`);
+            console.error('notify-registrants send failed:', name, e.message);
+        }
+    }
+
+    return { success: true, emailed, posted, skipped, unreachable };
+}
+
+// Vorstand/Admin: Angemeldete ueber eine Aenderung informieren.
 app.post('/events/:id/notify-registrants', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
-        const { id } = req.params;
-        const { subject, message } = req.body || {};
-        if (!message || !String(message).trim()) {
-            return res.status(400).json({ error: 'Nachricht (message) ist erforderlich' });
-        }
-        const ev = await pool.query('SELECT id, title, slug, start_date, location FROM events WHERE id = $1', [id]);
-        if (ev.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
-        const event = ev.rows[0];
-        const subj = (subject && String(subject).trim()) || `Änderung: ${event.title}`;
-        const authHeader = req.headers['authorization'];
-        const fwd = authHeader ? { headers: { Authorization: authHeader } } : {};
-
-        const regs = await pool.query(`
-            SELECT r.id, r.guest_name, r.guest_email, r.member_id,
-                   m.vorname, m.nachname, m.email AS member_email,
-                   m.zustellung_email, m.zustellung_post, m.strasse, m.plz, m.ort
-            FROM registrations r
-            LEFT JOIN members m ON r.member_id = m.id
-            WHERE r.event_id = $1 AND r.status IN ('approved', 'pending')
-        `, [id]);
-
-        const seen = new Set();
-        let emailed = 0, posted = 0, skipped = 0;
-        const unreachable = [];
-
-        for (const r of regs.rows) {
-            const key = r.member_id || (r.guest_email || '').toLowerCase();
-            if (!key || seen.has(key)) continue;
-            seen.add(key);
-
-            const name = r.member_id ? `${r.vorname || ''} ${r.nachname || ''}`.trim() : (r.guest_name || '');
-            const email = r.guest_email || r.member_email || null;
-            const postOk = r.member_id && r.zustellung_post && r.strasse && r.plz && r.ort;
-            const body = `${name ? `Hallo ${name},` : 'Hallo,'}\n\n${String(message).trim()}\n\nBetrifft: ${event.title}\n\nFreundliche Grüsse\nFeuerwehrverein Raura`;
-
-            try {
-                if (postOk) {
-                    await axios.post(`${DISPATCH_API}/pingen/send-manual`, {
-                        member_id: r.member_id, event_id: id, subject: subj, body, staging: false
-                    }, fwd);
-                    posted++;
-                } else if (email) {
-                    await axios.post(`${DISPATCH_API}/email/send`, {
-                        to: email, subject: subj, body, event_id: id
-                    }, fwd);
-                    emailed++;
-                } else {
-                    skipped++;
-                    unreachable.push(name || key);
-                }
-            } catch (e) {
-                skipped++;
-                unreachable.push(`${name || key} (Fehler)`);
-                console.error('notify-registrants send failed:', name, e.message);
-            }
-        }
-
-        res.json({ success: true, emailed, posted, skipped, unreachable });
+        const result = await notifyEventRegistrants(req.params.id, req.body, req.headers['authorization']);
+        res.json(result);
     } catch (error) {
+        if (error && error.status) return res.status(error.status).json({ error: error.error });
         console.error('notify-registrants error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Organisator (E-Mail-Match auf event.organizer_email): Angemeldete informieren.
+app.post('/events/:id/notify-registrants-as-organizer', authenticateAny, async (req, res) => {
+    try {
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return; // 403/404 wurde bereits gesendet
+        const result = await notifyEventRegistrants(req.params.id, req.body, req.headers['authorization']);
+        res.json(result);
+    } catch (error) {
+        if (error && error.status) return res.status(error.status).json({ error: error.error });
+        console.error('notify-registrants-as-organizer error:', error);
         res.status(500).json({ error: error.message });
     }
 });

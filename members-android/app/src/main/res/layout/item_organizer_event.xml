@@ -86,6 +86,88 @@
             android:layout_marginVertical="8dp"
             android:background="@color/divider" />
 
+        <!-- Event-Aktionen (nur Member-Mode: echte Event-ID vorhanden). 2x2-Raster. -->
+        <LinearLayout
+            android:id="@+id/orgEventActionsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/orgEventTeilnehmerlisteBtn"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:paddingHorizontal="4dp"
+                    android:text="Teilnehmerliste (PDF)"
+                    android:textColor="@color/primary"
+                    android:textSize="12sp"
+                    app:strokeColor="@color/primary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/orgEventAushangBtn"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:paddingHorizontal="4dp"
+                    android:text="Aushang (PDF)"
+                    android:textColor="@color/primary"
+                    android:textSize="12sp"
+                    app:strokeColor="@color/primary" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/orgEventNotifyBtn"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:paddingHorizontal="4dp"
+                    android:text="Informieren"
+                    android:textColor="@color/primary"
+                    android:textSize="12sp"
+                    app:strokeColor="@color/primary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/orgEventManageBtn"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:paddingHorizontal="4dp"
+                    android:text="Verwalten"
+                    android:textColor="@color/primary"
+                    android:textSize="12sp"
+                    app:strokeColor="@color/primary" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="8dp"
+                android:background="@color/divider" />
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -129,6 +211,15 @@
             android:text="Noch keine Anmeldungen für dieses Event."
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
+            android:visibility="gone" />
+
+        <!-- Rezepte & Einkaufsliste (read-only, programmatisch befuellt; -->
+        <!-- bleibt ausgeblendet wenn keine Rezepte verknuepft sind). -->
+        <LinearLayout
+            android:id="@+id/orgEventRecipesContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:visibility="gone" />
 
     </LinearLayout>

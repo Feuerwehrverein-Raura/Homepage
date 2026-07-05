@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="photos" path="photos/" />
+    <!-- Allgemeiner Cache-Root, damit heruntergeladene PDFs (Teilnehmerliste,
+         Aushang) ueber den FileProvider geoeffnet werden koennen. -->
+    <cache-path name="cache" path="." />
 </paths>

@@ -67,6 +67,12 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
+        <!-- Organisator: Event-Details bearbeiten + Schichten verwalten -->
+        <activity
+            android:name=".ui.organizer.OrganizerEditEventActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
         <!-- AppAuth: empfaengt OIDC-Redirect von Authentik -->
         <activity
             android:name="net.openid.appauth.RedirectUriReceiverActivity"
