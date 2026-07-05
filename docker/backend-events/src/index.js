@@ -3493,6 +3493,77 @@ app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
     }
 });
 
+// DEUTSCH: Alle Angemeldeten (approved+pending) manuell ueber eine Event-
+// Aenderung informieren. Kanal je Empfaenger nach Zustellpraeferenz: Mitglieder
+// mit zustellung_post + Adresse -> Brief via Pingen; sonst E-Mail (Gast-/
+// Mitglieds-Mail). Der Vorstand-JWT des Aufrufers wird an die Dispatch-Endpoints
+// weitergereicht. Mehrfach-Anmeldungen derselben Person -> nur EINE Nachricht.
+app.post('/events/:id/notify-registrants', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { subject, message } = req.body || {};
+        if (!message || !String(message).trim()) {
+            return res.status(400).json({ error: 'Nachricht (message) ist erforderlich' });
+        }
+        const ev = await pool.query('SELECT id, title, slug, start_date, location FROM events WHERE id = $1', [id]);
+        if (ev.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
+        const event = ev.rows[0];
+        const subj = (subject && String(subject).trim()) || `Änderung: ${event.title}`;
+        const authHeader = req.headers['authorization'];
+        const fwd = authHeader ? { headers: { Authorization: authHeader } } : {};
+
+        const regs = await pool.query(`
+            SELECT r.id, r.guest_name, r.guest_email, r.member_id,
+                   m.vorname, m.nachname, m.email AS member_email,
+                   m.zustellung_email, m.zustellung_post, m.strasse, m.plz, m.ort
+            FROM registrations r
+            LEFT JOIN members m ON r.member_id = m.id
+            WHERE r.event_id = $1 AND r.status IN ('approved', 'pending')
+        `, [id]);
+
+        const seen = new Set();
+        let emailed = 0, posted = 0, skipped = 0;
+        const unreachable = [];
+
+        for (const r of regs.rows) {
+            const key = r.member_id || (r.guest_email || '').toLowerCase();
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+
+            const name = r.member_id ? `${r.vorname || ''} ${r.nachname || ''}`.trim() : (r.guest_name || '');
+            const email = r.guest_email || r.member_email || null;
+            const postOk = r.member_id && r.zustellung_post && r.strasse && r.plz && r.ort;
+            const body = `${name ? `Hallo ${name},` : 'Hallo,'}\n\n${String(message).trim()}\n\nBetrifft: ${event.title}\n\nFreundliche Grüsse\nFeuerwehrverein Raura`;
+
+            try {
+                if (postOk) {
+                    await axios.post(`${DISPATCH_API}/pingen/send-manual`, {
+                        member_id: r.member_id, event_id: id, subject: subj, body, staging: false
+                    }, fwd);
+                    posted++;
+                } else if (email) {
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: email, subject: subj, body, event_id: id
+                    }, fwd);
+                    emailed++;
+                } else {
+                    skipped++;
+                    unreachable.push(name || key);
+                }
+            } catch (e) {
+                skipped++;
+                unreachable.push(`${name || key} (Fehler)`);
+                console.error('notify-registrants send failed:', name, e.message);
+            }
+        }
+
+        res.json({ success: true, emailed, posted, skipped, unreachable });
+    } catch (error) {
+        console.error('notify-registrants error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Teilnehmerliste-PDF direkt per GET abrufen. Zeigt alle Registrierten nach Schicht sortiert
 app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
     try {

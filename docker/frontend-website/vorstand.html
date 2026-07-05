@@ -2240,6 +2240,28 @@
     </div>
 
     <!-- Edit Registration Modal -->
+    <div id="notify-registrants-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-lg w-full">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Angemeldete informieren</h3>
+                    <button onclick="closeNotifyRegistrantsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <p class="text-sm text-gray-600 mb-3">Geht an alle bestätigten und offenen Anmeldungen. E-Mail wo möglich, für Mitglieder mit Post-Präferenz per Brief (Pingen, kostenpflichtig). Mehrfach-Anmeldungen erhalten nur eine Nachricht.</p>
+                <textarea id="notify-reg-message" rows="5" placeholder="z.B. Achtung: Der Anlass wurde auf den 12.7. verschoben. Neuer Ort: Feuerwehrmagazin." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500"></textarea>
+                <div id="notify-reg-result" class="text-sm mt-2"></div>
+                <div class="flex space-x-3 pt-4">
+                    <button id="notify-reg-send-btn" onclick="sendNotifyRegistrants()" class="flex-1 bg-fire-500 text-white py-2 px-4 rounded-lg hover:bg-fire-600 transition-colors">
+                        Senden
+                    </button>
+                    <button onclick="closeNotifyRegistrantsModal()" class="flex-1 border border-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-50 transition-colors">
+                        Abbrechen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="edit-registration-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] flex items-center justify-center p-4">
         <div class="bg-white rounded-lg max-w-md w-full">
             <div class="p-6">
@@ -5080,6 +5102,15 @@
             // Group by shift
             let html = '<div class="space-y-6">';
 
+            // Global: alle Angemeldeten ueber eine Aenderung informieren
+            html += `
+                <div class="flex justify-end">
+                    <button onclick="openNotifyRegistrantsModal()" class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1" title="Alle Angemeldeten über eine Änderung informieren">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        Angemeldete informieren
+                    </button>
+                </div>`;
+
             if (!event.shifts || event.shifts.length === 0) {
                 // Event ohne Schichten - direkter "Person hinzufügen" Button
                 html += `
@@ -5331,6 +5362,46 @@
         // ============================================
 
         // Öffnet das Modal zum Bearbeiten einer bestehenden Anmeldung (Name, E-Mail, Telefon).
+        // Alle Angemeldeten (bestaetigt+offen) ueber eine Event-Aenderung informieren.
+        function openNotifyRegistrantsModal() {
+            document.getElementById('notify-reg-message').value = '';
+            document.getElementById('notify-reg-result').textContent = '';
+            document.getElementById('notify-registrants-modal').classList.remove('hidden');
+        }
+        function closeNotifyRegistrantsModal() {
+            document.getElementById('notify-registrants-modal').classList.add('hidden');
+        }
+        async function sendNotifyRegistrants() {
+            const message = document.getElementById('notify-reg-message').value.trim();
+            if (!message) { alert('Bitte eine Nachricht eingeben'); return; }
+            const btn = document.getElementById('notify-reg-send-btn');
+            const resultEl = document.getElementById('notify-reg-result');
+            btn.disabled = true; btn.textContent = 'Wird gesendet...';
+            resultEl.textContent = '';
+            try {
+                const res = await fetch(`${API_BASE}/events/${currentEventForRegistrations.id}/notify-registrants`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ message })
+                });
+                const r = await res.json();
+                if (!res.ok) throw new Error(r.error || 'Fehler beim Senden');
+                const parts = [];
+                if (r.emailed) parts.push(`${r.emailed}× E-Mail`);
+                if (r.posted) parts.push(`${r.posted}× Brief`);
+                if (r.skipped) parts.push(`${r.skipped} nicht erreichbar`);
+                resultEl.className = 'text-sm text-green-700';
+                resultEl.textContent = `✓ Benachrichtigt: ${parts.join(', ') || 'niemand'}` +
+                    (r.unreachable && r.unreachable.length ? ` — ohne Kontakt: ${r.unreachable.join(', ')}` : '');
+                setTimeout(closeNotifyRegistrantsModal, 3000);
+            } catch (e) {
+                resultEl.className = 'text-sm text-red-600';
+                resultEl.textContent = 'Fehler: ' + e.message;
+            } finally {
+                btn.disabled = false; btn.textContent = 'Senden';
+            }
+        }
+
         function openEditRegistrationModal(regId, name, email, phone, participants) {
             document.getElementById('edit-reg-id').value = regId;
             document.getElementById('edit-reg-name').value = name || '';
