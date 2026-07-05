@@ -1892,9 +1892,24 @@ app.post('/registrations/public', async (req, res) => {
 
         // DEUTSCH: Begleitpersonen (Namen der weiteren Personen) — vom Formular
         // mitgeschickt, sanitisiert (max 49 Namen, je max 100 Zeichen).
+        // DEUTSCH: Begleitpersonen — Objekte {name, email?, phone?}; blanke Strings
+        // (aeltere Frontend-Version) werden als {name} uebernommen.
         const companions = Array.isArray(req.body.companions)
             ? req.body.companions
-                .map((c) => String(c).trim().substring(0, 100))
+                .map((c) => {
+                    if (typeof c === 'string') {
+                        const n = c.trim().substring(0, 100);
+                        return n ? { name: n } : null;
+                    }
+                    const n = String(c?.name || '').trim().substring(0, 100);
+                    if (!n) return null;
+                    const o = { name: n };
+                    const em = String(c?.email || '').trim().substring(0, 200);
+                    const ph = String(c?.phone || '').trim().substring(0, 50);
+                    if (em) o.email = em;
+                    if (ph) o.phone = ph;
+                    return o;
+                })
                 .filter(Boolean)
                 .slice(0, 49)
             : [];
