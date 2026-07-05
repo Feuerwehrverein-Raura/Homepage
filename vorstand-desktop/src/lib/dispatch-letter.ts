@@ -48,6 +48,23 @@ function letterAddressBlockHtml(member: Member): string {
     .join("\n        ");
 }
 
+/** Zielland fuer Pingen — explizit gesetzt (kein Text-Raten mehr). */
+export function recipientCountry(member: Member): "DE" | "CH" {
+  return isGermanRecipient(member) ? "DE" : "CH";
+}
+
+/**
+ * Positionierung des Empfaenger-Adressblocks im Fensterkuvert:
+ * DE = Fenster LINKS (DIN 5008, ~20mm von links), CH = Fenster RECHTS
+ * (Schweizer Standard, 118mm) — deckungsgleich mit der serverseitigen
+ * addAddressToPdf-Logik. Pingen bekommt zusaetzlich address_position + country.
+ */
+export function recipientWindowCss(member: Member): string {
+  return isGermanRecipient(member)
+    ? "top: 55mm; left: 20mm; width: 85mm; max-height: 30mm;"
+    : "top: 60mm; left: 118mm; width: 85.5mm; max-height: 25.5mm;";
+}
+
 /** Absenderzeile aus dem aktuellen Aktuar (Fallback ohne Adresse). */
 export function getAktuarAbsenderLine(members: Member[]): string {
   const a = members.find((m) => m.funktion && /aktuar/i.test(m.funktion));
@@ -57,76 +74,72 @@ export function getAktuarAbsenderLine(members: Member[]): string {
 }
 
 /**
- * Kompletter Brief im offiziellen Layout (Kopf mit Logo/Titel/Absender/
- * Empfaengeradresse im CH-Fenster + Datum, Betreff, Body, Schluss).
- * Pingen-konforme Massangaben (Adressfenster X=118mm, Y=60mm).
+ * EINHEITLICHE Brief-Vorlage (Basis: Event-Einladungsbrief). Da Pingen alle Briefe
+ * identisch annimmt, nutzen Standard- UND Event-Brief dieselbe Shell:
+ * - 15mm-Oberrand-Layout (per pdf_margin {top:'15mm', bottom:'20mm'} an send-post),
+ *   damit auch Folgeseiten nicht in Pingens Sperrzone laufen.
+ * - Kopf absolut positioniert (Logo links, Titel/Absender rechts, Datum rechts).
+ * - Body im normalen Textfluss -> sauberer Seitenumbruch bei langem Inhalt.
+ * - Adressfenster: DE LINKS (DIN 5008, ~20mm), CH RECHTS (Schweizer Standard, 118mm).
+ * Kopf-Koordinaten sind um 15mm nach oben verschoben (wegen des 15mm-Oberrands),
+ * damit das Adressfenster exakt bei 60mm/118mm (CH) bzw. links (DE) ab Blattrand landet.
  */
-export function generateDispatchLetterHTML(
-  bodyHtml: string,
-  subject: string,
+export function buildLetterShell(
   member: Member,
-  senderLine: string
+  senderLine: string,
+  bodyContentHtml: string
 ): string {
   const datum = new Date().toLocaleDateString("de-CH", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
-  const body = replacePlaceholders(bodyHtml || "", member);
-
+  const addrCss = isGermanRecipient(member)
+    ? "top:40mm;left:20mm;"
+    : "top:45mm;left:118mm;";
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8"><style>
-/* Puppeteer: margin 0 top/sides, 20mm bottom (fuer Footer-Seitenzahlen) */
-* { box-sizing: border-box; }
-body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
-/* Seite-1-Header: volle 210mm Breite, absolut positionierte Elemente */
-/* Schweizer Standard: Adressfenster X=118mm, Y=60mm */
-.first-page-header {
-    position: relative; width: 210mm; height: 110mm;
-    page-break-inside: avoid; page-break-after: avoid;
-}
-/* Pingen-Vorgaben:
- * Randsperrbereich: 5mm rundum
- * Frankierbereich: X=116-205.5mm, Y=40-87.5mm (reserviert, KEINE Absenderzeile hier)
- * Adressbereich: X=118-203.5mm, Y=60-85.5mm (NUR Empfängeradresse)
- * Logo oben links (ausserhalb Frankierbereich X<116mm) */
-.first-page-header .logo { position: absolute; top: 15mm; left: 20mm; width: 35mm; }
-.first-page-header .logo img { width: 35mm; height: auto; display: block; }
-/* Titel links oberhalb Frankierbereich (X<116mm und Y<40mm) */
-.first-page-header .title { position: absolute; top: 15mm; left: 60mm; font-size: 20pt; font-weight: bold; line-height: 1.2; }
-/* Absenderzeile: Y<40mm, links vom Frankierbereich (X<116mm) */
-.first-page-header .sender { position: absolute; top: 35mm; left: 20mm; width: 90mm; font-size: 7pt; color: #555; border-bottom: 0.3pt solid #999; padding-bottom: 0.5mm; }
-/* Empfängeradresse: EXAKT im Adressbereich X=118, Y=60, W=85.5, H=25.5 */
-.first-page-header .recipient { position: absolute; top: 60mm; left: 118mm; width: 85.5mm; max-height: 25.5mm; overflow: hidden; }
-/* Datum: unterhalb Frankierbereich (Y>87.5mm), rechts */
-.first-page-header .date { position: absolute; top: 92mm; right: 20mm; text-align: right; }
-/* Brieftext: 25mm links/rechts, 20mm Top-Margin auf Folgeseiten via @page */
-.letter-body { padding: 0 25mm; }
-.letter-body h1, .letter-body h2, .letter-body h3 { margin: 0.5em 0 0.3em 0; page-break-after: avoid; }
-.letter-body p { margin: 0.5em 0; orphans: 3; widows: 3; }
-.letter-closing { margin-top: 10mm; page-break-inside: avoid; }
-@page :not(:first) { margin-top: 20mm; }
+  @page { size: A4; }
+  body { margin: 0; padding: 0; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
 </style></head>
 <body>
-<div class="first-page-header">
-    <div class="logo"><img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura"></div>
-    <div class="title">Feuerwehrverein Raura<br>Kaiseraugst</div>
-    <div class="sender">${senderLine}</div>
-    <div class="recipient">
+<div style="position:relative;height:85mm;">
+    <div style="position:absolute;top:0;left:25mm;width:35mm;">
+        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width:35mm;height:auto;display:block;">
+    </div>
+    <div style="position:absolute;top:0;left:118mm;">
+        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Feuerwehrverein Raura</div>
+        <div style="font-size:20pt;font-weight:bold;line-height:1.2;">Kaiseraugst</div>
+    </div>
+    <div style="position:absolute;top:20mm;left:118mm;font-size:8pt;color:#333;">${senderLine}</div>
+    <div style="position:absolute;${addrCss}width:85mm;">
         ${letterAddressBlockHtml(member)}
     </div>
-    <div class="date">Kaiseraugst, ${datum}</div>
+    <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
 </div>
-<div class="letter-body">
-    ${subject ? `<div style="font-weight: bold; font-size: 13pt;">${subject}</div><hr style="border: none; border-top: 1px solid #000; margin: 4mm 0 6mm 0;">` : ""}
-    <div>${body}</div>
-    <div class="letter-closing">
+<div style="padding:0 25mm 5mm 25mm;">${bodyContentHtml}</div>
+</body></html>`;
+}
+
+/** Standard-Post-Brief: einheitliche Vorlage + Betreff/Body/Schluss. */
+export function generateDispatchLetterHTML(
+  bodyHtml: string,
+  subject: string,
+  member: Member,
+  senderLine: string
+): string {
+  const body = replacePlaceholders(bodyHtml || "", member);
+  const bodyContent = `${
+    subject
+      ? `<div style="font-weight:bold;font-size:13pt;">${subject}</div><hr style="border:none;border-top:1px solid #000;margin:4mm 0 6mm 0;">`
+      : ""
+  }<div>${body}</div>
+    <div style="margin-top:10mm;">
         Mit freundlichen Grüssen<br><br>
         <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
         <em>Der Vorstand</em>
-    </div>
-</div>
-</body></html>`;
+    </div>`;
+  return buildLetterShell(member, senderLine, bodyContent);
 }
 
 /**
@@ -157,7 +170,7 @@ export function generatePdfCoverHTML(
         <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
     </div>
     <div style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">${senderLine}</div>
-    <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm;">
+    <div style="position: absolute; ${recipientWindowCss(member)}">
         ${letterAddressBlockHtml(member)}
     </div>
     <div style="position: absolute; top: 97mm; right: 25mm; text-align: right;">Kaiseraugst, ${datum}</div>
