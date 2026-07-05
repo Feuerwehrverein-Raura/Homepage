@@ -3573,7 +3573,57 @@ app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
         doc.fillColor('#000000');
         doc.moveDown(1.5);
 
-        // Render by shift
+        // Name inkl. Personenzahl (bei Begleitung) aus dem notes-JSON.
+        const participantLabel = (p) => {
+            let n = p.name || '-';
+            try {
+                const nt = typeof p.notes === 'string' ? JSON.parse(p.notes) : p.notes;
+                if (nt && parseInt(nt.participants, 10) > 1) n += ` (${nt.participants} Pers.)`;
+            } catch (_) { /* alte Freitext-Notiz -> nur Name */ }
+            return n;
+        };
+
+        // Wiederverwendbare Teilnehmer-Tabelle (Nr./Name/E-Mail/Status).
+        const renderTable = (list) => {
+            const tableTop = doc.y;
+            const col1 = 50, col2 = 80, col3 = 280, col4 = 420;
+
+            doc.fontSize(9).font('Helvetica-Bold').fillColor('#4b5563');
+            doc.text('Nr.', col1, tableTop);
+            doc.text('Name', col2, tableTop);
+            doc.text('E-Mail', col3, tableTop);
+            doc.text('Status', col4, tableTop);
+            doc.fillColor('#000000');
+            doc.moveTo(col1, tableTop + 12).lineTo(545, tableTop + 12).strokeColor('#d1d5db').stroke();
+
+            let rowY = tableTop + 18;
+            doc.font('Helvetica').fontSize(9);
+
+            list.forEach((p, index) => {
+                if (rowY > 750) {
+                    doc.addPage();
+                    rowY = 50;
+                }
+
+                doc.fillColor('#374151').text(`${index + 1}.`, col1, rowY);
+                doc.text(participantLabel(p), col2, rowY, { width: 190 });
+                doc.text(p.email || '-', col3, rowY, { width: 130 });
+
+                const statusText = p.status === 'approved' ? 'Bestätigt' :
+                                  p.status === 'pending' ? 'Ausstehend' :
+                                  p.status === 'rejected' ? 'Abgelehnt' : p.status;
+                const statusColor = p.status === 'approved' ? '#22c55e' :
+                                   p.status === 'pending' ? '#f59e0b' : '#ef4444';
+                doc.fillColor(statusColor).text(statusText, col4, rowY);
+                doc.fillColor('#000000');
+
+                rowY += 16;
+            });
+
+            doc.y = rowY + 10;
+        };
+
+        // Render nach Schichten
         for (const shift of shifts) {
             if (shift.participants.length === 0) continue;
 
@@ -3594,44 +3644,25 @@ app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
             doc.fillColor('#000000');
             doc.moveDown(0.3);
 
-            // Table header
-            const tableTop = doc.y;
-            const col1 = 50, col2 = 80, col3 = 280, col4 = 420;
-
-            doc.fontSize(9).font('Helvetica-Bold').fillColor('#4b5563');
-            doc.text('Nr.', col1, tableTop);
-            doc.text('Name', col2, tableTop);
-            doc.text('E-Mail', col3, tableTop);
-            doc.text('Status', col4, tableTop);
-            doc.fillColor('#000000');
-            doc.moveTo(col1, tableTop + 12).lineTo(545, tableTop + 12).strokeColor('#d1d5db').stroke();
-
-            let rowY = tableTop + 18;
-            doc.font('Helvetica').fontSize(9);
-
-            shift.participants.forEach((p, index) => {
-                if (rowY > 750) {
-                    doc.addPage();
-                    rowY = 50;
-                }
-
-                doc.fillColor('#374151').text(`${index + 1}.`, col1, rowY);
-                doc.text(p.name || '-', col2, rowY, { width: 190 });
-                doc.text(p.email || '-', col3, rowY, { width: 130 });
-
-                const statusText = p.status === 'approved' ? 'Bestätigt' :
-                                  p.status === 'pending' ? 'Ausstehend' :
-                                  p.status === 'rejected' ? 'Abgelehnt' : p.status;
-                const statusColor = p.status === 'approved' ? '#22c55e' :
-                                   p.status === 'pending' ? '#f59e0b' : '#ef4444';
-                doc.fillColor(statusColor).text(statusText, col4, rowY);
-                doc.fillColor('#000000');
-
-                rowY += 16;
-            });
-
-            doc.y = rowY + 10;
+            renderTable(shift.participants);
             doc.moveDown(0.5);
+        }
+
+        // Direkt-Anmeldungen (ohne Schicht): Anlaesse ganz ohne Schichten
+        // (Taco-Abend etc.) ODER Direktanmeldungen neben Schichten. Ohne diesen
+        // Block blieb die Liste bei schichtlosen Events komplett leer.
+        const directList = participants.filter(
+            p => !Array.isArray(p.shift_ids) || p.shift_ids.length === 0
+        );
+        if (directList.length > 0) {
+            if (doc.y > 680) doc.addPage();
+            // Ueberschrift nur, wenn es daneben auch Schicht-Abschnitte gibt.
+            if (shifts.some(s => s.participants.length > 0)) {
+                doc.fontSize(12).font('Helvetica-Bold').fillColor('#1f2937').text('Direktanmeldungen');
+                doc.fillColor('#000000');
+                doc.moveDown(0.3);
+            }
+            renderTable(directList);
         }
 
         doc.moveDown(2);
