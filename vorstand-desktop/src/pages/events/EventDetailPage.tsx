@@ -911,6 +911,16 @@ export function EventDetailPage() {
                               </button>
                             </>
                           )}
+                          {/* M3: bestaetigte Anmeldung entfernen (z.B. nachtraegliche Absage) */}
+                          {reg.status === "approved" && (
+                            <button
+                              onClick={() => handleReject(reg.id)}
+                              className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600"
+                              title="Entfernen (absagen)"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

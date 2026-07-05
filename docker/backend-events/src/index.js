@@ -731,7 +731,7 @@ app.get('/events', async (req, res) => {
             // Get registrations for each shift
             const shiftsWithRegistrations = await Promise.all(shifts.rows.map(async (shift) => {
                 const registrations = await pool.query(`
-                    SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                    SELECT r.id, r.guest_name, r.guest_email, r.phone, r.notes, r.status, r.member_id, m.vorname, m.nachname, m.email AS member_email
                     FROM registrations r
                     LEFT JOIN members m ON r.member_id = m.id
                     WHERE $1 = ANY(r.shift_ids)
@@ -739,18 +739,21 @@ app.get('/events', async (req, res) => {
 
                 const approved = registrations.rows.filter(r => r.status === 'approved');
                 const pending = registrations.rows.filter(r => r.status === 'pending');
+                // Schicht-Anmeldungen liefern jetzt auch E-Mail/Telefon/Notizen mit
+                // (fuer Anzeige, Alternativ-Vorschlag-Prefill und PDF).
+                const mapReg = r => ({
+                    id: r.id,
+                    name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                    email: r.member_email || r.guest_email || null,
+                    phone: r.phone || null,
+                    notes: r.notes || null
+                });
 
                 return {
                     ...shift,
                     registrations: {
-                        approved: approved.map(r => ({
-                            id: r.id,
-                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
-                        })),
-                        pending: pending.map(r => ({
-                            id: r.id,
-                            name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
-                        })),
+                        approved: approved.map(mapReg),
+                        pending: pending.map(mapReg),
                         approvedCount: approved.length,
                         pendingCount: pending.length,
                         spotsLeft: shift.needed - approved.length
@@ -904,7 +907,7 @@ app.get('/events/:id', async (req, res, next) => {
         // Get registrations for each shift
         const shiftsWithRegistrations = await Promise.all(shifts.rows.map(async (shift) => {
             const registrations = await pool.query(`
-                SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
+                SELECT r.id, r.guest_name, r.guest_email, r.phone, r.notes, r.status, r.member_id, m.vorname, m.nachname, m.email AS member_email
                 FROM registrations r
                 LEFT JOIN members m ON r.member_id = m.id
                 WHERE $1 = ANY(r.shift_ids)
@@ -912,18 +915,20 @@ app.get('/events/:id', async (req, res, next) => {
 
             const approved = registrations.rows.filter(r => r.status === 'approved');
             const pending = registrations.rows.filter(r => r.status === 'pending');
+            // Schicht-Anmeldungen liefern jetzt auch E-Mail/Telefon/Notizen mit.
+            const mapReg = r => ({
+                id: r.id,
+                name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name,
+                email: r.member_email || r.guest_email || null,
+                phone: r.phone || null,
+                notes: r.notes || null
+            });
 
             return {
                 ...shift,
                 registrations: {
-                    approved: approved.map(r => ({
-                        id: r.id,
-                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
-                    })),
-                    pending: pending.map(r => ({
-                        id: r.id,
-                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
-                    })),
+                    approved: approved.map(mapReg),
+                    pending: pending.map(mapReg),
                     approvedCount: approved.length,
                     pendingCount: pending.length,
                     spotsLeft: shift.needed - approved.length
@@ -1161,7 +1166,10 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
 
         // Organisator benachrichtigen wenn neu zugewiesen
         const newOrgEmail = updatedEvent.organizer_email;
-        if (newOrgEmail && newOrgEmail !== oldOrgEmail) {
+        // M2: Zugang auch erstellen, wenn "Organisator-Zugang einrichten" angehakt ist
+        // und noch keiner existiert — vorher wirkte create_access im Edit nur bei
+        // einem Organisator-E-Mail-Wechsel.
+        if (newOrgEmail && (newOrgEmail !== oldOrgEmail || (create_access && !updatedEvent.event_email))) {
             // Pruefen ob Vorstandsmitglied (braucht keine separaten Zugangsdaten)
             const vorstandEmails = [
                 'praesident@fwv-raura.ch', 'aktuar@fwv-raura.ch', 'kassier@fwv-raura.ch',
@@ -3443,7 +3451,7 @@ app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
                 const helpers = shift.registrations?.approved?.map(r => r.name) || [];
 
                 byTimeSlot[timeKey].bereiche[bereich] = {
-                    needed: shift.max_helpers || 1,
+                    needed: shift.max_helpers || shift.needed || 1,
                     helpers
                 };
             });
@@ -3512,7 +3520,7 @@ app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
                    r.member_id, m.vorname, m.nachname, m.email as member_email
             FROM registrations r
             LEFT JOIN members m ON r.member_id = m.id
-            WHERE r.event_id = $1
+            WHERE r.event_id = $1 AND r.status <> 'rejected'
             ORDER BY COALESCE(m.nachname, r.guest_name)
         `, [id]);
 
@@ -3618,6 +3626,29 @@ app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
                 doc.fillColor('#000000');
 
                 rowY += 16;
+
+                // Zusatzinfos aus dem notes-JSON (Menue/Allergien/Telefon/Begleitung)
+                // — kuechen-/organisationsrelevant, v.a. bei GV.
+                try {
+                    const nt = typeof p.notes === 'string' ? JSON.parse(p.notes) : p.notes;
+                    if (nt && typeof nt === 'object') {
+                        const bits = [];
+                        if (nt.meal_selection) bits.push(`Menü: ${nt.meal_selection}`);
+                        if (nt.allergies) bits.push(`Allergien: ${nt.allergies}`);
+                        if (nt.phone) bits.push(`Tel: ${nt.phone}`);
+                        if (Array.isArray(nt.companions) && nt.companions.length) {
+                            bits.push('mit: ' + nt.companions
+                                .map(c => typeof c === 'string' ? c : [c && c.name, c && c.email, c && c.phone].filter(Boolean).join(' '))
+                                .join(', '));
+                        }
+                        if (bits.length) {
+                            doc.fontSize(8).fillColor(nt.allergies ? '#b45309' : '#6b7280')
+                                .text(bits.join('  ·  '), col2, rowY, { width: 455 });
+                            doc.fillColor('#000000').fontSize(9);
+                            rowY += 13;
+                        }
+                    }
+                } catch (_) { /* Freitext-Notiz ignorieren */ }
             });
 
             doc.y = rowY + 10;
@@ -4450,7 +4481,7 @@ app.post('/event-groups/:id/arbeitsplan-pdf', async (req, res) => {
                         const shift = byTime[timeKey][bereich];
                         if (shift) {
                             const helpers = shift.registrations?.approved?.map(r => r.name) || [];
-                            const needed = shift.max_helpers || 1;
+                            const needed = shift.max_helpers || shift.needed || 1;
                             doc.fontSize(9).font('Helvetica')
                                 .text(`      ${bereich} [${helpers.length}/${needed}]: ${helpers.length > 0 ? helpers.join(', ') : '(noch offen)'}`);
                         }
