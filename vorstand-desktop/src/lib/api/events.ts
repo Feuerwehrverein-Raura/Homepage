@@ -82,3 +82,26 @@ export async function suggestAlternativeShift(
     data
   );
 }
+
+export interface NotifyRegistrantsResult {
+  success: boolean;
+  emailed: number;
+  posted: number;
+  skipped: number;
+  unreachable: string[];
+}
+
+/**
+ * Informiert alle Angemeldeten (bestaetigt + offen) ueber eine Event-Aenderung.
+ * Kanal je Empfaenger nach Zustellpraeferenz (E-Mail bzw. Brief via Pingen).
+ */
+export async function notifyRegistrants(
+  eventId: string,
+  message: string,
+  subject?: string
+): Promise<NotifyRegistrantsResult> {
+  return await apiClient.post<NotifyRegistrantsResult>(
+    `/events/${eventId}/notify-registrants`,
+    { message, subject }
+  );
+}

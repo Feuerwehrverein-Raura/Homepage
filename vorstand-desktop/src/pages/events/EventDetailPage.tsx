@@ -10,6 +10,7 @@ import {
   suggestAlternativeShift,
   createRegistration,
   updateRegistration,
+  notifyRegistrants,
 } from "@/lib/api/events";
 import type {
   Event,
@@ -271,6 +272,10 @@ export function EventDetailPage() {
   const [regPhone, setRegPhone] = useState("");
   const [regParticipants, setRegParticipants] = useState("1");
   const [regSaving, setRegSaving] = useState(false);
+  // Angemeldete ueber eine Aenderung informieren
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notifyMsg, setNotifyMsg] = useState("");
+  const [notifySending, setNotifySending] = useState(false);
 
   useEffect(() => {
     if (id) fetchEvent(id);
@@ -459,6 +464,33 @@ export function EventDetailPage() {
       });
     } finally {
       setRegSaving(false);
+    }
+  };
+
+  const handleNotify = async () => {
+    if (!event || !notifyMsg.trim()) return;
+    setNotifySending(true);
+    try {
+      const r = await notifyRegistrants(event.id, notifyMsg.trim());
+      const parts: string[] = [];
+      if (r.emailed) parts.push(`${r.emailed}× E-Mail`);
+      if (r.posted) parts.push(`${r.posted}× Brief`);
+      if (r.skipped) parts.push(`${r.skipped} nicht erreichbar`);
+      setNotice({
+        type: "success",
+        text:
+          `Benachrichtigt: ${parts.join(", ") || "niemand"}` +
+          (r.unreachable.length ? ` — ohne Kontakt: ${r.unreachable.join(", ")}` : ""),
+      });
+      setNotifyOpen(false);
+      setNotifyMsg("");
+    } catch (e) {
+      setNotice({
+        type: "error",
+        text: e instanceof Error ? e.message : "Benachrichtigung fehlgeschlagen",
+      });
+    } finally {
+      setNotifySending(false);
     }
   };
 
@@ -813,6 +845,16 @@ export function EventDetailPage() {
                 Teilnehmerliste (PDF)
               </button>
             )}
+            {allRegistrations.length > 0 && (
+              <button
+                onClick={() => setNotifyOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
+                title="Alle Angemeldeten über eine Änderung informieren"
+              >
+                <Send className="h-4 w-4" />
+                Angemeldete informieren
+              </button>
+            )}
           </div>
           {allRegistrations.length === 0 && (
             <div className="py-8 text-center text-muted-foreground">
@@ -929,6 +971,51 @@ export function EventDetailPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Angemeldete informieren Modal */}
+      {notifyOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border rounded-lg p-6 max-w-lg w-full space-y-3">
+            <h3 className="font-semibold text-lg">Angemeldete informieren</h3>
+            <p className="text-sm text-muted-foreground">
+              Geht an alle bestätigten und offenen Anmeldungen von „{event.title}".
+              E-Mail wo möglich, für Mitglieder mit Post-Präferenz per Brief
+              (Pingen, kostenpflichtig). Mehrfach-Anmeldungen erhalten nur eine
+              Nachricht.
+            </p>
+            <div>
+              <label className="block text-sm font-medium mb-1">Nachricht</label>
+              <textarea
+                value={notifyMsg}
+                onChange={(e) => setNotifyMsg(e.target.value)}
+                rows={5}
+                placeholder="z.B. Achtung: Der Anlass wurde auf den 12.7. verschoben. Neuer Ort: Feuerwehrmagazin."
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm resize-y"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setNotifyOpen(false)}
+                className="px-4 py-2 rounded-md border text-sm hover:bg-muted"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleNotify}
+                disabled={notifySending || !notifyMsg.trim()}
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+              >
+                {notifySending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                Senden
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
