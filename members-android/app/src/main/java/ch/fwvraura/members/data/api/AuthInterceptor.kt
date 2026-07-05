@@ -7,8 +7,10 @@ import ch.fwvraura.members.util.OidcConstants
 import ch.fwvraura.members.util.TokenManager
 import okhttp3.FormBody
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.Response
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -55,19 +57,24 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
 
         if (!needsRefresh) return firstResponse
 
-        // 401/403 — Versuch mit Refresh-Token einen neuen Access-Token zu holen.
-        val refresh = tokenManager.refreshToken
-        if (refresh.isNullOrBlank()) {
-            firstResponse.close()
-            forceReLogin()
-            return chain.proceed(firstRequest) // wird vom Activity-Restart kurz darauf abgefangen
-        }
-
+        // 401/403 — neuen Access-Token besorgen:
+        //  a) OIDC-Refresh (SSO-Logins via Authentik), falls Refresh-Token vorhanden.
+        //  b) Fallback: STILLER Re-Login mit dem persistenten QR-App-Token. QR-Logins
+        //     haben keinen Refresh-Token — der gedruckte QR-Code IST die dauerhafte
+        //     Berechtigung. Vorher wurden QR-Nutzer hier sofort ausgeloggt und
+        //     mussten alle 8h neu scannen.
         val newAccessToken = synchronized(tokenManager) {
             // Falls ein paralleler Request den Token bereits erneuert hat: nutzen
             val current = tokenManager.token
             if (!current.isNullOrEmpty() && current != token) current
-            else refreshAccessToken(refresh)
+            else {
+                val viaRefresh = tokenManager.refreshToken
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { refreshAccessToken(it) }
+                viaRefresh ?: tokenManager.qrToken
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { qrReLogin(it) }
+            }
         }
 
         if (newAccessToken.isNullOrBlank()) {
@@ -108,6 +115,38 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Token refresh threw", e)
+            null
+        }
+    }
+
+    /**
+     * Stiller Re-Login mit dem persistenten QR-App-Token: tauscht ihn erneut gegen
+     * ein frisches JWT (POST /auth/member/qr-login bzw. /auth/organizer/qr-login).
+     * Gibt den neuen Access-Token zurueck oder null (z.B. QR widerrufen).
+     */
+    private fun qrReLogin(qrToken: String): String? {
+        val path = if (tokenManager.accountType == "organizer")
+            "auth/organizer/qr-login" else "auth/member/qr-login"
+        val url = ApiModule.API_BASE.removeSuffix("/") + "/" + path
+        val body = RequestBody.create(
+            "application/json".toMediaTypeOrNull(),
+            JSONObject().put("token", qrToken).toString()
+        )
+        val request = Request.Builder().url(url).post(body).build()
+        return try {
+            refreshClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    Log.w(TAG, "QR re-login failed: HTTP ${resp.code}")
+                    return null
+                }
+                val json = JSONObject(resp.body?.string() ?: return null)
+                val newAccess = json.optString("token").takeIf { it.isNotBlank() } ?: return null
+                tokenManager.token = newAccess
+                Log.d(TAG, "QR re-login successful")
+                newAccess
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "QR re-login threw", e)
             null
         }
     }

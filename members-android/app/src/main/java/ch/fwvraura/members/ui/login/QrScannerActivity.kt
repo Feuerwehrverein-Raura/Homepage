@@ -108,6 +108,9 @@ class QrScannerActivity : AppCompatActivity() {
                     }
                     val tm = MembersApp.instance.tokenManager
                     tm.token = body.token
+                    // Persistenten App-Token behalten: damit kann der AuthInterceptor bei
+                    // JWT-Ablauf still neu einloggen statt zum Neu-Scannen zu zwingen.
+                    tm.qrToken = payload.token
                     tm.accountType = if (payload.type == "fwv-organizer-login") "organizer" else "member"
                     tm.userEmail = body.user?.email ?: payload.email
                     tm.userName = body.user?.name
