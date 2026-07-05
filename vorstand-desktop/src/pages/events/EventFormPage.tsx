@@ -10,16 +10,49 @@ import {
   Trash2,
 } from "lucide-react";
 
+// Kategorien/Status wie in der Web-Version (vorstand.html) — die Werte steuern
+// Backend-Logik (registration_required, Menue, Schichten) und muessen matchen.
+const CATEGORIES = [
+  "Dorffest",
+  "GV",
+  "Aufbau",
+  "Abbau",
+  "Ausflug",
+  "Ausflug mit Anmeldung",
+  "Sonstiges",
+];
+const STATUSES = ["planned", "confirmed", "cancelled", "completed"];
+
+// Schicht-Bereiche wie im Web (SHIFT_TYPES) — als Vorschlagsliste (datalist).
+const SHIFT_BEREICHE = [
+  "Allgemein",
+  "Kueche",
+  "Bar",
+  "Service",
+  "Kasse",
+  "Springer",
+  "Vorbereitung",
+  "Aufbau",
+  "Abbau",
+];
+
+// ISO-Timestamp -> Wert fuer <input type="datetime-local"> (YYYY-MM-DDTHH:mm).
+function toLocalInput(v: string | null | undefined): string {
+  if (!v) return "";
+  return String(v).slice(0, 16);
+}
+
 const emptyForm: EventCreate = {
   title: "",
   subtitle: "",
   category: "",
-  status: "draft",
+  status: "planned",
   start_date: "",
   end_date: "",
   location: "",
   description: "",
   registration_deadline: "",
+  registration_required: false,
   max_participants: null,
   cost: "",
   organizer_name: "",
@@ -47,6 +80,10 @@ export function EventFormPage() {
   const [newShifts, setNewShifts] = useState<Omit<ShiftCreate, "event_id">[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Menue-Optionen (GV) als kommagetrennter Text; Organisator-Zugang; PDF-Aushang
+  const [mealOptionsText, setMealOptionsText] = useState("");
+  const [createAccess, setCreateAccess] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (isEdit && id) {
@@ -60,17 +97,19 @@ export function EventFormPage() {
         title: selectedEvent.title || "",
         subtitle: selectedEvent.subtitle || "",
         category: selectedEvent.category || "",
-        status: selectedEvent.status || "draft",
-        start_date: selectedEvent.start_date || "",
-        end_date: selectedEvent.end_date || "",
+        status: selectedEvent.status || "planned",
+        start_date: toLocalInput(selectedEvent.start_date),
+        end_date: toLocalInput(selectedEvent.end_date),
         location: selectedEvent.location || "",
         description: selectedEvent.description || "",
-        registration_deadline: selectedEvent.registration_deadline || "",
+        registration_deadline: toLocalInput(selectedEvent.registration_deadline),
+        registration_required: selectedEvent.registration_required ?? false,
         max_participants: selectedEvent.max_participants,
         cost: selectedEvent.cost || "",
         organizer_name: selectedEvent.organizer_name || "",
         organizer_email: selectedEvent.organizer_email || "",
       });
+      setMealOptionsText((selectedEvent.meal_options || []).join(", "));
     }
   }, [isEdit, selectedEvent]);
 
@@ -92,6 +131,69 @@ export function EventFormPage() {
     setNewShifts((prev) => prev.filter((_, i) => i !== index));
   };
 
+  // Springer-Schichten je vorhandenem Zeitslot generieren (wie im Web):
+  // fuer jeden (Datum, Von, Bis)-Slot der Nicht-Springer-Schichten wird eine
+  // Springer-Schicht (1 Person) angelegt, sofern noch keine existiert.
+  const generateSpringer = () => {
+    const existing = [
+      ...(selectedEvent?.shifts || []),
+      ...newShifts,
+    ];
+    const slots = new Map<string, { date: string; start: string; end: string }>();
+    for (const s of existing) {
+      if (
+        s.bereich !== "Springer" &&
+        s.bereich !== "Vorbereitung" &&
+        s.date &&
+        s.start_time
+      ) {
+        const key = `${s.date}|${s.start_time}|${s.end_time || ""}`;
+        if (!slots.has(key))
+          slots.set(key, {
+            date: String(s.date),
+            start: String(s.start_time),
+            end: String(s.end_time || ""),
+          });
+      }
+    }
+    const covered = new Set(
+      existing
+        .filter((s) => s.bereich === "Springer")
+        .map((s) => `${s.date}|${s.start_time}|${s.end_time || ""}`)
+    );
+    const toAdd = Array.from(slots.entries())
+      .filter(([key]) => !covered.has(key))
+      .map(([, slot]) => ({
+        ...emptyShift,
+        name: "Springer",
+        bereich: "Springer",
+        date: slot.date.slice(0, 10),
+        start_time: slot.start,
+        end_time: slot.end,
+        needed: 1,
+      }));
+    if (toAdd.length === 0) {
+      setError(
+        slots.size === 0
+          ? "Keine Zeitslots gefunden — bitte zuerst andere Schichten (Bar, Kueche, ...) anlegen."
+          : "Alle Zeitslots haben bereits Springer-Schichten."
+      );
+      return;
+    }
+    setError(null);
+    setNewShifts((prev) => [...prev, ...toAdd]);
+  };
+
+  // PDF-Datei als base64 (ohne data:-Prefix) fuer pdf_attachment lesen.
+  const readPdfBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve(String(reader.result || "").split(",")[1] || "");
+      reader.onerror = () => reject(new Error("PDF konnte nicht gelesen werden"));
+      reader.readAsDataURL(file);
+    });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title) {
@@ -101,8 +203,20 @@ export function EventFormPage() {
     setSaving(true);
     setError(null);
     try {
+      const payload: EventCreate = {
+        ...form,
+        meal_options: mealOptionsText
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        create_access: createAccess || undefined,
+      };
+      if (pdfFile) {
+        payload.pdf_attachment = await readPdfBase64(pdfFile);
+        payload.pdf_filename = pdfFile.name;
+      }
       if (isEdit && id) {
-        await updateEvent(id, form);
+        await updateEvent(id, payload);
         // Create new shifts for existing event
         for (const shift of newShifts) {
           if (shift.name) {
@@ -111,7 +225,7 @@ export function EventFormPage() {
         }
         navigate(`/events/${id}`);
       } else {
-        const event = await createEvent(form);
+        const event = await createEvent(payload);
         // Create shifts for new event
         for (const shift of newShifts) {
           if (shift.name) {
@@ -160,13 +274,13 @@ export function EventFormPage() {
               label="Kategorie"
               value={form.category || ""}
               onChange={(v) => handleChange("category", v)}
-              options={["", "Anlass", "Uebung", "Versammlung", "Kurs", "Sonstiges"]}
+              options={["", ...CATEGORIES]}
             />
             <SelectField
               label="Status"
-              value={form.status || "draft"}
+              value={form.status || "planned"}
               onChange={(v) => handleChange("status", v)}
-              options={["draft", "published", "cancelled", "completed"]}
+              options={STATUSES}
             />
           </div>
           <textarea
@@ -183,16 +297,16 @@ export function EventFormPage() {
           <legend className="px-2 text-sm font-semibold">Datum & Ort</legend>
           <div className="grid grid-cols-2 gap-4">
             <TextField
-              label="Startdatum"
+              label="Start (Datum + Zeit)"
               value={form.start_date || ""}
               onChange={(v) => handleChange("start_date", v)}
-              type="date"
+              type="datetime-local"
             />
             <TextField
-              label="Enddatum"
+              label="Ende (Datum + Zeit)"
               value={form.end_date || ""}
               onChange={(v) => handleChange("end_date", v)}
-              type="date"
+              type="datetime-local"
             />
           </div>
           <TextField
@@ -205,7 +319,7 @@ export function EventFormPage() {
               label="Anmeldefrist"
               value={form.registration_deadline || ""}
               onChange={(v) => handleChange("registration_deadline", v)}
-              type="date"
+              type="datetime-local"
             />
             <TextField
               label="Max. Teilnehmer"
@@ -219,6 +333,22 @@ export function EventFormPage() {
             value={form.cost || ""}
             onChange={(v) => handleChange("cost", v)}
           />
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!!form.registration_required}
+              onChange={(e) => setForm((p) => ({ ...p, registration_required: e.target.checked }))}
+              className="rounded border-input"
+            />
+            Anmeldung erforderlich
+          </label>
+          {form.category === "GV" && (
+            <TextField
+              label="Menue-Optionen (kommagetrennt, fuer die Essenswahl bei der Anmeldung)"
+              value={mealOptionsText}
+              onChange={setMealOptionsText}
+            />
+          )}
         </fieldset>
 
         {/* Organizer */}
@@ -237,6 +367,42 @@ export function EventFormPage() {
               type="email"
             />
           </div>
+          {isEdit && selectedEvent?.event_email ? (
+            <p className="text-sm text-green-700 dark:text-green-400">
+              ✓ Organisator-Zugang aktiv ({selectedEvent.event_email}) — Login im
+              Event-Dashboard
+            </p>
+          ) : (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={createAccess}
+                onChange={(e) => setCreateAccess(e.target.checked)}
+                className="rounded border-input"
+              />
+              Organisator-Zugang einrichten (Event-Dashboard-Login, Zugangsdaten
+              gehen per E-Mail an den Organisator)
+            </label>
+          )}
+        </fieldset>
+
+        {/* PDF-Aushang */}
+        <fieldset className="rounded-lg border p-4 space-y-3">
+          <legend className="px-2 text-sm font-semibold">PDF-Aushang</legend>
+          {isEdit && selectedEvent?.pdf_filename && !pdfFile && (
+            <p className="text-sm text-muted-foreground">
+              Aktuell: {selectedEvent.pdf_filename} (neue Datei ersetzt den Anhang)
+            </p>
+          )}
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+            className="block text-sm"
+          />
+          {pdfFile && (
+            <p className="text-xs text-muted-foreground">{pdfFile.name}</p>
+          )}
         </fieldset>
 
         {/* Shifts (only for new events or to add new shifts) */}
@@ -290,22 +456,42 @@ export function EventFormPage() {
                   onChange={(v) => updateNewShift(index, "needed", v ? parseInt(v) : null)}
                   type="number"
                 />
-                <TextField
-                  label="Bereich"
-                  value={shift.bereich || ""}
-                  onChange={(v) => updateNewShift(index, "bereich", v)}
-                />
+                <div>
+                  <label className="block text-sm font-medium mb-1">Bereich</label>
+                  <input
+                    list="shift-bereiche"
+                    value={shift.bereich || ""}
+                    onChange={(e) => updateNewShift(index, "bereich", e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
               </div>
             </div>
           ))}
-          <button
-            type="button"
-            onClick={addShift}
-            className="flex items-center gap-2 px-3 py-2 rounded-md border border-dashed text-sm text-muted-foreground hover:bg-muted transition-colors w-full justify-center"
-          >
-            <Plus className="h-4 w-4" />
-            Schicht hinzufuegen
-          </button>
+          <datalist id="shift-bereiche">
+            {SHIFT_BEREICHE.map((b) => (
+              <option key={b} value={b} />
+            ))}
+          </datalist>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={addShift}
+              className="flex items-center gap-2 px-3 py-2 rounded-md border border-dashed text-sm text-muted-foreground hover:bg-muted transition-colors flex-1 justify-center"
+            >
+              <Plus className="h-4 w-4" />
+              Schicht hinzufuegen
+            </button>
+            <button
+              type="button"
+              onClick={generateSpringer}
+              title="Erzeugt je Zeitslot der bestehenden Schichten eine Springer-Schicht (1 Person)"
+              className="flex items-center gap-2 px-3 py-2 rounded-md border border-dashed text-sm text-muted-foreground hover:bg-muted transition-colors justify-center"
+            >
+              <Plus className="h-4 w-4" />
+              Springer generieren
+            </button>
+          </div>
         </fieldset>
 
         {error && (

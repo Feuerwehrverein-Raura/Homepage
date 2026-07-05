@@ -56,6 +56,70 @@ function regDisplayName(r: {
   return full || r.guest_name || "Unbekannt";
 }
 
+// Anmelde-Zusatzdaten aus dem notes-JSON der Web-Anmeldemaske: Personenzahl,
+// Begleitpersonen (mit optionalen Kontaktdaten), Allergien, Menü, Telefon und
+// die Freitext-Bemerkung. Vorher wurde das rohe JSON in der Tabelle angezeigt.
+interface RegCompanion {
+  name: string;
+  email?: string;
+  phone?: string;
+}
+interface RegExtra {
+  phone: string;
+  participants: number;
+  companions: RegCompanion[];
+  allergies: string;
+  meal: string;
+  text: string;
+}
+function parseRegNotes(notes: unknown): RegExtra {
+  const out: RegExtra = {
+    phone: "",
+    participants: 1,
+    companions: [],
+    allergies: "",
+    meal: "",
+    text: "",
+  };
+  if (!notes) return out;
+  let n: Record<string, unknown> | null = null;
+  if (typeof notes === "string") {
+    try {
+      n = JSON.parse(notes) as Record<string, unknown>;
+    } catch {
+      out.text = notes;
+      return out;
+    }
+  } else if (typeof notes === "object") {
+    n = notes as Record<string, unknown>;
+  }
+  if (!n || typeof n !== "object") return out;
+  if (typeof n.phone === "string") out.phone = n.phone;
+  const p = parseInt(String(n.participants ?? ""), 10);
+  if (Number.isFinite(p) && p > 1) out.participants = p;
+  if (Array.isArray(n.companions)) {
+    for (const c of n.companions) {
+      if (typeof c === "string") {
+        if (c.trim()) out.companions.push({ name: c.trim() });
+      } else if (c && typeof c === "object") {
+        const o = c as { name?: unknown; email?: unknown; phone?: unknown };
+        const nm = typeof o.name === "string" ? o.name.trim() : "";
+        if (nm) {
+          out.companions.push({
+            name: nm,
+            email: typeof o.email === "string" && o.email ? o.email : undefined,
+            phone: typeof o.phone === "string" && o.phone ? o.phone : undefined,
+          });
+        }
+      }
+    }
+  }
+  if (typeof n.allergies === "string") out.allergies = n.allergies;
+  if (typeof n.meal_selection === "string") out.meal = n.meal_selection;
+  if (typeof n.notes === "string") out.text = n.notes;
+  return out;
+}
+
 function shiftDisplayLabel(s: Shift): string {
   const head = `${s.bereich ? s.bereich + " - " : ""}${s.name}`;
   const bits: string[] = [];
@@ -103,6 +167,8 @@ export function EventDetailPage() {
     deleteEvent,
     approveRegistration,
     rejectRegistration,
+    updateShift,
+    deleteShift,
   } = useEventsStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -114,6 +180,74 @@ export function EventDetailPage() {
   const [pdfLoading, setPdfLoading] = useState<"aushang" | "teilnehmer" | null>(
     null
   );
+
+  // Bestehende Schicht bearbeiten (Modal) — nutzt updateShift/deleteShift.
+  const [editShiftId, setEditShiftId] = useState<string | null>(null);
+  const [shiftForm, setShiftForm] = useState({
+    name: "",
+    bereich: "",
+    date: "",
+    start_time: "",
+    end_time: "",
+    needed: "",
+  });
+  const [shiftSaving, setShiftSaving] = useState(false);
+
+  const openShiftEdit = (shift: Shift) => {
+    setEditShiftId(shift.id);
+    setShiftForm({
+      name: shift.name || "",
+      bereich: shift.bereich || "",
+      date: (shift.date || "").slice(0, 10),
+      start_time: (shift.start_time || "").slice(0, 5),
+      end_time: (shift.end_time || "").slice(0, 5),
+      needed: shift.needed != null ? String(shift.needed) : "",
+    });
+  };
+
+  const saveShiftEdit = async () => {
+    if (!editShiftId || !id) return;
+    setShiftSaving(true);
+    try {
+      await updateShift(editShiftId, {
+        name: shiftForm.name,
+        bereich: shiftForm.bereich || null,
+        date: shiftForm.date || null,
+        start_time: shiftForm.start_time || null,
+        end_time: shiftForm.end_time || null,
+        needed: shiftForm.needed ? parseInt(shiftForm.needed, 10) : null,
+      });
+      await fetchEvent(id);
+      setEditShiftId(null);
+      setNotice({ type: "success", text: "Schicht gespeichert." });
+    } catch (err) {
+      setNotice({
+        type: "error",
+        text: err instanceof Error ? err.message : "Speichern fehlgeschlagen",
+      });
+    } finally {
+      setShiftSaving(false);
+    }
+  };
+
+  const handleDeleteShift = async (shift: Shift) => {
+    if (
+      !window.confirm(
+        `Schicht "${shift.name}" wirklich löschen? Zugehörige Anmeldungen gehen verloren.`
+      )
+    )
+      return;
+    try {
+      await deleteShift(shift.id);
+      if (id) await fetchEvent(id);
+      setNotice({ type: "success", text: "Schicht gelöscht." });
+    } catch (err) {
+      setNotice({
+        type: "error",
+        text: err instanceof Error ? err.message : "Löschen fehlgeschlagen",
+      });
+    }
+  };
 
   // E2 — Alternative Schicht vorschlagen
   const [suggestReg, setSuggestReg] = useState<{
@@ -369,6 +503,12 @@ export function EventDetailPage() {
 
   const hasShifts = (event.shifts?.length || 0) > 0;
 
+  // Belegte PERSONEN der Direkt-Anmeldungen (eine Anmeldung kann mehrere
+  // Personen umfassen) — fuer die Auslastungs-Anzeige gegen max_participants.
+  const personsUsed = allRegistrations
+    .filter((r) => r.type === "direct")
+    .reduce((sum, r) => sum + parseRegNotes(r.notes).participants, 0);
+
   return (
     <div>
       {/* Header */}
@@ -450,7 +590,17 @@ export function EventDetailPage() {
             <InfoRow icon={Calendar} label="Enddatum" value={formatSwissDate(event.end_date)} />
           )}
           <InfoRow icon={MapPin} label="Ort" value={event.location} />
-          <InfoRow icon={Users} label="Max. Teilnehmer" value={event.max_participants?.toString()} />
+          <InfoRow
+            icon={Users}
+            label="Teilnehmer"
+            value={
+              event.max_participants
+                ? `${personsUsed}/${event.max_participants} Personen belegt`
+                : personsUsed > 0
+                  ? `${personsUsed} Personen angemeldet`
+                  : undefined
+            }
+          />
           {event.registration_deadline && (
             <InfoRow icon={Calendar} label="Anmeldefrist" value={formatSwissDate(event.registration_deadline)} />
           )}
@@ -464,6 +614,13 @@ export function EventDetailPage() {
           <InfoRow icon={AlertCircle} label="Status" value={event.status} />
           {event.organizer_name && (
             <InfoRow icon={Users} label="Organisator" value={event.organizer_name} />
+          )}
+          {event.event_email && (
+            <InfoRow
+              icon={Users}
+              label="Organisator-Zugang"
+              value={`aktiv (${event.event_email})`}
+            />
           )}
           {event.organizer_email && (
             <InfoRow icon={Users} label="E-Mail" value={event.organizer_email} />
@@ -499,7 +656,11 @@ export function EventDetailPage() {
               : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
-          Anmeldungen ({allRegistrations.length})
+          Anmeldungen ({allRegistrations.length}
+          {personsUsed > allRegistrations.filter((r) => r.type === "direct").length
+            ? ` · ${personsUsed + allRegistrations.filter((r) => r.type === "shift").length} Pers.`
+            : ""}
+          )
         </button>
       </div>
 
@@ -517,7 +678,7 @@ export function EventDetailPage() {
                 <h4 className="font-semibold">{shift.name}</h4>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted-foreground">
-                    {shift.filled || 0} / {shift.needed || "?"} besetzt
+                    {shift.registrations?.approved?.length ?? 0} / {shift.needed || "?"} besetzt
                   </span>
                   <button
                     onClick={() =>
@@ -528,6 +689,20 @@ export function EventDetailPage() {
                   >
                     <UserPlus className="h-3.5 w-3.5" />
                     Person
+                  </button>
+                  <button
+                    onClick={() => openShiftEdit(shift)}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground"
+                    title="Schicht bearbeiten"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteShift(shift)}
+                    className="p-1 rounded hover:bg-muted text-destructive"
+                    title="Schicht loeschen"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>
@@ -642,13 +817,46 @@ export function EventDetailPage() {
                 <tbody>
                   {allRegistrations.map((reg) => (
                     <tr key={reg.id} className="border-b last:border-0">
-                      <td className="px-4 py-3">{regDisplayName(reg)}</td>
+                      <td className="px-4 py-3">
+                        {regDisplayName(reg)}
+                        {(reg as { email?: string | null }).email && (
+                          <div className="text-xs text-muted-foreground">
+                            {(reg as { email?: string | null }).email}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground">{reg.shiftName}</td>
                       <td className="px-4 py-3">
                         <RegistrationStatusBadge status={reg.status} />
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">
-                        {reg.notes || "-"}
+                        {(() => {
+                          const x = parseRegNotes(reg.notes);
+                          const rows: string[] = [];
+                          if (x.participants > 1) rows.push(`${x.participants} Personen`);
+                          if (x.companions.length)
+                            rows.push(
+                              `mit: ${x.companions
+                                .map((c) => [c.name, c.email, c.phone].filter(Boolean).join(" · "))
+                                .join(", ")}`
+                            );
+                          if (x.phone) rows.push(`Tel: ${x.phone}`);
+                          if (x.meal) rows.push(`Menü: ${x.meal}`);
+                          if (x.text) rows.push(x.text);
+                          if (rows.length === 0 && !x.allergies) return "-";
+                          return (
+                            <div className="space-y-0.5">
+                              {rows.map((r, i) => (
+                                <div key={i}>{r}</div>
+                              ))}
+                              {x.allergies && (
+                                <div className="font-medium text-amber-700 dark:text-amber-400">
+                                  ⚠ Allergien: {x.allergies}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
@@ -694,6 +902,87 @@ export function EventDetailPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Schicht bearbeiten Modal */}
+      {editShiftId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border rounded-lg p-6 max-w-lg w-full space-y-3">
+            <h3 className="font-semibold text-lg">Schicht bearbeiten</h3>
+            <div>
+              <label className="block text-sm font-medium mb-1">Name</label>
+              <input
+                value={shiftForm.name}
+                onChange={(e) => setShiftForm({ ...shiftForm, name: e.target.value })}
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Bereich</label>
+                <input
+                  value={shiftForm.bereich}
+                  onChange={(e) => setShiftForm({ ...shiftForm, bereich: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Benoetigt</label>
+                <input
+                  type="number"
+                  value={shiftForm.needed}
+                  onChange={(e) => setShiftForm({ ...shiftForm, needed: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Datum</label>
+                <input
+                  type="date"
+                  value={shiftForm.date}
+                  onChange={(e) => setShiftForm({ ...shiftForm, date: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Von</label>
+                <input
+                  type="time"
+                  value={shiftForm.start_time}
+                  onChange={(e) => setShiftForm({ ...shiftForm, start_time: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Bis</label>
+                <input
+                  type="time"
+                  value={shiftForm.end_time}
+                  onChange={(e) => setShiftForm({ ...shiftForm, end_time: e.target.value })}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setEditShiftId(null)}
+                className="px-4 py-2 rounded-md border text-sm hover:bg-muted"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={saveShiftEdit}
+                disabled={shiftSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+              >
+                {shiftSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                Speichern
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

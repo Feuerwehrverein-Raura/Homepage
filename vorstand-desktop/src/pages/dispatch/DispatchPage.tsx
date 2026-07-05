@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { formatSwissDateTime } from "@/lib/utils/date";
 import * as dispatchApi from "@/lib/api/dispatch";
@@ -134,6 +135,12 @@ function SendTab() {
   const [previewing, setPreviewing] = useState(false);
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState("");
+  // ?event=<id> (Einladung-Shortcut aus der Anlass-Liste) vorselektieren
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const ev = searchParams.get("event");
+    if (ev) setSelectedEvent(ev);
+  }, [searchParams]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
