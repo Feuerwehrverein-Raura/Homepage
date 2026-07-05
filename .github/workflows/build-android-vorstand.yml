@@ -139,6 +139,9 @@ jobs:
         with:
           tag_name: ${{ github.ref_name || format('vorstand-v{0}', inputs.version) }}
           name: Vorstand Android ${{ inputs.version || github.ref_name }}
+          # NIE als "Latest" markieren: releases/latest gehoert dem Desktop-Auto-
+          # Updater (latest.json) — Android-Releases wuerden ihn sonst kapern.
+          make_latest: false
           body: |
             ## FWV Vorstand Android App
 

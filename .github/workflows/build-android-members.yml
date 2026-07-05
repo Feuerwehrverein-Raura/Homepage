@@ -149,6 +149,9 @@ jobs:
         with:
           tag_name: ${{ github.ref_name || format('members-v{0}', inputs.version) }}
           name: FWV Raura Members ${{ github.ref_name || format('members-v{0}', inputs.version) }}
+          # NIE als "Latest" markieren: releases/latest gehoert dem Desktop-Auto-
+          # Updater (latest.json) — Android-Releases wuerden ihn sonst kapern.
+          make_latest: false
           generate_release_notes: true
           files: |
             members-*-debug.apk

@@ -79,7 +79,11 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: vorstand-desktop
-          tagName: ${{ github.ref_name || format('vorstand-desktop-v{0}', inputs.version) }}
+          # Nur bei Tag-Push / manuellem Dispatch ein Release erzeugen — PR-Builds
+          # kompilieren nur (leerer tagName = kein Release). Vorher entstanden
+          # "NN/merge"-Muell-Releases, die dem Auto-Updater den
+          # releases/latest-Pointer klauten (latest.json -> 404).
+          tagName: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || (github.event_name == 'workflow_dispatch' && format('vorstand-desktop-v{0}', inputs.version) || '') }}
           releaseName: 'Vorstand Desktop ${{ steps.version.outputs.value }}'
           releaseBody: |
             ## FWV Vorstand Desktop App v${{ steps.version.outputs.value }}
@@ -101,3 +105,12 @@ jobs:
             - Auto-Update
           releaseDraft: false
           prerelease: false
+
+      # Der Auto-Updater laedt releases/latest/download/latest.json — das Desktop-
+      # Release MUSS also "Latest" sein. Explizit markieren, damit spaeter erstellte
+      # Android-/sonstige Releases den Pointer nicht klauen.
+      - name: Desktop-Release als Latest markieren
+        if: startsWith(github.ref, 'refs/tags/') && matrix.platform == 'ubuntu-22.04'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --latest --repo "${{ github.repository }}"
