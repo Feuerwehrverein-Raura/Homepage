@@ -167,7 +167,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.api-accounting.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/invoices`) || PathPrefix(`/payments`) || PathPrefix(`/reports`) || PathPrefix(`/accounts`))
+      - traefik.http.routers.api-accounting.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/invoices`) || PathPrefix(`/payments`) || PathPrefix(`/reports`) || PathPrefix(`/accounts`) || PathPrefix(`/transactions`))
       - traefik.http.routers.api-accounting.entrypoints=https
       - traefik.http.routers.api-accounting-fees.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/membership-fees`)
       - traefik.http.routers.api-accounting-fees.priority=1000
