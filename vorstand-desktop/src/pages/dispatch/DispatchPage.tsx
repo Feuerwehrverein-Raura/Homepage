@@ -16,6 +16,7 @@ import {
 } from "@/lib/event-invitation";
 import * as eventsApi from "@/lib/api/events";
 import type { Event } from "@/lib/types/event";
+import { MassPdfPage } from "@/pages/masspdf/MassPdfPage";
 import type {
   EmailTemplate,
   PingenAccount,
@@ -38,9 +39,10 @@ import {
   Trash2,
   Paperclip,
   Eye,
+  FileUp,
 } from "lucide-react";
 
-type Tab = "send" | "templates" | "pingen" | "log";
+type Tab = "send" | "templates" | "pingen" | "masspdf" | "log";
 
 // Datei als base64 (ohne data:-Prefix) lesen — fuer den PDF-Brief-Versand.
 function readFileBase64(file: File): Promise<string> {
@@ -79,6 +81,7 @@ export function DispatchPage() {
     { key: "send", label: "Senden", icon: Send },
     { key: "templates", label: "Vorlagen", icon: FileText },
     { key: "pingen", label: "Post (Pingen)", icon: Mail },
+    { key: "masspdf", label: "Massen-PDF", icon: FileUp },
     { key: "log", label: "Verlauf", icon: RefreshCw },
   ];
 
@@ -108,6 +111,7 @@ export function DispatchPage() {
       {activeTab === "send" && <SendTab />}
       {activeTab === "templates" && <TemplatesTab />}
       {activeTab === "pingen" && <PingenTab />}
+      {activeTab === "masspdf" && <MassPdfPage />}
       {activeTab === "log" && <LogTab />}
     </div>
   );
@@ -907,6 +911,7 @@ function PingenTab() {
   // Webhooks (automatische Status-Updates)
   const [webhooks, setWebhooks] = useState<dispatchApi.PingenWebhook[]>([]);
   const [webhookBusy, setWebhookBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const load = async (stg = staging) => {
     setLoading(true);
@@ -920,6 +925,7 @@ function PingenTab() {
       setAccount(acc);
       setStats(st);
       setLetters(lt);
+      void syncPending(lt);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Laden");
     } finally {
@@ -1013,6 +1019,24 @@ function PingenTab() {
     }
   };
 
+  // Offene Briefe beim Laden automatisch mit Pingen abgleichen (Live-Status),
+  // da Pingen-Webhooks faktisch keine Events liefern.
+  const syncPending = async (lts: PingenLetter[]) => {
+    const finalStates = ["sent", "failed", "canceled", "cancelled", "delivered"];
+    const pending = lts.filter(
+      (l) => !finalStates.includes((l.status || "").toLowerCase())
+    );
+    if (pending.length === 0) return;
+    setSyncing(true);
+    try {
+      for (const l of pending.slice(0, 30)) {
+        await refreshStatus(l.id);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const inputCls =
     "w-full px-2 py-1.5 text-sm rounded-md border border-input bg-background";
 
@@ -1032,8 +1056,9 @@ function PingenTab() {
           <input type="checkbox" checked={staging} onChange={toggleStaging} className="rounded border-input" />
           Staging-Konto anzeigen
         </label>
-        <button onClick={() => load()} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <RefreshCw className="h-3 w-3" /> Aktualisieren
+        <button onClick={() => load()} disabled={syncing} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
+          <RefreshCw className={cn("h-3 w-3", syncing && "animate-spin")} />
+          {syncing ? "Synchronisiere Status…" : "Aktualisieren"}
         </button>
       </div>
 

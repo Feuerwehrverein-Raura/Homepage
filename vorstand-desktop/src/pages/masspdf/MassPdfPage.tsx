@@ -85,8 +85,6 @@ export function MassPdfPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Massen-PDF</h1>
-
       <div className="max-w-2xl space-y-6">
         {/* PDF Upload */}
         <div className="rounded-lg border bg-card p-6">

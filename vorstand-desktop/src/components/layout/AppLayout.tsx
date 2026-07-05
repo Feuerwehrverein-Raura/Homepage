@@ -15,7 +15,6 @@ import { RegistrationsPage } from "@/pages/admin/RegistrationsPage";
 import { AuditPage } from "@/pages/admin/AuditPage";
 import { MailcowPage } from "@/pages/mailcow/MailcowPage";
 import { VaultPage } from "@/pages/vault/VaultPage";
-import { MassPdfPage } from "@/pages/masspdf/MassPdfPage";
 import { MembershipFeesPage } from "@/pages/membership-fees/MembershipFeesPage";
 import { ScheduledJobsPage } from "@/pages/scheduled-jobs/ScheduledJobsPage";
 import { SettingsPage } from "@/pages/settings/SettingsPage";
@@ -53,7 +52,6 @@ export function AppLayout() {
             <Route path="mail" element={<MailPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="vault" element={<VaultPage />} />
-            <Route path="mass-pdf" element={<MassPdfPage />} />
             <Route path="membership-fees" element={<MembershipFeesPage />} />
             <Route path="scheduled-jobs" element={<ScheduledJobsPage />} />
             <Route path="app-tokens" element={<AppTokensPage />} />
