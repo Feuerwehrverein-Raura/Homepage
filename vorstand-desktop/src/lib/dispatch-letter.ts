@@ -101,6 +101,12 @@ export function buildLetterShell(
 <html><head><meta charset="UTF-8"><style>
   @page { size: A4; }
   body { margin: 0; padding: 0; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000; }
+  /* Sauberer Seitenumbruch bei langem Inhalt: keine Schusterjungen/Hurenkinder,
+     Ueberschriften nicht allein am Seitenende, Tabellen/Schlussformel zusammenhalten. */
+  .letter-body p { margin: 0.5em 0; orphans: 3; widows: 3; }
+  .letter-body h1, .letter-body h2, .letter-body h3 { margin: 0.5em 0 0.3em 0; page-break-after: avoid; }
+  .letter-body table, .letter-body tr { page-break-inside: avoid; }
+  .letter-closing { page-break-inside: avoid; }
 </style></head>
 <body>
 <div style="position:relative;height:85mm;">
@@ -117,7 +123,7 @@ export function buildLetterShell(
     </div>
     <div style="position:absolute;top:77mm;right:25mm;text-align:right;">Kaiseraugst, ${datum}</div>
 </div>
-<div style="padding:0 25mm 5mm 25mm;">${bodyContentHtml}</div>
+<div class="letter-body" style="padding:0 25mm 5mm 25mm;">${bodyContentHtml}</div>
 </body></html>`;
 }
 
@@ -134,7 +140,7 @@ export function generateDispatchLetterHTML(
       ? `<div style="font-weight:bold;font-size:13pt;">${subject}</div><hr style="border:none;border-top:1px solid #000;margin:4mm 0 6mm 0;">`
       : ""
   }<div>${body}</div>
-    <div style="margin-top:10mm;">
+    <div class="letter-closing" style="margin-top:10mm;">
         Mit freundlichen Grüssen<br><br>
         <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
         <em>Der Vorstand</em>
