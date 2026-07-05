@@ -1,6 +1,8 @@
 package ch.fwvraura.vorstand.data.api
 
 import ch.fwvraura.vorstand.data.model.*
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -85,6 +87,22 @@ interface EventsApi {
     suspend fun updateEvent(
         @Path("id") id: String,
         @Body event: EventCreate
+    ): Response<Event>
+
+    /**
+     * Aktualisiert ein Event mit einem vorserialisierten JSON-Body.
+     *
+     * Wird beim Bearbeiten verwendet, damit gezielt einzelne Felder auf null
+     * gesetzt (geleert) werden koennen — z.B. den PDF-Aushang entfernen. Der
+     * Standard-Gson des Retrofit-Clients laesst null-Felder weg, weshalb der
+     * Aufrufer den Body selbst mit serializeNulls serialisiert und als
+     * RequestBody ("application/json") uebergibt. Das Backend setzt genau die
+     * mitgelieferten Felder (present+null = leeren, fehlend = unveraendert).
+     */
+    @PUT("events/{id}")
+    suspend fun updateEventRaw(
+        @Path("id") id: String,
+        @Body body: RequestBody
     ): Response<Event>
 
     /**
@@ -216,4 +234,46 @@ interface EventsApi {
      */
     @POST("registrations")
     suspend fun createRegistration(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Unit>
+
+    /**
+     * Schlaegt einer angemeldeten Person eine alternative Schicht vor (bei voller
+     * oder abgesagter Schicht). Body: {shift_id} der Zielschicht.
+     *
+     * @param id ID der bestehenden Anmeldung.
+     * @param body {"shift_id": "..."} — die vorgeschlagene Alternativ-Schicht.
+     */
+    @POST("registrations/{id}/suggest-alternative")
+    suspend fun suggestAlternative(
+        @Path("id") id: String,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<Unit>
+
+    /**
+     * Informiert alle Angemeldeten (bestaetigt + wartend) ueber eine Aenderung am
+     * Event — per E-Mail oder Brief je nach Zustellpraeferenz.
+     *
+     * @param id Event-ID.
+     * @param body {"message": "..."} — der Aenderungstext.
+     * @return NotifyResult mit Zaehlern (emailed/posted/skipped/unreachable).
+     */
+    @POST("events/{id}/notify-registrants")
+    suspend fun notifyRegistrants(
+        @Path("id") id: String,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<NotifyResult>
+
+    /**
+     * Laedt den PDF-Aushang (Plakat) eines Events als Binaerstrom.
+     * @Streaming verhindert, dass Retrofit die ganze Datei in den Speicher laedt.
+     */
+    @Streaming
+    @GET("events/{id}/pdf")
+    suspend fun getAushangPdf(@Path("id") id: String): Response<ResponseBody>
+
+    /**
+     * Laedt die Teilnehmerliste eines Events als PDF-Binaerstrom.
+     */
+    @Streaming
+    @GET("events/{id}/pdf/teilnehmerliste")
+    suspend fun getTeilnehmerlistePdf(@Path("id") id: String): Response<ResponseBody>
 }

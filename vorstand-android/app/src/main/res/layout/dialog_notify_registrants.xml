@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Dialog um alle Angemeldeten (bestaetigt + wartend) ueber eine Aenderung am
+    Event zu informieren. Betreff ist mit "Aenderung: {Event-Titel}" vorbelegt,
+    die Nachricht ist ein Pflichtfeld.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:hint="Betreff">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/notifySubject"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Was hat sich geändert?">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/notifyMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="top"
+            android:inputType="textMultiLine"
+            android:minLines="4" />
+    </com.google.android.material.textfield.TextInputLayout>
+</LinearLayout>

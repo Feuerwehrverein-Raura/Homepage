@@ -118,6 +118,12 @@ data class EventRegistration(
     /** E-Mail-Adresse des Gastes. */
     @SerializedName("guest_email") val guestEmail: String? = null,
 
+    /**
+     * Vom Server aufgeloeste E-Mail (mapReg): Mitglied-Mail oder Gast-Mail.
+     * Fuer Mitglieder-Anmeldungen ist guestEmail leer — hier steht die Mail.
+     */
+    val email: String? = null,
+
     /** Telefonnummer des Angemeldeten. */
     val phone: String? = null,
 

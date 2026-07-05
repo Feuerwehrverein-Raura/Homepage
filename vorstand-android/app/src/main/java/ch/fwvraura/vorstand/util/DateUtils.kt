@@ -1,7 +1,10 @@
 package ch.fwvraura.vorstand.util
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -114,6 +117,54 @@ object DateUtils {
             date.format(isoFormatter)
         } catch (e: Exception) {
             // Bei Parsing-Fehlern null zurueckgeben
+            null
+        }
+    }
+
+    /**
+     * Formatter fuer ISO-Local-DateTime ohne Zeitzone: "yyyy-MM-ddTHH:mm".
+     * Das ist das Format, das das Backend fuer start_date/end_date/deadline erwartet.
+     */
+    private val isoLocalMinuteFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+
+    /**
+     * Baut aus einem Datum und einer Uhrzeit einen ISO-DateTime-String.
+     *
+     * MaterialDatePicker liefert die Auswahl als UTC-Mitternacht in Millis. Wir
+     * nehmen davon nur den Kalendertag und haengen die separat gewaehlte Uhrzeit
+     * (aus MaterialTimePicker) an — so entsteht kein Zeitzonen-Versatz.
+     *
+     * @param dateMillisUtc Datum als UTC-Millis (MaterialDatePicker.selection).
+     * @param hour Stunde (0-23) aus dem TimePicker.
+     * @param minute Minute (0-59) aus dem TimePicker.
+     * @return z.B. "2026-08-15T18:30".
+     */
+    fun toIsoDateTime(dateMillisUtc: Long, hour: Int, minute: Int): String {
+        val date = Instant.ofEpochMilli(dateMillisUtc).atZone(ZoneOffset.UTC).toLocalDate()
+        return date.atTime(hour, minute).format(isoLocalMinuteFormatter)
+    }
+
+    /**
+     * Zerlegt einen ISO-Datum/-DateTime-String in (Datum-Millis-UTC, Stunde, Minute)
+     * zur Vorbelegung von MaterialDatePicker + MaterialTimePicker beim Bearbeiten.
+     * Akzeptiert "yyyy-MM-dd", "yyyy-MM-ddTHH:mm[:ss][Z]" und Leerzeichen statt 'T'.
+     *
+     * @return Triple(Datum-Millis-UTC, Stunde, Minute) oder null bei ungueltiger Eingabe.
+     */
+    fun parseForPickers(iso: String?): Triple<Long, Int, Int>? {
+        if (iso.isNullOrBlank()) return null
+        return try {
+            val s = iso.trim().replace(' ', 'T')
+            val date = LocalDate.parse(s.substring(0, 10))
+            val millis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            val hasTime = s.length >= 16 && s.contains('T')
+            if (hasTime) {
+                val t = LocalTime.parse(s.substring(11, 16))
+                Triple(millis, t.hour, t.minute)
+            } else {
+                Triple(millis, 0, 0)
+            }
+        } catch (e: Exception) {
             null
         }
     }
