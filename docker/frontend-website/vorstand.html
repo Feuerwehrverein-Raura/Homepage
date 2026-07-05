@@ -4317,7 +4317,9 @@
                     Mitglied: r.member_id ? memberLabel(r.member_id) || `${r.vorname || ''} ${r.nachname || ''}`.trim() : '',
                     Gast: r.guest_name || '', 'Gast-Email': r.guest_email || '',
                     Telefon: parsedNotes.phone || '', Personen: parsedNotes.participants || '',
-                    Begleitpersonen: Array.isArray(parsedNotes.companions) ? parsedNotes.companions.join(', ') : '',
+                    Begleitpersonen: Array.isArray(parsedNotes.companions)
+                        ? parsedNotes.companions.map(c => typeof c === 'string' ? c : [c?.name, c?.email, c?.phone].filter(Boolean).join(' ')).join('; ')
+                        : '',
                     Allergien: parsedNotes.allergies || '',
                     Status: r.status, Erstellt: r.created_at || '',
                     Bestaetigt: r.approved_at || '', Notizen: parsedNotes.notes || ''
@@ -5223,7 +5225,12 @@
                         try {
                             const notes = typeof reg.notes === 'string' ? JSON.parse(reg.notes) : reg.notes;
                             if (notes?.participants) extraInfo += ` (${notes.participants} Pers.)`;
-                            if (Array.isArray(notes?.companions) && notes.companions.length) extraInfo += ` – mit: ${notes.companions.join(', ')}`;
+                            if (Array.isArray(notes?.companions) && notes.companions.length) {
+                                const compLabel = notes.companions
+                                    .map(c => typeof c === 'string' ? c : [c?.name, c?.email, c?.phone].filter(Boolean).join(' · '))
+                                    .join(', ');
+                                extraInfo += ` – mit: ${compLabel}`;
+                            }
                             if (notes?.phone) extraInfo += ` Tel: ${notes.phone}`;
                             if (notes?.meal_selection) mealDisplay = notes.meal_selection;
                             if (notes?.allergies) allergiesDisplay = notes.allergies;
