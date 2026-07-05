@@ -2260,6 +2260,11 @@
                         <label class="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
                         <input type="text" id="edit-reg-phone" autocomplete="new-password" data-lpignore="true" data-form-type="other" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Anzahl Personen</label>
+                        <input type="number" id="edit-reg-participants" min="1" max="50" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <p class="text-xs text-gray-500 mt-1">Zaehlt bei Anlaessen mit Teilnehmerlimit als belegte Plaetze.</p>
+                    </div>
                     <div class="flex space-x-3 pt-4">
                         <button onclick="saveRegistrationEdit()" class="flex-1 bg-fire-500 text-white py-2 px-4 rounded-lg hover:bg-fire-600 transition-colors">
                             Speichern
@@ -5211,30 +5216,36 @@
                             ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Bestaetigt</span>'
                             : '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Offen</span>';
 
-                        const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${escapeForOnclick(reg.name)}', '${escapeForOnclick(reg.email)}', '${escapeForOnclick(reg.phone)}')" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
-
-                        const actions = reg.status === 'pending'
-                            ? `${editBtn}<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
-                               <button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Ablehnen</button>`
-                            : `${editBtn}<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
-
-                        // Parse notes for extra info
+                        // Parse notes for extra info (VOR dem Bearbeiten-Button, damit
+                        // Telefon + Personenzahl ins Modal uebernommen werden koennen)
                         let extraInfo = '';
                         let mealDisplay = '-';
                         let allergiesDisplay = '-';
+                        let regPhone = reg.phone || '';
+                        let regParticipants = 1;
                         try {
                             const notes = typeof reg.notes === 'string' ? JSON.parse(reg.notes) : reg.notes;
-                            if (notes?.participants) extraInfo += ` (${notes.participants} Pers.)`;
+                            if (notes?.participants) {
+                                extraInfo += ` (${notes.participants} Pers.)`;
+                                regParticipants = parseInt(notes.participants) || 1;
+                            }
                             if (Array.isArray(notes?.companions) && notes.companions.length) {
                                 const compLabel = notes.companions
                                     .map(c => typeof c === 'string' ? c : [c?.name, c?.email, c?.phone].filter(Boolean).join(' · '))
                                     .join(', ');
                                 extraInfo += ` – mit: ${compLabel}`;
                             }
-                            if (notes?.phone) extraInfo += ` Tel: ${notes.phone}`;
+                            if (notes?.phone) { extraInfo += ` Tel: ${notes.phone}`; regPhone = notes.phone; }
                             if (notes?.meal_selection) mealDisplay = notes.meal_selection;
                             if (notes?.allergies) allergiesDisplay = notes.allergies;
                         } catch(e) {}
+
+                        const editBtn = `<button onclick="openEditRegistrationModal('${reg.id}', '${escapeForOnclick(reg.name)}', '${escapeForOnclick(reg.email)}', '${escapeForOnclick(regPhone)}', ${regParticipants})" class="text-gray-600 hover:text-gray-800 mr-2">Bearbeiten</button>`;
+
+                        const actions = reg.status === 'pending'
+                            ? `${editBtn}<button onclick="approveEventRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 mr-2">Bestaetigen</button>
+                               <button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Ablehnen</button>`
+                            : `${editBtn}<button onclick="rejectEventRegistration('${reg.id}')" class="text-red-600 hover:text-red-800">Entfernen</button>`;
 
                         html += `
                             <tr>
@@ -5320,11 +5331,12 @@
         // ============================================
 
         // Öffnet das Modal zum Bearbeiten einer bestehenden Anmeldung (Name, E-Mail, Telefon).
-        function openEditRegistrationModal(regId, name, email, phone) {
+        function openEditRegistrationModal(regId, name, email, phone, participants) {
             document.getElementById('edit-reg-id').value = regId;
             document.getElementById('edit-reg-name').value = name || '';
             document.getElementById('edit-reg-email').value = email || '';
             document.getElementById('edit-reg-phone').value = phone || '';
+            document.getElementById('edit-reg-participants').value = participants || 1;
             document.getElementById('edit-registration-modal').classList.remove('hidden');
         }
 
@@ -5339,6 +5351,7 @@
             const guest_name = document.getElementById('edit-reg-name').value.trim();
             const guest_email = document.getElementById('edit-reg-email').value.trim();
             const phone = document.getElementById('edit-reg-phone').value.trim();
+            const participants = parseInt(document.getElementById('edit-reg-participants').value) || 1;
 
             if (!guest_name) {
                 alert('Name ist erforderlich');
@@ -5346,13 +5359,15 @@
             }
 
             try {
+                // phone + participants werden serverseitig ins notes-JSON gemerged
+                // (companions/allergies bleiben erhalten).
                 const response = await fetch(`${API_BASE}/registrations/${id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify({ guest_name, guest_email, phone })
+                    body: JSON.stringify({ guest_name, guest_email, phone, participants })
                 });
 
                 if (!response.ok) throw new Error('Fehler beim Speichern');

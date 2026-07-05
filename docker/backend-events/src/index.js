@@ -1867,6 +1867,28 @@ app.post('/registrations/public', async (req, res) => {
                 code: 'deadline_passed'
             });
         }
+        // DEUTSCH: Duplikat-Schutz — dieselbe E-Mail (Gast ODER verknuepftes
+        // Mitglied) hat fuer diesen Anlass schon eine offene/bestaetigte
+        // Anmeldung. Nur fuer Teilnehmer-/GV-Anmeldungen: Helfer duerfen
+        // spaeter zusaetzliche Schichten nachbuchen.
+        if (type !== 'shift' && email) {
+            const dupe = await pool.query(
+                `SELECT id FROM registrations
+                 WHERE event_id = $1 AND status IN ('pending', 'approved')
+                   AND (LOWER(guest_email) = LOWER($2)
+                        OR member_id = (SELECT id FROM members WHERE LOWER(email) = LOWER($2) LIMIT 1))
+                 LIMIT 1`,
+                [ev.id, email]
+            );
+            if (dupe.rows.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'Mit dieser E-Mail-Adresse besteht bereits eine Anmeldung für diesen Anlass. Falls du etwas ändern möchtest, melde dich beim Vorstand.',
+                    code: 'already_registered'
+                });
+            }
+        }
+
         // DEUTSCH: Kapazitaet in PERSONEN pruefen (eine Anmeldung kann mehrere
         // Personen umfassen) — inkl. der jetzt angefragten Personenzahl.
         const requestedPersons = Math.min(Math.max(parseInt(participants, 10) || 1, 1), 50);
@@ -2736,7 +2758,33 @@ app.get('/registrations/alternative-response/:token', async (req, res) => {
 app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { guest_name, guest_email, phone, shift_ids, notes, status, member_id } = req.body;
+        const { guest_name, guest_email, phone, shift_ids, notes, status, member_id, participants } = req.body;
+
+        // DEUTSCH: participants/phone werden ins BESTEHENDE notes-JSON gemerged
+        // (dort liegen auch companions/allergies/meal — nicht ueberschreiben!).
+        // Ein explizit uebergebenes notes hat weiterhin Vorrang (wie bisher).
+        let mergedNotes = notes;
+        if (mergedNotes === undefined && (participants !== undefined || phone !== undefined)) {
+            const cur = await pool.query('SELECT notes FROM registrations WHERE id = $1', [id]);
+            if (cur.rows.length === 0) {
+                return res.status(404).json({ error: 'Registration not found' });
+            }
+            let obj = {};
+            try {
+                obj = cur.rows[0].notes ? JSON.parse(cur.rows[0].notes) : {};
+                if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) {
+                    obj = { notes: cur.rows[0].notes };
+                }
+            } catch (_) {
+                // Alte Freitext-Notizen als Bemerkung erhalten
+                obj = cur.rows[0].notes ? { notes: cur.rows[0].notes } : {};
+            }
+            if (participants !== undefined) {
+                obj.participants = Math.min(Math.max(parseInt(participants, 10) || 1, 1), 50);
+            }
+            if (phone !== undefined) obj.phone = String(phone);
+            mergedNotes = JSON.stringify(obj);
+        }
 
         const result = await pool.query(`
             UPDATE registrations
@@ -2749,7 +2797,7 @@ app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'),
                 member_id = COALESCE($8, member_id)
             WHERE id = $1
             RETURNING *
-        `, [id, guest_name, guest_email, phone, shift_ids, notes, status, member_id]);
+        `, [id, guest_name, guest_email, phone, shift_ids, mergedNotes, status, member_id]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Registration not found' });
