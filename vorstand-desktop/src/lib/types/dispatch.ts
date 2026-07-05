@@ -23,6 +23,7 @@ export interface BulkEmailRequest {
   templateId?: string;
   subject?: string;
   body?: string;
+  html?: string;
   variables?: Record<string, string>;
 }
 

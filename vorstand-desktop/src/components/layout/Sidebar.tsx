@@ -16,6 +16,7 @@ import {
   Wallet,
   Clock,
   QrCode,
+  FileSpreadsheet,
   Settings,
   LogOut,
   PanelLeftClose,
@@ -37,6 +38,7 @@ const navItems = [
   { path: "/membership-fees", label: "Beitraege", icon: Wallet },
   { path: "/scheduled-jobs", label: "Geplant", icon: Clock },
   { path: "/app-tokens", label: "App-QR", icon: QrCode },
+  { path: "/export", label: "Voll-Export", icon: FileSpreadsheet },
   { path: "/settings", label: "Einstellungen", icon: Settings },
 ];
 

@@ -129,6 +129,58 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 </body></html>`;
 }
 
+/**
+ * Deckblatt fuer den PDF-Brief-Versand (/dispatch/send-pdf-post): Logo, Titel,
+ * Absenderzeile, Empfaenger im CH-Fenster, Betreff + Beilage-Hinweis. Das
+ * eigentliche Dokument (hochgeladenes PDF) wird serverseitig angehaengt.
+ */
+export function generatePdfCoverHTML(
+  subject: string,
+  member: Member,
+  senderLine: string
+): string {
+  const datum = new Date().toLocaleDateString("de-CH", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const anrede = member.anrede === "Frau" ? "Liebe" : "Lieber";
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>@page { size: A4; margin: 0; } body { margin: 0; padding: 0; }</style></head>
+<body>
+<div style="width: 210mm; height: 297mm; position: relative; box-sizing: border-box; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.4; color: #000;">
+    <div style="position: absolute; top: 15mm; left: 25mm; width: 35mm;">
+        <img src="https://www.fwv-raura.ch/images/logo.png" alt="FWV Raura" style="width: 35mm; height: auto; display: block;">
+    </div>
+    <div style="position: absolute; top: 15mm; left: 118mm;">
+        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Feuerwehrverein Raura</div>
+        <div style="font-size: 20pt; font-weight: bold; line-height: 1.2;">Kaiseraugst</div>
+    </div>
+    <div style="position: absolute; top: 35mm; left: 118mm; font-size: 8pt; color: #333;">${senderLine}</div>
+    <div style="position: absolute; top: 60mm; left: 118mm; width: 85mm;">
+        ${letterAddressBlockHtml(member)}
+    </div>
+    <div style="position: absolute; top: 97mm; right: 25mm; text-align: right;">Kaiseraugst, ${datum}</div>
+    <div style="position: absolute; top: 110mm; left: 25mm; right: 25mm;">
+        <div style="font-weight: bold; font-size: 14pt; margin-bottom: 3mm;">${subject || ""}</div>
+        <hr style="border: none; border-top: 1.5px solid #cc0000; margin: 4mm 0 8mm 0;">
+        <div style="font-size: 11pt; color: #333;">
+            <p>${anrede} ${member.vorname || "{{vorname}}"},</p>
+            <p>Beiliegend erhältst du das Dokument zum oben genannten Betreff.</p>
+        </div>
+        <div style="margin-top: 15mm;">
+            Mit freundlichen Grüssen<br><br>
+            <strong><em>Feuerwehrverein Raura, Kaiseraugst</em></strong><br>
+            <em>Der Vorstand</em>
+        </div>
+        <div style="margin-top: 15mm; padding-top: 5mm; border-top: 1px solid #ddd; font-size: 9pt; color: #666;">
+            Beilage: 1 Dokument
+        </div>
+    </div>
+</div>
+</body></html>`;
+}
+
 /** Plaintext-Body (Zeilen) in einfaches HTML fuer den Brief wandeln. */
 export function bodyTextToHtml(text: string): string {
   return (text || "")
