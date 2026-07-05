@@ -276,4 +276,17 @@ interface EventsApi {
     @Streaming
     @GET("events/{id}/pdf/teilnehmerliste")
     suspend fun getTeilnehmerlistePdf(@Path("id") id: String): Response<ResponseBody>
+
+    // =====================================================================
+    // Rezepte & Einkaufsliste (read-only Proxy zur Inventar-API; Zugriff
+    // serverseitig fuer Vorstand ODER Organisator des Events).
+    // =====================================================================
+
+    /** Mit dem Event verknuepfte Rezepte (Chips). */
+    @GET("events/{id}/recipes")
+    suspend fun getRecipes(@Path("id") id: String): Response<List<Recipe>>
+
+    /** Aus den Rezepten berechnete Einkaufsliste. */
+    @GET("events/{id}/shopping-list")
+    suspend fun getShoppingList(@Path("id") id: String): Response<ShoppingList>
 }

@@ -20,6 +20,10 @@ data class Event(
     val cost: String? = null,
     @SerializedName("organizer_name") val organizerName: String? = null,
     @SerializedName("organizer_email") val organizerEmail: String? = null,
+    /** Menue-Optionen fuer GV-Events (Essenswahl bei der Anmeldung). */
+    @SerializedName("meal_options") val mealOptions: List<String>? = null,
+    /** Dateiname des PDF-Aushangs, falls einer hinterlegt ist. */
+    @SerializedName("pdf_filename") val pdfFilename: String? = null,
     val shifts: List<Shift>? = null
 )
 
