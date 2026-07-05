@@ -78,7 +78,23 @@ const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
  *  - Vor Anmeldeschluss: "Anmeldung wieder offen"
  *  - Nach Anmeldeschluss: "Platz frei geworden"
  */
-async function notifySlotFreed({ eventId, prevStatus }) {
+// DEUTSCH: Personen einer Anmeldung (aus dem notes-JSON, "participants", mind. 1).
+// Eine Anmeldung kann mehrere Personen umfassen — Kapazitaets-Zaehlungen muessen
+// PERSONEN summieren, nicht Anmelde-Zeilen.
+function registrationPersons(reg) {
+    try {
+        const n = typeof reg.notes === 'string' ? JSON.parse(reg.notes) : (reg.notes || {});
+        const v = parseInt(n?.participants, 10);
+        if (Number.isFinite(v) && v > 1) return v;
+    } catch (_) { /* alte/nicht-JSON notes zaehlen als 1 Person */ }
+    return 1;
+}
+
+function sumRegistrationPersons(rows) {
+    return rows.reduce((sum, r) => sum + registrationPersons(r), 0);
+}
+
+async function notifySlotFreed({ eventId, prevStatus, freedPersons = 1 }) {
     if (prevStatus !== 'approved') return;
     try {
         const ev = await pool.query(
@@ -89,14 +105,14 @@ async function notifySlotFreed({ eventId, prevStatus }) {
         const event = ev.rows[0];
         if (!event.max_participants) return; // ohne Kapazitaetslimit kein Broadcast
 
-        // approved-Anzahl JETZT (nach DELETE/UPDATE)
+        // approved-PERSONEN JETZT (nach DELETE/UPDATE) — nicht Zeilen zaehlen
         const cnt = await pool.query(
-            `SELECT COUNT(*)::int AS c FROM registrations
+            `SELECT notes FROM registrations
              WHERE event_id = $1 AND status = 'approved'`, [eventId]
         );
-        const approvedNow = cnt.rows[0].c;
-        // Vor unserer Aenderung war approved+1 — wir checken ob's damals voll war
-        const wasFull = (approvedNow + 1) >= event.max_participants;
+        const approvedNow = sumRegistrationPersons(cnt.rows);
+        // Vorher waren es approvedNow + freigewordene Personen — war es da voll?
+        const wasFull = (approvedNow + Math.max(1, freedPersons)) >= event.max_participants;
         if (!wasFull) return;
         if (approvedNow >= event.max_participants) return; // immer noch voll
 
@@ -1851,20 +1867,37 @@ app.post('/registrations/public', async (req, res) => {
                 code: 'deadline_passed'
             });
         }
+        // DEUTSCH: Kapazitaet in PERSONEN pruefen (eine Anmeldung kann mehrere
+        // Personen umfassen) — inkl. der jetzt angefragten Personenzahl.
+        const requestedPersons = Math.min(Math.max(parseInt(participants, 10) || 1, 1), 50);
         if (ev.max_participants) {
             const cnt = await pool.query(
-                `SELECT COUNT(*)::int AS c FROM registrations
+                `SELECT notes FROM registrations
                  WHERE event_id = $1 AND status IN ('approved', 'pending')`,
                 [ev.id]
             );
-            if (cnt.rows[0].c >= ev.max_participants) {
+            const used = sumRegistrationPersons(cnt.rows);
+            const free = ev.max_participants - used;
+            if (free < requestedPersons) {
                 return res.status(409).json({
                     success: false,
-                    message: 'Das Event ist bereits voll. Bitte wende dich an den Organisator.',
-                    code: 'event_full'
+                    message: free <= 0
+                        ? 'Das Event ist bereits voll. Bitte wende dich an den Organisator.'
+                        : `Es sind nur noch ${free} freie ${free === 1 ? 'Platz' : 'Plätze'} verfügbar (angefragt: ${requestedPersons}). Bitte reduziere die Personenzahl oder wende dich an den Organisator.`,
+                    code: 'event_full',
+                    freeSpots: Math.max(0, free)
                 });
             }
         }
+
+        // DEUTSCH: Begleitpersonen (Namen der weiteren Personen) — vom Formular
+        // mitgeschickt, sanitisiert (max 49 Namen, je max 100 Zeichen).
+        const companions = Array.isArray(req.body.companions)
+            ? req.body.companions
+                .map((c) => String(c).trim().substring(0, 100))
+                .filter(Boolean)
+                .slice(0, 49)
+            : [];
 
         // Registrierung speichern (mit member_id falls Mitglied erkannt)
         const registration = await pool.query(`
@@ -1877,7 +1910,14 @@ app.post('/registrations/public', async (req, res) => {
             name,
             email,
             type === 'shift' ? shiftIds : null,
-            JSON.stringify({ phone, participants, shifts, notes, meal_selection: meal_selection || null, allergies: allergies || null })
+            JSON.stringify({
+                phone,
+                participants: requestedPersons,
+                companions: companions.length ? companions : null,
+                shifts, notes,
+                meal_selection: meal_selection || null,
+                allergies: allergies || null
+            })
         ]);
 
         // DEUTSCH: Audit-Eintrag damit die Vorstand-App eine Push-Notification anzeigen kann.
@@ -2192,7 +2232,7 @@ app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, a
         }).catch(() => {});
         // Status-Wechsel approved -> nicht-approved kann Platz freimachen
         if (statusChanged && existing.rows[0].status === 'approved' && status !== 'approved') {
-            notifySlotFreed({ eventId, prevStatus: 'approved' }).catch(() => {});
+            notifySlotFreed({ eventId, prevStatus: 'approved', freedPersons: registrationPersons(existing.rows[0]) }).catch(() => {});
         }
     } catch (error) {
         console.error('PUT registrations as-organizer failed:', error);
@@ -2209,7 +2249,7 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
 
         // Vor dem DELETE Member-/Guest-Daten holen — nach dem DELETE haben wir nichts mehr.
         const before = await pool.query(
-            'SELECT member_id, guest_name, guest_email, status FROM registrations WHERE id = $1 AND event_id = $2',
+            'SELECT member_id, guest_name, guest_email, status, notes FROM registrations WHERE id = $1 AND event_id = $2',
             [regId, eventId]
         );
         if (before.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
@@ -2226,7 +2266,7 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
             guestName: before.rows[0].guest_name, guestEmail: before.rows[0].guest_email,
             action: 'deleted'
         }).catch(() => {});
-        notifySlotFreed({ eventId, prevStatus: before.rows[0].status }).catch(() => {});
+        notifySlotFreed({ eventId, prevStatus: before.rows[0].status, freedPersons: registrationPersons(before.rows[0]) }).catch(() => {});
     } catch (error) {
         console.error('DELETE registrations as-organizer failed:', error);
         res.status(500).json({ error: error.message });
@@ -2317,7 +2357,7 @@ async function organizerActOnRegistration(req, res, newStatus) {
             action: newStatus === 'approved' ? 'approved' : 'rejected'
         }).catch(() => {});
         if (prevStatus === 'approved' && newStatus !== 'approved') {
-            notifySlotFreed({ eventId, prevStatus }).catch(() => {});
+            notifySlotFreed({ eventId, prevStatus, freedPersons: registrationPersons(reg) }).catch(() => {});
         }
 
         res.json({ success: true, registration: reg });

@@ -1551,7 +1551,13 @@
                                 `}).join('')}
                             </div>
                         </div>
-                        
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Allergien / Unverträglichkeiten</label>
+                            <input type="text" name="allergies" placeholder="z.B. Nüsse, Laktose, Gluten – leer lassen wenn keine"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Bemerkungen</label>
                             <textarea name="notes" rows="3" 
@@ -1627,7 +1633,16 @@
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
                             ${event.maxParticipants ? `<p class="text-sm text-gray-500 mt-1">Maximal ${event.maxParticipants} Teilnehmer</p>` : ''}
                         </div>
-                        
+
+                        <!-- DEUTSCH: Namensfelder fuer Begleitpersonen (erscheinen bei Anzahl > 1) -->
+                        <div class="companions-box space-y-4"></div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Allergien / Unverträglichkeiten</label>
+                            <input type="text" name="allergies" placeholder="z.B. Nüsse, Laktose, Gluten – leer lassen wenn keine"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        </div>
+
                         ${event.cost && event.cost !== 'Kostenlos' ? `
                             <div class="bg-fire-50 p-4 rounded-lg">
                                 <p class="text-fire-800 font-medium">Kosten: ${event.cost}</p>
@@ -1658,12 +1673,40 @@
                     e.preventDefault();
                     await this.submitParticipantRegistration(new FormData(e.target));
                 });
+                this.wireCompanionFields(document.getElementById('participant-registration-form'));
 
                 modal.classList.remove('hidden');
             }
 
             // DEUTSCH: Sendet die Schicht-Anmeldung an die oeffentliche Registrierungs-API
             // DEUTSCH: Verarbeitet Erfolg (Weiterleitung), Mitglied-Erkennung (409) und Fehler
+            // DEUTSCH: Blendet bei "Anzahl Personen" > 1 Namensfelder fuer die
+            // Begleitpersonen ein (2. bis N. Person), damit alle Teilnehmer
+            // namentlich erfasst sind. Bereits eingetippte Namen bleiben erhalten.
+            wireCompanionFields(form) {
+                if (!form) return;
+                const input = form.querySelector('input[name="participants"]');
+                const box = form.querySelector('.companions-box');
+                if (!input || !box) return;
+                const render = () => {
+                    const n = Math.max(1, parseInt(input.value) || 1);
+                    const existing = Array.from(box.querySelectorAll('input[name="companion"]')).map(i => i.value);
+                    box.innerHTML = '';
+                    for (let i = 2; i <= n; i++) {
+                        const wrap = document.createElement('div');
+                        wrap.innerHTML = `
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Name ${i}. Person *</label>
+                            <input type="text" name="companion" required maxlength="100" placeholder="Vor- und Nachname"
+                                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">`;
+                        box.appendChild(wrap);
+                        const el = wrap.querySelector('input');
+                        if (existing[i - 2]) el.value = existing[i - 2];
+                    }
+                };
+                input.addEventListener('input', render);
+                render();
+            }
+
             async submitShiftRegistration(formData) {
                 const selectedShiftInputs = document.querySelectorAll('#shift-registration-form input[name="shifts"]:checked');
 
@@ -1695,6 +1738,7 @@
                     phone: formData.get('phone') || '',
                     shifts: shiftsData.map(s => s.name),
                     shiftIds: shiftsData.map(s => s.id),
+                    allergies: formData.get('allergies') || '',
                     notes: formData.get('notes') || ''
                 };
 
@@ -1746,6 +1790,8 @@
                     email: formData.get('email'),
                     phone: formData.get('phone') || '',
                     participants: parseInt(formData.get('participants')) || 1,
+                    companions: formData.getAll('companion').map(s => String(s).trim()).filter(Boolean),
+                    allergies: formData.get('allergies') || '',
                     notes: formData.get('notes') || ''
                 };
 
@@ -1851,6 +1897,9 @@
                             ${event.maxParticipants ? `<p class="text-sm text-gray-500 mt-1">Maximal ${event.maxParticipants} Teilnehmer</p>` : ''}
                         </div>
 
+                        <!-- DEUTSCH: Namensfelder fuer Begleitpersonen (erscheinen bei Anzahl > 1) -->
+                        <div class="companions-box space-y-4"></div>
+
                         ${mealHtml}
 
                         ${event.cost && event.cost !== 'Kostenlos' ? `
@@ -1882,6 +1931,7 @@
                     e.preventDefault();
                     await this.submitGVRegistration(new FormData(e.target));
                 });
+                this.wireCompanionFields(document.getElementById('gv-registration-form'));
 
                 modal.classList.remove('hidden');
             }
@@ -1902,6 +1952,7 @@
                     email: formData.get('email'),
                     phone: formData.get('phone') || '',
                     participants: parseInt(formData.get('participants')) || 1,
+                    companions: formData.getAll('companion').map(s => String(s).trim()).filter(Boolean),
                     meal_selection: formData.get('meal_selection') || '',
                     allergies: formData.get('allergies') || '',
                     notes: formData.get('notes') || ''
