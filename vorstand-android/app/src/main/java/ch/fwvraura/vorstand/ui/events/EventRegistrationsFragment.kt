@@ -21,8 +21,10 @@ import ch.fwvraura.vorstand.data.model.Event
 import ch.fwvraura.vorstand.data.model.EventRegistration
 import ch.fwvraura.vorstand.data.model.Member
 import ch.fwvraura.vorstand.data.model.Shift
+import ch.fwvraura.vorstand.data.model.parseRegNotes
 import ch.fwvraura.vorstand.databinding.FragmentEventRegistrationsBinding
 import ch.fwvraura.vorstand.util.DateUtils
+import ch.fwvraura.vorstand.util.FileOpener
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -78,6 +80,13 @@ class EventRegistrationsFragment : Fragment() {
 
         // Pull-to-Refresh: Laedt das Event und alle Anmeldungen neu
         binding.swipeRefresh.setOnRefreshListener { loadEvent() }
+
+        // PDF-Exporte: Teilnehmerliste und Aushang (Plakat) herunterladen/oeffnen
+        binding.btnTeilnehmerlistePdf.setOnClickListener { downloadTeilnehmerlistePdf() }
+        binding.btnAushangPdf.setOnClickListener { downloadAushangPdf() }
+
+        // Alle Angemeldeten ueber eine Aenderung informieren
+        binding.btnNotifyRegistrants.setOnClickListener { showNotifyRegistrantsDialog() }
 
         // Initiales Laden des Events
         loadEvent()
@@ -135,7 +144,16 @@ class EventRegistrationsFragment : Fragment() {
 
             // Info-Zeile: Anmeldezahlen und Zeitraum zusammenbauen
             val regs = shift.registrations
-            val registered = regs?.approvedCount ?: regs?.approved?.size ?: 0
+            // Personen zaehlen statt Zeilen: participants pro Anmeldung
+            // aufsummieren, damit Begleitpersonen fuer die Kapazitaet mitzaehlen
+            // (konsistent mit der Web-Ansicht). Falls die Einzel-Anmeldungen
+            // nicht vorliegen, auf den serverseitigen approvedCount zurueckfallen.
+            val approvedRegs = regs?.approved ?: emptyList()
+            val registered = if (approvedRegs.isNotEmpty()) {
+                approvedRegs.sumOf { parseRegNotes(it.notes).participants }
+            } else {
+                regs?.approvedCount ?: 0
+            }
             val needed = shift.needed ?: 0
             info.text = "$registered / $needed | ${DateUtils.formatDate(shift.date)} ${shift.startTime ?: ""}-${shift.endTime ?: ""}"
 
@@ -151,7 +169,8 @@ class EventRegistrationsFragment : Fragment() {
                 registrations = allRegistrations,
                 onApprove = { reg -> approveRegistration(reg.id) },
                 onReject = { reg -> confirmRemoveOrReject(reg) },
-                onEdit = { reg -> showEditRegistrationDialog(reg) }
+                onEdit = { reg -> showEditRegistrationDialog(reg) },
+                onSuggestAlternative = { reg -> showSuggestAlternativeDialog(reg) }
             )
 
             // Button zum Hinzufuegen einer Person zu dieser Schicht
@@ -202,6 +221,7 @@ class EventRegistrationsFragment : Fragment() {
         for (reg in allDirect) {
             val itemView = layoutInflater.inflate(R.layout.item_shift_registration, binding.directRegistrationsContainer, false)
             val name = itemView.findViewById<TextView>(R.id.regName)
+            val details = itemView.findViewById<TextView>(R.id.regDetails)
             val status = itemView.findViewById<TextView>(R.id.regStatus)
             val btnEdit = itemView.findViewById<MaterialButton>(R.id.btnEdit)
             val btnApprove = itemView.findViewById<MaterialButton>(R.id.btnApprove)
@@ -209,6 +229,14 @@ class EventRegistrationsFragment : Fragment() {
 
             // Name der angemeldeten Person anzeigen
             name.text = reg.displayName
+
+            // Zusatzdaten (Personenzahl, Telefon, Allergien, Menue, E-Mail ...)
+            // identisch zur Schicht-Ansicht aufbereiten (gemeinsamer Helfer).
+            // Der Alternative-Button (btnAlternative) bleibt hier ausgeblendet,
+            // da direkte Anmeldungen keiner Schicht zugeordnet sind.
+            val detailText = ShiftRegistrationsAdapter.buildDetails(reg)
+            details.text = detailText
+            details.visibility = if (detailText.isEmpty()) View.GONE else View.VISIBLE
 
             val isPending = reg.status == "pending"
             val isApproved = reg.status == "approved"
@@ -336,12 +364,15 @@ class EventRegistrationsFragment : Fragment() {
         val editName = dialogView.findViewById<TextInputEditText>(R.id.editName)
         val editEmail = dialogView.findViewById<TextInputEditText>(R.id.editEmail)
         val editPhone = dialogView.findViewById<TextInputEditText>(R.id.editPhone)
+        val editParticipants = dialogView.findViewById<TextInputEditText>(R.id.editParticipants)
 
         // Bestehende Daten in die Felder laden
         memberDropdown.setText(reg.displayName, false)
         editName.setText(reg.guestName ?: "")
         editEmail.setText(reg.guestEmail ?: "")
         editPhone.setText(reg.phone ?: "")
+        // Personenzahl aus dem notes-Feld vorbelegen (mindestens 1)
+        editParticipants.setText(parseRegNotes(reg.notes).participants.toString())
 
         var members: List<Member> = emptyList()
         var selectedMember: Member? = null
@@ -401,6 +432,12 @@ class EventRegistrationsFragment : Fragment() {
                 if (email.isNotEmpty()) body["guest_email"] = email
                 val phone = editPhone.text?.toString()?.trim() ?: ""
                 if (phone.isNotEmpty()) body["phone"] = phone
+
+                // Personenzahl immer mitsenden (mindestens 1), damit eine reine
+                // Aenderung der Personenzahl nicht verloren geht
+                val participants = editParticipants.text?.toString()?.trim()
+                    ?.toIntOrNull()?.takeIf { it >= 1 } ?: 1
+                body["participants"] = participants
 
                 // Validierung: Mindestens eine Aenderung muss vorhanden sein
                 if (body.isEmpty()) {
@@ -692,6 +729,266 @@ class EventRegistrationsFragment : Fragment() {
             } catch (_: Exception) {
                 Toast.makeText(requireContext(), "Fehler beim Hinzufügen", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    /**
+     * Baut ein menschenlesbares Label fuer eine Schicht:
+     * "Name – Datum Startzeit-Endzeit" (z.B. "Bar – 14.06.2025 18:00-22:00").
+     */
+    private fun shiftLabel(shift: Shift): String {
+        val time = "${shift.startTime ?: ""}-${shift.endTime ?: ""}"
+        return "${shift.name} – ${DateUtils.formatDate(shift.date)} $time".trim()
+    }
+
+    /**
+     * Zeigt einen Dialog um der angemeldeten Person eine alternative Schicht
+     * vorzuschlagen (z.B. bei voller oder abgesagter Schicht).
+     *
+     * Der Dialog listet alle anderen Schichten des Events (ohne die eigene
+     * Schicht der Anmeldung) in einem Dropdown und bietet ein optionales
+     * Kommentarfeld. Beim Bestaetigen wird die E-Mail der Person aufgeloest;
+     * fehlt sie, wird abgebrochen.
+     *
+     * @param reg Die betroffene Anmeldung
+     */
+    private fun showSuggestAlternativeDialog(reg: EventRegistration) {
+        val event = currentEvent ?: return
+
+        // Alle Schichten ausser der eigenen Schicht der Anmeldung anbieten
+        val otherShifts = (event.shifts ?: emptyList()).filter { it.id != reg.shiftId }
+        if (otherShifts.isEmpty()) {
+            Toast.makeText(requireContext(), "Keine andere Schicht vorhanden", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val dialogView = layoutInflater.inflate(R.layout.dialog_suggest_alternative, null)
+        val shiftDropdown = dialogView.findViewById<AutoCompleteTextView>(R.id.suggestShiftDropdown)
+        val commentInput = dialogView.findViewById<TextInputEditText>(R.id.suggestComment)
+
+        // Schicht-Labels fuer das Dropdown aufbauen
+        val labels = otherShifts.map { shiftLabel(it) }
+        val adapter = ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_dropdown_item_1line,
+            labels
+        )
+        shiftDropdown.setAdapter(adapter)
+
+        var selectedIndex = -1
+        shiftDropdown.setOnItemClickListener { _, _, position, _ -> selectedIndex = position }
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Alternative vorschlagen")
+            .setView(dialogView)
+            .setPositiveButton("Vorschlagen", null)
+            .setNegativeButton("Abbrechen", null)
+            .create()
+
+        // Eigener OnClickListener fuer Vorschlagen um Validierung zu ermoeglichen
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                // Validierung: eine Ziel-Schicht muss ausgewaehlt sein
+                if (selectedIndex < 0) {
+                    Toast.makeText(requireContext(), "Bitte eine Schicht auswählen", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                // E-Mail aufloesen (Server-Mail = Mitglied oder Gast); ohne Mail kein Vorschlag
+                val registrantEmail = (reg.email ?: reg.guestEmail)?.trim().orEmpty()
+                if (registrantEmail.isEmpty()) {
+                    Toast.makeText(requireContext(), "Keine E-Mail-Adresse hinterlegt", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val target = otherShifts[selectedIndex]
+                val comment = commentInput.text?.toString()?.trim() ?: ""
+                suggestAlternative(reg.id, target.id, registrantEmail, labels[selectedIndex], comment, dialog)
+            }
+        }
+
+        dialog.show()
+    }
+
+    /**
+     * Sendet den Alternativ-Vorschlag ueber die API.
+     * Bei Erfolg wird der Dialog geschlossen und eine Bestaetigung angezeigt.
+     *
+     * @param regId ID der bestehenden Anmeldung
+     * @param newShiftId ID der vorgeschlagenen Schicht (Pflicht, nicht leer)
+     * @param email E-Mail der angemeldeten Person (Pflicht, nicht leer)
+     * @param shiftInfo Menschenlesbares Label der Ziel-Schicht
+     * @param comment Optionaler Kommentar
+     * @param dialog Der geoeffnete Dialog (wird bei Erfolg geschlossen)
+     */
+    private fun suggestAlternative(
+        regId: String,
+        newShiftId: String,
+        email: String,
+        shiftInfo: String,
+        comment: String,
+        dialog: androidx.appcompat.app.AlertDialog
+    ) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val body = mapOf<String, Any?>(
+                    "newShiftId" to newShiftId,
+                    "email" to email,
+                    "shiftInfo" to shiftInfo,
+                    "comment" to comment
+                )
+                val response = ApiModule.eventsApi.suggestAlternative(regId, body)
+                if (response.isSuccessful) {
+                    Toast.makeText(requireContext(), "Alternative vorgeschlagen", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                } else {
+                    Toast.makeText(requireContext(), "Fehler beim Vorschlagen", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "Fehler beim Vorschlagen", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * Zeigt einen Dialog um alle Angemeldeten (bestaetigt + wartend) ueber eine
+     * Aenderung am Event zu informieren. Der Betreff ist mit dem Event-Titel
+     * vorbelegt, die Nachricht ist ein Pflichtfeld.
+     */
+    private fun showNotifyRegistrantsDialog() {
+        val event = currentEvent ?: return
+        val dialogView = layoutInflater.inflate(R.layout.dialog_notify_registrants, null)
+        val subjectInput = dialogView.findViewById<TextInputEditText>(R.id.notifySubject)
+        val messageInput = dialogView.findViewById<TextInputEditText>(R.id.notifyMessage)
+
+        // Betreff mit Event-Titel vorbelegen
+        subjectInput.setText("Änderung: ${event.title}")
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Angemeldete informieren")
+            .setView(dialogView)
+            .setPositiveButton("Senden", null)
+            .setNegativeButton("Abbrechen", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val subject = subjectInput.text?.toString()?.trim() ?: ""
+                val message = messageInput.text?.toString()?.trim() ?: ""
+                // Validierung: Nachricht ist Pflicht
+                if (message.isEmpty()) {
+                    Toast.makeText(requireContext(), "Bitte eine Nachricht eingeben", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                notifyRegistrants(event.id, subject, message, dialog)
+            }
+        }
+
+        dialog.show()
+    }
+
+    /**
+     * Sendet die Benachrichtigung ueber die API und zeigt anschliessend eine
+     * Zusammenfassung des Ergebnisses (per E-Mail / per Brief / uebersprungen
+     * sowie nicht erreichbare Empfaenger).
+     *
+     * @param eventId Event-ID
+     * @param subject Betreff der Nachricht
+     * @param message Aenderungstext (nicht leer)
+     * @param dialog Der geoeffnete Dialog (wird bei Erfolg geschlossen)
+     */
+    private fun notifyRegistrants(
+        eventId: String,
+        subject: String,
+        message: String,
+        dialog: androidx.appcompat.app.AlertDialog
+    ) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val body = mapOf<String, Any?>("subject" to subject, "message" to message)
+                val response = ApiModule.eventsApi.notifyRegistrants(eventId, body)
+                if (response.isSuccessful) {
+                    dialog.dismiss()
+                    val result = response.body()
+                    if (result != null) {
+                        // Ergebnis-Zusammenfassung aufbauen
+                        val summary = StringBuilder()
+                            .append("${result.emailed} per E-Mail, ")
+                            .append("${result.posted} per Brief, ")
+                            .append("${result.skipped} übersprungen")
+                        if (result.unreachable.isNotEmpty()) {
+                            summary.append("\nNicht erreichbar: ")
+                                .append(result.unreachable.joinToString(", "))
+                        }
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setTitle("Benachrichtigung gesendet")
+                            .setMessage(summary.toString())
+                            .setPositiveButton("OK", null)
+                            .show()
+                    } else {
+                        Toast.makeText(requireContext(), "Benachrichtigung gesendet", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(requireContext(), "Fehler beim Senden", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "Fehler beim Senden", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /**
+     * Laedt die Teilnehmerliste als PDF und oeffnet sie im System-PDF-Viewer.
+     * Waehrend des Ladens wird der Refresh-Indikator angezeigt.
+     */
+    private fun downloadTeilnehmerlistePdf() {
+        val id = eventId ?: return
+        viewLifecycleOwner.lifecycleScope.launch {
+            binding.swipeRefresh.isRefreshing = true
+            try {
+                val response = ApiModule.eventsApi.getTeilnehmerlistePdf(id)
+                val body = response.body()
+                if (response.isSuccessful && body != null) {
+                    val ok = FileOpener.openPdf(requireContext(), body.bytes(), "teilnehmerliste.pdf")
+                    if (!ok) Toast.makeText(requireContext(), "Keine PDF-App gefunden", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(requireContext(), "Fehler beim Laden der Teilnehmerliste", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "Fehler beim Laden der Teilnehmerliste", Toast.LENGTH_SHORT).show()
+            }
+            binding.swipeRefresh.isRefreshing = false
+        }
+    }
+
+    /**
+     * Laedt den PDF-Aushang (Plakat) des Events und oeffnet ihn im
+     * System-PDF-Viewer. Ist kein Aushang hinterlegt (404), wird ein Hinweis
+     * angezeigt. Waehrend des Ladens wird der Refresh-Indikator angezeigt.
+     */
+    private fun downloadAushangPdf() {
+        val id = eventId ?: return
+        viewLifecycleOwner.lifecycleScope.launch {
+            binding.swipeRefresh.isRefreshing = true
+            try {
+                val response = ApiModule.eventsApi.getAushangPdf(id)
+                val body = response.body()
+                when {
+                    response.isSuccessful && body != null -> {
+                        val ok = FileOpener.openPdf(requireContext(), body.bytes(), "aushang.pdf")
+                        if (!ok) Toast.makeText(requireContext(), "Keine PDF-App gefunden", Toast.LENGTH_SHORT).show()
+                    }
+                    response.code() == 404 -> {
+                        Toast.makeText(requireContext(), "Kein PDF-Aushang hinterlegt", Toast.LENGTH_SHORT).show()
+                    }
+                    else -> {
+                        Toast.makeText(requireContext(), "Fehler beim Laden des Aushangs", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "Fehler beim Laden des Aushangs", Toast.LENGTH_SHORT).show()
+            }
+            binding.swipeRefresh.isRefreshing = false
         }
     }
 

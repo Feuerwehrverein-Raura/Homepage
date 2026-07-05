@@ -52,6 +52,7 @@
         style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
         android:hint="Telefon">
 
         <com.google.android.material.textfield.TextInputEditText
@@ -59,5 +60,19 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="phone" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- Anzahl Personen (inkl. Hauptperson); zaehlt fuer die Kapazitaet -->
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Personen">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/editParticipants"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number" />
     </com.google.android.material.textfield.TextInputLayout>
 </LinearLayout>

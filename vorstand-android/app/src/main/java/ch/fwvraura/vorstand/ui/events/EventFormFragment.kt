@@ -2,6 +2,7 @@ package ch.fwvraura.vorstand.ui.events
 
 import android.app.TimePickerDialog
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
@@ -10,6 +11,7 @@ import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.setPadding
 import androidx.fragment.app.Fragment
@@ -27,11 +29,16 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import com.google.gson.GsonBuilder
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * EventFormFragment – Komplexes Formular zum Erstellen und Bearbeiten von Events
@@ -62,9 +69,21 @@ class EventFormFragment : Fragment() {
 
     // ── Dropdown-Optionen ────────────────────────────────────────────────────
 
-    /** Verfuegbare Kategorien fuer Events (Dropdown-Auswahl) */
+    /**
+     * Verfuegbare Kategorien fuer Events (Dropdown-Auswahl).
+     * Muss exakt mit CATEGORIES im Web/Desktop uebereinstimmen (inkl. "GV"),
+     * da die Backend-Logik (registration_required, Menue, Schichten) darauf aufbaut.
+     */
     private val categoryOptions = listOf(
-        "Dorffest", "Aufbau", "Abbau", "Ausflug", "Ausflug mit Anmeldung", "Sonstiges"
+        "Dorffest", "GV", "Aufbau", "Abbau", "Ausflug", "Ausflug mit Anmeldung", "Sonstiges"
+    )
+
+    /**
+     * Kategorien, die automatisch eine Anmeldung erfordern (wie im Web/Desktop).
+     * Beim Speichern wird registration_required daraus abgeleitet.
+     */
+    private val regRequiredCategories = listOf(
+        "Dorffest", "GV", "Aufbau", "Abbau", "Ausflug mit Anmeldung"
     )
 
     /** Status-Optionen auf Deutsch fuer die Anzeige im Dropdown */
@@ -79,9 +98,13 @@ class EventFormFragment : Fragment() {
     /** Mapping: Englischer API-Wert -> Deutsche Anzeige (z.B. "planned" -> "Geplant") */
     private val statusApiToDisplay = statusApiValues.zip(statusDisplayOptions).toMap()
 
-    /** Verfuegbare Bereiche fuer Schichten (z.B. "Bar", "Kueche", "Service") */
+    /**
+     * Verfuegbare Bereiche fuer Schichten (Vorschlagsliste im Schicht-Dialog).
+     * Entspricht exakt SHIFT_BEREICHE im Web/Desktop, damit "Springer",
+     * "Vorbereitung", "Kasse" etc. als Vorschlaege erscheinen.
+     */
     private val bereichOptions = listOf(
-        "Bar", "Küche", "Service", "Aufbau", "Abbau", "Technik", "Sonstiges"
+        "Allgemein", "Kueche", "Bar", "Service", "Kasse", "Springer", "Vorbereitung", "Aufbau", "Abbau"
     )
 
     // ── Schicht-Verwaltung ───────────────────────────────────────────────────
@@ -101,6 +124,62 @@ class EventFormFragment : Fragment() {
 
     /** Lokale Liste aller Schichten (neu, bestehend, und zum Loeschen vorgemerkte) */
     private val shiftEntries = mutableListOf<ShiftEntry>()
+
+    // ── Datum/Zeit-Zustand ───────────────────────────────────────────────────
+
+    /**
+     * Gespeicherte ISO-Strings (Format "yyyy-MM-ddTHH:mm") fuer die drei
+     * Datumsfelder. Werden ueber den Datum+Zeit-Picker gesetzt und beim Speichern
+     * direkt (ohne Re-Parsing des Schweizer Anzeigetexts) an die API gesendet.
+     */
+    private var startIso: String? = null
+    private var endIso: String? = null
+    private var deadlineIso: String? = null
+
+    // ── PDF-Aushang-Zustand ──────────────────────────────────────────────────
+
+    /** Ausgewaehltes PDF als RAW-base64 (ohne data:-Prefix), null wenn keins gewaehlt. */
+    private var pickedPdfBase64: String? = null
+
+    /** Dateiname des ausgewaehlten PDFs. */
+    private var pickedPdfName: String? = null
+
+    /** true wenn der bestehende PDF-Aushang entfernt werden soll (Entfernen-Button). */
+    private var removePdf: Boolean = false
+
+    /** Dateiname eines bereits am Event haengenden PDF-Aushangs (aus dem Edit-Prefill). */
+    private var existingPdfFilename: String? = null
+
+    /**
+     * Activity-Result-Launcher fuer die PDF-Auswahl.
+     *
+     * Muss als Fragment-Property (nicht in onViewCreated) initialisiert werden,
+     * damit die Registrierung vor dem START-Zustand erfolgt (sonst
+     * IllegalStateException) — gleiches Muster wie in MassPdfFragment.
+     *
+     * GetContent() liefert direkt eine Uri der gewaehlten Datei. Wir lesen die
+     * Bytes, kodieren sie als RAW-base64 und merken uns Name + Inhalt.
+     */
+    private val pdfPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                // PDF vollstaendig in ein ByteArray einlesen (use() schliesst den Stream)
+                val bytes = requireContext().contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes != null) {
+                    // RAW-base64 ohne Zeilenumbrueche und ohne data:-Prefix
+                    pickedPdfBase64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    pickedPdfName = resolvePdfName(uri)
+                    // Neue Datei hebt eine evtl. vorgemerkte Entfernung auf
+                    removePdf = false
+                    updatePdfUi()
+                }
+            } catch (e: Exception) {
+                Snackbar.make(binding.root, "Fehler beim Laden der PDF", Snackbar.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     /**
      * Erstellt die View-Hierarchie des Fragments.
@@ -125,9 +204,10 @@ class EventFormFragment : Fragment() {
         binding.toolbar.title = if (isEdit) getString(R.string.event_edit) else getString(R.string.event_new)
         binding.toolbar.setNavigationOnClickListener { findNavController().navigateUp() }
 
-        // Dropdowns und DatePicker initialisieren
+        // Dropdowns, DatePicker und PDF-Aushang-Bereich initialisieren
         setupDropdowns()
         setupDatePickers()
+        setupPdfSection()
 
         // Im Edit-Modus: Bestehende Event-Daten vom Server laden und Felder befuellen
         if (isEdit) loadEvent()
@@ -155,6 +235,11 @@ class EventFormFragment : Fragment() {
         )
         binding.inputCategory.setAdapter(categoryAdapter)
 
+        // Bei Auswahl einer Kategorie: Sichtbarkeit der Menue-Optionen (nur "GV") anpassen
+        binding.inputCategory.setOnItemClickListener { _, _, _, _ ->
+            updateMealOptionsVisibility()
+        }
+
         // Status-Dropdown mit den deutschen Status-Bezeichnungen befuellen
         val statusAdapter = ArrayAdapter(
             requireContext(),
@@ -169,17 +254,86 @@ class EventFormFragment : Fragment() {
         }
     }
 
+    /**
+     * Blendet das Menue-Optionen-Feld nur ein, wenn die Kategorie "GV" ausgewaehlt ist
+     * (wie im Web/Desktop). Wird nach Kategorie-Auswahl und beim Edit-Prefill aufgerufen.
+     */
+    private fun updateMealOptionsVisibility() {
+        val isGv = binding.inputCategory.text.toString().trim() == "GV"
+        binding.layoutMealOptions.visibility = if (isGv) View.VISIBLE else View.GONE
+    }
+
     // ── Date Pickers ─────────────────────────────────────────────────────────
 
     /**
-     * Konfiguriert die DatePicker fuer die drei Datumsfelder:
-     * Startdatum, Enddatum und Anmeldefrist.
-     * Bei Klick auf ein Datumsfeld oeffnet sich ein MaterialDatePicker.
+     * Konfiguriert die drei Datumsfelder (Startdatum, Enddatum, Anmeldefrist).
+     *
+     * Anders als frueher wird pro Feld nicht nur ein Datum, sondern zusaetzlich
+     * eine Uhrzeit erfasst: Ein Klick oeffnet einen MaterialDatePicker und danach
+     * einen MaterialTimePicker. Das Ergebnis wird als ISO-String
+     * ("yyyy-MM-ddTHH:mm") in der jeweiligen Zustandsvariable abgelegt und im Feld
+     * im Schweizer Format ("dd.MM.yyyy HH:mm") angezeigt.
      */
     private fun setupDatePickers() {
-        binding.inputStartDate.setOnClickListener { showDatePicker("Startdatum") { binding.inputStartDate.setText(it) } }
-        binding.inputEndDate.setOnClickListener { showDatePicker("Enddatum") { binding.inputEndDate.setText(it) } }
-        binding.inputRegistrationDeadline.setOnClickListener { showDatePicker("Anmeldefrist") { binding.inputRegistrationDeadline.setText(it) } }
+        binding.inputStartDate.setOnClickListener {
+            showDateTimePicker("Startdatum", startIso) { iso ->
+                startIso = iso
+                binding.inputStartDate.setText(DateUtils.formatDateTime(iso))
+            }
+        }
+        binding.inputEndDate.setOnClickListener {
+            showDateTimePicker("Enddatum", endIso) { iso ->
+                endIso = iso
+                binding.inputEndDate.setText(DateUtils.formatDateTime(iso))
+            }
+        }
+        binding.inputRegistrationDeadline.setOnClickListener {
+            showDateTimePicker("Anmeldefrist", deadlineIso) { iso ->
+                deadlineIso = iso
+                binding.inputRegistrationDeadline.setText(DateUtils.formatDateTime(iso))
+            }
+        }
+    }
+
+    /**
+     * Zeigt nacheinander einen Datums- und einen Zeit-Picker und liefert das
+     * kombinierte Ergebnis als ISO-String ("yyyy-MM-ddTHH:mm") zurueck.
+     *
+     * Beim Bearbeiten wird der Picker mit dem bestehenden Wert vorbelegt (Datum +
+     * Uhrzeit ueber DateUtils.parseForPickers), sonst mit dem heutigen Datum und
+     * 00:00 Uhr.
+     *
+     * @param title Titel fuer beide Picker (z.B. "Startdatum").
+     * @param currentIso Bisheriger ISO-Wert des Feldes (fuer die Vorbelegung), oder null.
+     * @param onPicked Callback mit dem fertigen ISO-String.
+     */
+    private fun showDateTimePicker(title: String, currentIso: String?, onPicked: (String) -> Unit) {
+        // Vorbelegung aus einem evtl. bereits gesetzten Wert ableiten
+        val preset = DateUtils.parseForPickers(currentIso)
+
+        val datePicker = MaterialDatePicker.Builder.datePicker()
+            .setTitleText(title)
+            .setSelection(preset?.first ?: MaterialDatePicker.todayInUtcMilliseconds())
+            .build()
+
+        // Nach der Datumsauswahl den Zeit-Picker oeffnen
+        datePicker.addOnPositiveButtonClickListener { dateMillis ->
+            val timePicker = MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_24H)
+                .setHour(preset?.second ?: 0)
+                .setMinute(preset?.third ?: 0)
+                .setTitleText(title)
+                .build()
+
+            // Nach der Zeitauswahl Datum + Zeit zu einem ISO-String zusammensetzen
+            timePicker.addOnPositiveButtonClickListener {
+                val iso = DateUtils.toIsoDateTime(dateMillis, timePicker.hour, timePicker.minute)
+                onPicked(iso)
+            }
+            timePicker.show(parentFragmentManager, "time_picker_$title")
+        }
+
+        datePicker.show(parentFragmentManager, "date_picker_$title")
     }
 
     /**
@@ -206,6 +360,66 @@ class EventFormFragment : Fragment() {
         picker.show(parentFragmentManager, "date_picker_$title")
     }
 
+    // ── PDF-Aushang ──────────────────────────────────────────────────────────
+
+    /**
+     * Richtet den PDF-Aushang-Bereich ein: "PDF waehlen" oeffnet den System-Picker,
+     * "Entfernen" merkt das Entfernen des bestehenden Aushangs vor. Setzt zudem die
+     * initiale Anzeige (Dateiname bzw. Platzhalter).
+     */
+    private fun setupPdfSection() {
+        binding.btnSelectPdf.setOnClickListener {
+            // GetContent-Contract erwartet den MIME-Type als Launch-Argument
+            pdfPickerLauncher.launch("application/pdf")
+        }
+        binding.btnRemovePdf.setOnClickListener {
+            // Entfernen vormerken und eine evtl. gewaehlte Datei verwerfen
+            removePdf = true
+            pickedPdfBase64 = null
+            pickedPdfName = null
+            updatePdfUi()
+        }
+        updatePdfUi()
+    }
+
+    /**
+     * Aktualisiert die PDF-Anzeige: zeigt den Namen der neu gewaehlten bzw. der
+     * bestehenden Datei und blendet den "Entfernen"-Button nur ein, wenn es etwas
+     * zu entfernen gibt.
+     */
+    private fun updatePdfUi() {
+        val displayName = when {
+            // Neu gewaehlte Datei hat Vorrang
+            pickedPdfName != null -> pickedPdfName
+            // Bestehender Aushang, solange nicht zum Entfernen vorgemerkt
+            !removePdf && existingPdfFilename != null -> existingPdfFilename
+            else -> null
+        }
+        binding.pdfFilenameText.text = displayName ?: "Keine Datei ausgewählt"
+        binding.btnRemovePdf.visibility = if (displayName != null) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * Ermittelt den Anzeigenamen einer per Picker gewaehlten Datei
+     * (OpenableColumns.DISPLAY_NAME), mit Fallback "aushang.pdf".
+     */
+    private fun resolvePdfName(uri: android.net.Uri): String {
+        var name: String? = null
+        try {
+            requireContext().contentResolver
+                .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (idx >= 0) name = cursor.getString(idx)
+                    }
+                }
+        } catch (_: Exception) {
+            // Bei Fehlern den Fallback-Namen verwenden
+        }
+        return name ?: "aushang.pdf"
+    }
+
     // ── Bestehendes Event laden ──────────────────────────────────────────────
 
     /**
@@ -227,17 +441,41 @@ class EventFormFragment : Fragment() {
                     binding.inputTitle.setText(e.title)
                     binding.inputSubtitle.setText(e.subtitle ?: "")
                     binding.inputCategory.setText(e.category ?: "", false)
+                    // Menue-Optionen vorbelegen und Sichtbarkeit (nur "GV") setzen
+                    binding.inputMealOptions.setText(e.mealOptions?.joinToString(", ") ?: "")
+                    updateMealOptionsVisibility()
                     // Status: API-Wert (englisch) in Anzeige-Wert (deutsch) umwandeln
                     binding.inputStatus.setText(statusApiToDisplay[e.status] ?: "", false)
                     binding.inputLocation.setText(e.location ?: "")
-                    binding.inputRegistrationDeadline.setText(DateUtils.formatDate(e.registrationDeadline))
-                    binding.inputStartDate.setText(DateUtils.formatDate(e.startDate))
-                    binding.inputEndDate.setText(DateUtils.formatDate(e.endDate))
+                    // Datum + Zeit: ISO-Rohwert merken und im Schweizer Datums-/Zeitformat anzeigen
+                    deadlineIso = e.registrationDeadline
+                    binding.inputRegistrationDeadline.setText(DateUtils.formatDateTime(e.registrationDeadline))
+                    startIso = e.startDate
+                    binding.inputStartDate.setText(DateUtils.formatDateTime(e.startDate))
+                    endIso = e.endDate
+                    binding.inputEndDate.setText(DateUtils.formatDateTime(e.endDate))
                     binding.inputMaxParticipants.setText(e.maxParticipants?.toString() ?: "")
                     binding.inputCost.setText(e.cost ?: "")
                     binding.inputOrganizerName.setText(e.organizerName ?: "")
                     binding.inputOrganizerEmail.setText(e.organizerEmail ?: "")
                     binding.inputDescription.setText(e.description ?: "")
+
+                    // Organisator-Zugang: existiert bereits, wenn eine Event-E-Mail gesetzt ist.
+                    // Dann nur den Status anzeigen und den Schalter ausblenden (nicht destruktiv,
+                    // damit der bestehende Zugang beim Speichern nicht ueberschrieben wird).
+                    if (!e.eventEmail.isNullOrBlank()) {
+                        binding.textCreateAccessActive.text = "Organisator-Zugang aktiv: ${e.eventEmail}"
+                        binding.textCreateAccessActive.visibility = View.VISIBLE
+                        binding.switchCreateAccess.visibility = View.GONE
+                        binding.textCreateAccessHint.visibility = View.GONE
+                    }
+
+                    // PDF-Aushang: bestehenden Dateinamen merken und in der UI anzeigen
+                    // (ermoeglicht das Anzeigen und Entfernen ueber updatePdfUi()).
+                    if (!e.pdfFilename.isNullOrBlank()) {
+                        existingPdfFilename = e.pdfFilename
+                    }
+                    updatePdfUi()
 
                     // Bestehende Schichten in die lokale Liste laden
                     // Jede Schicht wird als ShiftEntry mit existingId gespeichert,
@@ -537,8 +775,39 @@ class EventFormFragment : Fragment() {
         val selectedStatusDisplay = binding.inputStatus.text.toString().trim()
         val statusApiValue = statusDisplayToApi[selectedStatusDisplay] ?: selectedStatusDisplay.ifBlank { null }
 
+        // Ausgewaehlte Kategorie: bestimmt registration_required und ob Menue-Optionen gesendet werden
+        val selectedCategory = binding.inputCategory.text.toString().trim()
+
         val maxParticipantsText = binding.inputMaxParticipants.text.toString().trim()
-        val registrationDeadlineText = binding.inputRegistrationDeadline.text.toString().trim()
+
+        // Menue-Optionen nur bei Kategorie "GV" senden (kommagetrennt, leere Eintraege
+        // verwerfen), sonst null — wie im Web/Desktop.
+        val mealOptions = if (selectedCategory == "GV") {
+            binding.inputMealOptions.text.toString().split(",").map { it.trim() }.filter { it.isNotBlank() }
+        } else {
+            null
+        }
+
+        // PDF-Aushang beim Speichern (wie im Web/Desktop):
+        //  - neue Datei gewaehlt   -> Anhang (base64) + Dateiname senden
+        //  - Entfernen vorgemerkt  -> explizit null senden (bestehenden Aushang loeschen)
+        //  - sonst                 -> nichts mitschicken
+        val pdfAttachmentValue: String?
+        val pdfFilenameValue: String?
+        when {
+            pickedPdfBase64 != null -> {
+                pdfAttachmentValue = pickedPdfBase64
+                pdfFilenameValue = pickedPdfName
+            }
+            removePdf && existingPdfFilename != null -> {
+                pdfAttachmentValue = null
+                pdfFilenameValue = null
+            }
+            else -> {
+                pdfAttachmentValue = null
+                pdfFilenameValue = null
+            }
+        }
 
         // Schichten fuer neue Events: Nicht-geloeschte Schichten inline mitschicken
         // Bei bestehenden Events werden Schichten separat verwaltet (null setzen)
@@ -553,17 +822,25 @@ class EventFormFragment : Fragment() {
         val event = EventCreate(
             title = title,
             subtitle = binding.inputSubtitle.text.toString().trim().ifBlank { null },
-            category = binding.inputCategory.text.toString().trim().ifBlank { null },
+            category = selectedCategory.ifBlank { null },
             status = statusApiValue,
             location = binding.inputLocation.text.toString().trim().ifBlank { null },
-            registrationDeadline = if (registrationDeadlineText.isNotBlank()) DateUtils.toIsoDate(registrationDeadlineText) else null,
-            startDate = DateUtils.toIsoDate(binding.inputStartDate.text.toString().trim()),
-            endDate = DateUtils.toIsoDate(binding.inputEndDate.text.toString().trim()),
+            // Datum/Zeit direkt aus den gespeicherten ISO-Werten (kein Re-Parsing des Anzeigetexts)
+            registrationDeadline = deadlineIso,
+            startDate = startIso,
+            endDate = endIso,
             maxParticipants = if (maxParticipantsText.isNotBlank()) maxParticipantsText.toIntOrNull() else null,
             cost = binding.inputCost.text.toString().trim().ifBlank { null },
             organizerName = binding.inputOrganizerName.text.toString().trim().ifBlank { null },
             organizerEmail = binding.inputOrganizerEmail.text.toString().trim().ifBlank { null },
             description = binding.inputDescription.text.toString().trim().ifBlank { null },
+            // registration_required aus der Kategorie ableiten (wie im Web/Desktop)
+            registrationRequired = regRequiredCategories.contains(selectedCategory),
+            mealOptions = mealOptions,
+            // Organisator-Zugang nur anfordern, wenn der Schalter aktiv ist (sonst weglassen)
+            createAccess = if (binding.switchCreateAccess.isChecked) true else null,
+            pdfAttachment = pdfAttachmentValue,
+            pdfFilename = pdfFilenameValue,
             shifts = newShifts
         )
 
@@ -614,8 +891,35 @@ class EventFormFragment : Fragment() {
      * wird eine entsprechende Fehlermeldung angezeigt.
      */
     private suspend fun saveEditedEvent(event: EventCreate) {
-        // Schritt 1: Event-Grunddaten aktualisieren
-        val response = ApiModule.eventsApi.updateEvent(eventId!!, event)
+        // Schritt 1: Event-Grunddaten aktualisieren.
+        //
+        // Der Standard-Gson des Retrofit-Clients laesst null-Felder weg. Das ist
+        // beim Bearbeiten meist erwuenscht (partielles Update — nicht vorbelegte
+        // Felder sollen nicht versehentlich geleert werden). Es verhindert aber
+        // zwei Dinge, die das Web/Desktop kann:
+        //   - "PDF-Aushang entfernen": pdf_attachment/pdf_filename muessen als
+        //     explizites null gesendet werden (present+null = leeren im Backend).
+        //   - meal_options ausserhalb von GV auf null setzen.
+        // Deshalb serialisieren wir hier selbst mit serializeNulls, entfernen dann
+        // aber alle null-Felder WIEDER — ausser den bewusst zu leerenden. So bleibt
+        // das partielle Update erhalten und "Entfernen" wirkt trotzdem.
+        val gson = GsonBuilder().serializeNulls().create()
+        val obj = gson.toJsonTree(event).asJsonObject
+        obj.remove("shifts") // Schichten werden separat ueber eigene Endpunkte verwaltet
+
+        val keepNulls = mutableSetOf("meal_options")
+        if (removePdf && existingPdfFilename != null) {
+            keepNulls += "pdf_attachment"
+            keepNulls += "pdf_filename"
+        }
+        obj.entrySet()
+            .filter { it.value.isJsonNull && it.key !in keepNulls }
+            .map { it.key }
+            .forEach { obj.remove(it) }
+
+        val body = gson.toJson(obj)
+            .toRequestBody("application/json; charset=utf-8".toMediaType())
+        val response = ApiModule.eventsApi.updateEventRaw(eventId!!, body)
         if (!response.isSuccessful) {
             Snackbar.make(binding.root, "Fehler (${response.code()})", Snackbar.LENGTH_LONG).show()
             binding.btnSave.isEnabled = true

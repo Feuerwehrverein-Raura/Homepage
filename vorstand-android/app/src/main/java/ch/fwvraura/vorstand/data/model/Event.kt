@@ -60,6 +60,18 @@ data class Event(
     /** E-Mail-Adresse des Organisators fuer Rueckfragen. */
     @SerializedName("organizer_email") val organizerEmail: String? = null,
 
+    /** Organisator-Zugang (Event-Dashboard): Login-E-Mail, falls eingerichtet. */
+    @SerializedName("event_email") val eventEmail: String? = null,
+
+    /** Menue-Optionen fuer GV-Events. */
+    @SerializedName("meal_options") val mealOptions: List<String>? = null,
+
+    /** Dateiname des PDF-Aushangs, falls vorhanden. */
+    @SerializedName("pdf_filename") val pdfFilename: String? = null,
+
+    /** Ob eine Anmeldung erforderlich ist. */
+    @SerializedName("registration_required") val registrationRequired: Boolean? = null,
+
     /**
      * Liste der Schichten (Shifts) dieses Events.
      * Jede Schicht hat eigene Zeiten und Anmeldungen.
@@ -145,10 +157,34 @@ data class EventCreate(
     /** E-Mail-Adresse des Organisators fuer Rueckfragen. */
     @SerializedName("organizer_email") val organizerEmail: String? = null,
 
+    /** Ob eine Anmeldung erforderlich ist (wird aus der Kategorie abgeleitet). */
+    @SerializedName("registration_required") val registrationRequired: Boolean? = null,
+
+    /** Menue-Optionen fuer GV-Events (Essenswahl bei der Anmeldung). */
+    @SerializedName("meal_options") val mealOptions: List<String>? = null,
+
+    /** Beim Speichern: Organisator-Zugang (Event-Dashboard) einrichten. */
+    @SerializedName("create_access") val createAccess: Boolean? = null,
+
+    /** PDF-Aushang als base64 (Inhalt ohne data:-Prefix). */
+    @SerializedName("pdf_attachment") val pdfAttachment: String? = null,
+
+    /** Dateiname des PDF-Aushangs. */
+    @SerializedName("pdf_filename") val pdfFilename: String? = null,
+
     /**
      * Liste der Schichten, die zusammen mit dem Event erstellt werden sollen.
      * Wird nur beim Erstellen (POST) verwendet. Bei bestehenden Events
      * werden Schichten separat ueber eigene Endpunkte verwaltet.
      */
     val shifts: List<ShiftCreate>? = null
+)
+
+/** Antwort von POST /events/:id/notify-registrants. */
+data class NotifyResult(
+    val success: Boolean = false,
+    val emailed: Int = 0,
+    val posted: Int = 0,
+    val skipped: Int = 0,
+    val unreachable: List<String> = emptyList()
 )
