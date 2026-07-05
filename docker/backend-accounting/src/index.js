@@ -6,6 +6,7 @@ const express = require('express');   // DEUTSCH: Web-Framework für HTTP-Server
 const cors = require('cors');         // DEUTSCH: Cross-Origin Requests erlauben (für Frontend-Zugriff)
 const helmet = require('helmet');     // DEUTSCH: Sicherheits-Headers setzen (XSS-Schutz etc.)
 const { Pool } = require('pg');       // DEUTSCH: PostgreSQL-Verbindungspool
+const { authenticateAny, requireRole } = require('./auth-middleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -118,7 +119,7 @@ async function runStartupMigrations() {
 // ============================================
 
 // DEUTSCH: GET /accounts — Alle aktiven Konten abrufen, sortiert nach Kontonummer
-app.get('/accounts', async (req, res) => {
+app.get('/accounts', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM accounts WHERE is_active = true ORDER BY number');
         res.json(result.rows);
@@ -128,7 +129,7 @@ app.get('/accounts', async (req, res) => {
 });
 
 // DEUTSCH: POST /accounts — Neues Konto anlegen (Nummer, Name, Typ, optional: Übergeordnetes Konto)
-app.post('/accounts', async (req, res) => {
+app.post('/accounts', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { number, name, type, parent_id, description } = req.body;
         const result = await pool.query(`
@@ -146,7 +147,7 @@ app.post('/accounts', async (req, res) => {
 // ============================================
 
 // DEUTSCH: GET /transactions — Buchungen abrufen, optional gefiltert nach Datum (from/to) und Konto (account_id)
-app.get('/transactions', async (req, res) => {
+app.get('/transactions', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { from, to, account_id } = req.query;
         let query = `
@@ -182,7 +183,7 @@ app.get('/transactions', async (req, res) => {
 });
 
 // DEUTSCH: POST /transactions — Neue Buchung erstellen (Datum, Beschreibung, Soll-/Haben-Konto, Betrag)
-app.post('/transactions', async (req, res) => {
+app.post('/transactions', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const {
             date, description, debit_account_id, credit_account_id,
@@ -207,7 +208,7 @@ app.post('/transactions', async (req, res) => {
 // ============================================
 
 // DEUTSCH: GET /invoices — Rechnungen abrufen, optional gefiltert nach Status und Mitglied
-app.get('/invoices', async (req, res) => {
+app.get('/invoices', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { status, member_id } = req.query;
         let query = 'SELECT * FROM invoices WHERE 1=1';
@@ -231,7 +232,7 @@ app.get('/invoices', async (req, res) => {
 });
 
 // DEUTSCH: GET /invoices/:id — Einzelne Rechnung nach ID abrufen
-app.get('/invoices/:id', async (req, res) => {
+app.get('/invoices/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) {
@@ -244,7 +245,7 @@ app.get('/invoices/:id', async (req, res) => {
 });
 
 // DEUTSCH: POST /invoices — Neue Rechnung erstellen (generiert automatisch Rechnungsnummer im Format YYYY-0001)
-app.post('/invoices', async (req, res) => {
+app.post('/invoices', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const {
             member_id, recipient_name, recipient_address,
@@ -293,7 +294,7 @@ app.patch('/invoices/:id/pay', async (req, res) => {
 // ============================================
 
 // DEUTSCH: GET /reports/balance — Kontensaldo: Summiert Soll- und Haben-Beträge pro Konto
-app.get('/reports/balance', async (req, res) => {
+app.get('/reports/balance', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT
@@ -313,7 +314,7 @@ app.get('/reports/balance', async (req, res) => {
 });
 
 // DEUTSCH: GET /reports/cashflow — Cashflow pro Monat: Einnahmen vs. Ausgaben für ein bestimmtes Jahr
-app.get('/reports/cashflow', async (req, res) => {
+app.get('/reports/cashflow', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { year } = req.query;
         const targetYear = year || new Date().getFullYear();
@@ -536,7 +537,6 @@ app.patch('/membership-fees/payments/:id/reference', async (req, res) => {
 //
 // Auth: authenticateAny (Vorstand-JWT oder Authentik-JWT mit Vorstand-Gruppe).
 const axios = require('axios');
-const { authenticateAny, requireRole } = require('./auth-middleware');
 const { buildBeitragEmailForPayment, buildBeitragLetterForPayment, getKassier } = require('./beitrag-helpers');
 
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
