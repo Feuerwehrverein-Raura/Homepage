@@ -22,6 +22,7 @@ import { SettingsPage } from "@/pages/settings/SettingsPage";
 import { AppTokensPage } from "@/pages/app-tokens/AppTokensPage";
 import { MailPage } from "@/pages/mail/MailPage";
 import { ContactsPage } from "@/pages/contacts/ContactsPage";
+import { ExportPage } from "@/pages/export/ExportPage";
 
 export function AppLayout() {
   const applyTheme = useSettingsStore((s) => s.applyTheme);
@@ -56,6 +57,7 @@ export function AppLayout() {
             <Route path="membership-fees" element={<MembershipFeesPage />} />
             <Route path="scheduled-jobs" element={<ScheduledJobsPage />} />
             <Route path="app-tokens" element={<AppTokensPage />} />
+            <Route path="export" element={<ExportPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Routes>
         </div>

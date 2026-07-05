@@ -5,9 +5,16 @@ import * as dispatchApi from "@/lib/api/dispatch";
 import * as membersApi from "@/lib/api/members";
 import {
   generateDispatchLetterHTML,
+  generatePdfCoverHTML,
   getAktuarAbsenderLine,
   bodyTextToHtml,
 } from "@/lib/dispatch-letter";
+import {
+  generateEventInvitationLetterHTML,
+  generateEventInvitationEmailHTML,
+} from "@/lib/event-invitation";
+import * as eventsApi from "@/lib/api/events";
+import type { Event } from "@/lib/types/event";
 import type {
   EmailTemplate,
   PingenAccount,
@@ -28,9 +35,37 @@ import {
   Save,
   Pencil,
   Trash2,
+  Paperclip,
+  Eye,
 } from "lucide-react";
 
 type Tab = "send" | "templates" | "pingen" | "log";
+
+// Datei als base64 (ohne data:-Prefix) lesen — fuer den PDF-Brief-Versand.
+function readFileBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden"));
+    reader.readAsDataURL(file);
+  });
+}
+
+// PDF-Blob im Standard-Viewer oeffnen (Download-Weg, im Tauri-Webview zuverlaessig).
+function openPdfBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Vollname eines Mitglieds mit passender Funktion (z.B. Praesident/Aktuar).
+function memberFullNameByRole(members: Member[], re: RegExp): string {
+  const m = members.find((x) => x.funktion && re.test(x.funktion));
+  return m ? `${m.vorname || ""} ${m.nachname || ""}`.trim() : "";
+}
 
 export function DispatchPage() {
   const [activeTab, setActiveTab] = useState<Tab>("send");
@@ -75,7 +110,7 @@ export function DispatchPage() {
 
 /* ========== Send Tab ========== */
 function SendTab() {
-  const [mode, setMode] = useState<"email" | "post" | "auto" | "smart">("email");
+  const [mode, setMode] = useState<"email" | "post" | "auto" | "pdf-post" | "smart">("email");
   const [members, setMembers] = useState<Member[]>([]);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [recipientType, setRecipientType] = useState<"selected" | "all" | "filter">("selected");
@@ -85,6 +120,10 @@ function SendTab() {
   const [filterPostPref, setFilterPostPref] = useState(false);
   const [emailPreferenceOnly, setEmailPreferenceOnly] = useState(false);
   const [postPreferenceOnly, setPostPreferenceOnly] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -96,6 +135,10 @@ function SendTab() {
   useEffect(() => {
     membersApi.getMembers().then(setMembers).catch(() => {});
     dispatchApi.getTemplates().then(setTemplates).catch(() => {});
+    eventsApi
+      .getEvents()
+      .then((evs) => setEvents(evs.filter((e) => (e.status || "") !== "cancelled")))
+      .catch(() => {});
   }, []);
 
   const handleTemplateSelect = (templateId: string) => {
@@ -185,6 +228,64 @@ function SendTab() {
       return;
     }
 
+    // PDF-Brief: Deckblatt pro Empfaenger + hochgeladenes PDF -> Pingen
+    if (mode === "pdf-post") {
+      if (!pdfFile) {
+        setError("Bitte ein PDF auswaehlen");
+        return;
+      }
+      if (postRecipients.length === 0) {
+        setError("Keine Post-Empfaenger (vollstaendige Adresse noetig)");
+        return;
+      }
+      if (
+        !window.confirm(
+          `PDF-Brief an ${postRecipients.length} Empfaenger${postPreferenceOnly ? " mit Post-Praeferenz" : ""} senden (via Pingen${staging ? ", STAGING" : ""})?`
+        )
+      )
+        return;
+      setSending(true);
+      setError(null);
+      setResult(null);
+      try {
+        const pdfBase64 = await readFileBase64(pdfFile);
+        const senderLine = getAktuarAbsenderLine(members);
+        let ok = 0;
+        let fail = 0;
+        for (let i = 0; i < postRecipients.length; i++) {
+          const m = postRecipients[i];
+          try {
+            await dispatchApi.sendPdfPost({
+              cover_html: generatePdfCoverHTML(subject, m, senderLine),
+              pdf_base64: pdfBase64,
+              recipient: {
+                name: `${m.vorname} ${m.nachname}`.trim(),
+                street: m.strasse,
+                zip: m.plz,
+                city: m.ort,
+                country: "CH",
+              },
+              member_id: m.id,
+              subject: subject || "Dokument",
+              staging,
+            });
+            ok++;
+          } catch {
+            fail++;
+          }
+          setResult(`PDF-Briefe: ${i + 1}/${postRecipients.length} verarbeitet…`);
+        }
+        setResult(
+          `${ok} PDF-Briefe gesendet${fail ? `, ${fail} fehlgeschlagen` : ""}${staging ? " (Staging)" : ""}`
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Fehler beim Senden");
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
     // E-Mail / Post / Auto: clientseitige Aufteilung wie in der Web-Version
     const doEmail = mode === "email" || mode === "auto";
     const doPost = mode === "post" || mode === "auto";
@@ -223,31 +324,61 @@ function SendTab() {
     setError(null);
     setResult(null);
     const parts: string[] = [];
+    // Event-Einladung: eigenes Layout (Brief + E-Mail) statt Standard-Layout
+    const eventObj = selectedEvent
+      ? events.find((e) => e.id === selectedEvent) || null
+      : null;
+    const senderLine = getAktuarAbsenderLine(members);
+    const praesidentName = memberFullNameByRole(members, /pr[aä]sident/i);
+    const aktuarName = memberFullNameByRole(members, /aktuar/i);
+    const organizerName = eventObj?.organizer_name || "";
     try {
       if (doEmail && emailR.length > 0) {
-        const res = await dispatchApi.sendBulkEmail({
-          memberIds: emailR.map((m) => m.id),
-          templateId: selectedTemplate || undefined,
-          subject,
-          body,
-        });
+        const res = await dispatchApi.sendBulkEmail(
+          eventObj
+            ? {
+                memberIds: emailR.map((m) => m.id),
+                subject: subject || `Einladung: ${eventObj.title}`,
+                html: generateEventInvitationEmailHTML(
+                  eventObj,
+                  bodyTextToHtml(body),
+                  null,
+                  senderLine,
+                  praesidentName,
+                  aktuarName,
+                  organizerName,
+                  ""
+                ),
+              }
+            : {
+                memberIds: emailR.map((m) => m.id),
+                templateId: selectedTemplate || undefined,
+                subject,
+                body,
+              }
+        );
         parts.push(
           `${res.sent || 0} E-Mails gesendet${res.failed ? `, ${res.failed} fehlgeschlagen` : ""}`
         );
       }
       if (doPost && postR.length > 0) {
-        const senderLine = getAktuarAbsenderLine(members);
         const sourceHtml = bodyTextToHtml(body);
         let ok = 0;
         let fail = 0;
         for (let i = 0; i < postR.length; i++) {
           const m = postR[i];
-          const letterHtml = generateDispatchLetterHTML(
-            sourceHtml,
-            subject,
-            m,
-            senderLine
-          );
+          const letterHtml = eventObj
+            ? generateEventInvitationLetterHTML(
+                eventObj,
+                sourceHtml,
+                m,
+                senderLine,
+                praesidentName,
+                aktuarName,
+                organizerName,
+                ""
+              )
+            : generateDispatchLetterHTML(sourceHtml, subject, m, senderLine);
           try {
             await dispatchApi.sendPost({
               html: letterHtml,
@@ -280,6 +411,35 @@ function SendTab() {
     }
   };
 
+  // Vorschau: erzeugt das echte Brief-PDF fuer den ersten Post-Empfaenger.
+  const handlePreview = async () => {
+    const sample =
+      mode === "auto"
+        ? baseRecipients.find((m) => m.strasse && m.plz && m.ort && m.zustellung_post)
+        : postRecipients[0];
+    if (!sample) {
+      setError("Kein Post-Empfaenger fuer die Vorschau");
+      return;
+    }
+    setError(null);
+    setPreviewing(true);
+    try {
+      const senderLine = getAktuarAbsenderLine(members);
+      const html = generateDispatchLetterHTML(
+        bodyTextToHtml(body),
+        subject,
+        sample,
+        senderLine
+      );
+      const blob = await dispatchApi.previewLetterPdf(html);
+      openPdfBlob(blob, `Vorschau_${sample.nachname || "Brief"}.pdf`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Vorschau fehlgeschlagen");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Versandart */}
@@ -288,6 +448,7 @@ function SendTab() {
           ["email", "E-Mail", Mail],
           ["post", "Post", FileText],
           ["auto", "Auto (E-Mail + Post)", Send],
+          ["pdf-post", "PDF-Brief", Paperclip],
           ["smart", "Smart", Zap],
         ] as const).map(([val, lbl, Icon]) => (
           <button
@@ -321,6 +482,28 @@ function SendTab() {
         </select>
       </div>
 
+      {/* Event-Einladung (optional): eigenes Layout statt Standard */}
+      {(mode === "email" || mode === "post" || mode === "auto") && (
+        <div>
+          <label className="block text-sm font-medium mb-1">Event-Einladung (optional)</label>
+          <select
+            value={selectedEvent}
+            onChange={(e) => setSelectedEvent(e.target.value)}
+            className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Keine – Standard-Layout</option>
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>{ev.title}</option>
+            ))}
+          </select>
+          {selectedEvent && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Es wird das Event-Einladungs-Layout (Brief + E-Mail) verwendet.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Betreff + Nachricht: fuer E-Mail, Post und Auto (nicht Smart) */}
       {mode !== "smart" && (
         <>
@@ -333,15 +516,29 @@ function SendTab() {
               className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Nachricht</label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={6}
-              className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
-            />
-          </div>
+          {mode !== "pdf-post" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Nachricht</label>
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={6}
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-y"
+              />
+            </div>
+          )}
+          {mode === "pdf-post" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">PDF-Dokument (wird als Beilage mitgeschickt)</label>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                className="block text-sm"
+              />
+              {pdfFile && <p className="text-xs text-muted-foreground mt-1">{pdfFile.name}</p>}
+            </div>
+          )}
         </>
       )}
 
@@ -478,14 +675,27 @@ function SendTab() {
         </div>
       )}
 
-      <button
-        onClick={handleSend}
-        disabled={sending}
-        className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-      >
-        {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-        Senden
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={handleSend}
+          disabled={sending}
+          className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Senden
+        </button>
+        {(mode === "post" || mode === "auto") && (
+          <button
+            onClick={handlePreview}
+            disabled={previewing}
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 disabled:opacity-50"
+            title="Brief-PDF fuer den ersten Post-Empfaenger als Vorschau laden"
+          >
+            {previewing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+            Vorschau
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -688,6 +898,9 @@ function PingenTab() {
   const [singleBody, setSingleBody] = useState("");
   const [singleSending, setSingleSending] = useState(false);
   const [singleResult, setSingleResult] = useState<string | null>(null);
+  // Webhooks (automatische Status-Updates)
+  const [webhooks, setWebhooks] = useState<dispatchApi.PingenWebhook[]>([]);
+  const [webhookBusy, setWebhookBusy] = useState(false);
 
   const load = async (stg = staging) => {
     setLoading(true);
@@ -710,6 +923,7 @@ function PingenTab() {
 
   useEffect(() => {
     load();
+    loadWebhooks();
     membersApi.getMembers().then(setMembers).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -718,6 +932,41 @@ function PingenTab() {
     const next = !staging;
     setStaging(next);
     load(next);
+    loadWebhooks(next);
+  };
+
+  const loadWebhooks = async (stg = staging) => {
+    try {
+      setWebhooks(await dispatchApi.getPingenWebhooks(stg));
+    } catch {
+      setWebhooks([]);
+    }
+  };
+
+  const handleRegisterWebhook = async () => {
+    setWebhookBusy(true);
+    setError(null);
+    try {
+      await dispatchApi.registerPingenWebhook(staging);
+      await loadWebhooks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Webhook-Registrierung fehlgeschlagen");
+    } finally {
+      setWebhookBusy(false);
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
+    if (!window.confirm("Webhook loeschen?")) return;
+    setWebhookBusy(true);
+    try {
+      await dispatchApi.deletePingenWebhook(id, staging);
+      await loadWebhooks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Loeschen fehlgeschlagen");
+    } finally {
+      setWebhookBusy(false);
+    }
   };
 
   const handleSingleSend = async () => {
@@ -846,6 +1095,30 @@ function PingenTab() {
           {singleSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Brief senden{staging ? " (Staging)" : ""}
         </button>
+      </div>
+
+      {/* Webhooks (automatische Status-Updates) */}
+      <div className="rounded-lg border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm">Webhooks (auto. Status-Updates)</h3>
+          <button onClick={handleRegisterWebhook} disabled={webhookBusy} className="flex items-center gap-1 px-3 py-1.5 rounded-md bg-secondary text-secondary-foreground text-sm font-medium hover:bg-secondary/80 disabled:opacity-50">
+            <Plus className="h-4 w-4" /> Registrieren
+          </button>
+        </div>
+        {webhooks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Kein Webhook registriert.</p>
+        ) : (
+          <ul className="space-y-1">
+            {webhooks.map((w) => (
+              <li key={w.id} className="flex items-center justify-between gap-2 text-sm border rounded px-3 py-1.5">
+                <span className="truncate text-muted-foreground">{w.attributes?.url || w.id}</span>
+                <button onClick={() => handleDeleteWebhook(w.id)} disabled={webhookBusy} className="p-1 rounded hover:bg-muted text-destructive shrink-0" title="Loeschen">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* Letters */}

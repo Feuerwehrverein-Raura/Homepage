@@ -1,4 +1,6 @@
 import { apiClient } from "./client";
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { useAuthStore } from "@/stores/auth-store";
 import type {
   EmailTemplate,
   SendEmailRequest,
@@ -103,6 +105,76 @@ export async function sendPost(
   data: SendPostRequest
 ): Promise<SendPostResponse> {
   return await apiClient.post<SendPostResponse>("/dispatch/send-post", data);
+}
+
+// PDF-Brief mit Deckblatt: Deckblatt-HTML + hochgeladenes PDF (base64) -> Pingen
+export interface SendPdfPostRequest {
+  cover_html: string;
+  pdf_base64: string;
+  recipient: DispatchPostRecipient;
+  member_id?: string;
+  subject?: string;
+  staging?: boolean;
+}
+
+export async function sendPdfPost(
+  data: SendPdfPostRequest
+): Promise<SendPostResponse> {
+  return await apiClient.post<SendPostResponse>("/dispatch/send-pdf-post", data);
+}
+
+// Vorschau: Brief-HTML serverseitig zu PDF rendern (Blob) — zum Anzeigen vor
+// dem echten Versand. Binaer, daher tauriFetch statt apiClient.
+export async function previewLetterPdf(
+  html: string,
+  pdfMargin?: { top: string; right: string; bottom: string; left: string }
+): Promise<Blob> {
+  const token = useAuthStore.getState().token;
+  const res = await tauriFetch(
+    "https://api.fwv-raura.ch/dispatch/preview-pdf?zones=1",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ html, pdf_margin: pdfMargin }),
+    }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return await res.blob();
+}
+
+// Pingen-Webhooks (automatische Brief-Status-Updates)
+export interface PingenWebhook {
+  id: string;
+  attributes?: {
+    url?: string;
+    event_category?: string;
+    [k: string]: unknown;
+  };
+}
+
+export async function getPingenWebhooks(
+  staging = false
+): Promise<PingenWebhook[]> {
+  return await apiClient.get<PingenWebhook[]>(
+    `/pingen/webhooks?staging=${staging}`
+  );
+}
+
+export async function registerPingenWebhook(staging = false): Promise<unknown> {
+  return await apiClient.post("/pingen/webhooks/register", { staging });
+}
+
+export async function deletePingenWebhook(
+  id: string,
+  staging = false
+): Promise<unknown> {
+  return await apiClient.delete(`/pingen/webhooks/${id}?staging=${staging}`);
 }
 
 // Pingen

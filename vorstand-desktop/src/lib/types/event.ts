@@ -10,6 +10,7 @@ export interface Event {
   location: string | null;
   description: string | null;
   registration_deadline: string | null;
+  registration_required: boolean | null;
   max_participants: number | null;
   cost: string | null;
   organizer_name: string | null;
