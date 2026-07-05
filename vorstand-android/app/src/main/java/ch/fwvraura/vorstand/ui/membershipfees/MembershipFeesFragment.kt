@@ -25,6 +25,8 @@ import ch.fwvraura.vorstand.data.model.SetReferenceRequest
 import ch.fwvraura.vorstand.databinding.FragmentMembershipFeesBinding
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.tabs.TabLayout
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -115,11 +117,16 @@ class MembershipFeesFragment : Fragment() {
         binding.progress.visibility = View.VISIBLE
         viewLifecycleOwner.lifecycleScope.launch {
             try {
-                val (paymentsResp, summaryResp) = kotlinx.coroutines.coroutineScope {
-                    val a = kotlinx.coroutines.async { ApiModule.membershipFeesApi.listPayments(selectedYear) }
-                    val b = kotlinx.coroutines.async { ApiModule.membershipFeesApi.getSummary(selectedYear) }
+                // async ist eine CoroutineScope-Extension — nur unqualifiziert (mit
+                // Import) aufrufbar; FQN-Aufruf kompilierte nicht. Kein Destructuring,
+                // da component1() sonst mehrdeutig aufgeloest wird.
+                val results = coroutineScope {
+                    val a = async { ApiModule.membershipFeesApi.listPayments(selectedYear) }
+                    val b = async { ApiModule.membershipFeesApi.getSummary(selectedYear) }
                     a.await() to b.await()
                 }
+                val paymentsResp = results.first
+                val summaryResp = results.second
 
                 if (paymentsResp.isSuccessful) {
                     allPayments = paymentsResp.body().orEmpty()
