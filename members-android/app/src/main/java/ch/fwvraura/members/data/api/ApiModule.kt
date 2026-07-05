@@ -10,7 +10,8 @@ import java.util.concurrent.TimeUnit
 // Zentraler Retrofit-Setup. Members- und Events-API laufen beide auf
 // api.fwv-raura.ch — Traefik routet anhand des Pfades, ein Retrofit-Client reicht.
 object ApiModule {
-    private const val API_BASE = "https://api.fwv-raura.ch/"
+    // Public: der AuthInterceptor braucht die Basis fuer den stillen QR-Re-Login.
+    const val API_BASE = "https://api.fwv-raura.ch/"
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()

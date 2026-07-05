@@ -114,6 +114,9 @@ class QrScannerActivity : AppCompatActivity() {
                     val tokenManager = VorstandApp.instance.tokenManager
                     tokenManager.token = body.token
                     tokenManager.refreshToken = body.refreshToken
+                    // Persistenten App-Token behalten: Fallback fuer stillen Re-Login,
+                    // falls die Refresh-Kette reisst (sonst: Logout + neu scannen).
+                    tokenManager.qrToken = token
                     tokenManager.userEmail = body.user.email
                     tokenManager.userRole = body.user.role
                     tokenManager.userName = body.user.name

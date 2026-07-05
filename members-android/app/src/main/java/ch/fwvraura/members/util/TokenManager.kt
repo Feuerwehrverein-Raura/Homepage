@@ -46,6 +46,15 @@ class TokenManager(context: Context) {
         get() = prefs.getString(KEY_ACCOUNT_TYPE, null)
         set(value) { prefs.edit().putString(KEY_ACCOUNT_TYPE, value).commit() }
 
+    /**
+     * Persistenter QR-App-Token (fwv-member-... / fwv-org-...) aus dem gescannten
+     * Login-QR. Wird fuer den STILLEN Re-Login benutzt, wenn das kurzlebige JWT
+     * ablaeuft — ohne ihn muesste das Mitglied alle 8h den QR neu scannen.
+     */
+    var qrToken: String?
+        get() = prefs.getString(KEY_QR_TOKEN, null)
+        set(value) { prefs.edit().putString(KEY_QR_TOKEN, value).commit() }
+
     var userEmail: String?
         get() = prefs.getString(KEY_EMAIL, null)
         set(value) { prefs.edit().putString(KEY_EMAIL, value).commit() }
@@ -83,6 +92,7 @@ class TokenManager(context: Context) {
         private const val KEY_TOKEN = "auth_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
         private const val KEY_ACCOUNT_TYPE = "account_type"
+        private const val KEY_QR_TOKEN = "qr_token"
         private const val KEY_EMAIL = "user_email"
         private const val KEY_NAME = "user_name"
         private const val KEY_EVENT_ID = "event_id"

@@ -69,6 +69,16 @@ class TokenManager(context: Context) {
             prefs.edit().putString(KEY_REFRESH_TOKEN, value).commit()
         }
 
+    // Persistenter QR-App-Token (fwv-app-...) aus dem gescannten Login-QR.
+    // Fallback fuer den stillen Re-Login, wenn die Single-Use-Refresh-Kette
+    // reisst (z.B. Netzwerkabbruch waehrend der Token-Rotation) — vorher
+    // wurde man dann ausgeloggt und musste den QR neu scannen.
+    var qrToken: String?
+        get() = prefs.getString(KEY_QR_TOKEN, null)
+        set(value) {
+            prefs.edit().putString(KEY_QR_TOKEN, value).commit()
+        }
+
     // E-Mail-Adresse des eingeloggten Vorstandsmitglieds
     var userEmail: String?
         get() = prefs.getString(KEY_EMAIL, null)
@@ -139,6 +149,7 @@ class TokenManager(context: Context) {
     companion object {
         private const val KEY_TOKEN = "auth_token"
         private const val KEY_REFRESH_TOKEN = "refresh_token"
+        private const val KEY_QR_TOKEN = "qr_token"
         private const val KEY_EMAIL = "user_email"
         private const val KEY_ROLE = "user_role"
         private const val KEY_NAME = "user_name"

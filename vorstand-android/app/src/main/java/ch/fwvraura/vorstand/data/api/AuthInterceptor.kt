@@ -66,18 +66,20 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
 
         if (!needsRefresh) return firstResponse
 
-        // Versuche mit dem gespeicherten Refresh-Token einen neuen JWT zu holen.
-        val refresh = tokenManager.refreshToken
-        if (refresh.isNullOrBlank()) {
-            firstResponse.close()
-            forceReLogin()
-            return chain.proceed(firstRequest)
-        }
-
+        // Neuen JWT besorgen: erst mit dem Refresh-Token, sonst als Fallback per
+        // stillem Re-Login mit dem persistenten QR-App-Token (falls per QR
+        // eingeloggt). Erst wenn beides scheitert (z.B. QR widerrufen), Logout.
         val newAccess = synchronized(tokenManager) {
             val current = tokenManager.token
             if (!current.isNullOrEmpty() && current != token) current
-            else doRefresh(refresh)
+            else {
+                val viaRefresh = tokenManager.refreshToken
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { doRefresh(it) }
+                viaRefresh ?: tokenManager.qrToken
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { doQrReLogin(it) }
+            }
         }
 
         if (newAccess.isNullOrBlank()) {
@@ -91,6 +93,36 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
             .header("Authorization", "Bearer $newAccess")
             .build()
         return chain.proceed(retried)
+    }
+
+    /**
+     * Stiller Re-Login mit dem persistenten QR-App-Token (POST /auth/vorstand/qr-login).
+     * Rettet die Session, wenn die Single-Use-Refresh-Kette gerissen ist (z.B.
+     * Netzwerkabbruch genau waehrend der Token-Rotation) — vorher: Logout + neu scannen.
+     */
+    private fun doQrReLogin(qrToken: String): String? {
+        val baseUrl = ch.fwvraura.vorstand.data.api.ApiModule.BASE_URL
+        val url = baseUrl.removeSuffix("/") + "/auth/vorstand/qr-login"
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+        val body = okhttp3.RequestBody.create(
+            "application/json".toMediaTypeOrNull(),
+            org.json.JSONObject().put("token", qrToken).toString()
+        )
+        val req = okhttp3.Request.Builder().url(url).post(body).build()
+        return try {
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val json = org.json.JSONObject(resp.body?.string() ?: return null)
+                val newAccess = json.optString("token").takeIf { it.isNotBlank() } ?: return null
+                val newRefresh = json.optString("refresh_token").takeIf { it.isNotBlank() }
+                tokenManager.token = newAccess
+                if (!newRefresh.isNullOrBlank()) tokenManager.refreshToken = newRefresh
+                newAccess
+            }
+        } catch (_: Exception) { null }
     }
 
     /** Synchroner POST /auth/vorstand/refresh — gibt neuen Access-Token zurueck oder null. */
