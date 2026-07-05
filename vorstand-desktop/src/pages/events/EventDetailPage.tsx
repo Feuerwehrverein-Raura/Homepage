@@ -269,6 +269,7 @@ export function EventDetailPage() {
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regParticipants, setRegParticipants] = useState("1");
   const [regSaving, setRegSaving] = useState(false);
 
   useEffect(() => {
@@ -392,6 +393,7 @@ export function EventDetailPage() {
     setRegName("");
     setRegEmail("");
     setRegPhone("");
+    setRegParticipants("1");
     setRegModal({ mode: "create", shiftId, shiftLabel });
   };
 
@@ -401,7 +403,9 @@ export function EventDetailPage() {
     setRegEmail(
       reg.guest_email || (reg as { email?: string | null }).email || ""
     );
-    setRegPhone(reg.phone || "");
+    const extra = parseRegNotes(reg.notes);
+    setRegPhone(extra.phone || reg.phone || "");
+    setRegParticipants(String(extra.participants));
     setRegModal({ mode: "edit", regId: reg.id, shiftLabel });
   };
 
@@ -421,15 +425,28 @@ export function EventDetailPage() {
           guest_name: regName.trim(),
           guest_email: regEmail.trim(),
         };
-        if (regPhone.trim()) {
-          payload.notes = JSON.stringify({ phone: regPhone.trim() });
+        const createParticipants = Math.min(
+          Math.max(parseInt(regParticipants, 10) || 1, 1),
+          50
+        );
+        if (regPhone.trim() || createParticipants > 1) {
+          payload.notes = JSON.stringify({
+            phone: regPhone.trim(),
+            participants: createParticipants,
+          });
         }
         await createRegistration(payload);
         setNotice({ type: "success", text: "Person hinzugefuegt" });
       } else {
+        // phone + participants merged das Backend ins bestehende notes-JSON
+        // (companions/allergies bleiben erhalten).
         const payload: Record<string, unknown> = { guest_name: regName.trim() };
         if (regEmail.trim()) payload.guest_email = regEmail.trim();
-        if (regPhone.trim()) payload.phone = regPhone.trim();
+        payload.phone = regPhone.trim();
+        payload.participants = Math.min(
+          Math.max(parseInt(regParticipants, 10) || 1, 1),
+          50
+        );
         await updateRegistration(regModal.regId, payload);
         setNotice({ type: "success", text: "Anmeldung aktualisiert" });
       }
@@ -1135,6 +1152,22 @@ export function EventDetailPage() {
                   onChange={(e) => setRegPhone(e.target.value)}
                   className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">
+                  Anzahl Personen
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={regParticipants}
+                  onChange={(e) => setRegParticipants(e.target.value)}
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Zaehlt bei Anlaessen mit Teilnehmerlimit als belegte Plaetze.
+                </p>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-4">
