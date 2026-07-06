@@ -2212,13 +2212,13 @@ function RecipeView({ items, token, user, onLogin }: {
                     </div>
                     {recipe.sellable && recipe.sale_price && (
                       <span className="text-lg font-bold text-green-600">
-                        CHF {recipe.sale_price.toFixed(2)}
+                        CHF {Number(recipe.sale_price).toFixed(2)}
                       </span>
                     )}
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-sm text-gray-500">
-                      Kosten: CHF {recipe.calculated_cost.toFixed(2)}
+                      Kosten: CHF {Number(recipe.calculated_cost).toFixed(2)}
                     </span>
                     <div className={`px-2 py-1 rounded text-sm font-medium ${
                       recipe.available_portions > 5
@@ -2278,11 +2278,11 @@ function RecipeView({ items, token, user, onLogin }: {
                 <div className="text-right">
                   {selectedRecipe.sellable && selectedRecipe.sale_price && (
                     <div className="text-xl font-bold text-green-600">
-                      CHF {selectedRecipe.sale_price.toFixed(2)}
+                      CHF {Number(selectedRecipe.sale_price).toFixed(2)}
                     </div>
                   )}
                   <div className="text-sm text-gray-500">
-                    Kosten: CHF {selectedRecipe.calculated_cost.toFixed(2)}
+                    Kosten: CHF {Number(selectedRecipe.calculated_cost).toFixed(2)}
                   </div>
                 </div>
               </div>
@@ -3652,8 +3652,8 @@ function EventsView({ token, user, onLogin }: { token: string | null; user: User
                 <h3 className="font-semibold text-lg">🛒 Einkaufsliste</h3>
                 <div className="text-sm text-gray-600">
                   {shopping.total_purchased}/{shopping.total_items} erledigt · offen{' '}
-                  <strong>CHF {shopping.estimated_open_cost.toFixed(2)}</strong> · gesamt CHF{' '}
-                  {shopping.estimated_total_cost.toFixed(2)}
+                  <strong>CHF {Number(shopping.estimated_open_cost).toFixed(2)}</strong> · gesamt CHF{' '}
+                  {Number(shopping.estimated_total_cost).toFixed(2)}
                 </div>
               </div>
               <div className="overflow-x-auto">
