@@ -52,6 +52,12 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
+        <!-- Mitglied: Event vorschlagen (Vorstand prueft den Vorschlag) -->
+        <activity
+            android:name=".ui.events.ProposeEventActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
         <activity
             android:name=".ui.profile.EditProfileActivity"
             android:exported="false"

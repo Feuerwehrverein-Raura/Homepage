@@ -45,6 +45,23 @@ interface EventsApi {
     suspend fun getEvents(): Response<List<Event>>
 
     /**
+     * Ruft die von Mitgliedern eingereichten Event-Vorschlaege ab.
+     *
+     * Sendet einen GET-Request an "events/proposals" (Vorstand-Auth). Liefert
+     * alle Events mit status == "proposed" – also Vorschlaege, die noch auf
+     * Genehmigung oder Ablehnung durch den Vorstand warten. Diese Events sind
+     * bewusst NICHT in der normalen getEvents()-Liste enthalten.
+     *
+     * Jeder Vorschlag enthaelt zusaetzlich die Angaben zum vorschlagenden
+     * Mitglied (organizer_vorname, organizer_nachname, organizer_email,
+     * organizer_id) – der Vorschlagende ist der voreingestellte Organisator.
+     *
+     * @return Response<List<Event>> - Enthaelt bei Erfolg die Liste der Vorschlaege.
+     */
+    @GET("events/proposals")
+    suspend fun getProposals(): Response<List<Event>>
+
+    /**
      * Ruft ein einzelnes Event anhand seiner ID ab.
      *
      * Sendet einen GET-Request an "events/{id}", wobei {id} durch den uebergebenen
@@ -103,6 +120,25 @@ interface EventsApi {
     suspend fun updateEventRaw(
         @Path("id") id: String,
         @Body body: RequestBody
+    ): Response<Event>
+
+    /**
+     * Aktualisiert gezielt einzelne Felder eines Events per Map-Body.
+     *
+     * Wird zum Genehmigen eines Event-Vorschlags verwendet: mit
+     * mapOf("status" to "planned") wird der Status von "proposed" auf
+     * "planned" gesetzt, ohne die uebrigen Felder anzufassen. Das Backend
+     * aktualisiert nur die mitgelieferten Felder.
+     *
+     * @param id Die eindeutige ID des Events.
+     * @param body Map mit den zu setzenden Feldern (z.B. {"status": "planned"}).
+     *             @JvmSuppressWildcards sorgt fuer korrekte JSON-Serialisierung.
+     * @return Response<Event> - Enthaelt bei Erfolg das aktualisierte Event-Objekt.
+     */
+    @PUT("events/{id}")
+    suspend fun updateEventStatus(
+        @Path("id") id: String,
+        @Body body: Map<String, @JvmSuppressWildcards Any?>
     ): Response<Event>
 
     /**

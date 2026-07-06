@@ -5,6 +5,16 @@ export async function getEvents(): Promise<Event[]> {
   return await apiClient.get<Event[]>("/events");
 }
 
+/**
+ * Von Mitgliedern eingereichte Event-Vorschlaege (status === "proposed").
+ * Diese werden von getEvents() herausgefiltert und nur hier geliefert —
+ * inkl. organizer_vorname/-nachname/-email/-id des Vorschlagenden.
+ * Genehmigen = updateEvent(id, { status: "planned" }); Ablehnen = deleteEvent(id).
+ */
+export async function getProposals(): Promise<Event[]> {
+  return await apiClient.get<Event[]>("/events/proposals");
+}
+
 export async function getEvent(id: string): Promise<Event> {
   return await apiClient.get<Event>(`/events/${id}`);
 }

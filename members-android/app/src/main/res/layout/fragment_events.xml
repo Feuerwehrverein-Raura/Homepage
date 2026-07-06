@@ -154,5 +154,18 @@
             android:layout_gravity="center"
             android:indeterminate="true"
             android:visibility="gone" />
+
+        <!-- Jedes Mitglied darf ein Event vorschlagen (Vorstand prueft es). -->
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/fabProposeEvent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:text="Event vorschlagen"
+            android:textColor="@color/on_primary"
+            app:backgroundTint="@color/primary"
+            app:icon="@android:drawable/ic_input_add"
+            app:iconTint="@color/on_primary" />
     </FrameLayout>
 </LinearLayout>

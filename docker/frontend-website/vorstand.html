@@ -732,6 +732,27 @@
             </div>
         </section>
 
+        <!-- Vorschläge (von Mitgliedern eingereichte Anlass-Vorschläge, status='proposed') -->
+        <section class="pt-8">
+            <div class="container mx-auto px-4">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3">
+                            <h2 class="text-lg font-semibold text-gray-800">Vorschläge</h2>
+                            <span id="proposals-count-badge" class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600">0</span>
+                        </div>
+                        <p class="text-sm text-gray-500 hidden md:block">Von Mitgliedern eingereichte Anlass-Vorschläge</p>
+                    </div>
+                    <div id="proposals-container" class="p-4 space-y-3 hidden">
+                        <!-- Vorschläge werden per JavaScript befüllt -->
+                    </div>
+                    <div id="proposals-empty-state" class="px-6 py-4">
+                        <p class="text-sm text-gray-400">Keine offenen Vorschläge</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Events List -->
         <section class="py-8">
             <div class="container mx-auto px-4">
@@ -4426,6 +4447,9 @@
             } finally {
                 document.getElementById('events-loading-state').classList.add('hidden');
             }
+
+            // Event-Vorschläge (status='proposed') laden - erscheinen nicht in GET /events
+            await loadEventProposals();
         }
 
         // Rendert die Event-Tabelle mit Titel, Datum, Kategorie, Organisator, Status-Badge, Schichten-Übersicht und Anmeldungsstatus.
@@ -4532,6 +4556,115 @@
                 'completed': 'bg-gray-100 text-gray-800'
             };
             return classes[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        // ============================================
+        // EVENT-VORSCHLÄGE (von Mitgliedern eingereicht, status='proposed')
+        // Vorschläge erscheinen NICHT in GET /events und werden separat über
+        // GET /events/proposals geladen. Der Vorstand kann sie genehmigen
+        // (-> planned), bearbeiten (normales Edit-Modal, inkl. Organisator-
+        // Auswahl) oder ablehnen (Event löschen).
+        // ============================================
+
+        // Lädt die offenen Event-Vorschläge und rendert sie.
+        async function loadEventProposals() {
+            try {
+                const response = await fetch(`${API_BASE}/events/proposals`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error('Failed to load proposals');
+                const proposals = await response.json();
+                renderEventProposals(Array.isArray(proposals) ? proposals : []);
+            } catch (error) {
+                console.error('Error loading event proposals:', error);
+                renderEventProposals([]);
+            }
+        }
+
+        // Rendert die Vorschlags-Karten inkl. Count-Badge und Aktionen.
+        function renderEventProposals(proposals) {
+            const container = document.getElementById('proposals-container');
+            const emptyState = document.getElementById('proposals-empty-state');
+            const badge = document.getElementById('proposals-count-badge');
+
+            badge.textContent = proposals.length;
+            badge.className = proposals.length > 0
+                ? 'px-2 py-0.5 text-xs font-medium rounded-full bg-fire-100 text-fire-700'
+                : 'px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-600';
+
+            if (proposals.length === 0) {
+                container.innerHTML = '';
+                container.classList.add('hidden');
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.classList.remove('hidden');
+
+            container.innerHTML = proposals.map(p => {
+                const proposerName = [p.organizer_vorname, p.organizer_nachname].filter(Boolean).join(' ').trim()
+                    || p.organizer_member_email || p.organizer_email || 'Unbekannt';
+                const dateStr = p.start_date ? formatEventDate(p.start_date) : '';
+                const desc = (p.description || '').trim();
+                const snippet = desc.length > 140 ? escapeHtml(desc.slice(0, 140)) + '…' : escapeHtml(desc);
+                const meta = [dateStr, p.location ? escapeHtml(p.location) : ''].filter(Boolean).join(' · ');
+                return `
+                    <div class="border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center flex-wrap gap-2">
+                                <h3 class="text-sm font-semibold text-gray-900">${escapeHtml(p.title)}</h3>
+                                <span class="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Vorschlag</span>
+                            </div>
+                            ${meta ? `<div class="text-sm text-gray-600 mt-1">${meta}</div>` : ''}
+                            <div class="text-xs text-gray-500 mt-0.5">Vorschlag von ${escapeHtml(proposerName)}</div>
+                            ${snippet ? `<p class="text-sm text-gray-600 mt-2">${snippet}</p>` : ''}
+                        </div>
+                        <div class="flex items-center gap-2 md:flex-col md:items-stretch shrink-0">
+                            <button onclick="approveEventProposal('${p.id}')" class="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors whitespace-nowrap">Genehmigen</button>
+                            <button onclick="editEvent('${p.id}')" class="px-3 py-1.5 text-sm border border-fire-500 text-fire-600 rounded-lg hover:bg-fire-50 transition-colors whitespace-nowrap">Bearbeiten</button>
+                            <button onclick="rejectEventProposal('${p.id}')" class="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors whitespace-nowrap">Ablehnen</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Genehmigt einen Vorschlag: Status -> 'planned' (Vorschlagender bleibt Organisator).
+        async function approveEventProposal(id) {
+            try {
+                const response = await fetch(`${API_BASE}/events/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ status: 'planned' })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                showToast('Vorschlag genehmigt', 'success');
+                await loadEvents();
+            } catch (error) {
+                console.error('Error approving proposal:', error);
+                showToast('Fehler beim Genehmigen: ' + error.message, 'error');
+            }
+        }
+
+        // Lehnt einen Vorschlag ab: löscht das vorgeschlagene Event.
+        async function rejectEventProposal(id) {
+            if (!confirm('Diesen Vorschlag wirklich ablehnen? Das vorgeschlagene Event wird geloescht.')) return;
+            try {
+                const response = await fetch(`${API_BASE}/events/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                showToast('Vorschlag abgelehnt', 'success');
+                await loadEvents();
+            } catch (error) {
+                console.error('Error rejecting proposal:', error);
+                showToast('Fehler beim Ablehnen: ' + error.message, 'error');
+            }
         }
 
         // Generiert eine Einladung für ein Event via Event-Einladungs-Template

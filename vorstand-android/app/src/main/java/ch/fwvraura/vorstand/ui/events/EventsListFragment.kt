@@ -4,6 +4,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -22,6 +24,10 @@ import kotlinx.coroutines.launch
  * ermoeglicht das Erstellen eines neuen Events. Unterstuetzt Pull-to-Refresh
  * und zeigt Lade-, Leer- und Fehlerzustaende an.
  *
+ * Oberhalb der Events-Liste erscheint – nur falls vorhanden – eine
+ * "Vorschläge"-Sektion mit den von Mitgliedern eingereichten Event-Vorschlaegen.
+ * Pro Vorschlag kann der Vorstand genehmigen, bearbeiten oder ablehnen.
+ *
  * - Klick auf ein Event navigiert zu den Anmeldungen (EventRegistrationsFragment).
  * - Long-Press auf ein Event navigiert zum Bearbeitungsformular (EventFormFragment).
  */
@@ -38,6 +44,9 @@ class EventsListFragment : Fragment() {
 
     /** RecyclerView-Adapter fuer die Events-Liste */
     private lateinit var adapter: EventsAdapter
+
+    /** RecyclerView-Adapter fuer die Event-Vorschlaege (Sektion oben) */
+    private lateinit var proposalsAdapter: ProposalsAdapter
 
     /** Flag um zwischen erstem Laden (Ladeindikator) und Refresh (SwipeRefresh) zu unterscheiden */
     private var isFirstLoad = true
@@ -77,8 +86,34 @@ class EventsListFragment : Fragment() {
         binding.eventsRecycler.layoutManager = LinearLayoutManager(requireContext())
         binding.eventsRecycler.adapter = adapter
 
-        // Pull-to-Refresh: Laedt die Events neu wenn der Benutzer nach unten wischt
-        binding.swipeRefresh.setOnRefreshListener { viewModel.loadEvents() }
+        // Vorschlags-Adapter mit drei Aktions-Callbacks erstellen:
+        // onApprove: Status auf "planned" setzen (genehmigen)
+        // onEdit:    Bearbeitungsformular oeffnen (gleiche Navigation wie bei Events;
+        //            der Organisator-Picker ist mit dem Vorschlagenden vorbelegt)
+        // onReject:  Nach Rueckfrage den Vorschlag loeschen (ablehnen)
+        proposalsAdapter = ProposalsAdapter(
+            onApprove = { event ->
+                viewModel.approveProposal(event.id) { success ->
+                    val msg = if (success) "Vorschlag genehmigt" else "Fehler beim Genehmigen"
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                }
+            },
+            onEdit = { event ->
+                val bundle = Bundle().apply { putString("eventId", event.id) }
+                findNavController().navigate(R.id.action_events_to_form, bundle)
+            },
+            onReject = { event -> confirmReject(event.id) }
+        )
+
+        // Vorschlags-RecyclerView konfigurieren (verschachtelt in der Sektion oben)
+        binding.proposalsRecycler.layoutManager = LinearLayoutManager(requireContext())
+        binding.proposalsRecycler.adapter = proposalsAdapter
+
+        // Pull-to-Refresh: Laedt Events UND Vorschlaege neu wenn nach unten gewischt wird
+        binding.swipeRefresh.setOnRefreshListener {
+            viewModel.loadEvents()
+            viewModel.loadProposals()
+        }
 
         // Retry-Button: Wird im Fehlerzustand angezeigt und laedt die Events erneut
         binding.retryButton.setOnClickListener { viewModel.loadEvents() }
@@ -140,11 +175,45 @@ class EventsListFragment : Fragment() {
                         }
                     }
                 }
+
+                // Collector 4: Event-Vorschlaege beobachten
+                // Aktualisiert den Vorschlags-Adapter und blendet die gesamte
+                // Vorschlags-Sektion aus, wenn keine Vorschlaege vorhanden sind.
+                launch {
+                    viewModel.proposals.collect { proposals ->
+                        proposalsAdapter.submitList(proposals)
+                        binding.proposalsSection.visibility =
+                            if (proposals.isEmpty()) View.GONE else View.VISIBLE
+                        // Header mit Anzahl der offenen Vorschlaege
+                        binding.proposalsHeader.text = "Vorschläge (${proposals.size})"
+                    }
+                }
             }
         }
 
-        // Initiales Laden der Events beim Erstellen der View
+        // Initiales Laden der Events und Vorschlaege beim Erstellen der View
         viewModel.loadEvents()
+        viewModel.loadProposals()
+    }
+
+    /**
+     * Zeigt eine Rueckfrage vor dem Ablehnen (Loeschen) eines Vorschlags.
+     * Bei Bestaetigung wird der Vorschlag geloescht und ein Toast angezeigt.
+     *
+     * @param eventId Die ID des abzulehnenden Vorschlags
+     */
+    private fun confirmReject(eventId: String) {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Vorschlag ablehnen")
+            .setMessage("Diesen Event-Vorschlag wirklich ablehnen und löschen?")
+            .setPositiveButton("Ablehnen") { _, _ ->
+                viewModel.rejectProposal(eventId) { success ->
+                    val msg = if (success) "Vorschlag abgelehnt" else "Fehler beim Ablehnen"
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Abbrechen", null)
+            .show()
     }
 
     /**

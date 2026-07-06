@@ -28,6 +28,16 @@ interface EventsApi {
     @GET("events/{id}")
     suspend fun getEvent(@Path("id") id: String): Response<Event>
 
+    /**
+     * Event vorschlagen (eingeloggtes Mitglied). Erzeugt KEIN veroeffentlichtes
+     * Event, sondern einen Vorschlag (status='proposed'), den der Vorstand spaeter
+     * prueft und freigibt. Body: {title, subtitle?, description?, start_date,
+     * end_date?, location?, category?, cost?}. Das Backend setzt den Vorschlagenden
+     * automatisch als Organisator — daher keine Organizer-Felder senden.
+     */
+    @POST("events/propose")
+    suspend fun proposeEvent(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<Event>
+
     /** Oeffentliche Anmeldung — auch ohne Login moeglich. */
     @POST("registrations/public")
     suspend fun publicRegister(@Body body: PublicRegistrationRequest): Response<PublicRegistrationResponse>

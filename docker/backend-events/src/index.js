@@ -707,6 +707,7 @@ app.get('/events', async (req, res) => {
             FROM events e
             LEFT JOIN members m ON e.organizer_id = m.id
             WHERE 1=1
+              AND (e.status IS NULL OR e.status NOT IN ('proposed', 'rejected'))
         `;
         const params = [];
 
@@ -875,10 +876,76 @@ app.get('/events/:id/recipes', authenticateAny, requireEventRecipeAccess, (req, 
 app.get('/events/:id/shopping-list', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventory(req, res, 'shopping-list'));
 
 // DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
+// ============================================================
+// DEUTSCH: Event-Vorschlaege. Mitglieder koennen Events VORSCHLAGEN (nicht
+// direkt anlegen). Ein Vorschlag ist ein Event mit status='proposed'. Der
+// Vorstand genehmigt es (Status -> planned, Organisator waehlbar) oder lehnt ab.
+// ============================================================
+
+// Mitglied schlaegt ein Event vor (jede*r eingeloggte User).
+app.post('/events/propose', authenticateAny, async (req, res) => {
+    try {
+        const { title, subtitle, description, start_date, end_date, location, category, cost } = req.body || {};
+        if (!title || !String(title).trim()) return res.status(400).json({ error: 'title ist ein Pflichtfeld' });
+        if (!start_date) return res.status(400).json({ error: 'start_date ist ein Pflichtfeld' });
+
+        // Vorschlagenden als DEFAULT-Organisator hinterlegen — bei der Genehmigung
+        // im Bearbeiten-Formular waehlbar (Vorstand kann jemand anderen setzen).
+        // organizer_email = Login-Mail (fuer den E-Mail-Match), organizer_id =
+        // passende Mitglieds-ID falls vorhanden.
+        const proposerEmail = req.user?.email || null;
+        const proposerName = req.user?.name || null;
+        let proposerMemberId = null;
+        if (proposerEmail) {
+            const m = await pool.query('SELECT id FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1', [proposerEmail]);
+            proposerMemberId = m.rows[0]?.id || null;
+        }
+
+        const base = String(title).toLowerCase()
+            .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 80) || 'vorschlag';
+        const slug = `${base}-${crypto.randomBytes(3).toString('hex')}`;
+
+        const result = await pool.query(`
+            INSERT INTO events (
+                slug, title, subtitle, description, start_date, end_date, location, category,
+                cost, status, organizer_name, organizer_email, organizer_id, registration_required
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'proposed',$10,$11,$12,false)
+            RETURNING *
+        `, [
+            slug, title, subtitle || null, description || null, start_date, end_date || null,
+            location || null, category || null, cost || null,
+            proposerName, proposerEmail, proposerMemberId
+        ]);
+        res.status(201).json(result.rows[0]);
+    } catch (error) {
+        console.error('POST /events/propose error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Vorstand/Admin: alle offenen Event-Vorschlaege (status='proposed').
+app.get('/events/proposals', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT e.*, m.vorname AS organizer_vorname, m.nachname AS organizer_nachname,
+                   m.email AS organizer_member_email
+            FROM events e
+            LEFT JOIN members m ON e.organizer_id = m.id
+            WHERE e.status = 'proposed'
+            ORDER BY e.created_at DESC
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/events/:id', async (req, res, next) => {
     // Reservierte IDs sind eigene Routen — weiterleiten, damit Express
     // den spezifischeren Handler findet (sonst 404 weil dies hier matcht).
-    if (['my-event', 'login', 'organized-by-me'].includes(req.params.id)) return next();
+    if (['my-event', 'login', 'organized-by-me', 'proposals'].includes(req.params.id)) return next();
     try {
         const { id } = req.params;
 
@@ -2168,6 +2235,7 @@ app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
         if (!email) return res.json([]);
         const result = await pool.query(
             `SELECT * FROM events WHERE LOWER(organizer_email) = $1
+             AND (status IS NULL OR status NOT IN ('proposed', 'rejected'))
              AND (end_date IS NULL OR end_date >= NOW() - INTERVAL '7 days')
              ORDER BY start_date ASC`,
             [email]
