@@ -96,13 +96,15 @@ play {
         serviceAccountCredentials.set(file(keyFile))
     }
     enabled.set(!keyFile.isNullOrBlank())
-    track.set("internal")               // erst Internal Testing, manuell Promote zu Closed/Production
+    track.set("internal")               // Internal Testing (bei Bedarf manuell zu Closed/Production promoten)
     defaultToAppBundles.set(true)        // .aab statt .apk hochladen
-    // DRAFT statt COMPLETED — Bundle wird hochgeladen, aber NICHT automatisch
-    // verteilt. Der Vorstand klickt manuell auf "Roll out" in der Play Console.
-    // Pflicht solange die App noch nie veroeffentlicht wurde (Status "Entwurf"
-    // in der Console).
-    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.DRAFT)
+    // COMPLETED — das Bundle wird hochgeladen UND sofort an die internen Tester
+    // ausgerollt (kein manuelles "Roll out" in der Play Console mehr noetig).
+    // Internes Testing braucht dafuer keine Store-Pruefung. Falls Google den
+    // Auto-Rollout ablehnt, solange die App noch nie veroeffentlicht wurde, ist
+    // der Play-Upload-Schritt im Workflow auf continue-on-error gesetzt, sodass
+    // GitHub-Release + APK trotzdem entstehen.
+    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
 }
 
 dependencies {
