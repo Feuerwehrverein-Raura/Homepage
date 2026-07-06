@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Rezepte & Material zu einem Event (editierbar fuer Organisator/Vorstand):
+    (1) verknuepfte Rezepte (Portionen aendern/entfernen/hinzufuegen),
+    (2) manuelle Materialien (entfernen/hinzufuegen),
+    (3) benoetigte Materialien = Abgleich mit dem Lager (was fehlt hervorgehoben).
+    Aufbau analog zu den uebrigen Organisator-Screens (CoordinatorLayout + AppBar).
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/materialsRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fitsSystemWindows="true">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/primary">
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@color/primary"
+            app:navigationIcon="@drawable/ic_arrow_back"
+            app:title="Rezepte &amp; Material"
+            app:titleTextColor="@color/on_primary" />
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="8dp"
+            android:indeterminate="true"
+            android:visibility="gone" />
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.core.widget.NestedScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- ── (1) Verknuepfte Rezepte ─────────────────────────── -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="12dp"
+                        android:layout_marginTop="12dp"
+                        app:cardBackgroundColor="@color/surface"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="2dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Rezepte"
+                                android:textColor="@color/text_primary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/recipesList"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:nestedScrollingEnabled="false" />
+
+                            <TextView
+                                android:id="@+id/recipesEmpty"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Noch keine Rezepte verknüpft."
+                                android:textColor="@color/text_secondary"
+                                android:textSize="13sp"
+                                android:visibility="gone" />
+
+                            <!-- Rezept hinzufuegen -->
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:id="@+id/recipePickerLayout"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:hint="Rezept wählen"
+                                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+                                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                                    android:id="@+id/recipePicker"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="none" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:baselineAligned="false"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.textfield.TextInputLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:hint="Portionen"
+                                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+                                    <com.google.android.material.textfield.TextInputEditText
+                                        android:id="@+id/recipeServingsInput"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:inputType="number"
+                                        android:maxLength="4"
+                                        android:text="1"
+                                        android:textColor="@color/text_primary" />
+                                </com.google.android.material.textfield.TextInputLayout>
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnAddRecipe"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:text="Rezept"
+                                    app:cornerRadius="12dp"
+                                    app:icon="@android:drawable/ic_input_add" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- ── (2) Manuelle Materialien ────────────────────────── -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="12dp"
+                        android:layout_marginTop="12dp"
+                        app:cardBackgroundColor="@color/surface"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="2dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Manuelle Materialien"
+                                android:textColor="@color/text_primary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/manualList"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:nestedScrollingEnabled="false" />
+
+                            <TextView
+                                android:id="@+id/manualEmpty"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Keine manuellen Materialien erfasst."
+                                android:textColor="@color/text_secondary"
+                                android:textSize="13sp"
+                                android:visibility="gone" />
+
+                            <!-- Material hinzufuegen -->
+                            <com.google.android.material.textfield.TextInputLayout
+                                android:id="@+id/itemPickerLayout"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:hint="Material wählen"
+                                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+
+                                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                                    android:id="@+id/itemPicker"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:inputType="none" />
+                            </com.google.android.material.textfield.TextInputLayout>
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:baselineAligned="false"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.textfield.TextInputLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:hint="Menge"
+                                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+                                    <com.google.android.material.textfield.TextInputEditText
+                                        android:id="@+id/itemQtyInput"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:inputType="numberDecimal"
+                                        android:text="1"
+                                        android:textColor="@color/text_primary" />
+                                </com.google.android.material.textfield.TextInputLayout>
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnAddItem"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="8dp"
+                                    android:text="Material"
+                                    app:cornerRadius="12dp"
+                                    app:icon="@android:drawable/ic_input_add" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- ── (3) Benoetigte Materialien (Abgleich mit Lager) ─── -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="12dp"
+                        android:layout_marginTop="12dp"
+                        app:cardBackgroundColor="@color/surface"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="2dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Benötigte Materialien"
+                                android:textColor="@color/text_primary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/shoppingSummary"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp"
+                                android:visibility="gone" />
+
+                            <!-- Spaltenkopf (Gewichte identisch zu item_shopping_item) -->
+                            <LinearLayout
+                                android:id="@+id/shoppingHeader"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:baselineAligned="false"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="4dp"
+                                android:paddingBottom="4dp"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Material"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="12sp" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="0.7"
+                                    android:gravity="end"
+                                    android:text="Benötigt"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="12sp" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="0.7"
+                                    android:gravity="end"
+                                    android:text="Am Lager"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="12sp" />
+
+                                <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="0.7"
+                                    android:gravity="end"
+                                    android:text="Fehlt"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+
+                            <androidx.recyclerview.widget.RecyclerView
+                                android:id="@+id/shoppingList"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:nestedScrollingEnabled="false" />
+
+                            <TextView
+                                android:id="@+id/shoppingEmpty"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="Kein Bedarf — es sind weder Rezepte noch Materialien erfasst."
+                                android:textColor="@color/text_secondary"
+                                android:textSize="13sp"
+                                android:visibility="gone" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                </LinearLayout>
+            </androidx.core.widget.NestedScrollView>
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+    </LinearLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -93,6 +93,13 @@
             android:parentActivityName=".MainActivity"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Organisator: Rezepte & Material (verknuepfte Rezepte + Materialien, Lager-Abgleich) -->
+        <activity
+            android:name=".ui.organizer.EventMaterialsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- AppAuth: empfaengt OIDC-Redirect von Authentik -->
         <activity
             android:name="net.openid.appauth.RedirectUriReceiverActivity"

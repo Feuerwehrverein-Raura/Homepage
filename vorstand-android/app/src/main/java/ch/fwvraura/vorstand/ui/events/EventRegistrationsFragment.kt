@@ -99,6 +99,12 @@ class EventRegistrationsFragment : Fragment() {
             findNavController().navigate(R.id.action_registrations_to_organizer_notes, bundle)
         }
 
+        // Rezepte & Material verwalten (editierbarer Screen)
+        binding.btnEventMaterials.setOnClickListener {
+            val bundle = Bundle().apply { putString("eventId", eventId) }
+            findNavController().navigate(R.id.action_registrations_to_event_materials, bundle)
+        }
+
         // Initiales Laden des Events
         loadEvent()
     }
