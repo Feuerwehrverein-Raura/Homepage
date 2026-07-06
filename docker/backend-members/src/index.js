@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { Pool, types } = require('pg');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { ImapFlow } = require('imapflow');
 const multer = require('multer');
 const path = require('path');
@@ -928,6 +929,147 @@ app.post('/auth/member/qr-login', async (req, res) => {
             token: jwtToken,
             user: { id: member_id, email, name: `${vorname || ''} ${nachname || ''}`.trim() }
         });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// App-nativer Login + Passwort-Reset fuer die Mitglieder-App.
+// Passwort = das echte Authentik-Passwort (Web + App identisch): beim Reset via
+// Authentik-API gesetzt UND lokal als bcrypt-Hash gespeichert (schnelle Login-
+// Pruefung ohne Browser/OIDC). Ausgestellt wird dasselbe Member-JWT wie beim QR-
+// Login (type='member', 8h) — vom Events-Backend seit dem QR-Fix akzeptiert.
+// ============================================================
+
+// DEUTSCH: Setzt das Passwort im Authentik (fuer den Web-Login) via Admin-API.
+async function setAuthentikPassword(authentikUserId, password) {
+    const url = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const token = process.env.AUTHENTIK_API_TOKEN;
+    if (!token || !authentikUserId) return false;
+    try {
+        await axios.post(
+            `${url}/api/v3/core/users/${authentikUserId}/set_password/`,
+            { password },
+            { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 8000 }
+        );
+        return true;
+    } catch (e) {
+        console.error('setAuthentikPassword failed:', e.response?.status, e.message);
+        return false;
+    }
+}
+
+// DEUTSCH: Stellt ein Member-JWT aus (identisch zum QR-Login: type=member, 8h).
+function issueMemberJwt(memberId, email, name) {
+    return jwt.sign(
+        { sub: memberId, member_id: memberId, email, name, type: 'member', groups: [] },
+        process.env.JWT_SECRET,
+        { expiresIn: '8h' }
+    );
+}
+
+// DEUTSCH: App-Login mit E-Mail + Passwort (kein Browser). Prueft gegen den lokalen
+// bcrypt-Hash (per Reset gesetzt). Gibt ein Member-JWT zurueck.
+app.post('/auth/member/login', async (req, res) => {
+    const clientIp = getClientIp(req);
+    try {
+        const { email, password } = req.body || {};
+        if (!email || !password) return res.status(400).json({ error: 'E-Mail und Passwort erforderlich' });
+        const r = await pool.query(
+            'SELECT id, email, vorname, nachname, password_hash FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1',
+            [email]
+        );
+        const m = r.rows[0];
+        // Generisch: keine Auskunft, ob die E-Mail existiert.
+        if (!m || !m.password_hash) {
+            await logAudit(pool, 'MEMBER_LOGIN_FAILED', m?.id || null, email, clientIp, { reason: m ? 'no_password_set' : 'unknown_email' });
+            return res.status(401).json({ error: 'E-Mail oder Passwort ist falsch. Falls du noch kein App-Passwort hast, nutze „Passwort vergessen".' });
+        }
+        const ok = await bcrypt.compare(String(password), m.password_hash);
+        if (!ok) {
+            await logAudit(pool, 'MEMBER_LOGIN_FAILED', m.id, email, clientIp, { reason: 'wrong_password' });
+            return res.status(401).json({ error: 'E-Mail oder Passwort ist falsch.' });
+        }
+        const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
+        const token = issueMemberJwt(m.id, m.email, name);
+        await logAudit(pool, 'MEMBER_LOGIN_SUCCESS', m.id, email, clientIp, {});
+        res.json({ success: true, token, user: { id: m.id, email: m.email, name } });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: Passwort vergessen -> 6-stelliger Code per E-Mail (15 Min gueltig).
+// Antwortet immer generisch (keine Existenz-Auskunft).
+app.post('/auth/member/request-reset', async (req, res) => {
+    const clientIp = getClientIp(req);
+    try {
+        const { email } = req.body || {};
+        if (!email) return res.status(400).json({ error: 'E-Mail erforderlich' });
+        const r = await pool.query('SELECT id, email, vorname FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
+        const m = r.rows[0];
+        if (m) {
+            const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+            const codeHash = await bcrypt.hash(code, 10);
+            const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+            await pool.query(
+                `INSERT INTO member_password_resets (member_id, code_hash, attempts, expires_at)
+                 VALUES ($1, $2, 0, $3)
+                 ON CONFLICT (member_id) DO UPDATE SET code_hash = EXCLUDED.code_hash, attempts = 0, expires_at = EXCLUDED.expires_at, created_at = NOW()`,
+                [m.id, codeHash, expiresAt]
+            );
+            const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+            const body = `Guten Tag ${m.vorname || ''},\n\ndein Code zum Setzen eines neuen Passworts für die FWV-App:\n\n    ${code}\n\nGültig für 15 Minuten. Falls du das nicht angefordert hast, ignoriere diese E-Mail.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`.trim();
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, { to: m.email, subject: 'Dein Code für die FWV-App', body });
+            } catch (e) { console.error('Reset-Code-Mail fehlgeschlagen:', e.message); }
+            await logAudit(pool, 'MEMBER_RESET_REQUESTED', m.id, m.email, clientIp, {});
+        }
+        res.json({ success: true, message: 'Falls die E-Mail bei uns registriert ist, wurde ein Code verschickt.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DEUTSCH: Reset abschliessen — E-Mail + Code + neues Passwort. Setzt das Passwort
+// im Authentik (Web) UND lokal (App) und loggt direkt ein (Member-JWT zurueck).
+app.post('/auth/member/reset', async (req, res) => {
+    const clientIp = getClientIp(req);
+    try {
+        const { email, code, new_password } = req.body || {};
+        if (!email || !code || !new_password) return res.status(400).json({ error: 'E-Mail, Code und neues Passwort erforderlich' });
+        if (String(new_password).length < 8) return res.status(400).json({ error: 'Das Passwort muss mindestens 8 Zeichen haben.' });
+        const r = await pool.query('SELECT id, email, vorname, nachname, authentik_user_id FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
+        const m = r.rows[0];
+        const rr = m ? (await pool.query('SELECT code_hash, attempts, expires_at FROM member_password_resets WHERE member_id = $1', [m.id])).rows[0] : null;
+        if (!m || !rr) return res.status(400).json({ error: 'Kein gültiger Reset angefordert. Bitte „Passwort vergessen" erneut nutzen.' });
+        if (new Date(rr.expires_at) < new Date()) {
+            await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
+            return res.status(400).json({ error: 'Der Code ist abgelaufen. Bitte fordere einen neuen an.' });
+        }
+        if (rr.attempts >= 5) {
+            await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
+            return res.status(429).json({ error: 'Zu viele Fehlversuche. Bitte fordere einen neuen Code an.' });
+        }
+        const codeOk = await bcrypt.compare(String(code), rr.code_hash);
+        if (!codeOk) {
+            await pool.query('UPDATE member_password_resets SET attempts = attempts + 1 WHERE member_id = $1', [m.id]);
+            return res.status(400).json({ error: 'Der Code ist falsch.' });
+        }
+        // Passwort im Authentik setzen (Web-Login) — bei vorhandenem Authentik-Konto Pflicht.
+        if (m.authentik_user_id) {
+            const okAk = await setAuthentikPassword(m.authentik_user_id, String(new_password));
+            if (!okAk) return res.status(502).json({ error: 'Passwort konnte nicht gesetzt werden. Bitte später erneut versuchen.' });
+        }
+        // Lokalen bcrypt-Hash speichern (App-Login).
+        const hash = await bcrypt.hash(String(new_password), 10);
+        await pool.query('UPDATE members SET password_hash = $1 WHERE id = $2', [hash, m.id]);
+        await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
+        const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
+        const token = issueMemberJwt(m.id, m.email, name);
+        await logAudit(pool, 'MEMBER_RESET_SUCCESS', m.id, m.email, clientIp, {});
+        res.json({ success: true, token, user: { id: m.id, email: m.email, name } });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
