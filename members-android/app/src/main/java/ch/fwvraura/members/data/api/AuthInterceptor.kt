@@ -92,7 +92,8 @@ class AuthInterceptor(private val tokenManager: TokenManager) : Interceptor {
 
     /** Macht einen synchronen Token-Refresh gegen den Authentik-Token-Endpoint. */
     private fun refreshAccessToken(refreshToken: String): String? {
-        val tokenUrl = OidcConstants.AUTHENTIK_ISSUER.removeSuffix("/") + "/token/"
+        // Globaler Token-Endpoint (nicht unter dem App-Slug — der gibt 404).
+        val tokenUrl = OidcConstants.TOKEN_ENDPOINT
         val body = FormBody.Builder()
             .add("grant_type", "refresh_token")
             .add("refresh_token", refreshToken)
