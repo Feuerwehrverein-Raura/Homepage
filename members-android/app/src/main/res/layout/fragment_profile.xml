@@ -238,6 +238,20 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
+            <!-- App-Version (tippen = manuell auf Updates pruefen). -->
+            <TextView
+                android:id="@+id/appVersionText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:background="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:padding="10dp"
+                android:text="Version"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

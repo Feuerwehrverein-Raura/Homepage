@@ -3,10 +3,12 @@ package ch.fwvraura.members
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -18,6 +20,7 @@ import ch.fwvraura.members.ui.events.EventsListFragment
 import ch.fwvraura.members.ui.login.LoginActivity
 import ch.fwvraura.members.ui.organizer.OrganizerDashboardFragment
 import ch.fwvraura.members.ui.profile.ProfileFragment
+import ch.fwvraura.members.util.UpdateChecker
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -72,6 +75,7 @@ class MainActivity : AppCompatActivity() {
         if (!isOrganizerMode) checkOrganizerEligibility()
 
         ensureNotificationPermission()
+        checkForAppUpdate()
 
         binding.toolbar.setOnMenuItemClickListener { item ->
             if (item.itemId == R.id.action_logout) {
@@ -110,6 +114,37 @@ class MainActivity : AppCompatActivity() {
                     binding.bottomNav.menu.findItem(R.id.nav_organizer)?.isVisible = true
                 }
             } catch (_: Exception) { /* nicht kritisch — Tab bleibt versteckt */ }
+        }
+    }
+
+    /**
+     * Prueft (leise) via GitHub-Tags auf eine neuere Play-Version und bietet das
+     * Update an. Da die App ueber Play verteilt wird, wird kein APK geladen —
+     * der "Aktualisieren"-Button oeffnet die Play-Store-Seite.
+     */
+    private fun checkForAppUpdate() {
+        lifecycleScope.launch {
+            val newVersion = UpdateChecker.latestNewerVersion(this@MainActivity) ?: return@launch
+            if (isFinishing || isDestroyed) return@launch
+            val current = UpdateChecker.currentVersion(this@MainActivity)
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("Update verfügbar")
+                .setMessage("Version $newVersion ist verfügbar (installiert: $current). Jetzt im Play Store aktualisieren?")
+                .setPositiveButton("Aktualisieren") { _, _ -> openPlayStore() }
+                .setNegativeButton("Später", null)
+                .show()
+        }
+    }
+
+    /** Oeffnet die App-Seite im Play Store (Fallback: Browser). */
+    private fun openPlayStore() {
+        val pkg = packageName
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")))
+        } catch (_: android.content.ActivityNotFoundException) {
+            startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg"))
+            )
         }
     }
 }
