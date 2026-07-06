@@ -877,8 +877,52 @@ async function proxyInventory(req, res, path) {
     }
 }
 
+// DEUTSCH: Generischer Inventar-Proxy fuer Schreib-Operationen (POST/PUT/DELETE)
+// auf event-bezogene Ressourcen. Leitet Body + Status/Fehler durch.
+async function proxyInventoryReq(req, res, method, subpath) {
+    try {
+        const url = `${INVENTORY_URL}/api/events/${encodeURIComponent(req.eventSlug)}/${subpath}`;
+        const r = await axios({
+            method,
+            url,
+            headers: { 'x-order-api-key': INVENTORY_KEY, 'Content-Type': 'application/json' },
+            data: (method === 'get' || method === 'delete') ? undefined : (req.body || {}),
+            timeout: 8000
+        });
+        res.status(r.status).json(r.data);
+    } catch (error) {
+        const st = error.response?.status || 502;
+        res.status(st).json(error.response?.data || { error: 'Inventar-API nicht erreichbar' });
+    }
+}
+
+// DEUTSCH: Proxy fuer die NICHT event-bezogenen Listen (Rezepte/Materialien zum
+// Anwaehlen). Zugriff wieder nur Vorstand/Organisator (requireEventRecipeAccess).
+async function proxyInventoryList(req, res, listPath) {
+    try {
+        const r = await axios.get(`${INVENTORY_URL}/api/${listPath}`, {
+            headers: { 'x-order-api-key': INVENTORY_KEY },
+            timeout: 8000
+        });
+        res.json(r.data);
+    } catch (error) {
+        console.error(`Inventar-Listen-Proxy (${listPath}) fehlgeschlagen:`, error.message);
+        res.status(502).json({ error: 'Inventar-API nicht erreichbar' });
+    }
+}
+
 app.get('/events/:id/recipes', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventory(req, res, 'recipes'));
 app.get('/events/:id/shopping-list', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventory(req, res, 'shopping-list'));
+
+// DEUTSCH: Bearbeiten des Event-Rezept-/Materialmoduls (Vorstand/Organisator).
+app.post('/events/:id/recipes', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'post', 'recipes'));
+app.put('/events/:id/recipes/:recipeId', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'put', `recipes/${encodeURIComponent(req.params.recipeId)}`));
+app.delete('/events/:id/recipes/:recipeId', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'delete', `recipes/${encodeURIComponent(req.params.recipeId)}`));
+app.post('/events/:id/manual-items', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'post', 'manual-items'));
+app.delete('/events/:id/manual-items/:itemId', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'delete', `manual-items/${encodeURIComponent(req.params.itemId)}`));
+// Listen zum Anwaehlen (Rezepte + Materialien aus dem Lager).
+app.get('/events/:id/available-recipes', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryList(req, res, 'recipes'));
+app.get('/events/:id/available-items', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryList(req, res, 'items'));
 
 // DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
 // ============================================================
