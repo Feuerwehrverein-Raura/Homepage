@@ -473,8 +473,17 @@ app.patch('/membership-fees/payments/:id/pay', async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Zahlung nicht gefunden' });
         }
+        const payment = result.rows[0];
+        // #3: Mitglied per App-Push benachrichtigen, dass sein Beitrag verbucht wurde.
+        if (payment.member_id) {
+            const amt = payment.amount != null ? `CHF ${Number(payment.amount).toFixed(2)} ` : '';
+            pushToMember(payment.member_id, 'general',
+                `Beitrag ${payment.year || ''} verbucht`,
+                `Dein Mitgliederbeitrag ${amt}wurde als bezahlt verbucht. Danke!`,
+                { year: String(payment.year || '') }).catch(() => {});
+        }
         logInfo('Payment marked as paid', { id: req.params.id });
-        res.json(result.rows[0]);
+        res.json(payment);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -495,6 +504,57 @@ app.patch('/membership-fees/payments/:id/unpay', async (req, res) => {
         }
         res.json(result.rows[0]);
     } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: #2 — Zahlungserinnerungen. Taeglich per Server-Cron aufgerufen
+// (Header X-Cron-Key = INTERNAL_API_KEY). Erinnert Mitglieder mit noch offenem
+// Beitrag: 7 Tage VOR Faelligkeit und 14 Tage danach. Jede Bedingung trifft pro
+// Mitglied/Jahr genau einmal, daher braucht es keine Dedup-Spalte. Push + E-Mail.
+app.post('/membership-fees/cron-reminders', async (req, res) => {
+    try {
+        if (!INTERNAL_API_KEY || req.headers['x-cron-key'] !== INTERNAL_API_KEY) {
+            return res.status(401).json({ error: 'unauthorized' });
+        }
+        const rows = await pool.query(`
+            SELECT p.id, p.member_id, p.year, p.amount, s.due_date,
+                   m.vorname, m.email, m.zustellung_email
+            FROM membership_fee_payments p
+            JOIN membership_fee_settings s ON s.year = p.year
+            JOIN members m ON m.id = p.member_id
+            WHERE p.status <> 'bezahlt'
+              AND s.due_date IS NOT NULL
+              AND (s.due_date = CURRENT_DATE + INTERVAL '7 days'
+                   OR s.due_date = CURRENT_DATE - INTERVAL '14 days')
+              AND COALESCE(m.status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
+        `);
+        let pushed = 0, emailed = 0;
+        for (const r of rows.rows) {
+            const overdue = new Date(r.due_date) < new Date();
+            const amt = r.amount != null ? `CHF ${Number(r.amount).toFixed(2)}` : 'der Mitgliederbeitrag';
+            const dueStr = new Date(r.due_date).toLocaleDateString('de-CH');
+            const title = overdue ? `Beitrag ${r.year} ueberfaellig` : `Beitrag ${r.year} bald faellig`;
+            const body = overdue
+                ? `Dein Mitgliederbeitrag ${r.year} (${amt}) ist seit ${dueStr} offen. Bitte begleiche ihn bald.`
+                : `Dein Mitgliederbeitrag ${r.year} (${amt}) wird am ${dueStr} faellig.`;
+            pushToMember(r.member_id, 'general', title, body, { year: String(r.year) }).catch(() => {});
+            pushed++;
+            if (r.email && r.zustellung_email) {
+                try {
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to: r.email,
+                        subject: title,
+                        body: `Hallo ${r.vorname || ''},\n\n${body}\n\nFreundliche Gruesse\nFeuerwehrverein Raura`
+                    });
+                    emailed++;
+                } catch (e) { console.error('Beitrags-Erinnerung E-Mail fehlgeschlagen:', e.message); }
+            }
+        }
+        logInfo('Beitrags-Erinnerungen versendet', { pushed, emailed, candidates: rows.rows.length });
+        res.json({ success: true, pushed, emailed, candidates: rows.rows.length });
+    } catch (error) {
+        console.error('cron-reminders (fees) failed:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
@@ -540,6 +600,19 @@ const axios = require('axios');
 const { buildBeitragEmailForPayment, buildBeitragLetterForPayment, getKassier } = require('./beitrag-helpers');
 
 const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
+const MEMBERS_API_URL = process.env.MEMBERS_API_URL || 'http://api-members:3000';
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+
+// DEUTSCH: App-Push an ein Mitglied ueber api-members (respektiert dort
+// notification_preferences). Fire-and-forget; ohne INTERNAL_API_KEY uebersprungen.
+async function pushToMember(memberId, notificationType, title, body, data = {}) {
+    if (!memberId || !INTERNAL_API_KEY) return;
+    try {
+        await axios.post(`${MEMBERS_API_URL}/internal/push-to-member`,
+            { memberId, notificationType, title, body, data },
+            { headers: { 'X-Internal-Key': INTERNAL_API_KEY }, timeout: 5000 });
+    } catch (err) { console.error('pushToMember (accounting) failed:', err.message); }
+}
 
 app.post('/membership-fees/send-email-bulk', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {

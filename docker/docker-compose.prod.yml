@@ -154,6 +154,9 @@ services:
       DATABASE_URL: ${DATABASE_URL_ENCODED}
       JWT_SECRET: ${JWT_SECRET}
       MEMBERS_API_URL: http://api-members:3000
+      # Fuer App-Push (Beitrag verbucht / Zahlungserinnerung) ueber api-members.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      DISPATCH_API_URL: http://api-dispatch:3000
     depends_on:
       postgres:
         condition: service_healthy
