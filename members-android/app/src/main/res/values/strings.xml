@@ -6,7 +6,7 @@
     <string name="login_tab_member">Mitglied</string>
     <string name="login_tab_organizer">Organisator</string>
     <string name="login_tab_qr">QR-Code</string>
-    <string name="login_member_hint">Melde dich mit deiner E-Mail-Adresse und deinem App-Passwort an.</string>
+    <string name="login_member_hint">Anmeldung über das offizielle Vereins-Login (auth.fwv-raura.ch). Du wirst kurz zum Browser geleitet.</string>
     <string name="login_member_email">E-Mail</string>
     <string name="login_member_password">Passwort</string>
     <string name="login_member_button">Anmelden</string>

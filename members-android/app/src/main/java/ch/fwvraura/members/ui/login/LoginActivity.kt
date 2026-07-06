@@ -12,10 +12,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import ch.fwvraura.members.MainActivity
 import ch.fwvraura.members.MembersApp
-import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
-import ch.fwvraura.members.data.api.authErrorMessage
-import ch.fwvraura.members.data.model.MemberLoginRequest
 import ch.fwvraura.members.databinding.ActivityLoginBinding
 import ch.fwvraura.members.sync.ContactsSyncManager
 import ch.fwvraura.members.util.OidcConstants
@@ -118,49 +115,17 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupActions() {
-        // Mitglied-Tab: app-natives E-Mail + Passwort-Login (kein Browser/OIDC mehr).
-        binding.btnMemberLogin.setOnClickListener { doMemberLogin() }
+        // Mitglied-Tab: OIDC-Browser-Login (Authentik/AppAuth).
+        binding.btnMemberLogin.setOnClickListener { startOidcLogin() }
 
+        // Passwort-Reset laeuft app-nativ; die Reset-Activity fragt die E-Mail
+        // selbst ab (kein Prefill mehr, da das E-Mail-Feld entfernt wurde).
         binding.btnForgotPassword.setOnClickListener {
-            val intent = Intent(this, PasswordResetActivity::class.java)
-            val prefill = binding.inputMemberEmail.text?.toString()?.trim()
-            if (!prefill.isNullOrBlank()) {
-                intent.putExtra(PasswordResetActivity.EXTRA_PREFILL_EMAIL, prefill)
-            }
-            passwordResetLauncher.launch(intent)
+            passwordResetLauncher.launch(Intent(this, PasswordResetActivity::class.java))
         }
 
         binding.btnQrLogin.setOnClickListener {
             startActivity(Intent(this, QrScannerActivity::class.java))
-        }
-    }
-
-    /** E-Mail + Passwort gegen POST auth/member/login. */
-    private fun doMemberLogin() {
-        val email = binding.inputMemberEmail.text?.toString()?.trim().orEmpty()
-        val password = binding.inputMemberPassword.text?.toString().orEmpty()
-        if (email.isBlank() || password.isBlank()) {
-            showError(getString(R.string.login_error_empty))
-            return
-        }
-        binding.errorText.visibility = View.GONE
-        binding.loginProgress.visibility = View.VISIBLE
-        binding.btnMemberLogin.isEnabled = false
-        lifecycleScope.launch {
-            try {
-                val resp = ApiModule.authApi.memberLogin(MemberLoginRequest(email, password))
-                val body = resp.body()
-                if (resp.isSuccessful && !body?.token.isNullOrBlank()) {
-                    loginWithMemberToken(body!!.token!!, body.user?.email ?: email, body.user?.name)
-                } else {
-                    showError(resp.authErrorMessage())
-                }
-            } catch (e: Exception) {
-                showError("Netzwerkfehler: ${e.message}")
-            } finally {
-                binding.loginProgress.visibility = View.GONE
-                binding.btnMemberLogin.isEnabled = true
-            }
         }
     }
 
