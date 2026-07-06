@@ -980,7 +980,7 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             slug, title, subtitle, description, start_date, end_date,
             location, category, registration_required,
             registration_deadline, max_participants, cost, status, image_url, tags,
-            organizer_name, organizer_email, create_access,
+            organizer_name, organizer_email, organizer_id, create_access,
             meal_options, pdf_attachment, pdf_filename
         } = req.body;
 
@@ -1028,7 +1028,11 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             );
         }
 
-        if (create_access && organizer_email && !isVorstandMember) {
+        // Kein Token-Zugang, wenn der Organisator ein verknuepftes Mitglied ist
+        // (organizer_id gesetzt) — das Mitglied verwaltet das Event einfach in der
+        // Mitglieder-App (E-Mail-Match). Der Token-Portal-Pfad bleibt nur fuer
+        // externe Nicht-Mitglieder (Freitext-Organisator ohne organizer_id).
+        if (create_access && organizer_email && !isVorstandMember && !organizer_id) {
             // Event-spezifische E-Mail generieren
             eventEmail = `${slug}@fwv-raura.ch`;
             // Zufaelliges Passwort generieren (16 Zeichen, base64url)
@@ -1049,8 +1053,8 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
                 location, category, registration_required,
                 registration_deadline, max_participants, cost, status, image_url, tags,
                 organizer_name, organizer_email, event_email, event_password_hash, event_password_encrypted, event_access_expires,
-                meal_options, pdf_attachment, pdf_filename
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+                meal_options, pdf_attachment, pdf_filename, organizer_id
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
             RETURNING *
         `, [
             slug, title, subtitle, description, start_date, end_date,
@@ -1058,7 +1062,7 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             registration_deadline, max_participants, cost, status || 'planned', image_url, tags,
             organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventPasswordEncrypted, eventAccessExpires,
             meal_options ? JSON.stringify(meal_options) : null,
-            pdf_attachment || null, pdf_filename || null
+            pdf_attachment || null, pdf_filename || null, organizer_id || null
         ]);
 
         const newEvent = result.rows[0];
@@ -1067,10 +1071,15 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
         if (organizer_email && !create_access) {
             try {
                 const eventUrl = `https://fwv-raura.ch/events.html?event=${newEvent.slug || newEvent.id}`;
+                // Verknuepftes Mitglied → auf die Mitglieder-App verweisen (vorstand.html
+                // waere fuer Nicht-Vorstand gesperrt); sonst auf das Vorstand-Dashboard.
+                const manageHint = organizer_id
+                    ? `Du kannst das Event direkt in der Mitglieder-App unter "Organisieren" verwalten — Anmeldungen einsehen und genehmigen, Schichten und Details bearbeiten, Teilnehmerliste als PDF.`
+                    : `Du kannst die Anmeldungen im Vorstand-Dashboard verwalten:\nhttps://fwv-raura.ch/vorstand.html`;
                 await axios.post(`${DISPATCH_API}/email/send`, {
                     to: organizer_email,
                     subject: `Du bist Organisator/in: ${title}`,
-                    body: `Hallo ${organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${title}" eingetragen.\n\nDatum: ${start_date ? new Date(start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${newEvent.location || 'wird noch mitgeteilt'}\n\nDu kannst die Anmeldungen im Vorstand-Dashboard verwalten:\nhttps://fwv-raura.ch/vorstand.html\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar.\n\nFreundliche Gruesse\nFeuerwehrverein Raura`,
+                    body: `Hallo ${organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${title}" eingetragen.\n\nDatum: ${start_date ? new Date(start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${newEvent.location || 'wird noch mitgeteilt'}\n\n${manageHint}\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar.\n\nFreundliche Gruesse\nFeuerwehrverein Raura`,
                     event_id: newEvent.id
                 });
                 console.log(`Organisator-Benachrichtigung gesendet an ${organizer_email}`);
@@ -1166,6 +1175,9 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
 
         // Organisator benachrichtigen wenn neu zugewiesen
         const newOrgEmail = updatedEvent.organizer_email;
+        // Verknuepftes Mitglied (organizer_id gesetzt) → kein Token-Zugang noetig,
+        // es verwaltet das Event in der Mitglieder-App (E-Mail-Match).
+        const isLinkedMember = !!updatedEvent.organizer_id;
         // M2: Zugang auch erstellen, wenn "Organisator-Zugang einrichten" angehakt ist
         // und noch keiner existiert — vorher wirkte create_access im Edit nur bei
         // einem Organisator-E-Mail-Wechsel.
@@ -1177,10 +1189,11 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             ];
             const isVorstand = vorstandEmails.some(ve => newOrgEmail.toLowerCase() === ve.toLowerCase());
 
-            // Fuer Nicht-Vorstand: Event-Zugang erstellen oder bei Organisator-Wechsel
-            // das bestehende Passwort wiederverwenden (entschluesselt aus event_password_encrypted)
+            // Fuer Nicht-Vorstand UND Nicht-verknuepftes-Mitglied: Event-Zugang erstellen
+            // oder bei Organisator-Wechsel das bestehende Passwort wiederverwenden.
+            // Verknuepfte Mitglieder brauchen keinen Token — sie nutzen die App.
             let eventPassword = null;
-            if (!isVorstand) {
+            if (!isVorstand && !isLinkedMember) {
                 // Versuche das bestehende verschluesselte Passwort wiederzuverwenden
                 if (oldEncryptedPw) {
                     eventPassword = decryptPassword(oldEncryptedPw);
@@ -1215,6 +1228,10 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
 
                 if (isVorstand) {
                     emailBody = `Hallo ${updatedEvent.organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${updatedEvent.title}" eingetragen.\n\nDatum: ${updatedEvent.start_date ? new Date(updatedEvent.start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${updatedEvent.location || 'wird noch mitgeteilt'}\n\nDu kannst die Anmeldungen im Vorstand-Dashboard verwalten:\nhttps://fwv-raura.ch/vorstand.html\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar.\n\nFreundliche Gruesse\nFeuerwehrverein Raura`;
+                } else if (isLinkedMember) {
+                    // Verknuepftes Mitglied: verwaltet das Event in der Mitglieder-App,
+                    // keine Token-Zugangsdaten (vorstand.html waere fuer Nicht-Vorstand gesperrt).
+                    emailBody = `Hallo ${updatedEvent.organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${updatedEvent.title}" eingetragen.\n\nDatum: ${updatedEvent.start_date ? new Date(updatedEvent.start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${updatedEvent.location || 'wird noch mitgeteilt'}\n\nDu kannst das Event direkt in der Mitglieder-App unter "Organisieren" verwalten — Anmeldungen einsehen und genehmigen, Schichten und Details bearbeiten, Teilnehmerliste als PDF.\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar.\n\nFreundliche Gruesse\nFeuerwehrverein Raura`;
                 } else {
                     const dashboardUrl = 'https://fwv-raura.ch/event-dashboard.html';
                     emailBody = `Hallo ${updatedEvent.organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${updatedEvent.title}" eingetragen.\n\nDatum: ${updatedEvent.start_date ? new Date(updatedEvent.start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${updatedEvent.location || 'wird noch mitgeteilt'}`;

@@ -60,6 +60,13 @@ data class Event(
     /** E-Mail-Adresse des Organisators fuer Rueckfragen. */
     @SerializedName("organizer_email") val organizerEmail: String? = null,
 
+    /**
+     * ID des als Organisator verknuepften Mitglieds (falls Mitglied statt extern).
+     * Wenn gesetzt, verwaltet das Mitglied den Event in der Mitglieder-App und es
+     * wird kein Token-Zugang eingerichtet.
+     */
+    @SerializedName("organizer_id") val organizerId: String? = null,
+
     /** Organisator-Zugang (Event-Dashboard): Login-E-Mail, falls eingerichtet. */
     @SerializedName("event_email") val eventEmail: String? = null,
 
@@ -156,6 +163,13 @@ data class EventCreate(
 
     /** E-Mail-Adresse des Organisators fuer Rueckfragen. */
     @SerializedName("organizer_email") val organizerEmail: String? = null,
+
+    /**
+     * ID des als Organisator verknuepften Mitglieds. Wenn gesetzt, ueberspringt
+     * das Backend den Token-Zugang (das Mitglied verwaltet den Event in der
+     * Mitglieder-App). Bei externen Organisatoren null.
+     */
+    @SerializedName("organizer_id") val organizerId: String? = null,
 
     /** Ob eine Anmeldung erforderlich ist (wird aus der Kategorie abgeleitet). */
     @SerializedName("registration_required") val registrationRequired: Boolean? = null,

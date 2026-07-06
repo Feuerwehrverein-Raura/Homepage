@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useEventsStore } from "@/stores/events-store";
+import * as membersApi from "@/lib/api/members";
 import type { EventCreate, ShiftCreate } from "@/lib/types/event";
+import type { Member } from "@/lib/types/member";
 import {
   ArrowLeft,
   Loader2,
@@ -94,12 +96,24 @@ export function EventFormPage() {
   const [createAccess, setCreateAccess] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [removePdf, setRemovePdf] = useState(false);
+  // Organisator: "member" = verknuepftes Mitglied (verwaltet den Anlass in der
+  // Mitglieder-App, kein Token-Zugang noetig), "extern" = Freitext + optionaler
+  // Organisator-Zugang wie bisher. Neue Anlaesse starten im Mitglied-Modus.
+  const [organizerMode, setOrganizerMode] = useState<"member" | "extern">("member");
+  const [organizerMemberId, setOrganizerMemberId] = useState("");
+  const [members, setMembers] = useState<Member[]>([]);
 
   useEffect(() => {
     if (isEdit && id) {
       fetchEvent(id);
     }
   }, [isEdit, id, fetchEvent]);
+
+  // Mitglieder fuer die Organisator-Auswahl laden (gleiche Mechanik wie
+  // Dispatch-/MassPDF-Seite: direkter API-Call in lokalen State).
+  useEffect(() => {
+    membersApi.getMembers().then(setMembers).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (isEdit && selectedEvent) {
@@ -120,6 +134,18 @@ export function EventFormPage() {
         organizer_email: selectedEvent.organizer_email || "",
       });
       setMealOptionsText((selectedEvent.meal_options || []).join(", "));
+      // Organisator-Modus ableiten: verknuepftes Mitglied -> "member" (vorbelegt),
+      // sonst vorhandener Freitext-Organisator -> "extern", sonst Standard "member".
+      if (selectedEvent.organizer_id) {
+        setOrganizerMode("member");
+        setOrganizerMemberId(selectedEvent.organizer_id);
+      } else if (selectedEvent.organizer_email) {
+        setOrganizerMode("extern");
+        setOrganizerMemberId("");
+      } else {
+        setOrganizerMode("member");
+        setOrganizerMemberId("");
+      }
     }
   }, [isEdit, selectedEvent]);
 
@@ -213,6 +239,13 @@ export function EventFormPage() {
     setSaving(true);
     setError(null);
     try {
+      // Organisator aufloesen: Im Mitglied-Modus wird das gewaehlte Mitglied
+      // verknuepft (organizer_id) und Name/E-Mail daraus abgeleitet; das Backend
+      // ueberspringt dann den Token-Zugang. Im Extern-Modus bleibt alles Freitext.
+      const isMemberOrganizer = organizerMode === "member";
+      const organizerMember = isMemberOrganizer
+        ? members.find((m) => m.id === organizerMemberId)
+        : undefined;
       const payload: EventCreate = {
         ...form,
         // H1: registration_required aus der Kategorie ableiten (wie im Web) —
@@ -225,7 +258,17 @@ export function EventFormPage() {
           form.category === "GV"
             ? mealOptionsText.split(",").map((s) => s.trim()).filter(Boolean)
             : null,
-        create_access: createAccess || undefined,
+        organizer_id: isMemberOrganizer ? organizerMemberId || null : null,
+        organizer_name: isMemberOrganizer
+          ? organizerMember
+            ? `${organizerMember.vorname} ${organizerMember.nachname}`.trim()
+            : form.organizer_name || ""
+          : form.organizer_name || "",
+        organizer_email: isMemberOrganizer
+          ? organizerMember?.email || form.organizer_email || ""
+          : form.organizer_email || "",
+        // Token-Zugang nur im Extern-Modus; beim Mitglied entfaellt er.
+        create_access: isMemberOrganizer ? undefined : createAccess || undefined,
       };
       if (pdfFile) {
         payload.pdf_attachment = await readPdfBase64(pdfFile);
@@ -385,35 +428,81 @@ export function EventFormPage() {
         {/* Organizer */}
         <fieldset className="rounded-lg border p-4 space-y-4">
           <legend className="px-2 text-sm font-semibold">Organisator</legend>
-          <div className="grid grid-cols-2 gap-4">
-            <TextField
-              label="Name"
-              value={form.organizer_name || ""}
-              onChange={(v) => handleChange("organizer_name", v)}
-            />
-            <TextField
-              label="E-Mail"
-              value={form.organizer_email || ""}
-              onChange={(v) => handleChange("organizer_email", v)}
-              type="email"
-            />
-          </div>
-          {isEdit && selectedEvent?.event_email ? (
-            <p className="text-sm text-green-700 dark:text-green-400">
-              ✓ Organisator-Zugang aktiv ({selectedEvent.event_email}) — Login im
-              Event-Dashboard
-            </p>
-          ) : (
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <div className="flex gap-4 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
-                type="checkbox"
-                checked={createAccess}
-                onChange={(e) => setCreateAccess(e.target.checked)}
-                className="rounded border-input"
+                type="radio"
+                name="organizer-mode"
+                checked={organizerMode === "member"}
+                onChange={() => setOrganizerMode("member")}
+                className="border-input"
               />
-              Organisator-Zugang einrichten (Event-Dashboard-Login, Zugangsdaten
-              gehen per E-Mail an den Organisator)
+              Mitglied
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="organizer-mode"
+                checked={organizerMode === "extern"}
+                onChange={() => setOrganizerMode("extern")}
+                className="border-input"
+              />
+              Extern
+            </label>
+          </div>
+          {organizerMode === "member" ? (
+            <div>
+              <label className="block text-sm font-medium mb-1">Mitglied</label>
+              <select
+                value={organizerMemberId}
+                onChange={(e) => setOrganizerMemberId(e.target.value)}
+                className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">{"— Mitglied waehlen —"}</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {`${m.vorname} ${m.nachname}`.trim()}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Das Mitglied verwaltet den Anlass in der Mitglieder-App — ein
+                separater Organisator-Zugang ist nicht noetig.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <TextField
+                  label="Name"
+                  value={form.organizer_name || ""}
+                  onChange={(v) => handleChange("organizer_name", v)}
+                />
+                <TextField
+                  label="E-Mail"
+                  value={form.organizer_email || ""}
+                  onChange={(v) => handleChange("organizer_email", v)}
+                  type="email"
+                />
+              </div>
+              {isEdit && selectedEvent?.event_email ? (
+                <p className="text-sm text-green-700 dark:text-green-400">
+                  ✓ Organisator-Zugang aktiv ({selectedEvent.event_email}) — Login
+                  im Event-Dashboard
+                </p>
+              ) : (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createAccess}
+                    onChange={(e) => setCreateAccess(e.target.checked)}
+                    className="rounded border-input"
+                  />
+                  Organisator-Zugang einrichten (Event-Dashboard-Login,
+                  Zugangsdaten gehen per E-Mail an den Organisator)
+                </label>
+              )}
+            </>
           )}
         </fieldset>
 

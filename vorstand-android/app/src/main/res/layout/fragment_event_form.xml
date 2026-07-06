@@ -190,59 +190,121 @@
                     android:layout_height="wrap_content" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Organisator Name -->
-            <com.google.android.material.textfield.TextInputLayout
+            <!-- ── Organisator ─────────────────────────────────────────── -->
+            <TextView
+                android:id="@+id/textOrganizerLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp"
-                android:hint="Organisator Name"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputOrganizerName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- Organisator E-Mail -->
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:hint="Organisator E-Mail"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/inputOrganizerEmail"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="textEmailAddress" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <!-- Organisator-Zugang (Event-Dashboard) -->
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/switchCreateAccess"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="Organisator-Zugang einrichten"
+                android:text="Organisator"
+                android:textSize="18sp"
+                android:textStyle="bold"
                 android:textColor="@color/text_primary" />
 
-            <TextView
-                android:id="@+id/textCreateAccessHint"
+            <!-- Modus-Auswahl: Mitglied (verknuepft) oder Extern (freie Eingabe) -->
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/organizerModeGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:text="Eigenes Event-Dashboard für die Organisation"
-                android:textSize="13sp"
-                android:textColor="@color/text_secondary" />
+                app:singleSelection="true"
+                app:selectionRequired="true">
 
-            <TextView
-                android:id="@+id/textCreateAccessActive"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOrganizerMitglied"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Mitglied" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOrganizerExtern"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Extern" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <!-- Mitglied-Modus: Organisator aus der Mitgliederliste auswaehlen -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/layoutOrganizerMember"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:visibility="gone"
-                android:textSize="13sp"
-                android:textColor="@color/text_secondary" />
+                android:hint="Organisator (Mitglied)"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+                <AutoCompleteTextView
+                    android:id="@+id/inputOrganizerMember"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="none" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Extern-Modus: freie Eingabe von Name/E-Mail + optionaler Zugang -->
+            <LinearLayout
+                android:id="@+id/externOrganizerSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <!-- Organisator Name -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="Organisator Name"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputOrganizerName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Organisator E-Mail -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="Organisator E-Mail"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputOrganizerEmail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textEmailAddress" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Organisator-Zugang (Event-Dashboard) -->
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchCreateAccess"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Organisator-Zugang einrichten"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/textCreateAccessHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:text="Eigenes Event-Dashboard für die Organisation"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary" />
+
+                <TextView
+                    android:id="@+id/textCreateAccessActive"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:visibility="gone"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
 
             <!-- Beschreibung -->
             <com.google.android.material.textfield.TextInputLayout
