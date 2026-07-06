@@ -1934,6 +1934,136 @@ Eingetragen von: ${eingetragenVon}${notes ? `\nBemerkungen: ${notes}` : ''}`;
 });
 
 // DEUTSCH: Öffentliche Registrierung via Website-Formular (kein Login nötig). Erkennt Mitglieder automatisch per E-Mail, sendet Bestätigung an Anmelder und Benachrichtigung an Organisator
+// DEUTSCH: Schema fuer Gaeste-Anmelde-Bestaetigungen (Double-Opt-in). Unbestaetigte
+// Gaeste-Anmeldungen liegen hier — NICHT in registrations — bis der Gast den Link in
+// der Bestaetigungs-Mail klickt; erst dann wird die eigentliche Anmeldung erstellt.
+// So koennen Fake-/Fremd-Anmeldungen gar nicht erst in der Vorstand-Liste auftauchen.
+async function ensureRegistrationConfirmationsSchema() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS registration_confirmations (
+            token TEXT PRIMARY KEY,
+            event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+            email TEXT,
+            payload JSONB NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            expires_at TIMESTAMP NOT NULL
+        )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_reg_confirm_expires ON registration_confirmations(expires_at)`);
+}
+
+// DEUTSCH: Legt die eigentliche Anmeldung an (Insert + Audit-Push + Bestaetigungs-/
+// Organisator-Mails) und gibt die Registrierungs-Zeile zurueck. Wird direkt aufgerufen
+// (Mitglieder / Anmeldungen ohne E-Mail) ODER nach erfolgreicher Gast-Bestaetigung.
+async function finalizeRegistration(ctx) {
+    const {
+        ev, memberId, isMember, name, email, phone, type,
+        shiftIds, shifts, notes, meal_selection, allergies,
+        requestedPersons, companions, organizerEmail
+    } = ctx;
+    const eventTitle = ev.title;
+    const eventId = ev.id;
+
+    const registration = await pool.query(`
+        INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
+        VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+        RETURNING *
+    `, [
+        eventId, memberId || null, name, email,
+        type === 'shift' ? shiftIds : null,
+        JSON.stringify({
+            phone,
+            participants: requestedPersons,
+            companions: (companions && companions.length) ? companions : null,
+            shifts, notes,
+            meal_selection: meal_selection || null,
+            allergies: allergies || null
+        })
+    ]);
+
+    // Audit-Eintrag -> Vorstand-App-Push
+    try {
+        await pool.query(`
+            INSERT INTO audit_log (action, entity_type, email, new_values, created_at)
+            VALUES ('EVENT_REGISTRATION', 'registration', $1, $2, NOW())
+        `, [
+            email || null,
+            JSON.stringify({ name, eventTitle, eventId, type: type || 'participant', isMember })
+        ]);
+    } catch (auditError) {
+        console.error('Audit-Log fuer Anmeldung fehlgeschlagen:', auditError.message);
+    }
+
+    let mealInfo = '';
+    if (meal_selection) mealInfo += `\nMenüwahl: ${meal_selection}`;
+    if (allergies) mealInfo += `\nAllergien/Unverträglichkeiten: ${allergies}`;
+
+    let shiftInfo = '';
+    if (type === 'shift' && shiftIds && shiftIds.length > 0) {
+        const shiftDetails = await pool.query(
+            'SELECT name, date, start_time, end_time, bereich FROM shifts WHERE id = ANY($1) ORDER BY date, start_time',
+            [shiftIds]
+        );
+        if (shiftDetails.rows.length > 0) {
+            const shiftLines = shiftDetails.rows.map(s => {
+                const date = s.date ? new Date(s.date).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+                const time = s.start_time && s.end_time ? `${s.start_time.substring(0,5)}-${s.end_time.substring(0,5)}` : '';
+                const bereich = s.bereich ? ` (${s.bereich})` : '';
+                return `- ${s.name}: ${date} ${time}${bereich}`;
+            });
+            shiftInfo = `\nGewählte Schichten:\n${shiftLines.join('\n')}`;
+        }
+    }
+
+    const confirmSubject = `Bestätigung Ihrer Anmeldung - ${eventTitle}`;
+    const confirmBody = `
+Guten Tag ${name},
+
+Vielen Dank für Ihre Anmeldung${type === 'shift' ? ' als Helfer/in' : ''}!
+
+Event: ${eventTitle}
+${shiftInfo}
+${requestedPersons ? `Anzahl Personen: ${requestedPersons}` : ''}${mealInfo}
+${notes ? `\nBemerkungen: ${notes}` : ''}
+
+Wir werden Ihre Anmeldung bearbeiten und uns bei Ihnen melden.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura
+    `.trim();
+    try {
+        await axios.post(`${DISPATCH_API}/email/send`, { to: email, subject: confirmSubject, body: confirmBody });
+    } catch (emailError) {
+        console.error('Bestätigungs-E-Mail konnte nicht gesendet werden:', emailError.message);
+    }
+
+    if (memberId) {
+        pushToMember(memberId, 'event_update', confirmSubject,
+            'Wir haben deine Anmeldung erhalten und melden uns bei dir.', { eventId }).catch(() => {});
+    }
+
+    const orgSubject = `Neue Anmeldung für ${eventTitle}`;
+    const orgBody = `
+Neue ${type === 'shift' ? 'Helfer-' : 'Teilnehmer-'}Anmeldung eingegangen!
+
+Name: ${name}
+E-Mail: ${email}
+${phone ? `Telefon: ${phone}` : ''}
+${shiftInfo}
+${requestedPersons ? `Anzahl Personen: ${requestedPersons}` : ''}${mealInfo}
+${notes ? `\nBemerkungen: ${notes}` : ''}
+    `.trim();
+    const notifyEmail = (ev.category === 'GV')
+        ? 'vorstand@fwv-raura.ch'
+        : (ev.organizer_email || organizerEmail || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
+    try {
+        await axios.post(`${DISPATCH_API}/email/send`, { to: notifyEmail, subject: orgSubject, body: orgBody, event_id: eventId });
+    } catch (emailError) {
+        console.error('Organisator-E-Mail konnte nicht gesendet werden:', emailError.message);
+    }
+
+    return registration.rows[0];
+}
+
 app.post('/registrations/public', async (req, res) => {
     try {
         const {
@@ -1946,6 +2076,13 @@ app.post('/registrations/public', async (req, res) => {
             allergies, // DEUTSCH: Allergien/Unverträglichkeiten (für GV-Events)
             skipMemberCheck // Falls der User trotzdem als Gast anmelden möchte
         } = req.body;
+
+        // DEUTSCH: Honeypot gegen Bots — ein im Formular verstecktes Feld ("website").
+        // Menschen lassen es leer; Bots fuellen es aus. Gefuellt -> still als "Erfolg"
+        // abweisen (kein Insert, keine Mail), damit der Bot keinen Unterschied merkt.
+        if (typeof req.body?.website === 'string' && req.body.website.trim() !== '') {
+            return res.json({ success: true, message: 'Anmeldung erfolgreich' });
+        }
 
         // Prüfen ob die E-Mail zu einem Mitglied gehört - wenn ja, automatisch verknüpfen
         let memberId = null;
@@ -2063,149 +2200,121 @@ app.post('/registrations/public', async (req, res) => {
                 .slice(0, 49)
             : [];
 
-        // Registrierung speichern (mit member_id falls Mitglied erkannt)
-        const registration = await pool.query(`
-            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
-            VALUES ($1, $2, $3, $4, $5, $6, 'pending')
-            RETURNING *
-        `, [
-            event.rows[0].id,
-            memberId,
-            name,
-            email,
-            type === 'shift' ? shiftIds : null,
-            JSON.stringify({
-                phone,
-                participants: requestedPersons,
-                companions: companions.length ? companions : null,
-                shifts, notes,
-                meal_selection: meal_selection || null,
-                allergies: allergies || null
-            })
-        ]);
+        // DEUTSCH: Kontext fuer die Finalisierung buendeln.
+        const ctx = {
+            ev, memberId, isMember, name, email, phone, type,
+            shiftIds, shifts, notes, meal_selection, allergies,
+            requestedPersons, companions, organizerEmail
+        };
 
-        // DEUTSCH: Audit-Eintrag damit die Vorstand-App eine Push-Notification anzeigen kann.
-        // Spiegelt den E-Mail-Versand: jede neue Anmeldung erzeugt einen EVENT_REGISTRATION-Eintrag.
-        try {
-            await pool.query(`
-                INSERT INTO audit_log (action, entity_type, email, new_values, created_at)
-                VALUES ('EVENT_REGISTRATION', 'registration', $1, $2, NOW())
-            `, [
-                email || null,
-                JSON.stringify({
-                    name,
-                    eventTitle: event.rows[0].title,
-                    eventId: event.rows[0].id,
-                    type: type || 'participant',
-                    isMember
-                })
-            ]);
-        } catch (auditError) {
-            console.error('Audit-Log fuer Anmeldung fehlgeschlagen:', auditError.message);
-        }
-
-        // DEUTSCH: Menü-Info für E-Mails aufbereiten
-        let mealInfo = '';
-        if (meal_selection) {
-            mealInfo += `\nMenüwahl: ${meal_selection}`;
-        }
-        if (allergies) {
-            mealInfo += `\nAllergien/Unverträglichkeiten: ${allergies}`;
-        }
-
-        // Schicht-Details für E-Mail aus DB laden
-        let shiftInfo = '';
-        if (type === 'shift' && shiftIds && shiftIds.length > 0) {
-            const shiftDetails = await pool.query(
-                'SELECT name, date, start_time, end_time, bereich FROM shifts WHERE id = ANY($1) ORDER BY date, start_time',
-                [shiftIds]
+        // DEUTSCH: Double-Opt-in fuer GAESTE (kein erkanntes Mitglied): Anmeldung erst
+        // nach E-Mail-Bestaetigung anlegen. Verhindert Spam-/Fremd-Anmeldungen mit
+        // erfundener oder fremder Adresse. Mitglieder (E-Mail == bekanntes Mitglied) und
+        // Anmeldungen ohne E-Mail ueberspringen das und werden sofort angelegt.
+        if (!isMember && email) {
+            const token = crypto.randomBytes(24).toString('hex');
+            const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3 Tage gueltig
+            const payload = {
+                memberId, isMember, name, email, phone, type,
+                shiftIds, shifts, notes, meal_selection, allergies,
+                requestedPersons, companions, organizerEmail
+            };
+            await pool.query(
+                `INSERT INTO registration_confirmations (token, event_id, email, payload, expires_at)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [token, ev.id, email, JSON.stringify(payload), expiresAt]
             );
-            if (shiftDetails.rows.length > 0) {
-                const shiftLines = shiftDetails.rows.map(s => {
-                    const date = s.date ? new Date(s.date).toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
-                    const time = s.start_time && s.end_time ? `${s.start_time.substring(0,5)}-${s.end_time.substring(0,5)}` : '';
-                    const bereich = s.bereich ? ` (${s.bereich})` : '';
-                    return `- ${s.name}: ${date} ${time}${bereich}`;
-                });
-                shiftInfo = `\nGewählte Schichten:\n${shiftLines.join('\n')}`;
-            }
-        }
-
-        // Bestätigung an Anmelder
-        const confirmSubject = `Bestätigung Ihrer Anmeldung - ${eventTitle}`;
-        const confirmBody = `
+            const confirmUrl = `${process.env.BASE_URL || 'https://api.fwv-raura.ch'}/registrations/confirm?token=${token}`;
+            const optinBody = `
 Guten Tag ${name},
 
-Vielen Dank für Ihre Anmeldung${type === 'shift' ? ' als Helfer/in' : ''}!
+fast geschafft! Bitte bestätige deine Anmeldung für "${ev.title}" mit einem Klick:
 
-Event: ${eventTitle}
-${shiftInfo}
-${participants ? `Anzahl Personen: ${participants}` : ''}${mealInfo}
-${notes ? `\nBemerkungen: ${notes}` : ''}
+${confirmUrl}
 
-Wir werden Ihre Anmeldung bearbeiten und uns bei Ihnen melden.
+Ohne Bestätigung wird die Anmeldung nicht wirksam. Der Link ist 3 Tage gültig.
+Falls du dich nicht angemeldet hast, ignoriere diese E-Mail einfach.
 
 Mit freundlichen Grüssen
 Feuerwehrverein Raura
-        `.trim();
-
-        try {
-            await axios.post(`${DISPATCH_API}/email/send`, {
-                to: email,
-                subject: confirmSubject,
-                body: confirmBody
+            `.trim();
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: email,
+                    subject: `Bitte bestätige deine Anmeldung – ${ev.title}`,
+                    body: optinBody
+                });
+            } catch (emailError) {
+                console.error('Opt-in-Bestätigungsmail fehlgeschlagen:', emailError.message);
+            }
+            return res.json({
+                success: true,
+                pending_confirmation: true,
+                message: 'Fast geschafft! Wir haben dir eine E-Mail geschickt – bitte bestätige deine Anmeldung über den Link darin.'
             });
-        } catch (emailError) {
-            console.error('Bestätigungs-E-Mail konnte nicht gesendet werden:', emailError.message);
         }
 
-        // Push parallel — falls die anmelde-E-Mail einem Mitglied gehoert (memberId oben gesetzt)
-        if (memberId) {
-            pushToMember(memberId, 'event_update', confirmSubject,
-                'Wir haben deine Anmeldung erhalten und melden uns bei dir.',
-                { eventId }).catch(() => {});
-        }
-
-        // Benachrichtigung an Organisator
-        const orgSubject = `Neue Anmeldung für ${eventTitle}`;
-        const orgBody = `
-Neue ${type === 'shift' ? 'Helfer-' : 'Teilnehmer-'}Anmeldung eingegangen!
-
-Name: ${name}
-E-Mail: ${email}
-${phone ? `Telefon: ${phone}` : ''}
-${shiftInfo}
-${participants ? `Anzahl Personen: ${participants}` : ''}${mealInfo}
-${notes ? `\nBemerkungen: ${notes}` : ''}
-        `.trim();
-
-        // DEUTSCH: GV-Events: Benachrichtigung immer an vorstand@fwv-raura.ch
-        // Organisator-E-Mail aus DB laden (zuverlässiger als aus Request)
-        const dbOrgEmail = event.rows[0].organizer_email;
-        const notifyEmail = (event.rows[0].category === 'GV')
-            ? 'vorstand@fwv-raura.ch'
-            : (dbOrgEmail || organizerEmail || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
-
-        try {
-            await axios.post(`${DISPATCH_API}/email/send`, {
-                to: notifyEmail,
-                subject: orgSubject,
-                body: orgBody,
-                event_id: event.rows[0].id
-            });
-        } catch (emailError) {
-            console.error('Organisator-E-Mail konnte nicht gesendet werden:', emailError.message);
-        }
-
+        // Mitglied ODER keine E-Mail: sofort finalisieren.
+        const reg = await finalizeRegistration(ctx);
         res.json({
             success: true,
             message: isMember ? 'Anmeldung erfolgreich (als Mitglied verknüpft)' : 'Anmeldung erfolgreich',
-            registrationId: registration.rows[0].id,
-            isMember: isMember
+            registrationId: reg.id,
+            isMember
         });
     } catch (error) {
         console.error('Registration error:', error);
         res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// DEUTSCH: Gast bestaetigt seine Anmeldung (Double-Opt-in). Oeffentlich erreichbar
+// ueber den Link aus der Bestaetigungs-Mail. Legt die eigentliche Anmeldung an
+// (finalizeRegistration) und zeigt eine kleine Bestaetigungsseite im Browser.
+app.get('/registrations/confirm', async (req, res) => {
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const page = (title, msg, ok) => `<!doctype html><html lang="de"><head><meta charset="utf-8">`
+        + `<meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>`
+        + `<style>body{font-family:system-ui,-apple-system,sans-serif;background:#f3f4f6;margin:0;padding:2rem;`
+        + `display:flex;justify-content:center}main{background:#fff;max-width:30rem;width:100%;border-radius:1rem;`
+        + `padding:2rem;box-shadow:0 1px 3px rgba(0,0,0,.12);text-align:center}.i{font-size:3rem;line-height:1}`
+        + `h1{font-size:1.25rem;margin:.75rem 0 .75rem;color:#111}p{color:#374151;line-height:1.5}`
+        + `a{display:inline-block;margin-top:1.5rem;color:#dc2626;text-decoration:none;font-weight:600}</style></head>`
+        + `<body><main><div class="i">${ok ? '✅' : '⚠️'}</div><h1>${esc(title)}</h1><p>${esc(msg)}</p>`
+        + `<a href="https://fwv-raura.ch">Zur FWV-Raura-Website</a></main></body></html>`;
+    try {
+        const { token } = req.query;
+        if (!token || typeof token !== 'string') {
+            return res.status(400).send(page('Ungültiger Link', 'Es fehlt ein gültiges Bestätigungs-Token.', false));
+        }
+        const c = await pool.query('SELECT * FROM registration_confirmations WHERE token = $1', [token]);
+        if (c.rows.length === 0) {
+            return res.status(404).send(page('Link ungültig', 'Dieser Bestätigungslink ist ungültig oder wurde bereits verwendet.', false));
+        }
+        const row = c.rows[0];
+        if (new Date(row.expires_at) < new Date()) {
+            await pool.query('DELETE FROM registration_confirmations WHERE token = $1', [token]);
+            return res.status(410).send(page('Link abgelaufen', 'Dieser Bestätigungslink ist abgelaufen. Bitte melde dich bei Bedarf erneut an.', false));
+        }
+        const evq = await pool.query('SELECT * FROM events WHERE id = $1', [row.event_id]);
+        if (evq.rows.length === 0) {
+            await pool.query('DELETE FROM registration_confirmations WHERE token = $1', [token]);
+            return res.status(404).send(page('Anlass nicht gefunden', 'Der Anlass existiert nicht mehr.', false));
+        }
+        const ev = evq.rows[0];
+        if ((ev.status || '') === 'cancelled') {
+            await pool.query('DELETE FROM registration_confirmations WHERE token = $1', [token]);
+            return res.status(409).send(page('Anlass abgesagt', 'Dieser Anlass wurde inzwischen abgesagt – eine Anmeldung ist nicht mehr möglich.', false));
+        }
+        const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+        await finalizeRegistration({ ...payload, ev });
+        await pool.query('DELETE FROM registration_confirmations WHERE token = $1', [token]);
+        return res.send(page('Anmeldung bestätigt',
+            `Danke${payload.name ? ', ' + payload.name : ''}! Deine Anmeldung für „${ev.title}" ist bestätigt. Der Organisator wurde informiert und meldet sich bei dir.`, true));
+    } catch (error) {
+        console.error('Registrierungs-Bestätigung fehlgeschlagen:', error.message);
+        return res.status(500).send('<!doctype html><meta charset="utf-8"><p>Ein Fehler ist aufgetreten. Bitte versuche es später erneut.</p>');
     }
 });
 
@@ -5561,4 +5670,7 @@ app.listen(PORT, () => {
     ensureOrganizerNotesSchema()
         .then(() => console.log('Organisator-Notizen-Schema bereit'))
         .catch(e => console.error('ensureOrganizerNotesSchema failed:', e.message));
+    ensureRegistrationConfirmationsSchema()
+        .then(() => console.log('Registrierungs-Bestätigungs-Schema bereit'))
+        .catch(e => console.error('ensureRegistrationConfirmationsSchema failed:', e.message));
 });
