@@ -59,6 +59,27 @@ function authenticateToken(req, res, next) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
+    // DEUTSCH: 1. Versuch — Member-JWT (HS256, type='member'). Wird durch den QR-Login
+    // ausgestellt (POST /auth/member/qr-login, backend-members). Aelteren Mitgliedern
+    // kann so per QR-Code Zugang gegeben werden ohne OIDC-Konto. Bewusst OHNE Vorstand-/
+    // Admin-Gruppen — requireRole('vorstand','admin')-Endpunkte bleiben gesperrt.
+    // Identisch zum Muster in backend-members/src/auth-middleware.js.
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded && decoded.type === 'member' && decoded.email) {
+            req.user = {
+                id: decoded.sub || decoded.member_id || decoded.email,
+                email: decoded.email,
+                name: decoded.name,
+                groups: decoded.groups || []
+            };
+            return next();
+        }
+    } catch (_) {
+        // kein gueltiger Member-JWT — fall through zu Authentik OIDC (RS256)
+    }
+
+    // DEUTSCH: 2. Versuch — Authentik OIDC (RS256). Beide Issuer (Web + App) akzeptieren.
     jwt.verify(token, getKey, {
         algorithms: ['RS256'],
         issuer: ISSUERS
