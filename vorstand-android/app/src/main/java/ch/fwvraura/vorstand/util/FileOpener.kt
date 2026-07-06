@@ -58,7 +58,7 @@ object FileOpener {
      * @param context Kontext (fuer cacheDir, FileProvider und startActivity).
      * @param bytes Die rohen Datei-Bytes (z.B. aus ResponseBody.bytes()).
      * @param filename Gewuenschter Dateiname (Sonderzeichen werden ersetzt).
-     * @param mimeType MIME-Type der Datei; bei leer wird "*/*" verwendet.
+     * @param mimeType MIME-Type der Datei; bei leer werden alle Typen zugelassen.
      * @return true bei Erfolg, false wenn keine App zum Oeffnen gefunden wurde.
      */
     fun openFile(context: Context, bytes: ByteArray, filename: String, mimeType: String?): Boolean {
