@@ -1134,6 +1134,23 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
 
         const newEvent = result.rows[0];
 
+        // Neuer Anlass MIT Anmeldung: alle Mitglieder per App-Push informieren
+        // (Kanal 'event_update'). Bewusst nur Anmelde-Anlaesse und keine Vorschlaege
+        // ('proposed'), damit nicht jede Sitzung einen Push ausloest.
+        if (newEvent.registration_required && newEvent.status !== 'proposed' && process.env.INTERNAL_API_KEY) {
+            const membersUrl = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/push-broadcast';
+            const dateStr = newEvent.start_date
+                ? new Date(newEvent.start_date).toLocaleDateString('de-CH', { day: 'numeric', month: 'long' })
+                : '';
+            axios.post(membersUrl, {
+                notificationType: 'event_update',
+                title: `Neuer Anlass: ${newEvent.title}`,
+                body: `${dateStr ? dateStr + ' — ' : ''}Jetzt in der App anmelden.`,
+                data: { eventId: newEvent.id }
+            }, { headers: { 'X-Internal-Key': process.env.INTERNAL_API_KEY }, timeout: 10000 })
+                .catch(e => console.error('Neuer-Anlass-Broadcast fehlgeschlagen:', e.message));
+        }
+
         // Organisator benachrichtigen (immer wenn organizer_email gesetzt)
         if (organizer_email && !create_access) {
             try {
@@ -1228,8 +1245,9 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         values.push(id);
 
         // Vorherigen Organisator laden (um Änderung zu erkennen)
-        const oldEvent = await pool.query('SELECT organizer_email, organizer_name, title, event_password_encrypted FROM events WHERE id = $1', [id]);
+        const oldEvent = await pool.query('SELECT organizer_email, organizer_name, title, status, event_password_encrypted FROM events WHERE id = $1', [id]);
         const oldOrgEmail = oldEvent.rows[0]?.organizer_email;
+        const oldStatus = oldEvent.rows[0]?.status;
         const oldEncryptedPw = oldEvent.rows[0]?.event_password_encrypted;
 
         const result = await pool.query(`
@@ -1239,6 +1257,18 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         `, values);
 
         const updatedEvent = result.rows[0];
+
+        // Vorschlag genehmigt (proposed -> planned): den vorschlagenden Organisator
+        // (organizer_id = Mitglied) per App-Push informieren, dass sein Event-
+        // Vorschlag angenommen wurde und er nun organisieren kann.
+        if (oldStatus === 'proposed' && updatedEvent.status === 'planned' && updatedEvent.organizer_id) {
+            pushToMember(
+                updatedEvent.organizer_id, 'event_update',
+                `Vorschlag genehmigt: ${updatedEvent.title}`,
+                'Dein Event-Vorschlag wurde vom Vorstand genehmigt — du bist als Organisator eingetragen.',
+                { eventId: id }
+            ).catch(() => {});
+        }
 
         // Organisator benachrichtigen wenn neu zugewiesen
         const newOrgEmail = updatedEvent.organizer_email;
