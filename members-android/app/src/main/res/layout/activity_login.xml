@@ -61,7 +61,7 @@
                 <com.google.android.material.tabs.TabItem android:text="@string/login_tab_qr" />
             </com.google.android.material.tabs.TabLayout>
 
-            <!-- Mitglied-Bereich -->
+            <!-- Mitglied-Bereich: E-Mail + Passwort -->
             <LinearLayout
                 android:id="@+id/paneMember"
                 android:layout_width="match_parent"
@@ -77,13 +77,54 @@
                     android:textSize="14sp"
                     android:layout_marginBottom="16dp" />
 
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/login_member_email"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputMemberEmail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textEmailAddress"
+                        android:imeOptions="actionNext"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/login_member_password"
+                    app:passwordToggleEnabled="true"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/inputMemberPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:imeOptions="actionDone"
+                        android:maxLines="1" />
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnMemberLogin"
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
+                    android:layout_marginTop="16dp"
                     android:text="@string/login_member_button"
                     android:textSize="15sp"
                     app:cornerRadius="12dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnForgotPassword"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/login_forgot_password"
+                    android:textColor="@color/primary" />
             </LinearLayout>
 
             <!-- QR-Bereich -->
