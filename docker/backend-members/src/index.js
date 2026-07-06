@@ -960,6 +960,30 @@ async function setAuthentikPassword(authentikUserId, password) {
     }
 }
 
+// DEUTSCH: Prueft E-Mail+Passwort DIREKT gegen Authentik (OAuth2 password grant /
+// ROPC). So funktioniert das bestehende Authentik-Passwort im App-Login sofort —
+// ohne vorherigen Reset. Authentik matcht die E-Mail (user_fields = email,username).
+async function verifyAuthentikPassword(email, password) {
+    const BASE = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const cid = process.env.AUTHENTIK_CLIENT_ID, csec = process.env.AUTHENTIK_CLIENT_SECRET;
+    if (!cid || !csec || !email || !password) return false;
+    try {
+        const form = new URLSearchParams({
+            grant_type: 'password', username: email, password,
+            client_id: cid, client_secret: csec, scope: 'openid'
+        });
+        const r = await axios.post(`${BASE}/application/o/token/`, form.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 8000,
+            validateStatus: s => s === 200 || s === 400 || s === 401 || s === 403
+        });
+        return r.status === 200 && !!r.data?.access_token;
+    } catch (e) {
+        console.error('verifyAuthentikPassword error:', e.response?.status, e.message);
+        return false;
+    }
+}
+
 // DEUTSCH: Stellt ein Member-JWT aus (identisch zum QR-Login: type=member, 8h).
 function issueMemberJwt(memberId, email, name) {
     return jwt.sign(
@@ -969,8 +993,10 @@ function issueMemberJwt(memberId, email, name) {
     );
 }
 
-// DEUTSCH: App-Login mit E-Mail + Passwort (kein Browser). Prueft gegen den lokalen
-// bcrypt-Hash (per Reset gesetzt). Gibt ein Member-JWT zurueck.
+// DEUTSCH: App-Login mit E-Mail + Passwort (kein Browser). Prueft das Passwort
+// ZUERST direkt gegen Authentik (das bestehende Web-Passwort funktioniert sofort,
+// ohne vorherigen Reset); Fallback ist der lokale bcrypt-Hash (z.B. Mitglied ohne
+// Authentik-Konto oder per App-Reset gesetzt). Gibt ein Member-JWT zurueck.
 app.post('/auth/member/login', async (req, res) => {
     const clientIp = getClientIp(req);
     try {
@@ -981,12 +1007,14 @@ app.post('/auth/member/login', async (req, res) => {
             [email]
         );
         const m = r.rows[0];
-        // Generisch: keine Auskunft, ob die E-Mail existiert.
-        if (!m || !m.password_hash) {
-            await logAudit(pool, 'MEMBER_LOGIN_FAILED', m?.id || null, email, clientIp, { reason: m ? 'no_password_set' : 'unknown_email' });
-            return res.status(401).json({ error: 'E-Mail oder Passwort ist falsch. Falls du noch kein App-Passwort hast, nutze „Passwort vergessen".' });
+        if (!m) {
+            await logAudit(pool, 'MEMBER_LOGIN_FAILED', null, email, clientIp, { reason: 'unknown_email' });
+            return res.status(401).json({ error: 'E-Mail oder Passwort ist falsch.' });
         }
-        const ok = await bcrypt.compare(String(password), m.password_hash);
+        // 1) Direkt gegen Authentik pruefen (bestehendes Passwort, kein Reset noetig).
+        let ok = await verifyAuthentikPassword(m.email, String(password));
+        // 2) Fallback: lokaler bcrypt-Hash (Mitglied ohne Authentik-Konto / App-Reset).
+        if (!ok && m.password_hash) ok = await bcrypt.compare(String(password), m.password_hash);
         if (!ok) {
             await logAudit(pool, 'MEMBER_LOGIN_FAILED', m.id, email, clientIp, { reason: 'wrong_password' });
             return res.status(401).json({ error: 'E-Mail oder Passwort ist falsch.' });
