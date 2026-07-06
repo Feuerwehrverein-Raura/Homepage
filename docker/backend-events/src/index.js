@@ -843,15 +843,18 @@ const INVENTORY_KEY = process.env.INVENTORY_KEY || process.env.ORDER_API_KEY || 
 
 async function requireEventRecipeAccess(req, res, next) {
     try {
-        const userEmail = (req.user?.email || '').toLowerCase();
         const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
         const ev = await pool.query(
-            'SELECT slug, organizer_email FROM events WHERE slug = $1 OR id::text = $1 LIMIT 1',
+            'SELECT slug, organizer_email, organizer_id FROM events WHERE slug = $1 OR id::text = $1 LIMIT 1',
             [req.params.id]
         );
         if (ev.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
         req.eventSlug = ev.rows[0].slug;
-        const isOrganizer = userEmail !== '' && (ev.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        let isOrganizer = false;
+        if (!isPrivileged) {
+            const identity = await resolveOrganizerIdentity(req);
+            isOrganizer = isOrganizerIdentityMatch(identity, ev.rows[0]);
+        }
         if (isPrivileged || isOrganizer) return next();
         return res.status(403).json({ error: 'Nur Vorstand oder Organisator' });
     } catch (error) {
@@ -2259,16 +2262,66 @@ app.get('/registrations/mine', authenticateAny, async (req, res) => {
 // DEUTSCH: Events bei denen der eingeloggte User der Organisator ist (per E-Mail-Match).
 // Erlaubt der Mitglieder-App den "Organisator"-Tab automatisch einzublenden ohne
 // separates Event-Login.
+// DEUTSCH: Loest die "Organisator-Identitaet" des eingeloggten Users auf:
+// die Mitglieds-ID (fuer den organizer_id-Match) und die bekannten IDENTITAETS-
+// E-Mails (Login-Mail + Mitglieds-Haupt-email). Damit wird Organisator-Zugriff
+// robust erkannt — egal ob das Event per organizer_id verknuepft ist oder der
+// User sich mit einer anderen Mail einloggt als in members.email steht (Aufloesung
+// dann ueber authentik_user_id == Token-sub).
+//
+// Bewusst NICHT ueber versand_email: die ist nicht eindeutig (mehrere Mitglieder
+// koennen dieselbe Versand-Adresse teilen) — sie zum Matchen zu nutzen wuerde in
+// einem Autorisierungs-Pfad Zugriff ueber-gewaehren.
+async function resolveOrganizerIdentity(req) {
+    const loginEmail = (req.user?.email || '').toLowerCase();
+    const authId = req.user?.id ? String(req.user.id) : null;
+    const emails = new Set();
+    let memberId = null;
+    if (loginEmail) emails.add(loginEmail);
+    if (loginEmail || authId) {
+        try {
+            const m = await pool.query(
+                `SELECT id, LOWER(email) AS email
+                   FROM members
+                  WHERE ($1 <> '' AND LOWER(email) = $1)
+                     OR ($2 IS NOT NULL AND authentik_user_id = $2)
+                  ORDER BY (LOWER(email) = $1) DESC
+                  LIMIT 1`,
+                [loginEmail, authId]
+            );
+            if (m.rows[0]) {
+                memberId = m.rows[0].id;
+                if (m.rows[0].email) emails.add(m.rows[0].email);
+            }
+        } catch (e) {
+            console.error('resolveOrganizerIdentity error:', e.message);
+        }
+    }
+    return { memberId, emails: [...emails] };
+}
+
+// DEUTSCH: Prueft ob die aufgeloeste Identitaet Organisator des Event-Rows ist
+// (organizer_id-Match ODER eine der bekannten E-Mails == organizer_email).
+function isOrganizerIdentityMatch(identity, event) {
+    if (!identity) return false;
+    if (identity.memberId && event.organizer_id &&
+        String(event.organizer_id) === String(identity.memberId)) return true;
+    const oe = (event.organizer_email || '').toLowerCase();
+    return oe !== '' && identity.emails.includes(oe);
+}
+
 app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
     try {
-        const email = (req.user?.email || '').toLowerCase();
-        if (!email) return res.json([]);
+        const identity = await resolveOrganizerIdentity(req);
+        if (identity.emails.length === 0 && !identity.memberId) return res.json([]);
         const result = await pool.query(
-            `SELECT * FROM events WHERE LOWER(organizer_email) = $1
-             AND (status IS NULL OR status NOT IN ('proposed', 'rejected'))
-             AND (end_date IS NULL OR end_date >= NOW() - INTERVAL '7 days')
-             ORDER BY start_date ASC`,
-            [email]
+            `SELECT * FROM events
+              WHERE ( LOWER(organizer_email) = ANY($1::text[])
+                      OR ($2::uuid IS NOT NULL AND organizer_id = $2::uuid) )
+                AND (status IS NULL OR status NOT IN ('proposed', 'rejected'))
+                AND (end_date IS NULL OR end_date >= NOW() - INTERVAL '7 days')
+              ORDER BY start_date ASC`,
+            [identity.emails, identity.memberId]
         );
         res.json(result.rows);
     } catch (error) {
@@ -2282,13 +2335,16 @@ app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
 app.get('/events/:id/organizer-registrations', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
-        const userEmail = (req.user?.email || '').toLowerCase();
         const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
 
-        const event = await pool.query('SELECT id, organizer_email FROM events WHERE id = $1', [id]);
+        const event = await pool.query('SELECT id, organizer_email, organizer_id FROM events WHERE id = $1', [id]);
         if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
 
-        const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        let isOrganizer = false;
+        if (!isPrivileged) {
+            const identity = await resolveOrganizerIdentity(req);
+            isOrganizer = isOrganizerIdentityMatch(identity, event.rows[0]);
+        }
         if (!isPrivileged && !isOrganizer) {
             return res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
         }
@@ -2325,11 +2381,14 @@ app.post('/events/:eventId/registrations/:regId/reject-as-organizer', authentica
 // DEUTSCH: Hilfs-Funktion fuer organisator-auth (E-Mail-Match auf event.organizer_email
 // oder Vorstand/Admin). Setzt req.event als Side-Effect.
 async function ensureOrganizerAccess(req, res, eventId) {
-    const userEmail = (req.user?.email || '').toLowerCase();
     const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
-    const event = await pool.query('SELECT id, title, organizer_email FROM events WHERE id = $1', [eventId]);
+    const event = await pool.query('SELECT id, title, organizer_email, organizer_id FROM events WHERE id = $1', [eventId]);
     if (event.rows.length === 0) { res.status(404).json({ error: 'Event nicht gefunden' }); return null; }
-    const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+    let isOrganizer = false;
+    if (!isPrivileged) {
+        const identity = await resolveOrganizerIdentity(req);
+        isOrganizer = isOrganizerIdentityMatch(identity, event.rows[0]);
+    }
     if (!isPrivileged && !isOrganizer) {
         res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
         return null;
@@ -2438,13 +2497,16 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
 app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
-        const userEmail = (req.user?.email || '').toLowerCase();
         const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
 
-        const event = await pool.query('SELECT id, organizer_email FROM events WHERE id = $1', [id]);
+        const event = await pool.query('SELECT id, organizer_email, organizer_id FROM events WHERE id = $1', [id]);
         if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
 
-        const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        let isOrganizer = false;
+        if (!isPrivileged) {
+            const identity = await resolveOrganizerIdentity(req);
+            isOrganizer = isOrganizerIdentityMatch(identity, event.rows[0]);
+        }
         if (!isPrivileged && !isOrganizer) {
             return res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
         }
@@ -2603,13 +2665,16 @@ app.delete('/events/:eventId/shifts/:shiftId/as-organizer', authenticateAny, asy
 async function organizerActOnRegistration(req, res, newStatus) {
     try {
         const { eventId, regId } = req.params;
-        const userEmail = (req.user?.email || '').toLowerCase();
         const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
 
-        const event = await pool.query('SELECT id, title, organizer_email FROM events WHERE id = $1', [eventId]);
+        const event = await pool.query('SELECT id, title, organizer_email, organizer_id FROM events WHERE id = $1', [eventId]);
         if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
 
-        const isOrganizer = (event.rows[0].organizer_email || '').toLowerCase() === userEmail;
+        let isOrganizer = false;
+        if (!isPrivileged) {
+            const identity = await resolveOrganizerIdentity(req);
+            isOrganizer = isOrganizerIdentityMatch(identity, event.rows[0]);
+        }
         if (!isPrivileged && !isOrganizer) {
             return res.status(403).json({ error: 'Kein Zugriff auf dieses Event' });
         }
