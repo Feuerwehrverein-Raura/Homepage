@@ -110,6 +110,16 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="11sp" />
 
+                <!-- Zahlungserinnerungen: Push + E-Mail an alle offenen Beitraege -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSendReminders"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="Zahlungserinnerungen senden"
+                    app:icon="@drawable/ic_notification" />
+
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

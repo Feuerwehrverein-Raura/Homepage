@@ -707,6 +707,49 @@
         </div>
     </div>
 
+    <!-- ============================================================
+         MITGLIED-BENACHRICHTIGEN-MODAL
+         Sendet eine App-Push (Kanal "general") an ein einzelnes
+         Mitglied, optional zusätzlich per E-Mail. Wird aus der
+         Mitgliederliste heraus geöffnet (openMemberPushModal).
+         ============================================================ -->
+    <div id="member-push-modal" onclick="if(event.target===this)closeMemberPushModal()" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-lg w-full max-h-[95vh] overflow-y-auto shadow-xl">
+            <div class="sticky top-0 bg-white border-b px-5 py-4 flex justify-between items-center rounded-t-lg z-10">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                    Mitglied benachrichtigen
+                </h3>
+                <button type="button" onclick="closeMemberPushModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-5 space-y-4">
+                <p class="text-xs text-gray-600 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                    Push an dieses Mitglied (falls App installiert); optional zusätzlich E-Mail.
+                </p>
+                <p class="text-sm text-gray-700">An: <span id="member-push-target" class="font-semibold text-gray-900"></span></p>
+                <div>
+                    <label for="member-push-title" class="block text-sm font-medium text-gray-700 mb-1">Titel</label>
+                    <input type="text" id="member-push-title" maxlength="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="z.B. Erinnerung: Übung am Samstag">
+                </div>
+                <div>
+                    <label for="member-push-body" class="block text-sm font-medium text-gray-700 mb-1">Nachricht</label>
+                    <textarea id="member-push-body" rows="5" maxlength="1000" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Nachrichtentext..."></textarea>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" id="member-push-email" class="rounded text-fire-500 focus:ring-fire-500">
+                    <span>auch per E-Mail senden</span>
+                </label>
+            </div>
+            <div class="sticky bottom-0 bg-white border-t px-5 py-3 flex justify-end gap-2 rounded-b-lg">
+                <button type="button" onclick="closeMemberPushModal()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Abbrechen</button>
+                <button type="button" id="member-push-send-btn" onclick="sendMemberPush()" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    <span>Senden</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     </div> <!-- End Members Section -->
 
     <!-- ============================================================
@@ -2763,6 +2806,10 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             <span>An alle senden</span>
                         </button>
+                        <button id="fee-reminders-btn" onclick="sendPaymentReminders()" class="bg-amber-500 text-white px-5 py-2 rounded-lg hover:bg-amber-600 transition-colors flex items-center space-x-2 text-sm" title="Zahlungserinnerung (Push + E-Mail) an alle offenen, fälligen Beiträge — respektiert den 30-Tage-Rhythmus">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                            <span>Zahlungserinnerungen senden</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -3784,6 +3831,9 @@
                         <div class="text-sm text-gray-600">${member.funktion || '-'}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="openMemberPushModal('${member.id}', '${escapeForOnclick(`${member.vorname} ${member.nachname}`)}')" class="text-indigo-600 hover:text-indigo-800 mr-3">
+                            Benachrichtigen
+                        </button>
                         <button onclick="editMember('${member.id}')" class="text-fire-600 hover:text-fire-800">
                             Bearbeiten
                         </button>
@@ -8987,6 +9037,55 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             }
         }
 
+        // Sendet die Zahlungserinnerung sofort (gleiche Logik wie der tägliche
+        // Cron) an alle offenen, fälligen Beiträge. Der 30-Tage-Rhythmus wird
+        // serverseitig respektiert. Button ist während des Versands deaktiviert.
+        async function sendPaymentReminders() {
+            if (!confirm('Erinnerungen an alle offenen, fälligen Beiträge senden?')) return;
+
+            const btn = document.getElementById('fee-reminders-btn');
+            const originalHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('opacity-60', 'cursor-not-allowed');
+                btn.innerHTML = '<span>Wird gesendet…</span>';
+            }
+
+            try {
+                const response = await fetch(`${FEES_API}/send-reminders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({})
+                });
+
+                if (!response.ok) {
+                    let msg = `Fehler ${response.status}`;
+                    try {
+                        const err = await response.json();
+                        if (err && (err.error || err.message)) msg = err.error || err.message;
+                    } catch (e) { /* keine JSON-Fehlermeldung */ }
+                    throw new Error(msg);
+                }
+
+                const data = await response.json();
+                const pushed = data.pushed ?? 0;
+                const emailed = data.emailed ?? 0;
+                const candidates = data.candidates ?? 0;
+                showToast(`Erinnerungen gesendet (${pushed} Push, ${emailed} E-Mail, ${candidates} fällig)`, 'success');
+            } catch (error) {
+                showToast('Erinnerungen fehlgeschlagen: ' + error.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                    btn.innerHTML = originalHtml;
+                }
+            }
+        }
+
         // PDF generieren via Backend-API
         async function generateBeitragPDF() {
             const memberId = document.getElementById('beitrag-member-select').value;
@@ -11502,6 +11601,90 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 closePushModal();
             } catch (error) {
                 showToast('Push fehlgeschlagen: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                btn.innerHTML = originalHtml;
+            }
+        }
+
+        // ============================================
+        // MITGLIED BENACHRICHTIGEN (gezielte App-Push + optional E-Mail)
+        // ============================================
+
+        // Ziel-Mitglieder-IDs der aktuell geöffneten gezielten Benachrichtigung.
+        let memberPushTargetIds = [];
+
+        // Öffnet das Benachrichtigen-Modal für ein oder mehrere Mitglieder.
+        // memberIds: einzelne ID (String) oder Array von IDs.
+        // displayName: Anzeigename im Modal-Kopf (z.B. "Vorname Nachname").
+        function openMemberPushModal(memberIds, displayName) {
+            memberPushTargetIds = Array.isArray(memberIds) ? memberIds : [memberIds];
+            document.getElementById('member-push-target').textContent =
+                displayName || `${memberPushTargetIds.length} Mitglieder`;
+            document.getElementById('member-push-title').value = '';
+            document.getElementById('member-push-body').value = '';
+            document.getElementById('member-push-email').checked = false;
+            document.getElementById('member-push-modal').classList.remove('hidden');
+            document.getElementById('member-push-title').focus();
+        }
+
+        // Schliesst das Benachrichtigen-Modal.
+        function closeMemberPushModal() {
+            document.getElementById('member-push-modal').classList.add('hidden');
+        }
+
+        // Sendet eine gezielte App-Push (Kanal "general") an die gewählten
+        // Mitglieder, optional zusätzlich per E-Mail. Validiert Titel +
+        // Nachricht, POSTet an /push/to-members (Vorstand-Auth) und meldet das
+        // Ergebnis via Toast. Der Senden-Button ist während des Versands
+        // deaktiviert (verhindert Doppel-Versand).
+        async function sendMemberPush() {
+            const title = document.getElementById('member-push-title').value.trim();
+            const body = document.getElementById('member-push-body').value.trim();
+            const alsoEmail = document.getElementById('member-push-email').checked;
+
+            if (!title || !body) {
+                showToast('Bitte Titel und Nachricht ausfüllen', 'error');
+                return;
+            }
+            if (!memberPushTargetIds.length) {
+                showToast('Kein Mitglied ausgewählt', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('member-push-send-btn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.classList.add('opacity-60', 'cursor-not-allowed');
+            btn.innerHTML = '<span>Wird gesendet…</span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/push/to-members`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ memberIds: memberPushTargetIds, title, body, alsoEmail })
+                });
+
+                if (!response.ok) {
+                    let msg = `Fehler ${response.status}`;
+                    try {
+                        const err = await response.json();
+                        if (err && (err.error || err.message)) msg = err.error || err.message;
+                    } catch (e) { /* keine JSON-Fehlermeldung */ }
+                    throw new Error(msg);
+                }
+
+                const data = await response.json();
+                const pushed = data.pushed ?? 0;
+                const emailed = data.emailed ?? 0;
+                showToast('Benachrichtigung gesendet' + ` (Push: ${pushed}${emailed ? `, E-Mail: ${emailed}` : ''})`, 'success');
+                closeMemberPushModal();
+            } catch (error) {
+                showToast('Benachrichtigung fehlgeschlagen: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.classList.remove('opacity-60', 'cursor-not-allowed');

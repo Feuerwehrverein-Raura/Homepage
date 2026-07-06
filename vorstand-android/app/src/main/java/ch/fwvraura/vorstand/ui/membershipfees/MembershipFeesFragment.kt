@@ -14,6 +14,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import android.text.InputType
 import android.widget.EditText
+import android.widget.Toast
 import ch.fwvraura.vorstand.data.api.ApiModule
 import ch.fwvraura.vorstand.data.model.GeneratePaymentsRequest
 import ch.fwvraura.vorstand.data.model.MarkFeePaidRequest
@@ -84,6 +85,7 @@ class MembershipFeesFragment : Fragment() {
         // Long-Press: stattdessen planen statt sofort senden.
         binding.btnSendEmailBulk.setOnLongClickListener { onScheduleBulk("email"); true }
         binding.btnSendPostBulk.setOnLongClickListener { onScheduleBulk("post"); true }
+        binding.btnSendReminders.setOnClickListener { onSendRemindersClicked() }
 
         load()
     }
@@ -364,6 +366,43 @@ class MembershipFeesFragment : Fragment() {
             } finally {
                 binding.btnSendEmailBulk.isEnabled = true
                 binding.btnSendPostBulk.isEnabled = true
+                binding.progress.visibility = View.GONE
+            }
+        }
+    }
+
+    /** Zahlungserinnerungen: Bestaetigungsdialog, danach send-reminders aufrufen.
+     *  Das Backend bestimmt selbst die faelligen (offenen) Mitglieder. */
+    private fun onSendRemindersClicked() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Zahlungserinnerungen senden?")
+            .setMessage("Sendet an alle Mitglieder mit noch offenem Beitrag eine Erinnerung per Push (und E-Mail, wo hinterlegt).")
+            .setPositiveButton("Senden") { _, _ -> doSendReminders() }
+            .setNegativeButton("Abbrechen", null)
+            .show()
+    }
+
+    /** Fuehrt den Erinnerungslauf aus. Button waehrend des Sendens deaktiviert. */
+    private fun doSendReminders() {
+        binding.btnSendReminders.isEnabled = false
+        binding.progress.visibility = View.VISIBLE
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val resp = ApiModule.membershipFeesApi.sendReminders(emptyMap())
+                if (resp.isSuccessful) {
+                    val r = resp.body()
+                    val msg = if (r != null)
+                        "Erinnerungen gesendet (${r.pushed} Push, ${r.emailed} E-Mail, ${r.candidates} fällig)"
+                    else
+                        "Erinnerungen gesendet"
+                    Toast.makeText(requireContext(), msg, Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(requireContext(), "Fehler ${resp.code()}", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(requireContext(), "Netzwerkfehler: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                binding.btnSendReminders.isEnabled = true
                 binding.progress.visibility = View.GONE
             }
         }
