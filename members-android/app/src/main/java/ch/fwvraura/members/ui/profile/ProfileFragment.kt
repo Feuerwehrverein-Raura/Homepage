@@ -2,7 +2,9 @@ package ch.fwvraura.members.ui.profile
 
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -20,6 +22,7 @@ import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.databinding.FragmentProfileBinding
 import ch.fwvraura.members.databinding.ItemMyRegistrationBinding
 import ch.fwvraura.members.sync.ContactsSyncManager
+import ch.fwvraura.members.util.UpdateChecker
 import ch.fwvraura.members.ui.login.LoginActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import ch.fwvraura.members.util.DateUtils
@@ -54,6 +57,35 @@ class ProfileFragment : Fragment() {
         }
         binding.btnAustritt.setOnClickListener { showAustrittDialog() }
         setupContactsSyncSwitch()
+
+        // App-Version anzeigen; Tippen prueft manuell auf ein Play-Update.
+        val appVersion = UpdateChecker.currentVersion(requireContext())
+        binding.appVersionText.text = "Version $appVersion"
+        binding.appVersionText.setOnClickListener {
+            binding.appVersionText.text = "Suche nach Updates…"
+            viewLifecycleOwner.lifecycleScope.launch {
+                val newVersion = UpdateChecker.latestNewerVersion(requireContext())
+                if (_binding == null) return@launch
+                binding.appVersionText.text = "Version $appVersion"
+                if (newVersion != null) {
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("Update verfügbar")
+                        .setMessage("Version $newVersion ist verfügbar. Jetzt im Play Store aktualisieren?")
+                        .setPositiveButton("Aktualisieren") { _, _ ->
+                            val pkg = requireContext().packageName
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$pkg")))
+                            } catch (_: android.content.ActivityNotFoundException) {
+                                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$pkg")))
+                            }
+                        }
+                        .setNegativeButton("Später", null)
+                        .show()
+                } else {
+                    Toast.makeText(requireContext(), "Du hast die aktuellste Version", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
 
         // Sofort die in TokenManager gespeicherten Daten anzeigen
         val tm = MembersApp.instance.tokenManager
