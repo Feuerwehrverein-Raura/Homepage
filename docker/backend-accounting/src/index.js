@@ -75,6 +75,8 @@ async function runStartupMigrations() {
         // Bestehende NOT NULL auf reference_nr aufheben falls noch vorhanden
         await pool.query(`ALTER TABLE IF EXISTS membership_fee_payments ALTER COLUMN reference_nr DROP NOT NULL;`).catch(() => {});
         await pool.query(`ALTER TABLE IF EXISTS membership_fee_payments ALTER COLUMN reference_nr SET DEFAULT '';`).catch(() => {});
+        // Zeitpunkt der letzten Zahlungserinnerung — fuer den 30-Tage-Takt.
+        await pool.query(`ALTER TABLE IF EXISTS membership_fee_payments ADD COLUMN IF NOT EXISTS last_reminder_at DATE;`).catch(() => {});
         await pool.query(`
             CREATE TABLE IF NOT EXISTS membership_fee_settings (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -525,19 +527,16 @@ app.post('/membership-fees/cron-reminders', async (req, res) => {
             JOIN members m ON m.id = p.member_id
             WHERE p.status <> 'bezahlt'
               AND s.due_date IS NOT NULL
-              AND (s.due_date = CURRENT_DATE + INTERVAL '7 days'
-                   OR s.due_date = CURRENT_DATE - INTERVAL '14 days')
+              AND s.due_date <= CURRENT_DATE
+              AND (p.last_reminder_at IS NULL OR p.last_reminder_at <= CURRENT_DATE - INTERVAL '30 days')
               AND COALESCE(m.status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
         `);
         let pushed = 0, emailed = 0;
         for (const r of rows.rows) {
-            const overdue = new Date(r.due_date) < new Date();
             const amt = r.amount != null ? `CHF ${Number(r.amount).toFixed(2)}` : 'der Mitgliederbeitrag';
             const dueStr = new Date(r.due_date).toLocaleDateString('de-CH');
-            const title = overdue ? `Beitrag ${r.year} ueberfaellig` : `Beitrag ${r.year} bald faellig`;
-            const body = overdue
-                ? `Dein Mitgliederbeitrag ${r.year} (${amt}) ist seit ${dueStr} offen. Bitte begleiche ihn bald.`
-                : `Dein Mitgliederbeitrag ${r.year} (${amt}) wird am ${dueStr} faellig.`;
+            const title = `Beitrag ${r.year} offen`;
+            const body = `Dein Mitgliederbeitrag ${r.year} (${amt}) ist seit ${dueStr} faellig und noch offen. Bitte begleiche ihn.`;
             pushToMember(r.member_id, 'general', title, body, { year: String(r.year) }).catch(() => {});
             pushed++;
             if (r.email && r.zustellung_email) {
@@ -550,6 +549,8 @@ app.post('/membership-fees/cron-reminders', async (req, res) => {
                     emailed++;
                 } catch (e) { console.error('Beitrags-Erinnerung E-Mail fehlgeschlagen:', e.message); }
             }
+            // Zeitstempel setzen — die naechste Erinnerung kommt erst in 30 Tagen.
+            await pool.query('UPDATE membership_fee_payments SET last_reminder_at = CURRENT_DATE WHERE id = $1', [r.id]).catch(() => {});
         }
         logInfo('Beitrags-Erinnerungen versendet', { pushed, emailed, candidates: rows.rows.length });
         res.json({ success: true, pushed, emailed, candidates: rows.rows.length });
