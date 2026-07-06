@@ -1,11 +1,11 @@
 package ch.fwvraura.members.ui.login
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -14,6 +14,8 @@ import ch.fwvraura.members.MainActivity
 import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
+import ch.fwvraura.members.data.api.authErrorMessage
+import ch.fwvraura.members.data.model.MemberLoginRequest
 import ch.fwvraura.members.databinding.ActivityLoginBinding
 import ch.fwvraura.members.sync.ContactsSyncManager
 import ch.fwvraura.members.util.OidcConstants
@@ -60,6 +62,26 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Rueckkehr aus dem Passwort-Reset. Bei Erfolg hat die PasswordResetActivity
+     * bereits ein frisches Member-JWT erhalten und gibt es hier zurueck — wir
+     * legen damit die Session an und faehren dieselbe Post-Login-Routine wie beim
+     * normalen Login.
+     */
+    private val passwordResetLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        val data = result.data ?: return@registerForActivityResult
+        val token = data.getStringExtra(PasswordResetActivity.EXTRA_TOKEN)
+        if (token.isNullOrBlank()) return@registerForActivityResult
+        loginWithMemberToken(
+            token,
+            data.getStringExtra(PasswordResetActivity.EXTRA_EMAIL),
+            data.getStringExtra(PasswordResetActivity.EXTRA_NAME)
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         @Suppress("DEPRECATION")
@@ -96,10 +118,69 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupActions() {
-        binding.btnMemberLogin.setOnClickListener { startOidcLogin() }
+        // Mitglied-Tab: app-natives E-Mail + Passwort-Login (kein Browser/OIDC mehr).
+        binding.btnMemberLogin.setOnClickListener { doMemberLogin() }
+
+        binding.btnForgotPassword.setOnClickListener {
+            val intent = Intent(this, PasswordResetActivity::class.java)
+            val prefill = binding.inputMemberEmail.text?.toString()?.trim()
+            if (!prefill.isNullOrBlank()) {
+                intent.putExtra(PasswordResetActivity.EXTRA_PREFILL_EMAIL, prefill)
+            }
+            passwordResetLauncher.launch(intent)
+        }
 
         binding.btnQrLogin.setOnClickListener {
             startActivity(Intent(this, QrScannerActivity::class.java))
+        }
+    }
+
+    /** E-Mail + Passwort gegen POST auth/member/login. */
+    private fun doMemberLogin() {
+        val email = binding.inputMemberEmail.text?.toString()?.trim().orEmpty()
+        val password = binding.inputMemberPassword.text?.toString().orEmpty()
+        if (email.isBlank() || password.isBlank()) {
+            showError(getString(R.string.login_error_empty))
+            return
+        }
+        binding.errorText.visibility = View.GONE
+        binding.loginProgress.visibility = View.VISIBLE
+        binding.btnMemberLogin.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val resp = ApiModule.authApi.memberLogin(MemberLoginRequest(email, password))
+                val body = resp.body()
+                if (resp.isSuccessful && !body?.token.isNullOrBlank()) {
+                    loginWithMemberToken(body!!.token!!, body.user?.email ?: email, body.user?.name)
+                } else {
+                    showError(resp.authErrorMessage())
+                }
+            } catch (e: Exception) {
+                showError("Netzwerkfehler: ${e.message}")
+            } finally {
+                binding.loginProgress.visibility = View.GONE
+                binding.btnMemberLogin.isEnabled = true
+            }
+        }
+    }
+
+    /**
+     * Session aus einem rohen Member-JWT anlegen (Login ODER Reset-Erfolg) und
+     * die bestehende Post-Login-Routine ausfuehren: FCM-Token registrieren +
+     * Kontakt-Sync-Frage/Trigger + navigateToMain. Wie beim QR-Login hat dieses
+     * JWT keinen Refresh-Token — der stille Re-Login laeuft ueber den QR-App-Token
+     * bzw. hier ueber ein Neu-Anmelden.
+     */
+    private fun loginWithMemberToken(token: String, email: String?, name: String?) {
+        val tm = MembersApp.instance.tokenManager
+        tm.token = token
+        tm.refreshToken = null
+        tm.accountType = "member"
+        if (!email.isNullOrBlank()) tm.userEmail = email
+        tm.userName = name
+        lifecycleScope.launch {
+            registerFcmTokenIfPresent(tm)
+            handleContactsSyncAfterLogin()
         }
     }
 

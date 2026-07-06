@@ -38,6 +38,13 @@
             android:exported="false"
             android:theme="@style/Theme.FWVMembers.Login" />
 
+        <!-- Mitglied: app-natives Passwort-Zuruecksetzen (E-Mail-Code + neues Passwort) -->
+        <activity
+            android:name=".ui.login.PasswordResetActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FWVMembers"
+            android:windowSoftInputMode="adjustResize" />
+
         <activity
             android:name=".ui.login.QrScannerActivity"
             android:exported="false"

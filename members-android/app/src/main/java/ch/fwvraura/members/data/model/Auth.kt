@@ -1,5 +1,7 @@
 package ch.fwvraura.members.data.model
 
+import com.google.gson.annotations.SerializedName
+
 /** POST /events/login */
 data class OrganizerLoginRequest(
     val email: String,
@@ -31,4 +33,45 @@ data class QrLoginPayload(
     val type: String? = null,
     val email: String? = null,
     val token: String? = null
+)
+
+// --- App-natives Mitglieder-Login (E-Mail + Passwort) + Passwort-Reset ---
+
+/** POST /auth/member/login */
+data class MemberLoginRequest(
+    val email: String,
+    val password: String
+)
+
+/** POST /auth/member/request-reset */
+data class RequestResetRequest(
+    val email: String
+)
+
+/** POST /auth/member/reset */
+data class ResetRequest(
+    val email: String,
+    val code: String,
+    @SerializedName("new_password") val new_password: String
+)
+
+/**
+ * Antwort von /auth/member/login und /auth/member/reset (Erfolg: token + user)
+ * sowie /auth/member/request-reset (nur message). Bei Fehlern (401/400/429)
+ * liefert das Backend `{error}` — hier ueber [error] aus dem errorBody gelesen.
+ * Alle Felder optional, damit Erfolgs- und Fehler-Bodies mit derselben Klasse
+ * geparst werden koennen.
+ */
+data class MemberAuthResponse(
+    val success: Boolean = false,
+    val token: String? = null,
+    val user: MemberAuthUser? = null,
+    val message: String? = null,
+    val error: String? = null
+)
+
+data class MemberAuthUser(
+    val id: String? = null,
+    val email: String? = null,
+    val name: String? = null
 )
