@@ -16,3 +16,26 @@ export async function broadcastPush(
     body,
   });
 }
+
+export interface NotifyMembersResponse {
+  success: boolean;
+  pushed: number;
+  emailed: number;
+}
+
+// Gezielte Benachrichtigung an ausgewaehlte Mitglieder (per member_id).
+// Sendet einen Push an die App der genannten Mitglieder und optional
+// zusaetzlich eine E-Mail.
+export async function notifyMembers(
+  memberIds: string[],
+  title: string,
+  body: string,
+  alsoEmail: boolean
+): Promise<NotifyMembersResponse> {
+  return await apiClient.post<NotifyMembersResponse>("/push/to-members", {
+    memberIds,
+    title,
+    body,
+    alsoEmail,
+  });
+}

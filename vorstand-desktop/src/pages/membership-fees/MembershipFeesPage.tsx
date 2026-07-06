@@ -18,6 +18,7 @@ import {
   Send,
   MoreHorizontal,
   Clock,
+  BellRing,
 } from "lucide-react";
 import * as scheduledJobsApi from "@/lib/api/scheduled-jobs";
 import { FeeSettingsDialog } from "./FeeSettingsDialog";
@@ -51,6 +52,7 @@ export function MembershipFeesPage() {
   const [generating, setGenerating] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [sendingPost, setSendingPost] = useState(false);
+  const [sendingReminders, setSendingReminders] = useState(false);
   const [singleSendId, setSingleSendId] = useState<string | null>(null);
   const [singleMenuId, setSingleMenuId] = useState<string | null>(null);
   /** Lokal getrackte Ref-Drafts pro Zahlungs-ID — werden beim Blur gespeichert. */
@@ -271,6 +273,27 @@ export function MembershipFeesPage() {
     }
   };
 
+  const handleSendReminders = async () => {
+    const ok = confirm(
+      "Zahlungserinnerungen jetzt senden?\n\n" +
+      "Sendet an alle Mitglieder mit offenem Beitrag eine Erinnerung per App-Push " +
+      "und — sofern hinterlegt — zusaetzlich per E-Mail."
+    );
+    if (!ok) return;
+    setSendingReminders(true);
+    setError(null);
+    try {
+      const r = await feesApi.sendFeeReminders();
+      alert(
+        `Erinnerungen gesendet (${r.pushed} Push, ${r.emailed} E-Mail, ${r.candidates} fällig).`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Senden der Erinnerungen");
+    } finally {
+      setSendingReminders(false);
+    }
+  };
+
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
@@ -344,6 +367,19 @@ export function MembershipFeesPage() {
               <Send className="h-4 w-4" />
             )}
             Brief-Versand
+          </button>
+          <button
+            onClick={handleSendReminders}
+            disabled={sendingReminders}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-input bg-background text-sm hover:bg-accent disabled:opacity-50"
+            title="Push- und E-Mail-Erinnerung an alle offenen Beitraege"
+          >
+            {sendingReminders ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <BellRing className="h-4 w-4" />
+            )}
+            Zahlungserinnerungen senden
           </button>
           <div className="relative">
             <button

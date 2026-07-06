@@ -293,6 +293,16 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Benachrichtigen: gezielte Push-/E-Mail-Nachricht an dieses Mitglied -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnNotify"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Benachrichtigen"
+                app:icon="@drawable/ic_notification" />
+
             <!-- Action Buttons -->
             <LinearLayout
                 android:layout_width="match_parent"

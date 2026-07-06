@@ -19,7 +19,10 @@ import {
   XCircle,
   KeyRound,
   AlertCircle,
+  Bell,
+  X,
 } from "lucide-react";
+import { MemberNotifyDialog } from "./MemberNotifyDialog";
 
 type GroupKey = "nextcloud" | "vorstand" | "social";
 
@@ -33,6 +36,11 @@ export function MemberDetailPage() {
   const [passwordBusy, setPasswordBusy] = useState(false);
   const [passwordResult, setPasswordResult] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [notice, setNotice] = useState<{
+    type: "error" | "success";
+    text: string;
+  } | null>(null);
 
   // Gruppen & Rollen (Authentik)
   const [groupsLoading, setGroupsLoading] = useState(true);
@@ -205,6 +213,16 @@ export function MemberDetailPage() {
           </p>
         </div>
         <button
+          onClick={() => {
+            setNotice(null);
+            setNotifyOpen(true);
+          }}
+          className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
+        >
+          <Bell className="h-4 w-4" />
+          Benachrichtigen
+        </button>
+        <button
           onClick={() => navigate(`/members/${id}/edit`)}
           className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
         >
@@ -219,6 +237,31 @@ export function MemberDetailPage() {
           Loeschen
         </button>
       </div>
+
+      {/* Notice fuer Benachrichtigungs-Aktion */}
+      {notice && (
+        <div
+          className={cn(
+            "flex items-center gap-2 p-3 mb-4 rounded-md text-sm",
+            notice.type === "error"
+              ? "bg-destructive/10 text-destructive"
+              : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+          )}
+        >
+          {notice.type === "error" ? (
+            <AlertCircle className="h-4 w-4 shrink-0" />
+          ) : (
+            <CheckCircle className="h-4 w-4 shrink-0" />
+          )}
+          {notice.text}
+          <button
+            onClick={() => setNotice(null)}
+            className="ml-auto opacity-70 hover:opacity-100"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-6">
         {/* Left Column: Photo + Contact */}
@@ -461,6 +504,22 @@ export function MemberDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Benachrichtigen-Dialog */}
+      {notifyOpen && id && (
+        <MemberNotifyDialog
+          memberId={id}
+          memberName={`${member.vorname} ${member.nachname}`.trim()}
+          onClose={() => setNotifyOpen(false)}
+          onSent={(res) => {
+            setNotifyOpen(false);
+            setNotice({
+              type: "success",
+              text: `Benachrichtigung gesendet (${res.pushed} Push, ${res.emailed} E-Mail).`,
+            });
+          }}
+        />
       )}
     </div>
   );

@@ -3,6 +3,7 @@ package ch.fwvraura.vorstand.data.api
 import ch.fwvraura.vorstand.data.model.Member
 import ch.fwvraura.vorstand.data.model.MemberCreate
 import ch.fwvraura.vorstand.data.model.MemberStats
+import ch.fwvraura.vorstand.data.model.PushToMembersResult
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -196,4 +197,32 @@ interface MembersApi {
         @Path("id") id: String,
         @Body body: ch.fwvraura.vorstand.data.model.CloudPermissionUpdate
     ): Response<Unit>
+
+    // ============================================
+    // MANUELLE BENACHRICHTIGUNG (Push, optional zusaetzlich E-Mail)
+    // ============================================
+
+    /**
+     * Sendet eine gezielte Push-Benachrichtigung an ein oder mehrere Mitglieder.
+     *
+     * Sendet einen POST-Request an "push/to-members". Der Body wird als flexible
+     * Map uebergeben (nicht als data class), da die Struktur klein und dynamisch ist:
+     *   mapOf(
+     *     "memberIds" to listOf(id),   // Liste der Empfaenger-IDs
+     *     "title" to t,                // Titel der Benachrichtigung
+     *     "body" to b,                 // Nachrichtentext
+     *     "alsoEmail" to bool          // true = zusaetzlich per E-Mail senden
+     *   )
+     *
+     * @JvmSuppressWildcards verhindert, dass Kotlin fuer den Any?-Wertetyp
+     * Wildcard-Typen (? extends Object) generiert, was Gson bei der
+     * JSON-Serialisierung sonst stoert.
+     *
+     * @param body Map mit memberIds, title, body und alsoEmail.
+     * @return Response<PushToMembersResult> - Anzahl zugestellter Push-/E-Mail-Nachrichten.
+     */
+    @POST("push/to-members")
+    suspend fun notifyMembers(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<PushToMembersResult>
 }

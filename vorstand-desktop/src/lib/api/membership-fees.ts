@@ -7,6 +7,7 @@ import type {
   FeeSettingsUpsert,
   GeneratePaymentsResponse,
   SendEmailBulkResponse,
+  SendRemindersResponse,
 } from "@/lib/types/membership-fee";
 
 export async function listPayments(year: number): Promise<MembershipFeePayment[]> {
@@ -67,4 +68,10 @@ export async function sendPostBulk(year: number): Promise<SendEmailBulkResponse>
 
 export async function sendSingle(id: string, channel: "email" | "post"): Promise<{ success: boolean }> {
   return await apiClient.post<{ success: boolean }>(`/membership-fees/payments/${id}/send`, { channel });
+}
+
+// Sendet Zahlungserinnerungen fuer offene Beitraege sofort (Push + optional
+// E-Mail). Das Backend ermittelt die faelligen Empfaenger selbst.
+export async function sendFeeReminders(): Promise<SendRemindersResponse> {
+  return await apiClient.post<SendRemindersResponse>(`/membership-fees/send-reminders`, {});
 }

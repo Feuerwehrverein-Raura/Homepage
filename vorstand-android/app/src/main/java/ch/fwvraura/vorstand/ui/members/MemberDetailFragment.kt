@@ -20,7 +20,9 @@ import ch.fwvraura.vorstand.util.DateUtils
 import coil.load
 import coil.request.CachePolicy
 import coil.transform.CircleCropTransformation
+import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -129,6 +131,8 @@ class MemberDetailFragment : Fragment() {
         binding.photoContainer.setOnClickListener { showPhotoOptions() }
         // Cloud-Permissions: Sync-Button
         binding.btnSyncCloudPermissions.setOnClickListener { syncCloudPermissions() }
+        // Benachrichtigen-Button: Oeffnet den Push-/E-Mail-Dialog
+        binding.btnNotify.setOnClickListener { showNotifyDialog() }
 
         loadMember()
     }
@@ -445,6 +449,92 @@ class MemberDetailFragment : Fragment() {
                 binding.cloudPermissionsStatus.text = "Fehler: ${e.message}"
             } finally {
                 binding.btnSyncCloudPermissions.isEnabled = true
+            }
+        }
+    }
+
+    /**
+     * showNotifyDialog — Oeffnet einen Dialog zum gezielten Benachrichtigen des Mitglieds.
+     *
+     * Der Dialog (dialog_notify_member.xml) enthaelt:
+     * - Titel (Pflichtfeld)
+     * - Nachricht (mehrzeilig, Pflichtfeld)
+     * - Checkbox "auch per E-Mail" (steuert zusaetzlichen E-Mail-Versand)
+     *
+     * Der "Senden"-Button wird ueber einen OnShowListener manuell verdrahtet, damit
+     * der Dialog bei fehlender Eingabe NICHT automatisch geschlossen wird (sonst
+     * wuerde der Validierungs-Toast erscheinen und der Dialog trotzdem verschwinden).
+     */
+    private fun showNotifyDialog() {
+        // Ohne geladenes Mitglied gibt es keine Empfaenger-ID
+        val id = memberId ?: return
+
+        val dialogView = layoutInflater.inflate(R.layout.dialog_notify_member, null)
+        val titleInput = dialogView.findViewById<TextInputEditText>(R.id.notifyTitle)
+        val bodyInput = dialogView.findViewById<TextInputEditText>(R.id.notifyBody)
+        val emailCheck = dialogView.findViewById<MaterialCheckBox>(R.id.notifyAlsoEmail)
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Mitglied benachrichtigen")
+            .setView(dialogView)
+            .setPositiveButton("Senden", null)
+            .setNegativeButton("Abbrechen", null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val title = titleInput.text?.toString()?.trim().orEmpty()
+                val body = bodyInput.text?.toString()?.trim().orEmpty()
+                // Validierung: Titel und Nachricht sind Pflicht
+                if (title.isEmpty() || body.isEmpty()) {
+                    Toast.makeText(requireContext(), "Bitte Titel und Nachricht eingeben", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                sendNotification(id, title, body, emailCheck.isChecked, dialog)
+            }
+        }
+
+        dialog.show()
+    }
+
+    /**
+     * sendNotification — Sendet die Benachrichtigung ueber die API.
+     *
+     * Ruft push/to-members mit der Empfaenger-ID, Titel, Nachricht und dem
+     * E-Mail-Flag auf. Bei Erfolg wird der Dialog geschlossen und ein Bestaetigungs-
+     * Toast angezeigt, bei Fehler ein Fehler-Toast.
+     *
+     * @param id Die ID des zu benachrichtigenden Mitglieds
+     * @param title Titel der Benachrichtigung (nicht leer)
+     * @param body Nachrichtentext (nicht leer)
+     * @param alsoEmail true = zusaetzlich per E-Mail versenden
+     * @param dialog Der geoeffnete Dialog (wird bei Erfolg geschlossen)
+     */
+    private fun sendNotification(
+        id: String,
+        title: String,
+        body: String,
+        alsoEmail: Boolean,
+        dialog: androidx.appcompat.app.AlertDialog
+    ) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.membersApi.notifyMembers(
+                    mapOf(
+                        "memberIds" to listOf(id),
+                        "title" to title,
+                        "body" to body,
+                        "alsoEmail" to alsoEmail
+                    )
+                )
+                if (response.isSuccessful) {
+                    dialog.dismiss()
+                    Toast.makeText(requireContext(), "Benachrichtigung gesendet", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(requireContext(), "Fehler beim Senden", Toast.LENGTH_SHORT).show()
+                }
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), "Fehler beim Senden", Toast.LENGTH_SHORT).show()
             }
         }
     }

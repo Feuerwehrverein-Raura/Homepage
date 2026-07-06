@@ -69,3 +69,10 @@ export interface SendEmailBulkResponse {
   skipped: number;
   failures: Array<{ member_id?: string; name?: string; error?: string }>;
 }
+
+export interface SendRemindersResponse {
+  success: boolean;
+  pushed: number;
+  emailed: number;
+  candidates: number;
+}

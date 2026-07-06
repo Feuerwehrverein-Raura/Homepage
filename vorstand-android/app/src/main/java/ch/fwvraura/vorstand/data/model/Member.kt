@@ -178,3 +178,19 @@ data class MemberCreate(
     /** Ob die Zustellung per Post erfolgen soll. */
     @SerializedName("zustellung_post") val zustellungPost: Boolean? = null
 )
+
+/**
+ * Antwort von POST /push/to-members — Ergebnis einer gezielten Benachrichtigung.
+ *
+ * Wird zurueckgegeben, wenn ein oder mehrere Mitglieder manuell per Push
+ * (und optional per E-Mail) benachrichtigt werden.
+ *
+ * @property success Ob der Versand insgesamt erfolgreich war.
+ * @property pushed Anzahl tatsaechlich zugestellter Push-Nachrichten.
+ * @property emailed Anzahl zusaetzlich versendeter E-Mails (nur wenn alsoEmail=true).
+ */
+data class PushToMembersResult(
+    val success: Boolean = false,
+    val pushed: Int = 0,
+    val emailed: Int = 0
+)

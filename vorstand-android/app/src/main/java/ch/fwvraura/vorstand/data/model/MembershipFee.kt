@@ -112,3 +112,19 @@ data class SendSingleResponse(
     val channel: String? = null,
     val error: String? = null
 )
+
+/**
+ * Antwort von POST /membership-fees/send-reminders — Ergebnis eines
+ * manuellen Erinnerungslaufs fuer noch offene Mitgliedsbeitraege.
+ *
+ * @property success Ob der Erinnerungslauf erfolgreich durchgefuehrt wurde.
+ * @property pushed Anzahl versendeter Push-Erinnerungen.
+ * @property emailed Anzahl versendeter E-Mail-Erinnerungen.
+ * @property candidates Anzahl faelliger (offener) Beitraege, die beruecksichtigt wurden.
+ */
+data class FeeRemindersResult(
+    val success: Boolean = false,
+    val pushed: Int = 0,
+    val emailed: Int = 0,
+    val candidates: Int = 0
+)

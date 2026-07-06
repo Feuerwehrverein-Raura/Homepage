@@ -1,5 +1,6 @@
 package ch.fwvraura.vorstand.data.api
 
+import ch.fwvraura.vorstand.data.model.FeeRemindersResult
 import ch.fwvraura.vorstand.data.model.FeeSettingsUpsert
 import ch.fwvraura.vorstand.data.model.GeneratePaymentsRequest
 import ch.fwvraura.vorstand.data.model.GeneratePaymentsResponse
@@ -72,4 +73,20 @@ interface MembershipFeesApi {
         @Path("id") id: String,
         @Body body: ch.fwvraura.vorstand.data.model.SendSingleRequest
     ): Response<ch.fwvraura.vorstand.data.model.SendSingleResponse>
+
+    /**
+     * Sendet Zahlungserinnerungen fuer alle noch offenen Beitraege (Push + E-Mail).
+     *
+     * Sendet einen POST-Request an "membership-fees/send-reminders". Das Backend
+     * bestimmt selbst die faelligen Mitglieder; als Body genuegt eine leere Map
+     * (emptyMap()), die zu "{}" serialisiert wird. @JvmSuppressWildcards sorgt fuer
+     * korrekte JSON-Serialisierung des Any?-Wertetyps.
+     *
+     * @param body Leere Map (aktuell ohne Parameter — Platzhalter fuer spaetere Filter).
+     * @return Response<FeeRemindersResult> - Anzahl Push-/E-Mail-Erinnerungen und faelliger Beitraege.
+     */
+    @POST("membership-fees/send-reminders")
+    suspend fun sendReminders(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<FeeRemindersResult>
 }
