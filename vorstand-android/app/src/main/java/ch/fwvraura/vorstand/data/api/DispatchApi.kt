@@ -97,4 +97,18 @@ interface DispatchApi {
         @Query("event_id") eventId: String? = null,
         @Query("limit") limit: Int? = 100
     ): Response<List<DispatchLogEntry>>
+
+    // ============================================
+    // PUSH-BENACHRICHTIGUNGEN (App-Broadcast)
+    // ============================================
+
+    /**
+     * Sendet eine Push-Benachrichtigung (FCM, Kanal "general") an alle
+     * Mitglieder mit installierter App und aktivierten Benachrichtigungen.
+     * Body: {"title": <Titel>, "body": <Nachricht>}.
+     */
+    @POST("push/broadcast")
+    suspend fun broadcastPush(
+        @Body body: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<PushBroadcastResult>
 }

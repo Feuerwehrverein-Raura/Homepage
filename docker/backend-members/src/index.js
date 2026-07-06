@@ -4614,7 +4614,9 @@ app.put('/members/me/notifications', authenticateToken, async (req, res) => {
                 ON CONFLICT (member_id, notification_type)
                 DO UPDATE SET
                     enabled = $3,
-                    alternative_email = $4,
+                    -- Bestehende alternative_email NICHT leeren, wenn der Client sie
+                    -- nicht mitschickt (die App sendet nur enabled) — COALESCE behaelt sie.
+                    alternative_email = COALESCE($4, notification_preferences.alternative_email),
                     updated_at = NOW()
             `, [memberId, pref.notification_type, pref.enabled, pref.alternative_email || null]);
         }

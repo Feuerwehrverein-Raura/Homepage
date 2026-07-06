@@ -204,3 +204,18 @@ data class DispatchLogEntry(
     val status: String? = null,
     @SerializedName("created_at") val createdAt: String? = null
 )
+
+// ============================================
+// PUSH-BENACHRICHTIGUNGEN (App-Broadcast)
+// ============================================
+
+/**
+ * Ergebnis eines Push-Broadcasts an alle App-Mitglieder.
+ *
+ * @property success true, wenn der Versand ausgeloest wurde.
+ * @property sent Anzahl der erreichten Geraete (optional, kann null sein).
+ */
+data class PushBroadcastResult(
+    val success: Boolean = false,
+    val sent: Int? = null
+)
