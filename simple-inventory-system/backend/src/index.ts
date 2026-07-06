@@ -315,6 +315,21 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_recipes_recipe ON event_recipes(recipe_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_shopping_status ON event_shopping_status(event_slug)`);
 
+  // Manuell erfasste Materialien pro Event (zusaetzlich zu den aus Rezepten
+  // abgeleiteten Zutaten) — z.B. Teller, Servietten, Deko. Werden wie Rezept-
+  // Zutaten mit dem Lagerbestand abgeglichen.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS event_manual_items (
+      event_slug VARCHAR(255) NOT NULL,
+      item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+      quantity NUMERIC NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (event_slug, item_id)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_event_manual_items_slug ON event_manual_items(event_slug)`);
+
   // Einkaufs-PWA Phase 2/3: Ist-Kosten, Zahler, Lager-Einbuchung pro Position.
   await pool.query(`
     ALTER TABLE event_shopping_status ADD COLUMN IF NOT EXISTS actual_price NUMERIC;
@@ -1114,6 +1129,50 @@ app.delete('/api/events/:slug/recipes/:recipeId', authenticateEventAccess, async
   }
 });
 
+// Manuelle Material-Position zum Event hinzufuegen/aktualisieren (Upsert pro Event & Material).
+app.post('/api/events/:slug/manual-items', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug } = req.params;
+    const { item_id, quantity } = req.body;
+    if (!item_id) return res.status(400).json({ error: 'item_id ist erforderlich' });
+    const qty = quantity === undefined || quantity === null ? 1 : Number(quantity);
+    if (!(qty > 0) || qty > 2000000000) return res.status(400).json({ error: 'quantity muss positiv sein' });
+    const item = await pool.query('SELECT id FROM items WHERE id = $1 AND active = true', [item_id]);
+    if (item.rows.length === 0) return res.status(404).json({ error: 'Material nicht gefunden' });
+    const result = await pool.query(`
+      INSERT INTO event_manual_items (event_slug, item_id, quantity)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (event_slug, item_id)
+      DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [slug, item_id, qty]);
+    broadcast({ type: 'event_manual_item_set', event_slug: slug, item_id });
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('POST event manual-item error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Manuelle Material-Position vom Event entfernen.
+app.delete('/api/events/:slug/manual-items/:itemId', authenticateEventAccess, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { slug, itemId } = req.params;
+    const iid = parseInt(itemId, 10);
+    if (isNaN(iid)) return res.status(400).json({ error: 'Ungültige itemId' });
+    const result = await pool.query(
+      'DELETE FROM event_manual_items WHERE event_slug = $1 AND item_id = $2 RETURNING item_id',
+      [slug, iid]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Position nicht gefunden' });
+    broadcast({ type: 'event_manual_item_removed', event_slug: slug, item_id: iid });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('DELETE event manual-item error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Einkaufsliste für ein Event: summiert alle Rezept-Zutaten × Portionen
 // und rechnet gegen den aktuellen Lagerbestand → to_buy + geschätzte Kosten.
 // Ersetzt die bisherige statische XLSX/PDF-Einkaufsliste.
@@ -1121,11 +1180,34 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
   try {
     const { slug } = req.params;
     const result = await pool.query(`
+      WITH recipe_needs AS (
+        SELECT ri.item_id,
+               SUM(ri.quantity * er.servings)::numeric AS needed,
+               MAX(NULLIF(ri.unit, '')) AS unit
+        FROM event_recipes er
+        JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+        JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+        WHERE er.event_slug = $1
+        GROUP BY ri.item_id
+      ),
+      manual_needs AS (
+        SELECT item_id, SUM(quantity)::numeric AS needed
+        FROM event_manual_items
+        WHERE event_slug = $1
+        GROUP BY item_id
+      ),
+      all_ids AS (
+        SELECT item_id FROM recipe_needs
+        UNION
+        SELECT item_id FROM manual_needs
+      )
       SELECT
         i.id AS item_id,
         i.name AS item_name,
-        COALESCE(MAX(NULLIF(ri.unit, '')), i.unit) AS unit,
-        SUM(ri.quantity * er.servings)::numeric AS needed,
+        COALESCE(rn.unit, i.unit) AS unit,
+        COALESCE(rn.needed, 0)::numeric AS recipe_needed,
+        COALESCE(mn.needed, 0)::numeric AS manual_needed,
+        (COALESCE(rn.needed, 0) + COALESCE(mn.needed, 0))::numeric AS needed,
         i.quantity AS in_stock,
         i.purchase_price,
         i.supplier,
@@ -1138,15 +1220,11 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
         ess.actual_quantity,
         ess.paid_by,
         ess.restocked_at
-      FROM event_recipes er
-      JOIN recipes r ON r.id = er.recipe_id AND r.active = true
-      JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
-      JOIN items i ON i.id = ri.item_id
+      FROM all_ids ai
+      JOIN items i ON i.id = ai.item_id AND i.active = true
+      LEFT JOIN recipe_needs rn ON rn.item_id = ai.item_id
+      LEFT JOIN manual_needs mn ON mn.item_id = ai.item_id
       LEFT JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
-      WHERE er.event_slug = $1 AND i.active = true
-      GROUP BY i.id, i.name, i.unit, i.quantity, i.purchase_price, i.supplier,
-               ess.purchased, ess.purchased_by, ess.purchased_at, ess.recommendation, ess.note,
-               ess.actual_price, ess.actual_quantity, ess.paid_by, ess.restocked_at
       ORDER BY i.name
     `, [slug]);
 
@@ -1174,6 +1252,8 @@ app.get('/api/events/:slug/shopping-list', authenticateEventAccess, async (req: 
         item_name: row.item_name,
         unit: row.unit,
         needed,
+        recipe_needed: parseFloat(row.recipe_needed) || 0,
+        manual_needed: parseFloat(row.manual_needed) || 0,
         in_stock: inStock,
         to_buy: toBuy,
         purchase_price: price,
