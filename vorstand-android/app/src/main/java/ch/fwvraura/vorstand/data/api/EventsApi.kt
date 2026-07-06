@@ -325,4 +325,86 @@ interface EventsApi {
     /** Aus den Rezepten berechnete Einkaufsliste. */
     @GET("events/{id}/shopping-list")
     suspend fun getShoppingList(@Path("id") id: String): Response<ShoppingList>
+
+    // =====================================================================
+    // Organisator-Notizen — pro Event beliebig viele Notizen mit Text und/oder
+    // beliebig vielen Anhaengen (Bilder UND Dokumente).
+    // =====================================================================
+
+    /**
+     * Ruft alle Organisator-Notizen eines Events ab (neueste zuerst).
+     *
+     * @param id Event-ID.
+     * @return Response<List<OrganizerNote>> — je Notiz Text, Ersteller, Datum und
+     *         die Anhang-Metadaten (ohne Binaerinhalt).
+     */
+    @GET("events/{id}/organizer-notes")
+    suspend fun getOrganizerNotes(@Path("id") id: String): Response<List<OrganizerNote>>
+
+    /**
+     * Erstellt eine neue Organisator-Notiz.
+     *
+     * Body: { content?, attachments?:[{ filename, content_type, data(base64) }] }.
+     * Mindestens content ODER ein Anhang muss vorhanden sein. Der Standard-Gson
+     * laesst null-Felder weg, sodass reine Text- bzw. reine Anhang-Notizen korrekt
+     * serialisiert werden.
+     *
+     * @param id Event-ID.
+     * @param body Die Notizdaten (Text und/oder Anhaenge als Base64).
+     * @return Response<OrganizerNote> — bei Erfolg (201) die neu erstellte Notiz.
+     */
+    @POST("events/{id}/organizer-notes")
+    suspend fun createOrganizerNote(
+        @Path("id") id: String,
+        @Body body: CreateOrganizerNoteRequest
+    ): Response<OrganizerNote>
+
+    /**
+     * Loescht eine ganze Organisator-Notiz (inkl. aller Anhaenge).
+     *
+     * @param id Event-ID.
+     * @param noteId ID der zu loeschenden Notiz.
+     * @return Response<Unit> — Body { success:true } wird nicht ausgewertet, nur
+     *         der HTTP-Status (analog zu deleteEvent/deleteShift).
+     */
+    @DELETE("events/{id}/organizer-notes/{noteId}")
+    suspend fun deleteOrganizerNote(
+        @Path("id") id: String,
+        @Path("noteId") noteId: String
+    ): Response<Unit>
+
+    /**
+     * Loescht einen einzelnen Anhang einer Organisator-Notiz.
+     *
+     * @param id Event-ID.
+     * @param noteId ID der Notiz.
+     * @param attId ID des zu loeschenden Anhangs.
+     * @return Response<Unit> — nur der HTTP-Status wird ausgewertet.
+     */
+    @DELETE("events/{id}/organizer-notes/{noteId}/attachments/{attId}")
+    suspend fun deleteOrganizerNoteAttachment(
+        @Path("id") id: String,
+        @Path("noteId") noteId: String,
+        @Path("attId") attId: String
+    ): Response<Unit>
+
+    /**
+     * Laedt den Binaerinhalt eines Notiz-Anhangs (Content-Type serverseitig gesetzt).
+     *
+     * Erfordert den Bearer-Token (wird vom AuthInterceptor automatisch angehaengt),
+     * weshalb der Inhalt NICHT ueber eine <img>-URL, sondern hierueber geladen wird.
+     * @Streaming verhindert, dass Retrofit die ganze Datei vorab in den Speicher laedt.
+     *
+     * @param id Event-ID.
+     * @param noteId ID der Notiz.
+     * @param attId ID des Anhangs.
+     * @return Response<ResponseBody> — die rohen Bytes des Anhangs.
+     */
+    @Streaming
+    @GET("events/{id}/organizer-notes/{noteId}/attachments/{attId}")
+    suspend fun getOrganizerNoteAttachment(
+        @Path("id") id: String,
+        @Path("noteId") noteId: String,
+        @Path("attId") attId: String
+    ): Response<ResponseBody>
 }

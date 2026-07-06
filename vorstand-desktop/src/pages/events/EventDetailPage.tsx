@@ -12,6 +12,7 @@ import {
   updateRegistration,
   notifyRegistrants,
 } from "@/lib/api/events";
+import { OrganizerNotes } from "./OrganizerNotes";
 import type {
   Event,
   Shift,
@@ -173,7 +174,9 @@ export function EventDetailPage() {
   } = useEventsStore();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"shifts" | "registrations">("shifts");
+  const [activeTab, setActiveTab] = useState<
+    "shifts" | "registrations" | "notes"
+  >("shifts");
   const [notice, setNotice] = useState<{
     type: "error" | "success";
     text: string;
@@ -711,6 +714,17 @@ export function EventDetailPage() {
             : ""}
           )
         </button>
+        <button
+          onClick={() => setActiveTab("notes")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+            activeTab === "notes"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Notizen
+        </button>
       </div>
 
       {/* Shifts Tab */}
@@ -973,6 +987,9 @@ export function EventDetailPage() {
           )}
         </div>
       )}
+
+      {/* Notizen Tab */}
+      {activeTab === "notes" && <OrganizerNotes eventId={event.id} />}
 
       {/* Angemeldete informieren Modal */}
       {notifyOpen && (

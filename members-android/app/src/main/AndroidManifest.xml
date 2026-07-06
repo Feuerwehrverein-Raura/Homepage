@@ -79,6 +79,13 @@
             android:exported="false"
             android:parentActivityName=".MainActivity" />
 
+        <!-- Organisator: Notizen (Text + Anhaenge) pro Event -->
+        <activity
+            android:name=".ui.organizer.OrganizerNotesActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- AppAuth: empfaengt OIDC-Redirect von Authentik -->
         <activity
             android:name="net.openid.appauth.RedirectUriReceiverActivity"

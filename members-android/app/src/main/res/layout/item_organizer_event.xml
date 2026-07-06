@@ -161,6 +161,20 @@
                     app:strokeColor="@color/primary" />
             </LinearLayout>
 
+            <!-- Notizen: eigener, gut sichtbarer Zugang pro Event. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/orgEventNotesBtn"
+                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Notizen"
+                android:textColor="@color/primary"
+                android:textSize="12sp"
+                app:icon="@drawable/ic_file"
+                app:iconTint="@color/primary"
+                app:strokeColor="@color/primary" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

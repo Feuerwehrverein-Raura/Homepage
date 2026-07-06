@@ -93,6 +93,12 @@ class EventRegistrationsFragment : Fragment() {
         // Alle Angemeldeten ueber eine Aenderung informieren
         binding.btnNotifyRegistrants.setOnClickListener { showNotifyRegistrantsDialog() }
 
+        // Organisator-Notizen zu diesem Event oeffnen (eigener Screen)
+        binding.btnOrganizerNotes.setOnClickListener {
+            val bundle = Bundle().apply { putString("eventId", eventId) }
+            findNavController().navigate(R.id.action_registrations_to_organizer_notes, bundle)
+        }
+
         // Initiales Laden des Events
         loadEvent()
     }

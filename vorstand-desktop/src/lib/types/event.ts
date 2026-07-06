@@ -123,3 +123,41 @@ export interface DirectRegistrations {
   approvedCount: number;
   pendingCount: number;
 }
+
+// ---------------------------------------------------------------------------
+// Organisator-Notizen (pro Anlass beliebig viele Notizen, jede mit optional
+// beliebig vielen Anhaengen — Bilder wie Dokumente).
+// ---------------------------------------------------------------------------
+
+/** Ein Anhang einer Organisator-Notiz (Metadaten; Binaerdaten via GET-Endpoint). */
+export interface OrganizerNoteAttachment {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+}
+
+/** Eine Organisator-Notiz. Backend liefert neueste zuerst. */
+export interface OrganizerNote {
+  id: string;
+  content: string | null;
+  created_by: string;
+  created_at: string;
+  attachments: OrganizerNoteAttachment[];
+}
+
+/**
+ * Anhang beim Anlegen einer Notiz. `data` ist der Datei-Inhalt als base64 —
+ * ein vollstaendiger `data:<mime>;base64,<...>`-URI wird vom Backend akzeptiert.
+ */
+export interface OrganizerNoteAttachmentInput {
+  filename: string;
+  content_type: string;
+  data: string;
+}
+
+/** Body fuer POST — mind. `content` ODER 1 Anhang muss gesetzt sein. */
+export interface OrganizerNoteCreate {
+  content?: string;
+  attachments?: OrganizerNoteAttachmentInput[];
+}
