@@ -659,7 +659,9 @@ Feuerwehrverein Raura`,
 // DEUTSCH: Sicherheits-Header, CORS, JSON-Body-Parser und Proxy-Vertrauen konfigurieren
 app.use(helmet());
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// 30mb: Organisator-Notizen koennen Base64-kodierte Bilder/Dokumente enthalten
+// (max 10 MB pro Datei -> ~13 MB Base64; mehrere Anhaenge pro Notiz moeglich).
+app.use(express.json({ limit: '30mb' }));
 app.set('trust proxy', true);
 
 // ===========================================
@@ -5359,7 +5361,204 @@ Feuerwehrverein Raura
     }
 });
 
+// ============================================================
+// Organisator-Notizen: beliebig viele Notizen pro Event, jeweils
+// mit Text und optionalen Bild-/Dokument-Anhaengen. Zugriff via
+// ensureOrganizerAccess (Organisator des Events ODER Vorstand/Admin).
+// Anhaenge liegen als Base64 in der DB (wie pdf_attachment); kein
+// Objekt-Storage. Download setzt den passenden Content-Type.
+// ============================================================
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10 MB pro Datei (roh)
+
+async function ensureOrganizerNotesSchema() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS event_organizer_notes (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+            content TEXT,
+            created_by VARCHAR(200),
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_org_notes_event ON event_organizer_notes(event_id)`);
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS event_organizer_note_attachments (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            note_id UUID NOT NULL REFERENCES event_organizer_notes(id) ON DELETE CASCADE,
+            filename VARCHAR(300),
+            content_type VARCHAR(120),
+            size INTEGER,
+            data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_org_note_att_note ON event_organizer_note_attachments(note_id)`);
+}
+
+// DEUTSCH: base64-Laenge grob in Bytes umrechnen (ignoriert Padding/Zeilenumbrueche).
+function base64Bytes(str) { return Math.floor((str || '').length * 3 / 4); }
+
+// DEUTSCH: Erlaubt data:-URIs (z.B. vom Web-Client) — trennt Header ab und leitet
+// ggf. den Content-Type daraus ab. Mutiert das Anhang-Objekt.
+function stripDataUri(a) {
+    if (a && typeof a.data === 'string' && a.data.startsWith('data:')) {
+        const comma = a.data.indexOf(',');
+        if (comma !== -1) {
+            const ct = a.data.substring(5, comma).split(';')[0];
+            if (!a.content_type && ct) a.content_type = ct;
+            a.data = a.data.substring(comma + 1);
+        }
+    }
+    return a;
+}
+
+// GET: alle Notizen eines Events (mit Anhang-Metadaten, OHNE die Base64-Blobs).
+app.get('/events/:id/organizer-notes', authenticateAny, async (req, res) => {
+    try {
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return;
+        const notes = await pool.query(
+            `SELECT id, content, created_by, created_at
+               FROM event_organizer_notes WHERE event_id = $1 ORDER BY created_at DESC`,
+            [event.id]
+        );
+        const noteIds = notes.rows.map(n => n.id);
+        const attByNote = {};
+        if (noteIds.length) {
+            const atts = await pool.query(
+                `SELECT id, note_id, filename, content_type, size
+                   FROM event_organizer_note_attachments
+                  WHERE note_id = ANY($1::uuid[]) ORDER BY created_at ASC`,
+                [noteIds]
+            );
+            for (const a of atts.rows) {
+                (attByNote[a.note_id] = attByNote[a.note_id] || []).push({
+                    id: a.id, filename: a.filename, content_type: a.content_type, size: a.size
+                });
+            }
+        }
+        res.json(notes.rows.map(n => ({ ...n, attachments: attByNote[n.id] || [] })));
+    } catch (error) {
+        console.error('GET organizer-notes error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST: neue Notiz anlegen. Body: { content?, attachments?: [{filename, content_type, data(base64)}] }.
+app.post('/events/:id/organizer-notes', authenticateAny, async (req, res) => {
+    const event = await ensureOrganizerAccess(req, res, req.params.id);
+    if (!event) return;
+    const { content } = req.body || {};
+    const atts = (Array.isArray(req.body?.attachments) ? req.body.attachments : []).map(stripDataUri);
+    const text = (content || '').toString();
+    if (!text.trim() && atts.length === 0) {
+        return res.status(400).json({ error: 'Notiz braucht Text oder mindestens einen Anhang' });
+    }
+    for (const a of atts) {
+        if (!a || typeof a.data !== 'string' || !a.data) {
+            return res.status(400).json({ error: 'Ungueltiger Anhang (data fehlt)' });
+        }
+        if (base64Bytes(a.data) > MAX_ATTACHMENT_BYTES) {
+            return res.status(413).json({ error: `Anhang "${a.filename || ''}" zu gross (max 10 MB)` });
+        }
+    }
+    const createdBy = req.user?.name || req.user?.email || 'Unbekannt';
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const noteRes = await client.query(
+            `INSERT INTO event_organizer_notes (event_id, content, created_by)
+             VALUES ($1, $2, $3) RETURNING id, content, created_by, created_at`,
+            [event.id, text.trim() || null, createdBy]
+        );
+        const note = noteRes.rows[0];
+        const savedAtts = [];
+        for (const a of atts) {
+            const attRes = await client.query(
+                `INSERT INTO event_organizer_note_attachments (note_id, filename, content_type, size, data)
+                 VALUES ($1, $2, $3, $4, $5) RETURNING id, filename, content_type, size`,
+                [note.id,
+                 (a.filename || 'datei').toString().substring(0, 300),
+                 (a.content_type || 'application/octet-stream').toString().substring(0, 120),
+                 base64Bytes(a.data), a.data]
+            );
+            savedAtts.push(attRes.rows[0]);
+        }
+        await client.query('COMMIT');
+        res.status(201).json({ ...note, attachments: savedAtts });
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('POST organizer-notes error:', error.message);
+        res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE: ganze Notiz loeschen (Anhaenge kaskadieren via FK).
+app.delete('/events/:id/organizer-notes/:noteId', authenticateAny, async (req, res) => {
+    try {
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return;
+        const del = await pool.query(
+            `DELETE FROM event_organizer_notes WHERE id = $1 AND event_id = $2 RETURNING id`,
+            [req.params.noteId, event.id]
+        );
+        if (del.rows.length === 0) return res.status(404).json({ error: 'Notiz nicht gefunden' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DELETE organizer-notes error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE: einzelnen Anhang einer Notiz loeschen.
+app.delete('/events/:id/organizer-notes/:noteId/attachments/:attId', authenticateAny, async (req, res) => {
+    try {
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return;
+        const del = await pool.query(
+            `DELETE FROM event_organizer_note_attachments a
+              USING event_organizer_notes n
+              WHERE a.id = $1 AND a.note_id = $2 AND a.note_id = n.id AND n.event_id = $3
+              RETURNING a.id`,
+            [req.params.attId, req.params.noteId, event.id]
+        );
+        if (del.rows.length === 0) return res.status(404).json({ error: 'Anhang nicht gefunden' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DELETE organizer-note attachment error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// GET: Anhang herunterladen (Bild/Dokument) — setzt Content-Type + Dateiname.
+// Auth per Bearer noetig; Clients laden das Bild via fetch->Blob (nicht <img src>).
+app.get('/events/:id/organizer-notes/:noteId/attachments/:attId', authenticateAny, async (req, res) => {
+    try {
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return;
+        const att = await pool.query(
+            `SELECT a.filename, a.content_type, a.data
+               FROM event_organizer_note_attachments a
+               JOIN event_organizer_notes n ON a.note_id = n.id
+              WHERE a.id = $1 AND a.note_id = $2 AND n.event_id = $3`,
+            [req.params.attId, req.params.noteId, event.id]
+        );
+        if (att.rows.length === 0) return res.status(404).json({ error: 'Anhang nicht gefunden' });
+        const row = att.rows[0];
+        const buffer = Buffer.from(row.data, 'base64');
+        res.setHeader('Content-Type', row.content_type || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `inline; filename="${(row.filename || 'datei').replace(/"/g, '')}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('GET organizer-note attachment error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Server starten auf konfiguriertem Port
 app.listen(PORT, () => {
     console.log(`API-Events running on port ${PORT}`);
+    ensureOrganizerNotesSchema()
+        .then(() => console.log('Organisator-Notizen-Schema bereit'))
+        .catch(e => console.error('ensureOrganizerNotesSchema failed:', e.message));
 });
