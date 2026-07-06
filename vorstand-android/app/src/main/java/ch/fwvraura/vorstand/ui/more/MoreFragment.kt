@@ -1,5 +1,6 @@
 package ch.fwvraura.vorstand.ui.more
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,6 +11,7 @@ import ch.fwvraura.vorstand.MainActivity
 import ch.fwvraura.vorstand.R
 import ch.fwvraura.vorstand.VorstandApp
 import ch.fwvraura.vorstand.databinding.FragmentMoreBinding
+import ch.fwvraura.vorstand.ui.dispatch.PushBroadcastActivity
 
 /**
  * MoreFragment - "Mehr"-Tab mit App-Informationen und Logout-Funktion.
@@ -72,6 +74,11 @@ class MoreFragment : Fragment() {
         // Post-Massenversand (Pingen)
         binding.cardPingen.setOnClickListener {
             findNavController().navigate(R.id.action_more_to_mass_pdf)
+        }
+
+        // Mitglieder per App benachrichtigen (Push-Broadcast an alle App-Nutzer)
+        binding.cardPushBroadcast.setOnClickListener {
+            startActivity(Intent(requireContext(), PushBroadcastActivity::class.java))
         }
 
         // Mitgliedsbeitraege

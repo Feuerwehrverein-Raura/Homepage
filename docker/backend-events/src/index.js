@@ -3746,13 +3746,20 @@ async function notifyEventRegistrants(eventId, payload, authHeader) {
     `, [eventId]);
 
     const seen = new Set();
-    let emailed = 0, posted = 0, skipped = 0;
+    let emailed = 0, posted = 0, skipped = 0, pushed = 0;
     const unreachable = [];
 
     for (const r of regs.rows) {
         const key = r.member_id || (r.guest_email || '').toLowerCase();
         if (!key || seen.has(key)) continue;
         seen.add(key);
+
+        // Zusaetzlich App-Push an Mitglieder (respektiert notification_preferences —
+        // Mitglieder ohne App / mit deaktiviertem 'event_update' bekommen keinen).
+        if (r.member_id) {
+            pushToMember(r.member_id, 'event_update', subj, String(message).trim(), { eventId }).catch(() => {});
+            pushed++;
+        }
 
         const name = r.member_id ? `${r.vorname || ''} ${r.nachname || ''}`.trim() : (r.guest_name || '');
         const email = r.guest_email || r.member_email || null;
@@ -3781,7 +3788,7 @@ async function notifyEventRegistrants(eventId, payload, authHeader) {
         }
     }
 
-    return { success: true, emailed, posted, skipped, unreachable };
+    return { success: true, emailed, posted, skipped, pushed, unreachable };
 }
 
 // Vorstand/Admin: Angemeldete ueber eine Aenderung informieren.
@@ -3807,6 +3814,32 @@ app.post('/events/:id/notify-registrants-as-organizer', authenticateAny, async (
         if (error && error.status) return res.status(error.status).json({ error: error.error });
         console.error('notify-registrants-as-organizer error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Vorstand/Admin — App-Push-Broadcast an alle Mitglieder. Kanal
+// 'general' (Mitglieder koennen ihn in der App-Einstellung abschalten). Erreicht
+// nur Mitglieder mit installierter App + erlaubten Benachrichtigungen; E-Mail/Post
+// bleiben die universellen Kanaele. Leitet an api-members /internal/push-broadcast.
+app.post('/push/broadcast', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { title, body } = req.body || {};
+        if (!title || !String(title).trim() || !body || !String(body).trim()) {
+            return res.status(400).json({ error: 'title und body sind erforderlich' });
+        }
+        const key = process.env.INTERNAL_API_KEY;
+        if (!key) return res.status(500).json({ error: 'INTERNAL_API_KEY nicht gesetzt' });
+        const membersUrl = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/push-broadcast';
+        const resp = await axios.post(membersUrl, {
+            notificationType: 'general',
+            title: String(title).trim(),
+            body: String(body).trim(),
+            data: {}
+        }, { headers: { 'X-Internal-Key': key }, timeout: 15000 });
+        res.json({ success: true, sent: resp.data?.sent ?? null });
+    } catch (error) {
+        console.error('POST /push/broadcast error:', error.message);
+        res.status(502).json({ error: 'Push-Broadcast fehlgeschlagen' });
     }
 });
 

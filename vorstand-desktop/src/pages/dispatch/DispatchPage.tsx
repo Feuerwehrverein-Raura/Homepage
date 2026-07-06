@@ -44,9 +44,18 @@ import {
   Eye,
   FileUp,
   Clock,
+  Smartphone,
 } from "lucide-react";
+import { AppPushTab } from "./AppPushTab";
 
-type Tab = "send" | "templates" | "pingen" | "masspdf" | "scheduled" | "log";
+type Tab =
+  | "send"
+  | "templates"
+  | "pingen"
+  | "masspdf"
+  | "scheduled"
+  | "apppush"
+  | "log";
 
 // Datei als base64 (ohne data:-Prefix) lesen — fuer den PDF-Brief-Versand.
 function readFileBase64(file: File): Promise<string> {
@@ -83,6 +92,7 @@ export function DispatchPage() {
     { key: "pingen", label: "Post (Pingen)", icon: Mail },
     { key: "masspdf", label: "Massen-PDF", icon: FileUp },
     { key: "scheduled", label: "Geplant", icon: Clock },
+    { key: "apppush", label: "App-Push", icon: Smartphone },
     { key: "log", label: "Verlauf", icon: RefreshCw },
   ];
 
@@ -114,6 +124,7 @@ export function DispatchPage() {
       {activeTab === "pingen" && <PingenTab />}
       {activeTab === "masspdf" && <MassPdfPage />}
       {activeTab === "scheduled" && <ScheduledJobsPage />}
+      {activeTab === "apppush" && <AppPushTab />}
       {activeTab === "log" && <LogTab />}
     </div>
   );

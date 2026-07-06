@@ -1295,6 +1295,11 @@
                             (<span class="dispatch-email-count-display">0</span> E-Mail, <span class="dispatch-post-count-display">0</span> Post)
                         </span>
                         <!-- Buttons -->
+                        <!-- App-Push: eigenständige Push-Benachrichtigung an Mitglieder mit installierter App (unabhängig von E-Mail/Post) -->
+                        <button id="push-broadcast-open-btn" onclick="openPushModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-1 text-sm" title="Push-Benachrichtigung an alle Mitglieder mit installierter App senden">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                            <span>App-Push</span>
+                        </button>
                         <button id="dispatch-preview-modal-btn" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-1 text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                             <span>Vorschau</span>
@@ -1547,6 +1552,44 @@
                         </div>
                         <div id="dispatch-preview-modal-content" class="p-6 flex justify-center">
                             <p class="text-gray-400 text-sm py-8">Lade Vorschau...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                     APP-PUSH-MODAL
+                     Sendet eine Push-Benachrichtigung (FCM, Kanal "general")
+                     an alle Mitglieder mit installierter App und aktivierten
+                     Benachrichtigungen. Unabhängig vom E-Mail-/Post-Versand.
+                     ============================================================ -->
+                <div id="push-modal" onclick="if(event.target===this)closePushModal()" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-lg max-w-lg w-full max-h-[95vh] overflow-y-auto shadow-xl">
+                        <div class="sticky top-0 bg-white border-b px-5 py-4 flex justify-between items-center rounded-t-lg z-10">
+                            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                                Mitglieder per App benachrichtigen
+                            </h3>
+                            <button type="button" onclick="closePushModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+                        </div>
+                        <div class="p-5 space-y-4">
+                            <p class="text-xs text-gray-600 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
+                                Erreicht nur Mitglieder mit installierter App und aktivierten Benachrichtigungen. E-Mail/Post laufen separat.
+                            </p>
+                            <div>
+                                <label for="push-title" class="block text-sm font-medium text-gray-700 mb-1">Titel</label>
+                                <input type="text" id="push-title" maxlength="100" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="z.B. Erinnerung: Übung am Samstag">
+                            </div>
+                            <div>
+                                <label for="push-body" class="block text-sm font-medium text-gray-700 mb-1">Nachricht</label>
+                                <textarea id="push-body" rows="5" maxlength="1000" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="Nachrichtentext..."></textarea>
+                            </div>
+                        </div>
+                        <div class="sticky bottom-0 bg-white border-t px-5 py-3 flex justify-end gap-2 rounded-b-lg">
+                            <button type="button" onclick="closePushModal()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Abbrechen</button>
+                            <button type="button" id="push-send-btn" onclick="sendPushBroadcast()" class="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1 text-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                                <span>Senden</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -11397,6 +11440,74 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         });
 
         function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+        // ============================================
+        // APP-PUSH (Push-Broadcast an Mitglieder mit App)
+        // ============================================
+
+        // Öffnet das App-Push-Modal und setzt die Eingabefelder zurück.
+        function openPushModal() {
+            document.getElementById('push-title').value = '';
+            document.getElementById('push-body').value = '';
+            document.getElementById('push-modal').classList.remove('hidden');
+            document.getElementById('push-title').focus();
+        }
+
+        // Schliesst das App-Push-Modal.
+        function closePushModal() {
+            document.getElementById('push-modal').classList.add('hidden');
+        }
+
+        // Sendet eine Push-Benachrichtigung (FCM) an alle Mitglieder mit
+        // installierter App und aktivierten Benachrichtigungen.
+        // Validiert Titel + Nachricht, POSTet an /push/broadcast (Vorstand-Auth),
+        // meldet das Ergebnis via Toast. Der Senden-Button ist während des
+        // Versands deaktiviert (verhindert Doppel-Versand).
+        async function sendPushBroadcast() {
+            const title = document.getElementById('push-title').value.trim();
+            const body = document.getElementById('push-body').value.trim();
+            if (!title || !body) {
+                showToast('Bitte Titel und Nachricht ausfüllen', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('push-send-btn');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.classList.add('opacity-60', 'cursor-not-allowed');
+            btn.innerHTML = '<span>Wird gesendet…</span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/push/broadcast`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ title, body })
+                });
+
+                if (!response.ok) {
+                    let msg = `Fehler ${response.status}`;
+                    try {
+                        const err = await response.json();
+                        if (err && (err.error || err.message)) msg = err.error || err.message;
+                    } catch (e) { /* keine JSON-Fehlermeldung */ }
+                    throw new Error(msg);
+                }
+
+                const data = await response.json();
+                const sent = (data && data.sent != null) ? data.sent : null;
+                showToast('Push gesendet' + (sent != null ? ` (${sent} Geräte)` : ''), 'success');
+                closePushModal();
+            } catch (error) {
+                showToast('Push fehlgeschlagen: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60', 'cursor-not-allowed');
+                btn.innerHTML = originalHtml;
+            }
+        }
 
         // ============================================
         // INITIALIZE

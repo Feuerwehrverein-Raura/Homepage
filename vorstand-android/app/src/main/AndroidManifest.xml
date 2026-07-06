@@ -35,6 +35,11 @@
             android:exported="false"
             android:screenOrientation="portrait" />
 
+        <activity
+            android:name=".ui.dispatch.PushBroadcastActivity"
+            android:exported="false"
+            android:label="Mitglieder per App benachrichtigen" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
