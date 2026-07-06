@@ -71,6 +71,18 @@
         <argument
             android:name="eventId"
             app:argType="string" />
+        <action
+            android:id="@+id/action_registrations_to_organizer_notes"
+            app:destination="@id/organizerNotesFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/organizerNotesFragment"
+        android:name="ch.fwvraura.vorstand.ui.events.OrganizerNotesFragment"
+        android:label="Organisator-Notizen">
+        <argument
+            android:name="eventId"
+            app:argType="string" />
     </fragment>
 
     <!-- Dispatch -->

@@ -134,6 +134,13 @@ class OrganizerDashboardFragment : Fragment() {
                         .putExtra("eventId", event.id)
                 )
             }
+            card.orgEventNotesBtn.setOnClickListener {
+                startActivity(
+                    Intent(requireContext(), OrganizerNotesActivity::class.java)
+                        .putExtra(OrganizerNotesActivity.EXTRA_EVENT_ID, event.id)
+                        .putExtra(OrganizerNotesActivity.EXTRA_EVENT_TITLE, event.title)
+                )
+            }
         } else {
             card.orgEventAddBtn.visibility = View.GONE
             card.orgEventActionsContainer.visibility = View.GONE

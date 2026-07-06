@@ -1,9 +1,11 @@
 package ch.fwvraura.members.data.api
 
+import ch.fwvraura.members.data.model.CreateOrganizerNoteRequest
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.data.model.EventRegistration
 import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.data.model.NotifyResult
+import ch.fwvraura.members.data.model.OrganizerNote
 import ch.fwvraura.members.data.model.PublicRegistrationRequest
 import ch.fwvraura.members.data.model.PublicRegistrationResponse
 import ch.fwvraura.members.data.model.Recipe
@@ -172,6 +174,50 @@ interface EventsApi {
 
     @GET("events/{id}/shopping-list")
     suspend fun getShoppingList(@Path("id") id: String): Response<ShoppingList>
+
+    // ============================================================
+    // Organisator-Notizen (pro Event; Zugriff fuer Vorstand ODER Organisator,
+    // serverseitig geprueft). Jede Notiz hat Text und/oder Anhaenge.
+    // ============================================================
+
+    /** Alle Notizen eines Events (neueste zuerst). */
+    @GET("events/{id}/organizer-notes")
+    suspend fun getOrganizerNotes(@Path("id") eventId: String): Response<List<OrganizerNote>>
+
+    /** Neue Notiz anlegen (Text und/oder Anhaenge als Base64.NO_WRAP). */
+    @POST("events/{id}/organizer-notes")
+    suspend fun createOrganizerNote(
+        @Path("id") eventId: String,
+        @Body body: CreateOrganizerNoteRequest
+    ): Response<OrganizerNote>
+
+    /** Eine ganze Notiz (samt Anhaengen) loeschen. */
+    @DELETE("events/{eventId}/organizer-notes/{noteId}")
+    suspend fun deleteOrganizerNote(
+        @Path("eventId") eventId: String,
+        @Path("noteId") noteId: String
+    ): Response<Unit>
+
+    /** Einen einzelnen Anhang einer Notiz loeschen. */
+    @DELETE("events/{eventId}/organizer-notes/{noteId}/attachments/{attId}")
+    suspend fun deleteOrganizerNoteAttachment(
+        @Path("eventId") eventId: String,
+        @Path("noteId") noteId: String,
+        @Path("attId") attId: String
+    ): Response<Unit>
+
+    /**
+     * Die Bytes eines Anhangs authentifiziert laden (Content-Type wird
+     * serverseitig gesetzt). Ueber @Streaming, damit der Bearer-Token via
+     * Interceptor mitgeht — NICHT ueber eine <img>-URL.
+     */
+    @Streaming
+    @GET("events/{eventId}/organizer-notes/{noteId}/attachments/{attId}")
+    suspend fun getOrganizerNoteAttachment(
+        @Path("eventId") eventId: String,
+        @Path("noteId") noteId: String,
+        @Path("attId") attId: String
+    ): Response<ResponseBody>
 
     // ============================================================
     // PDFs (binaer). Endpunkte sind serverseitig oeffentlich lesbar.

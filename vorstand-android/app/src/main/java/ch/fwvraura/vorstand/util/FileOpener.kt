@@ -46,4 +46,40 @@ object FileOpener {
             false
         }
     }
+
+    /**
+     * Schreibt beliebige Datei-Bytes in eine Cache-Datei und oeffnet sie im
+     * passenden System-Viewer (Bilder, PDFs, Office-Dokumente, ...).
+     *
+     * Wird fuer Anhaenge von Organisator-Notizen verwendet: der Inhalt wird zuvor
+     * authentifiziert ueber die API geladen, hier in den Cache geschrieben und der
+     * Ziel-App per content:// URI (FileProvider) uebergeben.
+     *
+     * @param context Kontext (fuer cacheDir, FileProvider und startActivity).
+     * @param bytes Die rohen Datei-Bytes (z.B. aus ResponseBody.bytes()).
+     * @param filename Gewuenschter Dateiname (Sonderzeichen werden ersetzt).
+     * @param mimeType MIME-Type der Datei; bei leer werden alle Typen zugelassen.
+     * @return true bei Erfolg, false wenn keine App zum Oeffnen gefunden wurde.
+     */
+    fun openFile(context: Context, bytes: ByteArray, filename: String, mimeType: String?): Boolean {
+        val safeName = filename.ifBlank { "datei" }
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val file = File(context.cacheDir, safeName)
+        file.outputStream().use { it.write(bytes) }
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeType?.ifBlank { "*/*" } ?: "*/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return try {
+            context.startActivity(intent)
+            true
+        } catch (e: ActivityNotFoundException) {
+            false
+        }
+    }
 }

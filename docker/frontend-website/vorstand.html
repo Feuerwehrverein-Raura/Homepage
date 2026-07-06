@@ -2295,6 +2295,28 @@
                         <div id="no-registration-hint" class="md:col-span-2 border-t pt-4 mt-2 hidden">
                             <p class="text-sm text-gray-500 italic">Bei "Ausflug" ist keine Anmeldung erforderlich. Waehle "Ausflug mit Anmeldung" wenn eine Anmeldung benoetigt wird.</p>
                         </div>
+
+                        <!-- Organisator-Notizen: nur bei bestehenden Events. Eigene API,
+                             unabhaengig vom Formular-Submit (Buttons sind type="button"). -->
+                        <div id="organizer-notes-section" class="md:col-span-2 border-t pt-4 mt-2 hidden">
+                            <h4 class="font-medium text-gray-800 mb-1">Organisator-Notizen</h4>
+                            <p class="text-xs text-gray-500 mb-3">Interne Notizen mit optionalen Anhaengen (Bilder und Dokumente) zu diesem Event. Aenderungen werden sofort gespeichert.</p>
+                            <div id="organizer-notes-list" class="space-y-3 mb-4">
+                                <!-- Dynamisch befuellt via renderOrganizerNotes() -->
+                            </div>
+                            <div class="bg-gray-50 rounded-lg p-3 space-y-3">
+                                <textarea id="organizer-note-text" rows="3" placeholder="Neue Notiz schreiben..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"></textarea>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <input type="file" id="organizer-note-files" multiple class="hidden" onchange="document.getElementById('organizer-note-files-info').textContent = this.files.length ? this.files.length + ' Datei(en) ausgewaehlt' : ''">
+                                    <button type="button" onclick="document.getElementById('organizer-note-files').click()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm flex items-center gap-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                                        Anhaenge waehlen
+                                    </button>
+                                    <span id="organizer-note-files-info" class="text-sm text-gray-500"></span>
+                                    <button type="button" onclick="addOrganizerNote(document.getElementById('event-id').value)" class="ml-auto px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 text-sm">Notiz hinzufuegen</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="flex justify-between pt-4 border-t">
                         <button type="button" id="delete-event-btn" class="text-red-600 hover:text-red-700 font-medium hidden">Loeschen</button>
@@ -4937,6 +4959,9 @@
             document.getElementById('event-id').value = '';
             document.getElementById('event-shifts-container').innerHTML = '';
             document.getElementById('meal-options-container').innerHTML = '';
+            // Organisator-Notizen: bei neuen Events ausblenden (noch keine Event-ID vorhanden)
+            document.getElementById('organizer-notes-section').classList.add('hidden');
+            document.getElementById('organizer-notes-list').innerHTML = '';
             resetOrganizerCreateAccessWrapper();
             document.getElementById('event-organizer-name').value = '';
             document.getElementById('event-organizer-email').value = '';
@@ -5023,12 +5048,223 @@
                 // Felder je nach Kategorie aktualisieren
                 updateEventFormByCategory();
 
+                // Organisator-Notizen: Sektion einblenden, Eingaben zuruecksetzen und laden
+                document.getElementById('organizer-notes-section').classList.remove('hidden');
+                document.getElementById('organizer-note-text').value = '';
+                document.getElementById('organizer-note-files').value = '';
+                document.getElementById('organizer-note-files-info').textContent = '';
+                loadOrganizerNotes(event.id);
+
                 document.getElementById('delete-event-btn').classList.remove('hidden');
                 document.getElementById('event-modal').classList.remove('hidden');
             } catch (error) {
                 console.error('Error loading event:', error);
                 alert('Fehler beim Laden des Events');
             }
+        }
+
+        // ============================================================
+        // ORGANISATOR-NOTIZEN
+        // Pro Event beliebig viele interne Notizen mit optionalen
+        // Anhaengen (Bilder + Dokumente). Eigenes Events-Backend-API,
+        // unabhaengig vom Event-Formular. Anhaenge werden als data-URI
+        // (Base64) hochgeladen und beim Oeffnen per authentifiziertem
+        // fetch als Blob geladen (Bearer-Header noetig, daher NICHT als
+        // direkter <img src>).
+        // ============================================================
+        let organizerNotesEventId = null;   // aktuell im Modal geoeffnetes Event
+        let organizerNotesData = [];         // zuletzt geladene Notizen (fuer Anhang-Metadaten)
+
+        // Liest eine Datei als vollstaendige data-URI (data:<type>;base64,<...>).
+        // Das Backend akzeptiert die data-URI direkt als "data".
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Laedt alle Notizen eines Events und rendert sie (neueste zuerst vom Backend).
+        async function loadOrganizerNotes(eventId) {
+            if (!eventId) return;
+            organizerNotesEventId = eventId;
+            const list = document.getElementById('organizer-notes-list');
+            list.innerHTML = '<p class="text-sm text-gray-400">Notizen werden geladen...</p>';
+            try {
+                const response = await fetch(`${API_BASE}/events/${eventId}/organizer-notes`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const notes = await response.json();
+                organizerNotesData = Array.isArray(notes) ? notes : [];
+                renderOrganizerNotes(organizerNotesData);
+            } catch (error) {
+                console.error('Error loading organizer notes:', error);
+                list.innerHTML = '<p class="text-sm text-red-500">Fehler beim Laden der Notizen</p>';
+            }
+        }
+
+        // Rendert die Notizliste inkl. Anhang-Chips, Ersteller und Datum.
+        function renderOrganizerNotes(notes) {
+            const list = document.getElementById('organizer-notes-list');
+            const eventId = organizerNotesEventId;
+            if (!notes || notes.length === 0) {
+                list.innerHTML = '<p class="text-sm text-gray-400">Noch keine Notizen erfasst.</p>';
+                return;
+            }
+            list.innerHTML = notes.map(note => {
+                const created = note.created_at ? new Date(note.created_at).toLocaleString('de-CH') : '';
+                const author = note.created_by || 'Unbekannt';
+                const attachments = (note.attachments || []).map(att => {
+                    const isImage = (att.content_type || '').startsWith('image/');
+                    const icon = isImage ? '🖼️' : '📎';
+                    return `
+                        <span class="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-full pl-2 pr-1 py-0.5 text-xs">
+                            <button type="button" onclick="openOrganizerNoteAttachment('${eventId}', '${note.id}', '${att.id}')" class="inline-flex items-center gap-1 text-gray-700 hover:text-fire-600" title="${escapeHtml(att.filename)}">
+                                <span>${icon}</span><span class="max-w-[160px] truncate">${escapeHtml(att.filename)}</span>
+                            </button>
+                            <button type="button" onclick="deleteOrganizerNoteAttachment('${eventId}', '${note.id}', '${att.id}')" class="text-gray-400 hover:text-red-500 leading-none px-1" title="Anhang loeschen">&times;</button>
+                        </span>`;
+                }).join('');
+                const body = note.content
+                    ? `<div class="text-sm text-gray-800 whitespace-pre-wrap flex-1">${escapeHtml(note.content)}</div>`
+                    : `<div class="text-sm text-gray-400 italic flex-1">(nur Anhaenge)</div>`;
+                return `
+                    <div class="border border-gray-200 rounded-lg p-3">
+                        <div class="flex justify-between items-start gap-3">
+                            ${body}
+                            <button type="button" onclick="deleteOrganizerNote('${eventId}', '${note.id}')" class="text-red-500 hover:text-red-700 text-sm shrink-0" title="Notiz loeschen">Loeschen</button>
+                        </div>
+                        ${attachments ? `<div class="flex flex-wrap gap-2 mt-2">${attachments}</div>` : ''}
+                        <div class="text-xs text-gray-400 mt-2">${escapeHtml(author)}${created ? ' · ' + created : ''}</div>
+                    </div>`;
+            }).join('');
+        }
+
+        // Legt eine neue Notiz an (Text und/oder Anhaenge). Mind. Text ODER 1 Anhang.
+        // Anhaenge werden als data-URI (readAsDataURL) uebertragen.
+        async function addOrganizerNote(eventId) {
+            if (!eventId) { showToast('Event zuerst speichern', 'error'); return; }
+            const textEl = document.getElementById('organizer-note-text');
+            const filesEl = document.getElementById('organizer-note-files');
+            const infoEl = document.getElementById('organizer-note-files-info');
+            const content = textEl.value.trim();
+            const files = Array.from(filesEl.files || []);
+            if (!content && files.length === 0) {
+                showToast('Bitte Text eingeben oder mindestens einen Anhang waehlen', 'error');
+                return;
+            }
+            try {
+                const attachments = await Promise.all(files.map(async file => ({
+                    filename: file.name,
+                    content_type: file.type || 'application/octet-stream',
+                    data: await readFileAsDataURL(file)
+                })));
+                const payload = {};
+                if (content) payload.content = content;
+                if (attachments.length) payload.attachments = attachments;
+                const response = await fetch(`${API_BASE}/events/${eventId}/organizer-notes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                textEl.value = '';
+                filesEl.value = '';
+                infoEl.textContent = '';
+                showToast('Notiz gespeichert', 'success');
+                loadOrganizerNotes(eventId);
+            } catch (error) {
+                console.error('Error adding organizer note:', error);
+                showToast('Fehler beim Speichern der Notiz', 'error');
+            }
+        }
+
+        // Loescht eine ganze Notiz (inkl. aller Anhaenge).
+        async function deleteOrganizerNote(eventId, noteId) {
+            if (!confirm('Diese Notiz wirklich loeschen?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/events/${eventId}/organizer-notes/${noteId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                showToast('Notiz geloescht', 'success');
+                loadOrganizerNotes(eventId);
+            } catch (error) {
+                console.error('Error deleting organizer note:', error);
+                showToast('Fehler beim Loeschen der Notiz', 'error');
+            }
+        }
+
+        // Loescht einen einzelnen Anhang einer Notiz.
+        async function deleteOrganizerNoteAttachment(eventId, noteId, attId) {
+            if (!confirm('Diesen Anhang wirklich loeschen?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/events/${eventId}/organizer-notes/${noteId}/attachments/${attId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                showToast('Anhang geloescht', 'success');
+                loadOrganizerNotes(eventId);
+            } catch (error) {
+                console.error('Error deleting note attachment:', error);
+                showToast('Fehler beim Loeschen des Anhangs', 'error');
+            }
+        }
+
+        // Oeffnet einen Anhang: authentifiziertes fetch -> Blob -> Object-URL.
+        // Bilder inline als Lightbox-Vorschau, andere Dateien als Download.
+        async function openOrganizerNoteAttachment(eventId, noteId, attId) {
+            try {
+                const response = await fetch(`${API_BASE}/events/${eventId}/organizer-notes/${noteId}/attachments/${attId}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                // Metadaten (Dateiname/Typ) aus den geladenen Notizen ermitteln
+                let filename = 'anhang';
+                let contentType = blob.type || '';
+                const note = (organizerNotesData || []).find(n => String(n.id) === String(noteId));
+                const att = note && (note.attachments || []).find(a => String(a.id) === String(attId));
+                if (att) {
+                    filename = att.filename || filename;
+                    if (!contentType) contentType = att.content_type || '';
+                }
+                if (contentType.startsWith('image/')) {
+                    showOrganizerImageLightbox(url, filename);
+                } else {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    a.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 15000);
+                }
+            } catch (error) {
+                console.error('Error opening note attachment:', error);
+                showToast('Fehler beim Oeffnen des Anhangs', 'error');
+            }
+        }
+
+        // Einfache Bild-Lightbox als Overlay; schliesst per Klick und gibt die Object-URL frei.
+        function showOrganizerImageLightbox(url, filename) {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-80 z-[70] flex flex-col items-center justify-center p-4 cursor-zoom-out';
+            overlay.innerHTML = `
+                <img src="${url}" alt="${escapeHtml(filename)}" class="max-w-full max-h-[85vh] rounded shadow-2xl">
+                <div class="text-white text-sm mt-3">${escapeHtml(filename)} — zum Schliessen klicken</div>`;
+            overlay.addEventListener('click', () => {
+                overlay.remove();
+                URL.revokeObjectURL(url);
+            });
+            document.body.appendChild(overlay);
         }
 
         function loadEventShifts(shifts) {
