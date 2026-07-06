@@ -3873,6 +3873,49 @@ app.post('/push/broadcast', authenticateAny, requireRole('vorstand', 'admin'), a
     }
 });
 
+// DEUTSCH: Vorstand/Admin — gezielte Benachrichtigung an AUSGEWAEHLTE Mitglieder
+// (Push, optional zusaetzlich E-Mail). memberIds = Array von Mitglieds-UUIDs.
+app.post('/push/to-members', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const { memberIds, title, body, alsoEmail } = req.body || {};
+        if (!Array.isArray(memberIds) || memberIds.length === 0) {
+            return res.status(400).json({ error: 'memberIds (Array) erforderlich' });
+        }
+        if (!title || !String(title).trim() || !body || !String(body).trim()) {
+            return res.status(400).json({ error: 'title und body erforderlich' });
+        }
+        const t = String(title).trim(), b = String(body).trim();
+        const fwd = req.headers['authorization'] ? { headers: { Authorization: req.headers['authorization'] } } : {};
+        let members = [];
+        if (alsoEmail) {
+            const mr = await pool.query('SELECT id, vorname, email FROM members WHERE id = ANY($1::uuid[])', [memberIds]);
+            members = mr.rows;
+        }
+        const byId = new Map(members.map(m => [m.id, m]));
+        let pushed = 0, emailed = 0;
+        for (const id of memberIds) {
+            pushToMember(id, 'general', t, b, {}).catch(() => {});
+            pushed++;
+            if (alsoEmail) {
+                const m = byId.get(id);
+                if (m && m.email) {
+                    try {
+                        await axios.post(`${DISPATCH_API}/email/send`, {
+                            to: m.email, subject: t,
+                            body: `${m.vorname ? `Hallo ${m.vorname},` : 'Hallo,'}\n\n${b}\n\nFreundliche Gruesse\nFeuerwehrverein Raura`
+                        }, fwd);
+                        emailed++;
+                    } catch (e) { console.error('to-members E-Mail fehlgeschlagen:', e.message); }
+                }
+            }
+        }
+        res.json({ success: true, pushed, emailed });
+    } catch (error) {
+        console.error('POST /push/to-members error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Teilnehmerliste-PDF direkt per GET abrufen. Zeigt alle Registrierten nach Schicht sortiert
 app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
     try {

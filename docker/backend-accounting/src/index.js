@@ -514,48 +514,68 @@ app.patch('/membership-fees/payments/:id/unpay', async (req, res) => {
 // (Header X-Cron-Key = INTERNAL_API_KEY). Erinnert Mitglieder mit noch offenem
 // Beitrag: 7 Tage VOR Faelligkeit und 14 Tage danach. Jede Bedingung trifft pro
 // Mitglied/Jahr genau einmal, daher braucht es keine Dedup-Spalte. Push + E-Mail.
+// DEUTSCH: Kern der Zahlungserinnerung — faellige, offene Beitraege, pro Mitglied
+// hoechstens alle 30 Tage (last_reminder_at). Push + E-Mail. Von Cron UND
+// manuellem Vorstand-Trigger gemeinsam genutzt.
+async function runFeeReminders() {
+    const rows = await pool.query(`
+        SELECT p.id, p.member_id, p.year, p.amount, s.due_date,
+               m.vorname, m.email, m.zustellung_email
+        FROM membership_fee_payments p
+        JOIN membership_fee_settings s ON s.year = p.year
+        JOIN members m ON m.id = p.member_id
+        WHERE p.status <> 'bezahlt'
+          AND s.due_date IS NOT NULL
+          AND s.due_date <= CURRENT_DATE
+          AND (p.last_reminder_at IS NULL OR p.last_reminder_at <= CURRENT_DATE - INTERVAL '30 days')
+          AND COALESCE(m.status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
+    `);
+    let pushed = 0, emailed = 0;
+    for (const r of rows.rows) {
+        const amt = r.amount != null ? `CHF ${Number(r.amount).toFixed(2)}` : 'der Mitgliederbeitrag';
+        const dueStr = new Date(r.due_date).toLocaleDateString('de-CH');
+        const title = `Beitrag ${r.year} offen`;
+        const body = `Dein Mitgliederbeitrag ${r.year} (${amt}) ist seit ${dueStr} faellig und noch offen. Bitte begleiche ihn.`;
+        pushToMember(r.member_id, 'general', title, body, { year: String(r.year) }).catch(() => {});
+        pushed++;
+        if (r.email && r.zustellung_email) {
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: r.email,
+                    subject: title,
+                    body: `Hallo ${r.vorname || ''},\n\n${body}\n\nFreundliche Gruesse\nFeuerwehrverein Raura`
+                });
+                emailed++;
+            } catch (e) { console.error('Beitrags-Erinnerung E-Mail fehlgeschlagen:', e.message); }
+        }
+        // Zeitstempel setzen — die naechste Erinnerung kommt erst in 30 Tagen.
+        await pool.query('UPDATE membership_fee_payments SET last_reminder_at = CURRENT_DATE WHERE id = $1', [r.id]).catch(() => {});
+    }
+    logInfo('Beitrags-Erinnerungen versendet', { pushed, emailed, candidates: rows.rows.length });
+    return { pushed, emailed, candidates: rows.rows.length };
+}
+
+// Taeglich per Server-Cron (X-Cron-Key = INTERNAL_API_KEY).
 app.post('/membership-fees/cron-reminders', async (req, res) => {
     try {
         if (!INTERNAL_API_KEY || req.headers['x-cron-key'] !== INTERNAL_API_KEY) {
             return res.status(401).json({ error: 'unauthorized' });
         }
-        const rows = await pool.query(`
-            SELECT p.id, p.member_id, p.year, p.amount, s.due_date,
-                   m.vorname, m.email, m.zustellung_email
-            FROM membership_fee_payments p
-            JOIN membership_fee_settings s ON s.year = p.year
-            JOIN members m ON m.id = p.member_id
-            WHERE p.status <> 'bezahlt'
-              AND s.due_date IS NOT NULL
-              AND s.due_date <= CURRENT_DATE
-              AND (p.last_reminder_at IS NULL OR p.last_reminder_at <= CURRENT_DATE - INTERVAL '30 days')
-              AND COALESCE(m.status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
-        `);
-        let pushed = 0, emailed = 0;
-        for (const r of rows.rows) {
-            const amt = r.amount != null ? `CHF ${Number(r.amount).toFixed(2)}` : 'der Mitgliederbeitrag';
-            const dueStr = new Date(r.due_date).toLocaleDateString('de-CH');
-            const title = `Beitrag ${r.year} offen`;
-            const body = `Dein Mitgliederbeitrag ${r.year} (${amt}) ist seit ${dueStr} faellig und noch offen. Bitte begleiche ihn.`;
-            pushToMember(r.member_id, 'general', title, body, { year: String(r.year) }).catch(() => {});
-            pushed++;
-            if (r.email && r.zustellung_email) {
-                try {
-                    await axios.post(`${DISPATCH_API}/email/send`, {
-                        to: r.email,
-                        subject: title,
-                        body: `Hallo ${r.vorname || ''},\n\n${body}\n\nFreundliche Gruesse\nFeuerwehrverein Raura`
-                    });
-                    emailed++;
-                } catch (e) { console.error('Beitrags-Erinnerung E-Mail fehlgeschlagen:', e.message); }
-            }
-            // Zeitstempel setzen — die naechste Erinnerung kommt erst in 30 Tagen.
-            await pool.query('UPDATE membership_fee_payments SET last_reminder_at = CURRENT_DATE WHERE id = $1', [r.id]).catch(() => {});
-        }
-        logInfo('Beitrags-Erinnerungen versendet', { pushed, emailed, candidates: rows.rows.length });
-        res.json({ success: true, pushed, emailed, candidates: rows.rows.length });
+        const r = await runFeeReminders();
+        res.json({ success: true, ...r });
     } catch (error) {
         console.error('cron-reminders (fees) failed:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Manueller Vorstand-Trigger — gleiche Logik, respektiert ebenfalls den 30-Tage-Takt.
+app.post('/membership-fees/send-reminders', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const r = await runFeeReminders();
+        res.json({ success: true, ...r });
+    } catch (error) {
+        console.error('send-reminders (fees) failed:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
