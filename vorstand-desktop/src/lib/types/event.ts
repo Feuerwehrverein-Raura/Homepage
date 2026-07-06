@@ -15,6 +15,12 @@ export interface Event {
   cost: string | null;
   organizer_name: string | null;
   organizer_email: string | null;
+  /**
+   * Vor-/Nachname des vorschlagenden Mitglieds. Nur bei Event-Vorschlaegen
+   * (GET /events/proposals) gesetzt — der Vorschlagende ist Default-Organisator.
+   */
+  organizer_vorname?: string | null;
+  organizer_nachname?: string | null;
   /** Verknuepftes Organisator-Mitglied — verwaltet den Anlass in der Mitglieder-App. */
   organizer_id?: string | null;
   /** Organisator-Zugang (Event-Dashboard): Login-E-Mail, falls eingerichtet. */

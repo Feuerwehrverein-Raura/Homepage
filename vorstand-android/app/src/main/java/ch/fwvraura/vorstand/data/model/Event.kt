@@ -67,6 +67,19 @@ data class Event(
      */
     @SerializedName("organizer_id") val organizerId: String? = null,
 
+    /**
+     * Vorname des vorschlagenden Mitglieds. Nur bei Event-Vorschlaegen
+     * (GET /events/proposals) befuellt – dort ist der Vorschlagende der
+     * voreingestellte Organisator. Bei normalen Events null.
+     */
+    @SerializedName("organizer_vorname") val organizerVorname: String? = null,
+
+    /**
+     * Nachname des vorschlagenden Mitglieds. Nur bei Event-Vorschlaegen
+     * (GET /events/proposals) befuellt. Bei normalen Events null.
+     */
+    @SerializedName("organizer_nachname") val organizerNachname: String? = null,
+
     /** Organisator-Zugang (Event-Dashboard): Login-E-Mail, falls eingerichtet. */
     @SerializedName("event_email") val eventEmail: String? = null,
 

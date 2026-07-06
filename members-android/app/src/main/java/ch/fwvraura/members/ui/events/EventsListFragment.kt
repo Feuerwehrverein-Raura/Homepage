@@ -67,6 +67,11 @@ class EventsListFragment : Fragment() {
             override fun onTabReselected(tab: TabLayout.Tab) {}
         })
 
+        // Jedes Mitglied darf ein Event vorschlagen — oeffnet das Vorschlags-Formular.
+        binding.fabProposeEvent.setOnClickListener {
+            startActivity(Intent(requireContext(), ProposeEventActivity::class.java))
+        }
+
         setupCalendar()
         loadEvents()
     }
@@ -89,6 +94,8 @@ class EventsListFragment : Fragment() {
     private fun switchTab(position: Int) {
         binding.swipeRefresh.visibility = if (position == 0) View.VISIBLE else View.GONE
         binding.paneCalendar.visibility = if (position == 1) View.VISIBLE else View.GONE
+        // FAB nur im Listen-Tab zeigen, damit er den Kalender nicht ueberdeckt.
+        binding.fabProposeEvent.visibility = if (position == 0) View.VISIBLE else View.GONE
         if (position == 1 && !calendarLoaded) loadCalendarItems()
     }
 
@@ -172,7 +179,11 @@ class EventsListFragment : Fragment() {
             try {
                 val response = ApiModule.eventsApi.listCalendarItems()
                 if (response.isSuccessful) {
+                    // Versendete E-Mails/Briefe (Dispatch-Log) gehoeren nicht in den
+                    // Mitglieder-Kalender — als Vorstand sieht man sonst ALLE Dispatches.
+                    // Nur Anlaesse, Vorstandssitzungen und Beitraege behalten.
                     calendarItems = response.body().orEmpty()
+                        .filter { it.type != "email" && it.type != "letter" }
                     itemsByDay = bucketItemsByDay(calendarItems)
                     calendarLoaded = true
                     binding.calendarView.notifyCalendarChanged()
