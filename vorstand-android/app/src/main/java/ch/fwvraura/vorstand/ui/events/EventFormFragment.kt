@@ -20,6 +20,7 @@ import androidx.navigation.fragment.findNavController
 import ch.fwvraura.vorstand.R
 import ch.fwvraura.vorstand.data.api.ApiModule
 import ch.fwvraura.vorstand.data.model.EventCreate
+import ch.fwvraura.vorstand.data.model.Member
 import ch.fwvraura.vorstand.data.model.Shift
 import ch.fwvraura.vorstand.data.model.ShiftCreate
 import ch.fwvraura.vorstand.databinding.FragmentEventFormBinding
@@ -150,6 +151,20 @@ class EventFormFragment : Fragment() {
     /** Dateiname eines bereits am Event haengenden PDF-Aushangs (aus dem Edit-Prefill). */
     private var existingPdfFilename: String? = null
 
+    // ── Organisator-Zustand ──────────────────────────────────────────────────
+
+    /** Geladene Mitgliederliste, hinterlegt den Organisator-Dropdown (Mitglied-Modus). */
+    private var members: List<Member> = emptyList()
+
+    /** Aktuell als Organisator ausgewaehltes Mitglied (Mitglied-Modus), sonst null. */
+    private var selectedMember: Member? = null
+
+    /**
+     * Beim Edit-Prefill gemerkte organizer_id, falls die Mitgliederliste noch nicht
+     * geladen ist. Sobald die Mitglieder geladen sind, wird das Mitglied vorausgewaehlt.
+     */
+    private var pendingOrganizerId: String? = null
+
     /**
      * Activity-Result-Launcher fuer die PDF-Auswahl.
      *
@@ -208,6 +223,7 @@ class EventFormFragment : Fragment() {
         setupDropdowns()
         setupDatePickers()
         setupPdfSection()
+        setupOrganizerSection()
 
         // Im Edit-Modus: Bestehende Event-Daten vom Server laden und Felder befuellen
         if (isEdit) loadEvent()
@@ -420,6 +436,87 @@ class EventFormFragment : Fragment() {
         return name ?: "aushang.pdf"
     }
 
+    // ── Organisator ──────────────────────────────────────────────────────────
+
+    /**
+     * Richtet den Organisator-Bereich ein: Modus-Umschalter (Mitglied/Extern),
+     * laedt die Mitgliederliste in den Dropdown und setzt den Standardmodus.
+     *
+     * Standard ist der Mitglied-Modus (verknuepfter Organisator ohne Token-Zugang).
+     * Der Edit-Prefill (loadEvent) kann den Modus nachtraeglich auf Extern umstellen.
+     */
+    private fun setupOrganizerSection() {
+        // Bei Moduswechsel die Sichtbarkeit der beiden Bereiche anpassen
+        binding.organizerModeGroup.addOnButtonCheckedListener { _, _, isChecked ->
+            if (isChecked) updateOrganizerMode()
+        }
+
+        // Standardmodus: Mitglied (wird bei Edit ggf. ueberschrieben)
+        binding.organizerModeGroup.check(R.id.btnOrganizerMitglied)
+        updateOrganizerMode()
+
+        // Mitgliederliste asynchron laden und den Dropdown befuellen
+        loadMembers()
+    }
+
+    /**
+     * Blendet je nach gewaehltem Modus den Mitglied-Dropdown oder den Extern-Bereich
+     * (Name/E-Mail/Zugang) ein bzw. aus.
+     */
+    private fun updateOrganizerMode() {
+        val isMitglied = binding.organizerModeGroup.checkedButtonId == R.id.btnOrganizerMitglied
+        binding.layoutOrganizerMember.visibility = if (isMitglied) View.VISIBLE else View.GONE
+        binding.externOrganizerSection.visibility = if (isMitglied) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * Laedt alle Mitglieder vom Server und hinterlegt den Organisator-Dropdown mit
+     * "Vorname Nachname"-Labels. Bei Auswahl wird das Mitglied in [selectedMember]
+     * gemerkt. Wartet ein Edit-Prefill auf ein Mitglied ([pendingOrganizerId]),
+     * wird es nach dem Laden vorausgewaehlt.
+     */
+    private fun loadMembers() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = ApiModule.membersApi.getMembers()
+                if (response.isSuccessful) {
+                    members = response.body() ?: emptyList()
+                    val labels = members.map { "${it.vorname} ${it.nachname}" }
+                    val adapter = ArrayAdapter(
+                        requireContext(),
+                        android.R.layout.simple_dropdown_item_1line,
+                        labels
+                    )
+                    binding.inputOrganizerMember.setAdapter(adapter)
+                    // Bei Auswahl: ausgewaehltes Mitglied merken (fuer den Speichern-Schritt)
+                    binding.inputOrganizerMember.setOnItemClickListener { _, _, position, _ ->
+                        selectedMember = members[position]
+                    }
+                    // Falls der Edit-Prefill auf die Mitglieder gewartet hat: jetzt vorwaehlen
+                    pendingOrganizerId?.let { preselectOrganizerMember(it) }
+                }
+            } catch (_: Exception) { }
+        }
+    }
+
+    /**
+     * Waehlt das Mitglied mit der gegebenen ID im Organisator-Dropdown aus (Edit-Prefill).
+     * Setzt [selectedMember] und den Anzeigetext. Ist die Mitgliederliste noch nicht
+     * geladen, wird die ID in [pendingOrganizerId] gemerkt und die Auswahl nach dem
+     * Laden (loadMembers) nachgeholt.
+     */
+    private fun preselectOrganizerMember(organizerId: String) {
+        val member = members.firstOrNull { it.id == organizerId }
+        if (member != null) {
+            selectedMember = member
+            binding.inputOrganizerMember.setText("${member.vorname} ${member.nachname}", false)
+            pendingOrganizerId = null
+        } else {
+            // Mitglieder noch nicht geladen -> nach dem Laden nachholen
+            pendingOrganizerId = organizerId
+        }
+    }
+
     // ── Bestehendes Event laden ──────────────────────────────────────────────
 
     /**
@@ -458,6 +555,20 @@ class EventFormFragment : Fragment() {
                     binding.inputCost.setText(e.cost ?: "")
                     binding.inputOrganizerName.setText(e.organizerName ?: "")
                     binding.inputOrganizerEmail.setText(e.organizerEmail ?: "")
+
+                    // Organisator-Modus aus den Event-Daten ableiten:
+                    //  - organizer_id gesetzt   -> Mitglied-Modus, Mitglied vorwaehlen
+                    //    (wird nachgeholt, falls die Mitgliederliste noch nicht geladen ist)
+                    //  - sonst Name/E-Mail da    -> Extern-Modus mit den bestehenden Werten
+                    //  - sonst                   -> Standard (Mitglied) beibehalten
+                    if (e.organizerId != null) {
+                        binding.organizerModeGroup.check(R.id.btnOrganizerMitglied)
+                        preselectOrganizerMember(e.organizerId)
+                    } else if (!e.organizerEmail.isNullOrBlank() || !e.organizerName.isNullOrBlank()) {
+                        binding.organizerModeGroup.check(R.id.btnOrganizerExtern)
+                    }
+                    updateOrganizerMode()
+
                     binding.inputDescription.setText(e.description ?: "")
 
                     // Organisator-Zugang: existiert bereits, wenn eine Event-E-Mail gesetzt ist.
@@ -817,6 +928,29 @@ class EventFormFragment : Fragment() {
             null // Schichten werden beim Bearbeiten separat ueber die API verwaltet
         }
 
+        // Organisator je nach gewaehltem Modus bestimmen:
+        //  - Mitglied-Modus mit Auswahl -> organizer_id + Name/E-Mail aus dem Mitglied,
+        //    KEIN Token-Zugang (das Backend ueberspringt ihn bei gesetztem organizer_id).
+        //  - Extern-Modus (oder Mitglied-Modus ohne Auswahl) -> freie Eingabe aus den
+        //    Textfeldern; Organisator-Zugang nur, wenn der Schalter aktiv ist.
+        val isMitgliedMode = binding.organizerModeGroup.checkedButtonId == R.id.btnOrganizerMitglied
+        val selected = selectedMember
+        val organizerIdValue: String?
+        val organizerNameValue: String?
+        val organizerEmailValue: String?
+        val createAccessValue: Boolean?
+        if (isMitgliedMode && selected != null) {
+            organizerIdValue = selected.id
+            organizerNameValue = "${selected.vorname} ${selected.nachname}"
+            organizerEmailValue = selected.email
+            createAccessValue = null
+        } else {
+            organizerIdValue = null
+            organizerNameValue = binding.inputOrganizerName.text.toString().trim().ifBlank { null }
+            organizerEmailValue = binding.inputOrganizerEmail.text.toString().trim().ifBlank { null }
+            createAccessValue = if (binding.switchCreateAccess.isChecked) true else null
+        }
+
         // EventCreate-Objekt aus allen Formularfeldern zusammenbauen
         // Leere Felder werden als null gesetzt um sie nicht zu ueberschreiben
         val event = EventCreate(
@@ -831,14 +965,16 @@ class EventFormFragment : Fragment() {
             endDate = endIso,
             maxParticipants = if (maxParticipantsText.isNotBlank()) maxParticipantsText.toIntOrNull() else null,
             cost = binding.inputCost.text.toString().trim().ifBlank { null },
-            organizerName = binding.inputOrganizerName.text.toString().trim().ifBlank { null },
-            organizerEmail = binding.inputOrganizerEmail.text.toString().trim().ifBlank { null },
+            organizerName = organizerNameValue,
+            organizerEmail = organizerEmailValue,
+            organizerId = organizerIdValue,
             description = binding.inputDescription.text.toString().trim().ifBlank { null },
             // registration_required aus der Kategorie ableiten (wie im Web/Desktop)
             registrationRequired = regRequiredCategories.contains(selectedCategory),
             mealOptions = mealOptions,
-            // Organisator-Zugang nur anfordern, wenn der Schalter aktiv ist (sonst weglassen)
-            createAccess = if (binding.switchCreateAccess.isChecked) true else null,
+            // Organisator-Zugang: im Mitglied-Modus null (Backend ueberspringt ihn),
+            // im Extern-Modus je nach Schalter
+            createAccess = createAccessValue,
             pdfAttachment = pdfAttachmentValue,
             pdfFilename = pdfFilenameValue,
             shifts = newShifts
@@ -911,6 +1047,11 @@ class EventFormFragment : Fragment() {
         if (removePdf && existingPdfFilename != null) {
             keepNulls += "pdf_attachment"
             keepNulls += "pdf_filename"
+        }
+        // Im Extern-Modus organizer_id bewusst als null senden, damit ein zuvor
+        // verknuepftes Mitglied entkoppelt wird (analog meal_options ausserhalb GV).
+        if (binding.organizerModeGroup.checkedButtonId != R.id.btnOrganizerMitglied) {
+            keepNulls += "organizer_id"
         }
         obj.entrySet()
             .filter { it.value.isJsonNull && it.key !in keepNulls }

@@ -15,6 +15,8 @@ export interface Event {
   cost: string | null;
   organizer_name: string | null;
   organizer_email: string | null;
+  /** Verknuepftes Organisator-Mitglied — verwaltet den Anlass in der Mitglieder-App. */
+  organizer_id?: string | null;
   /** Organisator-Zugang (Event-Dashboard): Login-E-Mail, falls eingerichtet. */
   event_email?: string | null;
   /** Menue-Optionen fuer GV-Events (Anmeldung mit Essenswahl). */
@@ -42,6 +44,12 @@ export interface EventCreate {
   cost?: string | null;
   organizer_name?: string | null;
   organizer_email?: string | null;
+  /**
+   * Organisator ist ein verknuepftes Mitglied (Member.id). Ist es gesetzt,
+   * ueberspringt das Backend den separaten Token-Zugang — das Mitglied
+   * verwaltet den Anlass direkt in der Mitglieder-App.
+   */
+  organizer_id?: string | null;
   slug?: string | null;
   /** Menue-Optionen fuer GV-Events. */
   meal_options?: string[] | null;
