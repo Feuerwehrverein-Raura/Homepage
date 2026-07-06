@@ -86,7 +86,7 @@ class OrganizerNotesFragment : Fragment() {
     private var attachmentsLabel: TextView? = null
 
     /**
-     * Datei-Picker fuer Anhaenge (Bilder UND Dokumente, MIME "*/*").
+     * Datei-Picker fuer Anhaenge (Bilder UND Dokumente, alle MIME-Typen).
      *
      * Muss als Fragment-Property registriert werden (vor STARTED), damit keine
      * IllegalStateException auftritt – gleiches Muster wie in EventFormFragment.
