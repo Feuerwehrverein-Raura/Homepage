@@ -175,6 +175,20 @@
                 app:iconTint="@color/primary"
                 app:strokeColor="@color/primary" />
 
+            <!-- Rezepte & Material: verknuepfte Rezepte + Materialien, Lager-Abgleich. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/orgEventMaterialsBtn"
+                style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Rezepte &amp; Material"
+                android:textColor="@color/primary"
+                android:textSize="12sp"
+                app:icon="@drawable/ic_event"
+                app:iconTint="@color/primary"
+                app:strokeColor="@color/primary" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

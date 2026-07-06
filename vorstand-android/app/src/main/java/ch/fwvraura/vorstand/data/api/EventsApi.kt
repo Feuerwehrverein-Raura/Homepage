@@ -327,6 +327,64 @@ interface EventsApi {
     suspend fun getShoppingList(@Path("id") id: String): Response<ShoppingList>
 
     // =====================================================================
+    // Rezepte & Material — editierbares Modul im Event-Detail
+    // (EventMaterialsFragment). Rezepte + manuelle Materialien am Event
+    // anwaehlen; die Einkaufsliste (shopping-list) rechnet daraus, was fehlt.
+    // =====================================================================
+
+    /**
+     * Mit dem Event verknuepfte Rezepte inkl. Rezept-ID und Portionen.
+     * Gleiche URL wie getRecipes(), aber mit vollem Modell (recipe_id, servings)
+     * fuer die Bearbeitung.
+     */
+    @GET("events/{id}/recipes")
+    suspend fun getLinkedRecipes(@Path("id") id: String): Response<List<LinkedRecipe>>
+
+    /** Alle waehlbaren Rezepte aus dem Lager (zum Verknuepfen). */
+    @GET("events/{id}/available-recipes")
+    suspend fun getAvailableRecipes(@Path("id") id: String): Response<List<AvailableRecipe>>
+
+    /** Alle waehlbaren Materialien aus dem Lager (fuer manuelle Positionen). */
+    @GET("events/{id}/available-items")
+    suspend fun getAvailableItems(@Path("id") id: String): Response<List<AvailableItem>>
+
+    /** Verknuepft ein Rezept mit dem Event. Body: {recipe_id, servings}. */
+    @POST("events/{id}/recipes")
+    suspend fun addRecipe(
+        @Path("id") id: String,
+        @Body body: LinkRecipeRequest
+    ): Response<Unit>
+
+    /** Aendert die Portionen eines verknuepften Rezepts. Body: {servings}. */
+    @PUT("events/{id}/recipes/{recipeId}")
+    suspend fun updateRecipeServings(
+        @Path("id") id: String,
+        @Path("recipeId") recipeId: String,
+        @Body body: UpdateServingsRequest
+    ): Response<Unit>
+
+    /** Entfernt ein verknuepftes Rezept vom Event. */
+    @DELETE("events/{id}/recipes/{recipeId}")
+    suspend fun deleteRecipe(
+        @Path("id") id: String,
+        @Path("recipeId") recipeId: String
+    ): Response<Unit>
+
+    /** Fuegt ein manuelles Material hinzu. Body: {item_id, quantity}. */
+    @POST("events/{id}/manual-items")
+    suspend fun addManualItem(
+        @Path("id") id: String,
+        @Body body: AddManualItemRequest
+    ): Response<Unit>
+
+    /** Entfernt ein manuelles Material vom Event. */
+    @DELETE("events/{id}/manual-items/{itemId}")
+    suspend fun deleteManualItem(
+        @Path("id") id: String,
+        @Path("itemId") itemId: String
+    ): Response<Unit>
+
+    // =====================================================================
     // Organisator-Notizen — pro Event beliebig viele Notizen mit Text und/oder
     // beliebig vielen Anhaengen (Bilder UND Dokumente).
     // =====================================================================

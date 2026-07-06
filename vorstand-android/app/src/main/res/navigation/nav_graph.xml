@@ -74,12 +74,24 @@
         <action
             android:id="@+id/action_registrations_to_organizer_notes"
             app:destination="@id/organizerNotesFragment" />
+        <action
+            android:id="@+id/action_registrations_to_event_materials"
+            app:destination="@id/eventMaterialsFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/organizerNotesFragment"
         android:name="ch.fwvraura.vorstand.ui.events.OrganizerNotesFragment"
         android:label="Organisator-Notizen">
+        <argument
+            android:name="eventId"
+            app:argType="string" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/eventMaterialsFragment"
+        android:name="ch.fwvraura.vorstand.ui.events.EventMaterialsFragment"
+        android:label="Rezepte &amp; Material">
         <argument
             android:name="eventId"
             app:argType="string" />

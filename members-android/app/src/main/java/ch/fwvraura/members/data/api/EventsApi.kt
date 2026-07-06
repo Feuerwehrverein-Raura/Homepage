@@ -1,8 +1,13 @@
 package ch.fwvraura.members.data.api
 
+import ch.fwvraura.members.data.model.AddManualItemRequest
+import ch.fwvraura.members.data.model.AvailableItem
+import ch.fwvraura.members.data.model.AvailableRecipe
 import ch.fwvraura.members.data.model.CreateOrganizerNoteRequest
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.data.model.EventRegistration
+import ch.fwvraura.members.data.model.LinkRecipeRequest
+import ch.fwvraura.members.data.model.LinkedRecipe
 import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.data.model.NotifyResult
 import ch.fwvraura.members.data.model.OrganizerNote
@@ -10,6 +15,7 @@ import ch.fwvraura.members.data.model.PublicRegistrationRequest
 import ch.fwvraura.members.data.model.PublicRegistrationResponse
 import ch.fwvraura.members.data.model.Recipe
 import ch.fwvraura.members.data.model.ShoppingList
+import ch.fwvraura.members.data.model.UpdateServingsRequest
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
@@ -174,6 +180,59 @@ interface EventsApi {
 
     @GET("events/{id}/shopping-list")
     suspend fun getShoppingList(@Path("id") id: String): Response<ShoppingList>
+
+    // ============================================================
+    // Rezepte & Material — editierbar (Vorstand ODER Organisator des Events,
+    // serverseitig via requireEventRecipeAccess geprueft). Proxy zur Inventar-API.
+    // ============================================================
+
+    /** Mit dem Event verknuepfte Rezepte (ausfuehrlich: id, servings, ...). */
+    @GET("events/{id}/recipes")
+    suspend fun getLinkedRecipes(@Path("id") id: String): Response<List<LinkedRecipe>>
+
+    /** Alle auswaehlbaren Rezepte. */
+    @GET("events/{id}/available-recipes")
+    suspend fun getAvailableRecipes(@Path("id") id: String): Response<List<AvailableRecipe>>
+
+    /** Alle auswaehlbaren Materialien. */
+    @GET("events/{id}/available-items")
+    suspend fun getAvailableItems(@Path("id") id: String): Response<List<AvailableItem>>
+
+    /** Rezept mit dem Event verknuepfen (Upsert von Portionen). */
+    @POST("events/{id}/recipes")
+    suspend fun linkRecipe(
+        @Path("id") id: String,
+        @Body body: LinkRecipeRequest
+    ): Response<Unit>
+
+    /** Portionen einer Verknuepfung aendern. */
+    @PUT("events/{id}/recipes/{recipeId}")
+    suspend fun updateRecipeServings(
+        @Path("id") id: String,
+        @Path("recipeId") recipeId: Int,
+        @Body body: UpdateServingsRequest
+    ): Response<Unit>
+
+    /** Verknuepfung loesen. */
+    @DELETE("events/{id}/recipes/{recipeId}")
+    suspend fun unlinkRecipe(
+        @Path("id") id: String,
+        @Path("recipeId") recipeId: Int
+    ): Response<Unit>
+
+    /** Manuelle Material-Position hinzufuegen (Upsert von Menge). */
+    @POST("events/{id}/manual-items")
+    suspend fun addManualItem(
+        @Path("id") id: String,
+        @Body body: AddManualItemRequest
+    ): Response<Unit>
+
+    /** Manuelle Material-Position entfernen. */
+    @DELETE("events/{id}/manual-items/{itemId}")
+    suspend fun removeManualItem(
+        @Path("id") id: String,
+        @Path("itemId") itemId: Int
+    ): Response<Unit>
 
     // ============================================================
     // Organisator-Notizen (pro Event; Zugriff fuer Vorstand ODER Organisator,

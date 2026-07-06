@@ -13,6 +13,7 @@ import {
   notifyRegistrants,
 } from "@/lib/api/events";
 import { OrganizerNotes } from "./OrganizerNotes";
+import { EventMaterials } from "./EventMaterials";
 import type {
   Event,
   Shift,
@@ -175,7 +176,7 @@ export function EventDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "shifts" | "registrations" | "notes"
+    "shifts" | "registrations" | "materials" | "notes"
   >("shifts");
   const [notice, setNotice] = useState<{
     type: "error" | "success";
@@ -715,6 +716,17 @@ export function EventDetailPage() {
           )
         </button>
         <button
+          onClick={() => setActiveTab("materials")}
+          className={cn(
+            "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+            activeTab === "materials"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Rezepte &amp; Material
+        </button>
+        <button
           onClick={() => setActiveTab("notes")}
           className={cn(
             "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
@@ -987,6 +999,9 @@ export function EventDetailPage() {
           )}
         </div>
       )}
+
+      {/* Rezepte & Material Tab */}
+      {activeTab === "materials" && <EventMaterials eventId={event.id} />}
 
       {/* Notizen Tab */}
       {activeTab === "notes" && <OrganizerNotes eventId={event.id} />}

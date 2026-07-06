@@ -77,10 +77,20 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:layout_marginBottom="8dp"
                     android:text="Organisator-Notizen"
                     android:textSize="13sp"
                     app:icon="@drawable/ic_note" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEventMaterials"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="Rezepte &amp; Material"
+                    android:textSize="13sp"
+                    app:icon="@drawable/ic_link" />
 
                 <!-- Rezepte & Einkaufsliste (read-only Spiegelung des Web-Rezeptmoduls).
                      Nur sichtbar, wenn dem Event Rezepte verknuepft sind; sonst gone. -->
