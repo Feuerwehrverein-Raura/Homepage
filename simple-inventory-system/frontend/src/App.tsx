@@ -218,6 +218,9 @@ function App() {
   const [lookupResult, setLookupResult] = useState<any | null>(null); // External barcode lookup result
   const [prefillData, setPrefillData] = useState<any | null>(null); // Prefill data for new item form
   const [publicItemCode, setPublicItemCode] = useState<string | null>(null); // For public QR code scans
+  const [assignCode, setAssignCode] = useState<string | null>(null); // Gescannter Code, der einem bestehenden Artikel zugeordnet werden soll
+  const [assignSearch, setAssignSearch] = useState(''); // Suchtext im Zuordnen-Picker
+  const [assignBusy, setAssignBusy] = useState(false); // Zuordnung läuft
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -502,6 +505,39 @@ function App() {
     }
   };
 
+  // Gescannten Barcode einem bestehenden Artikel zuordnen (statt Duplikat anlegen)
+  const assignBarcodeToItem = async (item: Item, code: string) => {
+    if (!token) {
+      alert('Bitte zuerst einloggen');
+      return;
+    }
+    setAssignBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/items/${item.id}/barcode`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ ean_code: code })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAssignCode(null);
+        setAssignSearch('');
+        setLookupResult(null);
+        setScanResult(data); // Artikel mit Eingang/Ausgang-Buttons anzeigen
+        fetchItems();
+      } else {
+        alert(data.error || 'Zuordnen fehlgeschlagen');
+      }
+    } catch (error) {
+      alert('Zuordnen fehlgeschlagen');
+    } finally {
+      setAssignBusy(false);
+    }
+  };
+
   // Render public item view if accessed via /item/:code URL
   if (publicItemCode) {
     return (
@@ -776,6 +812,12 @@ function App() {
                     >
                       + Artikel anlegen
                     </button>
+                    <button
+                      onClick={() => { setAssignSearch(''); setAssignCode(lookupResult.product?.ean_code || lookupResult.ean_code || ''); }}
+                      className="w-full mt-3 bg-white border-2 border-green-600 text-green-700 hover:bg-green-50 py-3 rounded-lg font-semibold touch-manipulation"
+                    >
+                      🔗 Bestehendem Artikel zuordnen
+                    </button>
                   </>
                 ) : (
                   <div className="text-center">
@@ -798,6 +840,12 @@ function App() {
                     >
                       Manuell anlegen
                     </button>
+                    <button
+                      onClick={() => { setAssignSearch(''); setAssignCode(lookupResult.ean_code || ''); }}
+                      className="w-full bg-white border-2 border-blue-600 text-blue-700 hover:bg-blue-50 py-3 rounded-lg font-semibold touch-manipulation"
+                    >
+                      🔗 Bestehendem Artikel zuordnen
+                    </button>
                   </div>
                 )}
 
@@ -807,6 +855,66 @@ function App() {
                 >
                   Nächsten scannen
                 </button>
+              </div>
+            )}
+
+            {/* Zuordnen-Picker: gescannten Barcode einem bestehenden Artikel zuweisen */}
+            {assignCode !== null && (
+              <div
+                className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4"
+                onClick={() => { if (!assignBusy) { setAssignCode(null); setAssignSearch(''); } }}
+              >
+                <div
+                  className="bg-white rounded-t-2xl sm:rounded-lg w-full sm:max-w-md max-h-[85vh] flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-4 border-b">
+                    <h2 className="text-lg font-semibold">Barcode zuordnen</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Code <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">{assignCode}</span> einem bestehenden Artikel zuweisen:
+                    </p>
+                    <input
+                      autoFocus
+                      value={assignSearch}
+                      onChange={(e) => setAssignSearch(e.target.value)}
+                      placeholder="Artikel suchen…"
+                      className="mt-3 w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="overflow-y-auto flex-1">
+                    {items
+                      .filter((i) => i.name.toLowerCase().includes(assignSearch.toLowerCase()))
+                      .slice(0, 50)
+                      .map((i) => (
+                        <button
+                          key={i.id}
+                          disabled={assignBusy}
+                          onClick={() => assignBarcodeToItem(i, assignCode)}
+                          className="w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-50 touch-manipulation"
+                        >
+                          <div className="font-medium">{i.name}</div>
+                          <div className="text-xs text-gray-500">
+                            {i.category_name || 'ohne Kategorie'} · Bestand {i.quantity} {i.unit}
+                            {i.ean_code && (
+                              <span className="text-orange-600"> · hat bereits EAN {i.ean_code} (wird ersetzt)</span>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    {items.filter((i) => i.name.toLowerCase().includes(assignSearch.toLowerCase())).length === 0 && (
+                      <p className="p-4 text-sm text-gray-400">Kein Artikel gefunden.</p>
+                    )}
+                  </div>
+                  <div className="p-3 border-t">
+                    <button
+                      disabled={assignBusy}
+                      onClick={() => { setAssignCode(null); setAssignSearch(''); }}
+                      className="w-full bg-gray-200 hover:bg-gray-300 py-3 rounded-lg touch-manipulation disabled:opacity-50"
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

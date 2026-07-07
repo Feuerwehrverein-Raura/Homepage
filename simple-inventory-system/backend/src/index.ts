@@ -1661,6 +1661,45 @@ app.get('/api/items/barcode/:code', async (req, res) => {
   }
 });
 
+// Einen gescannten (GS1/EAN) Barcode einem BESTEHENDEN Artikel zuordnen,
+// statt einen neuen Artikel anzulegen. Setzt nur ean_code (keine anderen Felder).
+app.patch('/api/items/:id/barcode', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const code = (req.body?.ean_code ?? '').toString().trim();
+    if (!code) {
+      return res.status(400).json({ error: 'ean_code erforderlich' });
+    }
+
+    // Gehört der Code bereits einem ANDEREN Artikel? -> nicht überschreiben
+    const dup = await pool.query(
+      `SELECT id, name FROM items
+       WHERE (ean_code = $1 OR custom_barcode = $1) AND id <> $2 AND active = true`,
+      [code, id]
+    );
+    if (dup.rows.length > 0) {
+      return res.status(409).json({
+        error: `Barcode gehört bereits zu "${dup.rows[0].name}".`,
+        item: dup.rows[0]
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE items SET ean_code = $1, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND active = true RETURNING *`,
+      [code, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+
+    broadcast({ type: 'item_updated', item: result.rows[0] });
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // ========================================
 // EAN BARCODE LOOKUP (External Databases)
 // ========================================
