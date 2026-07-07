@@ -241,14 +241,5 @@
             android:textSize="13sp"
             android:visibility="gone" />
 
-        <!-- Rezepte & Einkaufsliste (read-only, programmatisch befuellt; -->
-        <!-- bleibt ausgeblendet wenn keine Rezepte verknuepft sind). -->
-        <LinearLayout
-            android:id="@+id/orgEventRecipesContainer"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:visibility="gone" />
-
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

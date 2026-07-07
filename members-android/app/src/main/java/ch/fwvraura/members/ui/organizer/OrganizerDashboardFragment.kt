@@ -2,7 +2,6 @@ package ch.fwvraura.members.ui.organizer
 
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Typeface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,7 +9,6 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.PopupMenu
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
@@ -19,10 +17,7 @@ import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.data.api.ApiModule
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.data.model.EventRegistration
-import ch.fwvraura.members.data.model.Recipe
 import ch.fwvraura.members.data.model.Shift
-import ch.fwvraura.members.data.model.ShoppingItem
-import ch.fwvraura.members.data.model.ShoppingList
 import ch.fwvraura.members.data.model.parseRegNotes
 import ch.fwvraura.members.databinding.DialogOrgNotifyBinding
 import ch.fwvraura.members.databinding.DialogOrgSuggestAlternativeBinding
@@ -177,12 +172,6 @@ class OrganizerDashboardFragment : Fragment() {
             }
         }
         binding.eventsContainer.addView(card.root)
-
-        // Rezepte & Einkaufsliste laden (nur Member-Mode: echte Event-ID). Rendert
-        // nichts, falls keine Rezepte verknuepft sind — Section bleibt ausgeblendet.
-        if (isMemberMode()) {
-            loadRecipesAndShopping(event.id, card.orgEventRecipesContainer)
-        }
     }
 
     private fun bindRegistration(item: ItemRegistrationBinding, r: EventRegistration) {
@@ -520,95 +509,6 @@ class OrganizerDashboardFragment : Fragment() {
             }
         }
     }
-
-    // ============================================================
-    // Rezepte & Einkaufsliste (read-only, pro Event, Member-Mode).
-    // ============================================================
-
-    /**
-     * Laedt Rezepte + Einkaufsliste und befuellt den Section-Container. Ohne
-     * verknuepfte Rezepte (oder bei Fehler) bleibt die Section ausgeblendet.
-     */
-    private fun loadRecipesAndShopping(eventId: String, container: LinearLayout) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            try {
-                val recipesResp = ApiModule.eventsApi.getRecipes(eventId)
-                val recipes = if (recipesResp.isSuccessful) recipesResp.body().orEmpty() else emptyList()
-                if (recipes.isEmpty()) return@launch
-                val shoppingResp = ApiModule.eventsApi.getShoppingList(eventId)
-                val shopping = if (shoppingResp.isSuccessful) shoppingResp.body() else null
-                renderRecipesSection(container, recipes, shopping)
-            } catch (_: Exception) { /* Section bleibt ausgeblendet */ }
-        }
-    }
-
-    private fun renderRecipesSection(container: LinearLayout, recipes: List<Recipe>, shopping: ShoppingList?) {
-        container.removeAllViews()
-
-        // Trennlinie oben
-        container.addView(View(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1))
-                .apply { topMargin = dp(10); bottomMargin = dp(8) }
-            setBackgroundColor(Color.parseColor("#E5E7EB"))
-        })
-        container.addView(sectionTextView("Rezepte & Einkaufsliste", 14f, "#111827", bold = true, topDp = 0))
-
-        // Rezeptnamen inline
-        val names = recipes.mapNotNull { it.name?.takeIf { nm -> nm.isNotBlank() } }
-        if (names.isNotEmpty()) {
-            container.addView(sectionTextView(names.joinToString(" · "), 13f, "#4B5563", bold = false, topDp = 4))
-        }
-
-        // Einkaufslisten-Positionen
-        val items = shopping?.items.orEmpty()
-        for (item in items) {
-            container.addView(sectionTextView(shoppingRowText(item), 13f, "#4B5563", bold = false, topDp = 4))
-        }
-
-        // Summenzeile
-        if (shopping != null) {
-            val total = shopping.totalToBuy ?: items.size
-            val cost = shopping.estimatedOpenCost ?: 0.0
-            container.addView(
-                sectionTextView("$total Positionen · Offen: CHF ${formatCost(cost)}", 13f, "#111827", bold = true, topDp = 6)
-            )
-        }
-
-        container.visibility = View.VISIBLE
-    }
-
-    /** Eine Einkaufslisten-Zeile: "{✅/⬜} {Name}  {Menge Einheit}  {Empfehlung}". */
-    private fun shoppingRowText(item: ShoppingItem): String {
-        val check = if (item.purchased) "✅" else "⬜"
-        val qtyUnit = listOf(formatQty(item.toBuy), item.unit.orEmpty())
-            .filter { it.isNotBlank() }.joinToString(" ")
-        return buildString {
-            append(check).append(" ").append(item.itemName.orEmpty())
-            if (qtyUnit.isNotBlank()) append("  ").append(qtyUnit)
-            item.recommendation?.takeIf { it.isNotBlank() }?.let { append("  ").append(it) }
-        }
-    }
-
-    /** Menge ohne unnoetige Nachkommastellen (2.0 -> "2", 1.5 -> "1.5"). */
-    private fun formatQty(v: Double?): String {
-        if (v == null) return ""
-        return if (v % 1.0 == 0.0) v.toLong().toString() else v.toString()
-    }
-
-    private fun formatCost(v: Double): String = String.format(java.util.Locale.US, "%.2f", v)
-
-    /** Baut einen einfachen TextView fuer die programmatisch erzeugte Rezept-Section. */
-    private fun sectionTextView(text: String, sizeSp: Float, colorHex: String, bold: Boolean, topDp: Int): TextView =
-        TextView(requireContext()).apply {
-            this.text = text
-            textSize = sizeSp
-            setTextColor(Color.parseColor(colorHex))
-            if (bold) setTypeface(typeface, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { if (topDp > 0) topMargin = dp(topDp) }
-        }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
