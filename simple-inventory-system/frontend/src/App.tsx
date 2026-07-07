@@ -824,8 +824,24 @@ function App() {
                     <div className="text-5xl mb-4">🔍</div>
                     <h2 className="text-lg font-semibold mb-2">Barcode nicht gefunden</h2>
                     <p className="text-gray-500 mb-4">
-                      Der Barcode <span className="font-mono bg-gray-100 px-2 py-1 rounded">{lookupResult.ean_code}</span> wurde weder lokal noch in externen Datenbanken gefunden.
+                      Der Barcode <span className="font-mono bg-gray-100 px-2 py-1 rounded">{lookupResult.ean_code}</span> wurde nirgends gefunden.
                     </p>
+
+                    {Array.isArray(lookupResult.checked) && lookupResult.checked.length > 0 && (
+                      <div className="text-left bg-gray-50 rounded-lg p-3 mb-4">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Geprüfte Quellen — kein Treffer</p>
+                        <ul className="space-y-1">
+                          {lookupResult.checked.map((c: any, idx: number) => (
+                            <li key={idx} className="text-sm text-gray-600 flex items-center gap-2">
+                              <span className="text-red-500">✗</span>
+                              <span>{c.source}</span>
+                              {c.note && <span className="text-xs text-gray-400">({c.note})</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     <button
                       onClick={() => {
                         setPrefillData({
