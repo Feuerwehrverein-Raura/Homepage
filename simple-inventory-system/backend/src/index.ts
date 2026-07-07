@@ -1022,8 +1022,14 @@ app.get('/api/events/:slug/recipes', authenticateEventAccess, async (req: Authen
   try {
     const { slug } = req.params;
     const result = await pool.query(`
-      SELECT er.id AS link_id, er.servings, er.notes AS link_notes,
-             r.*, rc.name AS category_name
+      -- WICHTIG: er.servings MUSS nach r.* stehen. r.* enthält ebenfalls eine
+      -- Spalte "servings" (recipes.servings, meist 1); bei gleichem Spaltennamen
+      -- gewinnt in node-postgres die zuletzt selektierte. So liefert das Feld
+      -- "servings" die Event-Portionen (event_recipes.servings), nicht die
+      -- Rezept-Basisportionen.
+      SELECT er.id AS link_id, er.notes AS link_notes,
+             r.*, rc.name AS category_name,
+             er.servings
       FROM event_recipes er
       JOIN recipes r ON r.id = er.recipe_id
       LEFT JOIN recipe_categories rc ON r.recipe_category_id = rc.id
