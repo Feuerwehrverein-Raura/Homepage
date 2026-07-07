@@ -1,9 +1,7 @@
 package ch.fwvraura.vorstand.ui.events
 
 import android.graphics.Color
-import android.graphics.Paint
 import android.os.Bundle
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,7 +10,6 @@ import android.widget.AutoCompleteTextView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -24,7 +21,6 @@ import ch.fwvraura.vorstand.data.model.Event
 import ch.fwvraura.vorstand.data.model.EventRegistration
 import ch.fwvraura.vorstand.data.model.Member
 import ch.fwvraura.vorstand.data.model.Shift
-import ch.fwvraura.vorstand.data.model.ShoppingItem
 import ch.fwvraura.vorstand.data.model.parseRegNotes
 import ch.fwvraura.vorstand.databinding.FragmentEventRegistrationsBinding
 import ch.fwvraura.vorstand.util.DateUtils
@@ -33,7 +29,6 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
-import java.util.Locale
 import kotlinx.coroutines.launch
 
 /**
@@ -127,8 +122,6 @@ class EventRegistrationsFragment : Fragment() {
                     displayShifts(event)
                     // Direkte Anmeldungen (ohne Schicht-Zuordnung) anzeigen
                     displayDirectRegistrations(event)
-                    // Read-only Rezeptmodul (nur sichtbar bei verknuepften Rezepten)
-                    loadRecipeModule()
                 }
             } catch (_: Exception) { }
             binding.swipeRefresh.isRefreshing = false
@@ -1010,155 +1003,6 @@ class EventRegistrationsFragment : Fragment() {
             binding.swipeRefresh.isRefreshing = false
         }
     }
-
-    /**
-     * Laedt das read-only Rezeptmodul (mit dem Event verknuepfte Rezepte samt
-     * daraus berechneter Einkaufsliste) aus der Inventar-API ueber den
-     * Events-Proxy und zeigt es an. Spiegelt das Rezeptmodul der Web-Ansicht.
-     *
-     * Die meisten Events haben keine verknuepften Rezepte – dann bleibt die
-     * Karte ausgeblendet. Auch bei fehlender Berechtigung (403) oder sonstigen
-     * Fehlern wird nichts angezeigt (optionales Modul, kein Absturz/Toast).
-     */
-    private fun loadRecipeModule() {
-        val id = eventId ?: return
-        viewLifecycleOwner.lifecycleScope.launch {
-            // Karte zuruecksetzen: standardmaessig ausgeblendet
-            binding.recipesCard.visibility = View.GONE
-            try {
-                // 1) Verknuepfte Rezepte laden – ohne Rezepte bleibt die Karte weg
-                val recipesResponse = ApiModule.eventsApi.getRecipes(id)
-                val recipes = recipesResponse.body()
-                if (!recipesResponse.isSuccessful || recipes.isNullOrEmpty()) return@launch
-
-                // 2) Einkaufsliste best-effort nachladen (aus den Rezepten berechnet)
-                val shopResponse = ApiModule.eventsApi.getShoppingList(id)
-                val shopping = if (shopResponse.isSuccessful) shopResponse.body() else null
-
-                // 3) Rezeptnamen als kompakte Chip-Zeile darstellen
-                binding.recipesChips.text = recipes.mapNotNull { it.name }.joinToString("  ·  ")
-
-                // 4) Einkaufsliste rendern (Positionen + Zusammenfassung)
-                binding.shoppingContainer.removeAllViews()
-                if (shopping != null) {
-                    for (item in shopping.items) {
-                        binding.shoppingContainer.addView(buildShoppingRow(item))
-                    }
-                    val summary = StringBuilder()
-                        .append("${shopping.totalToBuy ?: 0} Positionen zu kaufen")
-                        .append(" · Offen: CHF ")
-                        .append(String.format(Locale.ROOT, "%.2f", shopping.estimatedOpenCost ?: 0.0))
-                    if ((shopping.totalPurchased ?: 0) > 0) {
-                        summary.append(" · ${shopping.totalPurchased} erledigt")
-                    }
-                    binding.shoppingSummary.text = summary.toString()
-                    binding.shoppingSummary.visibility = View.VISIBLE
-                } else {
-                    binding.shoppingSummary.visibility = View.GONE
-                }
-
-                // 5) Erst nach erfolgreichem Aufbau die Karte einblenden
-                binding.recipesCard.visibility = View.VISIBLE
-            } catch (_: Exception) {
-                // Optionales Modul: bei Fehlern nichts anzeigen
-                binding.recipesCard.visibility = View.GONE
-            }
-        }
-    }
-
-    /**
-     * Baut programmatisch eine Zeile der Einkaufsliste:
-     * - Haken-Glyph (✅ gekauft / ⬜ offen)
-     * - Zutatname (durchgestrichen & grau wenn bereits gekauft)
-     * - Menge "{Menge} {Einheit}" (rechts, grau)
-     * - optionale Bezugsquelle/Empfehlung (klein, grau) unter dem Namen
-     */
-    private fun buildShoppingRow(item: ShoppingItem): View {
-        val container = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            setPadding(0, dp(6), 0, dp(6))
-        }
-
-        // Obere Zeile: Glyph + Zutatname + Menge
-        val topRow = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            gravity = Gravity.TOP
-        }
-
-        val purchased = item.purchased
-
-        // Haken-Glyph (gekauft / offen)
-        val glyph = TextView(requireContext()).apply {
-            text = if (purchased) "✅" else "⬜"
-            textSize = 14f
-            setPadding(0, 0, dp(6), 0)
-        }
-
-        // Zutatname – nimmt den verfuegbaren Platz ein
-        val name = TextView(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            text = item.itemName ?: ""
-            textSize = 14f
-            if (purchased) {
-                setTextColor(ContextCompat.getColor(requireContext(), R.color.text_hint))
-                paintFlags = paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
-            } else {
-                setTextColor(ContextCompat.getColor(requireContext(), R.color.text_primary))
-            }
-        }
-
-        // Menge "{Menge} {Einheit}"
-        val amount = TextView(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.leftMargin = dp(8) }
-            text = "${formatQty(item.toBuy)} ${item.unit ?: ""}".trim()
-            textSize = 14f
-            setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
-        }
-
-        topRow.addView(glyph)
-        topRow.addView(name)
-        topRow.addView(amount)
-        container.addView(topRow)
-
-        // Optionale Bezugsquelle/Empfehlung (klein, grau) unter dem Namen
-        val recommendation = item.recommendation
-        if (!recommendation.isNullOrBlank()) {
-            val recView = TextView(requireContext()).apply {
-                text = recommendation
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
-                setPadding(dp(22), dp(2), 0, 0)
-            }
-            container.addView(recView)
-        }
-
-        return container
-    }
-
-    /**
-     * Formatiert eine Einkaufsmenge wie die Web-Ansicht: ab 10 auf eine ganze
-     * Zahl gerundet, darunter auf eine Nachkommastelle.
-     */
-    private fun formatQty(value: Double?): String {
-        val v = value ?: 0.0
-        return if (v >= 10) Math.round(v).toString()
-        else String.format(Locale.ROOT, "%.1f", v)
-    }
-
-    /** Wandelt dp in px um (fuer programmatisch erzeugte Einkaufslisten-Zeilen). */
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
 
     /**
      * Raeumt das Binding auf wenn die View zerstoert wird.
