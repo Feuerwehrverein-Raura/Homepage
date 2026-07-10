@@ -1430,20 +1430,22 @@ app.get('/contact/confirm/:token', async (req, res) => {
 
         if (type === 'membership' && membership) {
             // Mitgliedschaftsantrag
-            const isFirefighterRaurica = membership.firefighterStatus === 'Ja (aktiv)';
-            const registrationStatus = isFirefighterRaurica ? 'approved' : 'pending';
+            // IMMER zur Prüfung durch den Vorstand — auch aktive Feuerwehr-Raurica-
+            // Mitglieder gehen in die Warteschlange (Schutz vor Missbrauch/Spam).
+            const registrationStatus = 'pending';
 
             const cityParts = (membership.city || '').trim().split(' ');
             const plz = cityParts[0] || '';
             const ort = cityParts.slice(1).join(' ') || membership.city || '';
 
-            const registrationResult = await pool.query(`
+            await pool.query(`
                 INSERT INTO member_registrations
-                (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
-                 feuerwehr_status, korrespondenz_methode, korrespondenz_adresse, status)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                RETURNING id
+                (anrede, geschlecht, geburtstag, vorname, nachname, strasse, plz, ort,
+                 telefon, mobile, email, feuerwehr_status,
+                 korrespondenz_methode, korrespondenz_adresse, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             `, [
+                membership.anrede || null, membership.geschlecht || null, membership.geburtstag || null,
                 membership.firstname, membership.lastname, membership.street,
                 plz, ort, membership.phone, membership.mobile || null,
                 membership.email, membership.firefighterStatus,
@@ -1451,76 +1453,39 @@ app.get('/contact/confirm/:token', async (req, res) => {
                 registrationStatus
             ]);
 
-            const registrationId = registrationResult.rows[0].id;
+            const fwStatusText =
+                membership.firefighterStatus === 'Ja (aktiv)' ? 'Aktives Feuerwehr-Mitglied (Raurica)' :
+                membership.firefighterStatus === 'former' ? 'Ehemaliges Feuerwehr-Mitglied' :
+                'Kein Feuerwehr-Mitglied';
 
-            if (isFirefighterRaurica) {
-                const memberResult = await pool.query(`
-                    INSERT INTO members
-                    (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
-                     status, feuerwehr_zugehoerigkeit, zustellung_email, zustellung_post, eintrittsdatum)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aktivmitglied', 'feuerwehr_raurica', $9, $10, NOW())
-                    RETURNING id
-                `, [
-                    membership.firstname, membership.lastname, membership.street,
-                    plz, ort, membership.phone, membership.mobile || null,
-                    membership.email, membership.correspondenceMethod === 'email',
-                    membership.correspondenceMethod === 'post'
-                ]);
+            // Bestätigungs-Mail an die antragstellende Person (für alle gleich)
+            await transporter.sendMail({
+                from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
+                to: membership.email,
+                subject: 'Bestätigung Ihres Mitgliedschaftsantrags - FWV Raura',
+                text: `
+Guten Tag ${membership.firstname} ${membership.lastname},
 
-                await pool.query(`
-                    UPDATE member_registrations
-                    SET member_id = $1, processed_at = NOW(), processed_by = 'system'
-                    WHERE id = $2
-                `, [memberResult.rows[0].id, registrationId]);
+Vielen Dank für Ihren Mitgliedschaftsantrag beim Feuerwehrverein Raura!
 
-                emailSubject = `Neues Mitglied: ${membership.firstname} ${membership.lastname} (automatisch aufgenommen)`;
-                emailBody = `
-NEUES MITGLIED (AUTOMATISCH AUFGENOMMEN)
-========================================
-
-${membership.firstname} ${membership.lastname} ist Mitglied der Feuerwehr Raurica
-und wurde automatisch als Aktivmitglied aufgenommen.
-
-Persönliche Daten:
-- Name: ${membership.firstname} ${membership.lastname}
-- Strasse: ${membership.street}
-- Ort: ${membership.city}
-- Telefon: ${membership.phone}
-- Mobile: ${membership.mobile || '-'}
-- E-Mail: ${membership.email}
-
-Feuerwehr-Status: Aktives Feuerwehr-Mitglied
-Korrespondenz: ${membership.correspondenceMethod}
-
-Das Mitglied wurde der Datenbank hinzugefügt.
-                `.trim();
-
-                await transporter.sendMail({
-                    from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
-                    to: membership.email,
-                    subject: 'Willkommen beim Feuerwehrverein Raura!',
-                    text: `
-Liebe/r ${membership.firstname} ${membership.lastname},
-
-Herzlich willkommen beim Feuerwehrverein Raura!
-
-Als aktives Mitglied der Feuerwehr Raurica wurden Sie automatisch als Aktivmitglied aufgenommen.
-
-Wir freuen uns auf Ihre Teilnahme an unseren Vereinsaktivitäten!
+Wir haben Ihren Antrag erhalten. Der Vorstand prüft ihn und Sie werden
+über das Ergebnis informiert.
 
 Mit freundlichen Grüssen
 Feuerwehrverein Raura
-                    `.trim()
-                });
-            } else {
-                emailSubject = `Neuer Mitgliedschaftsantrag: ${membership.firstname} ${membership.lastname} (zu prüfen)`;
-                emailBody = `
+                `.trim()
+            });
+
+            emailSubject = `Neuer Mitgliedschaftsantrag: ${membership.firstname} ${membership.lastname} (zu prüfen)`;
+            emailBody = `
 NEUER MITGLIEDSCHAFTSANTRAG (ZU PRÜFEN)
 =======================================
 
 ${membership.firstname} ${membership.lastname} möchte Mitglied werden.
 
 Persönliche Daten:
+- Anrede / Geschlecht: ${membership.anrede || '-'} / ${membership.geschlecht || '-'}
+- Geburtstag: ${membership.geburtstag || '-'}
 - Name: ${membership.firstname} ${membership.lastname}
 - Strasse: ${membership.street}
 - Ort: ${membership.city}
@@ -1528,30 +1493,12 @@ Persönliche Daten:
 - Mobile: ${membership.mobile || '-'}
 - E-Mail: ${membership.email}
 
-Feuerwehr-Status: ${membership.firefighterStatus === 'former' ? 'Ehemaliges Feuerwehr-Mitglied' : 'Kein Feuerwehr-Mitglied'}
+Feuerwehr-Status: ${fwStatusText}
 Korrespondenz: ${membership.correspondenceMethod}
 
 Der Antrag muss im Vorstand-Bereich geprüft und genehmigt werden:
 https://fwv-raura.ch/vorstand.html
-                `.trim();
-
-                await transporter.sendMail({
-                    from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
-                    to: membership.email,
-                    subject: 'Bestätigung Ihres Mitgliedschaftsantrags - FWV Raura',
-                    text: `
-Guten Tag ${membership.firstname} ${membership.lastname},
-
-Vielen Dank für Ihren Mitgliedschaftsantrag beim Feuerwehrverein Raura!
-
-Wir haben Ihren Antrag erhalten. Da Sie kein aktives Mitglied der Feuerwehr Raurica sind,
-wird Ihr Antrag vom Vorstand geprüft und Sie werden über das Ergebnis informiert.
-
-Mit freundlichen Grüssen
-Feuerwehrverein Raura
-                    `.trim()
-                });
-            }
+            `.trim();
 
             await transporter.sendMail({
                 from: `"Feuerwehrverein Raura" <${process.env.SMTP_USER}>`,
@@ -1724,10 +1671,12 @@ app.post('/member-registrations/:id/approve', authenticateAny, async (req, res) 
         const memberResult = await pool.query(`
             INSERT INTO members
             (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
-             status, feuerwehr_zugehoerigkeit, zustellung_email, zustellung_post, eintrittsdatum)
+             status, feuerwehr_zugehoerigkeit, zustellung_email, zustellung_post, eintrittsdatum,
+             anrede, geschlecht, geburtstag, adresszusatz)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Aktivmitglied',
                     CASE WHEN $9 = 'Ja (aktiv)' THEN 'feuerwehr_raurica' ELSE 'keine' END,
-                    $10, $11, NOW())
+                    $10, $11, NOW(),
+                    $12, $13, $14, $15)
             RETURNING id
         `, [
             reg.vorname,
@@ -1740,7 +1689,11 @@ app.post('/member-registrations/:id/approve', authenticateAny, async (req, res) 
             reg.email,
             reg.feuerwehr_status,
             reg.korrespondenz_methode === 'email',
-            reg.korrespondenz_methode === 'post'
+            reg.korrespondenz_methode === 'post',
+            reg.anrede || null,
+            reg.geschlecht || null,
+            reg.geburtstag || null,
+            reg.korrespondenz_adresse || null
         ]);
 
         const memberId = memberResult.rows[0].id;
