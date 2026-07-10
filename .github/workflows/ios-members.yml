@@ -14,16 +14,23 @@ on:
 jobs:
   build:
     name: Compile-Check (Simulator, unsigniert)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Toolchain-Info
+        run: |
+          xcodebuild -version
+          xcodegen --version || true
 
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate Xcode project
         working-directory: members-ios
-        run: xcodegen generate
+        run: |
+          xcodegen generate
+          ls -la FWVMembers.xcodeproj
 
       - name: Build for iOS Simulator
         working-directory: members-ios
