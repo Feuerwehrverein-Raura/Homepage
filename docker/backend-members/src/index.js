@@ -3659,8 +3659,11 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
         const memberResult = await pool.query(`
             INSERT INTO members
             (vorname, nachname, strasse, plz, ort, telefon, mobile, email,
-             status, zustellung_email, zustellung_post, eintrittsdatum)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+             status, zustellung_email, zustellung_post, eintrittsdatum,
+             anrede, geschlecht, geburtstag, adresszusatz, feuerwehr_zugehoerigkeit)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(),
+                    $12, $13, $14, $15,
+                    CASE WHEN $16 = 'Ja (aktiv)' THEN 'feuerwehr_raurica' ELSE 'keine' END)
             RETURNING id
         `, [
             registration.vorname,
@@ -3673,7 +3676,12 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
             registration.email,
             memberStatus,
             registration.korrespondenz_methode === 'email',
-            registration.korrespondenz_methode === 'post'
+            registration.korrespondenz_methode === 'post',
+            registration.anrede || null,
+            registration.geschlecht || null,
+            registration.geburtstag || null,
+            registration.korrespondenz_adresse || null,
+            registration.feuerwehr_status || null
         ]);
 
         const memberId = memberResult.rows[0].id;
