@@ -791,6 +791,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     toggleMembershipForm(this.value === 'Mitgliedschaft');
                 });
 
+                // DEUTSCH: Direktlink https://fwv-raura.ch/#mitglied-werden ->
+                // Betreff "Mitgliedschaft" vorauswaehlen, Beitrittsformular aufklappen
+                // und zur Kontakt-Sektion scrollen. Funktioniert beim Laden und beim
+                // Klick auf einen solchen Link waehrend man schon auf der Seite ist.
+                function applyMembershipDeepLink() {
+                    if (window.location.hash === '#mitglied-werden') {
+                        subjectSelect.value = 'Mitgliedschaft';
+                        toggleMembershipForm(true);
+                        const contactSection = document.getElementById('contact');
+                        if (contactSection) {
+                            contactSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }
+                }
+                applyMembershipDeepLink();
+                window.addEventListener('hashchange', applyMembershipDeepLink);
+
                 // DEUTSCH: Bei Aenderung der Korrespondenz-Methode (Post/E-Mail) Optionen aktualisieren
                 // Korrespondenz-Methode Änderung
                 correspondenceMethodRadios.forEach(radio => {
