@@ -1,0 +1,5 @@
+# Von XcodeGen generiert (aus project.yml) — nicht einchecken
+FWVMembers.xcodeproj/
+DerivedData/
+.DS_Store
+*.xcuserstate
