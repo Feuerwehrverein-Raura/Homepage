@@ -3640,7 +3640,6 @@ app.get('/member-registrations/:id', authenticateVorstand, async (req, res) => {
 app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, res) => {
     try {
         const { id } = req.params;
-        const { memberStatus = 'Passivmitglied' } = req.body;
 
         // Get registration
         const regResult = await pool.query('SELECT * FROM member_registrations WHERE id = $1', [id]);
@@ -3654,6 +3653,13 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
         if (registration.status !== 'pending') {
             return res.status(400).json({ error: 'Registration already processed' });
         }
+
+        // FW-Raura-Angehörige (aktiv) werden sofort Aktivmitglied; alle anderen
+        // (ehemalig / kein) kommen als "Aufnahme pendent" und werden erst an der
+        // GV definitiv aufgenommen (Status dort manuell auf Aktivmitglied gesetzt).
+        const memberStatus = registration.feuerwehr_status === 'Ja (aktiv)'
+            ? 'Aktivmitglied'
+            : 'Aufnahme pendent';
 
         // Create member from registration
         const memberResult = await pool.query(`
@@ -3732,14 +3738,19 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
 
         // Send welcome email to new member
         const today = new Date().toLocaleDateString('de-CH');
+        const istAktiv = memberStatus === 'Aktivmitglied';
         getAktuarName().then(aktuarName => {
-            sendNotificationEmail(memberId, 'Willkommen neues Mitglied', {
+            sendNotificationEmail(memberId,
+                istAktiv ? 'Willkommen neues Mitglied' : 'Aufnahmeantrag angenommen', {
                 mitgliedsnummer: memberId.substring(0, 8),
                 status: memberStatus,
                 eintrittsdatum: today,
                 aktuar_name: aktuarName
-            }, 'general', 'Willkommen beim FWV Raura!',
-               'Deine Mitgliedschaft wurde bestaetigt.'
+            }, 'general',
+               istAktiv ? 'Willkommen beim FWV Raura!' : 'Dein Aufnahmeantrag wurde angenommen',
+               istAktiv
+                 ? 'Deine Mitgliedschaft wurde bestaetigt.'
+                 : 'Dein Aufnahmeantrag wurde vom Vorstand angenommen und wird an der naechsten Generalversammlung definitiv bestaetigt.'
             ).catch(err => console.error('Welcome email failed:', err));
         }).catch(err => console.error('getAktuarName failed:', err));
 
@@ -3861,6 +3872,7 @@ app.get('/members/stats/overview', authenticateAny, async (req, res) => {
                 COUNT(*) as total,
                 COUNT(*) FILTER (WHERE status = 'Aktivmitglied') as aktiv,
                 COUNT(*) FILTER (WHERE status = 'Passivmitglied') as passiv,
+                COUNT(*) FILTER (WHERE status = 'Aufnahme pendent') as pendent,
                 COUNT(*) FILTER (WHERE status = 'Ehrenmitglied') as ehren,
                 COUNT(*) FILTER (WHERE zustellung_email = true) as email_zustellung,
                 COUNT(*) FILTER (WHERE zustellung_post = true) as post_zustellung
