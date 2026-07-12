@@ -153,9 +153,9 @@ class MembersListFragment : Fragment() {
     private fun setupFilters() {
         binding.filterChips.setOnCheckedStateChangeListener { _, checkedIds ->
             val filter = when {
-                checkedIds.contains(R.id.chipAktiv) -> "Aktiv"
-                checkedIds.contains(R.id.chipPassiv) -> "Passiv"
-                checkedIds.contains(R.id.chipEhren) -> "Ehren"
+                checkedIds.contains(R.id.chipAktiv) -> "Aktivmitglied"
+                checkedIds.contains(R.id.chipPassiv) -> "Aufnahme pendent"
+                checkedIds.contains(R.id.chipEhren) -> "Ehrenmitglied"
                 else -> null
             }
             viewModel.loadMembers(filter = filter)

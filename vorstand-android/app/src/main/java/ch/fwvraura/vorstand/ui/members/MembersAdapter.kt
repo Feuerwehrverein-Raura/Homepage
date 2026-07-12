@@ -101,11 +101,11 @@ class MembersAdapter(
             binding.memberStatus.text = member.status ?: "Aktiv"
             val context = binding.root.context
             when (member.status?.lowercase()) {
-                "aktiv" -> {
+                "aktiv", "aktivmitglied" -> {
                     binding.memberStatus.setChipBackgroundColorResource(R.color.status_aktiv_bg)
                     binding.memberStatus.setTextColor(context.getColor(R.color.status_aktiv))
                 }
-                "passiv" -> {
+                "aufnahme pendent" -> {
                     binding.memberStatus.setChipBackgroundColorResource(R.color.status_passiv_bg)
                     binding.memberStatus.setTextColor(context.getColor(R.color.status_passiv))
                 }
