@@ -1434,9 +1434,13 @@ app.get('/contact/confirm/:token', async (req, res) => {
             // Mitglieder gehen in die Warteschlange (Schutz vor Missbrauch/Spam).
             const registrationStatus = 'pending';
 
-            const cityParts = (membership.city || '').trim().split(' ');
-            const plz = cityParts[0] || '';
-            const ort = cityParts.slice(1).join(' ') || membership.city || '';
+            // "PLZ und Ort" robust trennen: nur eine FÜHRENDE Ziffernfolge gilt als
+            // PLZ (Spalte ist varchar(10)). Ohne führende PLZ bleibt sie leer und die
+            // ganze Eingabe wandert in den Ort (z.B. nur "Kaiseraugst").
+            const cityRaw = (membership.city || '').trim();
+            const plzMatch = cityRaw.match(/^(\d{4,10})\s+(.*)$/);
+            const plz = plzMatch ? plzMatch[1] : '';
+            const ort = plzMatch ? plzMatch[2].trim() : cityRaw;
 
             await pool.query(`
                 INSERT INTO member_registrations
