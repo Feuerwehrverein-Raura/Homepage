@@ -215,6 +215,7 @@ function App() {
   const [scanResult, setScanResult] = useState<Item | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanQty, setScanQty] = useState(1); // Menge für Ein-/Ausgang im Scan-Ergebnis
   const [lookupResult, setLookupResult] = useState<any | null>(null); // External barcode lookup result
   const [prefillData, setPrefillData] = useState<any | null>(null); // Prefill data for new item form
   const [publicItemCode, setPublicItemCode] = useState<string | null>(null); // For public QR code scans
@@ -723,20 +724,44 @@ function App() {
                 </div>
 
                 {user ? (
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <button
-                      onClick={() => updateStock(scanResult.id, 'out')}
-                      className="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold touch-manipulation"
-                    >
-                      - Ausgang
-                    </button>
-                    <button
-                      onClick={() => updateStock(scanResult.id, 'in')}
-                      className="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold touch-manipulation"
-                    >
-                      + Eingang
-                    </button>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-center gap-3 mb-4">
+                      <button
+                        onClick={() => setScanQty(Math.max(1, scanQty - 1))}
+                        className="w-11 h-11 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full text-2xl font-bold touch-manipulation"
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        inputMode="numeric"
+                        value={scanQty}
+                        onChange={(e) => setScanQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="text-2xl font-bold w-24 text-center border border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={() => setScanQty(scanQty + 1)}
+                        className="w-11 h-11 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full text-2xl font-bold touch-manipulation"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                      <button
+                        onClick={() => updateStock(scanResult.id, 'out', scanQty)}
+                        className="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold touch-manipulation"
+                      >
+                        - Ausgang
+                      </button>
+                      <button
+                        onClick={() => updateStock(scanResult.id, 'in', scanQty)}
+                        className="bg-green-500 hover:bg-green-600 active:bg-green-700 text-white py-3 sm:py-4 rounded-lg text-base sm:text-lg font-semibold touch-manipulation"
+                      >
+                        + Eingang
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <div className="text-center text-gray-500 py-4">
                     <button onClick={login} className="text-blue-600 underline">
@@ -3225,7 +3250,14 @@ function ItemDetailModal({ item, token, user, onLogin, onClose, onUpdate, catego
                 >
                   -
                 </button>
-                <span className="text-3xl font-bold w-16 text-center">{quantity}</span>
+                <input
+                  type="number"
+                  min="1"
+                  inputMode="numeric"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  className="text-3xl font-bold w-24 text-center border border-gray-300 rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
                 <button
                   onClick={() => setQuantity(quantity + 1)}
                   className="w-12 h-12 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-full text-2xl font-bold touch-manipulation"
