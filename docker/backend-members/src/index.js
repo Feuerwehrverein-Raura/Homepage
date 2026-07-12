@@ -2885,6 +2885,49 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
             updated_fields: fields
         });
 
+        // Login (Authentik) nachträglich provisionieren, wenn ein Mitglied JETZT auf
+        // "Aktivmitglied" gesetzt wird (z.B. "Aufnahme pendent" -> aktiv an der GV) und
+        // noch keinen Login hat. So bekommen wartende Aufnahmen erst nach der GV Zugang.
+        const updatedRow = result.rows[0];
+        if (updates.status === 'Aktivmitglied' &&
+            oldMember.status !== 'Aktivmitglied' &&
+            !oldMember.authentik_user_id &&
+            updatedRow.email) {
+            try {
+                const ak = await createAuthentikUser({
+                    vorname: updatedRow.vorname,
+                    nachname: updatedRow.nachname,
+                    email: updatedRow.email
+                });
+                if (ak) {
+                    await pool.query(
+                        'UPDATE members SET authentik_user_id = $1, authentik_synced_at = NOW() WHERE id = $2',
+                        [ak.pk.toString(), id]
+                    );
+                    for (const type of ['shift_reminder', 'event_update', 'newsletter', 'general']) {
+                        await pool.query(
+                            `INSERT INTO notification_preferences (member_id, notification_type, enabled)
+                             VALUES ($1, $2, true) ON CONFLICT (member_id, notification_type) DO NOTHING`,
+                            [id, type]
+                        );
+                    }
+                    const today = new Date().toLocaleDateString('de-CH');
+                    getAktuarName().then(aktuarName => {
+                        sendNotificationEmail(id, 'Willkommen neues Mitglied', {
+                            mitgliedsnummer: id.substring(0, 8),
+                            status: 'Aktivmitglied',
+                            eintrittsdatum: today,
+                            aktuar_name: aktuarName
+                        }, 'general', 'Willkommen beim FWV Raura!',
+                           'Deine Mitgliedschaft wurde bestaetigt.'
+                        ).catch(err => console.error('Welcome email failed:', err));
+                    }).catch(err => console.error('getAktuarName failed:', err));
+                }
+            } catch (e) {
+                console.error('Authentik-Provisionierung bei Statuswechsel fehlgeschlagen:', e.message);
+            }
+        }
+
         // Send notification email to member - only show actually changed fields
         const fieldLabels = {
             vorname: 'Vorname',
@@ -3693,8 +3736,11 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
         const memberId = memberResult.rows[0].id;
 
         // Auto-create Authentik user if email is provided
+        // Login (Authentik) erst anlegen, wenn das Mitglied wirklich aktiv ist.
+        // "Aufnahme pendent" (warten auf GV) bekommt noch KEINEN Login — der wird
+        // erst beim Statuswechsel auf Aktivmitglied provisioniert (siehe PUT /members/:id).
         let authentikResult = null;
-        if (registration.email) {
+        if (memberStatus === 'Aktivmitglied' && registration.email) {
             authentikResult = await createAuthentikUser({
                 vorname: registration.vorname,
                 nachname: registration.nachname,
