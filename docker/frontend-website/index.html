@@ -212,7 +212,7 @@
                     <a href="#about" class="bg-white text-fire-700 px-8 py-3 rounded-lg font-semibold hover:bg-fire-50 transition-colors shadow-lg">
                         Über uns
                     </a>
-                    <a href="#contact" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-fire-700 transition-colors">
+                    <a href="#mitglied-werden" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-fire-700 transition-colors">
                         Mitglied werden
                     </a>
                 </div>
@@ -1107,12 +1107,17 @@ document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
                     e.preventDefault();
-                    const target = document.querySelector(this.getAttribute('href'));
+                    const href = this.getAttribute('href');
+                    const target = document.querySelector(href);
                     if (target) {
                         target.scrollIntoView({
                             behavior: 'smooth',
                             block: 'start'
                         });
+                    } else {
+                        // Anker ohne echtes Ziel-Element (z.B. #mitglied-werden):
+                        // Hash setzen, damit der hashchange-Handler greift.
+                        window.location.hash = href;
                     }
                 });
             });
