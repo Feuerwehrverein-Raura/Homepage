@@ -3829,6 +3829,29 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
             ).catch(err => console.error('Welcome email failed:', err));
         }).catch(err => console.error('getAktuarName failed:', err));
 
+        // Vorstand über das neue Mitglied informieren (x-api-key wird vom
+        // axios-Interceptor automatisch angehängt).
+        const vorstandEmail = process.env.VORSTAND_EMAIL || 'vorstand@fwv-raura.ch';
+        const vorstandInfoBody =
+`Ein Mitgliedschaftsantrag wurde genehmigt.
+
+Name: ${registration.vorname} ${registration.nachname}
+Status: ${memberStatus}
+E-Mail: ${registration.email || '-'}
+Telefon: ${registration.telefon || '-'}
+Ort: ${[registration.plz, registration.ort].filter(Boolean).join(' ') || '-'}
+Feuerwehr-Status: ${registration.feuerwehr_status || '-'}
+Aufgenommen am: ${today}
+
+${istAktiv
+  ? 'Aufgenommen als Aktivmitglied — Login + Willkommensmail wurden versandt.'
+  : 'Status "Aufnahme pendent" — definitive Aufnahme an der nächsten Generalversammlung.'}`;
+        axios.post(`${process.env.DISPATCH_API_URL || 'http://api-dispatch:3000'}/email/send`, {
+            to: vorstandEmail,
+            subject: `Neues Mitglied: ${registration.vorname} ${registration.nachname}`,
+            body: vorstandInfoBody
+        }).catch(err => console.error('Vorstand-Info-Mail fehlgeschlagen:', err.message));
+
         res.json({
             success: true,
             message: 'Registration approved',
