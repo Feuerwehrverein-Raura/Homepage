@@ -85,7 +85,7 @@ class MemberFormFragment : Fragment() {
 
         // Status-Dropdown: AutoCompleteTextView mit den drei moeglichen Status-Werten
         val statusAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line,
-            listOf("Aktiv", "Passiv", "Ehrenmitglied"))
+            listOf("Aktivmitglied", "Aufnahme pendent", "Ehrenmitglied"))
         binding.inputStatus.setAdapter(statusAdapter)
 
         // Im Bearbeiten-Modus: Bestehende Daten laden und Formular befuellen
@@ -127,7 +127,7 @@ class MemberFormFragment : Fragment() {
                     binding.inputOrt.setText(m.ort ?: "")
                     binding.inputGeburtstag.setText(DateUtils.formatDate(m.geburtstag))
                     // false = Dropdown-Liste nicht automatisch oeffnen
-                    binding.inputStatus.setText(m.status ?: "Aktiv", false)
+                    binding.inputStatus.setText(m.status ?: "Aktivmitglied", false)
                     binding.inputFunktion.setText(m.funktion ?: "")
                     binding.inputEintrittsdatum.setText(DateUtils.formatDate(m.eintrittsdatum))
                 }

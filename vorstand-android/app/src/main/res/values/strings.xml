@@ -21,7 +21,7 @@
     <string name="members_search">Suche nach Name oder E-Mail…</string>
     <string name="members_filter_all">Alle</string>
     <string name="members_filter_aktiv">Aktiv</string>
-    <string name="members_filter_passiv">Passiv</string>
+    <string name="members_filter_passiv">Pendent</string>
     <string name="members_filter_ehren">Ehren</string>
     <string name="member_new">Neues Mitglied</string>
     <string name="member_edit">Mitglied bearbeiten</string>

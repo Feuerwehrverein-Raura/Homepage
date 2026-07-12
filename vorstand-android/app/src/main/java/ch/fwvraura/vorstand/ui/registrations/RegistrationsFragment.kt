@@ -138,28 +138,30 @@ class RegistrationsFragment : Fragment() {
      * @param reg Der zu genehmigende Mitgliedschaftsantrag.
      */
     private fun approveRegistration(reg: MemberRegistration) {
-        // Moegliche Mitgliedschaftsstatus zur Auswahl
-        val statuses = arrayOf("Aktiv", "Passiv")
+        // Der Status wird serverseitig automatisch gesetzt: FW-Raura-Angehörige
+        // (aktiv) werden sofort Aktivmitglied, alle anderen "Aufnahme pendent"
+        // (Freischaltung an der GV). Darum nur noch eine Bestätigung, keine Statuswahl.
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("${reg.fullName} genehmigen")
-            .setItems(statuses) { _, which ->
-                // Asynchroner API-Aufruf zur Genehmigung mit dem gewaehlten Status
+            .setMessage("FW-Raura-Angehörige werden sofort Aktivmitglied, alle anderen erhalten den Status \"Aufnahme pendent\" (Freischaltung an der GV).")
+            .setPositiveButton("Genehmigen") { _, _ ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     try {
                         val response = ApiModule.registrationsApi.approve(
-                            reg.id, ApproveRequest(statuses[which])
+                            reg.id, ApproveRequest("Aktivmitglied")
                         )
                         if (response.isSuccessful) {
-                            // Erfolg: Bestaetigung anzeigen und Liste aktualisieren
                             Snackbar.make(binding.root, "Antrag genehmigt", Snackbar.LENGTH_SHORT).show()
                             loadRegistrations()
+                        } else {
+                            Snackbar.make(binding.root, "Fehler: ${response.code()}", Snackbar.LENGTH_SHORT).show()
                         }
                     } catch (e: Exception) {
-                        // Fehler: Fehlermeldung in Snackbar anzeigen
                         Snackbar.make(binding.root, "Fehler: ${e.message}", Snackbar.LENGTH_SHORT).show()
                     }
                 }
             }
+            .setNegativeButton("Abbrechen", null)
             .show()
     }
 

@@ -109,7 +109,7 @@ class MembersViewModel : ViewModel() {
             try {
                 // Filter-Wert fuer die API: Nur gueltige Status-Werte werden uebergeben
                 val statusParam = when (filter) {
-                    "Aktiv", "Passiv", "Ehren" -> filter
+                    "Aktivmitglied", "Aufnahme pendent", "Ehrenmitglied" -> filter
                     else -> null
                 }
                 // API-Aufruf: Laedt Mitglieder mit optionalem Status-Filter und Suchbegriff
