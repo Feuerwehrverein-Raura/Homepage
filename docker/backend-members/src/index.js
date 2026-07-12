@@ -1266,6 +1266,26 @@ async function createAuthentikUser(member) {
     }
 }
 
+// DEUTSCH: Erzeugt einen Passwort-Setzen-Link (Authentik Recovery-Flow) für einen
+// User. Damit kann ein neues Mitglied sein Passwort selbst setzen, ohne dass ein
+// temporäres Passwort weitergegeben werden muss.
+async function getAuthentikRecoveryLink(authentikUserId) {
+    const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const AUTHENTIK_API_TOKEN = process.env.AUTHENTIK_API_TOKEN;
+    if (!AUTHENTIK_API_TOKEN || !authentikUserId) return null;
+    try {
+        const response = await axios.post(
+            `${AUTHENTIK_API_URL}/api/v3/core/users/${authentikUserId}/recovery/`,
+            {},
+            { headers: { 'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}` } }
+        );
+        return response.data?.link || null;
+    } catch (error) {
+        console.error('Failed to create Authentik recovery link:', error.response?.data || error.message);
+        return null;
+    }
+}
+
 // DEUTSCH: Löscht einen Benutzer aus Authentik anhand seiner Authentik-ID
 async function deleteAuthentikUser(authentikUserId) {
     const AUTHENTIK_API_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
@@ -2911,13 +2931,16 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
                             [id, type]
                         );
                     }
+                    const passwortLink = await getAuthentikRecoveryLink(ak.pk);
                     const today = new Date().toLocaleDateString('de-CH');
                     getAktuarName().then(aktuarName => {
                         sendNotificationEmail(id, 'Willkommen neues Mitglied', {
                             mitgliedsnummer: id.substring(0, 8),
                             status: 'Aktivmitglied',
                             eintrittsdatum: today,
-                            aktuar_name: aktuarName
+                            aktuar_name: aktuarName,
+                            email: updatedRow.email || '',
+                            passwort_link: passwortLink || ''
                         }, 'general', 'Willkommen beim FWV Raura!',
                            'Deine Mitgliedschaft wurde bestaetigt.'
                         ).catch(err => console.error('Welcome email failed:', err));
@@ -3724,8 +3747,8 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
             registration.mobile,
             registration.email,
             memberStatus,
-            registration.korrespondenz_methode === 'email',
-            registration.korrespondenz_methode === 'post',
+            /mail/i.test(registration.korrespondenz_methode || ''),
+            /post/i.test(registration.korrespondenz_methode || ''),
             registration.anrede || null,
             registration.geschlecht || null,
             registration.geburtstag || null,
@@ -3740,6 +3763,7 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
         // "Aufnahme pendent" (warten auf GV) bekommt noch KEINEN Login — der wird
         // erst beim Statuswechsel auf Aktivmitglied provisioniert (siehe PUT /members/:id).
         let authentikResult = null;
+        let passwortLink = null;
         if (memberStatus === 'Aktivmitglied' && registration.email) {
             authentikResult = await createAuthentikUser({
                 vorname: registration.vorname,
@@ -3764,6 +3788,9 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
                         ON CONFLICT (member_id, notification_type) DO NOTHING
                     `, [memberId, type]);
                 }
+
+                // Passwort-Setzen-Link (Authentik Recovery) für die Willkommensmail
+                passwortLink = await getAuthentikRecoveryLink(authentikResult.pk);
             }
         }
 
@@ -3791,7 +3818,9 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
                 mitgliedsnummer: memberId.substring(0, 8),
                 status: memberStatus,
                 eintrittsdatum: today,
-                aktuar_name: aktuarName
+                aktuar_name: aktuarName,
+                email: registration.email || '',
+                passwort_link: passwortLink || ''
             }, 'general',
                istAktiv ? 'Willkommen beim FWV Raura!' : 'Dein Aufnahmeantrag wurde angenommen',
                istAktiv
