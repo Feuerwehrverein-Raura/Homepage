@@ -715,6 +715,7 @@ function ReceiptsPanel({ slug, token, userEmail, version, onAuthError, onChange 
   const [receipts, setReceipts] = useState<Receipt[] | null>(null)
   const [amount, setAmount] = useState('')
   const [busy, setBusy] = useState(false)
+  const [viewer, setViewer] = useState<string | null>(null) // Beleg im Vollbild ansehen (PWA-tauglich)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -761,9 +762,9 @@ function ReceiptsPanel({ slug, token, userEmail, version, onAuthError, onChange 
           <ul className="grid grid-cols-3 gap-2">
             {receipts.map((r) => (
               <li key={r.id} className="relative">
-                <a href={`${MEDIA_ORIGIN}${r.image_url}`} target="_blank" rel="noreferrer">
+                <button type="button" onClick={() => setViewer(`${MEDIA_ORIGIN}${r.image_url}`)} className="block w-full">
                   <img src={`${MEDIA_ORIGIN}${r.image_url}`} alt="Beleg" className="w-full h-24 object-cover rounded-lg border border-gray-100" />
-                </a>
+                </button>
                 {r.amount != null && <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white rounded px-1">{chf(r.amount)}</span>}
                 <button onClick={() => remove(r.id)} aria-label="Beleg löschen"
                   className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 text-gray-600 text-sm shadow">×</button>
@@ -771,6 +772,13 @@ function ReceiptsPanel({ slug, token, userEmail, version, onAuthError, onChange 
             ))}
           </ul>
         )}
+      {viewer && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-3" onClick={() => setViewer(null)}>
+          <img src={viewer} alt="Beleg" className="max-w-full max-h-full object-contain rounded-lg" />
+          <button type="button" onClick={() => setViewer(null)} aria-label="Schliessen"
+            className="absolute top-4 right-4 bg-white/90 rounded-full w-10 h-10 text-gray-700 text-2xl shadow">×</button>
+        </div>
+      )}
     </div>
   )
 }
