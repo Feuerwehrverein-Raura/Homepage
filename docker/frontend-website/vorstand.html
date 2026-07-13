@@ -3944,12 +3944,15 @@
                 const setPwForm = document.getElementById('set-password-form');
                 pwResult.classList.add('hidden');
                 setPwForm.classList.add('hidden');
-                if (member.authentik_user_id) {
-                    pwSection.classList.remove('hidden');
-                    pwSection.dataset.memberId = member.id;
-                } else {
-                    pwSection.classList.add('hidden');
-                }
+                // Bereich immer zeigen: das Login-Datenblatt (QR + lokales Passwort)
+                // funktioniert auch für Mitglieder OHNE Authentik-Konto (z.B. ältere
+                // ohne E-Mail). Passwort zurücksetzen/setzen brauchen ein Konto und
+                // werden nur dann eingeblendet.
+                pwSection.classList.remove('hidden');
+                pwSection.dataset.memberId = member.id;
+                const hasAccount = !!member.authentik_user_id;
+                document.getElementById('reset-password-btn').classList.toggle('hidden', !hasAccount);
+                document.getElementById('set-password-btn').classList.toggle('hidden', !hasAccount);
             } catch (error) {
                 console.error('Error loading member:', error);
                 alert('Fehler beim Laden des Mitglieds');
