@@ -3541,6 +3541,69 @@ app.post('/members/:id/reset-password', authenticateVorstand, async (req, res) =
     }
 });
 
+// DEUTSCH: Login-Datenblatt — setzt ein bekanntes Passwort (App-bcrypt + Authentik),
+// stellt einen QR-Login-Token sicher und gibt beides im Klartext zurück, damit der
+// Vorstand pro Mitglied eine Login-Seite drucken kann (v.a. für ältere Mitglieder).
+app.post('/members/:id/datenblatt', authenticateVorstand, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const m = await pool.query('SELECT id, email, vorname, nachname, authentik_user_id FROM members WHERE id = $1', [id]);
+        if (m.rows.length === 0) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        const member = m.rows[0];
+
+        // Lesbares Passwort erzeugen (z.B. FWV-482913)
+        const password = `FWV-${Math.floor(100000 + Math.random() * 900000)}`;
+
+        // Lokalen bcrypt-Hash setzen (App-Login) + Authentik-Passwort (Web-Login, falls Konto)
+        const hash = await bcrypt.hash(password, 10);
+        await pool.query('UPDATE members SET password_hash = $1 WHERE id = $2', [hash, id]);
+        if (member.authentik_user_id) {
+            try { await setAuthentikUserPassword(member.authentik_user_id, password); }
+            catch (e) { console.error('Authentik-Passwort (Datenblatt) fehlgeschlagen:', e.message); }
+        }
+
+        // QR-Login-Token sicherstellen (bestehenden wiederverwenden, sonst neu)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS member_app_tokens (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+                token TEXT NOT NULL UNIQUE,
+                description TEXT,
+                created_by TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        let qrToken;
+        const existing = await pool.query(
+            'SELECT token FROM member_app_tokens WHERE member_id = $1 ORDER BY created_at DESC LIMIT 1', [id]
+        );
+        if (existing.rows.length > 0) {
+            qrToken = existing.rows[0].token;
+        } else {
+            qrToken = 'fwv-member-' + crypto.randomBytes(32).toString('base64url');
+            await pool.query(
+                'INSERT INTO member_app_tokens (member_id, token, description, created_by) VALUES ($1, $2, $3, $4)',
+                [id, qrToken, 'Datenblatt', req.user.email]
+            );
+        }
+
+        await logAudit(pool, 'MEMBER_DATENBLATT_GENERATED', null, req.user.email, getClientIp(req), {
+            member_id: id, member_name: `${member.vorname} ${member.nachname}`
+        });
+
+        res.json({
+            success: true,
+            name: `${member.vorname} ${member.nachname}`,
+            email: member.email || '',
+            password,
+            qr_token: qrToken
+        });
+    } catch (error) {
+        console.error('Datenblatt error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Passwort manuell setzen (Vorstand gibt ein bestimmtes Passwort ein)
 app.post('/members/:id/set-password', authenticateVorstand, async (req, res) => {
     try {
