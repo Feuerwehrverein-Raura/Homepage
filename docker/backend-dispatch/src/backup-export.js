@@ -5,8 +5,8 @@
  *         Anlaesse, Versand, Audit-Log, Service-Accounts (nur Metadaten).
  *
  * Empfaenger: process.env.BACKUP_EMAIL (default: vorstand@fwv-raura.ch).
- * Wird bei Container-Start auf 03:00 Europe/Zurich geplant; nach jedem Lauf
- * wird der naechste Tag gleicher Zeit gesetzt.
+ * Wird bei Container-Start auf Sonntag 03:00 Europe/Zurich geplant; nach jedem
+ * Lauf wird der naechste Sonntag gleicher Zeit gesetzt.
  */
 
 const XLSX = require('xlsx');
@@ -158,7 +158,7 @@ function buildWorkbook(data) {
 async function runDailyBackup(pool) {
     const recipient = process.env.BACKUP_EMAIL || 'vorstand@fwv-raura.ch';
     const PORT = process.env.PORT || 3000;
-    console.log('[BACKUP] Starting daily backup export ->', recipient);
+    console.log('[BACKUP] Starting weekly backup export ->', recipient);
     try {
         const data = await loadAll(pool);
         const buf = buildWorkbook(data);
@@ -168,11 +168,11 @@ async function runDailyBackup(pool) {
         const apiKey = process.env.API_KEY || process.env.INTERNAL_API_KEY;
         await axios.post(`http://localhost:${PORT}/email/send`, {
             to: recipient,
-            subject: `FWV Raura — Tagesbackup ${today}`,
-            body: `Anbei das automatische Tagesbackup aller Vereinsdaten als Excel-Datei.\n\n` +
+            subject: `FWV Raura — Wochenbackup ${today}`,
+            body: `Anbei das automatische Wochenbackup aller Vereinsdaten als Excel-Datei.\n\n` +
                   `Inhalt: Mitglieder, Beitraege, Rechnungen, Buchhaltung, Anmeldungen, Anlaesse, ` +
                   `Versand-Historie (90 Tage), Audit-Log (90 Tage), Service-Accounts, Scheduled-Jobs.\n\n` +
-                  `Diese E-Mail wird taeglich automatisch versendet. Bitte sicher archivieren.\n\n` +
+                  `Diese E-Mail wird woechentlich (Sonntag) automatisch versendet. Bitte sicher archivieren.\n\n` +
                   `Feuerwehrverein Raura`,
             attachments: [{
                 filename,
@@ -188,17 +188,21 @@ async function runDailyBackup(pool) {
 }
 
 /**
- * Plant den naechsten Lauf auf 03:00 Europe/Zurich (lokal). Nach jedem Lauf
- * wird neu auf naechsten Tag 03:00 geplant. setTimeout statt setInterval —
- * so ist die Uhrzeit stabil auch ueber DST-Wechsel.
+ * Plant den naechsten Lauf auf Sonntag 03:00 Europe/Zurich (lokal). Nach jedem
+ * Lauf wird neu auf den naechsten Sonntag 03:00 geplant. setTimeout statt
+ * setInterval — so ist die Uhrzeit stabil auch ueber DST-Wechsel.
  */
 function scheduleNext(pool) {
     const now = new Date();
     const next = new Date(now);
     next.setHours(3, 0, 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
+    // Auf den naechsten Sonntag schieben (getDay(): 0 = Sonntag)
+    const daysUntilSunday = (7 - next.getDay()) % 7;
+    next.setDate(next.getDate() + daysUntilSunday);
+    // Falls es bereits Sonntag nach 03:00 ist, eine Woche weiter
+    if (next <= now) next.setDate(next.getDate() + 7);
     const ms = next.getTime() - now.getTime();
-    console.log('[BACKUP] Next daily backup scheduled at', next.toISOString(), `(in ${Math.round(ms / 60000)} min)`);
+    console.log('[BACKUP] Next weekly backup scheduled at', next.toISOString(), `(in ${Math.round(ms / 3600000)} h)`);
     setTimeout(async () => {
         await runDailyBackup(pool);
         scheduleNext(pool);

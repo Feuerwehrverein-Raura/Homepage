@@ -1,9 +1,11 @@
 #!/bin/bash
-# Tägliches PostgreSQL-Backup für alle Datenbanken
-# Wird per Crontab ausgeführt: 0 2 * * * /opt/docker/fwv-website/cron/postgres-backup.sh >> /var/log/fwv-postgres-backup.log 2>&1
+# Wöchentliches PostgreSQL-Backup für alle Datenbanken
+# Wird per Crontab ausgeführt: 0 2 * * 0 /opt/docker/fwv-website/cron/postgres-backup.sh >> /var/log/fwv-postgres-backup.log 2>&1
+# (0 2 * * 0 = jeden Sonntag um 02:00 Uhr)
 
 BACKUP_DIR="/opt/docker/backups/postgres"
-RETENTION_DAYS=7
+# 56 Tage = ca. 8 Wochenbackups werden aufbewahrt
+RETENTION_DAYS=56
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 
