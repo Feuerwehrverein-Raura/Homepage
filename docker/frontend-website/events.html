@@ -1961,6 +1961,8 @@
                         // DEUTSCH: Nutzer zum Mitglieder-Login auffordern
                         this.showMemberLoginPrompt(result.memberName, payload);
                     } else {
+                        // DEUTSCH: Anmeldeschluss vorbei -> Hinweis auf telefonische Meldung
+                        if (this.handleDeadlinePassed(result)) return;
                         throw new Error(result.message || 'Unbekannter Fehler');
                     }
                 } catch (error) {
@@ -2019,6 +2021,8 @@
                         // User ist Mitglied - zum Login auffordern
                         this.showMemberLoginPrompt(result.memberName, payload);
                     } else {
+                        // DEUTSCH: Anmeldeschluss vorbei -> Hinweis auf telefonische Meldung
+                        if (this.handleDeadlinePassed(result)) return;
                         throw new Error(result.message || 'Unbekannter Fehler');
                     }
                 } catch (error) {
@@ -2191,6 +2195,8 @@
                     } else if (response.status === 409 && result.isMember) {
                         this.showMemberLoginPrompt(result.memberName, payload);
                     } else {
+                        // DEUTSCH: Anmeldeschluss vorbei -> Hinweis auf telefonische Meldung
+                        if (this.handleDeadlinePassed(result)) return;
                         throw new Error(result.message || 'Unbekannter Fehler');
                     }
                 } catch (error) {
@@ -2200,6 +2206,21 @@
                     submitBtn.disabled = false;
                     submitBtn.textContent = originalText;
                 }
+            }
+
+            // DEUTSCH: Prueft, ob die API die Anmeldung wegen abgelaufenem Anmeldeschluss
+            // DEUTSCH: abgelehnt hat. Falls ja, wird ein Hinweis angezeigt, dass sich der Nutzer
+            // DEUTSCH: telefonisch beim Organisator oder Vorstand melden soll. Gibt true zurueck,
+            // DEUTSCH: wenn der Fall behandelt wurde (aufrufende Funktion soll dann abbrechen).
+            handleDeadlinePassed(result) {
+                if (result && result.code === 'deadline_passed') {
+                    document.getElementById('registration-modal').classList.add('hidden');
+                    alert('Der Anmeldeschluss für dieses Event ist bereits vorbei.\n\n'
+                        + 'Bitte melde dich telefonisch beim Organisator oder beim Vorstand, '
+                        + 'wenn du dich trotzdem noch anmelden möchtest.');
+                    return true;
+                }
+                return false;
             }
 
             // DEUTSCH: Zeigt einen Hinweis wenn die eingegebene E-Mail zu einem Mitglied gehoert
@@ -2260,6 +2281,8 @@
                             this.showSuccessAndRedirect(result.message);
                         }
                     } else {
+                        // DEUTSCH: Anmeldeschluss vorbei -> Hinweis auf telefonische Meldung
+                        if (this.handleDeadlinePassed(result)) return;
                         throw new Error(result.message || 'Unbekannter Fehler');
                     }
                 } catch (error) {

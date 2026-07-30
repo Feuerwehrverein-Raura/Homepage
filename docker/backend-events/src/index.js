@@ -2171,7 +2171,9 @@ app.post('/registrations/public', async (req, res) => {
         if (ev.registration_deadline && new Date(ev.registration_deadline) < new Date()) {
             return res.status(409).json({
                 success: false,
-                message: 'Der Anmeldeschluss fuer dieses Event ist bereits vorbei.',
+                message: 'Der Anmeldeschluss fuer dieses Event ist bereits vorbei. '
+                    + 'Bitte melde dich telefonisch beim Organisator oder beim Vorstand, '
+                    + 'wenn du dich trotzdem noch anmelden moechtest.',
                 code: 'deadline_passed'
             });
         }
