@@ -29,12 +29,12 @@ fun getVersionCode(): Int {
 
 android {
     namespace = "ch.fwvraura.members"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.fwv.members"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = getVersionCode()
         versionName = getVersionFromTag()
 

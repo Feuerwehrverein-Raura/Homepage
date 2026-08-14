@@ -39,12 +39,12 @@ jobs:
       - name: Install required SDK components
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-35"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;36.0.0" "platforms;android-36"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.12'
+          gradle-version: '8.13'
 
       - name: Inject version from tag
         shell: bash
