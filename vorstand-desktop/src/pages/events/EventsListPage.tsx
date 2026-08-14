@@ -332,15 +332,27 @@ export function EventsListPage() {
 
       {/* Events Table */}
       {!isLoading && events.length > 0 && (
-        <div className="border rounded-lg overflow-hidden">
+        // overflow-x-auto statt -hidden: schmale Fenster haben die Tabelle sonst
+        // stumm abgeschnitten (die "Einladung"-Spalte war halb weg, ohne
+        // Scrollbalken zum Nachziehen). Kategorie/Ort blenden vorher aus, damit
+        // es meist gar nicht erst zum Scrollen kommt.
+        <div className="border rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left px-4 py-3 font-medium">Titel</th>
-                <th className="text-left px-4 py-3 font-medium">Kategorie</th>
-                <th className="text-left px-4 py-3 font-medium">Datum</th>
-                <th className="text-left px-4 py-3 font-medium">Ort</th>
-                <th className="text-left px-4 py-3 font-medium">Anmeldungen</th>
+                <th className="hidden xl:table-cell text-left px-4 py-3 font-medium">
+                  Kategorie
+                </th>
+                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">
+                  Datum
+                </th>
+                <th className="hidden lg:table-cell text-left px-4 py-3 font-medium">
+                  Ort
+                </th>
+                <th className="text-left px-4 py-3 font-medium whitespace-nowrap">
+                  Anmeldungen
+                </th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-right px-4 py-3 font-medium"></th>
               </tr>
@@ -352,33 +364,50 @@ export function EventsListPage() {
                   onClick={() => navigate(`/events/${event.id}`)}
                   className="border-b last:border-0 hover:bg-muted/50 cursor-pointer transition-colors"
                 >
+                  {/* max-w + truncate am inneren div (nicht am td): in einer
+                      auto-layout-Tabelle ignoriert der Browser max-width auf
+                      der Zelle, ein langer Titel sprengt sonst die Spalte. */}
                   <td className="px-4 py-3">
-                    <div className="font-medium">{event.title}</div>
+                    <div
+                      className="max-w-[280px] truncate font-medium"
+                      title={event.title}
+                    >
+                      {event.title}
+                    </div>
                     {event.subtitle && (
-                      <div className="text-xs text-muted-foreground">
+                      <div
+                        className="max-w-[280px] truncate text-xs text-muted-foreground"
+                        title={event.subtitle}
+                      >
                         {event.subtitle}
                       </div>
                     )}
                     {event.organizer_name && (
-                      <div className="text-xs text-muted-foreground">
+                      <div
+                        className="max-w-[280px] truncate text-xs text-muted-foreground"
+                        title={event.organizer_name}
+                      >
                         Org: {event.organizer_name}
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="hidden xl:table-cell px-4 py-3 text-muted-foreground">
                     {event.category || "-"}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                     {formatSwissDate(event.start_date)}
                     {event.end_date && event.end_date !== event.start_date && (
                       <span> - {formatSwissDate(event.end_date)}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="hidden lg:table-cell px-4 py-3 text-muted-foreground">
                     {event.location ? (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {event.location}
+                      <span
+                        className="flex max-w-[200px] items-center gap-1"
+                        title={event.location}
+                      >
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{event.location}</span>
                       </span>
                     ) : (
                       "-"
@@ -390,7 +419,7 @@ export function EventsListPage() {
                       if (c.pending === 0 && c.approved === 0 && c.needed === 0)
                         return <span className="text-muted-foreground">-</span>;
                       return (
-                        <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-xs whitespace-nowrap">
                           <span className="flex items-center gap-1 text-muted-foreground">
                             <Users className="h-3 w-3" />
                             {c.needed > 0 ? `${c.approved}/${c.needed}` : c.approved}
@@ -407,7 +436,7 @@ export function EventsListPage() {
                   <td className="px-4 py-3">
                     <EventStatusBadge status={event.status} />
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

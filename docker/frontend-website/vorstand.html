@@ -802,14 +802,18 @@
         <!-- Events List -->
         <section class="py-8">
             <div class="container mx-auto px-4">
-                <div class="bg-white rounded-lg shadow overflow-hidden">
+                <!-- overflow-x-auto statt -hidden: sonst schneidet der Rahmen die
+                     rechten Spalten stumm ab, sobald das Fenster schmaler wird —
+                     ohne Scrollbalken kam man nicht mehr an die Aktionen ran.
+                     Kategorie/Organisator blenden vorher aus. -->
+                <div class="bg-white rounded-lg shadow overflow-x-auto">
                     <table class="min-w-full">
                         <thead class="bg-gray-100">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Titel</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Datum</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Kategorie</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Organisator</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap">Datum</th>
+                                <th class="hidden xl:table-cell px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Kategorie</th>
+                                <th class="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Organisator</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Schichten/Personen</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Anmeldungen</th>
@@ -4716,15 +4720,15 @@
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
-                            <div class="text-sm font-medium text-gray-900">${event.title}</div>
+                            <div class="text-sm font-medium text-gray-900 max-w-[280px] truncate" title="${(event.title || '').replace(/"/g, '&quot;')}">${event.title}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-600">${startDate.toLocaleDateString('de-CH')}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="hidden xl:table-cell px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-600">${event.category || '-'}</div>
                         </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        <td class="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-600">${event.organizer_name || '-'}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
