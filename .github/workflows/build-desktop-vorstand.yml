@@ -89,18 +89,19 @@ jobs:
           # tauri.conf.json -> plugins.updater).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Apple-Code-Signing/Notarisierung. Solange die Secrets fehlen, sind
-          # die Variablen leer und tauri-action ueberspringt das Signieren —
-          # der Mac-Build entsteht dann unsigniert (siehe Release-Text).
-          # Zum Aktivieren: Apple Developer Program + die folgenden Secrets
-          # im Repo hinterlegen (dann faellt der xattr-Hinweis im Release weg).
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Apple-Code-Signing ist bewusst NICHT verdrahtet, solange kein
+          # Developer-Account existiert — der Mac-Build bleibt unsigniert
+          # (siehe xattr-Hinweis im Release-Text).
+          #
+          # Wichtig beim spaeteren Aktivieren: die Variablen duerfen nicht
+          # leer gesetzt werden. Tauri liest sie in Rust mit env::var(), und
+          # das liefert fuer eine gesetzte, leere Variable Ok("") — Tauri
+          # haelt das fuer ein vorhandenes Zertifikat und bricht beim
+          # Buendeln mit "failed to import keychain certificate" ab. Also
+          # erst zusammen mit den echten Secrets eintragen:
+          #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+          #   APPLE_SIGNING_IDENTITY, KEYCHAIN_PASSWORD,
+          #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
         with:
           projectPath: vorstand-desktop
           args: ${{ matrix.args }}

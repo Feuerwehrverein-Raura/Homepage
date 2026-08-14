@@ -61,12 +61,25 @@ Einmalige Freigabe:
 xattr -dr com.apple.quarantine "/Applications/FWV Vorstand.app"
 ```
 
-Sobald ein Developer-Account da ist, reicht es, die Secrets
-`APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`,
-`APPLE_SIGNING_IDENTITY`, `KEYCHAIN_PASSWORD`, `APPLE_ID`,
-`APPLE_PASSWORD` und `APPLE_TEAM_ID` im Repo zu hinterlegen — der
-Workflow liest sie bereits aus, und `tauri-action` uebernimmt
-Signieren und Notarisieren dann von selbst.
+Sobald ein Developer-Account da ist: die Secrets `APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
+`KEYCHAIN_PASSWORD`, `APPLE_ID`, `APPLE_PASSWORD` und `APPLE_TEAM_ID`
+hinterlegen **und** sie im Workflow als `env` des Build-Schritts
+eintragen. `tauri-action` uebernimmt Signieren und Notarisieren dann
+von selbst.
+
+Beides gehoert zusammen: die Variablen duerfen nicht auf Vorrat leer
+im Workflow stehen. Tauri liest sie in Rust mit `env::var()`, und das
+liefert fuer eine gesetzte, leere Variable `Ok("")`. Tauri haelt das
+fuer ein vorhandenes Zertifikat, ruft `security import` mit leerem
+Input auf und bricht den Build ab:
+
+```
+security: SecKeychainItemImport: One or more parameters passed to a
+function were not valid.
+failed to bundle project failed codesign application: failed to import
+keychain certificate
+```
 
 ## Release
 
