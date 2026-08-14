@@ -23,8 +23,18 @@ jobs:
         include:
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            args: ''
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
+            args: ''
+          # Ein Universal-Binary statt zwei Mac-Jobs: GitHub stellt x86_64-Runner
+          # nur noch bis August 2027 bereit, Cross-Kompilieren vom ARM-Runner
+          # laeuft dagegen dauerhaft. tauri-action traegt einen Universal-Build
+          # in latest.json unter BEIDEN Keys (darwin-aarch64 + darwin-x86_64)
+          # ein, der Updater findet ihn also auf Intel wie auf Apple Silicon.
+          - platform: macos-latest
+            target: universal-apple-darwin
+            args: '--target universal-apple-darwin'
     runs-on: ${{ matrix.platform }}
     permissions:
       contents: write
@@ -40,6 +50,8 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || matrix.target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -77,8 +89,21 @@ jobs:
           # tauri.conf.json -> plugins.updater).
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Apple-Code-Signing/Notarisierung. Solange die Secrets fehlen, sind
+          # die Variablen leer und tauri-action ueberspringt das Signieren —
+          # der Mac-Build entsteht dann unsigniert (siehe Release-Text).
+          # Zum Aktivieren: Apple Developer Program + die folgenden Secrets
+          # im Repo hinterlegen (dann faellt der xattr-Hinweis im Release weg).
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: vorstand-desktop
+          args: ${{ matrix.args }}
           # Nur bei Tag-Push / manuellem Dispatch ein Release erzeugen — PR-Builds
           # kompilieren nur (leerer tagName = kein Release). Vorher entstanden
           # "NN/merge"-Muell-Releases, die dem Auto-Updater den
@@ -93,6 +118,11 @@ jobs:
             ### Installation
             - **Windows**: `.msi` Installer ausfuehren
             - **Linux (Debian/Ubuntu)**: `.deb` Paket installieren mit `sudo dpkg -i <datei>.deb`
+            - **macOS** (Intel + Apple Silicon): `.dmg` oeffnen, App nach
+              "Programme" ziehen. Der Build ist **nicht von Apple beglaubigt**,
+              darum meldet macOS beim ersten Start "beschaedigt". Einmalig im
+              Terminal freigeben:
+              `xattr -dr com.apple.quarantine "/Applications/FWV Vorstand.app"`
 
             ### Features
             - Mitgliederverwaltung (CRUD, Suche, Filter, Foto)
