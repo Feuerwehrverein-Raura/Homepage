@@ -5,6 +5,8 @@ struct MainTabView: View {
         TabView {
             EventsView()
                 .tabItem { Label("Anlässe", systemImage: "calendar") }
+            OrganizerView()
+                .tabItem { Label("Organisator", systemImage: "person.badge.shield.checkmark") }
             ProfileView()
                 .tabItem { Label("Profil", systemImage: "person.crop.circle") }
             SettingsView()

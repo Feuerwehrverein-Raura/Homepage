@@ -1,0 +1,243 @@
+import SwiftUI
+
+/// Organisator-Bereich: die selbst organisierten Anlässe und deren
+/// Anmeldungen, mit Genehmigen und Ablehnen.
+///
+/// Wer Organisator ist, entscheidet das Backend über die E-Mail-Adresse
+/// (`organizer_email` des Anlasses). Wer nichts organisiert, bekommt hier
+/// eine leere Liste — der Tab bleibt trotzdem sichtbar, wie auf Android.
+struct OrganizerView: View {
+    @EnvironmentObject var auth: AuthManager
+    @State private var events: [Event] = []
+    @State private var registrations: [String: [EventRegistration]] = [:]
+    @State private var loading = true
+    @State private var error: String?
+    @State private var working: String?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if loading {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let error {
+                    message(error, systemImage: "exclamationmark.triangle")
+                } else if events.isEmpty {
+                    message("Du organisierst zurzeit keinen Anlass.",
+                            systemImage: "person.badge.shield.checkmark")
+                } else {
+                    List {
+                        ForEach(events) { event in
+                            Section {
+                                let regs = registrations[event.id] ?? []
+                                if regs.isEmpty {
+                                    Text("Noch keine Anmeldungen.")
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    ForEach(regs) { registration in
+                                        RegistrationCard(
+                                            registration: registration,
+                                            busy: working == registration.id,
+                                            approve: {
+                                                Task { await decide(event, registration, approve: true) }
+                                            },
+                                            reject: {
+                                                Task { await decide(event, registration, approve: false) }
+                                            }
+                                        )
+                                    }
+                                }
+                            } header: {
+                                EventHeader(event: event,
+                                            pending: pendingCount(event))
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Organisator")
+            .task { await load() }
+            .refreshable { await load() }
+        }
+    }
+
+    private func pendingCount(_ event: Event) -> Int {
+        (registrations[event.id] ?? []).filter { $0.status == "pending" }.count
+    }
+
+    private func message(_ text: String, systemImage: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: systemImage).font(.largeTitle).foregroundStyle(.secondary)
+            Text(text).foregroundStyle(.secondary).multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    private func load() async {
+        loading = true
+        error = nil
+        do {
+            let api = auth.api()
+            let mine: [Event] = try await api.get("events/organized-by-me")
+            events = mine
+            // Die Anmeldungen haengen an je einem eigenen Endpunkt. Nacheinander
+            // statt nebenlaeufig: es sind wenige Anlaesse, und so bleibt die
+            // Reihenfolge nachvollziehbar, wenn einer davon scheitert.
+            var collected: [String: [EventRegistration]] = [:]
+            for event in mine {
+                let regs: [EventRegistration] = (try? await api.get(
+                    "events/\(event.id)/organizer-registrations")) ?? []
+                collected[event.id] = regs
+            }
+            registrations = collected
+        } catch {
+            self.error = "Organisator-Daten konnten nicht geladen werden."
+        }
+        loading = false
+    }
+
+    private func decide(_ event: Event,
+                        _ registration: EventRegistration,
+                        approve: Bool) async {
+        working = registration.id
+        defer { working = nil }
+        let action = approve ? "approve-as-organizer" : "reject-as-organizer"
+        do {
+            let _: PublicRegistrationResponse = try await auth.api().post(
+                "events/\(event.id)/registrations/\(registration.id)/\(action)",
+                body: [String: String]()
+            )
+            await load()
+        } catch {
+            self.error = approve
+                ? "Genehmigen fehlgeschlagen."
+                : "Ablehnen fehlgeschlagen."
+        }
+    }
+}
+
+private struct EventHeader: View {
+    let event: Event
+    let pending: Int
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title)
+                HStack(spacing: 8) {
+                    if let date = event.startDate {
+                        Text(DateFormat.swiss(date))
+                    }
+                    if let location = event.location, !location.isEmpty {
+                        Text(location)
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if pending > 0 {
+                Text("\(pending) offen")
+                    .font(.caption2.weight(.medium))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.orange.opacity(0.2), in: Capsule())
+                    .foregroundStyle(.orange)
+            }
+        }
+        .textCase(nil)
+    }
+}
+
+private struct RegistrationCard: View {
+    let registration: EventRegistration
+    let busy: Bool
+    var approve: () -> Void
+    var reject: () -> Void
+
+    private var notes: RegNotes { RegNotes.parse(registration.notes) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(registration.displayName).font(.subheadline.weight(.medium))
+                Spacer()
+                StatusPill(status: registration.status)
+            }
+
+            if let email = registration.guestEmail, !email.isEmpty {
+                Text(email).font(.caption).foregroundStyle(.secondary)
+            }
+
+            // Aufbereitet statt roh: im notes-Feld steckt JSON.
+            if notes.participants > 1 {
+                Label("\(notes.participants) Personen", systemImage: "person.2")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let phone = notes.phone {
+                Label(phone, systemImage: "phone").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(notes.companions) { companion in
+                Label(companion.name, systemImage: "person")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let allergies = notes.allergies {
+                Label(allergies, systemImage: "allergens")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            if let meal = notes.mealSelection {
+                Label(meal, systemImage: "fork.knife")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let text = notes.text {
+                Text(text).font(.caption).foregroundStyle(.secondary)
+            }
+
+            if registration.status == "pending" {
+                HStack(spacing: 12) {
+                    Button(action: approve) {
+                        Label("Genehmigen", systemImage: "checkmark")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+
+                    Button(action: reject) {
+                        Label("Ablehnen", systemImage: "xmark")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    if busy { ProgressView() }
+                }
+                .disabled(busy)
+                .padding(.top, 2)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+private struct StatusPill: View {
+    let status: String?
+
+    private var appearance: (String, Color) {
+        switch status {
+        case "approved": return ("bestätigt", .green)
+        case "rejected": return ("abgelehnt", .red)
+        case "pending": return ("offen", .orange)
+        default: return (status ?? "—", .secondary)
+        }
+    }
+
+    var body: some View {
+        Text(appearance.0)
+            .font(.caption2.weight(.medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(appearance.1.opacity(0.15), in: Capsule())
+            .foregroundStyle(appearance.1)
+    }
+}

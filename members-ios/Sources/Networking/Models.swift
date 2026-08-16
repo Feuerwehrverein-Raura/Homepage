@@ -360,3 +360,115 @@ struct MemberAuthResponse: Decodable {
     let message: String?
     let error: String?
 }
+
+// MARK: Organisator
+
+/// Eine Anmeldung, wie sie der Organisator sieht
+/// (`GET events/{id}/organizer-registrations`).
+struct EventRegistration: Decodable, Identifiable {
+    let id: String
+    let eventId: String?
+    let memberId: String?
+    let guestName: String?
+    let guestEmail: String?
+    let status: String?
+    let notes: String?
+    let createdAt: String?
+    let memberVorname: String?
+    let memberNachname: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, status, notes
+        case eventId = "event_id"
+        case memberId = "member_id"
+        case guestName = "guest_name"
+        case guestEmail = "guest_email"
+        case createdAt = "created_at"
+        case memberVorname = "member_vorname"
+        case memberNachname = "member_nachname"
+    }
+
+    /// Angezeigter Name: Mitglied vor Gast.
+    var displayName: String {
+        let member = [memberVorname, memberNachname]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+        if !member.isEmpty { return member }
+        return guestName ?? guestEmail ?? "Unbekannt"
+    }
+}
+
+/// Begleitperson einer Anmeldung.
+struct RegCompanion: Identifiable {
+    let name: String
+    let email: String?
+    let phone: String?
+
+    var id: String { name }
+}
+
+/// Aus dem rohen `notes`-Feld geparste Zusatzdaten.
+///
+/// Das Backend legt dort JSON ab: `{phone, participants, companions,
+/// allergies, meal_selection, notes}`. Ganz alte Anmeldungen enthalten
+/// stattdessen reinen Freitext. Ohne die Unterscheidung stünde im
+/// Organisator-Bereich rohes JSON auf dem Bildschirm.
+struct RegNotes {
+    var phone: String?
+    var participants: Int = 1
+    var companions: [RegCompanion] = []
+    var allergies: String?
+    var mealSelection: String?
+    var text: String?
+
+    var isEmpty: Bool {
+        (phone?.isEmpty ?? true) && companions.isEmpty
+            && (allergies?.isEmpty ?? true) && (mealSelection?.isEmpty ?? true)
+            && (text?.isEmpty ?? true)
+    }
+
+    /// Defensiv wie `parseRegNotes` der Android-App: kein JSON-Objekt heisst
+    /// Freitext, Begleitpersonen können Zeichenkette oder Objekt sein, und
+    /// jeder Fehler fällt sicher auf Freitext zurück.
+    static func parse(_ raw: String?) -> RegNotes {
+        guard let raw, !raw.trimmingCharacters(in: .whitespaces).isEmpty else {
+            return RegNotes()
+        }
+        guard let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data),
+              let dict = object as? [String: Any] else {
+            return RegNotes(text: raw)
+        }
+
+        func string(_ key: String) -> String? {
+            guard let value = dict[key] as? String else { return nil }
+            return value.isEmpty ? nil : value
+        }
+
+        var notes = RegNotes()
+        notes.phone = string("phone")
+        if let count = dict["participants"] as? Int, count >= 1 {
+            notes.participants = count
+        }
+        notes.allergies = string("allergies")
+        notes.mealSelection = string("meal_selection")
+        notes.text = string("notes")
+
+        if let raw = dict["companions"] as? [Any] {
+            notes.companions = raw.compactMap { entry in
+                if let name = entry as? String, !name.isEmpty {
+                    return RegCompanion(name: name, email: nil, phone: nil)
+                }
+                if let object = entry as? [String: Any],
+                   let name = object["name"] as? String, !name.isEmpty {
+                    return RegCompanion(name: name,
+                                        email: object["email"] as? String,
+                                        phone: object["phone"] as? String)
+                }
+                return nil
+            }
+        }
+        return notes
+    }
+}
