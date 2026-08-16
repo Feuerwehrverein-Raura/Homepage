@@ -7,9 +7,13 @@ struct LoginView: View {
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            Image(systemName: "flame.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(.red)
+            // Dasselbe Emblem wie in der Android-App (ic_launcher_foreground),
+            // freigestellt — das dortige logo_mitglieder.png hat einen
+            // eingebrannten Karo-Hintergrund und taugt nicht als Vorlage.
+            Image("LogoMitglieder")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 180, height: 180)
             Text("FWV Mitglieder")
                 .font(.largeTitle.bold())
             Text("Feuerwehrverein Raura Kaiseraugst")
