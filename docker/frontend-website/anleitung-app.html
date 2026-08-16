@@ -92,8 +92,6 @@
         nav.site-nav, .kapitelleiste, .nur-bildschirm, footer.site-footer,
         #mobile-menu { display: none !important; }
         .druckkopf { display: flex !important; }
-        .druck-plattform { display: block !important; color: #6b7280 !important;
-            font-size: 9.5pt; margin-top: -2mm; }
         header.hero { background: #fff !important; color: #1f2937 !important;
             padding: 0 0 6mm !important; }
         header.hero h1 { color: #991b1b !important; font-size: 24pt; }
@@ -157,10 +155,6 @@
             <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
         </div>
         <h1 class="text-4xl font-bold mb-4">Die Mitglieder-App</h1>
-        <!-- DEUTSCH: Nur im PDF. Am Bildschirm sagt der Umschalter, welche
-             Bilder zu sehen sind; gedruckt steht es nirgends, darum hier.
-             Den Text setzt das PDF-Skript je nach Ausgabe. -->
-        <p class="druck-plattform" style="display:none"></p>
         <p class="text-xl max-w-2xl">Anlässe sehen, sich für Schichten eintragen, das eigene Profil pflegen — alles vom Telefon aus. Diese Anleitung führt durch jeden Bildschirm.</p>
         <div class="nur-bildschirm mt-6 flex flex-wrap items-center gap-3">
             <span class="text-sm text-fire-100">Bilder von</span>
@@ -197,6 +191,7 @@
 
 <main class="py-8">
     <div class="container mx-auto px-4 max-w-4xl space-y-6">
+    
     
     
 
@@ -568,6 +563,8 @@
     </div>
 
     </div>
+
+    </div>
 </main>
 
 <footer class="site-footer bg-gray-800 text-white py-8 mt-4">
@@ -590,6 +587,7 @@
                 <div class="space-y-2">
                     <a href="anleitung-app.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Mitglieder-App</a>
                     <a href="anleitung-website.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Website</a>
+                    <a href="anleitung-nextcloud.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Cloud (Nextcloud)</a>
                     <a href="anleitung-passwort.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Passwort setzen</a>
                 </div>
             </div>

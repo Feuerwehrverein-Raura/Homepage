@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Passwort setzen - Feuerwehrverein Raura</title>
+<title>Anleitung Cloud - Feuerwehrverein Raura</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
     tailwind.config = {
@@ -114,7 +114,7 @@
                 <a href="events.html" class="text-gray-700 hover:text-fire-600 transition-colors">Veranstaltungen</a>
                 <a href="calendar.html" class="text-gray-700 hover:text-fire-600 transition-colors">Kalender</a>
                 <a href="mein.html" class="text-gray-700 hover:text-fire-600 transition-colors">Mein Bereich</a>
-                <a href="anleitung-passwort.html" class="text-fire-600 font-semibold">Anleitungen</a>
+                <a href="anleitung-nextcloud.html" class="text-fire-600 font-semibold">Anleitungen</a>
             </div>
             <button id="mobile-menu-button" class="md:hidden text-gray-700">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,7 +130,7 @@
         <a href="events.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Veranstaltungen</a>
         <a href="calendar.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Kalender</a>
         <a href="mein.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Mein Bereich</a>
-        <a href="anleitung-passwort.html" class="block px-3 py-2 text-fire-600 font-semibold bg-fire-50 rounded-md">Anleitungen</a>
+        <a href="anleitung-nextcloud.html" class="block px-3 py-2 text-fire-600 font-semibold bg-fire-50 rounded-md">Anleitungen</a>
     </div>
 </div>
 
@@ -141,9 +141,9 @@
             <img src="images/logo.png" alt="" style="height:12mm; width:auto;">
             <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
         </div>
-        <h1 class="text-4xl font-bold mb-4">Passwort setzen</h1>
-        <p class="text-xl max-w-2xl">Vergessen — oder noch nie eines gehabt? Beides geht gleich: Du setzt das Vereins-Passwort selbst, in der App oder über die Website. Der Vorstand muss dafür nichts tun.</p>
-        <div class="mt-6"><a href="anleitungen/anleitung-passwort.pdf" class="nur-bildschirm inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>Als PDF</span></a></div>
+        <h1 class="text-4xl font-bold mb-4">Die Vereins-Cloud</h1>
+        <p class="text-xl max-w-2xl">Fotos, Unterlagen und Anleitungen an einem Ort — für alle Mitglieder zugänglich. Wichtig ist nur, den richtigen Knopf beim Anmelden zu treffen.</p>
+        <div class="mt-6"><a href="anleitungen/anleitung-nextcloud.pdf" class="nur-bildschirm inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>Als PDF</span></a></div>
     </div>
 </header>
 
@@ -151,10 +151,11 @@
 <div class="kapitelleiste bg-white border-b sticky top-16 z-40 overflow-x-auto">
     <div class="container mx-auto px-4">
         <div class="flex space-x-5 py-3 whitespace-nowrap text-sm">
-            <a href="#ueberblick" class="text-gray-600 hover:text-fire-600 transition-colors">Auch beim ersten Mal</a>
-            <a href="#app" class="text-gray-600 hover:text-fire-600 transition-colors">In der App</a>
-            <a href="#website" class="text-gray-600 hover:text-fire-600 transition-colors">Über die Website</a>
-            <a href="#probleme" class="text-gray-600 hover:text-fire-600 transition-colors">Wenn es nicht klappt</a>
+            <a href="#anmelden" class="text-gray-600 hover:text-fire-600 transition-colors">Anmelden</a>
+            <a href="#dateien" class="text-gray-600 hover:text-fire-600 transition-colors">Die Ordner</a>
+            <a href="#arbeiten" class="text-gray-600 hover:text-fire-600 transition-colors">Arbeiten</a>
+            <a href="#handy" class="text-gray-600 hover:text-fire-600 transition-colors">Auf dem Telefon</a>
+            <a href="#probleme" class="text-gray-600 hover:text-fire-600 transition-colors">Wenn es klemmt</a>
         </div>
     </div>
 </div>
@@ -162,125 +163,142 @@
 <main class="py-8">
     <div class="container mx-auto px-4 max-w-4xl space-y-6">
     
-    
-    
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="ueberblick">
-  <h2>Auch beim ersten Mal</h2>
-  <p>Der Verein hat nie Passwörter verschickt. Wer sich zum
-    <strong>ersten Mal</strong> anmeldet, hat also gar keines — und geht
-    genau denselben Weg wie jemand, der seines vergessen hat.</p>
-  <p>Der Knopf heisst zwar <em>Passwort vergessen</em>. Er setzt aber
-    ebenso gut ein erstes. Lass dich davon nicht abhalten: Wenn du noch nie
-    drin warst, ist das hier dein Weg hinein.</p>
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anmelden">
+  <h2>Der wichtigste Punkt zuerst: die Anmeldung</h2>
+  <p>Die Vereins-Cloud liegt unter <code>nextcloud.fwv-raura.ch</code>.
+    Dort landest du auf einer Anmeldeseite mit zwei Feldern für Kontoname
+    und Passwort — <strong>und genau die brauchst du nicht.</strong></p>
   <aside class="note">
-    <b>Bei der Aufnahme kam eine E-Mail</b> mit einem Link zum Setzen des
-    Passworts. Ist die verschwunden oder der Link abgelaufen, macht das
-    nichts — die beiden Wege unten führen genauso ans Ziel, beliebig oft.
+    <b>Nimm den unscheinbaren Knopf ganz unten:</b>
+    <em>Anmelden mit Authentik</em>. Nur der führt zum Ziel. Das Formular
+    darüber gehört zu Nextcloud-eigenen Konten, und ein solches hat bei uns
+    niemand — dort einzutippen führt zu „falsches Passwort", egal wie
+    richtig du tippst.
   </aside>
-
-  <h3>Ein Passwort für alles</h3>
-  <p>Für die Website und für die Mitglieder-App gilt <strong>dasselbe
-    Konto</strong>. Es liegt bei der Anmeldestelle des Vereins unter
-    <code>auth.fwv-raura.ch</code>, und dort hängen auch die übrigen
-    Dienste dran — Nextcloud, das Wiki, das Vorstands-Portal.</p>
-  <p>Was du hier setzt, gilt also überall. Du musst das nirgends ein
-    zweites Mal machen.</p>
-  <p>Der Vorstand muss dafür nichts tun. Es gibt zwei Wege, und beide
-    führen zum selben Ergebnis — nimm den, der dir gerade näher liegt.</p>
+  <ol class="steps">
+    <li><code>nextcloud.fwv-raura.ch</code> aufrufen.</li>
+    <li>Ganz unten auf <strong>Anmelden mit Authentik</strong> klicken.</li>
+    <li>Auf der Seite des Vereins mit deinem gewohnten Vereins-Login
+      anmelden — dasselbe Konto wie in der App und im Mitgliederbereich.</li>
+    <li>Fertig, du bist in der Cloud.</li>
+  </ol>
+  <p>Warst du am selben Tag schon einmal angemeldet, geht es meist ohne
+    Nachfrage durch — der Klick auf den Knopf genügt.</p>
   <aside class="note">
-    <b>Der Verein sieht dein Passwort nicht.</b> Auch der Aktuar kann es
-    nicht nachschlagen, nur den Vorgang anstossen. Deshalb lohnt sich der
-    Weg über die E-Mail immer.
+    <b>„Passwort vergessen?" auf dieser Seite hilft dir nicht.</b> Der Link
+    gehört zum Nextcloud-Formular. Wenn du dein Vereins-Passwort setzen
+    oder zurücksetzen willst, steht der Weg in der
+    <a href="anleitung-passwort.html">Anleitung zum Passwort</a>.
   </aside>
+  <figure class="shot">
+    <img src="images/anleitung/nextcloud/01-anmelden.jpg"
+         alt="Anmeldeseite mit dem Knopf Anmelden mit Authentik ganz unten">
+    <figcaption>Nicht das Formular — der Knopf ganz unten</figcaption>
+  </figure>
 </section>
 
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="app">
-  <h2>Der Weg in der App</h2>
-  <p>Der kürzere Weg, wenn du das Telefon ohnehin in der Hand hast: Er
-    bleibt ganz in der App, ein Browser wird nicht gebraucht, und am Ende
-    bist du gleich angemeldet.</p>
-  <ol class="steps">
-    <li>Die Mitglieder-App öffnen. Auf dem Anmeldebildschirm ganz unten
-      steht <strong>Passwort vergessen</strong> — antippen.</li>
-    <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
-      <strong>Code anfordern</strong> drücken.</li>
-    <li>In den Posteingang schauen. In der E-Mail steht ein Zahlencode.</li>
-    <li>Zurück in der App: Code eintippen, das neue Passwort zweimal
-      eingeben und bestätigen.</li>
-  </ol>
-  <p>Danach bist du direkt in der App angemeldet — und kannst dich mit
-    demselben Passwort auch auf der Website anmelden.</p>
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="dateien">
+  <h2>Die Ordner des Vereins</h2>
+  <p>Nach der Anmeldung stehen die <strong>Dateien</strong> im Mittelpunkt.
+    Was du dort siehst, hängt von deiner Funktion ab — die Ordner sind an
+    Gruppen gebunden, nicht an einzelne Personen.</p>
+  <p>Für alle Mitglieder:</p>
+  <ul>
+    <li><strong>Fotos</strong> — Bilder von Anlässen.</li>
+    <li><strong>Roter Schopf</strong> — Unterlagen rund ums Lokal.</li>
+    <li><strong>Anleitungen</strong> — unter anderem diese hier als PDF.</li>
+  </ul>
+  <p>Dazu kommt für den Vorstand der Ordner <strong>Vorstand</strong> mit
+    den Unterlagen der Vereinsführung.</p>
   <aside class="note">
-    <b>Der Code ist nur kurz gültig.</b> Kommt die E-Mail erst später, oder
-    hast du zwischendurch etwas anderes gemacht, fordere einfach einen
-    neuen an.
+    <b>Diese Ordner gehören dem Verein, nicht dir.</b> Was du darin
+    änderst oder löschst, ändert sich für alle. Dein eigener Bereich ist
+    alles, was <em>ausserhalb</em> dieser Ordner liegt — dort kannst du
+    ablegen, was du willst.
   </aside>
+  <p>Fehlt dir ein Ordner, den du erwartest, stimmt vermutlich deine
+    Gruppenzugehörigkeit nicht. Das ist nichts, was du selbst richten
+    kannst — melde dich beim Aktuar.</p>
+  <figure class="shot">
+    <img src="images/anleitung/nextcloud/02-dateien.jpg"
+         alt="Die Dateiansicht mit den Gruppenordnern">
+    <figcaption>Die Gruppenordner nach dem Anmelden</figcaption>
+  </figure>
 </section>
 
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="website">
-  <h2>Der Weg über die Website</h2>
-  <p>Kein Telefon zur Hand, oder du sitzt sowieso am Rechner? Dann geht es
-    über die Anmeldeseite.</p>
-  <ol class="steps">
-    <li>Auf <code>www.fwv-raura.ch</code> auf <strong>Mein Bereich</strong>
-      klicken. Es erscheint die Anmeldeseite des Vereins.</li>
-    <li>Ganz unten steht <strong>Benutzername oder Passwort
-      vergessen?</strong> — anklicken.</li>
-    <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
-      <strong>Continue</strong> drücken.</li>
-    <li>In den Posteingang schauen. Der Link in der E-Mail führt auf eine
-      Seite, auf der du ein neues Passwort setzt.</li>
-    <li>Mit dem neuen Passwort anmelden — auf der Website wie in der
-      App.</li>
-  </ol>
-  <p>Die Seite lässt sich auch direkt aufrufen:
-    <code>auth.fwv-raura.ch/if/flow/password-recovery/</code></p>
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="arbeiten">
+  <h2>Hochladen, öffnen, teilen</h2>
+  <h3>Dateien hinzufügen</h3>
+  <p>Der Knopf <strong>+</strong> oben legt neue Ordner an oder lädt
+    Dateien hoch. Schneller geht es, indem du Dateien vom Rechner einfach
+    ins Fenster ziehst.</p>
+
+  <h3>Ansehen und bearbeiten</h3>
+  <p>Ein Klick auf eine Datei öffnet sie direkt im Browser — Bilder und
+    PDF ohne Umweg, Text- und Tabellendokumente in der eingebauten
+    Bearbeitung. Herunterladen musst du dafür nichts.</p>
+
+  <h3>Weitergeben</h3>
+  <p>Über das Teilen-Symbol neben einer Datei erzeugst du einen
+    <strong>Link</strong>, den du per Mail oder Chat verschicken kannst.
+    Wer ihn hat, kommt an die Datei — auch ohne Vereinskonto.</p>
+  <aside class="note">
+    <b>Beim Teilen kurz nachdenken.</b> Ein Link wandert weiter, ohne dass
+    du es merkst. Für alles, was nicht für die Öffentlichkeit ist, setze
+    ein Ablaufdatum oder ein Passwort — beides bietet Nextcloud beim
+    Erstellen des Links an.
+  </aside>
+
+  <h3>Versehentlich gelöscht?</h3>
+  <p>Gelöschte Dateien landen im <strong>Papierkorb</strong> und lassen
+    sich von dort zurückholen. Und zu jeder Datei bewahrt Nextcloud
+    <strong>frühere Fassungen</strong> auf — hast du ein Dokument
+    überschrieben, kommst du über das Drei-Punkte-Menü an den Stand von
+    vorher.</p>
   <figure class="shot">
-    <img src="images/anleitung/gemeinsam-auth-login.jpg"
-         alt="Anmeldeseite mit dem Link zum Zurücksetzen ganz unten">
-    <figcaption>Schritt 2: der Link steht unter dem Anmeldefeld</figcaption>
+    <img src="images/anleitung/nextcloud/03-teilen.jpg"
+         alt="Das Fenster zum Teilen einer Datei">
+    <figcaption>Einen Link erzeugen — mit Ablaufdatum</figcaption>
   </figure>
-  <figure class="shot">
-    <img src="images/anleitung/gemeinsam-auth-recovery.jpg"
-         alt="Formular zum Zurücksetzen des Passworts">
-    <figcaption>Schritt 3: E-Mail-Adresse eingeben</figcaption>
-  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="handy">
+  <h2>Auf dem Telefon</h2>
+  <p>Es gibt eine Nextcloud-App für Android und iPhone. Damit hast du die
+    Vereinsordner unterwegs dabei und kannst Fotos von einem Anlass gleich
+    hochladen.</p>
+  <p><strong>Auch dort gilt die Regel von oben:</strong> Nach der Eingabe
+    der Adresse <code>nextcloud.fwv-raura.ch</code> öffnet die App ein
+    Browserfenster. Dort erscheint dieselbe Anmeldeseite — und wieder
+    führt nur <em>Anmelden mit Authentik</em> zum Ziel.</p>
+  <aside class="note">
+    <b>Das Adressbuch geht einfacher.</b> Wenn es dir nur darum geht, die
+    Nummern der Mitglieder im Telefon zu haben, brauchst du die
+    Nextcloud-App nicht — das erledigt die Mitglieder-App unter
+    <em>Einstellungen &rarr; Adressbuch</em>. Siehe die
+    <a href="anleitung-app.html#adressbuch">App-Anleitung</a>.
+  </aside>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="probleme">
-  <h2>Wenn es nicht klappt</h2>
-  <h3>Es kommt keine E-Mail</h3>
-  <p>Zuerst im Spam-Ordner nachsehen — Nachrichten von der Anmeldestelle
-    landen dort gern. Warte ausserdem ein paar Minuten; der Versand ist
-    nicht immer sofort.</p>
-  <p>Kommt danach nichts an, ist unter dieser Adresse vermutlich kein Konto
-    hinterlegt. Häufigster Grund: Der Verein hat eine andere Adresse von
-    dir als die, die du eingegeben hast. Dann hilft der Aktuar weiter.</p>
+  <h2>Wenn es klemmt</h2>
+  <h3>„Falscher Benutzername oder falsches Passwort"</h3>
+  <p>Du hast das obere Formular benutzt. Lade die Seite neu und nimm den
+    Knopf <strong>Anmelden mit Authentik</strong> ganz unten.</p>
 
-  <h3>Der Link aus der Willkommens-E-Mail geht nicht mehr</h3>
-  <p>Solche Links laufen nach einiger Zeit ab — das ist kein Fehler,
-    sondern Absicht. Nimm einfach einen der beiden Wege oben; sie führen
-    zum selben Formular und lassen sich beliebig oft benutzen.</p>
+  <h3>Ich sehe keinen einzigen Vereinsordner</h3>
+  <p>Dann fehlt deine Gruppenzugehörigkeit. Das passiert selten, ist aber
+    nichts, was du selbst beheben kannst — eine kurze Meldung an
+    <code>aktuar@fwv-raura.ch</code> genügt.</p>
 
-  <h3>Ich weiss meinen Benutzernamen nicht</h3>
-  <p>Du brauchst ihn nicht. Für das Zurücksetzen genügt die E-Mail-Adresse,
-    und anmelden kannst du dich damit ebenfalls.</p>
+  <h3>Ein Ordner ist plötzlich weg</h3>
+  <p>Meist hat sich eine Funktion geändert — mit ihr die Gruppe und damit
+    der Zugriff. Wenn das nicht sein sollte, melde dich.</p>
 
-  <h3>Das neue Passwort wird nicht angenommen</h3>
-  <p>Es muss mindestens acht Zeichen haben. Zu einfache Passwörter — der
-    eigene Name, <code>12345678</code> — weist die Anmeldestelle ebenfalls
-    ab. Ein Satz, den du dir merken kannst, ist die einfachste sichere
-    Lösung.</p>
-
-  <h3>Ich komme trotzdem nicht rein</h3>
-  <p>Melde dich beim Aktuar unter <code>aktuar@fwv-raura.ch</code>. Er
-    kann prüfen, welche Adresse hinterlegt ist, und den Zugang neu
-    aufsetzen.</p>
+  <h3>Ich komme gar nicht bis zur Anmeldeseite</h3>
+  <p>Prüfe die Adresse: <code>nextcloud.fwv-raura.ch</code>, ohne
+    <em>www</em> davor.</p>
 </section>
-
-
-
-    </div>
 
     </div>
 
