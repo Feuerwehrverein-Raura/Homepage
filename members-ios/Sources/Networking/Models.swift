@@ -69,6 +69,22 @@ struct MemberProfile: Codable {
     let funktion: String?
     let status: String?
     let geburtstag: String?
+    /// Relativer Pfad wie "/uploads/abc.jpg" — das Backend liefert keine
+    /// vollstaendige URL.
+    let foto: String?
+
+    /// Vollstaendige Bild-URL. Die Dateien liegen hinter express.static ohne
+    /// Anmeldung, ein Token wird zum Laden also nicht gebraucht.
+    var fotoURL: URL? {
+        guard let foto, !foto.isEmpty else { return nil }
+        return URL(string: foto, relativeTo: AppConfig.apiBase)
+    }
+
+    var fullName: String {
+        [vorname, nachname].compactMap { $0 }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+    }
 }
 
 struct MyRegistration: Codable, Identifiable {
@@ -134,4 +150,105 @@ struct PublicRegistrationResponse: Decodable {
     let message: String?
     let registrationId: String?
     let isMember: Bool?
+}
+
+// MARK: Eigene Daten bearbeiten
+
+/// Body für `PUT members/me` — nur die Felder, die ein Mitglied selbst
+/// ändern darf. Schlüssel wie in der Android-App (Gson ohne
+/// `@SerializedName`), also unverändert die Feldnamen.
+struct MemberProfileUpdate: Encodable {
+    var anrede: String?
+    var vorname: String?
+    var nachname: String?
+    var email: String?
+    var geburtstag: String?
+    var mobile: String?
+    var telefon: String?
+    var strasse: String?
+    var plz: String?
+    var ort: String?
+}
+
+struct PhotoUploadResponse: Decodable {
+    let success: Bool?
+    let photoUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case success
+        case photoUrl = "photo_url"
+    }
+}
+
+/// Austritt beantragen. Löscht nichts — der Vorstand entscheidet.
+struct AustrittRequest: Encodable {
+    var reason: String?
+    var austrittsdatum: String?
+}
+
+struct AustrittResponse: Decodable {
+    let success: Bool?
+    let message: String?
+}
+
+// MARK: Zugänge
+
+/// Antwort von `GET members/me/accesses` — alles in einem Rutsch.
+struct AccessesResponse: Decodable {
+    var functionEmails: [FunctionEmail] = []
+    var nextcloudFolders: [NextcloudFolder] = []
+    var systemAccesses: [SystemAccess] = []
+    var serviceAccounts: [ServiceAccount] = []
+}
+
+struct SystemAccess: Decodable, Identifiable {
+    let system: String
+    let url: String?
+    let access: String?
+    var enabled: Bool? = true
+
+    var id: String { system }
+}
+
+/// Nextcloud-Gruppenordner. Das Schema kommt direkt von Nextcloud —
+/// übernommen sind nur die Felder, die hier gebraucht werden.
+struct NextcloudFolder: Decodable, Identifiable {
+    let id: Int?
+    let mountPoint: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case mountPoint = "mount_point"
+    }
+}
+
+/// Funktions-E-Mail, etwa praesident@fwv-raura.ch.
+struct FunctionEmail: Decodable, Identifiable {
+    let function: String
+    let email: String
+    let password: String?
+    let server: String?
+    let imapPort: Int?
+    let smtpPort: Int?
+    let webmail: String?
+
+    var id: String { email }
+}
+
+/// Geteilter Zugang, etwa für Kasse oder Küchendisplay.
+struct ServiceAccount: Decodable, Identifiable {
+    let accountName: String?
+    let username: String
+    let displayName: String?
+    let password: String?
+    let description: String?
+    let rotationDays: Int?
+    let nextRotation: String?
+
+    var id: String { username }
+}
+
+struct ChangeFunctionEmailPasswordRequest: Encodable {
+    let email: String
+    let password: String
 }
