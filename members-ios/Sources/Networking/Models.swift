@@ -709,3 +709,153 @@ struct NoteAttachmentUpload: Encodable {
         case contentType = "content_type"
     }
 }
+
+// MARK: Rezepte und Material
+
+/// Zahl, die vom Backend als Zahl **oder** als Zeichenkette kommen kann.
+///
+/// Die Inventar-API liefert `numeric`-Spalten aus PostgreSQL teils als
+/// String. Ein festes `Double` liesse die ganze Antwort scheitern, sobald
+/// eine Menge als "2.5" statt 2.5 ankommt — und dann bliebe die
+/// Einkaufsliste komplett leer, ohne erkennbaren Grund.
+struct LooseNumber: Decodable {
+    let value: Double?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let number = try? container.decode(Double.self) {
+            value = number
+        } else if let text = try? container.decode(String.self) {
+            value = Double(text.replacingOccurrences(of: ",", with: "."))
+        } else {
+            value = nil
+        }
+    }
+
+    /// Ohne unnötige Nachkommastellen: 2.0 wird "2", 2.5 bleibt "2.5".
+    var text: String {
+        guard let value else { return "—" }
+        return value == value.rounded()
+            ? String(Int(value))
+            : String(format: "%.2f", value)
+    }
+}
+
+/// Ein mit dem Anlass verknüpftes Rezept.
+struct LinkedRecipe: Decodable, Identifiable {
+    let id: Int?
+    let recipeId: Int?
+    let linkId: Int?
+    let name: String?
+    let servings: LooseNumber?
+    let categoryName: String?
+    let availablePortions: LooseNumber?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, servings
+        case recipeId = "recipe_id"
+        case linkId = "link_id"
+        case categoryName = "category_name"
+        case availablePortions = "available_portions"
+    }
+
+    /// Für Ändern und Lösen der Verknüpfung. Das Backend liefert die
+    /// Rezept-ID je nach Endpunkt in `recipe_id` oder in `id`.
+    var effectiveRecipeId: Int? { recipeId ?? id }
+}
+
+struct AvailableRecipe: Decodable, Identifiable {
+    let id: Int
+    let name: String?
+    let categoryName: String?
+    let availablePortions: LooseNumber?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case categoryName = "category_name"
+        case availablePortions = "available_portions"
+    }
+}
+
+struct AvailableItem: Decodable, Identifiable {
+    let id: Int
+    let name: String?
+    let unit: String?
+    let quantity: LooseNumber?
+    let categoryName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, unit, quantity
+        case categoryName = "category_name"
+    }
+}
+
+struct LinkRecipeRequest: Encodable {
+    let recipeId: Int
+    let servings: Int
+
+    enum CodingKeys: String, CodingKey {
+        case servings
+        case recipeId = "recipe_id"
+    }
+}
+
+struct UpdateServingsRequest: Encodable {
+    let servings: Int
+}
+
+struct AddManualItemRequest: Encodable {
+    let itemId: Int
+    let quantity: Double
+
+    enum CodingKeys: String, CodingKey {
+        case quantity
+        case itemId = "item_id"
+    }
+}
+
+/// Eine Position der Einkaufsliste — aus verknüpften Rezepten **und**
+/// manuell erfassten Materialien gegen den Lagerbestand gerechnet.
+struct ShoppingItem: Decodable, Identifiable {
+    let itemId: Int?
+    let itemName: String?
+    let toBuy: LooseNumber?
+    let unit: String?
+    var purchased: Bool = false
+    let needed: LooseNumber?
+    let recipeNeeded: LooseNumber?
+    let manualNeeded: LooseNumber?
+    let inStock: LooseNumber?
+    let supplier: String?
+    let estimatedCost: LooseNumber?
+
+    enum CodingKeys: String, CodingKey {
+        case unit, purchased, needed, supplier
+        case itemId = "item_id"
+        case itemName = "item_name"
+        case toBuy = "to_buy"
+        case recipeNeeded = "recipe_needed"
+        case manualNeeded = "manual_needed"
+        case inStock = "in_stock"
+        case estimatedCost = "estimated_cost"
+    }
+
+    var id: Int { itemId ?? itemName.hashValue }
+
+    /// Manuell erfasst, wenn ein manueller Bedarf gebucht ist.
+    var isManual: Bool { (manualNeeded?.value ?? 0) > 0 }
+}
+
+struct ShoppingList: Decodable {
+    var items: [ShoppingItem] = []
+    let totalItems: Int?
+    let totalToBuy: Int?
+    let estimatedTotalCost: LooseNumber?
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case totalItems = "total_items"
+        case totalToBuy = "total_to_buy"
+        case estimatedTotalCost = "estimated_total_cost"
+    }
+}

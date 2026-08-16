@@ -19,6 +19,7 @@ struct OrganizerView: View {
     @State private var suggesting: EditTarget?
     @State private var editingEvent: Event?
     @State private var notesFor: Event?
+    @State private var materialsFor: Event?
     @State private var pdf: PDFTarget?
 
     struct PDFTarget: Identifiable {
@@ -104,6 +105,12 @@ struct OrganizerView: View {
                                             .font(.caption)
                                     }
                                     Button {
+                                        materialsFor = event
+                                    } label: {
+                                        Label("Material", systemImage: "carrot")
+                                            .font(.caption)
+                                    }
+                                    Button {
                                         pdf = PDFTarget(
                                             event: event,
                                             title: "Teilnehmerliste",
@@ -144,6 +151,11 @@ struct OrganizerView: View {
             .sheet(item: $notifying) { event in
                 NotifyRegistrantsSheet(event: event)
                     .environmentObject(auth)
+            }
+            .sheet(item: $materialsFor) { event in
+                NavigationStack {
+                    EventMaterialsView(event: event).environmentObject(auth)
+                }
             }
             .sheet(item: $notesFor) { event in
                 NavigationStack {
