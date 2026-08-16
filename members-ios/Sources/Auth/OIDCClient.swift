@@ -18,6 +18,7 @@ final class OIDCClient: NSObject, ASWebAuthenticationPresentationContextProvidin
         case cancelled
         case cannotStart
         case tokenExchangeFailed
+        case refreshFailed
     }
 
     /// Muss stark referenziert bleiben, solange der Browser-Dialog offen ist.
@@ -38,6 +39,28 @@ final class OIDCClient: NSObject, ASWebAuthenticationPresentationContextProvidin
             throw OIDCError.noCode
         }
         return try await exchange(code: code, verifier: verifier, tokenEndpoint: discovery.tokenEndpoint)
+    }
+
+    /// Holt mit dem Refresh-Token ein frisches Token-Paar — ohne Browser und
+    /// ohne Zutun des Nutzers. Der Token-Endpunkt kommt aus der Discovery:
+    /// Authentik liefert dort den globalen Endpunkt. Ihn unter dem App-Slug
+    /// zusammenzubauen, endet in einem 404 (dieselbe Falle ist in der
+    /// Android-App als Kommentar vermerkt).
+    func refresh(refreshToken: String) async throws -> Tokens {
+        let discovery = try await fetchDiscovery()
+        do {
+            return try await postToken(
+                form: [
+                    "grant_type": "refresh_token",
+                    "refresh_token": refreshToken,
+                    "client_id": AppConfig.oidcClientID
+                ],
+                tokenEndpoint: discovery.tokenEndpoint
+            )
+        } catch {
+            // Abgelaufener oder zurueckgezogener Refresh-Token landet hier.
+            throw OIDCError.refreshFailed
+        }
     }
 
     // MARK: Discovery
@@ -102,16 +125,24 @@ final class OIDCClient: NSObject, ASWebAuthenticationPresentationContextProvidin
     // MARK: Token-Exchange
 
     private func exchange(code: String, verifier: String, tokenEndpoint: URL) async throws -> Tokens {
+        try await postToken(
+            form: [
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": AppConfig.oidcRedirectURI,
+                "client_id": AppConfig.oidcClientID,
+                "code_verifier": verifier
+            ],
+            tokenEndpoint: tokenEndpoint
+        )
+    }
+
+    /// Gemeinsamer Formular-POST an den Token-Endpunkt — fuer den ersten
+    /// Code-Tausch wie fuer den spaeteren Refresh.
+    private func postToken(form: [String: String], tokenEndpoint: URL) async throws -> Tokens {
         var req = URLRequest(url: tokenEndpoint)
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        let form: [String: String] = [
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": AppConfig.oidcRedirectURI,
-            "client_id": AppConfig.oidcClientID,
-            "code_verifier": verifier
-        ]
         req.httpBody = form
             .map { "\($0.key)=\(Self.formEncode($0.value))" }
             .joined(separator: "&")

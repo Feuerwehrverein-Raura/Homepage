@@ -42,8 +42,7 @@ struct EventsView: View {
         loading = true
         error = nil
         do {
-            let api = APIClient(baseURL: AppConfig.apiBase, tokenProvider: { auth.accessToken })
-            events = try await api.get("events")
+            events = try await auth.api().get("events")
         } catch {
             self.error = "Events konnten nicht geladen werden."
         }

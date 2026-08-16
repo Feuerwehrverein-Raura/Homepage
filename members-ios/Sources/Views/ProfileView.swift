@@ -52,8 +52,7 @@ struct ProfileView: View {
         loading = true
         error = nil
         do {
-            let api = APIClient(baseURL: AppConfig.apiBase, tokenProvider: { auth.accessToken })
-            profile = try await api.get("members/me")
+            profile = try await auth.api().get("members/me")
         } catch {
             self.error = "Profil konnte nicht geladen werden."
         }

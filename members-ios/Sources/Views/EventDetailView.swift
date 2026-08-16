@@ -55,8 +55,7 @@ struct EventDetailView: View {
 
     private func load() async {
         do {
-            let api = APIClient(baseURL: AppConfig.apiBase, tokenProvider: { auth.accessToken })
-            event = try await api.get("events/\(eventId)")
+            event = try await auth.api().get("events/\(eventId)")
         } catch {
             // Bei Fehler bleibt der Listen-Fallback sichtbar.
         }
