@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anleitung Mitglieder-App - Feuerwehrverein Raura</title>
-<meta name="description" content="Bebilderte Anleitung zur Mitglieder-App des Feuerwehrvereins Raura Kaiseraugst.">
+<meta name="description" content="Bebilderte Anleitung zur Mitglieder-App des Feuerwehrvereins Raura Kaiseraugst, fuer iPhone und Android.">
 <style>
   /* Farben aus dem Vereins-Theme: #B91C1C ist der Primaerton, den auch die
      Android-App und die Website verwenden. Neutraltoene mit leichtem
@@ -255,13 +255,25 @@
   }
 
 
-  .sitebar {
-    background: var(--ink);
-    color: var(--paper);
-    font-family: var(--mono);
-    font-size: .74rem;
-    letter-spacing: .05em;
+  .switcher { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .switcher .wrap {
+    display: flex; align-items: center; gap: .8rem;
+    padding: .7rem 1.5rem;
   }
+  .switcher-label {
+    font-family: var(--mono); font-size: .7rem;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: .82rem;
+    padding: .3rem 1rem; border: 0; cursor: pointer;
+    background: transparent; color: var(--muted);
+  }
+  .seg button.on { background: var(--brand); color: #fff; }
+
+  .sitebar { background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: .74rem; letter-spacing: .05em; }
   .sitebar .wrap { padding: .55rem 1.5rem; display: flex; gap: .6rem; }
   .sitebar a { color: var(--paper); text-decoration: none; opacity: .85; }
   .sitebar a:hover { opacity: 1; text-decoration: underline; }
@@ -292,6 +304,15 @@
   </div>
 </header>
 
+<div class="switcher">
+  <div class="wrap">
+    <span class="switcher-label">Bilder von</span>
+    <div class="seg" role="group" aria-label="Plattform wählen">
+      <button type="button" data-platform="ios" class="on">iPhone</button>
+      <button type="button" data-platform="android">Android</button>
+    </div>
+  </div>
+</div>
 <nav class="toc">
   <ol>
     <li><a href="#installieren">Installieren</a></li>
@@ -320,13 +341,13 @@
       im App Store. Sobald die Verteilung über TestFlight steht, kommt sie
       auf dieselbe Seite.</p>
     <aside class="note">
-      <b>Die Bilder hier stammen vom iPhone.</b> Auf Android sieht die App
-      etwas anders aus, funktioniert aber gleich — mit zwei Ausnahmen, die
-      am Ende stehen.
+      <b>Beide Apps können dasselbe.</b> Sie sehen nur unterschiedlich aus,
+      weil jede den Gestaltungsregeln ihres Systems folgt. Oben lässt sich
+      umschalten, welche Bilder du sehen willst.
     </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/01-anlaesse.jpg" alt="Die Anlass-Liste der App">
+    <img src="images/anleitung/ios/01-anlaesse.jpg" data-ios="images/anleitung/ios/01-anlaesse.jpg" data-android="images/anleitung/android/01-anlaesse.jpg" alt="Die Anlass-Liste der App">
     <figcaption>So sieht die App nach dem Anmelden aus</figcaption>
   </figure>
 </section>
@@ -357,7 +378,7 @@
       gar kein Konto besteht.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/05-profil.jpg" alt="Das Profil nach dem Anmelden">
+    <img src="images/anleitung/ios/05-profil.jpg" data-ios="images/anleitung/ios/05-profil.jpg" data-android="images/anleitung/android/05-profil.jpg" alt="Das Profil nach dem Anmelden">
     <figcaption>Nach der Anmeldung: dein Profil</figcaption>
   </figure>
 </section>
@@ -378,7 +399,7 @@
       welche gibt.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/02-kalender.jpg" alt="Monatsansicht des Kalenders">
+    <img src="images/anleitung/ios/02-kalender.jpg" data-ios="images/anleitung/ios/02-kalender.jpg" data-android="images/anleitung/android/02-kalender.jpg" alt="Monatsansicht des Kalenders">
     <figcaption>Kalender mit farbigen Punkten je Eintragsart</figcaption>
   </figure>
 </section>
@@ -403,7 +424,7 @@
     </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/04-anmeldung.jpg" alt="Schichtauswahl beim Anmelden">
+    <img src="images/anleitung/ios/04-anmeldung.jpg" data-ios="images/anleitung/ios/04-anmeldung.jpg" data-android="images/anleitung/android/04-anmeldung.jpg" alt="Schichtauswahl beim Anmelden">
     <figcaption>Schichten auswählen, Kontakt ist vorausgefüllt</figcaption>
   </figure>
 </section>
@@ -424,7 +445,7 @@
     </ul>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/06-meine-anmeldungen.jpg" alt="Liste der eigenen Anmeldungen">
+    <img src="images/anleitung/ios/06-meine-anmeldungen.jpg" data-ios="images/anleitung/ios/06-meine-anmeldungen.jpg" data-android="images/anleitung/android/06-meine-anmeldungen.jpg" alt="Liste der eigenen Anmeldungen">
     <figcaption>Eigene Anmeldungen mit Status</figcaption>
   </figure>
 </section>
@@ -445,7 +466,7 @@
       darüber entscheidet.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/05-profil.jpg" alt="Profilansicht mit Foto">
+    <img src="images/anleitung/ios/05-profil.jpg" data-ios="images/anleitung/ios/05-profil.jpg" data-android="images/anleitung/android/05-profil.jpg" alt="Profilansicht mit Foto">
     <figcaption>Profil mit Foto, Funktion und Kontakt</figcaption>
   </figure>
 </section>
@@ -467,7 +488,7 @@
     </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/07-zugaenge.jpg" alt="Übersicht der Zugänge">
+    <img src="images/anleitung/ios/07-zugaenge.jpg" data-ios="images/anleitung/ios/07-zugaenge.jpg" data-android="images/anleitung/android/07-zugaenge.jpg" alt="Übersicht der Zugänge">
     <figcaption>Systeme, Funktions-E-Mails, geteilte Konten</figcaption>
   </figure>
 </section>
@@ -486,7 +507,7 @@
       nachts aufgefrischt. Voraussetzung ist ein Nextcloud-Konto.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/10-adressbuch.jpg" alt="Anleitung zum Adressbuch">
+    <img src="images/anleitung/ios/10-adressbuch.jpg" data-ios="images/anleitung/ios/10-adressbuch.jpg" data-android="images/anleitung/android/10-adressbuch.jpg" alt="Anleitung zum Adressbuch">
     <figcaption>Adressbuch einrichten</figcaption>
   </figure>
 </section>
@@ -508,7 +529,7 @@
     </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/09-benachrichtigungen.jpg" alt="Benachrichtigungs-Einstellungen">
+    <img src="images/anleitung/ios/09-benachrichtigungen.jpg" data-ios="images/anleitung/ios/09-benachrichtigungen.jpg" data-android="images/anleitung/android/09-benachrichtigungen.jpg" alt="Benachrichtigungs-Einstellungen">
     <figcaption>Vier Arten, einzeln schaltbar</figcaption>
   </figure>
 </section>
@@ -536,7 +557,7 @@
       keine Adresse hinterlegt hat, wurde übergangen.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/11-organisator.jpg" alt="Organisator-Bereich">
+    <img src="images/anleitung/ios/11-organisator.jpg" data-ios="images/anleitung/ios/11-organisator.jpg" data-android="images/anleitung/android/11-organisator.jpg" alt="Organisator-Bereich">
     <figcaption>Anmeldungen verwalten</figcaption>
   </figure>
 </section>
@@ -567,7 +588,7 @@
       Adressbuch einmal als Konto ein — danach bleibt es genauso aktuell.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/08-einstellungen.jpg" alt="Einstellungen der App">
+    <img src="images/anleitung/ios/08-einstellungen.jpg" data-ios="images/anleitung/ios/08-einstellungen.jpg" data-android="images/anleitung/android/08-einstellungen.jpg" alt="Einstellungen der App">
     <figcaption>Einstellungen</figcaption>
   </figure>
 </section>
@@ -578,6 +599,33 @@
   <div>Fragen oder etwas funktioniert nicht? Melde dich beim Vorstand —
     am besten mit einem Bildschirmfoto der Stelle, an der es hakt.</div>
 </footer>
+
+<script>
+  // Bilder umschalten. Beide Saetze liegen als Dateien vor; getauscht wird
+  // nur das src-Attribut, der Text bleibt derselbe — die Apps koennen ja
+  // dasselbe.
+  (function () {
+    var buttons = document.querySelectorAll('.seg button');
+    var shots = document.querySelectorAll('figure.shot img');
+    function apply(platform) {
+      shots.forEach(function (img) {
+        var next = img.getAttribute('data-' + platform);
+        if (next) { img.src = next; }
+      });
+      buttons.forEach(function (b) {
+        b.classList.toggle('on', b.dataset.platform === platform);
+      });
+      try { localStorage.setItem('anleitung-plattform', platform); } catch (e) {}
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () { apply(b.dataset.platform); });
+    });
+    var stored;
+    try { stored = localStorage.getItem('anleitung-plattform'); } catch (e) {}
+    if (stored) { apply(stored); }
+  })();
+</script>
+
 
 </body>
 </html>
