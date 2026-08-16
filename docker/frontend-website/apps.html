@@ -128,6 +128,71 @@
             <!-- DEUTSCH: Responsive 2-Spalten-Grid fuer die App-Karten (1 Spalte auf Mobil, 2 ab md-Breakpoint) -->
             <div class="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
 
+                <!-- DEUTSCH: Mitglieder-App Karte - die einzige App fuer alle Mitglieder,
+                     deshalb steht sie zuoberst. Besonderheit: Der Play-Store-Eintrag ist
+                     ein geschlossener Test, man muss vorher freigeschaltet werden. Der
+                     APK-Weg daneben braucht das nicht. -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 md:col-span-2">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/mitglieder.png" alt="Mitglieder App" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Mitglieder</h3>
+                            <p class="text-gray-500 text-sm">Für alle Vereinsmitglieder</p>
+                            <div class="mt-2 flex items-center space-x-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Android 8+
+                                </span>
+                                <span id="members-version" class="text-gray-400 text-xs">Lade...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Anlässe ansehen, sich für Schichten eintragen, das eigene Profil und die Zugänge verwalten — alles vom Telefon aus. Es gibt zwei Wege zur App.</p>
+
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <!-- DEUTSCH: Weg 1 - Play Store, aber nur nach Freischaltung -->
+                            <div class="border border-gray-200 rounded-xl p-5">
+                                <div class="flex items-center mb-3">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                        Geschlossener Test
+                                    </span>
+                                </div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Über den Play Store</h4>
+                                <p class="text-sm text-gray-600 mb-3">Die App ist im Play Store noch nicht öffentlich. Laden kann sie nur, wer freigeschaltet ist.</p>
+                                <p class="text-sm text-gray-600 mb-3">Schreib eine E-Mail an
+                                    <a href="mailto:aktuar@fwv-raura.ch?subject=Zugang%20zur%20Mitglieder-App" class="text-fire-600 hover:underline font-semibold">aktuar@fwv-raura.ch</a>
+                                    und gib darin die <strong>E-Mail-Adresse deines Google-Kontos</strong> an — also die, mit der du am Telefon im Play Store angemeldet bist. Sobald du freigeschaltet bist, bekommst du Bescheid.</p>
+                                <p class="text-xs text-gray-500">Nicht die Adresse, die der Verein von dir hat — nur die Google-Adresse kennt der Play Store.</p>
+                            </div>
+
+                            <!-- DEUTSCH: Weg 2 - APK direkt. Der Link zeigt auf den rollenden Tag
+                                 members-latest, dessen Dateiname keine Versionsnummer traegt.
+                                 Deshalb hier bewusst fest verdrahtet statt per loadLatestRelease. -->
+                            <div class="border border-gray-200 rounded-xl p-5">
+                                <div class="flex items-center mb-3">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Ohne Freischaltung
+                                    </span>
+                                </div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Datei direkt laden</h4>
+                                <p class="text-sm text-gray-600 mb-4">Braucht keine Freischaltung. Android fragt beim Öffnen einmal, ob es Apps aus dieser Quelle installieren darf.</p>
+                                <a href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest.apk"
+                                   class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                                    <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                    APK herunterladen
+                                </a>
+                            </div>
+                        </div>
+
+                        <p class="mt-5 text-sm text-gray-600">Wie die App funktioniert, steht Schritt für Schritt in der
+                            <a href="anleitung-app.html" class="text-fire-600 hover:underline font-semibold">Anleitung zur Mitglieder-App</a>.</p>
+                    </div>
+                </div>
+
                 <!-- DEUTSCH: Vorstand-App Karte - Vereinsverwaltungs-App fuer den Vereinsvorstand -->
                 <!-- DEUTSCH: Hover-Effekt: Schatten vergroessern und Karte leicht nach oben verschieben -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
@@ -582,10 +647,10 @@
                         || appRelease.assets.find(a => a.name.endsWith('.apk'));
                     if (apkAsset) {
                         // DEUTSCH: Direkter APK-Download-Link vom GitHub Release Asset
-                        downloadBtn.href = apkAsset.browser_download_url;
+                        if (downloadBtn) downloadBtn.href = apkAsset.browser_download_url;
                     } else {
                         // DEUTSCH: Fallback: Link zur Release-Seite wenn kein APK-Asset gefunden wurde
-                        downloadBtn.href = appRelease.html_url;
+                        if (downloadBtn) downloadBtn.href = appRelease.html_url;
                     }
                     // DEUTSCH: Extrahiert die Versionsnummer aus dem Tag (z.B. "vorstand-v1.2.3" wird zu "v1.2.3")
                     const version = appRelease.tag_name.replace(`${appPrefix}-v`, 'v');
@@ -597,7 +662,7 @@
                     'vorstand': 'https://github.com/Feuerwehrverein-Raura/Homepage/releases',
                     'kds': 'https://github.com/Feuerwehrverein-Raura/Homepage/releases'
                 };
-                downloadBtn.href = fallbacks[appPrefix] || '#';
+                if (downloadBtn) downloadBtn.href = fallbacks[appPrefix] || '#';
                 // DEUTSCH: Versionsnummer wird geleert, da sie nicht ermittelt werden konnte
                 versionSpan.textContent = '';
             }
@@ -606,6 +671,9 @@
         // DEUTSCH: Beim Seitenaufruf beide Release-Versionen parallel laden
         loadLatestRelease('vorstand');
         loadLatestRelease('kds');
+        // DEUTSCH: Bei der Mitglieder-App nur die Versionsnummer — der
+        // Download-Knopf zeigt fest auf den rollenden Tag members-latest.
+        loadLatestRelease('members');
     </script>
 
 </body>
