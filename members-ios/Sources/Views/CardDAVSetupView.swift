@@ -1,27 +1,50 @@
 import SwiftUI
 import UIKit
 
-/// Anleitung, um das Mitglieder-Adressbuch als CardDAV-Konto einzurichten.
+/// Richtet das Mitglieder-Adressbuch als CardDAV-Konto ein.
 ///
-/// Warum eine Anleitung und kein Knopf: iOS lässt Apps kein CardDAV-Konto
-/// anlegen. Konten dieser Art entstehen entweder von Hand in den
-/// Systemeinstellungen oder über ein Konfigurationsprofil, und ein solches
-/// Profil kann nur Safari installieren, nicht die App. Ein Deeplink direkt
-/// in „Account hinzufügen" existiert ebenfalls nicht — die `App-Prefs:`-URLs
-/// sind nicht öffentlich und führen zur Ablehnung im App Store.
+/// Warum das nicht die App selbst erledigt: iOS lässt Apps kein CardDAV-Konto
+/// anlegen. Solche Konten entstehen entweder von Hand in den
+/// Systemeinstellungen oder über ein Konfigurationsprofil — und ein Profil
+/// kann nur Safari installieren, nicht die App. Ein Deeplink direkt in
+/// „Account hinzufügen“ existiert ebenfalls nicht; die `App-Prefs:`-URLs sind
+/// nicht öffentlich und führen zur Ablehnung im App Store.
+///
+/// Darum beides: der bequeme Weg über das Profil, und die Handanleitung für
+/// den Fall, dass die Installation eines Profils Unbehagen auslöst — sie
+/// zeigt „Nicht verifiziert“, weil das Profil unsigniert ist.
 struct CardDAVSetupView: View {
+    @Environment(\.openURL) private var openURL
     @State private var copied = false
 
-    private let steps: [(String, String)] = [
-        ("1", "Einstellungen öffnen, dann Apps → Kontakte → Accounts"),
-        ("2", "Account hinzufügen → Andere → CardDAV-Account"),
-        ("3", "Als Server \(AppConfig.cardDAVServer) eintragen"),
-        ("4", "Benutzername und Passwort vom Nextcloud-Konto eingeben"),
-        ("5", "Sichern — das Adressbuch \(AppConfig.cardDAVAddressBook) erscheint in den Kontakten")
+    private static let profileURL = URL(string: "https://www.fwv-raura.ch/carddav.mobileconfig")!
+
+    private let steps = [
+        "Einstellungen öffnen, dann Apps → Kontakte → Accounts",
+        "Account hinzufügen → Andere → CardDAV-Account",
+        "Als Server \(AppConfig.cardDAVServer) eintragen",
+        "Benutzername und Passwort vom Nextcloud-Konto eingeben",
+        "Sichern — das Adressbuch \(AppConfig.cardDAVAddressBook) erscheint in den Kontakten"
     ]
 
     var body: some View {
         List {
+            Section {
+                Button {
+                    openURL(Self.profileURL)
+                } label: {
+                    Label("Profil installieren", systemImage: "arrow.down.doc")
+                }
+            } header: {
+                Text("Empfohlen")
+            } footer: {
+                Text("Öffnet Safari und lädt ein Konfigurationsprofil. Danach in "
+                   + "den Einstellungen bestätigen und das Nextcloud-Passwort "
+                   + "eingeben — fertig. Der Hinweis „Nicht verifiziert“ ist "
+                   + "erwartbar: das Profil ist unsigniert, weil dafür ein "
+                   + "Apple-Entwicklerzertifikat nötig wäre.")
+            }
+
             Section {
                 Button {
                     UIPasteboard.general.string = AppConfig.cardDAVServer
@@ -41,24 +64,24 @@ struct CardDAVSetupView: View {
                             .foregroundStyle(copied ? .green : .accentColor)
                     }
                 }
-            } footer: {
-                Text("Tippen zum Kopieren. Mehr als den Servernamen braucht "
-                   + "iOS nicht — den Rest findet es selbst.")
-            }
 
-            Section("Einrichten") {
-                ForEach(steps, id: \.0) { step in
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                     HStack(alignment: .top, spacing: 12) {
-                        Text(step.0)
+                        Text("\(index + 1)")
                             .font(.caption.weight(.bold))
                             .frame(width: 22, height: 22)
                             .background(Color.accentColor.opacity(0.15), in: Circle())
-                        Text(step.1)
+                        Text(step)
                             .font(.subheadline)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.vertical, 2)
                 }
+            } header: {
+                Text("Oder von Hand")
+            } footer: {
+                Text("Den Servernamen antippen, um ihn zu kopieren. Mehr braucht "
+                   + "iOS nicht — den Rest findet es selbst.")
             }
 
             Section {
@@ -68,14 +91,13 @@ struct CardDAVSetupView: View {
                 Label("Bei einem Anruf zeigt das iPhone den Namen an, wie bei "
                     + "jedem anderen Kontakt.",
                       systemImage: "phone")
-                Label("Ein Nextcloud-Konto ist Voraussetzung. Ohne ein solches "
-                    + "hilft der einmalige Import in den Einstellungen.",
+                Label("Voraussetzung ist ein Nextcloud-Konto.",
                       systemImage: "person.badge.key")
             } header: {
                 Text("Was das bringt")
             }
         }
-        .navigationTitle("Live-Adressbuch")
+        .navigationTitle("Adressbuch")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

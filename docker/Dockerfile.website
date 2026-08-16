@@ -17,6 +17,9 @@ COPY qr-rechnung.html ./
 # Kalender-Dateien
 COPY calendar.ics ./
 
+# Konfigurationsprofil fuer das CardDAV-Adressbuch (iPhone/iPad/Mac)
+COPY carddav.mobileconfig ./
+
 # JavaScript-Dateien im Root
 COPY events.js ./
 

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Konfigurationsprofil fuer das Mitglieder-Adressbuch (CardDAV).
+
+  Richtet auf iPhone, iPad und Mac ein CardDAV-Konto gegen Nextcloud ein.
+  Das Adressbuch "fwv-mitglieder" wird naechtlich vom Cron-Job
+  cron/nextcloud-contacts-sync.sh aus der Mitgliederdatenbank befuellt.
+
+  Benutzername und Passwort stehen bewusst NICHT im Profil: jedes Mitglied
+  meldet sich mit dem eigenen Nextcloud-Konto an, und iOS fragt die Daten
+  beim Installieren ab. Ein Profil mit fest eingetragenen Zugangsdaten waere
+  ausserdem ein Passwort zum Mitnehmen.
+
+  Den Serverpfad muss das Profil nicht kennen — nextcloud.fwv-raura.ch
+  beantwortet /.well-known/carddav mit einem Redirect auf den DAV-Pfad, und
+  Apple-Geraete folgen dem selbst.
+
+  Das Profil ist unsigniert; iOS zeigt beim Installieren "Nicht verifiziert".
+  Signieren wuerde ein Apple-Developer-Zertifikat voraussetzen.
+-->
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.carddav.account</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>PayloadIdentifier</key>
+			<string>ch.fwvraura.carddav.mitglieder.account</string>
+			<key>PayloadUUID</key>
+			<string>71A6C1E7-3C93-4587-99D3-403CEB881721</string>
+			<key>PayloadDisplayName</key>
+			<string>FWV Raura Mitglieder</string>
+			<key>CardDAVAccountDescription</key>
+			<string>FWV Raura Mitglieder</string>
+			<key>CardDAVHostName</key>
+			<string>nextcloud.fwv-raura.ch</string>
+			<key>CardDAVPort</key>
+			<integer>443</integer>
+			<key>CardDAVUseSSL</key>
+			<true/>
+		</dict>
+	</array>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+	<key>PayloadIdentifier</key>
+	<string>ch.fwvraura.carddav.mitglieder</string>
+	<key>PayloadUUID</key>
+	<string>4DA7BA97-004F-4895-9F2E-D862F73E0C8A</string>
+	<key>PayloadDisplayName</key>
+	<string>FWV Raura — Mitglieder-Adressbuch</string>
+	<key>PayloadOrganization</key>
+	<string>Feuerwehrverein Raura Kaiseraugst</string>
+	<key>PayloadDescription</key>
+	<string>Richtet das Mitglieder-Adressbuch des Feuerwehrvereins Raura ein. Die Kontakte bleiben automatisch aktuell. Beim Installieren werden Benutzername und Passwort des eigenen Nextcloud-Kontos abgefragt.</string>
+	<key>PayloadRemovalDisallowed</key>
+	<false/>
+</dict>
+</plist>
