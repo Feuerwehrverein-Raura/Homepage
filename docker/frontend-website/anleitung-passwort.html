@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Passwort zurücksetzen - Feuerwehrverein Raura</title>
+<title>Passwort setzen - Feuerwehrverein Raura</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
     tailwind.config = {
@@ -141,8 +141,8 @@
             <img src="images/logo.png" alt="" style="height:12mm; width:auto;">
             <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
         </div>
-        <h1 class="text-4xl font-bold mb-4">Passwort vergessen</h1>
-        <p class="text-xl max-w-2xl">Das Vereins-Passwort lässt sich selbst zurücksetzen — in der App oder über die Website. Der Vorstand muss dafür nichts tun.</p>
+        <h1 class="text-4xl font-bold mb-4">Passwort setzen</h1>
+        <p class="text-xl max-w-2xl">Vergessen — oder noch nie eines gehabt? Beides geht gleich: Du setzt das Vereins-Passwort selbst, in der App oder über die Website. Der Vorstand muss dafür nichts tun.</p>
         <div class="mt-6"><a href="anleitungen/anleitung-passwort.pdf" class="nur-bildschirm inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>Als PDF</span></a></div>
     </div>
 </header>
@@ -151,7 +151,7 @@
 <div class="kapitelleiste bg-white border-b sticky top-16 z-40 overflow-x-auto">
     <div class="container mx-auto px-4">
         <div class="flex space-x-5 py-3 whitespace-nowrap text-sm">
-            <a href="#ueberblick" class="text-gray-600 hover:text-fire-600 transition-colors">Überblick</a>
+            <a href="#ueberblick" class="text-gray-600 hover:text-fire-600 transition-colors">Auch beim ersten Mal</a>
             <a href="#app" class="text-gray-600 hover:text-fire-600 transition-colors">In der App</a>
             <a href="#website" class="text-gray-600 hover:text-fire-600 transition-colors">Über die Website</a>
             <a href="#probleme" class="text-gray-600 hover:text-fire-600 transition-colors">Wenn es nicht klappt</a>
@@ -162,20 +162,34 @@
 <main class="py-8">
     <div class="container mx-auto px-4 max-w-4xl space-y-6">
     
+    
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="ueberblick">
-  <h2>Ein Passwort für alles</h2>
+  <h2>Auch beim ersten Mal</h2>
+  <p>Der Verein hat nie Passwörter verschickt. Wer sich zum
+    <strong>ersten Mal</strong> anmeldet, hat also gar keines — und geht
+    genau denselben Weg wie jemand, der seines vergessen hat.</p>
+  <p>Der Knopf heisst zwar <em>Passwort vergessen</em>. Er setzt aber
+    ebenso gut ein erstes. Lass dich davon nicht abhalten: Wenn du noch nie
+    drin warst, ist das hier dein Weg hinein.</p>
+  <aside class="note">
+    <b>Bei der Aufnahme kam eine E-Mail</b> mit einem Link zum Setzen des
+    Passworts. Ist die verschwunden oder der Link abgelaufen, macht das
+    nichts — die beiden Wege unten führen genauso ans Ziel, beliebig oft.
+  </aside>
+
+  <h3>Ein Passwort für alles</h3>
   <p>Für die Website und für die Mitglieder-App gilt <strong>dasselbe
     Konto</strong>. Es liegt bei der Anmeldestelle des Vereins unter
     <code>auth.fwv-raura.ch</code>, und dort hängen auch die übrigen
     Dienste dran — Nextcloud, das Wiki, das Vorstands-Portal.</p>
-  <p>Setzt du das Passwort zurück, gilt das neue also überall. Du musst
-    das nirgends ein zweites Mal machen.</p>
+  <p>Was du hier setzt, gilt also überall. Du musst das nirgends ein
+    zweites Mal machen.</p>
   <p>Der Vorstand muss dafür nichts tun. Es gibt zwei Wege, und beide
     führen zum selben Ergebnis — nimm den, der dir gerade näher liegt.</p>
   <aside class="note">
     <b>Der Verein sieht dein Passwort nicht.</b> Auch der Aktuar kann es
-    nicht nachschlagen, nur den Zurücksetzen-Vorgang anstossen. Deshalb
-    lohnt sich der Weg über die E-Mail immer.
+    nicht nachschlagen, nur den Vorgang anstossen. Deshalb lohnt sich der
+    Weg über die E-Mail immer.
   </aside>
 </section>
 
@@ -242,6 +256,11 @@
     hinterlegt. Häufigster Grund: Der Verein hat eine andere Adresse von
     dir als die, die du eingegeben hast. Dann hilft der Aktuar weiter.</p>
 
+  <h3>Der Link aus der Willkommens-E-Mail geht nicht mehr</h3>
+  <p>Solche Links laufen nach einiger Zeit ab — das ist kein Fehler,
+    sondern Absicht. Nimm einfach einen der beiden Wege oben; sie führen
+    zum selben Formular und lassen sich beliebig oft benutzen.</p>
+
   <h3>Ich weiss meinen Benutzernamen nicht</h3>
   <p>Du brauchst ihn nicht. Für das Zurücksetzen genügt die E-Mail-Adresse,
     und anmelden kannst du dich damit ebenfalls.</p>
@@ -259,6 +278,8 @@
 </section>
 
 
+
+    </div>
 
     </div>
 </main>
@@ -283,7 +304,7 @@
                 <div class="space-y-2">
                     <a href="anleitung-app.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Mitglieder-App</a>
                     <a href="anleitung-website.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Website</a>
-                    <a href="anleitung-passwort.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Passwort zurücksetzen</a>
+                    <a href="anleitung-passwort.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Passwort setzen</a>
                 </div>
             </div>
             <div>
