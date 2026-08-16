@@ -45,50 +45,74 @@ xcrun --sdk iphoneos swiftc -typecheck -target arm64-apple-ios16.0 \
 Was in der App funktioniert:
 
 - **Anmelden:** OIDC mit PKCE über `ASWebAuthenticationSession`, Tokens
-  im Keychain
-- **Events:** Liste und Detailansicht mit Datum, Ort, Kosten,
-  Organisator, Beschreibung und Schichten — nur lesend
+  im Keychain, Token-Refresh mit 401-Wiederholung
+- **Anlässe:** Liste und Detailansicht mit Datum, Ort, Kosten,
+  Organisator, Beschreibung und Schichten
+- **Anmelden zu Anlässen:** Schicht- und Teilnehmer-Anmeldung,
+  vorbelegt aus dem eigenen Profil
+- **Meine Anmeldungen:** Status, Datum, Ort, zugeteilte Schichten
 - **Profil:** Stammdaten, Kontakt, Adresse — nur lesend
-- **Einstellungen:** Abmelden
+- **Adressbuch:** Anleitung und Konfigurationsprofil für das
+  CardDAV-Adressbuch aus Nextcloud
 - **CI:** Simulator-Build als Compile-Check bei jedem Push und PR
 
-### Bekannte Lücken
+## Was gegenüber der Android-App fehlt
 
-Nach Dringlichkeit, nicht nach Aufwand:
+Die Android-App ist der grössere Bruder; hier steht, was auf iOS noch
+aussteht. Nach Aufwand sortiert, das Blockierte zuletzt.
 
-1. **Der Refresh-Token wird nie eingelöst.** `AuthManager` legt ihn im
-   Keychain ab, aber `OIDCClient` hat keine Refresh-Methode und
-   `APIClient` behandelt kein 401. Läuft der Access-Token ab, bleibt
-   `isLoggedIn` auf `true`: die App wirkt angemeldet und zeigt nur noch
-   Ladefehler. Vorbild ist `AuthInterceptor` der Android-App — bei
-   401/403 den `refresh_token`-Grant fahren und den Request einmal
-   wiederholen.
-2. **Anmelden zu Anlässen fehlt ganz.** Dafür nötig: `POST` im
-   `APIClient` (kann bisher nur `GET`), der Aufruf
-   `POST registrations/public` mit `{type: "shift"|"participant",
-   eventId, eventTitle, organizerEmail, name, email, phone, notes,
-   shiftIds}`, das Feld `organizerEmail` im `Event`-Modell, und eine
-   Ansicht für `GET registrations/mine` — das Modell `MyRegistration`
-   existiert bereits ungenutzt.
-3. **Kein Push.** Braucht einen APNs-Key und damit das Apple Developer
-   Program.
-4. **Adressbuch-Import** ist in `SettingsView` ein Button ohne
-   Funktion.
+**Profil bearbeiten.** Auf iOS ist das Profil nur lesbar. Android kann
+Änderungen speichern (`PUT members/me`), ein Profilfoto hochladen
+(`POST members/me/photo`, die App muss vorher selbst verkleinern — das
+Backend tut es nicht) und den Austritt beantragen
+(`POST members/me/austritt`).
+
+**Zugänge.** `GET members/me/accesses` liefert Web-Zugänge, Cloud-Ordner
+und Funktions-E-Mails in einem Rutsch; Android zeigt sie als Karten und
+lässt das Passwort einer Funktions-E-Mail ändern. Auf iOS fehlt der
+Bildschirm ganz.
+
+**Anlass vorschlagen.** `POST events/propose` legt keinen
+veröffentlichten Anlass an, sondern einen Vorschlag zur Prüfung durch
+den Vorstand. Der Vorschlagende wird serverseitig als Organisator
+gesetzt.
+
+**Kalender.** `GET calendar/items` liefert Anlässe, Beiträge und
+Versände zusammengefasst.
+
+**Organisator-Bereich.** Der grosse Block — auf Android ein eigener
+Tab: Dashboard der eigenen Anlässe, Anmeldungen genehmigen und
+ablehnen, Anmeldungen von Hand hinzufügen und bearbeiten (für
+telefonisch gemeldete Gäste), Anlass und Schichten als Organisator
+bearbeiten, alternative Schicht vorschlagen, Angemeldete benachrichtigen,
+Notizen mit Anhängen, Rezepte und Material, PDF-Ausdrucke. Rund 25
+Endpunkte, sinnvoll in Etappen zu bauen.
+
+**Push und Benachrichtigungseinstellungen.** Blockiert: das Backend
+nimmt unter `POST members/me/fcm-token` einen FCM-Token entgegen, iOS
+bräuchte dafür Firebase Cloud Messaging und damit einen APNs-Key aus
+dem Apple Developer Program. Android hat dazu vier Schalter für die
+Arten von Benachrichtigungen.
+
+**Auslieferung.** TestFlight und App Store — ebenfalls am Apple-Konto.
 
 ### Phasen
 
 - [x] **Phase 1 — Fundament:** App-Gerüst, Config, Keychain,
       API-Client, OIDC-Login, Tab-Shell, CI
-- [x] **Phase 2 — Lesen:** Events-Liste, Event-Detail mit Schichten,
-      Profil
-- [ ] **Phase 3 — Sitzung tragfähig machen:** Token-Refresh und
-      401-Wiederholung. Wenig Code, aber alles Weitere baut darauf auf
-- [ ] **Phase 4 — Anmeldung:** Schicht- und Teilnehmer-Anmeldung,
-      „Meine Anmeldungen" im Profil
-- [ ] **Phase 5 — Push:** braucht Apple-Konto
-- [ ] **Phase 6 — Organisator:** Notizen, Rezepte, Material — der
-      grosse Block, den Android schon hat
-- [ ] **Phase 7 — Adressbuch-Import (CNContacts), App-Store-Listing**
+- [x] **Phase 2 — Lesen:** Anlass-Liste, Detail mit Schichten, Profil
+- [x] **Phase 3 — Sitzung tragfähig machen:** Token-Refresh und
+      401-Wiederholung
+- [x] **Phase 4 — Anmeldung:** Schicht- und Teilnehmer-Anmeldung,
+      „Meine Anmeldungen"
+- [x] **Phase 5 — Adressbuch:** CardDAV statt Import (eine App kann
+      unter iOS keine Kontakte bereitstellen)
+- [ ] **Phase 6 — Eigene Daten:** Profil bearbeiten, Foto, Zugänge,
+      Austritt
+- [ ] **Phase 7 — Mitwirken:** Anlass vorschlagen, Kalender
+- [ ] **Phase 8 — Organisator:** der grosse Block
+- [ ] **Phase 9 — Push:** braucht Apple-Konto
+- [ ] **Phase 10 — App-Store-Listing:** braucht Apple-Konto
 
 ## Voraussetzungen für TestFlight/Release (offen, Apple-Konto nötig)
 
