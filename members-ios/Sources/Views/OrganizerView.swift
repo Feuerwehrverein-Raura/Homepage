@@ -16,6 +16,8 @@ struct OrganizerView: View {
     @State private var adding: Event?
     @State private var notifying: Event?
     @State private var editing: EditTarget?
+    @State private var suggesting: EditTarget?
+    @State private var editingEvent: Event?
 
     /// Anlass und Anmeldung gehoeren beim Bearbeiten zusammen.
     struct EditTarget: Identifiable {
@@ -57,7 +59,11 @@ struct OrganizerView: View {
                                             edit: {
                                                 editing = EditTarget(event: event,
                                                                      registration: registration)
-                                            }
+                                            },
+                                            suggest: event.hasShifts ? {
+                                                suggesting = EditTarget(event: event,
+                                                                        registration: registration)
+                                            } : nil
                                         )
                                     }
                                 }
@@ -72,6 +78,12 @@ struct OrganizerView: View {
                                         notifying = event
                                     } label: {
                                         Label("Benachrichtigen", systemImage: "envelope")
+                                            .font(.caption)
+                                    }
+                                    Button {
+                                        editingEvent = event
+                                    } label: {
+                                        Label("Bearbeiten", systemImage: "square.and.pencil")
                                             .font(.caption)
                                     }
                                 }
@@ -95,6 +107,17 @@ struct OrganizerView: View {
             .sheet(item: $notifying) { event in
                 NotifyRegistrantsSheet(event: event)
                     .environmentObject(auth)
+            }
+            .sheet(item: $editingEvent) { event in
+                OrganizerEditEventView(event: event) { Task { await load() } }
+                    .environmentObject(auth)
+            }
+            .sheet(item: $suggesting) { target in
+                SuggestAlternativeSheet(event: target.event,
+                                        registration: target.registration) {
+                    Task { await load() }
+                }
+                .environmentObject(auth)
             }
             .sheet(item: $editing) { target in
                 EditRegistrationSheet(event: target.event,
@@ -201,6 +224,7 @@ private struct RegistrationCard: View {
     var approve: () -> Void
     var reject: () -> Void
     var edit: () -> Void
+    var suggest: (() -> Void)?
 
     private var notes: RegNotes { RegNotes.parse(registration.notes) }
 
@@ -263,6 +287,15 @@ private struct RegistrationCard: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+
+                if let suggest {
+                    Button(action: suggest) {
+                        Label("Andere Schicht", systemImage: "arrow.triangle.swap")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
 
                 if busy { ProgressView() }
             }

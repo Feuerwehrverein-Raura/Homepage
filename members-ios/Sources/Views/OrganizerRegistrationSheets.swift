@@ -384,3 +384,140 @@ struct NotifyRegistrantsSheet: View {
         }
     }
 }
+
+/// Einer angemeldeten Person eine andere Schicht vorschlagen
+/// (`POST .../suggest-alternative-as-organizer`).
+///
+/// Nützlich, wenn eine Schicht überbesetzt und eine andere leer ist: Das
+/// Backend verschickt den Vorschlag, die Person entscheidet selbst.
+struct SuggestAlternativeSheet: View {
+    @EnvironmentObject var auth: AuthManager
+    @Environment(\.dismiss) private var dismiss
+
+    let event: Event
+    let registration: EventRegistration
+    var onSent: () -> Void
+
+    @State private var shiftId: String?
+    @State private var comment = ""
+    @State private var busy = false
+    @State private var error: String?
+
+    private var shifts: [Shift] { event.shifts ?? [] }
+
+    private var email: String {
+        registration.guestEmail ?? ""
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    if shifts.isEmpty {
+                        Text("Dieser Anlass hat keine Schichten.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(shifts) { shift in
+                            Button {
+                                shiftId = shift.id
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(shift.bereich ?? shift.name)
+                                            .foregroundStyle(.primary)
+                                        if let start = shift.startTime {
+                                            Text(label(for: shift, start: start))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    if shiftId == shift.id {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(Color.accentColor)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Andere Schicht")
+                } footer: {
+                    Text("\(registration.displayName) bekommt den Vorschlag "
+                       + "zugeschickt und entscheidet selbst.")
+                }
+
+                Section("Bemerkung") {
+                    TextField("Optional", text: $comment, axis: .vertical)
+                        .lineLimit(2...5)
+                }
+
+                if email.isEmpty {
+                    Section {
+                        Label("Für diese Anmeldung ist keine E-Mail hinterlegt — "
+                            + "der Vorschlag kann nicht zugestellt werden.",
+                              systemImage: "exclamationmark.triangle")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                }
+
+                if let error {
+                    Section {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("Alternative vorschlagen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Abbrechen") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if busy {
+                        ProgressView()
+                    } else {
+                        Button("Senden") { Task { await send() } }
+                            .disabled(shiftId == nil || email.isEmpty)
+                    }
+                }
+            }
+        }
+    }
+
+    private func label(for shift: Shift, start: String) -> String {
+        if let end = shift.endTime { return "\(start) – \(end)" }
+        return start
+    }
+
+    private func send() async {
+        guard let shiftId,
+              let shift = shifts.first(where: { $0.id == shiftId }) else { return }
+        busy = true
+        error = nil
+        defer { busy = false }
+        // shiftInfo ist reiner Anzeigetext fuer die Nachricht — das Backend
+        // baut daraus keine Logik.
+        let info = [shift.bereich ?? shift.name, shift.startTime, shift.endTime]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        do {
+            let _: PublicRegistrationResponse = try await auth.api().post(
+                "events/\(event.id)/registrations/\(registration.id)/suggest-alternative-as-organizer",
+                body: SuggestAlternativeRequest(
+                    newShiftId: shiftId,
+                    email: email,
+                    shiftInfo: info,
+                    comment: comment.trimmingCharacters(in: .whitespaces).isEmpty
+                        ? nil : comment
+                )
+            )
+            onSent()
+            dismiss()
+        } catch {
+            self.error = "Vorschlag konnte nicht gesendet werden."
+        }
+    }
+}

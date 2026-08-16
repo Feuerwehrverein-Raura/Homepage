@@ -547,3 +547,110 @@ struct DirectoryEntry: Decodable, Identifiable {
             .trimmingCharacters(in: .whitespaces)
     }
 }
+
+/// Body für `PUT events/{id}/as-organizer`.
+///
+/// Teilaktualisierung: was `nil` ist, lässt der Encoder weg, und das Backend
+/// rührt das Feld nicht an. Eine Ausnahme macht `mealOptions` — dort muss
+/// ausdrücklich `null` ankommen, um ein Menü zu leeren, sonst bliebe es
+/// ewig stehen. Genau diese Unterscheidung trifft auch die Android-App.
+struct OrganizerEventUpdate: Encodable {
+    var title: String?
+    var subtitle: String?
+    var description: String?
+    var startDate: String?
+    var endDate: String?
+    var location: String?
+    var category: String?
+    var registrationRequired: Bool?
+    var registrationDeadline: String?
+    var maxParticipants: Int?
+    var cost: String?
+    var status: String?
+    /// `nil` heisst „nicht anfassen", `.some(nil)` heisst „leeren".
+    var mealOptions: String??
+
+    enum CodingKeys: String, CodingKey {
+        case title, subtitle, description, location, category, cost, status
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case registrationRequired = "registration_required"
+        case registrationDeadline = "registration_deadline"
+        case maxParticipants = "max_participants"
+        case mealOptions = "meal_options"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(title, forKey: .title)
+        try c.encodeIfPresent(subtitle, forKey: .subtitle)
+        try c.encodeIfPresent(description, forKey: .description)
+        try c.encodeIfPresent(startDate, forKey: .startDate)
+        try c.encodeIfPresent(endDate, forKey: .endDate)
+        try c.encodeIfPresent(location, forKey: .location)
+        try c.encodeIfPresent(category, forKey: .category)
+        try c.encodeIfPresent(registrationRequired, forKey: .registrationRequired)
+        try c.encodeIfPresent(registrationDeadline, forKey: .registrationDeadline)
+        try c.encodeIfPresent(maxParticipants, forKey: .maxParticipants)
+        try c.encodeIfPresent(cost, forKey: .cost)
+        try c.encodeIfPresent(status, forKey: .status)
+        // Doppeltes Optional aufloesen: aussen "nicht gesetzt", innen "null".
+        if let mealOptions {
+            if let value = mealOptions {
+                try c.encode(value, forKey: .mealOptions)
+            } else {
+                try c.encodeNil(forKey: .mealOptions)
+            }
+        }
+    }
+}
+
+/// Body für Anlegen und Ändern einer Schicht als Organisator.
+struct ShiftPayload: Encodable {
+    var name: String?
+    var description: String?
+    var date: String?
+    var startTime: String?
+    var endTime: String?
+    var needed: Int?
+    var bereich: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, description, date, needed, bereich
+        case startTime = "start_time"
+        case endTime = "end_time"
+    }
+}
+
+/// Body für `POST .../suggest-alternative-as-organizer`.
+/// Schlüssel in camelCase — wie die Map, die die Android-App dort baut.
+struct SuggestAlternativeRequest: Encodable {
+    let newShiftId: String
+    let email: String
+    let shiftInfo: String
+    var comment: String?
+}
+
+/// Werte, die Organisator-Formulare brauchen und die in der Android-App
+/// als Listen im Bildschirm stehen.
+enum OrganizerOptions {
+    /// Kategorien, bei denen das Backend eine Anmeldung erwartet. Die
+    /// Android-App leitet `registration_required` daraus ab, statt es den
+    /// Organisator setzen zu lassen.
+    static let registrationRequiredCategories = [
+        "Dorffest", "GV", "Aufbau", "Abbau", "Ausflug mit Anmeldung"
+    ]
+
+    static let categories = [
+        "Dorffest", "GV", "Ausflug", "Ausflug mit Anmeldung",
+        "Aufbau", "Abbau", "Sonstiges"
+    ]
+
+    static let statusDisplay = ["Geplant", "Bestätigt", "Abgesagt", "Abgeschlossen"]
+    static let statusValues = ["planned", "confirmed", "cancelled", "completed"]
+
+    static let bereiche = [
+        "Allgemein", "Kueche", "Bar", "Service", "Kasse",
+        "Springer", "Vorbereitung", "Aufbau", "Abbau"
+    ]
+}
