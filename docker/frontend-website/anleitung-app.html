@@ -4,329 +4,196 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anleitung Mitglieder-App - Feuerwehrverein Raura</title>
-<style>
-  /* Farben aus dem Vereins-Theme: #B91C1C ist der Primaerton, den auch die
-     Android-App und die Website verwenden. Neutraltoene mit leichtem
-     Rotstich, damit sie zum Akzent gehoeren statt daneben zu stehen. */
-  :root {
-    --paper:   #FCFAF9;
-    --surface: #F4EEEC;
-    --line:    #E2D6D2;
-    --ink:     #1B1514;
-    --muted:   #6E605C;
-    --brand:   #B91C1C;
-    --brand-deep: #7F1414;
-    --ok:      #1F7A46;
-
-    --display: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-    --measure: 34rem;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper:   #17110F;
-      --surface: #231A18;
-      --line:    #3A2C29;
-      --ink:     #F3EDEB;
-      --muted:   #AC9994;
-      --brand:   #F0736A;
-      --brand-deep: #F3948D;
-      --ok:      #5BC287;
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    fire: {
+                        50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca',
+                        300: '#fca5a5', 400: '#f87171', 500: '#ef4444',
+                        600: '#dc2626', 700: '#b91c1c', 800: '#991b1b',
+                        900: '#7f1d1d',
+                    }
+                }
+            }
+        }
     }
-  }
-  :root[data-theme="dark"] {
-    --paper:   #17110F;
-    --surface: #231A18;
-    --line:    #3A2C29;
-    --ink:     #F3EDEB;
-    --muted:   #AC9994;
-    --brand:   #F0736A;
-    --brand-deep: #F3948D;
-    --ok:      #5BC287;
-  }
+</script>
+<style>
+    /* Die Kapitel sind schlichtes HTML ohne Klassen — hier bekommen sie
+       das Aussehen der Website. */
+    .chapter h2 { font-size: 1.5rem; line-height: 2rem; font-weight: 700;
+        color: #991b1b; margin: 0 0 .75rem; }
+    .chapter h3 { font-size: 1.125rem; font-weight: 600; color: #1f2937;
+        margin: 1.75rem 0 .35rem; }
+    .chapter p { color: #374151; line-height: 1.7; margin: 0 0 .85rem; }
+    .chapter ul { list-style: disc; padding-left: 1.35rem; color: #374151;
+        line-height: 1.7; margin: 0 0 .85rem; }
+    .chapter li { margin-bottom: .35rem; }
+    .chapter strong { font-weight: 600; color: #1f2937; }
+    .chapter a { color: #dc2626; text-decoration: underline; }
+    .chapter a:hover { color: #b91c1c; }
+    .chapter code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .875em; background: #fef2f2; border: 1px solid #fee2e2;
+        border-radius: .25rem; padding: .1em .35em; overflow-wrap: anywhere; }
 
-  * { box-sizing: border-box; }
+    /* Nummerierte Schritte — nur dort, wo die Reihenfolge wirklich zaehlt. */
+    ol.steps { list-style: none; margin: 0 0 .85rem; padding: 0;
+        counter-reset: step; }
+    ol.steps li { counter-increment: step; position: relative;
+        padding-left: 2.6rem; margin-bottom: .8rem; color: #374151;
+        line-height: 1.7; }
+    ol.steps li::before { content: counter(step); position: absolute;
+        left: 0; top: .1em; width: 1.75rem; height: 1.75rem; display: grid;
+        place-items: center; border-radius: 9999px; background: #dc2626;
+        color: #fff; font-size: .8rem; font-weight: 600; }
 
-  body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: var(--body);
-    font-size: 17px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
+    aside.note { background: #fef2f2; border-left: 4px solid #ef4444;
+        border-radius: 0 .5rem .5rem 0; padding: .9rem 1rem;
+        margin: 1.1rem 0; color: #374151; font-size: .95rem; }
+    aside.note b { color: #991b1b; }
 
-  /* ---------------------------------------------------------- Kopf */
+    figure.shot { margin: 1.25rem 0 0; }
+    figure.shot img { width: 100%; display: block; border: 1px solid #e5e7eb;
+        border-radius: .5rem; background: #f9fafb; }
+    figure.shot figcaption { color: #6b7280; font-size: .8rem;
+        margin-top: .5rem; }
 
-  header.top {
-    background: var(--brand);
-    color: #fff;
-    padding: 3.5rem 1.5rem 3rem;
-  }
-  .wrap { max-width: 62rem; margin: 0 auto; }
+    table.diff { border-collapse: collapse; width: 100%; font-size: .95rem;
+        color: #374151; }
+    table.diff th, table.diff td { text-align: left; padding: .5rem .6rem;
+        border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    table.diff th { font-size: .75rem; text-transform: uppercase;
+        letter-spacing: .05em; color: #6b7280; font-weight: 600; }
 
-  header.top .eyebrow {
-    font-family: var(--mono);
-    font-size: .7rem;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-    opacity: .82;
-    margin: 0 0 .9rem;
-  }
-  header.top h1 {
-    font-family: var(--display);
-    font-weight: 800;
-    letter-spacing: -.03em;
-    font-size: clamp(2.4rem, 7vw, 4rem);
-    line-height: 1.02;
-    margin: 0;
-    text-wrap: balance;
-  }
-  header.top p.lead {
-    max-width: var(--measure);
-    margin: 1.1rem 0 0;
-    font-size: 1.06rem;
-    opacity: .93;
-  }
+    /* Bei der App liegt das Telefonbild neben dem Text, nicht darunter. */
+    .guide-app section.chapter { display: grid; gap: 2rem;
+        grid-template-columns: minmax(0, 1fr) 14rem; align-items: start; }
+    @media (max-width: 767px) {
+        .guide-app section.chapter { grid-template-columns: 1fr; gap: 1.25rem; }
+        .guide-app figure.shot img { max-width: 15rem; }
+    }
+    @media print {
+        .guide-app section.chapter { display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 52mm !important;
+            gap: 8mm !important; }
+        .guide-app figure.shot img { max-height: 120mm; }
+    }
 
-  /* ------------------------------------------------------ Inhalt */
-
-  nav.toc {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
-    overflow-x: auto;
-  }
-  nav.toc ol {
-    display: flex;
-    gap: 1.4rem;
-    list-style: none;
-    margin: 0 auto;
-    padding: .7rem 1.5rem;
-    max-width: 62rem;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: .74rem;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-  }
-  nav.toc a { color: var(--muted); text-decoration: none; }
-  nav.toc a:hover, nav.toc a:focus-visible { color: var(--brand); }
-
-  main { padding: 0 1.5rem 5rem; }
-
-  section.chapter {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 15rem;
-    gap: 2.5rem;
-    align-items: start;
-    padding: 3.2rem 0;
-    border-bottom: 1px solid var(--line);
-    max-width: 62rem;
-    margin: 0 auto;
-  }
-  section.chapter:last-of-type { border-bottom: 0; }
-
-  @media (max-width: 46rem) {
-    section.chapter { grid-template-columns: 1fr; gap: 1.6rem; }
-  }
-
-  .chapter h2 {
-    font-family: var(--display);
-    font-weight: 800;
-    letter-spacing: -.02em;
-    font-size: 1.7rem;
-    line-height: 1.15;
-    margin: 0 0 .8rem;
-    color: var(--brand-deep);
-    text-wrap: balance;
-  }
-  .chapter h3 {
-    font-family: var(--display);
-    font-size: 1.02rem;
-    font-weight: 700;
-    letter-spacing: -.01em;
-    margin: 1.6rem 0 .4rem;
-  }
-  .chapter p { margin: 0 0 .9rem; max-width: var(--measure); }
-  .chapter ul { margin: 0 0 .9rem; padding-left: 1.1rem; max-width: var(--measure); }
-  .chapter li { margin-bottom: .35rem; }
-
-  strong { font-weight: 650; }
-  code {
-    font-family: var(--mono);
-    font-size: .88em;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: .1em .35em;
-  }
-
-  /* Schritte — nur dort, wo die Reihenfolge wirklich zaehlt. */
-  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
-  ol.steps li {
-    counter-increment: step;
-    position: relative;
-    padding-left: 2.6rem;
-    margin-bottom: .9rem;
-    max-width: var(--measure);
-  }
-  ol.steps li::before {
-    content: counter(step);
-    position: absolute;
-    left: 0;
-    top: -.05em;
-    width: 1.75rem;
-    height: 1.75rem;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--brand);
-    color: #fff;
-    font-family: var(--mono);
-    font-size: .8rem;
-    font-weight: 600;
-  }
-
-  figure.shot { margin: 0; }
-  figure.shot img {
-    width: 100%;
-    max-width: 15rem;
-    display: block;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    background: var(--surface);
-  }
-  figure.shot figcaption {
-    font-family: var(--mono);
-    font-size: .68rem;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-top: .55rem;
-    max-width: 15rem;
-  }
-
-  aside.note {
-    border-left: 3px solid var(--brand);
-    background: var(--surface);
-    padding: .85rem 1rem;
-    margin: 1.2rem 0;
-    max-width: var(--measure);
-    font-size: .95rem;
-  }
-  aside.note b { color: var(--brand-deep); }
-
-  table.diff {
-    border-collapse: collapse;
-    width: 100%;
-    max-width: var(--measure);
-    font-size: .95rem;
-  }
-  table.diff th, table.diff td {
-    text-align: left;
-    padding: .5rem .6rem;
-    border-bottom: 1px solid var(--line);
-    vertical-align: top;
-  }
-  table.diff th {
-    font-family: var(--mono);
-    font-size: .7rem;
-    letter-spacing: .07em;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-weight: 500;
-  }
-
-  footer.end {
-    max-width: 62rem;
-    margin: 0 auto;
-    padding: 2.5rem 1.5rem 4rem;
-    color: var(--muted);
-    font-size: .9rem;
-    border-top: 1px solid var(--line);
-  }
-
-
-  .switcher { background: var(--surface); border-bottom: 1px solid var(--line); }
-  .switcher .wrap {
-    display: flex; align-items: center; gap: .8rem;
-    padding: .7rem 1.5rem;
-  }
-  .switcher-label {
-    font-family: var(--mono); font-size: .7rem;
-    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
-  }
-  .seg { display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
-  .seg button {
-    font: inherit; font-size: .82rem;
-    padding: .3rem 1rem; border: 0; cursor: pointer;
-    background: transparent; color: var(--muted);
-  }
-  .seg button.on { background: var(--brand); color: #fff; }
-
-  .sitebar { background: var(--ink); color: var(--paper);
-    font-family: var(--mono); font-size: .74rem; letter-spacing: .05em; }
-  .sitebar .wrap { padding: .55rem 1.5rem; display: flex; gap: .6rem; }
-  .sitebar a { color: var(--paper); text-decoration: none; opacity: .85; }
-  .sitebar a:hover { opacity: 1; text-decoration: underline; }
-  .sitebar .sep { opacity: .4; }
-  a { color: var(--brand); }
-  a:focus-visible, button:focus-visible {
-    outline: 2px solid var(--brand);
-    outline-offset: 2px;
-  }
+    /* -------------------------------------------------------- Druck
+       Aus derselben Datei entsteht das PDF. Im Druck faellt weg, was nur
+       am Bildschirm nuetzt; jedes Kapitel beginnt auf einer neuen Seite,
+       Bild und Beschriftung bleiben zusammen. */
+    @media print {
+        @page { size: A4; margin: 15mm 14mm 16mm; }
+        body { background: #fff !important; font-size: 10.5pt; }
+        nav.site-nav, .kapitelleiste, .nur-bildschirm, footer.site-footer,
+        #mobile-menu { display: none !important; }
+        .druckkopf { display: flex !important; }
+        header.hero { background: #fff !important; color: #1f2937 !important;
+            padding: 0 0 6mm !important; }
+        header.hero h1 { color: #991b1b !important; font-size: 24pt; }
+        header.hero p { color: #4b5563 !important; font-size: 11pt; }
+        main { padding: 0 !important; }
+        main > div { max-width: none !important; padding: 0 !important; }
+        section.chapter { break-before: page; box-shadow: none !important;
+            border-radius: 0 !important; padding: 0 !important;
+            background: #fff !important; }
+        section.chapter:first-of-type { break-before: avoid; }
+        .chapter h2 { font-size: 15pt; }
+        .chapter h3 { font-size: 11pt; break-after: avoid; }
+        figure.shot { break-inside: avoid; }
+        figure.shot img { max-height: 150mm; object-fit: contain;
+            object-position: top left; }
+        aside.note { break-inside: avoid; }
+        .chapter a { color: #1f2937; text-decoration: none; }
+    }
 </style>
+</head>
+<body class="bg-gray-50 guide-app">
 
-<div class="sitebar"><div class="wrap">
-    <a href="mein.html">&larr; Mein Portal</a><span class="sep">·</span>
-    <a href="index.html">Website</a><span class="sep">·</span>
-    <a href="anleitung-website.html">Website-Anleitung</a><span class="sep">·</span>
-    <a href="apps.html">Apps</a></div></div>
-<header class="top">
-  <div class="wrap">
-    <p class="eyebrow">Feuerwehrverein Raura Kaiseraugst</p>
-    <h1>Die Mitglieder-App</h1>
-    <p class="lead">Anlässe sehen, sich für Schichten eintragen, das eigene
-      Profil pflegen — alles vom Telefon aus. Diese Anleitung führt durch
-      jeden Bildschirm.</p>
-  </div>
+<!-- DEUTSCH: Navigation wie auf den uebrigen Seiten der Website -->
+<nav class="site-nav bg-white shadow-md sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between h-16">
+            <div class="flex items-center space-x-3">
+                <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="h-12 w-auto">
+                <span class="text-xl font-bold text-fire-700">Feuerwehrverein Raura</span>
+            </div>
+            <div class="hidden md:flex space-x-6">
+                <a href="index.html" class="text-gray-700 hover:text-fire-600 transition-colors">Home</a>
+                <a href="events.html" class="text-gray-700 hover:text-fire-600 transition-colors">Veranstaltungen</a>
+                <a href="calendar.html" class="text-gray-700 hover:text-fire-600 transition-colors">Kalender</a>
+                <a href="mein.html" class="text-gray-700 hover:text-fire-600 transition-colors">Mein Bereich</a>
+                <a href="anleitung-app.html" class="text-fire-600 font-semibold">Anleitungen</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+</nav>
+<div id="mobile-menu" class="hidden md:hidden bg-white shadow-md">
+    <div class="px-4 pt-2 pb-3 space-y-1">
+        <a href="index.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Home</a>
+        <a href="events.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Veranstaltungen</a>
+        <a href="calendar.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Kalender</a>
+        <a href="mein.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Mein Bereich</a>
+        <a href="anleitung-app.html" class="block px-3 py-2 text-fire-600 font-semibold bg-fire-50 rounded-md">Anleitungen</a>
+    </div>
+</div>
+
+<header class="hero bg-gradient-to-r from-fire-600 to-fire-800 text-white py-12">
+    <div class="container mx-auto px-4">
+        <!-- DEUTSCH: Nur im PDF sichtbar - am Bildschirm steht das Logo in der Navigation -->
+        <div class="druckkopf" style="display:none; align-items:center; gap:8px; margin-bottom:10mm;">
+            <img src="images/logo.png" alt="" style="height:12mm; width:auto;">
+            <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
+        </div>
+        <h1 class="text-4xl font-bold mb-4">Die Mitglieder-App</h1>
+        <p class="text-xl max-w-2xl">Anlässe sehen, sich für Schichten eintragen, das eigene Profil pflegen — alles vom Telefon aus. Diese Anleitung führt durch jeden Bildschirm.</p>
+        <div class="nur-bildschirm mt-6 flex flex-wrap items-center gap-3">
+            <span class="text-sm text-fire-100">Bilder von</span>
+            <div class="seg inline-flex rounded-full overflow-hidden border border-white/40">
+                <button type="button" data-platform="ios"
+                    class="px-4 py-1.5 text-sm bg-white text-fire-700 font-semibold">iPhone</button>
+                <button type="button" data-platform="android"
+                    class="px-4 py-1.5 text-sm text-white">Android</button>
+            </div>
+            <a href="anleitungen/anleitung-app-iphone.pdf" class="ml-auto inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>PDF iPhone</span></a>
+            <a href="anleitungen/anleitung-app-android.pdf" class="inline-flex items-center space-x-2 bg-white/15 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-white/25 transition-colors"><span>⬇</span><span>PDF Android</span></a>
+        </div>
+    </div>
 </header>
 
-<div class="switcher">
-  <div class="wrap">
-    <span class="switcher-label">Bilder von</span>
-    <div class="seg" role="group" aria-label="Plattform wählen">
-      <button type="button" data-platform="ios" class="on">iPhone</button>
-      <button type="button" data-platform="android">Android</button>
+<!-- DEUTSCH: Kapitelleiste - klebt unter der Navigation, waagrecht scrollbar -->
+<div class="kapitelleiste bg-white border-b sticky top-16 z-40 overflow-x-auto">
+    <div class="container mx-auto px-4">
+        <div class="flex space-x-5 py-3 whitespace-nowrap text-sm">
+            <a href="#installieren" class="text-gray-600 hover:text-fire-600 transition-colors">Installieren</a>
+            <a href="#anmelden" class="text-gray-600 hover:text-fire-600 transition-colors">Anmelden</a>
+            <a href="#passwort" class="text-gray-600 hover:text-fire-600 transition-colors">Passwort</a>
+            <a href="#anlaesse" class="text-gray-600 hover:text-fire-600 transition-colors">Anlässe</a>
+            <a href="#mithelfen" class="text-gray-600 hover:text-fire-600 transition-colors">Mithelfen</a>
+            <a href="#anmeldungen" class="text-gray-600 hover:text-fire-600 transition-colors">Meine Anmeldungen</a>
+            <a href="#profil" class="text-gray-600 hover:text-fire-600 transition-colors">Profil</a>
+            <a href="#zugaenge" class="text-gray-600 hover:text-fire-600 transition-colors">Zugänge</a>
+            <a href="#adressbuch" class="text-gray-600 hover:text-fire-600 transition-colors">Adressbuch</a>
+            <a href="#meldungen" class="text-gray-600 hover:text-fire-600 transition-colors">Benachrichtigungen</a>
+            <a href="#organisator" class="text-gray-600 hover:text-fire-600 transition-colors">Für Organisatoren</a>
+        </div>
     </div>
-  </div>
 </div>
-<nav class="toc">
-  <ol>
-    <li><a href="#installieren">Installieren</a></li>
-    <li><a href="#anmelden">Anmelden</a></li>
-    <li><a href="#passwort">Passwort</a></li>
-    <li><a href="#anlaesse">Anlässe</a></li>
-    <li><a href="#mithelfen">Mithelfen</a></li>
-    <li><a href="#anmeldungen">Meine Anmeldungen</a></li>
-    <li><a href="#profil">Profil</a></li>
-    <li><a href="#zugaenge">Zugänge</a></li>
-    <li><a href="#adressbuch">Adressbuch</a></li>
-    <li><a href="#meldungen">Benachrichtigungen</a></li>
-    <li><a href="#organisator">Für Organisatoren</a></li>
-  </ol>
-</nav>
 
-<main>
+<main class="py-8">
+    <div class="container mx-auto px-4 max-w-4xl space-y-6">
+    
 
-<section class="chapter" id="installieren">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="installieren">
   <div>
     <h2>App aufs Telefon holen</h2>
     <p><strong>Android:</strong> Auf <a href="https://www.fwv-raura.ch/apps.html">fwv-raura.ch/apps.html</a>
@@ -348,7 +215,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="anmelden">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anmelden">
   <div>
     <h2>Anmelden</h2>
     <p>Es gibt drei Wege hinein. Der erste ist der übliche.</p>
@@ -379,7 +246,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="passwort">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="passwort">
   <div>
     <h2>Passwort vergessen</h2>
     <p>Es gibt nur <em>ein</em> Vereins-Passwort — dasselbe für die App und
@@ -419,6 +286,8 @@
     </aside>
     <p>Den Weg gibt es auch direkt:
       <code>auth.fwv-raura.ch/if/flow/password-recovery/</code></p>
+    <p>Ausführlicher, mit allem was schiefgehen kann, steht das in der
+      <a href="anleitung-passwort.html">Anleitung zum Passwort</a>.</p>
   </div>
   <figure class="shot">
     <img src="images/anleitung/gemeinsam-auth-recovery.jpg" alt="Formular zum Zurücksetzen des Passworts">
@@ -426,7 +295,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="anlaesse">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anlaesse">
   <div>
     <h2>Anlässe ansehen</h2>
     <p>Der erste Tab zeigt alle Anlässe des Vereins. Oben schaltest du
@@ -447,7 +316,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="mithelfen">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="mithelfen">
   <div>
     <h2>Mithelfen oder teilnehmen</h2>
     <p>Unten auf der Anlass-Seite steht ein Knopf. Wie er heisst, hängt
@@ -472,7 +341,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="anmeldungen">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anmeldungen">
   <div>
     <h2>Meine Anmeldungen</h2>
     <p>Im Profil unter <strong>Meine Anmeldungen</strong> siehst du alles,
@@ -493,7 +362,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="profil">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="profil">
   <div>
     <h2>Profil und Foto</h2>
     <p>Der Profil-Tab zeigt deine Angaben. Über <strong>Bearbeiten</strong>
@@ -514,7 +383,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="zugaenge">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="zugaenge">
   <div>
     <h2>Zugänge</h2>
     <p>Ebenfalls im Profil: <strong>Zugänge</strong>. Hier steht, auf
@@ -536,7 +405,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="adressbuch">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="adressbuch">
   <div>
     <h2>Mitglieder im Adressbuch</h2>
     <p>Unter <strong>Einstellungen → Mitglieder-Adressbuch einrichten</strong>
@@ -555,7 +424,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="meldungen">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="meldungen">
   <div>
     <h2>Benachrichtigungen</h2>
     <p>Unter <strong>Einstellungen → Benachrichtigungen</strong> legst du
@@ -577,7 +446,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="organisator">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="organisator">
   <div>
     <h2>Für Organisatoren</h2>
     <p>Organisierst du selbst einen Anlass, bekommst du einen zusätzlichen
@@ -605,7 +474,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="unterschiede">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="unterschiede">
   <div>
     <h2>Android und iPhone im Vergleich</h2>
     <p>Beide Apps können dasselbe. Zwei Punkte unterscheiden sich:</p>
@@ -636,17 +505,61 @@
   </figure>
 </section>
 
+
+
+
+    </div>
 </main>
 
-<footer class="end">
-  <div>Fragen oder etwas funktioniert nicht? Melde dich beim Vorstand —
-    am besten mit einem Bildschirmfoto der Stelle, an der es hakt.</div>
+<footer class="site-footer bg-gray-800 text-white py-8 mt-4">
+    <div class="container mx-auto px-4">
+        <div class="grid md:grid-cols-3 gap-8">
+            <div>
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-8 h-8 rounded-full overflow-hidden bg-white p-1">
+                        <img src="images/logo.png" alt="Logo" class="w-full h-full object-contain">
+                    </div>
+                    <span class="text-xl font-bold">FWV Raura</span>
+                </div>
+                <p class="text-gray-300 text-sm">
+                    Feuerwehrverein Raura Kaiseraugst - Tradition, Kameradschaft
+                    und Gemeinschaft seit vielen Jahren.
+                </p>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Anleitungen</h4>
+                <div class="space-y-2">
+                    <a href="anleitung-app.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Mitglieder-App</a>
+                    <a href="anleitung-website.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Website</a>
+                    <a href="anleitung-passwort.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Passwort zurücksetzen</a>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Kontakt</h4>
+                <div class="space-y-2 text-sm">
+                    <p class="text-gray-300">kontakt@fwv-raura.ch</p>
+                    <p class="text-gray-300">4303 Kaiseraugst</p>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-gray-700 mt-8 pt-8 text-center">
+            <p class="text-gray-400 text-sm">
+                Feuerwehrverein Raura Kaiseraugst — Stand: August 2026.
+                Fehlt ein Schritt oder stimmt etwas nicht mehr, melde dich beim Aktuar.
+            </p>
+        </div>
+    </div>
 </footer>
 
 <script>
-  // Bilder umschalten. Beide Saetze liegen als Dateien vor; getauscht wird
-  // nur das src-Attribut, der Text bleibt derselbe — die Apps koennen ja
-  // dasselbe.
+    // DEUTSCH: Ausfahr-Menu fuer schmale Bildschirme, wie auf den uebrigen Seiten
+    document.getElementById('mobile-menu-button').addEventListener('click', function () {
+        document.getElementById('mobile-menu').classList.toggle('hidden');
+    });
+</script>
+<script>
+  // DEUTSCH: Bilder umschalten. Beide Saetze liegen als Dateien vor;
+  // getauscht wird nur das src-Attribut, der Text bleibt derselbe.
   (function () {
     var buttons = document.querySelectorAll('.seg button');
     var shots = document.querySelectorAll('figure.shot img');
@@ -656,7 +569,11 @@
         if (next) { img.src = next; }
       });
       buttons.forEach(function (b) {
-        b.classList.toggle('on', b.dataset.platform === platform);
+        var on = b.dataset.platform === platform;
+        b.classList.toggle('bg-white', on);
+        b.classList.toggle('text-fire-700', on);
+        b.classList.toggle('font-semibold', on);
+        b.classList.toggle('text-white', !on);
       });
       try { localStorage.setItem('anleitung-plattform', platform); } catch (e) {}
     }
@@ -668,7 +585,5 @@
     if (stored) { apply(stored); }
   })();
 </script>
-
-
 </body>
 </html>

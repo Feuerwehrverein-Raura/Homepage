@@ -4,269 +4,172 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anleitung Website - Feuerwehrverein Raura</title>
-<style>
-  /* Gleiche Farben und Schriftrollen wie die App-Anleitung — beide sollen
-     erkennbar aus demselben Haus stammen. Unterschied ist der Rhythmus:
-     Bildschirmfotos vom Rechner sind breit, darum liegen sie unter dem
-     Text statt daneben. */
-  :root {
-    --paper:   #FCFAF9;
-    --surface: #F4EEEC;
-    --line:    #E2D6D2;
-    --ink:     #1B1514;
-    --muted:   #6E605C;
-    --brand:   #B91C1C;
-    --brand-deep: #7F1414;
-
-    --display: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-
-    --measure: 36rem;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper:   #17110F;
-      --surface: #231A18;
-      --line:    #3A2C29;
-      --ink:     #F3EDEB;
-      --muted:   #AC9994;
-      --brand:   #F0736A;
-      --brand-deep: #F3948D;
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    fire: {
+                        50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca',
+                        300: '#fca5a5', 400: '#f87171', 500: '#ef4444',
+                        600: '#dc2626', 700: '#b91c1c', 800: '#991b1b',
+                        900: '#7f1d1d',
+                    }
+                }
+            }
+        }
     }
-  }
-  :root[data-theme="dark"] {
-    --paper:   #17110F;
-    --surface: #231A18;
-    --line:    #3A2C29;
-    --ink:     #F3EDEB;
-    --muted:   #AC9994;
-    --brand:   #F0736A;
-    --brand-deep: #F3948D;
-  }
+</script>
+<style>
+    /* Die Kapitel sind schlichtes HTML ohne Klassen — hier bekommen sie
+       das Aussehen der Website. */
+    .chapter h2 { font-size: 1.5rem; line-height: 2rem; font-weight: 700;
+        color: #991b1b; margin: 0 0 .75rem; }
+    .chapter h3 { font-size: 1.125rem; font-weight: 600; color: #1f2937;
+        margin: 1.75rem 0 .35rem; }
+    .chapter p { color: #374151; line-height: 1.7; margin: 0 0 .85rem; }
+    .chapter ul { list-style: disc; padding-left: 1.35rem; color: #374151;
+        line-height: 1.7; margin: 0 0 .85rem; }
+    .chapter li { margin-bottom: .35rem; }
+    .chapter strong { font-weight: 600; color: #1f2937; }
+    .chapter a { color: #dc2626; text-decoration: underline; }
+    .chapter a:hover { color: #b91c1c; }
+    .chapter code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .875em; background: #fef2f2; border: 1px solid #fee2e2;
+        border-radius: .25rem; padding: .1em .35em; overflow-wrap: anywhere; }
 
-  * { box-sizing: border-box; }
+    /* Nummerierte Schritte — nur dort, wo die Reihenfolge wirklich zaehlt. */
+    ol.steps { list-style: none; margin: 0 0 .85rem; padding: 0;
+        counter-reset: step; }
+    ol.steps li { counter-increment: step; position: relative;
+        padding-left: 2.6rem; margin-bottom: .8rem; color: #374151;
+        line-height: 1.7; }
+    ol.steps li::before { content: counter(step); position: absolute;
+        left: 0; top: .1em; width: 1.75rem; height: 1.75rem; display: grid;
+        place-items: center; border-radius: 9999px; background: #dc2626;
+        color: #fff; font-size: .8rem; font-weight: 600; }
 
-  body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: var(--body);
-    font-size: 17px;
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-  }
+    aside.note { background: #fef2f2; border-left: 4px solid #ef4444;
+        border-radius: 0 .5rem .5rem 0; padding: .9rem 1rem;
+        margin: 1.1rem 0; color: #374151; font-size: .95rem; }
+    aside.note b { color: #991b1b; }
 
-  /* ---------------------------------------------------------- Kopf */
+    figure.shot { margin: 1.25rem 0 0; }
+    figure.shot img { width: 100%; display: block; border: 1px solid #e5e7eb;
+        border-radius: .5rem; background: #f9fafb; }
+    figure.shot figcaption { color: #6b7280; font-size: .8rem;
+        margin-top: .5rem; }
 
-  .sitebar { background: var(--ink); color: var(--paper);
-    font-family: var(--mono); font-size: .74rem; letter-spacing: .05em; }
-  .sitebar .wrap { padding: .55rem 1.5rem; display: flex; gap: .6rem; }
-  .sitebar a { color: var(--paper); text-decoration: none; opacity: .85; }
-  .sitebar a:hover { opacity: 1; text-decoration: underline; }
-  .sitebar .sep { opacity: .4; }
+    table.diff { border-collapse: collapse; width: 100%; font-size: .95rem;
+        color: #374151; }
+    table.diff th, table.diff td { text-align: left; padding: .5rem .6rem;
+        border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    table.diff th { font-size: .75rem; text-transform: uppercase;
+        letter-spacing: .05em; color: #6b7280; font-weight: 600; }
 
-  header.top {
-    background: var(--brand);
-    color: #fff;
-    padding: 3.5rem 1.5rem 3rem;
-  }
-  .wrap { max-width: 62rem; margin: 0 auto; }
 
-  header.top .eyebrow {
-    font-family: var(--mono);
-    font-size: .7rem;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-    opacity: .82;
-    margin: 0 0 .9rem;
-  }
-  header.top h1 {
-    font-family: var(--display);
-    font-weight: 800;
-    letter-spacing: -.03em;
-    font-size: clamp(2.4rem, 7vw, 4rem);
-    line-height: 1.02;
-    margin: 0;
-    text-wrap: balance;
-  }
-  header.top p.lead {
-    max-width: var(--measure);
-    margin: 1.1rem 0 0;
-    font-size: 1.06rem;
-    opacity: .93;
-  }
-
-  /* ------------------------------------------------------ Inhalt */
-
-  nav.toc {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
-    overflow-x: auto;
-  }
-  nav.toc ol {
-    display: flex;
-    gap: 1.4rem;
-    list-style: none;
-    margin: 0 auto;
-    padding: .7rem 1.5rem;
-    max-width: 62rem;
-    white-space: nowrap;
-    font-family: var(--mono);
-    font-size: .74rem;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-  }
-  nav.toc a { color: var(--muted); text-decoration: none; }
-  nav.toc a:hover, nav.toc a:focus-visible { color: var(--brand); }
-
-  main { padding: 0 1.5rem 5rem; }
-
-  section.chapter {
-    max-width: 62rem;
-    margin: 0 auto;
-    padding: 3.2rem 0;
-    border-bottom: 1px solid var(--line);
-  }
-  section.chapter:last-of-type { border-bottom: 0; }
-
-  .chapter h2 {
-    font-family: var(--display);
-    font-weight: 800;
-    letter-spacing: -.02em;
-    font-size: 1.7rem;
-    line-height: 1.15;
-    margin: 0 0 .8rem;
-    color: var(--brand-deep);
-    text-wrap: balance;
-  }
-  .chapter h3 {
-    font-family: var(--display);
-    font-size: 1.02rem;
-    font-weight: 700;
-    letter-spacing: -.01em;
-    margin: 1.6rem 0 .4rem;
-  }
-  .chapter p { margin: 0 0 .9rem; max-width: var(--measure); }
-  .chapter ul { margin: 0 0 .9rem; padding-left: 1.1rem; max-width: var(--measure); }
-  .chapter li { margin-bottom: .35rem; }
-
-  strong { font-weight: 650; }
-  code {
-    font-family: var(--mono);
-    font-size: .88em;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: .1em .35em;
-    overflow-wrap: anywhere;
-  }
-
-  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
-  ol.steps li {
-    counter-increment: step;
-    position: relative;
-    padding-left: 2.6rem;
-    margin-bottom: .9rem;
-    max-width: var(--measure);
-  }
-  ol.steps li::before {
-    content: counter(step);
-    position: absolute;
-    left: 0;
-    top: -.05em;
-    width: 1.75rem;
-    height: 1.75rem;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--brand);
-    color: #fff;
-    font-family: var(--mono);
-    font-size: .8rem;
-    font-weight: 600;
-  }
-
-  /* Breite Bildschirmfotos: volle Spaltenbreite, unter dem Text. */
-  figure.shot { margin: 1.6rem 0 0; }
-  figure.shot img {
-    width: 100%;
-    display: block;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--surface);
-  }
-  figure.shot figcaption {
-    font-family: var(--mono);
-    font-size: .68rem;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-top: .55rem;
-  }
-
-  aside.note {
-    border-left: 3px solid var(--brand);
-    background: var(--surface);
-    padding: .85rem 1rem;
-    margin: 1.2rem 0;
-    max-width: var(--measure);
-    font-size: .95rem;
-  }
-  aside.note b { color: var(--brand-deep); }
-
-  footer.end {
-    max-width: 62rem;
-    margin: 0 auto;
-    padding: 2.5rem 1.5rem 4rem;
-    color: var(--muted);
-    font-size: .9rem;
-    border-top: 1px solid var(--line);
-  }
-
-  a { color: var(--brand); }
-  a:focus-visible, button:focus-visible {
-    outline: 2px solid var(--brand);
-    outline-offset: 2px;
-  }
+    /* -------------------------------------------------------- Druck
+       Aus derselben Datei entsteht das PDF. Im Druck faellt weg, was nur
+       am Bildschirm nuetzt; jedes Kapitel beginnt auf einer neuen Seite,
+       Bild und Beschriftung bleiben zusammen. */
+    @media print {
+        @page { size: A4; margin: 15mm 14mm 16mm; }
+        body { background: #fff !important; font-size: 10.5pt; }
+        nav.site-nav, .kapitelleiste, .nur-bildschirm, footer.site-footer,
+        #mobile-menu { display: none !important; }
+        .druckkopf { display: flex !important; }
+        header.hero { background: #fff !important; color: #1f2937 !important;
+            padding: 0 0 6mm !important; }
+        header.hero h1 { color: #991b1b !important; font-size: 24pt; }
+        header.hero p { color: #4b5563 !important; font-size: 11pt; }
+        main { padding: 0 !important; }
+        main > div { max-width: none !important; padding: 0 !important; }
+        section.chapter { break-before: page; box-shadow: none !important;
+            border-radius: 0 !important; padding: 0 !important;
+            background: #fff !important; }
+        section.chapter:first-of-type { break-before: avoid; }
+        .chapter h2 { font-size: 15pt; }
+        .chapter h3 { font-size: 11pt; break-after: avoid; }
+        figure.shot { break-inside: avoid; }
+        figure.shot img { max-height: 150mm; object-fit: contain;
+            object-position: top left; }
+        aside.note { break-inside: avoid; }
+        .chapter a { color: #1f2937; text-decoration: none; }
+    }
 </style>
+</head>
+<body class="bg-gray-50 ">
 
-<div class="sitebar"><div class="wrap">
-    <a href="mein.html">&larr; Mein Portal</a><span class="sep">·</span>
-    <a href="index.html">Website</a><span class="sep">·</span>
-    <a href="anleitung-app.html">App-Anleitung</a></div></div>
-<header class="top">
-  <div class="wrap">
-    <p class="eyebrow">Feuerwehrverein Raura Kaiseraugst</p>
-    <h1>Die Vereins&shy;website</h1>
-    <p class="lead">Termine nachschlagen, sich für eine Schicht eintragen,
-      den Kalender abonnieren — und im Mitgliederbereich die eigenen Daten
-      und Zugänge verwalten. Diese Anleitung geht Seite für Seite durch.</p>
-  </div>
+<!-- DEUTSCH: Navigation wie auf den uebrigen Seiten der Website -->
+<nav class="site-nav bg-white shadow-md sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between h-16">
+            <div class="flex items-center space-x-3">
+                <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="h-12 w-auto">
+                <span class="text-xl font-bold text-fire-700">Feuerwehrverein Raura</span>
+            </div>
+            <div class="hidden md:flex space-x-6">
+                <a href="index.html" class="text-gray-700 hover:text-fire-600 transition-colors">Home</a>
+                <a href="events.html" class="text-gray-700 hover:text-fire-600 transition-colors">Veranstaltungen</a>
+                <a href="calendar.html" class="text-gray-700 hover:text-fire-600 transition-colors">Kalender</a>
+                <a href="mein.html" class="text-gray-700 hover:text-fire-600 transition-colors">Mein Bereich</a>
+                <a href="anleitung-website.html" class="text-fire-600 font-semibold">Anleitungen</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+</nav>
+<div id="mobile-menu" class="hidden md:hidden bg-white shadow-md">
+    <div class="px-4 pt-2 pb-3 space-y-1">
+        <a href="index.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Home</a>
+        <a href="events.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Veranstaltungen</a>
+        <a href="calendar.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Kalender</a>
+        <a href="mein.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Mein Bereich</a>
+        <a href="anleitung-website.html" class="block px-3 py-2 text-fire-600 font-semibold bg-fire-50 rounded-md">Anleitungen</a>
+    </div>
+</div>
+
+<header class="hero bg-gradient-to-r from-fire-600 to-fire-800 text-white py-12">
+    <div class="container mx-auto px-4">
+        <!-- DEUTSCH: Nur im PDF sichtbar - am Bildschirm steht das Logo in der Navigation -->
+        <div class="druckkopf" style="display:none; align-items:center; gap:8px; margin-bottom:10mm;">
+            <img src="images/logo.png" alt="" style="height:12mm; width:auto;">
+            <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
+        </div>
+        <h1 class="text-4xl font-bold mb-4">Die Vereinswebsite</h1>
+        <p class="text-xl max-w-2xl">Termine nachschlagen, sich für eine Schicht eintragen, den Kalender abonnieren — und im Mitgliederbereich die eigenen Daten und Zugänge verwalten. Diese Anleitung geht Seite für Seite durch.</p>
+        <div class="mt-6"><a href="anleitungen/anleitung-website.pdf" class="nur-bildschirm inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>Als PDF</span></a></div>
+    </div>
 </header>
 
-<nav class="toc">
-  <ol>
-    <li><a href="#ueberblick">Überblick</a></li>
-    <li><a href="#veranstaltungen">Veranstaltungen</a></li>
-    <li><a href="#anlass">Ein Anlass</a></li>
-    <li><a href="#mithelfen">Mithelfen</a></li>
-    <li><a href="#arbeitsplan">Arbeitsplan</a></li>
-    <li><a href="#kalender">Kalender</a></li>
-    <li><a href="#abonnieren">Abonnieren</a></li>
-    <li><a href="#portal">Mein Portal</a></li>
-    <li><a href="#apps">Apps</a></li>
-    <li><a href="#kontakt">Kontakt</a></li>
-  </ol>
-</nav>
+<!-- DEUTSCH: Kapitelleiste - klebt unter der Navigation, waagrecht scrollbar -->
+<div class="kapitelleiste bg-white border-b sticky top-16 z-40 overflow-x-auto">
+    <div class="container mx-auto px-4">
+        <div class="flex space-x-5 py-3 whitespace-nowrap text-sm">
+            <a href="#ueberblick" class="text-gray-600 hover:text-fire-600 transition-colors">Überblick</a>
+            <a href="#veranstaltungen" class="text-gray-600 hover:text-fire-600 transition-colors">Veranstaltungen</a>
+            <a href="#anlass" class="text-gray-600 hover:text-fire-600 transition-colors">Ein Anlass</a>
+            <a href="#mithelfen" class="text-gray-600 hover:text-fire-600 transition-colors">Mithelfen</a>
+            <a href="#arbeitsplan" class="text-gray-600 hover:text-fire-600 transition-colors">Arbeitsplan</a>
+            <a href="#kalender" class="text-gray-600 hover:text-fire-600 transition-colors">Kalender</a>
+            <a href="#abonnieren" class="text-gray-600 hover:text-fire-600 transition-colors">Abonnieren</a>
+            <a href="#portal" class="text-gray-600 hover:text-fire-600 transition-colors">Mein Portal</a>
+            <a href="#apps" class="text-gray-600 hover:text-fire-600 transition-colors">Apps</a>
+            <a href="#kontakt" class="text-gray-600 hover:text-fire-600 transition-colors">Kontakt</a>
+        </div>
+    </div>
+</div>
 
-<main>
+<main class="py-8">
+    <div class="container mx-auto px-4 max-w-4xl space-y-6">
+    
 
-<section class="chapter" id="ueberblick">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="ueberblick">
   <h2>Was wo steht</h2>
   <p>Die Website ist unter <code>www.fwv-raura.ch</code> erreichbar und
     braucht keine Anmeldung — bis auf einen Bereich.</p>
@@ -302,7 +205,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="veranstaltungen">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="veranstaltungen">
   <h2>Alle Anlässe auf einen Blick</h2>
   <p>Unter <strong>Veranstaltungen</strong> steht jeder Anlass des Vereins
     untereinander: Titel, Datum, Zeit, Ort und wer ihn organisiert.</p>
@@ -324,7 +227,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="anlass">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anlass">
   <h2>Ein Anlass im Einzelnen</h2>
   <p>Ein Klick auf einen Anlass öffnet ein Fenster mit allem, was dazu
     bekannt ist: Termin und Zeit, Ort mit Adresse, Kosten sowie Name und
@@ -343,7 +246,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="mithelfen">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="mithelfen">
   <h2>Für eine Schicht eintragen</h2>
   <p>Bei Anlässen, für die Helfer gesucht werden, führt
     <strong>Für Schicht anmelden</strong> zum Formular. Dafür braucht es
@@ -371,7 +274,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="arbeitsplan">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="arbeitsplan">
   <h2>Den Arbeitsplan ansehen</h2>
   <p><strong>Arbeitsplan ansehen</strong> zeigt die fertige Einteilung als
     Tabelle: links die Zeitblöcke, in den Spalten die Posten — Bar, Küche
@@ -388,7 +291,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="kalender">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="kalender">
   <h2>Der Vereinskalender</h2>
   <p>Der <strong>Kalender</strong> zeigt denselben Bestand als
     Monatsansicht. Mit den Pfeilen links neben dem Monatsnamen blätterst du
@@ -404,7 +307,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="abonnieren">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="abonnieren">
   <h2>Termine in den eigenen Kalender holen</h2>
   <p>Statt hier nachzuschlagen, kannst du den Vereinskalender abonnieren:
     Die Termine erscheinen dann in deinem Kalender am Telefon oder Rechner
@@ -431,7 +334,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="portal">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="portal">
   <h2>Mein Portal — der Mitgliederbereich</h2>
   <p>Hinter <strong>Mein Bereich</strong> liegt der einzige Teil der
     Website, der eine Anmeldung verlangt. Der Klick führt auf die
@@ -444,7 +347,7 @@
     <b>Passwort vergessen?</b> Auf der Anmeldeseite unten auf
     <em>Benutzername oder Passwort vergessen?</em> klicken und der E-Mail
     folgen. Der Weg ist in der
-    <a href="anleitung-app.html#passwort">App-Anleitung</a> Schritt für
+    <a href="anleitung-passwort.html">eigenen Anleitung</a> Schritt für
     Schritt beschrieben — er gilt für App und Website gleichermassen.
   </aside>
   <figure class="shot">
@@ -533,7 +436,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="apps">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="apps">
   <h2>Die Apps</h2>
   <p>Unter <strong>Apps</strong> liegen die Programme des Vereins zum
     Herunterladen — die Mitglieder-App für Android sowie die Werkzeuge für
@@ -547,7 +450,7 @@
   </figure>
 </section>
 
-<section class="chapter" id="kontakt">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="kontakt">
   <h2>Fragen, Anliegen, Mitglied werden</h2>
   <p>Ganz unten auf der Startseite steht das Kontaktformular. Im Feld
     <strong>Betreff auswählen</strong> gibt es neben der allgemeinen
@@ -564,10 +467,58 @@
   </figure>
 </section>
 
+
+
+
+    </div>
 </main>
 
-<footer class="end">
-  <div>Feuerwehrverein Raura Kaiseraugst — Stand: August 2026. Kommt dir
-    etwas seltsam vor oder fehlt ein Schritt, melde dich beim Aktuar.</div>
+<footer class="site-footer bg-gray-800 text-white py-8 mt-4">
+    <div class="container mx-auto px-4">
+        <div class="grid md:grid-cols-3 gap-8">
+            <div>
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-8 h-8 rounded-full overflow-hidden bg-white p-1">
+                        <img src="images/logo.png" alt="Logo" class="w-full h-full object-contain">
+                    </div>
+                    <span class="text-xl font-bold">FWV Raura</span>
+                </div>
+                <p class="text-gray-300 text-sm">
+                    Feuerwehrverein Raura Kaiseraugst - Tradition, Kameradschaft
+                    und Gemeinschaft seit vielen Jahren.
+                </p>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Anleitungen</h4>
+                <div class="space-y-2">
+                    <a href="anleitung-app.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Mitglieder-App</a>
+                    <a href="anleitung-website.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Website</a>
+                    <a href="anleitung-passwort.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Passwort zurücksetzen</a>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Kontakt</h4>
+                <div class="space-y-2 text-sm">
+                    <p class="text-gray-300">kontakt@fwv-raura.ch</p>
+                    <p class="text-gray-300">4303 Kaiseraugst</p>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-gray-700 mt-8 pt-8 text-center">
+            <p class="text-gray-400 text-sm">
+                Feuerwehrverein Raura Kaiseraugst — Stand: August 2026.
+                Fehlt ein Schritt oder stimmt etwas nicht mehr, melde dich beim Aktuar.
+            </p>
+        </div>
+    </div>
 </footer>
+
+<script>
+    // DEUTSCH: Ausfahr-Menu fuer schmale Bildschirme, wie auf den uebrigen Seiten
+    document.getElementById('mobile-menu-button').addEventListener('click', function () {
+        document.getElementById('mobile-menu').classList.toggle('hidden');
+    });
+</script>
+
+</body>
 </html>

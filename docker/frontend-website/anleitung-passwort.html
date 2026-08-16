@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Passwort zurücksetzen - Feuerwehrverein Raura</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    fire: {
+                        50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca',
+                        300: '#fca5a5', 400: '#f87171', 500: '#ef4444',
+                        600: '#dc2626', 700: '#b91c1c', 800: '#991b1b',
+                        900: '#7f1d1d',
+                    }
+                }
+            }
+        }
+    }
+</script>
+<style>
+    /* Die Kapitel sind schlichtes HTML ohne Klassen — hier bekommen sie
+       das Aussehen der Website. */
+    .chapter h2 { font-size: 1.5rem; line-height: 2rem; font-weight: 700;
+        color: #991b1b; margin: 0 0 .75rem; }
+    .chapter h3 { font-size: 1.125rem; font-weight: 600; color: #1f2937;
+        margin: 1.75rem 0 .35rem; }
+    .chapter p { color: #374151; line-height: 1.7; margin: 0 0 .85rem; }
+    .chapter ul { list-style: disc; padding-left: 1.35rem; color: #374151;
+        line-height: 1.7; margin: 0 0 .85rem; }
+    .chapter li { margin-bottom: .35rem; }
+    .chapter strong { font-weight: 600; color: #1f2937; }
+    .chapter a { color: #dc2626; text-decoration: underline; }
+    .chapter a:hover { color: #b91c1c; }
+    .chapter code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: .875em; background: #fef2f2; border: 1px solid #fee2e2;
+        border-radius: .25rem; padding: .1em .35em; overflow-wrap: anywhere; }
+
+    /* Nummerierte Schritte — nur dort, wo die Reihenfolge wirklich zaehlt. */
+    ol.steps { list-style: none; margin: 0 0 .85rem; padding: 0;
+        counter-reset: step; }
+    ol.steps li { counter-increment: step; position: relative;
+        padding-left: 2.6rem; margin-bottom: .8rem; color: #374151;
+        line-height: 1.7; }
+    ol.steps li::before { content: counter(step); position: absolute;
+        left: 0; top: .1em; width: 1.75rem; height: 1.75rem; display: grid;
+        place-items: center; border-radius: 9999px; background: #dc2626;
+        color: #fff; font-size: .8rem; font-weight: 600; }
+
+    aside.note { background: #fef2f2; border-left: 4px solid #ef4444;
+        border-radius: 0 .5rem .5rem 0; padding: .9rem 1rem;
+        margin: 1.1rem 0; color: #374151; font-size: .95rem; }
+    aside.note b { color: #991b1b; }
+
+    figure.shot { margin: 1.25rem 0 0; }
+    figure.shot img { width: 100%; display: block; border: 1px solid #e5e7eb;
+        border-radius: .5rem; background: #f9fafb; }
+    figure.shot figcaption { color: #6b7280; font-size: .8rem;
+        margin-top: .5rem; }
+
+    table.diff { border-collapse: collapse; width: 100%; font-size: .95rem;
+        color: #374151; }
+    table.diff th, table.diff td { text-align: left; padding: .5rem .6rem;
+        border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    table.diff th { font-size: .75rem; text-transform: uppercase;
+        letter-spacing: .05em; color: #6b7280; font-weight: 600; }
+
+
+    /* -------------------------------------------------------- Druck
+       Aus derselben Datei entsteht das PDF. Im Druck faellt weg, was nur
+       am Bildschirm nuetzt; jedes Kapitel beginnt auf einer neuen Seite,
+       Bild und Beschriftung bleiben zusammen. */
+    @media print {
+        @page { size: A4; margin: 15mm 14mm 16mm; }
+        body { background: #fff !important; font-size: 10.5pt; }
+        nav.site-nav, .kapitelleiste, .nur-bildschirm, footer.site-footer,
+        #mobile-menu { display: none !important; }
+        .druckkopf { display: flex !important; }
+        header.hero { background: #fff !important; color: #1f2937 !important;
+            padding: 0 0 6mm !important; }
+        header.hero h1 { color: #991b1b !important; font-size: 24pt; }
+        header.hero p { color: #4b5563 !important; font-size: 11pt; }
+        main { padding: 0 !important; }
+        main > div { max-width: none !important; padding: 0 !important; }
+        section.chapter { break-before: page; box-shadow: none !important;
+            border-radius: 0 !important; padding: 0 !important;
+            background: #fff !important; }
+        section.chapter:first-of-type { break-before: avoid; }
+        .chapter h2 { font-size: 15pt; }
+        .chapter h3 { font-size: 11pt; break-after: avoid; }
+        figure.shot { break-inside: avoid; }
+        figure.shot img { max-height: 150mm; object-fit: contain;
+            object-position: top left; }
+        aside.note { break-inside: avoid; }
+        .chapter a { color: #1f2937; text-decoration: none; }
+    }
+</style>
+</head>
+<body class="bg-gray-50 ">
+
+<!-- DEUTSCH: Navigation wie auf den uebrigen Seiten der Website -->
+<nav class="site-nav bg-white shadow-md sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+        <div class="flex items-center justify-between h-16">
+            <div class="flex items-center space-x-3">
+                <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="h-12 w-auto">
+                <span class="text-xl font-bold text-fire-700">Feuerwehrverein Raura</span>
+            </div>
+            <div class="hidden md:flex space-x-6">
+                <a href="index.html" class="text-gray-700 hover:text-fire-600 transition-colors">Home</a>
+                <a href="events.html" class="text-gray-700 hover:text-fire-600 transition-colors">Veranstaltungen</a>
+                <a href="calendar.html" class="text-gray-700 hover:text-fire-600 transition-colors">Kalender</a>
+                <a href="mein.html" class="text-gray-700 hover:text-fire-600 transition-colors">Mein Bereich</a>
+                <a href="anleitung-passwort.html" class="text-fire-600 font-semibold">Anleitungen</a>
+            </div>
+            <button id="mobile-menu-button" class="md:hidden text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+</nav>
+<div id="mobile-menu" class="hidden md:hidden bg-white shadow-md">
+    <div class="px-4 pt-2 pb-3 space-y-1">
+        <a href="index.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Home</a>
+        <a href="events.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Veranstaltungen</a>
+        <a href="calendar.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Kalender</a>
+        <a href="mein.html" class="block px-3 py-2 text-gray-700 hover:bg-fire-50 rounded-md">Mein Bereich</a>
+        <a href="anleitung-passwort.html" class="block px-3 py-2 text-fire-600 font-semibold bg-fire-50 rounded-md">Anleitungen</a>
+    </div>
+</div>
+
+<header class="hero bg-gradient-to-r from-fire-600 to-fire-800 text-white py-12">
+    <div class="container mx-auto px-4">
+        <!-- DEUTSCH: Nur im PDF sichtbar - am Bildschirm steht das Logo in der Navigation -->
+        <div class="druckkopf" style="display:none; align-items:center; gap:8px; margin-bottom:10mm;">
+            <img src="images/logo.png" alt="" style="height:12mm; width:auto;">
+            <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
+        </div>
+        <h1 class="text-4xl font-bold mb-4">Passwort vergessen</h1>
+        <p class="text-xl max-w-2xl">Das Vereins-Passwort lässt sich selbst zurücksetzen — in der App oder über die Website. Der Vorstand muss dafür nichts tun.</p>
+        <div class="mt-6"><a href="anleitungen/anleitung-passwort.pdf" class="nur-bildschirm inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>Als PDF</span></a></div>
+    </div>
+</header>
+
+<!-- DEUTSCH: Kapitelleiste - klebt unter der Navigation, waagrecht scrollbar -->
+<div class="kapitelleiste bg-white border-b sticky top-16 z-40 overflow-x-auto">
+    <div class="container mx-auto px-4">
+        <div class="flex space-x-5 py-3 whitespace-nowrap text-sm">
+            <a href="#ueberblick" class="text-gray-600 hover:text-fire-600 transition-colors">Überblick</a>
+            <a href="#app" class="text-gray-600 hover:text-fire-600 transition-colors">In der App</a>
+            <a href="#website" class="text-gray-600 hover:text-fire-600 transition-colors">Über die Website</a>
+            <a href="#probleme" class="text-gray-600 hover:text-fire-600 transition-colors">Wenn es nicht klappt</a>
+        </div>
+    </div>
+</div>
+
+<main class="py-8">
+    <div class="container mx-auto px-4 max-w-4xl space-y-6">
+    
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="ueberblick">
+  <h2>Ein Passwort für alles</h2>
+  <p>Für die Website und für die Mitglieder-App gilt <strong>dasselbe
+    Konto</strong>. Es liegt bei der Anmeldestelle des Vereins unter
+    <code>auth.fwv-raura.ch</code>, und dort hängen auch die übrigen
+    Dienste dran — Nextcloud, das Wiki, das Vorstands-Portal.</p>
+  <p>Setzt du das Passwort zurück, gilt das neue also überall. Du musst
+    das nirgends ein zweites Mal machen.</p>
+  <p>Der Vorstand muss dafür nichts tun. Es gibt zwei Wege, und beide
+    führen zum selben Ergebnis — nimm den, der dir gerade näher liegt.</p>
+  <aside class="note">
+    <b>Der Verein sieht dein Passwort nicht.</b> Auch der Aktuar kann es
+    nicht nachschlagen, nur den Zurücksetzen-Vorgang anstossen. Deshalb
+    lohnt sich der Weg über die E-Mail immer.
+  </aside>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="app">
+  <h2>Der Weg in der App</h2>
+  <p>Der kürzere Weg, wenn du das Telefon ohnehin in der Hand hast: Er
+    bleibt ganz in der App, ein Browser wird nicht gebraucht, und am Ende
+    bist du gleich angemeldet.</p>
+  <ol class="steps">
+    <li>Die Mitglieder-App öffnen. Auf dem Anmeldebildschirm ganz unten
+      steht <strong>Passwort vergessen</strong> — antippen.</li>
+    <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
+      <strong>Code anfordern</strong> drücken.</li>
+    <li>In den Posteingang schauen. In der E-Mail steht ein Zahlencode.</li>
+    <li>Zurück in der App: Code eintippen, das neue Passwort zweimal
+      eingeben und bestätigen.</li>
+  </ol>
+  <p>Danach bist du direkt in der App angemeldet — und kannst dich mit
+    demselben Passwort auch auf der Website anmelden.</p>
+  <aside class="note">
+    <b>Der Code ist nur kurz gültig.</b> Kommt die E-Mail erst später, oder
+    hast du zwischendurch etwas anderes gemacht, fordere einfach einen
+    neuen an.
+  </aside>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="website">
+  <h2>Der Weg über die Website</h2>
+  <p>Kein Telefon zur Hand, oder du sitzt sowieso am Rechner? Dann geht es
+    über die Anmeldeseite.</p>
+  <ol class="steps">
+    <li>Auf <code>www.fwv-raura.ch</code> auf <strong>Mein Bereich</strong>
+      klicken. Es erscheint die Anmeldeseite des Vereins.</li>
+    <li>Ganz unten steht <strong>Benutzername oder Passwort
+      vergessen?</strong> — anklicken.</li>
+    <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
+      <strong>Continue</strong> drücken.</li>
+    <li>In den Posteingang schauen. Der Link in der E-Mail führt auf eine
+      Seite, auf der du ein neues Passwort setzt.</li>
+    <li>Mit dem neuen Passwort anmelden — auf der Website wie in der
+      App.</li>
+  </ol>
+  <p>Die Seite lässt sich auch direkt aufrufen:
+    <code>auth.fwv-raura.ch/if/flow/password-recovery/</code></p>
+  <figure class="shot">
+    <img src="images/anleitung/gemeinsam-auth-login.jpg"
+         alt="Anmeldeseite mit dem Link zum Zurücksetzen ganz unten">
+    <figcaption>Schritt 2: der Link steht unter dem Anmeldefeld</figcaption>
+  </figure>
+  <figure class="shot">
+    <img src="images/anleitung/gemeinsam-auth-recovery.jpg"
+         alt="Formular zum Zurücksetzen des Passworts">
+    <figcaption>Schritt 3: E-Mail-Adresse eingeben</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="probleme">
+  <h2>Wenn es nicht klappt</h2>
+  <h3>Es kommt keine E-Mail</h3>
+  <p>Zuerst im Spam-Ordner nachsehen — Nachrichten von der Anmeldestelle
+    landen dort gern. Warte ausserdem ein paar Minuten; der Versand ist
+    nicht immer sofort.</p>
+  <p>Kommt danach nichts an, ist unter dieser Adresse vermutlich kein Konto
+    hinterlegt. Häufigster Grund: Der Verein hat eine andere Adresse von
+    dir als die, die du eingegeben hast. Dann hilft der Aktuar weiter.</p>
+
+  <h3>Ich weiss meinen Benutzernamen nicht</h3>
+  <p>Du brauchst ihn nicht. Für das Zurücksetzen genügt die E-Mail-Adresse,
+    und anmelden kannst du dich damit ebenfalls.</p>
+
+  <h3>Das neue Passwort wird nicht angenommen</h3>
+  <p>Es muss mindestens acht Zeichen haben. Zu einfache Passwörter — der
+    eigene Name, <code>12345678</code> — weist die Anmeldestelle ebenfalls
+    ab. Ein Satz, den du dir merken kannst, ist die einfachste sichere
+    Lösung.</p>
+
+  <h3>Ich komme trotzdem nicht rein</h3>
+  <p>Melde dich beim Aktuar unter <code>aktuar@fwv-raura.ch</code>. Er
+    kann prüfen, welche Adresse hinterlegt ist, und den Zugang neu
+    aufsetzen.</p>
+</section>
+
+
+
+    </div>
+</main>
+
+<footer class="site-footer bg-gray-800 text-white py-8 mt-4">
+    <div class="container mx-auto px-4">
+        <div class="grid md:grid-cols-3 gap-8">
+            <div>
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="w-8 h-8 rounded-full overflow-hidden bg-white p-1">
+                        <img src="images/logo.png" alt="Logo" class="w-full h-full object-contain">
+                    </div>
+                    <span class="text-xl font-bold">FWV Raura</span>
+                </div>
+                <p class="text-gray-300 text-sm">
+                    Feuerwehrverein Raura Kaiseraugst - Tradition, Kameradschaft
+                    und Gemeinschaft seit vielen Jahren.
+                </p>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Anleitungen</h4>
+                <div class="space-y-2">
+                    <a href="anleitung-app.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Mitglieder-App</a>
+                    <a href="anleitung-website.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Website</a>
+                    <a href="anleitung-passwort.html" class="text-gray-300 hover:text-white transition-colors block text-sm">Passwort zurücksetzen</a>
+                </div>
+            </div>
+            <div>
+                <h4 class="text-lg font-semibold mb-4">Kontakt</h4>
+                <div class="space-y-2 text-sm">
+                    <p class="text-gray-300">kontakt@fwv-raura.ch</p>
+                    <p class="text-gray-300">4303 Kaiseraugst</p>
+                </div>
+            </div>
+        </div>
+        <div class="border-t border-gray-700 mt-8 pt-8 text-center">
+            <p class="text-gray-400 text-sm">
+                Feuerwehrverein Raura Kaiseraugst — Stand: August 2026.
+                Fehlt ein Schritt oder stimmt etwas nicht mehr, melde dich beim Aktuar.
+            </p>
+        </div>
+    </div>
+</footer>
+
+<script>
+    // DEUTSCH: Ausfahr-Menu fuer schmale Bildschirme, wie auf den uebrigen Seiten
+    document.getElementById('mobile-menu-button').addEventListener('click', function () {
+        document.getElementById('mobile-menu').classList.toggle('hidden');
+    });
+</script>
+
+</body>
+</html>
