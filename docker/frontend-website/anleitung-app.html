@@ -92,6 +92,8 @@
         nav.site-nav, .kapitelleiste, .nur-bildschirm, footer.site-footer,
         #mobile-menu { display: none !important; }
         .druckkopf { display: flex !important; }
+        .druck-plattform { display: block !important; color: #6b7280 !important;
+            font-size: 9.5pt; margin-top: -2mm; }
         header.hero { background: #fff !important; color: #1f2937 !important;
             padding: 0 0 6mm !important; }
         header.hero h1 { color: #991b1b !important; font-size: 24pt; }
@@ -155,6 +157,10 @@
             <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
         </div>
         <h1 class="text-4xl font-bold mb-4">Die Mitglieder-App</h1>
+        <!-- DEUTSCH: Nur im PDF. Am Bildschirm sagt der Umschalter, welche
+             Bilder zu sehen sind; gedruckt steht es nirgends, darum hier.
+             Den Text setzt das PDF-Skript je nach Ausgabe. -->
+        <p class="druck-plattform" style="display:none"></p>
         <p class="text-xl max-w-2xl">Anlässe sehen, sich für Schichten eintragen, das eigene Profil pflegen — alles vom Telefon aus. Diese Anleitung führt durch jeden Bildschirm.</p>
         <div class="nur-bildschirm mt-6 flex flex-wrap items-center gap-3">
             <span class="text-sm text-fire-100">Bilder von</span>
@@ -197,17 +203,54 @@
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="installieren">
   <div>
     <h2>App aufs Telefon holen</h2>
-    <p><strong>Android:</strong> Auf <a href="https://www.fwv-raura.ch/apps.html">fwv-raura.ch/apps.html</a>
-      liegt die Datei zum Herunterladen. Android fragt beim Öffnen, ob es
-      Apps aus dieser Quelle installieren darf — das musst du einmal
-      erlauben, danach läuft es wie bei jeder anderen App.</p>
-    <p><strong>iPhone:</strong> Die iOS-Fassung ist fertig, aber noch nicht
-      im App Store. Sobald die Verteilung über TestFlight steht, kommt sie
-      auf dieselbe Seite.</p>
+    <h3>Android</h3>
+    <p>Die App liegt im Play Store, aber noch als <strong>geschlossener
+      Test</strong>. Das heisst: Sie ist nicht öffentlich zu finden, und
+      herunterladen kann sie nur, wer freigeschaltet ist. Ein Schritt
+      vorweg ist deshalb nötig.</p>
+    <ol class="steps">
+      <li>Eine E-Mail an <strong>aktuar@fwv-raura.ch</strong> schreiben und
+        darin die <strong>E-Mail-Adresse deines Google-Kontos</strong>
+        angeben — also die, mit der du am Telefon im Play Store angemeldet
+        bist.</li>
+      <li>Warten, bis du freigeschaltet bist. Du bekommst Bescheid.</li>
+      <li>Erst danach den Play Store öffnen und die App laden.</li>
+    </ol>
+    <aside class="note">
+      <b>Es muss die Google-Adresse sein.</b> Nicht die Adresse, die der
+      Verein von dir hat, sondern die deines Google-Kontos — nur die kennt
+      der Play Store. Sind es zufällig dieselben, umso einfacher.
+    </aside>
+    <h4 style="font-weight:600;margin:1.5rem 0 .35rem">Ohne Play Store: die Datei direkt laden</h4>
+    <p>Dieser Weg braucht keine Freischaltung. Dafür fragt Android beim
+      Öffnen, ob es Apps aus dieser Quelle installieren darf — das musst du
+      einmal erlauben, danach läuft es wie bei jeder anderen App.</p>
+    <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin:.9rem 0">
+      <img src="images/anleitung/qr-app-android.png"
+           alt="QR-Code zum Herunterladen der Mitglieder-App"
+           style="width:120px;height:120px;flex:none;border:1px solid #e5e7eb;border-radius:.5rem">
+      <div style="flex:1;min-width:14rem">
+        <p style="margin:0 0 .35rem"><strong>Mit dem Telefon scannen</strong> —
+          der Code führt direkt auf die Installationsdatei.</p>
+        <p style="margin:0;font-size:.85rem;color:#6b7280;overflow-wrap:anywhere">
+          <a href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest.apk">github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest.apk</a>
+        </p>
+      </div>
+    </div>
+    <aside class="note">
+      <b>Der Link bleibt gültig.</b> Er zeigt nicht auf eine bestimmte
+      Fassung, sondern immer auf die neuste — auch in einem Jahr, auch auf
+      einem ausgedruckten Blatt. Eine Übersicht aller Vereins-Apps steht auf
+      <a href="https://www.fwv-raura.ch/apps.html">fwv-raura.ch/apps.html</a>.
+    </aside>
+    <h3>iPhone</h3>
+    <p>Die iOS-Fassung ist fertig, aber noch nicht im App Store. Sobald die
+      Verteilung über TestFlight steht, kommt sie auf dieselbe Seite.</p>
     <aside class="note">
       <b>Beide Apps können dasselbe.</b> Sie sehen nur unterschiedlich aus,
-      weil jede den Gestaltungsregeln ihres Systems folgt. Oben lässt sich
-      umschalten, welche Bilder du sehen willst.
+      weil jede den Gestaltungsregeln ihres Systems folgt.<span
+      class="nur-bildschirm"> Oben lässt sich umschalten, welche Bilder du
+      sehen willst.</span>
     </aside>
   </div>
   <figure class="shot">
@@ -231,10 +274,19 @@
         bist du direkt drin.</li>
     </ol>
     <h3>Mit QR-Code</h3>
-    <p>Hast du kein Vereins-Konto, aber einen gedruckten QR-Code bekommen:
-      <strong>Mit QR-Code anmelden</strong> antippen und den Code vor die
-      Kamera halten. Beim ersten Mal fragt das Telefon nach der
-      Kamera-Erlaubnis.</p>
+    <p>Macht dir die Anmeldung Mühe, oder nutzt du keine E-Mail? Dann
+      druckt dir der Vorstand einen <strong>QR-Code</strong> aus. In der
+      App auf <strong>Mit QR-Code anmelden</strong> tippen und den Zettel
+      vor die Kamera halten — fertig, ohne Benutzername und ohne Passwort.
+      Beim ersten Mal fragt das Telefon nach der Kamera-Erlaubnis.</p>
+    <p>Du siehst danach genau dasselbe wie alle anderen: deine Anlässe,
+      dein Profil, deine Anmeldungen. Der QR-Code ist nur ein bequemerer
+      Weg hinein, kein zweites Konto.</p>
+    <aside class="note">
+      <b>Den Zettel gut aufbewahren.</b> Wer ihn hat, kommt in dein Konto.
+      Ist er verloren gegangen, sag dem Vorstand Bescheid — er sperrt den
+      alten Code und druckt einen neuen.
+    </aside>
     <h3>Passwort vergessen</h3>
     <p>Wenn du beim Anmelden nicht weiterkommst, weil das Passwort fehlt:
       siehe den <a href="#passwort">nächsten Abschnitt</a>. Das

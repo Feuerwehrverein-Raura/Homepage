@@ -189,3 +189,49 @@ jobs:
             der Play-Console-Account verifiziert ist.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # DEUTSCH: Rollender Zeiger auf die jeweils neuste Fassung.
+      #
+      # Warum ueberhaupt: Die Release-Datei traegt die Versionsnummer im
+      # Namen, ein Link darauf veraltet also mit jedem Release. Gedruckte
+      # Anleitungen und QR-Codes brauchen aber eine Adresse, die bleibt.
+      # `releases/latest` scheidet aus — die gehoert dem Desktop-Updater
+      # (siehe make_latest oben). Also ein eigener Tag mit gleichbleibendem
+      # Dateinamen:
+      #
+      #   .../releases/download/members-latest/members-latest.apk
+      #
+      # Als Vorabversion markiert, damit GitHub sie nicht zur "Latest
+      # release" des Repos macht und dem Desktop-Updater dazwischenfunkt.
+      - name: Update rolling "members-latest" release
+        if: startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          APK="members-${VERSION}-release.apk"
+          if [ ! -f "$APK" ]; then
+            echo "Kein Release-APK gefunden — nichts zu tun."
+            exit 0
+          fi
+          cp "$APK" members-latest.apk
+
+          NOTES="Dieser Eintrag zeigt immer auf die neuste Fassung der
+          Mitglieder-App. Der Dateiname bleibt gleich, damit Links und
+          QR-Codes in den Anleitungen nicht veralten.
+
+          Aktuell ausgeliefert: **${VERSION}**
+
+          Direktlink:
+          https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
+
+          if gh release view members-latest >/dev/null 2>&1; then
+            gh release upload members-latest members-latest.apk --clobber
+            gh release edit members-latest --notes "$NOTES"
+          else
+            gh release create members-latest members-latest.apk \
+              --title "Mitglieder-App — neuste Fassung" \
+              --notes "$NOTES" \
+              --prerelease \
+              --target "$GITHUB_SHA"
+          fi
