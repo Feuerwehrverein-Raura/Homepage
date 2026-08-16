@@ -18,6 +18,15 @@ struct OrganizerView: View {
     @State private var editing: EditTarget?
     @State private var suggesting: EditTarget?
     @State private var editingEvent: Event?
+    @State private var notesFor: Event?
+    @State private var pdf: PDFTarget?
+
+    struct PDFTarget: Identifiable {
+        let event: Event
+        let title: String
+        let path: String
+        var id: String { path }
+    }
 
     /// Anlass und Anmeldung gehoeren beim Bearbeiten zusammen.
     struct EditTarget: Identifiable {
@@ -87,6 +96,34 @@ struct OrganizerView: View {
                                             .font(.caption)
                                     }
                                 }
+                                HStack(spacing: 16) {
+                                    Button {
+                                        notesFor = event
+                                    } label: {
+                                        Label("Notizen", systemImage: "note.text")
+                                            .font(.caption)
+                                    }
+                                    Button {
+                                        pdf = PDFTarget(
+                                            event: event,
+                                            title: "Teilnehmerliste",
+                                            path: "events/\(event.id)/pdf/teilnehmerliste")
+                                    } label: {
+                                        Label("Teilnehmerliste", systemImage: "doc.text")
+                                            .font(.caption)
+                                    }
+                                    Button {
+                                        pdf = PDFTarget(
+                                            event: event,
+                                            title: "Aushang",
+                                            path: "events/\(event.id)/pdf")
+                                    } label: {
+                                        Label("Aushang", systemImage: "doc.richtext")
+                                            .font(.caption)
+                                    }
+                                }
+                                .buttonStyle(.borderless)
+                                .padding(.vertical, 2)
                                 .buttonStyle(.borderless)
                                 .padding(.vertical, 2)
                             } header: {
@@ -106,6 +143,15 @@ struct OrganizerView: View {
             }
             .sheet(item: $notifying) { event in
                 NotifyRegistrantsSheet(event: event)
+                    .environmentObject(auth)
+            }
+            .sheet(item: $notesFor) { event in
+                NavigationStack {
+                    OrganizerNotesView(event: event).environmentObject(auth)
+                }
+            }
+            .sheet(item: $pdf) { target in
+                PDFPreview(title: target.title, path: target.path)
                     .environmentObject(auth)
             }
             .sheet(item: $editingEvent) { event in

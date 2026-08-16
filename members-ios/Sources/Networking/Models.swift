@@ -654,3 +654,58 @@ enum OrganizerOptions {
         "Springer", "Vorbereitung", "Aufbau", "Abbau"
     ]
 }
+
+// MARK: Organisator-Notizen
+
+/// Eine Notiz zu einem Anlass — Text und/oder beliebig viele Anhänge.
+struct OrganizerNote: Decodable, Identifiable {
+    let id: String
+    let content: String?
+    let createdBy: String?
+    let createdAt: String?
+    var attachments: [OrganizerNoteAttachment] = []
+
+    enum CodingKeys: String, CodingKey {
+        case id, content, attachments
+        case createdBy = "created_by"
+        case createdAt = "created_at"
+    }
+}
+
+/// Ein Anhang. Die Bytes liegen nicht im JSON — sie werden einzeln und
+/// authentifiziert über
+/// `GET events/{id}/organizer-notes/{noteId}/attachments/{attId}` geholt.
+struct OrganizerNoteAttachment: Decodable, Identifiable {
+    let id: String
+    let filename: String
+    let contentType: String?
+    var size: Int = 0
+
+    enum CodingKeys: String, CodingKey {
+        case id, filename, size
+        case contentType = "content_type"
+    }
+
+    var isImage: Bool {
+        contentType?.lowercased().hasPrefix("image/") == true
+    }
+}
+
+/// Body zum Anlegen einer Notiz. Text **oder** Anhang muss dabei sein —
+/// das prüft das Backend.
+struct CreateOrganizerNoteRequest: Encodable {
+    var content: String?
+    var attachments: [NoteAttachmentUpload]?
+}
+
+/// Ein hochzuladender Anhang: die Datei als Base64, ohne `data:`-Präfix.
+struct NoteAttachmentUpload: Encodable {
+    let filename: String
+    let contentType: String
+    let data: String
+
+    enum CodingKeys: String, CodingKey {
+        case filename, data
+        case contentType = "content_type"
+    }
+}

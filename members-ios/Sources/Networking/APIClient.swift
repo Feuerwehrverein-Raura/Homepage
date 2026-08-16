@@ -72,6 +72,15 @@ struct APIClient {
         return try JSONDecoder().decode(T.self, from: response)
     }
 
+    /// Rohe Bytes holen — fuer Anhaenge und PDFs.
+    ///
+    /// Diese Endpunkte verlangen den Bearer-Token, ein direkter Aufruf ueber
+    /// eine Bild-URL (AsyncImage) scheitert deshalb. Der Weg hier nimmt
+    /// dieselbe 401/403-Wiederholung mit wie alle anderen Anfragen.
+    func data(_ path: String) async throws -> Data {
+        try await send(path: path, method: "GET", body: nil)
+    }
+
     // MARK: Intern
 
     /// Führt die Anfrage aus und wiederholt sie einmal, wenn der Server mit
