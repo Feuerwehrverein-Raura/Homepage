@@ -37,6 +37,23 @@ struct Event: Codable, Identifiable, Hashable {
 
     var hasShifts: Bool { !(shifts ?? []).isEmpty }
 
+    /// Ob der Anlass noch bevorsteht. Massgeblich ist das Ende, sonst der
+    /// Beginn; ein ganzer Tag Zugabe, damit ein laufender Anlass nicht
+    /// mitten am Tag aus der Liste verschwindet. Gleiche Regel wie
+    /// `isUpcoming` in der Android-App.
+    var isUpcoming: Bool {
+        let reference = endDate ?? startDate
+        guard let reference, reference.count >= 10 else { return true }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: String(reference.prefix(10))) else {
+            // Unlesbares Datum lieber anzeigen als stillschweigend verstecken.
+            return true
+        }
+        return date.addingTimeInterval(24 * 60 * 60) >= Date()
+    }
+
     static func == (lhs: Event, rhs: Event) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }

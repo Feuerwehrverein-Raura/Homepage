@@ -66,7 +66,14 @@ struct EventsView: View {
         loading = true
         error = nil
         do {
-            events = try await auth.api().get("events")
+            // Wie in der Android-App: abgesagte raus, Vergangenes raus, nach
+            // Beginn sortiert. Ohne das steht im August noch ein Anlass vom
+            // Februar zuoberst — die API liefert weder gefiltert noch sortiert.
+            let alle: [Event] = try await auth.api().get("events")
+            events = alle
+                .filter { $0.status != "cancelled" }
+                .filter(\.isUpcoming)
+                .sorted { ($0.startDate ?? "") < ($1.startDate ?? "") }
         } catch {
             self.error = "Events konnten nicht geladen werden."
         }
