@@ -2,7 +2,9 @@ import SwiftUI
 
 struct EventsView: View {
     @EnvironmentObject var auth: AuthManager
+    /// Alle Anlaesse ausser abgesagten — aufgeteilt wird erst beim Anzeigen.
     @State private var events: [Event] = []
+    @State private var showPast = false
     @State private var loading = true
     @State private var error: String?
     @State private var showCalendar = false
@@ -17,12 +19,33 @@ struct EventsView: View {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error {
                     message(error, systemImage: "exclamationmark.triangle")
-                } else if events.isEmpty {
-                    message("Keine Events.", systemImage: "calendar")
                 } else {
-                    List(events) { event in
-                        NavigationLink(destination: EventDetailView(eventId: event.id, fallback: event)) {
-                            EventRow(event: event)
+                    List {
+                        if visible.isEmpty {
+                            Text(showPast ? "Keine vergangenen Anlässe."
+                                          : "Zurzeit steht nichts an.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(visible) { event in
+                                NavigationLink(destination: EventDetailView(
+                                    eventId: event.id, fallback: event)) {
+                                    EventRow(event: event)
+                                }
+                            }
+                        }
+
+                        // Der Weg zurueck steht am Ende der Liste, nicht oben:
+                        // wer die App oeffnet, will wissen was ansteht — nicht
+                        // was war. Gesucht wird Vergangenes bewusst.
+                        Section {
+                            Button {
+                                withAnimation { showPast.toggle() }
+                            } label: {
+                                Label(showPast ? "Kommende Anlässe"
+                                               : "Vergangene Anlässe",
+                                      systemImage: showPast ? "arrow.uturn.left" : "clock.arrow.circlepath")
+                                    .font(.subheadline)
+                            }
                         }
                     }
                     .listStyle(.plain)
@@ -54,6 +77,16 @@ struct EventsView: View {
         }
     }
 
+    /// Kommende aufsteigend — das Naechste zuerst. Vergangene absteigend,
+    /// denn rueckblickend interessiert das zuletzt Gewesene.
+    private var visible: [Event] {
+        showPast
+            ? events.filter { !$0.isUpcoming }
+                    .sorted { ($0.startDate ?? "") > ($1.startDate ?? "") }
+            : events.filter(\.isUpcoming)
+                    .sorted { ($0.startDate ?? "") < ($1.startDate ?? "") }
+    }
+
     private func message(_ text: String, systemImage: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: systemImage).font(.largeTitle).foregroundStyle(.secondary)
@@ -66,14 +99,11 @@ struct EventsView: View {
         loading = true
         error = nil
         do {
-            // Wie in der Android-App: abgesagte raus, Vergangenes raus, nach
-            // Beginn sortiert. Ohne das steht im August noch ein Anlass vom
-            // Februar zuoberst — die API liefert weder gefiltert noch sortiert.
+            // Abgesagte fliegen ganz raus, wie in der Android-App. Die
+            // Trennung kommend/vergangen passiert beim Anzeigen, damit der
+            // Umschalter unten ohne neuen Abruf funktioniert.
             let alle: [Event] = try await auth.api().get("events")
-            events = alle
-                .filter { $0.status != "cancelled" }
-                .filter(\.isUpcoming)
-                .sorted { ($0.startDate ?? "") < ($1.startDate ?? "") }
+            events = alle.filter { $0.status != "cancelled" }
         } catch {
             self.error = "Events konnten nicht geladen werden."
         }

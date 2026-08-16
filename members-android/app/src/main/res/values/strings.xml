@@ -33,6 +33,7 @@
     <string name="nav_events">Anlässe</string>
     <string name="nav_profile">Profil</string>
     <string name="nav_organizer">Organisator</string>
+    <string name="nav_settings">Einstellungen</string>
     <string name="events_loading">Anlässe werden geladen…</string>
     <string name="events_empty">Keine Anlässe gefunden.</string>
     <string name="events_error">Fehler beim Laden: %1$s</string>

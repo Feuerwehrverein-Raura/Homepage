@@ -63,15 +63,6 @@
                 app:cornerRadius="10dp" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnNotifications"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:text="Benachrichtigungs-Einstellungen"
-                app:cornerRadius="10dp" />
-
-            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAccesses"
                 style="@style/Widget.Material3.Button.OutlinedButton"
                 android:layout_width="match_parent"
@@ -146,72 +137,7 @@
                 android:textSize="14sp"
                 android:visibility="gone" />
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginVertical="20dp"
-                android:background="@color/divider" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Mitglieder im Adressbuch"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="Bei eingehenden Anrufen wird der Name angezeigt, wenn ein FWV-Mitglied anruft."
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/switchContactsSync"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/syncControlsRow"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="4dp"
-                android:visibility="gone">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSyncNow"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Jetzt synchronisieren"
-                    android:textSize="12sp"
-                    android:layout_marginEnd="6dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRestoreContacts"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Gelöschte wiederherstellen"
-                    android:textSize="12sp"
-                    android:textColor="@color/primary" />
-            </LinearLayout>
+            
 
             <View
                 android:layout_width="match_parent"

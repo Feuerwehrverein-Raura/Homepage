@@ -21,10 +21,8 @@ import ch.fwvraura.members.data.model.MemberProfile
 import ch.fwvraura.members.data.model.MyRegistration
 import ch.fwvraura.members.databinding.FragmentProfileBinding
 import ch.fwvraura.members.databinding.ItemMyRegistrationBinding
-import ch.fwvraura.members.sync.ContactsSyncManager
 import ch.fwvraura.members.util.UpdateChecker
 import ch.fwvraura.members.ui.login.LoginActivity
-import androidx.activity.result.contract.ActivityResultContracts
 import ch.fwvraura.members.util.DateUtils
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
@@ -47,16 +45,12 @@ class ProfileFragment : Fragment() {
         binding.btnEdit.setOnClickListener {
             startActivity(Intent(requireContext(), EditProfileActivity::class.java))
         }
-        binding.btnNotifications.setOnClickListener {
-            startActivity(Intent(requireContext(),
-                ch.fwvraura.members.ui.notifications.NotificationsActivity::class.java))
-        }
+        
         binding.btnAccesses.setOnClickListener {
             startActivity(Intent(requireContext(),
                 ch.fwvraura.members.ui.accesses.AccessesActivity::class.java))
         }
         binding.btnAustritt.setOnClickListener { showAustrittDialog() }
-        setupContactsSyncSwitch()
 
         // App-Version anzeigen; Tippen prueft manuell auf ein Play-Update.
         val appVersion = UpdateChecker.currentVersion(requireContext())
@@ -199,53 +193,6 @@ class ProfileFragment : Fragment() {
         } else {
             row.visibility = View.VISIBLE
             text.text = value
-        }
-    }
-
-    private val contactsPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ ->
-        val tm = MembersApp.instance.tokenManager
-        tm.contactsSyncEnabled = true
-        ContactsSyncManager.enableSync(requireContext())
-        ContactsSyncManager.requestSyncNow(requireContext())
-        binding.syncControlsRow.visibility = View.VISIBLE
-        Snackbar.make(binding.root, "Mitglieder werden ins Adressbuch synchronisiert.", Snackbar.LENGTH_SHORT).show()
-    }
-
-    private fun setupContactsSyncSwitch() {
-        val tm = MembersApp.instance.tokenManager
-        binding.switchContactsSync.isChecked = tm.contactsSyncEnabled
-        binding.syncControlsRow.visibility = if (tm.contactsSyncEnabled) View.VISIBLE else View.GONE
-        binding.switchContactsSync.setOnCheckedChangeListener { _, checked ->
-            if (checked == tm.contactsSyncEnabled) return@setOnCheckedChangeListener
-            tm.contactsSyncAsked = true
-            if (checked) {
-                contactsPermissionLauncher.launch(arrayOf(
-                    android.Manifest.permission.READ_CONTACTS,
-                    android.Manifest.permission.WRITE_CONTACTS
-                ))
-            } else {
-                tm.contactsSyncEnabled = false
-                ContactsSyncManager.disableSync(requireContext())
-                binding.syncControlsRow.visibility = View.GONE
-                Snackbar.make(binding.root,
-                    "Adressbuch-Sync deaktiviert. FWV-Kontakte wurden vom Telefon entfernt.",
-                    Snackbar.LENGTH_LONG).show()
-            }
-        }
-        binding.btnSyncNow.setOnClickListener {
-            ContactsSyncManager.requestSyncNow(requireContext())
-            Snackbar.make(binding.root, "Sync angestossen — kann ein paar Sekunden dauern.",
-                Snackbar.LENGTH_SHORT).show()
-        }
-        binding.btnRestoreContacts.setOnClickListener {
-            val removed = ContactsSyncManager.restoreDeletedContacts(requireContext())
-            val msg = if (removed > 0)
-                "$removed gelöschte Mitglieder werden wiederhergestellt — Sync läuft."
-            else
-                "Keine gelöschten FWV-Kontakte gefunden. Sync wird trotzdem ausgelöst."
-            Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
         }
     }
 

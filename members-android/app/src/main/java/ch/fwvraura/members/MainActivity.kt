@@ -50,12 +50,14 @@ class MainActivity : AppCompatActivity() {
         // erst nach Backend-Check (E-Mail-Match auf event.organizer_email).
         binding.bottomNav.menu.findItem(R.id.nav_organizer)?.isVisible = isOrganizerMode
         binding.bottomNav.menu.findItem(R.id.nav_profile)?.isVisible = !isOrganizerMode
+        binding.bottomNav.menu.findItem(R.id.nav_settings)?.isVisible = !isOrganizerMode
 
         binding.bottomNav.setOnItemSelectedListener { item ->
             val frag: Fragment = when (item.itemId) {
                 R.id.nav_events -> EventsListFragment()
                 R.id.nav_profile -> ProfileFragment()
                 R.id.nav_organizer -> OrganizerDashboardFragment()
+                R.id.nav_settings -> ch.fwvraura.members.ui.settings.SettingsFragment()
                 else -> EventsListFragment()
             }
             replaceFragment(frag)
