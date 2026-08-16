@@ -48,8 +48,17 @@ struct EventDetailView: View {
                     }
                 }
 
-                if current.allowsRegistration {
-                    Divider()
+            }
+            .padding()
+        }
+        // Der Anmelde-Knopf gehoert nicht ans Ende des Scrollbereichs: bei
+        // einem Anlass mit vielen Schichten muesste man erst bis nach unten
+        // scrollen, und unter der schwebenden Tab-Leiste von iOS 26 lag er
+        // ausserdem halb verdeckt. Als safeAreaInset schwebt er ueber dem
+        // Inhalt, immer sichtbar und immer erreichbar.
+        .safeAreaInset(edge: .bottom) {
+            if current.allowsRegistration {
+                Group {
                     if registered {
                         Label("Anmeldung gesendet", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
@@ -68,8 +77,10 @@ struct EventDetailView: View {
                         .controlSize(.large)
                     }
                 }
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(.bar)
             }
-            .padding()
         }
         .navigationTitle("Event")
         .navigationBarTitleDisplayMode(.inline)
