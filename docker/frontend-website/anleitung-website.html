@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anleitung Website - Feuerwehrverein Raura</title>
+<style>
+  /* Gleiche Farben und Schriftrollen wie die App-Anleitung — beide sollen
+     erkennbar aus demselben Haus stammen. Unterschied ist der Rhythmus:
+     Bildschirmfotos vom Rechner sind breit, darum liegen sie unter dem
+     Text statt daneben. */
+  :root {
+    --paper:   #FCFAF9;
+    --surface: #F4EEEC;
+    --line:    #E2D6D2;
+    --ink:     #1B1514;
+    --muted:   #6E605C;
+    --brand:   #B91C1C;
+    --brand-deep: #7F1414;
+
+    --display: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --measure: 36rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #17110F;
+      --surface: #231A18;
+      --line:    #3A2C29;
+      --ink:     #F3EDEB;
+      --muted:   #AC9994;
+      --brand:   #F0736A;
+      --brand-deep: #F3948D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:   #17110F;
+    --surface: #231A18;
+    --line:    #3A2C29;
+    --ink:     #F3EDEB;
+    --muted:   #AC9994;
+    --brand:   #F0736A;
+    --brand-deep: #F3948D;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------------------------------------------------------- Kopf */
+
+  .sitebar { background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: .74rem; letter-spacing: .05em; }
+  .sitebar .wrap { padding: .55rem 1.5rem; display: flex; gap: .6rem; }
+  .sitebar a { color: var(--paper); text-decoration: none; opacity: .85; }
+  .sitebar a:hover { opacity: 1; text-decoration: underline; }
+  .sitebar .sep { opacity: .4; }
+
+  header.top {
+    background: var(--brand);
+    color: #fff;
+    padding: 3.5rem 1.5rem 3rem;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; }
+
+  header.top .eyebrow {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .82;
+    margin: 0 0 .9rem;
+  }
+  header.top h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    letter-spacing: -.03em;
+    font-size: clamp(2.4rem, 7vw, 4rem);
+    line-height: 1.02;
+    margin: 0;
+    text-wrap: balance;
+  }
+  header.top p.lead {
+    max-width: var(--measure);
+    margin: 1.1rem 0 0;
+    font-size: 1.06rem;
+    opacity: .93;
+  }
+
+  /* ------------------------------------------------------ Inhalt */
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  nav.toc ol {
+    display: flex;
+    gap: 1.4rem;
+    list-style: none;
+    margin: 0 auto;
+    padding: .7rem 1.5rem;
+    max-width: 62rem;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  nav.toc a { color: var(--muted); text-decoration: none; }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--brand); }
+
+  main { padding: 0 1.5rem 5rem; }
+
+  section.chapter {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 3.2rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  section.chapter:last-of-type { border-bottom: 0; }
+
+  .chapter h2 {
+    font-family: var(--display);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    font-size: 1.7rem;
+    line-height: 1.15;
+    margin: 0 0 .8rem;
+    color: var(--brand-deep);
+    text-wrap: balance;
+  }
+  .chapter h3 {
+    font-family: var(--display);
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    margin: 1.6rem 0 .4rem;
+  }
+  .chapter p { margin: 0 0 .9rem; max-width: var(--measure); }
+  .chapter ul { margin: 0 0 .9rem; padding-left: 1.1rem; max-width: var(--measure); }
+  .chapter li { margin-bottom: .35rem; }
+
+  strong { font-weight: 650; }
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .1em .35em;
+    overflow-wrap: anywhere;
+  }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  ol.steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 2.6rem;
+    margin-bottom: .9rem;
+    max-width: var(--measure);
+  }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: -.05em;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: .8rem;
+    font-weight: 600;
+  }
+
+  /* Breite Bildschirmfotos: volle Spaltenbreite, unter dem Text. */
+  figure.shot { margin: 1.6rem 0 0; }
+  figure.shot img {
+    width: 100%;
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+  figure.shot figcaption {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: .55rem;
+  }
+
+  aside.note {
+    border-left: 3px solid var(--brand);
+    background: var(--surface);
+    padding: .85rem 1rem;
+    margin: 1.2rem 0;
+    max-width: var(--measure);
+    font-size: .95rem;
+  }
+  aside.note b { color: var(--brand-deep); }
+
+  footer.end {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+    color: var(--muted);
+    font-size: .9rem;
+    border-top: 1px solid var(--line);
+  }
+
+  a { color: var(--brand); }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+</style>
+
+<div class="sitebar"><div class="wrap">
+    <a href="mein.html">&larr; Mein Portal</a><span class="sep">·</span>
+    <a href="index.html">Website</a><span class="sep">·</span>
+    <a href="anleitung-app.html">App-Anleitung</a></div></div>
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow">Feuerwehrverein Raura Kaiseraugst</p>
+    <h1>Die Vereins&shy;website</h1>
+    <p class="lead">Termine nachschlagen, sich für eine Schicht eintragen,
+      den Kalender abonnieren — und im Mitgliederbereich die eigenen Daten
+      und Zugänge verwalten. Diese Anleitung geht Seite für Seite durch.</p>
+  </div>
+</header>
+
+<nav class="toc">
+  <ol>
+    <li><a href="#ueberblick">Überblick</a></li>
+    <li><a href="#veranstaltungen">Veranstaltungen</a></li>
+    <li><a href="#anlass">Ein Anlass</a></li>
+    <li><a href="#mithelfen">Mithelfen</a></li>
+    <li><a href="#arbeitsplan">Arbeitsplan</a></li>
+    <li><a href="#kalender">Kalender</a></li>
+    <li><a href="#abonnieren">Abonnieren</a></li>
+    <li><a href="#portal">Mein Portal</a></li>
+    <li><a href="#apps">Apps</a></li>
+    <li><a href="#kontakt">Kontakt</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section class="chapter" id="ueberblick">
+  <h2>Was wo steht</h2>
+  <p>Die Website ist unter <code>www.fwv-raura.ch</code> erreichbar und
+    braucht keine Anmeldung — bis auf einen Bereich.</p>
+  <p>Die Startseite trägt alles Wichtige selbst: <strong>Über uns</strong>,
+    die <strong>Termine</strong> der nächsten Zeit, die
+    <strong>Statuten</strong> und zuunterst den <strong>Kontakt</strong>.
+    Die Einträge oben springen zu diesen Abschnitten, statt eine neue Seite
+    zu öffnen.</p>
+  <p>Auf eigene Seiten führen:</p>
+  <ul>
+    <li><strong>Veranstaltungen</strong> — die vollständige Liste aller
+      Anlässe mit Suche und Filtern.</li>
+    <li><strong>Kalender</strong> — dieselben Termine als Monatsansicht,
+      zum Abonnieren.</li>
+    <li><strong>Mitglieder</strong> beziehungsweise
+      <strong>Mein Bereich</strong> — der Mitgliederbereich. Nur hier wird
+      eine Anmeldung verlangt.</li>
+    <li><strong>Vorstand</strong> — wer welches Amt hat.</li>
+    <li><strong>Apps</strong> — die Programme des Vereins.</li>
+  </ul>
+  <p>Auf den Unterseiten ist die Leiste kürzer und führt zurück auf
+    <strong>Home</strong>; erreichbar bleibt von dort alles.</p>
+  <aside class="note">
+    <b>Auf dem Telefon</b> klappt dieselbe Navigation hinter dem Symbol mit
+    den drei Strichen auf. Die Bilder in dieser Anleitung stammen vom
+    Rechner; die Seiten sehen auf kleinen Bildschirmen anders aus, können
+    aber dasselbe.
+  </aside>
+  <figure class="shot">
+    <img src="images/anleitung/web/01-start.jpg"
+         alt="Die Startseite mit Vereinslogo und Navigation">
+    <figcaption>Die Startseite</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="veranstaltungen">
+  <h2>Alle Anlässe auf einen Blick</h2>
+  <p>Unter <strong>Veranstaltungen</strong> steht jeder Anlass des Vereins
+    untereinander: Titel, Datum, Zeit, Ort und wer ihn organisiert.</p>
+  <p>Standardmässig sind <strong>alle</strong> Anlässe eingeblendet. Über
+    die drei Schalter links wechselst du auf <strong>Kommende</strong> oder
+    <strong>Vergangene</strong> — Ersteres ist meist das, was du willst.
+    Daneben liegen ein Suchfeld und ein Auswahlfeld für die Kategorie
+    (Dorffest, Aufbau, Vereinsausflug und so weiter).</p>
+  <p>Ganz rechts schaltest du zwischen der Liste und einer Kachelansicht
+    um. Der Inhalt ist derselbe, nur dichter gesetzt.</p>
+  <p>Die farbigen Merker an jedem Anlass sagen, woran du bist:
+    <em>Bestätigt</em> heisst, der Termin steht; <em>Helfer gesucht</em>
+    heisst, es fehlen noch Leute für die Schichten;
+    <em>Anmeldung erforderlich</em> heisst, ohne Eintrag geht es nicht.</p>
+  <figure class="shot">
+    <img src="images/anleitung/web/03-veranstaltungen.jpg"
+         alt="Liste der Veranstaltungen mit Filtern und Merkern">
+    <figcaption>Veranstaltungen mit Filter, Suche und Kategorien</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="anlass">
+  <h2>Ein Anlass im Einzelnen</h2>
+  <p>Ein Klick auf einen Anlass öffnet ein Fenster mit allem, was dazu
+    bekannt ist: Termin und Zeit, Ort mit Adresse, Kosten sowie Name und
+    E-Mail des Organisators.</p>
+  <p>Im Feld <strong>Direktlink</strong> steht eine Adresse, die genau
+    diesen Anlass öffnet — praktisch, um ihn in einer Nachricht
+    weiterzugeben. <strong>Kopieren</strong> legt sie in die
+    Zwischenablage.</p>
+  <p>Unten stehen die Schaltflächen: sich für eine Schicht eintragen, den
+    Arbeitsplan ansehen, oder den Termin in den eigenen Kalender
+    übernehmen.</p>
+  <figure class="shot">
+    <img src="images/anleitung/web/04-anlass-detail.jpg"
+         alt="Detailfenster eines Anlasses mit Direktlink">
+    <figcaption>Ein Anlass mit Direktlink und Schaltflächen</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="mithelfen">
+  <h2>Für eine Schicht eintragen</h2>
+  <p>Bei Anlässen, für die Helfer gesucht werden, führt
+    <strong>Für Schicht anmelden</strong> zum Formular. Dafür braucht es
+    kein Konto — auch Angehörige und Bekannte können sich so eintragen.</p>
+  <ol class="steps">
+    <li>Name und E-Mail eintragen, Telefon ist freiwillig.</li>
+    <li>Unter <strong>Schichten auswählen</strong> ankreuzen, wann du
+      kannst. Volle Schichten sind als <em>Voll</em> gekennzeichnet und
+      zeigen, wer schon eingeteilt ist.</li>
+    <li>Absenden. Du bekommst eine Bestätigung per E-Mail.</li>
+  </ol>
+  <p>Bist du Mitglied, lohnt sich der rote Knopf ganz oben:
+    <strong>Als Mitglied anmelden</strong> füllt Name und Kontaktdaten aus
+    deinem Profil ein, und die Anmeldung erscheint danach unter
+    <a href="#portal">Meine Veranstaltungen</a> in deinem Portal.</p>
+  <aside class="note">
+    <b>Zwei Schichten am Stück</b> sind dem Verein lieber als zwei einzelne
+    verteilt über den Abend — das steht als Hinweis auch im Formular. Wer
+    kann, hängt zwei aneinander.
+  </aside>
+  <figure class="shot">
+    <img src="images/anleitung/web/05-schicht-anmelden.jpg"
+         alt="Anmeldeformular mit Schichtauswahl">
+    <figcaption>Das Anmeldeformular mit den Schichten</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="arbeitsplan">
+  <h2>Den Arbeitsplan ansehen</h2>
+  <p><strong>Arbeitsplan ansehen</strong> zeigt die fertige Einteilung als
+    Tabelle: links die Zeitblöcke, in den Spalten die Posten — Bar, Küche
+    und was der Anlass sonst braucht — und in den Feldern, wer eingeteilt
+    ist.</p>
+  <p><strong>PDF herunterladen</strong> erzeugt daraus ein Blatt zum
+    Ausdrucken und Aufhängen. <strong>Bearbeiten</strong> führt weiter auf
+    das Dashboard des Anlasses — dort lässt sich die Einteilung ändern,
+    was aber nur denen offensteht, die den Anlass organisieren.</p>
+  <figure class="shot">
+    <img src="images/anleitung/web/06-arbeitsplan.jpg"
+         alt="Arbeitsplan als Tabelle mit Zeitblöcken und Posten">
+    <figcaption>Der Arbeitsplan, auch als PDF</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="kalender">
+  <h2>Der Vereinskalender</h2>
+  <p>Der <strong>Kalender</strong> zeigt denselben Bestand als
+    Monatsansicht. Mit den Pfeilen links neben dem Monatsnamen blätterst du
+    vor und zurück, <strong>Heute</strong> springt zum laufenden Monat. Im
+    Auswahlfeld rechts lässt sich statt des Monatsrasters eine
+    <strong>Listenansicht</strong> wählen.</p>
+  <p>Termine stehen als farbige Balken im jeweiligen Tag. Ein Klick darauf
+    öffnet dasselbe Detailfenster wie auf der Veranstaltungsseite.</p>
+  <figure class="shot">
+    <img src="images/anleitung/web/07-kalender.jpg"
+         alt="Monatsansicht des Vereinskalenders">
+    <figcaption>Monatsansicht mit den Terminen im Tag</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="abonnieren">
+  <h2>Termine in den eigenen Kalender holen</h2>
+  <p>Statt hier nachzuschlagen, kannst du den Vereinskalender abonnieren:
+    Die Termine erscheinen dann in deinem Kalender am Telefon oder Rechner
+    und aktualisieren sich von selbst, wenn der Verein etwas ändert.</p>
+  <p><strong>Kalender abonnieren</strong> oben auf der Kalenderseite bietet
+    drei Wege an:</p>
+  <ul>
+    <li><strong>Automatisch</strong> — ein Klick, das Gerät öffnet die
+      eigene Kalender-App und fragt nach. Der bequemste Weg.</li>
+    <li><strong>Manuelle URL</strong> — falls der Klick nichts bewirkt:
+      <code>webcal://api.fwv-raura.ch/calendar/ics</code> kopieren und in
+      der Kalender-App unter „Kalender abonnieren“ einfügen.</li>
+    <li><strong>ICS-Datei</strong> — lädt die Termine einmalig herunter.
+      Sie werden dann <em>nicht</em> mehr aktualisiert.</li>
+  </ul>
+  <aside class="note">
+    <b>Abonnement statt Datei.</b> Die ICS-Datei ist eine Momentaufnahme.
+    Verschiebt der Verein einen Anlass, merkt das nur, wer abonniert hat.
+  </aside>
+  <figure class="shot">
+    <img src="images/anleitung/web/08-kalender-abo.jpg"
+         alt="Fenster mit den drei Wegen zum Abonnieren">
+    <figcaption>Abonnieren: automatisch, per URL oder als Datei</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="portal">
+  <h2>Mein Portal — der Mitgliederbereich</h2>
+  <p>Hinter <strong>Mein Bereich</strong> liegt der einzige Teil der
+    Website, der eine Anmeldung verlangt. Der Klick führt auf die
+    Anmeldeseite des Vereins; danach landest du wieder auf der Website.
+    Es ist dasselbe Konto wie in der App.</p>
+  <p>Was dich dort erwartet:</p>
+  <ul>
+    <li><strong>Persönliche Daten</strong> — Profilfoto, Stammdaten,
+      Kontaktdaten, Adresse und Bankverbindung. Änderst du etwas hier,
+      gilt es auch in der App.</li>
+    <li><strong>Funktions-E-Mails</strong> — wer ein Amt hat, findet hier
+      die Zugangsdaten der zugehörigen Adresse samt Webmail-Link.</li>
+    <li><strong>Benachrichtigungen</strong> — welche Meldungen du per
+      E-Mail bekommen willst.</li>
+    <li><strong>Meine Veranstaltungen</strong> — alle Anlässe, für die du
+      dich eingetragen hast.</li>
+    <li><strong>Gruppenordner, Netzlaufwerk, gemeinsame Zugänge</strong> —
+      die Ablagen und Logins, die zu deiner Funktion gehören. Die
+      Passwörter wechseln in festen Abständen von selbst; hier steht immer
+      das gültige.</li>
+    <li><strong>System-Zugänge</strong> — eine Übersicht, auf welche
+      Systeme des Vereins du überhaupt Zugriff hast.</li>
+  </ul>
+  <p>Organisierst du einen Anlass, kommt ein weiterer Block dazu:
+    <strong>Events als Organisator</strong>, mit dem Link auf das
+    Dashboard des jeweiligen Anlasses.</p>
+  <aside class="note">
+    <b>Passwort vergessen?</b> Auf der Anmeldeseite unten auf
+    <em>Benutzername oder Passwort vergessen?</em> klicken und der E-Mail
+    folgen. Der Weg ist in der
+    <a href="anleitung-app.html#passwort">App-Anleitung</a> Schritt für
+    Schritt beschrieben — er gilt für App und Website gleichermassen.
+  </aside>
+  <figure class="shot">
+    <img src="images/anleitung/gemeinsam-auth-login.jpg"
+         alt="Anmeldeseite des Vereins">
+    <figcaption>Die Anmeldung gilt für Website und App</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="apps">
+  <h2>Die Apps</h2>
+  <p>Unter <strong>Apps</strong> liegen die Programme des Vereins zum
+    Herunterladen — die Mitglieder-App für Android sowie die Werkzeuge für
+    den Vereinsbetrieb, etwa die Küchenanzeige.</p>
+  <p>Was in der Mitglieder-App steckt und wie sie eingerichtet wird, steht
+    in der eigenen <a href="anleitung-app.html">App-Anleitung</a>.</p>
+  <figure class="shot">
+    <img src="images/anleitung/web/09-apps.jpg"
+         alt="Übersichtsseite der Apps">
+    <figcaption>Die Apps des Vereins</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="kontakt">
+  <h2>Fragen, Anliegen, Mitglied werden</h2>
+  <p>Ganz unten auf der Startseite steht das Kontaktformular. Im Feld
+    <strong>Betreff auswählen</strong> gibt es neben der allgemeinen
+    Anfrage auch den Punkt für eine <strong>Mitgliedschaft</strong> —
+    wählst du den, erscheint statt des Nachrichtenfelds ein Formular mit
+    den Angaben, die der Verein für eine Aufnahme braucht.</p>
+  <p>Daneben stehen die Postadresse des Vereins, die allgemeine Adresse
+    <code>kontakt@fwv-raura.ch</code> und der Aktuar als direkter
+    Ansprechpartner.</p>
+  <figure class="shot">
+    <img src="images/anleitung/web/02-kontakt.jpg"
+         alt="Kontaktbereich mit Adresse und Formular">
+    <figcaption>Kontakt und Aufnahmeantrag</figcaption>
+  </figure>
+</section>
+
+</main>
+
+<footer class="end">
+  <div>Feuerwehrverein Raura Kaiseraugst — Stand: August 2026. Kommt dir
+    etwas seltsam vor oder fehlt ein Schritt, melde dich beim Aktuar.</div>
+</footer>
+</html>
