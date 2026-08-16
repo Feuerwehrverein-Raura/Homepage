@@ -26,5 +26,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: FWV Mitglieder
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        # Ohne diesen Text beendet iOS die App beim Oeffnen der Kamera.
+        INFOPLIST_KEY_NSCameraUsageDescription: >-
+          Damit du dein Profilfoto direkt aufnehmen kannst.
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic

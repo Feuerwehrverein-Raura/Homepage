@@ -24,6 +24,8 @@ struct EditProfileView: View {
     @State private var ort = ""
 
     @State private var photoItem: PhotosPickerItem?
+    @State private var showCamera = false
+    @State private var confirmDelete = false
     @State private var photoStatus: String?
     @State private var uploading = false
 
@@ -45,7 +47,7 @@ struct EditProfileView: View {
                             .clipShape(Circle())
                             Spacer()
                             Button("Entfernen", role: .destructive) {
-                                Task { await deletePhoto() }
+                                confirmDelete = true
                             }
                             .font(.callout)
                             .disabled(uploading)
@@ -62,6 +64,15 @@ struct EditProfileView: View {
                         }
                     }
                     .disabled(uploading)
+
+                    if CameraPicker.isAvailable {
+                        Button {
+                            showCamera = true
+                        } label: {
+                            Label("Foto aufnehmen", systemImage: "camera.viewfinder")
+                        }
+                        .disabled(uploading)
+                    }
 
                     if let photoStatus {
                         Text(photoStatus)
@@ -118,6 +129,20 @@ struct EditProfileView: View {
             }
             .onAppear(perform: fill)
             .onChange(of: photoItem) { _ in Task { await uploadPhoto() } }
+            .sheet(isPresented: $showCamera) {
+                CameraPicker { image in
+                    Task { await upload(image) }
+                }
+                .ignoresSafeArea()
+            }
+            .confirmationDialog("Profilfoto entfernen?",
+                                isPresented: $confirmDelete,
+                                titleVisibility: .visible) {
+                Button("Entfernen", role: .destructive) {
+                    Task { await deletePhoto() }
+                }
+                Button("Abbrechen", role: .cancel) {}
+            }
         }
     }
 
@@ -171,9 +196,24 @@ struct EditProfileView: View {
 
         do {
             guard let raw = try await photoItem.loadTransferable(type: Data.self),
-                  let image = UIImage(data: raw),
-                  let jpeg = Self.downscaled(image) else {
+                  let image = UIImage(data: raw) else {
                 photoStatus = "Bild konnte nicht gelesen werden."
+                return
+            }
+            await upload(image)
+        } catch {
+            photoStatus = "Upload fehlgeschlagen."
+        }
+    }
+
+    /// Gemeinsamer Weg fuer Galerie und Kamera.
+    private func upload(_ image: UIImage) async {
+        uploading = true
+        photoStatus = nil
+        defer { uploading = false }
+        do {
+            guard let jpeg = Self.downscaled(image) else {
+                photoStatus = "Bild konnte nicht verarbeitet werden."
                 return
             }
             let response: PhotoUploadResponse = try await auth.api().upload(
@@ -209,9 +249,9 @@ struct EditProfileView: View {
     }
 
     /// Verkleinert auf höchstens 1024 Pixel Kantenlänge und komprimiert als
-    /// JPEG. Das Backend skaliert **nicht** selbst — ein Bild direkt aus der
-    /// Kamera hätte mehrere Megabyte, und die landen so in der Datenbank.
-    /// Die Android-App macht es aus demselben Grund.
+    /// JPEG mit 85 % — dieselben Werte wie `downscaleToJpeg` in der
+    /// Android-App. Das Backend skaliert **nicht** selbst; ein Bild direkt
+    /// aus der Kamera läge sonst mit mehreren Megabyte in der Datenbank.
     private static func downscaled(_ image: UIImage, maxEdge: CGFloat = 1024) -> Data? {
         let longest = max(image.size.width, image.size.height)
         let scale = longest > maxEdge ? maxEdge / longest : 1
@@ -221,6 +261,6 @@ struct EditProfileView: View {
         let resized = renderer.image { _ in
             image.draw(in: CGRect(origin: .zero, size: target))
         }
-        return resized.jpegData(compressionQuality: 0.8)
+        return resized.jpegData(compressionQuality: 0.85)
     }
 }
