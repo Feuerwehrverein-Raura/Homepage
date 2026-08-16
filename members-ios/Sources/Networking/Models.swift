@@ -252,3 +252,53 @@ struct ChangeFunctionEmailPasswordRequest: Encodable {
     let email: String
     let password: String
 }
+
+// MARK: Kalender
+
+/// Eintrag aus `GET calendar/items` — fasst Anlässe, Beiträge und Versände
+/// zusammen. `type` ist eines von: event, board_meeting, fee_due, fee_paid,
+/// letter, email.
+struct CalendarItem: Decodable, Identifiable {
+    let id: String
+    let type: String
+    let date: String
+    let title: String
+    let subtitle: String?
+    let description: String?
+    let refId: String?
+}
+
+// MARK: Anlass vorschlagen
+
+/// Body für `POST events/propose`.
+///
+/// Achtung, anders als bei `registrations/public`: hier will das Backend
+/// **snake_case**. Die Android-App baut dafür von Hand eine Map, statt ihr
+/// Datenmodell zu serialisieren — wer sich an der Anmeldung orientiert und
+/// camelCase schickt, verliert Datum und Ort stillschweigend.
+struct ProposeEventRequest: Encodable {
+    let title: String
+    let startDate: String
+    var endDate: String?
+    var location: String?
+    var category: String?
+    var cost: String?
+    var description: String?
+
+    enum CodingKeys: String, CodingKey {
+        case title, location, category, cost, description
+        case startDate = "start_date"
+        case endDate = "end_date"
+    }
+}
+
+// MARK: Newsletter
+
+struct NewsletterEmailRequest: Encodable {
+    let email: String
+}
+
+struct NewsletterResponse: Decodable {
+    let success: Bool?
+    let message: String?
+}

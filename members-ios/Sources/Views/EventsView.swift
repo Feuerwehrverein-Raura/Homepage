@@ -5,11 +5,15 @@ struct EventsView: View {
     @State private var events: [Event] = []
     @State private var loading = true
     @State private var error: String?
+    @State private var showCalendar = false
+    @State private var proposing = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if loading {
+                if showCalendar {
+                    CalendarView()
+                } else if loading {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let error {
                     message(error, systemImage: "exclamationmark.triangle")
@@ -24,9 +28,29 @@ struct EventsView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Events")
+            .navigationTitle("Anlässe")
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Picker("Ansicht", selection: $showCalendar) {
+                        Text("Liste").tag(false)
+                        Text("Kalender").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        proposing = true
+                    } label: {
+                        Label("Anlass vorschlagen", systemImage: "plus")
+                    }
+                }
+            }
             .task { await load() }
             .refreshable { await load() }
+            .sheet(isPresented: $proposing) {
+                ProposeEventView { Task { await load() } }
+                    .environmentObject(auth)
+            }
         }
     }
 

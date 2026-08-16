@@ -4,7 +4,7 @@ struct MainTabView: View {
     var body: some View {
         TabView {
             EventsView()
-                .tabItem { Label("Events", systemImage: "calendar") }
+                .tabItem { Label("Anlässe", systemImage: "calendar") }
             ProfileView()
                 .tabItem { Label("Profil", systemImage: "person.crop.circle") }
             SettingsView()
