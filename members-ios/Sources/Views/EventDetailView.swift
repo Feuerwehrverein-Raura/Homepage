@@ -5,6 +5,8 @@ struct EventDetailView: View {
     let eventId: String
     let fallback: Event
     @State private var event: Event?
+    @State private var showRegistration = false
+    @State private var registered = false
 
     private var current: Event { event ?? fallback }
 
@@ -45,12 +47,40 @@ struct EventDetailView: View {
                         ShiftRow(shift: shift)
                     }
                 }
+
+                if current.allowsRegistration {
+                    Divider()
+                    if registered {
+                        Label("Anmeldung gesendet", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Button {
+                            showRegistration = true
+                        } label: {
+                            // Beschriftung wie in der Android-App: bei
+                            // Schichten geht es ums Mithelfen, sonst um die
+                            // eigene Teilnahme.
+                            Text(current.hasShifts ? "Helfen" : "Anmelden")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    }
+                }
             }
             .padding()
         }
         .navigationTitle("Event")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(isPresented: $showRegistration) {
+            RegistrationSheet(event: current) {
+                registered = true
+                Task { await load() }
+            }
+            .environmentObject(auth)
+        }
     }
 
     private func load() async {

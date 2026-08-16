@@ -21,6 +21,13 @@ struct ProfileView: View {
                 } else if let p = profile {
                     List {
                         Section {
+                            NavigationLink {
+                                MyRegistrationsView()
+                            } label: {
+                                Label("Meine Anmeldungen", systemImage: "checklist")
+                            }
+                        }
+                        Section {
                             LabeledContent("Name",
                                 value: [p.vorname, p.nachname].compactMap { $0 }.joined(separator: " "))
                             if let s = p.status, !s.isEmpty { LabeledContent("Status", value: s) }

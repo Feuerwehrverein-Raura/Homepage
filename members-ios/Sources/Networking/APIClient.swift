@@ -1,7 +1,7 @@
 import Foundation
 
-/// Schlanker REST-Client (URLSession + Codable). Konkrete Endpunkte/Modelle
-/// kommen in Phase 2 (Spiegel von Android `EventsApi`/`MembersApi`).
+/// Schlanker REST-Client (URLSession + Codable), Gegenstück zu Androids
+/// `EventsApi`/`MembersApi`.
 struct APIClient {
     let baseURL: URL
     let tokenProvider: () async -> String?
@@ -15,7 +15,13 @@ struct APIClient {
     }
 
     func get<T: Decodable>(_ path: String) async throws -> T {
-        let data = try await send(path: path)
+        let data = try await send(path: path, method: "GET", body: nil)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    func post<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
+        let encoded = try JSONEncoder().encode(body)
+        let data = try await send(path: path, method: "POST", body: encoded)
         return try JSONDecoder().decode(T.self, from: data)
     }
 
@@ -28,22 +34,26 @@ struct APIClient {
     /// deckt der 403-Fall den stillen Re-Login mit dem QR-Token ab, den es
     /// auf iOS nicht gibt. Ein 403 heisst hier „angemeldet, aber nicht
     /// berechtigt" — daran ändert ein frischer Token nichts.
-    private func send(path: String) async throws -> Data {
-        let (data, status) = try await perform(path: path)
+    private func send(path: String, method: String, body: Data?) async throws -> Data {
+        let (data, status) = try await perform(path: path, method: method, body: body)
         guard status == 401, let refresh else {
             return try verify(data: data, status: status)
         }
         guard await refresh() else {
             throw APIError.badStatus(status)
         }
-        let (retryData, retryStatus) = try await perform(path: path)
+        let (retryData, retryStatus) = try await perform(path: path, method: method, body: body)
         return try verify(data: retryData, status: retryStatus)
     }
 
-    private func perform(path: String) async throws -> (Data, Int) {
+    private func perform(path: String, method: String, body: Data?) async throws -> (Data, Int) {
         var req = URLRequest(url: baseURL.appendingPathComponent(path))
-        req.httpMethod = "GET"
+        req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let body {
+            req.httpBody = body
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
         if let token = await tokenProvider() {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
