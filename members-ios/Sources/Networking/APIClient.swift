@@ -77,10 +77,11 @@ struct APIClient {
     /// Führt die Anfrage aus und wiederholt sie einmal, wenn der Server mit
     /// 401 antwortet und der Refresh geklappt hat.
     ///
-    /// Bewusst nur bei 401, nicht auch bei 403 wie in der Android-App: dort
-    /// deckt der 403-Fall den stillen Re-Login mit dem QR-Token ab, den es
-    /// auf iOS nicht gibt. Ein 403 heisst hier „angemeldet, aber nicht
-    /// berechtigt" — daran ändert ein frischer Token nichts.
+    /// Bei 401 **und** 403, wie in Androids AuthInterceptor. Der 403-Fall
+    /// wirkt auf den ersten Blick falsch — „angemeldet, aber nicht
+    /// berechtigt" — deckt hier aber den abgelaufenen QR-Zugang ab, bei dem
+    /// das Backend 403 statt 401 schickt. Ein legitimes 403 kostet dadurch
+    /// eine zusätzliche Erneuerung und scheitert danach wie zuvor.
     private func send(
         path: String,
         method: String,
@@ -89,7 +90,7 @@ struct APIClient {
     ) async throws -> Data {
         let (data, status) = try await perform(
             path: path, method: method, body: body, contentType: contentType)
-        guard status == 401, let refresh else {
+        guard status == 401 || status == 403, let refresh else {
             return try verify(data: data, status: status)
         }
         guard await refresh() else {

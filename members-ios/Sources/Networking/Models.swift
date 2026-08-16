@@ -302,3 +302,61 @@ struct NewsletterResponse: Decodable {
     let success: Bool?
     let message: String?
 }
+
+// MARK: Anmeldung per QR-Code und Passwort-Reset
+
+/// Inhalt eines gescannten Login-QR-Codes.
+struct QrLoginPayload: Decodable {
+    let v: Int?
+    let type: String?
+    let email: String?
+    let token: String?
+
+    /// Ob der Code zu einem Organisator gehört. Android unterscheidet am
+    /// `type`-Feld bzw. am Präfix des Rohtextes.
+    var isOrganizer: Bool { type == "fwv-organizer-login" }
+}
+
+struct QrLoginRequest: Encodable {
+    let token: String
+}
+
+struct LoginResponse: Decodable {
+    let success: Bool?
+    let token: String?
+    let eventId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case success, token
+        case eventId = "event_id"
+    }
+}
+
+struct RequestResetRequest: Encodable {
+    let email: String
+}
+
+/// Body für `POST auth/member/reset`.
+///
+/// `new_password` in snake_case — die Android-App setzt hier eigens ein
+/// `@SerializedName`, während die übrigen Felder ihre Namen behalten.
+struct ResetRequest: Encodable {
+    let email: String
+    let code: String
+    let newPassword: String
+
+    enum CodingKeys: String, CodingKey {
+        case email, code
+        case newPassword = "new_password"
+    }
+}
+
+/// Antwort von `auth/member/login`, `-/reset` und `-/request-reset`.
+/// Alle Felder optional, damit Erfolg und Fehler mit demselben Typ gelesen
+/// werden können — das Backend schickt bei Fehlern `{error}`.
+struct MemberAuthResponse: Decodable {
+    let success: Bool?
+    let token: String?
+    let message: String?
+    let error: String?
+}
