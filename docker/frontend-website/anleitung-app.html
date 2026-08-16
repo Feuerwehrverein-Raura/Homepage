@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anleitung Mitglieder-App - Feuerwehrverein Raura</title>
+<meta name="description" content="Bebilderte Anleitung zur Mitglieder-App des Feuerwehrvereins Raura Kaiseraugst.">
+<style>
+  /* Farben aus dem Vereins-Theme: #B91C1C ist der Primaerton, den auch die
+     Android-App und die Website verwenden. Neutraltoene mit leichtem
+     Rotstich, damit sie zum Akzent gehoeren statt daneben zu stehen. */
+  :root {
+    --paper:   #FCFAF9;
+    --surface: #F4EEEC;
+    --line:    #E2D6D2;
+    --ink:     #1B1514;
+    --muted:   #6E605C;
+    --brand:   #B91C1C;
+    --brand-deep: #7F1414;
+    --ok:      #1F7A46;
+
+    --display: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --measure: 34rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:   #17110F;
+      --surface: #231A18;
+      --line:    #3A2C29;
+      --ink:     #F3EDEB;
+      --muted:   #AC9994;
+      --brand:   #F0736A;
+      --brand-deep: #F3948D;
+      --ok:      #5BC287;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:   #17110F;
+    --surface: #231A18;
+    --line:    #3A2C29;
+    --ink:     #F3EDEB;
+    --muted:   #AC9994;
+    --brand:   #F0736A;
+    --brand-deep: #F3948D;
+    --ok:      #5BC287;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------------------------------------------------------- Kopf */
+
+  header.top {
+    background: var(--brand);
+    color: #fff;
+    padding: 3.5rem 1.5rem 3rem;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; }
+
+  header.top .eyebrow {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    opacity: .82;
+    margin: 0 0 .9rem;
+  }
+  header.top h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    letter-spacing: -.03em;
+    font-size: clamp(2.4rem, 7vw, 4rem);
+    line-height: 1.02;
+    margin: 0;
+    text-wrap: balance;
+  }
+  header.top p.lead {
+    max-width: var(--measure);
+    margin: 1.1rem 0 0;
+    font-size: 1.06rem;
+    opacity: .93;
+  }
+
+  /* ------------------------------------------------------ Inhalt */
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  nav.toc ol {
+    display: flex;
+    gap: 1.4rem;
+    list-style: none;
+    margin: 0 auto;
+    padding: .7rem 1.5rem;
+    max-width: 62rem;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  nav.toc a { color: var(--muted); text-decoration: none; }
+  nav.toc a:hover, nav.toc a:focus-visible { color: var(--brand); }
+
+  main { padding: 0 1.5rem 5rem; }
+
+  section.chapter {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 15rem;
+    gap: 2.5rem;
+    align-items: start;
+    padding: 3.2rem 0;
+    border-bottom: 1px solid var(--line);
+    max-width: 62rem;
+    margin: 0 auto;
+  }
+  section.chapter:last-of-type { border-bottom: 0; }
+
+  @media (max-width: 46rem) {
+    section.chapter { grid-template-columns: 1fr; gap: 1.6rem; }
+  }
+
+  .chapter h2 {
+    font-family: var(--display);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    font-size: 1.7rem;
+    line-height: 1.15;
+    margin: 0 0 .8rem;
+    color: var(--brand-deep);
+    text-wrap: balance;
+  }
+  .chapter h3 {
+    font-family: var(--display);
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    margin: 1.6rem 0 .4rem;
+  }
+  .chapter p { margin: 0 0 .9rem; max-width: var(--measure); }
+  .chapter ul { margin: 0 0 .9rem; padding-left: 1.1rem; max-width: var(--measure); }
+  .chapter li { margin-bottom: .35rem; }
+
+  strong { font-weight: 650; }
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: .1em .35em;
+  }
+
+  /* Schritte — nur dort, wo die Reihenfolge wirklich zaehlt. */
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  ol.steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 2.6rem;
+    margin-bottom: .9rem;
+    max-width: var(--measure);
+  }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: -.05em;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--brand);
+    color: #fff;
+    font-family: var(--mono);
+    font-size: .8rem;
+    font-weight: 600;
+  }
+
+  figure.shot { margin: 0; }
+  figure.shot img {
+    width: 100%;
+    max-width: 15rem;
+    display: block;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+  figure.shot figcaption {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: .55rem;
+    max-width: 15rem;
+  }
+
+  aside.note {
+    border-left: 3px solid var(--brand);
+    background: var(--surface);
+    padding: .85rem 1rem;
+    margin: 1.2rem 0;
+    max-width: var(--measure);
+    font-size: .95rem;
+  }
+  aside.note b { color: var(--brand-deep); }
+
+  table.diff {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: var(--measure);
+    font-size: .95rem;
+  }
+  table.diff th, table.diff td {
+    text-align: left;
+    padding: .5rem .6rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  table.diff th {
+    font-family: var(--mono);
+    font-size: .7rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  footer.end {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+    color: var(--muted);
+    font-size: .9rem;
+    border-top: 1px solid var(--line);
+  }
+
+
+  .sitebar {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .05em;
+  }
+  .sitebar .wrap { padding: .55rem 1.5rem; display: flex; gap: .6rem; }
+  .sitebar a { color: var(--paper); text-decoration: none; opacity: .85; }
+  .sitebar a:hover { opacity: 1; text-decoration: underline; }
+  .sitebar .sep { opacity: .4; }
+  a { color: var(--brand); }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+</style>
+
+<div class="sitebar">
+  <div class="wrap">
+    <a href="mein.html">&larr; Mein Portal</a>
+    <span class="sep">·</span>
+    <a href="index.html">Website</a>
+    <span class="sep">·</span>
+    <a href="apps.html">Apps</a>
+  </div>
+</div>
+<header class="top">
+  <div class="wrap">
+    <p class="eyebrow">Feuerwehrverein Raura Kaiseraugst</p>
+    <h1>Die Mitglieder-App</h1>
+    <p class="lead">Anlässe sehen, sich für Schichten eintragen, das eigene
+      Profil pflegen — alles vom Telefon aus. Diese Anleitung führt durch
+      jeden Bildschirm.</p>
+  </div>
+</header>
+
+<nav class="toc">
+  <ol>
+    <li><a href="#installieren">Installieren</a></li>
+    <li><a href="#anmelden">Anmelden</a></li>
+    <li><a href="#anlaesse">Anlässe</a></li>
+    <li><a href="#mithelfen">Mithelfen</a></li>
+    <li><a href="#anmeldungen">Meine Anmeldungen</a></li>
+    <li><a href="#profil">Profil</a></li>
+    <li><a href="#zugaenge">Zugänge</a></li>
+    <li><a href="#adressbuch">Adressbuch</a></li>
+    <li><a href="#meldungen">Benachrichtigungen</a></li>
+    <li><a href="#organisator">Für Organisatoren</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section class="chapter" id="installieren">
+  <div>
+    <h2>App aufs Telefon holen</h2>
+    <p><strong>Android:</strong> Auf <a href="https://www.fwv-raura.ch/apps.html">fwv-raura.ch/apps.html</a>
+      liegt die Datei zum Herunterladen. Android fragt beim Öffnen, ob es
+      Apps aus dieser Quelle installieren darf — das musst du einmal
+      erlauben, danach läuft es wie bei jeder anderen App.</p>
+    <p><strong>iPhone:</strong> Die iOS-Fassung ist fertig, aber noch nicht
+      im App Store. Sobald die Verteilung über TestFlight steht, kommt sie
+      auf dieselbe Seite.</p>
+    <aside class="note">
+      <b>Die Bilder hier stammen vom iPhone.</b> Auf Android sieht die App
+      etwas anders aus, funktioniert aber gleich — mit zwei Ausnahmen, die
+      am Ende stehen.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/01-anlaesse.jpg" alt="Die Anlass-Liste der App">
+    <figcaption>So sieht die App nach dem Anmelden aus</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="anmelden">
+  <div>
+    <h2>Anmelden</h2>
+    <p>Es gibt drei Wege hinein. Der erste ist der übliche.</p>
+    <h3>Mit dem Vereins-Login</h3>
+    <ol class="steps">
+      <li>In der App auf <strong>Anmelden</strong> tippen.</li>
+      <li>Das Telefon fragt, ob die App die Vereins-Anmeldung verwenden
+        darf — <strong>Fortfahren</strong>.</li>
+      <li>Im Browserfenster mit deinem Vereins-Konto anmelden und die
+        Berechtigungen bestätigen.</li>
+      <li>Fertig. Die App merkt sich die Anmeldung; beim nächsten Start
+        bist du direkt drin.</li>
+    </ol>
+    <h3>Mit QR-Code</h3>
+    <p>Hast du kein Vereins-Konto, aber einen gedruckten QR-Code bekommen:
+      <strong>Mit QR-Code anmelden</strong> antippen und den Code vor die
+      Kamera halten. Beim ersten Mal fragt das Telefon nach der
+      Kamera-Erlaubnis.</p>
+    <h3>Passwort vergessen</h3>
+    <p>Über <strong>Passwort vergessen</strong> forderst du einen Code per
+      E-Mail an und setzt damit ein neues Passwort. Aus Sicherheitsgründen
+      lautet die Antwort immer gleich — auch wenn zur eingegebenen Adresse
+      gar kein Konto besteht.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/05-profil.jpg" alt="Das Profil nach dem Anmelden">
+    <figcaption>Nach der Anmeldung: dein Profil</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="anlaesse">
+  <div>
+    <h2>Anlässe ansehen</h2>
+    <p>Der erste Tab zeigt alle Anlässe des Vereins. Oben schaltest du
+      zwischen <strong>Liste</strong> und <strong>Kalender</strong> um.</p>
+    <p>Die Liste zeigt Titel, Datum und Ort untereinander — gut, um zu
+      sehen, was als Nächstes ansteht. Der Kalender zeigt den Monat mit
+      farbigen Punkten an den Tagen: jede Farbe steht für eine Art von
+      Eintrag, von Anlässen über Vorstandssitzungen bis zu fälligen
+      Beiträgen. Tippst du einen Tag an, erscheinen darunter nur dessen
+      Einträge.</p>
+    <p>Ein Tipp auf einen Anlass öffnet die Einzelheiten: Datum, Ort,
+      Kosten, Organisator, Beschreibung — und die Schichten, falls es
+      welche gibt.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/02-kalender.jpg" alt="Monatsansicht des Kalenders">
+    <figcaption>Kalender mit farbigen Punkten je Eintragsart</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="mithelfen">
+  <div>
+    <h2>Mithelfen oder teilnehmen</h2>
+    <p>Unten auf der Anlass-Seite steht ein Knopf. Wie er heisst, hängt
+      vom Anlass ab:</p>
+    <ul>
+      <li><strong>Helfen</strong> — der Anlass hat Schichten. Du wählst
+        eine oder mehrere aus.</li>
+      <li><strong>Anmelden</strong> — es geht um deine Teilnahme. Du gibst
+        an, mit wie vielen Personen du kommst, und kannst Allergien
+        vermerken.</li>
+    </ul>
+    <p>Name, E-Mail und Telefon sind aus deinem Profil vorausgefüllt. Du
+      kannst sie ändern, etwa wenn du jemanden mit anmeldest.</p>
+    <aside class="note">
+      <b>Kein Knopf sichtbar?</b> Dann verlangt dieser Anlass keine
+      Anmeldung — etwa ein Ausflug, zu dem man einfach kommt.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/04-anmeldung.jpg" alt="Schichtauswahl beim Anmelden">
+    <figcaption>Schichten auswählen, Kontakt ist vorausgefüllt</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="anmeldungen">
+  <div>
+    <h2>Meine Anmeldungen</h2>
+    <p>Im Profil unter <strong>Meine Anmeldungen</strong> siehst du alles,
+      wozu du dich eingetragen hast — mit Datum, Ort und den Schichten,
+      die dir zugeteilt sind.</p>
+    <p>Der farbige Vermerk rechts sagt, wie es um die Anmeldung steht:</p>
+    <ul>
+      <li><strong>offen</strong> — der Organisator hat sie noch nicht
+        angesehen</li>
+      <li><strong>bestätigt</strong> — du bist eingeteilt</li>
+      <li><strong>abgelehnt</strong> — meist, weil die Schicht schon voll
+        war</li>
+    </ul>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/06-meine-anmeldungen.jpg" alt="Liste der eigenen Anmeldungen">
+    <figcaption>Eigene Anmeldungen mit Status</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="profil">
+  <div>
+    <h2>Profil und Foto</h2>
+    <p>Der Profil-Tab zeigt deine Angaben. Über <strong>Bearbeiten</strong>
+      oben rechts änderst du Name, Kontakt und Adresse selbst — es braucht
+      niemanden im Vorstand dafür.</p>
+    <p>Beim Profilfoto hast du die Wahl zwischen Mediathek und Kamera. Die
+      App verkleinert das Bild vor dem Hochladen, du musst dich also nicht
+      um die Dateigrösse kümmern. Entfernen geht ebenfalls, mit Rückfrage.</p>
+    <p><strong>Status</strong> und <strong>Funktion</strong> lassen sich
+      nicht selbst ändern — die pflegt der Vorstand.</p>
+    <p>Ganz unten steht <strong>Austritt beantragen</strong>. Der Antrag
+      löscht nichts und beendet nichts: Er geht an den Vorstand, der
+      darüber entscheidet.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/05-profil.jpg" alt="Profilansicht mit Foto">
+    <figcaption>Profil mit Foto, Funktion und Kontakt</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="zugaenge">
+  <div>
+    <h2>Zugänge</h2>
+    <p>Ebenfalls im Profil: <strong>Zugänge</strong>. Hier steht, auf
+      welche Systeme du Zugriff hast — Website, Nextcloud, Vorstand-Portal
+      und was sonst für deine Funktion freigeschaltet ist.</p>
+    <p>Hast du eine Funktions-E-Mail wie <code>aktuar@fwv-raura.ch</code>,
+      findest du hier die Zugangsdaten samt Serveradressen. <strong>Das
+      Passwort kannst du hier auch ändern</strong> — das ist die einzige
+      Stelle, an der das geht.</p>
+    <aside class="note">
+      <b>Passwörter sind verdeckt.</b> Ein Tipp darauf zeigt sie an, langes
+      Drücken kopiert sie. Das schützt vor neugierigen Blicken über die
+      Schulter — mehr nicht. Zeig den Bildschirm nicht herum.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/07-zugaenge.jpg" alt="Übersicht der Zugänge">
+    <figcaption>Systeme, Funktions-E-Mails, geteilte Konten</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="adressbuch">
+  <div>
+    <h2>Mitglieder im Adressbuch</h2>
+    <p>Unter <strong>Einstellungen → Mitglieder-Adressbuch einrichten</strong>
+      verbindest du dein Telefon mit dem Vereins-Adressbuch. Danach stehen
+      alle Mitglieder in deinen Kontakten, und bei einem Anruf siehst du
+      den Namen statt einer unbekannten Nummer.</p>
+    <p>Der bequeme Weg ist das Profil zum Installieren; die App bietet es
+      an. Wer lieber von Hand einrichtet, findet dort auch den Servernamen
+      zum Kopieren und die Schritte einzeln aufgeführt.</p>
+    <p>Die Kontakte bleiben von allein aktuell — das Adressbuch wird
+      nachts aufgefrischt. Voraussetzung ist ein Nextcloud-Konto.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/10-adressbuch.jpg" alt="Anleitung zum Adressbuch">
+    <figcaption>Adressbuch einrichten</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="meldungen">
+  <div>
+    <h2>Benachrichtigungen</h2>
+    <p>Unter <strong>Einstellungen → Benachrichtigungen</strong> legst du
+      fest, worüber du informiert wirst: Einladungen zu Anlässen,
+      Erinnerungen an Schichten, Rückmeldungen zu deinen Anmeldungen und
+      Vereinsmitteilungen.</p>
+    <p>Die Einstellungen gelten für E-Mail <em>und</em> für Meldungen aufs
+      Telefon. Schaltest du etwas ab, bekommst du es auf keinem der beiden
+      Wege.</p>
+    <aside class="note">
+      <b>Meldungen aufs iPhone kommen noch nicht.</b> Die Einstellungen
+      wirken bereits für E-Mail; die Zustellung aufs Gerät wird gerade
+      eingerichtet. Auf Android funktioniert sie schon.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/09-benachrichtigungen.jpg" alt="Benachrichtigungs-Einstellungen">
+    <figcaption>Vier Arten, einzeln schaltbar</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="organisator">
+  <div>
+    <h2>Für Organisatoren</h2>
+    <p>Organisierst du selbst einen Anlass, bekommst du einen zusätzlichen
+      Tab. Der Verein erkennt das an der E-Mail-Adresse, die beim Anlass
+      als Organisator hinterlegt ist — du musst nichts einschalten.</p>
+    <p>Dort siehst du deine Anlässe mit allen Anmeldungen und kannst:</p>
+    <ul>
+      <li>Anmeldungen <strong>genehmigen</strong> oder ablehnen</li>
+      <li>jemanden von Hand <strong>erfassen</strong>, der telefonisch
+        zugesagt hat</li>
+      <li>alle Angemeldeten <strong>benachrichtigen</strong></li>
+      <li>eine <strong>andere Schicht vorschlagen</strong>, wenn eine voll
+        und eine andere leer ist</li>
+      <li>über <strong>Mehr</strong>: Anlass und Schichten bearbeiten,
+        Notizen mit Fotos anlegen, Rezepte und Material verwalten,
+        Teilnehmerliste und Aushang als PDF öffnen</li>
+    </ul>
+    <p>Nach dem Benachrichtigen zeigt die App, wen die Nachricht
+      <em>nicht</em> erreicht hat. Diese Liste lohnt einen Blick — wer
+      keine Adresse hinterlegt hat, wurde übergangen.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/11-organisator.jpg" alt="Organisator-Bereich">
+    <figcaption>Anmeldungen verwalten</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="unterschiede">
+  <div>
+    <h2>Android und iPhone im Vergleich</h2>
+    <p>Beide Apps können dasselbe. Zwei Punkte unterscheiden sich:</p>
+    <table class="diff">
+      <thead>
+        <tr><th>Thema</th><th>Android</th><th>iPhone</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Meldungen aufs Gerät</td>
+          <td>funktioniert</td>
+          <td>in Arbeit</td>
+        </tr>
+        <tr>
+          <td>Mitglieder im Adressbuch</td>
+          <td>gleicht laufend ab</td>
+          <td>über CardDAV-Konto</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Der Unterschied beim Adressbuch hat einen technischen Grund: Unter
+      iOS darf keine App Kontakte bereitstellen. Dort richtet man das
+      Adressbuch einmal als Konto ein — danach bleibt es genauso aktuell.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/08-einstellungen.jpg" alt="Einstellungen der App">
+    <figcaption>Einstellungen</figcaption>
+  </figure>
+</section>
+
+</main>
+
+<footer class="end">
+  <div>Fragen oder etwas funktioniert nicht? Melde dich beim Vorstand —
+    am besten mit einem Bildschirmfoto der Stelle, an der es hakt.</div>
+</footer>
+
+</body>
+</html>

@@ -13,6 +13,7 @@ COPY schichtplan-manager.html ./
 COPY mitglieder.html ./
 COPY auth-callback.html ./
 COPY qr-rechnung.html ./
+COPY anleitung-app.html ./
 
 # Kalender-Dateien
 COPY calendar.ics ./
