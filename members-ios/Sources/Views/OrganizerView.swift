@@ -13,6 +13,16 @@ struct OrganizerView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var working: String?
+    @State private var adding: Event?
+    @State private var notifying: Event?
+    @State private var editing: EditTarget?
+
+    /// Anlass und Anmeldung gehoeren beim Bearbeiten zusammen.
+    struct EditTarget: Identifiable {
+        let event: Event
+        let registration: EventRegistration
+        var id: String { registration.id }
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,10 +53,30 @@ struct OrganizerView: View {
                                             },
                                             reject: {
                                                 Task { await decide(event, registration, approve: false) }
+                                            },
+                                            edit: {
+                                                editing = EditTarget(event: event,
+                                                                     registration: registration)
                                             }
                                         )
                                     }
                                 }
+                                HStack(spacing: 16) {
+                                    Button {
+                                        adding = event
+                                    } label: {
+                                        Label("Erfassen", systemImage: "person.badge.plus")
+                                            .font(.caption)
+                                    }
+                                    Button {
+                                        notifying = event
+                                    } label: {
+                                        Label("Benachrichtigen", systemImage: "envelope")
+                                            .font(.caption)
+                                    }
+                                }
+                                .buttonStyle(.borderless)
+                                .padding(.vertical, 2)
                             } header: {
                                 EventHeader(event: event,
                                             pending: pendingCount(event))
@@ -58,6 +88,21 @@ struct OrganizerView: View {
             .navigationTitle("Organisator")
             .task { await load() }
             .refreshable { await load() }
+            .sheet(item: $adding) { event in
+                AddRegistrationSheet(event: event) { Task { await load() } }
+                    .environmentObject(auth)
+            }
+            .sheet(item: $notifying) { event in
+                NotifyRegistrantsSheet(event: event)
+                    .environmentObject(auth)
+            }
+            .sheet(item: $editing) { target in
+                EditRegistrationSheet(event: target.event,
+                                      registration: target.registration) {
+                    Task { await load() }
+                }
+                .environmentObject(auth)
+            }
         }
     }
 
@@ -155,6 +200,7 @@ private struct RegistrationCard: View {
     let busy: Bool
     var approve: () -> Void
     var reject: () -> Void
+    var edit: () -> Void
 
     private var notes: RegNotes { RegNotes.parse(registration.notes) }
 
@@ -194,8 +240,8 @@ private struct RegistrationCard: View {
                 Text(text).font(.caption).foregroundStyle(.secondary)
             }
 
-            if registration.status == "pending" {
-                HStack(spacing: 12) {
+            HStack(spacing: 12) {
+                if registration.status == "pending" {
                     Button(action: approve) {
                         Label("Genehmigen", systemImage: "checkmark")
                             .font(.caption)
@@ -209,12 +255,20 @@ private struct RegistrationCard: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-
-                    if busy { ProgressView() }
                 }
-                .disabled(busy)
-                .padding(.top, 2)
+
+                Button(action: edit) {
+                    Label("Bearbeiten", systemImage: "pencil")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                if busy { ProgressView() }
             }
+            .buttonStyle(.borderless)
+            .disabled(busy)
+            .padding(.top, 2)
         }
         .padding(.vertical, 4)
     }

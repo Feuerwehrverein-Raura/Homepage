@@ -2,7 +2,7 @@ import Foundation
 
 /// Codable-Modelle, gespiegelt von der Android-App (gleiche JSON-Felder).
 
-struct Event: Codable, Identifiable {
+struct Event: Codable, Identifiable, Hashable {
     let id: String
     let title: String
     let subtitle: String?
@@ -36,6 +36,9 @@ struct Event: Codable, Identifiable {
     }
 
     var hasShifts: Bool { !(shifts ?? []).isEmpty }
+
+    static func == (lhs: Event, rhs: Event) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 struct Shift: Codable, Identifiable {
@@ -470,5 +473,77 @@ struct RegNotes {
             }
         }
         return notes
+    }
+}
+
+/// Body für `POST events/{id}/registrations-as-organizer` — der Organisator
+/// trägt jemanden von Hand ein, etwa nach einer telefonischen Meldung.
+/// Entweder ein Mitglied (`member_id`) oder ein Gast mit Namen.
+struct OrganizerAddRegistrationRequest: Encodable {
+    var memberId: String?
+    var guestName: String?
+    var guestEmail: String?
+    var guestPhone: String?
+    var participants: Int?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case participants, notes
+        case memberId = "member_id"
+        case guestName = "guest_name"
+        case guestEmail = "guest_email"
+        case guestPhone = "guest_phone"
+    }
+}
+
+/// Body für `PUT events/{eventId}/registrations/{regId}/as-organizer`.
+/// Felder, die null bleiben, rührt das Backend nicht an.
+struct OrganizerEditRegistrationRequest: Encodable {
+    var guestName: String?
+    var guestEmail: String?
+    var guestPhone: String?
+    var participants: Int?
+    var notes: String?
+    var status: String?
+
+    enum CodingKeys: String, CodingKey {
+        case participants, notes, status
+        case guestName = "guest_name"
+        case guestEmail = "guest_email"
+        case guestPhone = "guest_phone"
+    }
+}
+
+/// Ergebnis von `POST events/{id}/notify-registrants-as-organizer`.
+/// `unreachable` zählt auf, wen die Nachricht nicht erreicht hat — der
+/// Organisator sollte das sehen, statt zu glauben, alle seien informiert.
+struct NotifyResult: Decodable {
+    let success: Bool?
+    let emailed: Int?
+    let posted: Int?
+    let skipped: Int?
+    let unreachable: [String]?
+}
+
+struct NotifyRequest: Encodable {
+    let subject: String
+    let message: String
+}
+
+/// Eintrag des Mitgliederverzeichnisses (`GET members/directory`) — hier für
+/// die Auswahl beim Eintragen von Hand.
+struct DirectoryEntry: Decodable, Identifiable {
+    let id: String
+    let vorname: String?
+    let nachname: String?
+    let email: String?
+    let mobile: String?
+    let telefon: String?
+    let funktion: String?
+
+    var fullName: String {
+        [vorname, nachname].compactMap { $0 }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
     }
 }
