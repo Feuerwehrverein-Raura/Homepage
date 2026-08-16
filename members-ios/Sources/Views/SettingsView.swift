@@ -11,6 +11,21 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section {
+                    NavigationLink {
+                        CardDAVSetupView()
+                    } label: {
+                        Label("Live-Adressbuch einrichten (CardDAV)",
+                              systemImage: "arrow.triangle.2.circlepath")
+                    }
+                } header: {
+                    Text("Adressbuch")
+                } footer: {
+                    Text("Empfohlen: die Mitglieder bleiben dauerhaft aktuell, "
+                       + "ohne dass du etwas nachziehen musst. Braucht ein "
+                       + "Nextcloud-Konto.")
+                }
+
+                Section {
                     Button {
                         Task { await importContacts() }
                     } label: {
@@ -32,12 +47,13 @@ struct SettingsView: View {
                             .foregroundStyle(importFailed ? .red : .green)
                     }
                 } header: {
-                    Text("Adressbuch")
+                    Text("Einmaliger Import")
                 } footer: {
-                    Text("Überträgt Name, Funktion und Kontaktdaten der Mitglieder "
-                       + "einmalig in deine Kontakte. Ein erneuter Import "
-                       + "aktualisiert die bereits angelegten Einträge, statt sie "
-                       + "zu verdoppeln.")
+                    Text("Für alle ohne Nextcloud-Konto: überträgt Name, Funktion "
+                       + "und Kontaktdaten einmalig in deine Kontakte. Ein "
+                       + "erneuter Import aktualisiert die bestehenden Einträge, "
+                       + "statt sie zu verdoppeln — er bleibt aber eine "
+                       + "Momentaufnahme.")
                 }
 
                 Section {

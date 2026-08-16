@@ -18,4 +18,14 @@ enum AppConfig {
     static let oidcCallbackScheme = "com.fwv.members"
     /// offline_access ⇒ Refresh-Token (sonst nur kurzlebiger Access-Token).
     static let oidcScopes = ["openid", "profile", "email", "offline_access"]
+
+    // MARK: Adressbuch (CardDAV)
+
+    /// Nextcloud hält das Adressbuch, das der nächtliche Cron-Job
+    /// `nextcloud-contacts-sync.sh` aus der Mitgliederdatenbank befüllt.
+    /// Mehr als den Servernamen braucht iOS nicht: unter
+    /// `/.well-known/carddav` liegt ein Redirect auf den DAV-Pfad, den das
+    /// System selbst auflöst.
+    static let cardDAVServer = "nextcloud.fwv-raura.ch"
+    static let cardDAVAddressBook = "fwv-mitglieder"
 }
