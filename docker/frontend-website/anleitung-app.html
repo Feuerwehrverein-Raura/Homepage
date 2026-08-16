@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Anleitung Mitglieder-App - Feuerwehrverein Raura</title>
-<meta name="description" content="Bebilderte Anleitung zur Mitglieder-App des Feuerwehrvereins Raura Kaiseraugst, fuer iPhone und Android.">
 <style>
   /* Farben aus dem Vereins-Theme: #B91C1C ist der Primaerton, den auch die
      Android-App und die Website verwenden. Neutraltoene mit leichtem
@@ -285,15 +284,10 @@
   }
 </style>
 
-<div class="sitebar">
-  <div class="wrap">
-    <a href="mein.html">&larr; Mein Portal</a>
-    <span class="sep">·</span>
-    <a href="index.html">Website</a>
-    <span class="sep">·</span>
-    <a href="apps.html">Apps</a>
-  </div>
-</div>
+<div class="sitebar"><div class="wrap">
+    <a href="mein.html">&larr; Mein Portal</a><span class="sep">·</span>
+    <a href="index.html">Website</a><span class="sep">·</span>
+    <a href="apps.html">Apps</a></div></div>
 <header class="top">
   <div class="wrap">
     <p class="eyebrow">Feuerwehrverein Raura Kaiseraugst</p>
@@ -317,6 +311,7 @@
   <ol>
     <li><a href="#installieren">Installieren</a></li>
     <li><a href="#anmelden">Anmelden</a></li>
+    <li><a href="#passwort">Passwort</a></li>
     <li><a href="#anlaesse">Anlässe</a></li>
     <li><a href="#mithelfen">Mithelfen</a></li>
     <li><a href="#anmeldungen">Meine Anmeldungen</a></li>
@@ -372,14 +367,43 @@
       Kamera halten. Beim ersten Mal fragt das Telefon nach der
       Kamera-Erlaubnis.</p>
     <h3>Passwort vergessen</h3>
-    <p>Über <strong>Passwort vergessen</strong> forderst du einen Code per
-      E-Mail an und setzt damit ein neues Passwort. Aus Sicherheitsgründen
-      lautet die Antwort immer gleich — auch wenn zur eingegebenen Adresse
-      gar kein Konto besteht.</p>
+    <p>Wenn du beim Anmelden nicht weiterkommst, weil das Passwort fehlt:
+      siehe den <a href="#passwort">nächsten Abschnitt</a>. Das
+      Vereins-Login lässt sich selbst zurücksetzen.</p>
   </div>
   <figure class="shot">
     <img src="images/anleitung/ios/05-profil.jpg" data-ios="images/anleitung/ios/05-profil.jpg" data-android="images/anleitung/android/05-profil.jpg" alt="Das Profil nach dem Anmelden">
     <figcaption>Nach der Anmeldung: dein Profil</figcaption>
+  </figure>
+</section>
+
+<section class="chapter" id="passwort">
+  <div>
+    <h2>Passwort vergessen</h2>
+    <p>Das Vereins-Login gilt für die App <em>und</em> für die Website. Es
+      lässt sich selbst zurücksetzen, ohne dass jemand aus dem Vorstand
+      etwas tun muss.</p>
+    <ol class="steps">
+      <li>Auf der Anmeldeseite unten auf
+        <strong>Benutzername oder Passwort vergessen?</strong> tippen.</li>
+      <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
+        <strong>Continue</strong> drücken.</li>
+      <li>In den Posteingang schauen. Der Link darin führt auf eine Seite,
+        auf der du ein neues Passwort setzt.</li>
+      <li>Mit dem neuen Passwort anmelden — in der App wie auf der
+        Website.</li>
+    </ol>
+    <aside class="note">
+      <b>Keine E-Mail bekommen?</b> Zuerst im Spam-Ordner nachsehen. Kommt
+      dort nichts an, ist unter dieser Adresse vermutlich kein Konto
+      hinterlegt — dann hilft nur der Vorstand weiter.
+    </aside>
+    <p>Den Weg gibt es auch direkt:
+      <code>auth.fwv-raura.ch/if/flow/password-recovery/</code></p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/gemeinsam-auth-recovery.jpg" alt="Formular zum Zurücksetzen des Passworts">
+    <figcaption>Schritt 2: E-Mail eingeben</figcaption>
   </figure>
 </section>
 
