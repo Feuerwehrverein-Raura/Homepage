@@ -77,6 +77,10 @@ struct OrganizerView: View {
                                         )
                                     }
                                 }
+                                // Sechs Beschriftungen nebeneinander brechen auf
+                                // dem Telefon mitten im Wort um. Die zwei
+                                // haeufigsten Handgriffe bleiben sichtbar, der
+                                // Rest zieht in ein Menue.
                                 HStack(spacing: 16) {
                                     Button {
                                         adding = event
@@ -90,47 +94,46 @@ struct OrganizerView: View {
                                         Label("Benachrichtigen", systemImage: "envelope")
                                             .font(.caption)
                                     }
-                                    Button {
-                                        editingEvent = event
+                                    Spacer()
+                                    Menu {
+                                        Button {
+                                            editingEvent = event
+                                        } label: {
+                                            Label("Anlass bearbeiten",
+                                                  systemImage: "square.and.pencil")
+                                        }
+                                        Button {
+                                            notesFor = event
+                                        } label: {
+                                            Label("Notizen", systemImage: "note.text")
+                                        }
+                                        Button {
+                                            materialsFor = event
+                                        } label: {
+                                            Label("Rezepte & Material", systemImage: "carrot")
+                                        }
+                                        Divider()
+                                        Button {
+                                            pdf = PDFTarget(
+                                                event: event,
+                                                title: "Teilnehmerliste",
+                                                path: "events/\(event.id)/pdf/teilnehmerliste")
+                                        } label: {
+                                            Label("Teilnehmerliste", systemImage: "doc.text")
+                                        }
+                                        Button {
+                                            pdf = PDFTarget(
+                                                event: event,
+                                                title: "Aushang",
+                                                path: "events/\(event.id)/pdf")
+                                        } label: {
+                                            Label("Aushang", systemImage: "doc.richtext")
+                                        }
                                     } label: {
-                                        Label("Bearbeiten", systemImage: "square.and.pencil")
+                                        Label("Mehr", systemImage: "ellipsis.circle")
                                             .font(.caption)
                                     }
                                 }
-                                HStack(spacing: 16) {
-                                    Button {
-                                        notesFor = event
-                                    } label: {
-                                        Label("Notizen", systemImage: "note.text")
-                                            .font(.caption)
-                                    }
-                                    Button {
-                                        materialsFor = event
-                                    } label: {
-                                        Label("Material", systemImage: "carrot")
-                                            .font(.caption)
-                                    }
-                                    Button {
-                                        pdf = PDFTarget(
-                                            event: event,
-                                            title: "Teilnehmerliste",
-                                            path: "events/\(event.id)/pdf/teilnehmerliste")
-                                    } label: {
-                                        Label("Teilnehmerliste", systemImage: "doc.text")
-                                            .font(.caption)
-                                    }
-                                    Button {
-                                        pdf = PDFTarget(
-                                            event: event,
-                                            title: "Aushang",
-                                            path: "events/\(event.id)/pdf")
-                                    } label: {
-                                        Label("Aushang", systemImage: "doc.richtext")
-                                            .font(.caption)
-                                    }
-                                }
-                                .buttonStyle(.borderless)
-                                .padding(.vertical, 2)
                                 .buttonStyle(.borderless)
                                 .padding(.vertical, 2)
                             } header: {

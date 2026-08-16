@@ -26,6 +26,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        NotificationsView()
+                    } label: {
+                        Label("Benachrichtigungen", systemImage: "bell")
+                    }
+                }
+
+                Section {
                     Toggle("Newsletter abonniert", isOn: $newsletterOn)
                         .disabled(newsletterBusy)
                         .onChange(of: newsletterOn) { wanted in

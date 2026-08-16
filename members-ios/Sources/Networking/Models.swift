@@ -859,3 +859,40 @@ struct ShoppingList: Decodable {
         case estimatedTotalCost = "estimated_total_cost"
     }
 }
+
+// MARK: Benachrichtigungen
+
+/// Eine Einstellung aus `notification_preferences`.
+struct NotificationPreference: Codable, Identifiable {
+    var id: String?
+    var memberId: String?
+    var notificationType: String
+    var enabled: Bool = true
+    var alternativeEmail: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, enabled
+        case memberId = "member_id"
+        case notificationType = "notification_type"
+        case alternativeEmail = "alternative_email"
+    }
+}
+
+struct NotificationsUpdateRequest: Encodable {
+    let preferences: [NotificationPreference]
+}
+
+/// Body für `POST members/me/fcm-token`.
+///
+/// `platform` steht hier auf "ios" — die Android-App schickt "android".
+/// Das Backend unterscheidet daran, über welchen Weg es zustellt.
+struct FcmTokenRegistration: Encodable {
+    let token: String
+    var deviceId: String?
+    var platform: String = "ios"
+
+    enum CodingKeys: String, CodingKey {
+        case token, platform
+        case deviceId = "device_id"
+    }
+}
