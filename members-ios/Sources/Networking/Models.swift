@@ -71,6 +71,24 @@ struct MemberProfile: Codable {
     let geburtstag: String?
 }
 
+/// Eintrag aus `GET members/directory` — Grundlage für den Adressbuch-Import.
+struct DirectoryEntry: Codable, Identifiable {
+    let id: String
+    let vorname: String?
+    let nachname: String?
+    let email: String?
+    let mobile: String?
+    let telefon: String?
+    let funktion: String?
+
+    var fullName: String {
+        [vorname, nachname]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespaces)
+    }
+}
+
 struct MyRegistration: Codable, Identifiable {
     let id: String
     let status: String?
