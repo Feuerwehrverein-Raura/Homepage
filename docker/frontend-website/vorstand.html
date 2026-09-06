@@ -7371,6 +7371,19 @@
             const upcoming = events.filter(e => e.status !== 'cancelled' && (!e.end_date || new Date(e.end_date) >= now))
                 .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
 
+            // Schichten nachladen, sobald ein anderer Anlass gewaehlt wird —
+            // davon haengt ab, ob die Einladung zum Helferaufruf wird.
+            if (!select.dataset.schichtHandler) {
+                select.dataset.schichtHandler = '1';
+                select.addEventListener('change', async () => {
+                    await ladeDispatchSchichten(select.value);
+                    if (typeof showEmailPreview === 'function' &&
+                        document.getElementById('dispatch-preview')?.innerHTML) {
+                        showEmailPreview();
+                    }
+                });
+            }
+
             select.innerHTML = '<option value="">-- Event auswählen --</option>';
             upcoming.forEach(e => {
                 const opt = document.createElement('option');
@@ -7378,6 +7391,65 @@
                 opt.textContent = `${e.title} (${formatEventDate(e.start_date, false)})`;
                 select.appendChild(opt);
             });
+        }
+
+        // Schichten des gewaehlten Anlasses. Wird beim Umschalten des Dropdowns
+        // gefuellt, damit buildEventInvitationBody() ohne Warten darauf zugreifen
+        // kann — die Funktion baut HTML und ist bewusst synchron.
+        let dispatchSchichten = [];
+
+        async function ladeDispatchSchichten(eventId) {
+            dispatchSchichten = [];
+            if (!eventId) return;
+            try {
+                const antwort = await fetch(`${API_BASE}/shifts?event_id=${encodeURIComponent(eventId)}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (antwort.ok) dispatchSchichten = await antwort.json();
+            } catch (e) { /* ohne Schichten bleibt es bei der schlichten Einladung */ }
+        }
+
+        // Baut den Helferaufruf: eine Zeile je Tag, darin die Bereiche mit
+        // Zeitfenstern und Bedarf. Ohne Schichten kommt nichts zurueck — dann
+        // bleibt es bei der gewoehnlichen Einladung.
+        function baueSchichtBlock() {
+            if (!dispatchSchichten || dispatchSchichten.length === 0) return '';
+
+            const nachTag = {};
+            dispatchSchichten.forEach(sch => {
+                const tag = (sch.date || '').substring(0, 10);
+                (nachTag[tag] = nachTag[tag] || []).push(sch);
+            });
+
+            const zeit = t => (t || '').substring(0, 5);
+            const wochentag = d => {
+                const namen = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+                const dat = new Date(d + 'T12:00:00');
+                return isNaN(dat) ? '' : namen[dat.getDay()];
+            };
+
+            const zeilen = Object.keys(nachTag).sort().map(tag => {
+                const eintraege = nachTag[tag]
+                    .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+                    .map(sch => {
+                        const bereich = sch.bereich || sch.name || '';
+                        const spanne = sch.start_time ? `${zeit(sch.start_time)}–${zeit(sch.end_time)}` : '';
+                        return `${bereich} ${spanne} (${sch.needed || 1})`;
+                    }).join(' &middot; ');
+                const datum = tag.split('-').reverse().join('.');
+                return `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;white-space:nowrap;">${wochentag(tag)}, ${datum}</td><td>${eintraege}</td></tr>`;
+            }).join('');
+
+            const gesamt = dispatchSchichten.reduce((n, sch) => n + (sch.needed || 1), 0);
+
+            return `
+                <div style="margin:3mm 0 1mm 0;font-weight:bold;">Wir suchen Helferinnen und Helfer</div>
+                <div style="margin:0 0 2mm 0;">Damit der Anlass gelingt, brauchen wir insgesamt
+                    <strong>${gesamt} Einsätze</strong>. Trag dich für die Schichten ein, die dir passen —
+                    über den QR-Code unten oder auf <strong>www.fwv-raura.ch</strong> beim Anlass.
+                    Zwei Schichten am Stück sind uns lieber als zwei einzelne über den Tag verteilt.</div>
+                <table style="border-collapse:collapse;margin:0 0 3mm 0;">${zeilen}</table>
+                <div style="margin:0 0 3mm 0;font-size:9pt;color:#555;">Die Zahl in Klammern ist der Bedarf pro Schicht.</div>`;
         }
 
         // Gibt das aktuell im Dropdown ausgewaehlte Event zurueck (oder null)
@@ -8809,6 +8881,9 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 ? `<div style="margin:0 0 3mm 0;white-space:pre-wrap;">${event.description}</div>`
                 : '';
 
+            // Hat der Anlass Schichten, wird aus der Einladung ein Helferaufruf.
+            const schichtHtml = baueSchichtBlock();
+
             return `
                 <div style="font-size:13pt;font-weight:bold;text-decoration:underline;margin-bottom:1mm;">${event.title || ''}</div>
                 <div style="font-size:10pt;margin-bottom:3mm;">${subtitle}</div>
@@ -8817,7 +8892,10 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 ${descriptionHtml}
                 <p style="margin:0 0 2mm 0;">Die wichtigsten Daten nochmals zusammengefasst:</p>
                 <table style="margin:0 0 3mm 0;border-collapse:collapse;">${rows}</table>
-                <p style="margin:0;">Wir freuen uns über zahlreiches Erscheinen.</p>
+                ${schichtHtml}
+                <p style="margin:0;">${schichtHtml
+                    ? 'Ohne Helferinnen und Helfer geht es nicht — herzlichen Dank fürs Mitmachen.'
+                    : 'Wir freuen uns über zahlreiches Erscheinen.'}</p>
                 <p style="margin:0 0 3mm 0;">Im Namen des Vorstandes.</p>
                 <p style="margin:0 0 6mm 0;">Mit freundlichen Grüssen</p>
                 <table style="width:100%;border-collapse:collapse;page-break-inside:avoid;">
