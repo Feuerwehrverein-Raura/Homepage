@@ -7026,6 +7026,10 @@
 
             // Event-Einladung: anderes Layout verwenden
             const event = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
+            // Platzhalter haengen an der Event-Auswahl, nicht am Layout. Sonst zeigt
+            // die Vorschau {{event_title}}, waehrend der Versand ihn laengst ersetzt —
+            // eine Vorschau, die etwas anderes zeigt als das Ergebnis, ist wertlos.
+            const eventFuerPlatzhalter = getSelectedDispatchEvent();
             const emailHtml = event
                 ? generateEventInvitationEmailHTML(event, bodyHtml, sampleMember)
                 : generateDispatchEmailHTML(bodyHtml, subject, sampleMember);
@@ -7035,7 +7039,7 @@
             previewDiv.innerHTML = `
                 <div style="background:#f3f4f6;padding:15px;border-radius:6px 6px 0 0;border:1px solid #e5e7eb;border-bottom:none;">
                     <div style="font-size:11px;color:#6b7280;">An: ${sampleMember.email}</div>
-                    <div style="font-weight:600;color:#111827;">${replacePlaceholders(subject, sampleMember) || '(kein Betreff)'}</div>
+                    <div style="font-weight:600;color:#111827;">${replacePlaceholders(replaceEventPlaceholders(subject, eventFuerPlatzhalter), sampleMember) || '(kein Betreff)'}</div>
                 </div>
                 <div style="border:1px solid #e5e7eb;border-radius:0 0 6px 6px;background:white;overflow:hidden;">
                     ${emailHtml.replace(/^<!DOCTYPE.*?<body[^>]*>/s, '').replace(/<\/body>.*$/s, '')}
@@ -7627,9 +7631,14 @@
                 if (emailRecipients.length > 0) {
                     const sourceHtml = content.html || (content.text || '').split('\n').map(l => `<p>${l || '&nbsp;'}</p>`).join('');
                     // Event-Einladung: spezielles Layout; sonst Standard-Layout
-                    const evt = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
-                    const wrappedHtml = evt
-                        ? generateEventInvitationEmailHTML(evt, sourceHtml, null)
+                    // Layout nur beim Spezial-Template; Platzhalter dagegen immer,
+                    // sobald ein Anlass gewaehlt ist. Sonst bleibt {{event_title}}
+                    // stehen, wenn jemand die gleichnamige Vorlage aus der
+                    // Datenbank erwischt statt der fest eingebauten.
+                    const evtLayout = (currentTemplate?.layout === 'event-invitation') ? getSelectedDispatchEvent() : null;
+                    const evt = getSelectedDispatchEvent();
+                    const wrappedHtml = evtLayout
+                        ? generateEventInvitationEmailHTML(evtLayout, sourceHtml, null)
                         : generateDispatchEmailHTML(sourceHtml, subject, null);
 
                     // Event-Platzhalter ({{event_title}} etc.) im Betreff und Text-Fallback aufloesen.
@@ -7650,7 +7659,13 @@
                             subject: emailSubject,
                             body: emailBodyText,
                             html: wrappedHtml,
-                            variables: {},
+                            // Auffangnetz: Ersetzt das Backend die Platzhalter selbst,
+                            // ist es gleichgueltig, welche Vorlage gewaehlt wurde.
+                            variables: evt ? {
+                                event_title: evt.title || '',
+                                event_date: evt.start_date ? formatEventDate(evt.start_date) : '',
+                                event_location: evt.location || ''
+                            } : {},
                             attachments: []
                         })
                     });
