@@ -1197,8 +1197,18 @@ async function createAuthentikUser(member) {
     }
 
     try {
-        // Generate a username from email (use part before @)
-        const username = member.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+        // DEUTSCH: Benutzername aus dem NAMEN, nicht aus der Adresse.
+        //
+        // Frueher stand hier der Teil vor dem @. Bei Ehepaaren mit gemeinsamer
+        // Adresse hiess das Konto danach nach der einen Person, gehoerte aber
+        // der anderen — so entstanden "franz.kaeslin" fuer Margrit,
+        // "reinerberg47" fuer Helen, "martin.gisela" fuer Gisela. Und das
+        // zweite Konto liess sich gar nicht anlegen, weil der Benutzername
+        // schon vergeben war; der Fehler blieb unbemerkt.
+        const username = await freierBenutzername(member, AUTHENTIK_API_URL, {
+            'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+            'Content-Type': 'application/json'
+        });
 
         const userData = {
             username: username,
@@ -2909,10 +2919,18 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
         // "Aktivmitglied" gesetzt wird (z.B. "Aufnahme pendent" -> aktiv an der GV) und
         // noch keinen Login hat. So bekommen wartende Aufnahmen erst nach der GV Zugang.
         const updatedRow = result.rows[0];
-        if (updates.status === 'Aktivmitglied' &&
-            oldMember.status !== 'Aktivmitglied' &&
-            !oldMember.authentik_user_id &&
-            updatedRow.email) {
+        // DEUTSCH: Login anlegen, sobald ein Mitglied eine Adresse hat und noch
+        // keines besitzt — unabhaengig davon, ob gerade der Status wechselt.
+        //
+        // Vorher hing das ausschliesslich am Uebergang auf "Aktivmitglied".
+        // Wer bereits aktiv war, als diese Automatik entstand, ging deshalb
+        // leer aus; Ehrenmitglieder ebenso, weil sie diesen Uebergang nie
+        // durchlaufen — so hatte der Praesident jahrelang keinen Zugang.
+        // Wer noch auf die Aufnahme wartet, bekommt weiterhin keinen.
+        const OHNE_ZUGANG = ['Aufnahme pendent', 'Ausgetreten', 'Verstorben'];
+        if (!oldMember.authentik_user_id &&
+            updatedRow.email &&
+            !OHNE_ZUGANG.includes(updatedRow.status)) {
             try {
                 const ak = await createAuthentikUser({
                     vorname: updatedRow.vorname,
@@ -2933,7 +2951,21 @@ app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async
                     }
                     const passwortLink = await getAuthentikRecoveryLink(ak.pk);
                     const today = new Date().toLocaleDateString('de-CH');
-                    getAktuarName().then(aktuarName => {
+
+                    // DEUTSCH: Die Willkommens-Mail nur bei einer echten Aufnahme.
+                    //
+                    // Seit der Zugang auch nachtraeglich entsteht, wuerde sie sonst
+                    // an langjaehrige Mitglieder gehen, die bloss bisher keinen
+                    // Login hatten — mit "Deine Mitgliedschaft wurde bestaetigt"
+                    // an jemanden, der seit zwanzig Jahren dabei ist.
+                    const istAufnahme = updates.status === 'Aktivmitglied' &&
+                                        oldMember.status !== 'Aktivmitglied';
+                    if (!istAufnahme) {
+                        console.log(`[AUTHENTIK] Zugang nachtraeglich angelegt fuer ` +
+                            `${updatedRow.vorname} ${updatedRow.nachname} — keine ` +
+                            `Willkommens-Mail, Passwort-Link: ${passwortLink ? 'erzeugt' : 'fehlt'}`);
+                    }
+                    if (istAufnahme) getAktuarName().then(aktuarName => {
                         sendNotificationEmail(id, 'Willkommen neues Mitglied', {
                             mitgliedsnummer: id.substring(0, 8),
                             status: 'Aktivmitglied',
@@ -4676,6 +4708,32 @@ app.get('/members/:id/social-media-group', authenticateAny, requireRole('vorstan
     }
 });
 
+// DEUTSCH: Namen vergleichbar machen — Umlaute, Gross-/Kleinschreibung und
+// doppelte Leerzeichen sollen keinen Unterschied machen.
+function normName(wert) {
+    return (wert || '')
+        .toLowerCase()
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+        .replace(/[éèê]/g, 'e').replace(/ß/g, 'ss')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+// DEUTSCH: Sucht einen freien Benutzernamen nach dem Muster vorname.nachname.
+// Ist er vergeben (Namensvetter), wird durchnummeriert.
+async function freierBenutzername(member, apiUrl, headers) {
+    const basis = normName(`${member.vorname} ${member.nachname}`).replace(/ /g, '.');
+    for (let i = 0; i < 20; i++) {
+        const kandidat = i === 0 ? basis : `${basis}${i + 1}`;
+        const belegt = await axios.get(`${apiUrl}/api/v3/core/users/`, {
+            params: { username: kandidat }, headers
+        });
+        if ((belegt.data?.results || []).length === 0) return kandidat;
+    }
+    // Sehr unwahrscheinlich — dann lieber die Adresse als frueher.
+    return member.email;
+}
+
 // Sync all members with email to Authentik
 // DEUTSCH: Erstellt Authentik-Benutzer für alle Mitglieder die noch nicht synchronisiert sind (Bulk-Sync)
 app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
@@ -4703,28 +4761,77 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
 
         for (const member of members) {
             try {
-                // Create user in Authentik
-                const userData = {
-                    username: member.email,
-                    name: `${member.vorname} ${member.nachname}`,
-                    email: member.email,
-                    is_active: true,
-                    groups: [], // Will be assigned via Authentik UI or later
-                    type: 'internal' // Regular user (not service account)
+                const authHeaders = {
+                    'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                    'Content-Type': 'application/json'
                 };
 
-                const authentikResponse = await axios.post(
+                // DEUTSCH: ERST nachsehen, ob zu dieser Adresse schon ein
+                // Authentik-Konto existiert.
+                //
+                // Ohne diese Suche legte der Sync fuer jedes Mitglied ohne
+                // authentik_user_id ein NEUES Konto an — auch dann, wenn zu
+                // derselben Adresse laengst eines bestand. Ergebnis: zwei
+                // Konten, die Anmeldung blieb am alten haengen, gepflegt
+                // wurde das neue. Genau so entstand im August 2026 die
+                // Dublette stefan.mueller / stefan.mueller.1694.
+                let authentikUser = null;
+                let verknuepft = false;
+
+                const suche = await axios.get(
                     `${AUTHENTIK_API_URL}/api/v3/core/users/`,
-                    userData,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
-                            'Content-Type': 'application/json'
-                        }
-                    }
+                    { params: { search: member.email }, headers: authHeaders }
+                );
+                // E-Mail allein genuegt NICHT: Ehepaare teilen sich hier Adressen,
+                // und die Benutzernamen sind irrefuehrend — hinter "franz.kaeslin"
+                // steckt Margrits Konto, hinter "reinerberg47" das von Helen.
+                // Nur wenn zusaetzlich der Name uebereinstimmt, ist es dieselbe
+                // Person; sonst gehoert das Konto dem Partner und es braucht ein
+                // eigenes.
+                const nameGleich = (a, b) => normName(a) === normName(b);
+                const treffer = (suche.data?.results || []).filter(
+                    u => (u.email || '').toLowerCase().trim() === member.email.toLowerCase().trim()
+                        && nameGleich(u.name, `${member.vorname} ${member.nachname}`)
                 );
 
-                const authentikUser = authentikResponse.data;
+                if (treffer.length > 0) {
+                    // Vorhandenes Konto uebernehmen statt ein zweites anlegen.
+                    // Bei mehreren gewinnt das aelteste (kleinste pk) — das ist
+                    // erfahrungsgemaess jenes, mit dem sich die Person anmeldet.
+                    // Deaktivierte Konten scheiden aus: Wer gesperrt wurde, soll
+                    // nicht durch einen Sync stillschweigend wieder angebunden
+                    // werden.
+                    const aktive = treffer.filter(u => u.is_active !== false);
+                    authentikUser = (aktive.length > 0 ? aktive : treffer)
+                        .sort((a, b) => a.pk - b.pk)[0];
+                    verknuepft = true;
+
+                    if (treffer.length > 1) {
+                        console.warn(`[SYNC] ${member.email}: ${treffer.length} Authentik-Konten ` +
+                            `(pk ${treffer.map(u => u.pk).join(', ')}) — verknuepft mit pk ${authentikUser.pk}`);
+                    }
+                }
+
+                // Der Benutzername muss eindeutig sein. Frueher stand hier die
+                // E-Mail — bei geteilten Adressen scheiterte das Anlegen des
+                // zweiten Kontos daran, und der Fehler blieb unbemerkt.
+                const benutzername = authentikUser ? null : await freierBenutzername(
+                    member, AUTHENTIK_API_URL, authHeaders);
+
+                const authentikResponse = authentikUser ? { data: authentikUser } : await axios.post(
+                    `${AUTHENTIK_API_URL}/api/v3/core/users/`,
+                    {
+                        username: benutzername,
+                        name: `${member.vorname} ${member.nachname}`,
+                        email: member.email,
+                        is_active: true,
+                        groups: [], // Will be assigned via Authentik UI or later
+                        type: 'internal' // Regular user (not service account)
+                    },
+                    { headers: authHeaders }
+                );
+
+                authentikUser = authentikResponse.data;
 
                 // Update member with Authentik user ID
                 await pool.query(`
@@ -4747,7 +4854,10 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
                     member_id: member.id,
                     name: `${member.vorname} ${member.nachname}`,
                     email: member.email,
-                    authentik_user_id: authentikUser.pk
+                    authentik_user_id: authentikUser.pk,
+                    // DEUTSCH: "linked" = vorhandenes Konto uebernommen,
+                    // "created" = es gab noch keines
+                    action: verknuepft ? 'linked' : 'created'
                 });
 
             } catch (error) {
