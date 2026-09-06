@@ -7377,6 +7377,7 @@
                 select.dataset.schichtHandler = '1';
                 select.addEventListener('change', async () => {
                     await ladeDispatchSchichten(select.value);
+                    setzeGrundtextFuer(getSelectedDispatchEvent());
                     if (typeof showEmailPreview === 'function' &&
                         document.getElementById('dispatch-preview')?.innerHTML) {
                         showEmailPreview();
@@ -7412,7 +7413,61 @@
         // Baut den Helferaufruf: eine Zeile je Tag, darin die Bereiche mit
         // Zeitfenstern und Bedarf. Ohne Schichten kommt nichts zurueck — dann
         // bleibt es bei der gewoehnlichen Einladung.
-        function baueSchichtBlock() {
+        // Kategorien, bei denen es um Helfer geht und nicht um Teilnahme.
+        // Gleiche Einteilung wie auf der Website (getRegistrationBadge dort):
+        // Ein Dorffest sucht Helfer, ein Ausflug oder eine GV sammelt
+        // Anmeldungen. Die Kategorie entscheidet, nicht der Zufall, ob schon
+        // jemand Schichten angelegt hat.
+        const HELFER_KATEGORIEN = ['Dorffest'];
+
+        // Grundtext je Anlassart. Bisher las sich jede Einladung gleich —
+        // "Hiermit moechte der Vorstand euch zum Event X einladen", ob es nun
+        // um einen Ausflug ging oder um ein Dorffest mit zwei Dutzend
+        // Einsaetzen. Die Kategorie steht am Anlass, also kann der Text ihr
+        // folgen. Was hier landet, bleibt im Eingabefeld frei aenderbar.
+        const GRUNDTEXTE = {
+            'Dorffest':
+                '<p>Unser <strong>{{event_title}}</strong> steht an — und dafür brauchen wir euch.</p>' +
+                '<p>Der Anlass lebt davon, dass genügend Hände mit anpacken: an der Bar, in der Küche, ' +
+                'beim Auf- und Abbau. Trag dich für die Schichten ein, die dir passen.</p>',
+            'GV':
+                '<p>Der Vorstand lädt zur <strong>{{event_title}}</strong> ein.</p>' +
+                '<p>Deine Teilnahme ist uns wichtig — an der Generalversammlung werden die ' +
+                'Geschäfte des Vereins besprochen und entschieden. Bitte meldet euch an, damit ' +
+                'wir planen können.</p>',
+            'Ausflug':
+                '<p>Der Vorstand lädt euch herzlich zum <strong>{{event_title}}</strong> ein.</p>' +
+                '<p>Kommt einfach vorbei — eine Anmeldung braucht es nicht.</p>',
+            'Ausflug mit Anmeldung':
+                '<p>Der Vorstand lädt euch herzlich zum <strong>{{event_title}}</strong> ein.</p>' +
+                '<p>Damit wir planen können, bitten wir um eine Anmeldung — über den QR-Code ' +
+                'unten oder auf der Website.</p>',
+            'Aufbau':
+                '<p>Für den <strong>{{event_title}}</strong> brauchen wir helfende Hände.</p>' +
+                '<p>Melde dich an, wenn du Zeit hast — je mehr mitmachen, desto schneller ' +
+                'sind wir durch.</p>',
+            'Abbau':
+                '<p>Nach dem Anlass ist vor dem Aufräumen: Für den <strong>{{event_title}}</strong> ' +
+                'brauchen wir noch einmal Unterstützung.</p>' +
+                '<p>Melde dich an, wenn du Zeit hast.</p>'
+        };
+
+        // Setzt den Grundtext zur Kategorie ins Eingabefeld — aber nur, wenn
+        // dort noch der unveraenderte Vorlagentext steht. Wer schon selbst
+        // getippt hat, dem wird nichts ueberschrieben.
+        function setzeGrundtextFuer(event) {
+            if (!event) return;
+            const text = GRUNDTEXTE[event.category || ''];
+            if (!text) return;
+            const jetzt = (getDispatchContent().html || '').trim();
+            const vorlage = (currentTemplate?.body || '').trim();
+            const unveraendert = !jetzt || jetzt === vorlage ||
+                                 Object.values(GRUNDTEXTE).some(t => t.trim() === jetzt);
+            if (unveraendert) setDispatchContent(text, null);
+        }
+
+        function baueSchichtBlock(event) {
+            if (!event || !HELFER_KATEGORIEN.includes(event.category || '')) return '';
             if (!dispatchSchichten || dispatchSchichten.length === 0) return '';
 
             const nachTag = {};
@@ -8882,7 +8937,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 : '';
 
             // Hat der Anlass Schichten, wird aus der Einladung ein Helferaufruf.
-            const schichtHtml = baueSchichtBlock();
+            const schichtHtml = baueSchichtBlock(event);
 
             return `
                 <div style="font-size:13pt;font-weight:bold;text-decoration:underline;margin-bottom:1mm;">${event.title || ''}</div>
