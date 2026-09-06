@@ -7426,10 +7426,12 @@
         // Einsaetzen. Die Kategorie steht am Anlass, also kann der Text ihr
         // folgen. Was hier landet, bleibt im Eingabefeld frei aenderbar.
         const GRUNDTEXTE = {
-            // Kein Artikel vor {{event_title}}: "Unser Chilbi" waere falsch, "Unsere
-            // Waldfest" auch. Das Geschlecht steckt im Titel, nicht in der Vorlage.
+            // "Unsere", nicht "Unser": Die Anlaesse dieser Kategorie sind bei uns
+            // alle weiblich — Chilbi, Fasnacht, Lange Nacht der Musik. Kaeme
+            // einmal ein saechliches oder maennliches dazu (ein Waldfest, ein
+            // Dorfmarkt), muss dieser Satz angefasst werden.
             'Dorffest':
-                '<p><strong>{{event_title}}</strong> steht an — und dafür brauchen wir euch.</p>' +
+                '<p>Unsere <strong>{{event_title}}</strong> steht an — und dafür brauchen wir euch.</p>' +
                 '<p>Der Anlass lebt davon, dass genügend Hände mit anpacken: an der Bar, in der Küche, ' +
                 'beim Auf- und Abbau. Trag dich für die Schichten ein, die dir passen.</p>',
             'GV':
