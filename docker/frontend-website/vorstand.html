@@ -7426,8 +7426,10 @@
         // Einsaetzen. Die Kategorie steht am Anlass, also kann der Text ihr
         // folgen. Was hier landet, bleibt im Eingabefeld frei aenderbar.
         const GRUNDTEXTE = {
+            // Kein Artikel vor {{event_title}}: "Unser Chilbi" waere falsch, "Unsere
+            // Waldfest" auch. Das Geschlecht steckt im Titel, nicht in der Vorlage.
             'Dorffest':
-                '<p>Unser <strong>{{event_title}}</strong> steht an — und dafür brauchen wir euch.</p>' +
+                '<p><strong>{{event_title}}</strong> steht an — und dafür brauchen wir euch.</p>' +
                 '<p>Der Anlass lebt davon, dass genügend Hände mit anpacken: an der Bar, in der Küche, ' +
                 'beim Auf- und Abbau. Trag dich für die Schichten ein, die dir passen.</p>',
             'GV':
@@ -7495,12 +7497,18 @@
                 return `<tr><td style="font-weight:bold;padding:0.5mm 5mm 0.5mm 0;vertical-align:top;white-space:nowrap;">${wochentag(tag)}, ${datum}</td><td>${eintraege}</td></tr>`;
             }).join('');
 
+            // Zwei verschiedene Zahlen, die gern verwechselt werden: wie viele
+            // Schichten ausgeschrieben sind, und wie viele Helferinnen und
+            // Helfer sie zusammen brauchen.
+            const anzahlSchichten = dispatchSchichten.length;
             const gesamt = dispatchSchichten.reduce((n, sch) => n + (sch.needed || 1), 0);
 
             return `
                 <div style="margin:3mm 0 1mm 0;font-weight:bold;">Wir suchen Helferinnen und Helfer</div>
-                <div style="margin:0 0 2mm 0;">Damit der Anlass gelingt, brauchen wir insgesamt
-                    <strong>${gesamt} Einsätze</strong>. Trag dich für die Schichten ein, die dir passen —
+                <div style="margin:0 0 2mm 0;">Ausgeschrieben sind
+                    <strong>${anzahlSchichten} verschiedene Schichten</strong> mit zusammen
+                    <strong>${gesamt} Helferschichten</strong>, die besetzt werden wollen.
+                    Trag dich für die Schichten ein, die dir passen —
                     über den QR-Code unten oder auf <strong>www.fwv-raura.ch</strong> beim Anlass.
                     Zwei Schichten am Stück sind uns lieber als zwei einzelne über den Tag verteilt.</div>
                 <table style="border-collapse:collapse;margin:0 0 3mm 0;">${zeilen}</table>
