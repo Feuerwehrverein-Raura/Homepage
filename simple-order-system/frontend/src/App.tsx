@@ -159,6 +159,14 @@ function App() {
   const [twintQrUrl, setTwintQrUrl] = useState<string | null>(null);
   const [twintPayment, setTwintPayment] = useState<{ orderId: number; total: number } | null>(null);
 
+  // Nicht gedruckte Bons. Bewusst ein stehendes Banner und kein alert():
+  // Ein Hinweisfenster ist im Betrieb weggeklickt, bevor es jemand gelesen
+  // hat. Das hier bleibt stehen, bis es bestaetigt wird.
+  const [druckWarnung, setDruckWarnung] = useState<{
+    orderId: number;
+    fehler: { station: string; meldung: string; art: string }[];
+  } | null>(null);
+
   // WebSocket state
   const wsRef = useRef<WebSocket | null>(null);
   const [wsConnected, setWsConnected] = useState(false);
@@ -361,6 +369,11 @@ function App() {
           if (orderType === 'tisch' && tableNumber) {
             fetchOpenOrders(tableNumber);
           }
+        } else if (data.type === 'print_failed') {
+          // Auch Bildschirme, die die Bestellung nicht selbst ausgeloest haben,
+          // sollen es sehen — und Nachdrucke aus der Cloud haben ueberhaupt
+          // keinen Aufrufer, dem geantwortet werden koennte.
+          setDruckWarnung({ orderId: parseInt(data.order_id), fehler: data.druckfehler || [] });
         } else if (data.type === 'order_completed') {
           // Remove completed order from lists
           setAllOpenOrders(prev => prev.filter(o => o.id !== parseInt(data.order_id)));
@@ -754,6 +767,9 @@ function App() {
         }
 
         const result = await res.json();
+        if (result.druckfehler?.length) {
+          setDruckWarnung({ orderId: selectedOrder.id, fehler: result.druckfehler });
+        }
         setOrderConfirmation({
           orderId: selectedOrder.id,
           orderType: 'tisch',
@@ -786,6 +802,10 @@ function App() {
         });
 
         const order = await orderRes.json();
+
+        if (order.druckfehler?.length) {
+          setDruckWarnung({ orderId: order.id, fehler: order.druckfehler });
+        }
 
         // Show payment modal (include table number for "pay later" option)
         const currentTableNum = orderType === 'tisch' ? parseInt(tableNumber) : undefined;
@@ -832,6 +852,43 @@ function App() {
       <InstallPrompt appName="Kasse" />
       {/* Offline Warning Banner */}
       <OfflineBanner apiUrl={API_URL} />
+
+      {/* Nicht gedruckte Bons. Steht oben und bleibt stehen, bis jemand
+          bestaetigt — ein Bon, der nie gedruckt wurde, faellt sonst erst auf,
+          wenn der Gast nachfragt. */}
+      {druckWarnung && (
+        <div className="sticky top-0 z-40 bg-red-600 text-white px-4 py-3 shadow-lg">
+          <div className="flex items-start gap-3 max-w-4xl mx-auto">
+            <div className="text-2xl leading-none">🖨️</div>
+            <div className="flex-1">
+              <div className="font-bold">
+                Bon nicht gedruckt — Bestellung #{druckWarnung.orderId}
+              </div>
+              <ul className="mt-1 text-sm space-y-0.5">
+                {druckWarnung.fehler.map((f, i) => (
+                  <li key={i}>
+                    <span className="font-semibold uppercase">{f.station}</span>
+                    {': '}
+                    {f.art === 'kein-drucker'
+                      ? 'Kein Drucker eingerichtet'
+                      : f.meldung}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-1 text-sm text-red-100">
+                Die Bestellung ist erfasst und verrechnet. Nur der Bon fehlt —
+                bitte von Hand weitergeben.
+              </div>
+            </div>
+            <button
+              onClick={() => setDruckWarnung(null)}
+              className="shrink-0 bg-white/20 hover:bg-white/30 rounded-lg px-3 py-1.5 text-sm font-medium"
+            >
+              Verstanden
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Order Confirmation Modal */}
       {orderConfirmation && (

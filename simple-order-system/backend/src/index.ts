@@ -568,10 +568,18 @@ async function syncFromCloud() {
       // Print receipts after successful commit
       for (const orderToPrint of ordersToPrint) {
         try {
-          await printReceipt(orderToPrint.orderId, orderToPrint.tableNumber, orderToPrint.items);
-          console.log(`Printed synced order #${orderToPrint.orderId} from cloud`);
+          const druckfehler = await printReceipt(orderToPrint.orderId, orderToPrint.tableNumber, orderToPrint.items);
+          meldeDruckfehler(druckfehler, orderToPrint.orderId);
+          if (druckfehler.length === 0) {
+            console.log(`Printed synced order #${orderToPrint.orderId} from cloud`);
+          }
         } catch (printError) {
           console.error(`Failed to print synced order #${orderToPrint.orderId}:`, printError);
+          meldeDruckfehler([{
+            station: 'alle',
+            meldung: printError instanceof Error ? printError.message : String(printError),
+            art: 'fehler'
+          }], orderToPrint.orderId);
         }
       }
 
@@ -951,12 +959,22 @@ app.post('/api/orders', async (req, res) => {
       // Don't fail the order, just log the error
     }
 
-    // Print receipt
+    // Bon drucken. Ein Fehlschlag darf die Bestellung nicht zurueckrollen —
+    // sie ist bezahlt und im Buch. Er muss aber sichtbar werden, deshalb
+    // reisen die Fehler in der Antwort mit bis in die Oberflaeche.
+    let druckfehler: Druckfehler[] = [];
     try {
-      await printReceipt(order.id, table_number, items);
+      druckfehler = await printReceipt(order.id, table_number, items);
     } catch (printError) {
       console.error('Print error:', printError);
+      druckfehler = [{
+        station: 'alle',
+        meldung: printError instanceof Error ? printError.message : String(printError),
+        art: 'fehler'
+      }];
     }
+
+    meldeDruckfehler(druckfehler, order.id);
 
     // Broadcast to kitchen display
     broadcast({ type: 'new_order', order: { ...order, items } });
@@ -964,7 +982,7 @@ app.post('/api/orders', async (req, res) => {
     // Queue for cloud sync
     queueOrderSync(order.id, 'create');
 
-    res.json(order);
+    res.json({ ...order, druckfehler });
   } catch (error) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: 'Database error' });
@@ -1071,12 +1089,20 @@ app.post('/api/orders/:id/items', async (req, res) => {
       console.error('Failed to update inventory:', inventoryError);
     }
 
-    // Print receipt for additional items
+    // Bon fuer die Nachbestellung. Fehler wie oben: nicht verschlucken.
+    let druckfehler: Druckfehler[] = [];
     try {
-      await printReceipt(parseInt(id), order.table_number, items);
+      druckfehler = await printReceipt(parseInt(id), order.table_number, items);
     } catch (printError) {
       console.error('Print error:', printError);
+      druckfehler = [{
+        station: 'alle',
+        meldung: printError instanceof Error ? printError.message : String(printError),
+        art: 'fehler'
+      }];
     }
+
+    meldeDruckfehler(druckfehler, parseInt(id));
 
     // Broadcast update
     broadcast({ type: 'order_updated', order_id: id });
@@ -1084,7 +1110,7 @@ app.post('/api/orders/:id/items', async (req, res) => {
     // Queue for cloud sync
     queueOrderSync(parseInt(id), 'update');
 
-    res.json({ success: true, total: newTotal });
+    res.json({ success: true, total: newTotal, druckfehler });
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('Add items error:', error);
@@ -2113,8 +2139,24 @@ async function printToNetworkPrinter(
   return printViaRawTcp(printerConfig, station, orderId, tableNumber, items);
 }
 
+// Ergebnis eines Druckauftrags. Frueher hat printReceipt Fehler nur auf die
+// Konsole geschrieben und ist stillschweigend weitergelaufen: Die Bestellung
+// galt als erledigt, an der Bar wusste niemand davon, und der Gast wartete auf
+// ein Bier, dessen Bon nie gedruckt wurde. Jetzt wandern die Fehler bis in die
+// Oberflaeche.
+export interface Druckfehler {
+  station: string;
+  meldung: string;
+  // 'fehler'      = Drucker war eingerichtet, hat aber abgelehnt oder
+  //                 nicht geantwortet
+  // 'kein-drucker' = fuer diese Station ist gar kein Drucker hinterlegt,
+  //                 es wurde also nichts gedruckt
+  art: 'fehler' | 'kein-drucker';
+}
+
 // Printer function (ESC/POS)
-async function printReceipt(orderId: number, tableNumber: number, items: any[]) {
+async function printReceipt(orderId: number, tableNumber: number, items: any[]): Promise<Druckfehler[]> {
+  const druckfehler: Druckfehler[] = [];
   try {
     // Get printer configuration from database
     const printerConfigs = await getPrinterConfig();
@@ -2137,7 +2179,13 @@ async function printReceipt(orderId: number, tableNumber: number, items: any[]) 
           await printToNetworkPrinter(printerConfig, station, orderId, tableNumber, stationItems as any[]);
         } catch (printErr) {
           console.error(`Failed to print to ${station}:`, printErr);
-          // Continue with other stations even if one fails
+          // Andere Stationen trotzdem bedienen — ein defekter Kuechendrucker
+          // darf den Bon fuer die Bar nicht verhindern. Gemeldet wird er aber.
+          druckfehler.push({
+            station,
+            meldung: printErr instanceof Error ? printErr.message : String(printErr),
+            art: 'fehler'
+          });
         }
       } else {
         // Fallback: Log to console if no printer configured
@@ -2153,13 +2201,35 @@ async function printReceipt(orderId: number, tableNumber: number, items: any[]) 
         });
 
         console.log('===========================\n');
+
+        // Auch das ist eine Nichtlieferung: Fuer diese Station ist kein
+        // Drucker hinterlegt, der Bon existiert nur in der Container-Konsole.
+        druckfehler.push({
+          station,
+          meldung: 'Kein Drucker eingerichtet',
+          art: 'kein-drucker'
+        });
       }
     }
+
+    return druckfehler;
 
   } catch (error) {
     console.error('Print error:', error);
     throw error;
   }
+}
+
+// Meldet Druckfehler an alle offenen Bildschirme (Kasse, Kuechendisplay).
+// Zusaetzlich zur Antwort auf die Bestellung: Wer die Bestellung nicht selbst
+// ausgeloest hat, erfaehrt sonst nichts davon — und beim Nachdruck aus der
+// Cloud gibt es ueberhaupt keine Antwort, an die sich etwas haengen liesse.
+function meldeDruckfehler(druckfehler: Druckfehler[], orderId: number) {
+  if (!druckfehler || druckfehler.length === 0) return;
+  for (const f of druckfehler) {
+    console.error(`Bestellung #${orderId}: Bon fuer "${f.station}" nicht gedruckt — ${f.meldung}`);
+  }
+  broadcast({ type: 'print_failed', order_id: orderId, druckfehler });
 }
 
 // Payment Service
