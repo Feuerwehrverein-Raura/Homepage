@@ -4270,9 +4270,13 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
-                        // DE: Fenster links (DIN 5008) + Land explizit; CH: rechts
-                        address_position: recipient?.country === 'DE' ? 'left' : 'right',
-                        country: recipient?.country || 'CH'
+                        // DE: Fenster links (DIN 5008); CH: rechts.
+                        // KEIN country-Attribut hier — die Pingen-API kennt es beim
+                        // Brief-Erstellen nicht und quittiert es mit 400
+                        // "invalid_body_structure". Das Zielland liest Pingen aus der
+                        // Adresse im PDF. (Fehler stammte aus 7b79cde, 05.07.2026,
+                        // und hat seither jeden Brief ueber diesen Weg blockiert.)
+                        address_position: recipient?.country === 'DE' ? 'left' : 'right'
                     }
                 }
             },
@@ -4360,9 +4364,13 @@ app.post('/dispatch/send-pdf-post', authenticateAny, async (req, res) => {
                         delivery_product: 'cheap',
                         print_mode: 'simplex',
                         print_spectrum: 'grayscale',
-                        // DE: Fenster links (DIN 5008) + Land explizit; CH: rechts
-                        address_position: recipient?.country === 'DE' ? 'left' : 'right',
-                        country: recipient?.country || 'CH'
+                        // DE: Fenster links (DIN 5008); CH: rechts.
+                        // KEIN country-Attribut hier — die Pingen-API kennt es beim
+                        // Brief-Erstellen nicht und quittiert es mit 400
+                        // "invalid_body_structure". Das Zielland liest Pingen aus der
+                        // Adresse im PDF. (Fehler stammte aus 7b79cde, 05.07.2026,
+                        // und hat seither jeden Brief ueber diesen Weg blockiert.)
+                        address_position: recipient?.country === 'DE' ? 'left' : 'right'
                     }
                 }
             },
