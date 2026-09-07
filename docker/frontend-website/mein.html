@@ -6,6 +6,9 @@
     <title>Mein Portal - Feuerwehrverein Raura</title>
     <!-- DEUTSCH: Tailwind CSS wird ueber CDN geladen fuer Utility-First-Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- DEUTSCH: QR-Codes fuer die VPN-Konfiguration. Gleiche Bibliothek
+         wie in der Vorstands-App, damit nicht zwei nebeneinander laufen. -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierten Feuerwehr-Rot-Farben (fire-50 bis fire-800) -->
     <script>
         // DEUTSCH: Erweitert die Standard-Tailwind-Farbpalette um die "fire"-Farbabstufungen
@@ -387,6 +390,60 @@
                         </h2>
                         <div id="system-accesses-list" class="space-y-2">
                             <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- DEUTSCH: VPN-Zugaenge (WireGuard) zur Selbstbedienung.
+                         Legt ueber /members/me/vpn einen Zugang an; die API reicht
+                         das an wg-agent auf dem Server weiter. Die Konfiguration
+                         wird genau einmal ausgeliefert und nirgends zwischengespeichert. -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h2 class="text-xl font-bold text-gray-800 mb-1 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-fire-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                            VPN-Zugang
+                        </h2>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Verbindet dein Gerät mit dem Vereinsnetz — für die Dateiablage und
+                            das Netz im Roten Schopf. Es läuft nur Vereinsverkehr durch den
+                            Tunnel; dein übriges Surfen bleibt unberührt.
+                        </p>
+
+                        <div id="vpn-list" class="space-y-2 mb-4">
+                            <!-- Wird von JavaScript gefuellt -->
+                        </div>
+                        <div id="vpn-empty" class="text-sm text-gray-500 mb-4 hidden">
+                            Noch kein Gerät verbunden.
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <input type="text" id="vpn-geraet" maxlength="20" placeholder="Gerätename, z.B. handy"
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                            <button id="vpn-anlegen" class="bg-fire-500 hover:bg-fire-600 text-white px-4 py-2 rounded-lg font-medium">
+                                Zugang erstellen
+                            </button>
+                        </div>
+                        <p id="vpn-fehler" class="text-sm text-red-600 mt-2 hidden"></p>
+
+                        <!-- Erscheint einmalig nach dem Anlegen: QR-Code und Datei.
+                             Danach ist die Konfiguration nicht mehr abrufbar. -->
+                        <div id="vpn-neu" class="hidden mt-6 border-t pt-6">
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-sm text-amber-900">
+                                <strong>Jetzt einrichten.</strong> Diese Konfiguration wird aus
+                                Sicherheitsgründen nur ein einziges Mal angezeigt. Wer sie
+                                verliert, erstellt einfach einen neuen Zugang.
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div id="vpn-qr" class="bg-white p-3 border rounded-lg"></div>
+                                <p class="text-sm text-gray-600 mt-3 text-center">
+                                    WireGuard-App öffnen, «Hinzufügen» → «Aus QR-Code» und
+                                    diesen Code abfotografieren.
+                                </p>
+                                <button id="vpn-download" class="mt-4 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm">
+                                    Als Datei herunterladen (für den Rechner)
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -1015,6 +1072,143 @@
         // DEUTSCH: Laedt alle Zugaenge des Mitglieds von GET /members/me/accesses.
         // Die API liefert 4 Bereiche: Funktions-E-Mails, Nextcloud-Ordner, Organisator-Events, System-Zugaenge.
         // Bei API-Fehler werden Fallback-Daten basierend auf den Profildaten des Mitglieds angezeigt.
+        // ============================================
+        // DEUTSCH: VPN-Zugaenge (WireGuard)
+        //
+        // Die Seite spricht nur mit /members/me/vpn. Alles Weitere — die
+        // WireGuard-Schnittstelle des Servers — erledigt wg-agent dahinter.
+        // ============================================
+
+        function vpnFehler(text) {
+            const el = document.getElementById('vpn-fehler');
+            if (!text) { el.classList.add('hidden'); return; }
+            el.textContent = text;
+            el.classList.remove('hidden');
+        }
+
+        async function ladeVpnZugaenge() {
+            try {
+                const response = await fetch(`${API_BASE}/members/me/vpn`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) return;
+                const zugaenge = await response.json();
+
+                const liste = document.getElementById('vpn-list');
+                const leer = document.getElementById('vpn-empty');
+                liste.innerHTML = '';
+
+                if (!zugaenge.length) {
+                    leer.classList.remove('hidden');
+                    return;
+                }
+                leer.classList.add('hidden');
+
+                zugaenge.forEach(z => {
+                    const wann = z.zuletzt
+                        ? new Date(z.zuletzt).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                        : 'noch nie verbunden';
+                    const zeile = document.createElement('div');
+                    zeile.className = 'flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2';
+                    const links = document.createElement('div');
+                    links.innerHTML = `<div class="font-medium text-gray-800">${z.geraet}</div>` +
+                        `<div class="text-xs text-gray-500">${z.adresse} · ${wann}</div>`;
+                    const knopf = document.createElement('button');
+                    knopf.className = 'text-sm text-red-600 hover:text-red-700';
+                    knopf.textContent = 'Entfernen';
+                    knopf.onclick = () => entferneVpnZugang(z.name, z.geraet);
+                    zeile.appendChild(links);
+                    zeile.appendChild(knopf);
+                    liste.appendChild(zeile);
+                });
+            } catch (e) {
+                console.error('VPN-Zugaenge laden:', e);
+            }
+        }
+
+        async function erstelleVpnZugang() {
+            const feld = document.getElementById('vpn-geraet');
+            const knopf = document.getElementById('vpn-anlegen');
+            const geraet = feld.value.trim();
+            vpnFehler('');
+
+            if (geraet.length < 2) {
+                vpnFehler('Bitte einen Gerätenamen angeben, mindestens zwei Zeichen.');
+                return;
+            }
+
+            knopf.disabled = true;
+            knopf.textContent = 'Wird erstellt…';
+            try {
+                const response = await fetch(`${API_BASE}/members/me/vpn`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ geraet })
+                });
+                const daten = await response.json();
+                if (!response.ok) {
+                    vpnFehler(daten.error || 'Der Zugang konnte nicht erstellt werden.');
+                    return;
+                }
+
+                zeigeVpnKonfiguration(daten);
+                feld.value = '';
+                ladeVpnZugaenge();
+            } catch (e) {
+                vpnFehler('Der Zugang konnte nicht erstellt werden.');
+            } finally {
+                knopf.disabled = false;
+                knopf.textContent = 'Zugang erstellen';
+            }
+        }
+
+        function zeigeVpnKonfiguration(daten) {
+            const bereich = document.getElementById('vpn-neu');
+            const qr = document.getElementById('vpn-qr');
+
+            // Typ 0 = automatische Groesse, 'L' = niedrigste Fehlerkorrektur.
+            // Eine WireGuard-Konfiguration ist lang; hoehere Korrekturstufen
+            // sprengen die Kapazitaet und die Bibliothek wirft einen Fehler.
+            qr.innerHTML = '';
+            const code = qrcode(0, 'L');
+            code.addData(daten.konfiguration);
+            code.make();
+            qr.innerHTML = code.createImgTag(4, 8);
+
+            document.getElementById('vpn-download').onclick = () => {
+                const blob = new Blob([daten.konfiguration], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `fwv-raura-${daten.geraet}.conf`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            };
+
+            bereich.classList.remove('hidden');
+            bereich.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        async function entferneVpnZugang(name, geraet) {
+            if (!confirm(`Zugang «${geraet}» wirklich entfernen?\n\nDas Gerät verliert damit sofort die Verbindung zum Vereinsnetz.`)) return;
+            try {
+                const response = await fetch(`${API_BASE}/members/me/vpn/${encodeURIComponent(name)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) {
+                    vpnFehler('Der Zugang konnte nicht entfernt werden.');
+                    return;
+                }
+                document.getElementById('vpn-neu').classList.add('hidden');
+                ladeVpnZugaenge();
+            } catch (e) {
+                vpnFehler('Der Zugang konnte nicht entfernt werden.');
+            }
+        }
+
         async function loadAccesses() {
             try {
                 document.getElementById('accesses-loading').classList.remove('hidden');
@@ -1031,6 +1225,7 @@
                 accessesLoaded = true;
 
                 // DEUTSCH: Alle 6 Bereiche rendern mit den Daten aus der API
+                ladeVpnZugaenge();
                 renderFunctionEmails(data.functionEmails || []);
                 renderNextcloudFolders(data.nextcloudFolders || []);
                 renderSmbCredentials(data.smbCredentials || null);
@@ -1739,6 +1934,12 @@
 
         // DEUTSCH: Foto-Loeschen-Button
         document.getElementById('my-photo-delete-btn').addEventListener('click', deleteMyPhoto);
+
+        // VPN: Knopf und Eingabetaste im Geraetefeld
+        document.getElementById('vpn-anlegen').addEventListener('click', erstelleVpnZugang);
+        document.getElementById('vpn-geraet').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') erstelleVpnZugang();
+        });
 
         // ============================================
         // DEUTSCH: INITIALISIERUNG

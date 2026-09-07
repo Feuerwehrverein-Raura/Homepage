@@ -5281,6 +5281,150 @@ async function getNextcloudGroupFolders(userGroups) {
 
 // Get all accesses for the current user
 // DEUTSCH: Sammelt alle Zugänge eines Mitglieds: Funktions-E-Mails, Nextcloud-Ordner, System-Zugänge und Organisator-Events
+// ---------------------------------------------------------------------------
+// VPN-Zugaenge (WireGuard) zur Selbstbedienung
+//
+// Der Weg dahin: Diese API fasst den Netzwerkstapel NICHT selbst an — sie
+// laeuft in einem Container und kaeme an die WireGuard-Schnittstelle des
+// Servers ohnehin nicht heran. Stattdessen ruft sie wg-agent auf, einen
+// schmalen Dienst auf dem Server, der nur an 172.18.0.1 lauscht und den
+// Kopf X-Internal-Key verlangt. So braucht kein Container erweiterte Rechte.
+//
+// Jeder Zugang traegt ein Praefix aus der Mitglieder-Kennung. Damit ist ohne
+// zusaetzliche Tabelle klar, wem er gehoert — und ein Mitglied kann keinen
+// fremden Zugang loeschen, weil das Praefix beim Entfernen geprueft wird.
+const WG_AGENT = process.env.WG_AGENT_URL || 'http://172.18.0.1:8787';
+const VPN_MAX_PRO_MITGLIED = 5;
+
+function vpnPraefix(memberId) {
+    // UUID auf acht Zeichen kuerzen: eindeutig genug fuer einen Verein und
+    // kurz genug, dass daneben noch ein Geraetename Platz hat.
+    return 'm' + String(memberId).replace(/-/g, '').slice(0, 8);
+}
+
+async function agentAufruf(methode, pfad, daten) {
+    return axios({
+        method: methode,
+        url: WG_AGENT + pfad,
+        data: daten,
+        headers: { 'X-Internal-Key': process.env.INTERNAL_API_KEY || '' },
+        timeout: 15000,
+        validateStatus: () => true
+    });
+}
+
+async function mitgliedAusToken(req, res) {
+    const r = await pool.query('SELECT id, vorname, nachname FROM members WHERE email = $1', [req.user.email]);
+    if (r.rows.length === 0) {
+        res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        return null;
+    }
+    return r.rows[0];
+}
+
+// Eigene Zugaenge auflisten
+app.get('/members/me/vpn', authenticateToken, async (req, res) => {
+    try {
+        const member = await mitgliedAusToken(req, res);
+        if (!member) return;
+        const praefix = vpnPraefix(member.id) + '-';
+
+        const antwort = await agentAufruf('get', '/peers');
+        if (antwort.status !== 200) {
+            return res.status(502).json({ error: 'VPN-Dienst nicht erreichbar' });
+        }
+        const eigene = (antwort.data || [])
+            .filter(z => z.name.startsWith(praefix))
+            .map(z => ({
+                name: z.name,
+                geraet: z.name.slice(praefix.length),
+                adresse: z.adresse,
+                // 0 = noch nie verbunden
+                zuletzt: z.zuletzt ? new Date(z.zuletzt * 1000).toISOString() : null
+            }));
+        res.json(eigene);
+    } catch (error) {
+        console.error('GET /members/me/vpn:', error.message);
+        res.status(500).json({ error: 'VPN-Zugaenge konnten nicht geladen werden' });
+    }
+});
+
+// Neuen Zugang anlegen
+app.post('/members/me/vpn', authenticateToken, async (req, res) => {
+    try {
+        const member = await mitgliedAusToken(req, res);
+        if (!member) return;
+
+        const geraet = String(req.body.geraet || '').trim().toLowerCase()
+            .replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        if (geraet.length < 2 || geraet.length > 20) {
+            return res.status(400).json({ error: 'Geraetename: 2 bis 20 Zeichen, Buchstaben und Ziffern' });
+        }
+
+        const praefix = vpnPraefix(member.id) + '-';
+
+        // Obergrenze je Mitglied: das Tunnelnetz hat rund 150 Adressen, und
+        // niemand braucht unbegrenzt viele Geraete.
+        const liste = await agentAufruf('get', '/peers');
+        if (liste.status === 200) {
+            const eigene = (liste.data || []).filter(z => z.name.startsWith(praefix));
+            if (eigene.length >= VPN_MAX_PRO_MITGLIED) {
+                return res.status(400).json({
+                    error: `Mehr als ${VPN_MAX_PRO_MITGLIED} Zugaenge sind nicht vorgesehen. Bitte einen alten entfernen.`
+                });
+            }
+            if (eigene.some(z => z.name === praefix + geraet)) {
+                return res.status(400).json({ error: 'Ein Zugang mit diesem Geraetenamen existiert bereits' });
+            }
+        }
+
+        const antwort = await agentAufruf('post', '/peers', { name: praefix + geraet });
+        if (antwort.status !== 201) {
+            const grund = (antwort.data && antwort.data.fehler) || 'unbekannt';
+            return res.status(502).json({ error: 'Zugang konnte nicht angelegt werden: ' + grund });
+        }
+
+        // Die Konfiguration enthaelt den privaten Schluessel und wird bewusst
+        // NUR hier, genau einmal, herausgegeben. Der Server speichert sie zwar
+        // unter /etc/wireguard/clients, die API liefert sie aber kein zweites
+        // Mal aus — wer sie verliert, legt einen neuen Zugang an.
+        res.status(201).json({
+            name: antwort.data.name,
+            geraet,
+            adresse: antwort.data.adresse,
+            konfiguration: antwort.data.konfiguration
+        });
+    } catch (error) {
+        console.error('POST /members/me/vpn:', error.message);
+        res.status(500).json({ error: 'Zugang konnte nicht angelegt werden' });
+    }
+});
+
+// Eigenen Zugang entfernen
+app.delete('/members/me/vpn/:name', authenticateToken, async (req, res) => {
+    try {
+        const member = await mitgliedAusToken(req, res);
+        if (!member) return;
+
+        const name = String(req.params.name || '').toLowerCase();
+        const praefix = vpnPraefix(member.id) + '-';
+        // Der Kern der Zugriffspruefung: ohne passendes Praefix gehoert der
+        // Zugang jemand anderem.
+        if (!name.startsWith(praefix)) {
+            return res.status(403).json({ error: 'Dieser Zugang gehoert nicht zu Ihrem Konto' });
+        }
+
+        const antwort = await agentAufruf('delete', '/peers/' + encodeURIComponent(name));
+        if (antwort.status !== 200) {
+            return res.status(404).json({ error: 'Zugang nicht gefunden' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DELETE /members/me/vpn:', error.message);
+        res.status(500).json({ error: 'Zugang konnte nicht entfernt werden' });
+    }
+});
+
 app.get('/members/me/accesses', authenticateToken, async (req, res) => {
     try {
         // Get member with function and authentik info
