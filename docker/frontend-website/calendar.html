@@ -228,7 +228,12 @@
 
                     // DEUTSCH: Transformiert das API-Format (snake_case) ins interne Format (camelCase)
                     // DEUTSCH: Setzt Standardwerte fuer fehlende Felder (z.B. 'Kostenlos', 'Sonstiges')
-                    this.events = apiEvents.map(e => ({
+                    // DEUTSCH: Anlaesse ohne festen Termin gehoeren nicht in ein
+                    // Kalenderblatt. Ihr start_date dient nur der groben Einordnung;
+                    // im Raster wuerde es als verbindlicher Termin gelesen. Sie stehen
+                    // stattdessen auf der Anlass-Seite mit dem Hinweis "Termin noch
+                    // offen" — wo sie niemanden in die Irre fuehren.
+                    this.events = apiEvents.filter(e => e.datum_offen !== true).map(e => ({
                         id: e.slug || e.id,
                         title: e.title || 'Unbenanntes Event',
                         subtitle: e.subtitle || '',

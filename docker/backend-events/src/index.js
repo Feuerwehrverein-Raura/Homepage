@@ -1097,7 +1097,11 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             location, category, registration_required,
             registration_deadline, max_participants, cost, status, image_url, tags,
             organizer_name, organizer_email, organizer_id, create_access,
-            meal_options, pdf_attachment, pdf_filename
+            meal_options, pdf_attachment, pdf_filename,
+            // DEUTSCH: Termin steht noch nicht fest. start_date bleibt trotzdem
+            // gesetzt — als grobe Einordnung fuer Sortierung und Kalender —,
+            // wird aber nirgends als Datum angezeigt.
+            datum_offen
         } = req.body;
 
         // Pflichtfelder pruefen, sonst 400 statt undurchschaubarem 500
@@ -1169,8 +1173,8 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
                 location, category, registration_required,
                 registration_deadline, max_participants, cost, status, image_url, tags,
                 organizer_name, organizer_email, event_email, event_password_hash, event_password_encrypted, event_access_expires,
-                meal_options, pdf_attachment, pdf_filename, organizer_id
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+                meal_options, pdf_attachment, pdf_filename, organizer_id, datum_offen
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
             RETURNING *
         `, [
             slug, title, subtitle, description, start_date, end_date,
@@ -1178,7 +1182,10 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             registration_deadline, max_participants, cost, status || 'planned', image_url, tags,
             organizer_name || null, organizer_email || null, eventEmail, eventPasswordHash, eventPasswordEncrypted, eventAccessExpires,
             meal_options ? JSON.stringify(meal_options) : null,
-            pdf_attachment || null, pdf_filename || null, organizer_id || null
+            pdf_attachment || null, pdf_filename || null, organizer_id || null,
+            // DEUTSCH: Termin steht noch nicht fest. start_date bleibt gesetzt (grobe
+            // Einordnung fuer die Sortierung), wird aber nirgends angezeigt.
+            datum_offen === true
         ]);
 
         const newEvent = result.rows[0];
@@ -1273,7 +1280,12 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             'max_participants', 'cost', 'status', 'image_url', 'tags',
             'organizer_id', 'organizer_name', 'organizer_email',
             'event_email', 'event_password_hash', 'event_access_expires',
-            'meal_options', 'pdf_attachment', 'pdf_filename'
+            'meal_options', 'pdf_attachment', 'pdf_filename',
+            // DEUTSCH: Termin steht noch nicht fest. start_date bleibt trotzdem
+            // gesetzt — als grobe Einordnung fuer die Sortierung —, wird aber
+            // nirgends angezeigt. Vorher landeten solche Anlaesse alle auf dem
+            // 31.12. und standen im Kalender als Silvester-Auflauf.
+            'datum_offen'
         ];
 
         const filteredUpdates = {};

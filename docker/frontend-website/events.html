@@ -407,6 +407,10 @@
                         category: e.category || 'Allgemein',
                         startDate: new Date(e.start_date),
                         endDate: new Date(e.end_date || e.start_date),
+                        // DEUTSCH: Termin steht noch nicht fest. start_date ist
+                        // trotzdem gesetzt und ordnet den Anlass grob ein, wird
+                        // aber nicht als Datum angezeigt.
+                        datumOffen: e.datum_offen === true,
                         location: e.location || '',
                         organizer: e.organizer_name || '',
                         email: e.organizer_email || '',
@@ -935,12 +939,13 @@
                                         <div class="space-y-2">
                                             <div class="flex items-center">
                                                 <span class="mr-2">📅</span>
-                                                <span>${this.formatDate(event.startDate)}</span>
+                                                <span>${event.datumOffen ? 'Termin noch offen' : this.formatDate(event.startDate)}</span>
                                             </div>
+                                            ${event.datumOffen ? '' : `
                                             <div class="flex items-center">
                                                 <span class="mr-2">⏰</span>
                                                 <span>${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
-                                            </div>
+                                            </div>`}
                                         </div>
                                         <div class="space-y-2">
                                             <div class="flex items-center">
@@ -1011,7 +1016,7 @@
                             <div class="space-y-2 text-sm text-gray-500 mb-4">
                                 <div class="flex items-center">
                                     <span class="mr-2">📅</span>
-                                    <span>${this.formatDate(event.startDate)}</span>
+                                    <span>${event.datumOffen ? 'Termin noch offen' : this.formatDate(event.startDate)}</span>
                                 </div>
                                 <div class="flex items-center">
                                     <span class="mr-2">📍</span>

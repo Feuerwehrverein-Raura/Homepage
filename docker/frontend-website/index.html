@@ -1408,6 +1408,9 @@ async function loadUpcomingEvents() {
             startDate: new Date(event.start_date),
             endDate: event.end_date ? new Date(event.end_date) : null,
             location: event.location || '',
+            // DEUTSCH: Termin steht noch nicht fest — start_date ordnet den
+            // Anlass nur grob ein und wird nicht als Datum angezeigt.
+            datumOffen: event.datum_offen === true,
             slug: event.slug
         }));
 
@@ -1518,12 +1521,15 @@ function renderUpcomingEvents(events) {
         };
         const emoji = emojiMap[event.category] || '📅';
 
-        // DEUTSCH: Datum im Schweizer Format formatieren (z.B. "15. Juni 2026")
-        const dateStr = event.startDate.toLocaleDateString('de-CH', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        // DEUTSCH: Datum im Schweizer Format formatieren (z.B. "15. Juni 2026").
+        // Steht der Termin noch nicht fest, waere ein Datum irrefuehrend.
+        const dateStr = event.datumOffen
+            ? 'Termin noch offen'
+            : event.startDate.toLocaleDateString('de-CH', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
 
         const subtitle = event.subtitle || event.category;
         // DEUTSCH: Beschreibung auf 120 Zeichen kuerzen mit "..." am Ende
