@@ -70,10 +70,16 @@ function authenticateToken(req, res, next) {
     // QR-Code Zugang gegeben werden ohne OIDC-Konto.
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (decoded && decoded.type === 'member' && decoded.email) {
+        // Frueher wurde hier decoded.email verlangt. Sieben Mitglieder haben
+        // keine E-Mail-Adresse — fuer sie fiel die Pruefung durch und landete
+        // bei Authentik, wo sie erst recht scheiterte. Jetzt genuegt eine
+        // Kennung: die Mitglieds-UUID oder der Benutzername.
+        if (decoded && decoded.type === 'member' &&
+            (decoded.email || decoded.sub || decoded.member_id || decoded.benutzername)) {
             req.user = {
                 id: decoded.sub || decoded.member_id || decoded.email,
                 email: decoded.email,
+                benutzername: decoded.benutzername,
                 name: decoded.name,
                 groups: decoded.groups || []
             };

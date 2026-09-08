@@ -663,6 +663,13 @@
                     <!-- Passwort-Verwaltung -->
                     <div id="password-section" class="hidden">
                         <h4 class="font-semibold text-gray-700 mb-3">Passwort-Verwaltung</h4>
+                        <!-- DEUTSCH: Anmeldename. Fuer Mitglieder ohne E-Mail-Adresse
+                             ist das die einzige Kennung, mit der sie sich anmelden
+                             koennen — sie steht hier, damit man sie ihnen sagen kann. -->
+                        <p class="text-sm text-gray-600 mb-3">
+                            Anmeldename: <code id="benutzername-anzeige" class="bg-gray-100 px-2 py-1 rounded border select-all">—</code>
+                            <span class="text-gray-400">— geht anstelle der E-Mail-Adresse</span>
+                        </p>
                         <div class="flex flex-wrap gap-2 mb-2">
                             <button type="button" id="reset-password-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm">
                                 Passwort zuruecksetzen
@@ -3977,6 +3984,8 @@
                 // werden nur dann eingeblendet.
                 pwSection.classList.remove('hidden');
                 pwSection.dataset.memberId = member.id;
+                document.getElementById('benutzername-anzeige').textContent =
+                    member.benutzername || '— noch keiner —';
                 const hasAccount = !!member.authentik_user_id;
                 document.getElementById('reset-password-btn').classList.toggle('hidden', !hasAccount);
                 document.getElementById('set-password-btn').classList.toggle('hidden', !hasAccount);

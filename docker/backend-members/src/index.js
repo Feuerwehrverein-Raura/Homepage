@@ -994,11 +994,110 @@ async function verifyAuthentikPassword(email, password) {
 }
 
 // DEUTSCH: Stellt ein Member-JWT aus (identisch zum QR-Login: type=member, 8h).
-function issueMemberJwt(memberId, email, name) {
+// ---------------------------------------------------------------------------
+// Benutzername als Kennung neben der E-Mail
+//
+// Der Mitgliederbereich sucht das Mitglied bisher ueber die E-Mail-Adresse.
+// Sieben von einundsechzig Mitgliedern haben keine — ausgerechnet die
+// aeltere Haelfte, fuer die der QR-Login und der Anmeldebon ueberhaupt
+// gedacht sind. Fuer sie war der Mitgliederbereich nicht erreichbar.
+//
+// Jedes Mitglied bekommt deshalb einen Benutzernamen aus Vor- und
+// Nachname ("stefan.mueller"). Er ist eindeutig, aendert sich nicht, und
+// man kann ihn jemandem sagen, ohne dass er ihn buchstabieren muss.
+// ---------------------------------------------------------------------------
+
+// Aus "Müller" wird "mueller", aus "D'Angelo" wird "dangelo": Was man nicht
+// ohne Nachfrage eintippen kann, hat in einem Anmeldenamen nichts verloren.
+function benutzernameAus(vorname, nachname) {
+    const sauber = (t) => String(t || '')
+        .toLowerCase()
+        .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+        .replace(/ß/g, 'ss')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '')
+        .trim();
+    const v = sauber(vorname);
+    const n = sauber(nachname);
+    if (!v && !n) return null;
+    return [v, n].filter(Boolean).join('.');
+}
+
+// Legt die Spalte an und fuellt sie. Laeuft beim Start, nicht bei jedem
+// Zugriff: Eine Spalte anzulegen ist keine Sache, die in einen
+// Anfrage-Pfad gehoert.
+async function benutzernamenSicherstellen() {
+    try {
+        await pool.query(`
+            ALTER TABLE members ADD COLUMN IF NOT EXISTS benutzername VARCHAR(120);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_members_benutzername
+                ON members (LOWER(benutzername)) WHERE benutzername IS NOT NULL;
+        `);
+
+        const offen = await pool.query(
+            'SELECT id, vorname, nachname FROM members WHERE benutzername IS NULL'
+        );
+        if (!offen.rows.length) return;
+
+        const vergeben = new Set(
+            (await pool.query('SELECT LOWER(benutzername) AS b FROM members WHERE benutzername IS NOT NULL'))
+                .rows.map(r => r.b)
+        );
+
+        let gesetzt = 0;
+        for (const m of offen.rows) {
+            const basis = benutzernameAus(m.vorname, m.nachname);
+            if (!basis) continue;
+            // Zwei Leute mit demselben Namen bekommen eine Nummer. Lieber
+            // "hans.meier2" als eine stille Kollision.
+            let name = basis, n = 1;
+            while (vergeben.has(name)) { n += 1; name = basis + n; }
+            vergeben.add(name);
+            await pool.query('UPDATE members SET benutzername = $1 WHERE id = $2', [name, m.id]);
+            gesetzt += 1;
+        }
+        console.log(`Benutzernamen vergeben: ${gesetzt}`);
+    } catch (e) {
+        console.error('Benutzernamen konnten nicht angelegt werden:', e.message);
+    }
+}
+
+// Das Mitglied zur aktuellen Anmeldung finden.
+//
+// Drei Wege, in dieser Reihenfolge: die Kennung aus dem Token (bei
+// Mitglieder-Token die UUID), die E-Mail, der Benutzername. Die UUID zuerst,
+// weil sie die einzige ist, die sich nie aendert — E-Mail und Benutzername
+// koennen korrigiert werden.
+async function mitgliedZurAnmeldung(req) {
+    const kennung = req.user?.id;
+    const email = req.user?.email;
+    const benutzername = req.user?.benutzername;
+
+    const istUuid = typeof kennung === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(kennung);
+
+    if (istUuid) {
+        const r = await pool.query('SELECT * FROM members WHERE id = $1', [kennung]);
+        if (r.rows.length) return r.rows[0];
+    }
+    if (email) {
+        const r = await pool.query('SELECT * FROM members WHERE LOWER(email) = LOWER($1)', [email]);
+        if (r.rows.length) return r.rows[0];
+    }
+    if (benutzername) {
+        const r = await pool.query(
+            'SELECT * FROM members WHERE LOWER(benutzername) = LOWER($1)', [benutzername]);
+        if (r.rows.length) return r.rows[0];
+    }
+    return null;
+}
+
+function issueMemberJwt(memberId, email, name, benutzername, dauer) {
     return jwt.sign(
-        { sub: memberId, member_id: memberId, email, name, type: 'member', groups: [] },
+        { sub: memberId, member_id: memberId, email, name, benutzername,
+          type: 'member', groups: [] },
         process.env.JWT_SECRET,
-        { expiresIn: '8h' }
+        { expiresIn: dauer || '8h' }
     );
 }
 
@@ -1009,27 +1108,33 @@ function issueMemberJwt(memberId, email, name) {
 app.post('/auth/member/login', async (req, res) => {
     const clientIp = getClientIp(req);
     try {
+        // Das Feld heisst aus Ruecksicht auf die bestehende App weiter
+        // "email", nimmt aber auch den Benutzernamen. Sieben Mitglieder
+        // haben keine E-Mail-Adresse und koennten sich sonst nie anmelden.
         const { email, password } = req.body || {};
-        if (!email || !password) return res.status(400).json({ error: 'E-Mail und Passwort erforderlich' });
+        if (!email || !password) return res.status(400).json({ error: 'Anmeldename und Passwort erforderlich' });
         const r = await pool.query(
-            'SELECT id, email, vorname, nachname, password_hash FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1',
+            'SELECT id, email, benutzername, vorname, nachname, password_hash FROM members ' +
+            'WHERE LOWER(email) = LOWER($1) OR LOWER(benutzername) = LOWER($1) LIMIT 1',
             [email]
         );
         const m = r.rows[0];
         if (!m) {
-            await logAudit(pool, 'MEMBER_LOGIN_FAILED', null, email, clientIp, { reason: 'unknown_email' });
-            return res.status(401).json({ error: 'E-Mail oder Passwort ist falsch.' });
+            await logAudit(pool, 'MEMBER_LOGIN_FAILED', null, email, clientIp, { reason: 'unbekannter Anmeldename' });
+            return res.status(401).json({ error: 'Anmeldename oder Passwort ist falsch.' });
         }
         // 1) Direkt gegen Authentik pruefen (bestehendes Passwort, kein Reset noetig).
-        let ok = await verifyAuthentikPassword(m.email, String(password));
+        // Ohne E-Mail gibt es kein Authentik-Konto — dann gleich der lokale
+        // Hash, den das Login-Datenblatt setzt.
+        let ok = m.email ? await verifyAuthentikPassword(m.email, String(password)) : false;
         // 2) Fallback: lokaler bcrypt-Hash (Mitglied ohne Authentik-Konto / App-Reset).
         if (!ok && m.password_hash) ok = await bcrypt.compare(String(password), m.password_hash);
         if (!ok) {
             await logAudit(pool, 'MEMBER_LOGIN_FAILED', m.id, email, clientIp, { reason: 'wrong_password' });
-            return res.status(401).json({ error: 'E-Mail oder Passwort ist falsch.' });
+            return res.status(401).json({ error: 'Anmeldename oder Passwort ist falsch.' });
         }
         const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
-        const token = issueMemberJwt(m.id, m.email, name);
+        const token = issueMemberJwt(m.id, m.email, name, m.benutzername);
         await logAudit(pool, 'MEMBER_LOGIN_SUCCESS', m.id, email, clientIp, {});
         res.json({ success: true, token, user: { id: m.id, email: m.email, name } });
     } catch (err) {
@@ -2240,16 +2345,12 @@ app.get('/members', authenticateAny, async (req, res) => {
 // DEUTSCH: Gibt das eigene Mitgliederprofil zurück (Self-Service, basierend auf E-Mail im Token)
 app.get('/members/me', authenticateToken, async (req, res) => {
     try {
-        console.log('/members/me called for user:', req.user?.email);
-        const result = await pool.query(
-            'SELECT * FROM members WHERE email = $1',
-            [req.user.email]
-        );
-
-        if (result.rows.length === 0) {
-            console.log('Member not found for email:', req.user.email);
+        const gefunden = await mitgliedZurAnmeldung(req);
+        if (!gefunden) {
+            console.log('Mitglied nicht gefunden fuer', req.user?.email || req.user?.benutzername || req.user?.id);
             return res.status(404).json({ error: 'Member profile not found' });
         }
+        const result = { rows: [gefunden] };
 
         console.log('Member found:', result.rows[0].vorname, result.rows[0].nachname);
         res.json(result.rows[0]);
@@ -2570,10 +2671,10 @@ app.put('/members/me', authenticateToken, async (req, res) => {
         console.log('PUT /members/me called for user:', req.user?.email);
 
         // Get current member data to track changes
-        const currentResult = await pool.query(
-            'SELECT * FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const currentResult = { rows: _m ? [_m] : [] };
 
         if (currentResult.rows.length === 0) {
             return res.status(404).json({ error: 'Member profile not found' });
@@ -2795,10 +2896,10 @@ app.post('/members/me/photo', authenticateToken, upload.single('photo'), async (
         }
 
         // Get member ID from email
-        const memberResult = await pool.query(
-            'SELECT id, foto FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const memberResult = { rows: _m ? [_m] : [] };
 
         if (memberResult.rows.length === 0) {
             fs.unlinkSync(req.file.path);
@@ -2842,10 +2943,10 @@ app.post('/members/me/photo', authenticateToken, upload.single('photo'), async (
 app.delete('/members/me/photo', authenticateToken, async (req, res) => {
     try {
         // Get member
-        const memberResult = await pool.query(
-            'SELECT id, foto FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const memberResult = { rows: _m ? [_m] : [] };
 
         if (memberResult.rows.length === 0) {
             return res.status(404).json({ error: 'Member profile not found' });
@@ -3747,7 +3848,8 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
     try {
         await anmeldecodeTabelle();
         const m = await pool.query(
-            'SELECT id, vorname, nachname FROM members WHERE id = $1', [req.params.id]
+            'SELECT id, vorname, nachname, benutzername FROM members WHERE id = $1',
+            [req.params.id]
         );
         if (!m.rows.length) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
         const mitglied = m.rows[0];
@@ -3791,6 +3893,9 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
       <text em="true">${xmlSicher(bis)} Uhr.&#10;</text>
       <text em="false">Danach bleibst du 7 Tage&#10;angemeldet.&#10;</text>
       <text>Nach dem Scannen ist dieser Bon&#10;wertlos - er darf in den Abfall.&#10;</text>
+      <text>&#10;Anmeldename (falls du ihn&#10;spaeter brauchst):&#10;</text>
+      <text em="true">${xmlSicher(mitglied.benutzername || '-')}&#10;</text>
+      <text em="false"/>
       <feed line="3"/>
       <cut type="feed"/>`);
 
@@ -3835,30 +3940,20 @@ app.post('/auth/member/code-login', async (req, res) => {
         }
 
         const m = await pool.query(
-            'SELECT id, email, vorname, nachname FROM members WHERE id = $1',
+            'SELECT id, email, benutzername, vorname, nachname FROM members WHERE id = $1',
             [treffer.rows[0].member_id]
         );
         if (!m.rows.length) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
         const mitglied = m.rows[0];
 
-        // Dieselbe Form wie beim QR-Login der App (type=member), aber laenger
-        // gueltig: sieben Tage statt acht Stunden. Der Bon wird an einem
-        // mehrtaegigen Anlass ausgegeben, und niemand soll am zweiten Tag
-        // erneut anstehen.
-        //
-        // sub und member_id muessen mit drin sein: authenticateToken setzt
-        // req.user.id auf "sub || member_id || email". Ohne sie fiele die
-        // Kennung auf die E-Mail zurueck, und das Token saehe anders aus als
-        // das der App — zwei Formen desselben Tokens waeren eine Falle fuer
-        // den Naechsten, der hier etwas aendert.
-        const token = jwt.sign({
-            sub: mitglied.id,
-            member_id: mitglied.id,
-            email: mitglied.email,
-            name: `${mitglied.vorname} ${mitglied.nachname}`.trim(),
-            type: 'member',
-            groups: []
-        }, process.env.JWT_SECRET, { expiresIn: ANMELDEBON_SITZUNG });
+        // Ueber denselben Helfer wie App- und QR-Login, damit es nur eine
+        // Stelle gibt, an der ein Mitglieder-Token entsteht — nur laenger
+        // gueltig: sieben Tage statt acht Stunden, weil der Bon an einem
+        // mehrtaegigen Anlass ausgegeben wird.
+        const token = issueMemberJwt(
+            mitglied.id, mitglied.email,
+            `${mitglied.vorname} ${mitglied.nachname}`.trim(),
+            mitglied.benutzername, ANMELDEBON_SITZUNG);
 
         await logAudit(pool, 'MEMBER_CODE_LOGIN_SUCCESS', mitglied.id, mitglied.email, clientIp, {});
         res.json({ token, name: `${mitglied.vorname} ${mitglied.nachname}` });
@@ -5199,10 +5294,10 @@ app.post('/members/sync-vaultwarden', authenticateAny, requireRole('vorstand', '
 app.get('/members/me/notifications', authenticateToken, async (req, res) => {
     try {
         // Get member ID from email
-        const memberResult = await pool.query(
-            'SELECT id FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const memberResult = { rows: _m ? [_m] : [] };
 
         if (memberResult.rows.length === 0) {
             return res.status(404).json({ error: 'Member profile not found' });
@@ -5236,10 +5331,10 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
         }
 
         // Get member ID from email
-        const memberResult = await pool.query(
-            'SELECT id FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const memberResult = { rows: _m ? [_m] : [] };
         if (memberResult.rows.length === 0) {
             return res.status(404).json({ error: 'Member profile not found' });
         }
@@ -5288,10 +5383,10 @@ app.put('/members/me/notifications', authenticateToken, async (req, res) => {
         }
 
         // Get member ID from email
-        const memberResult = await pool.query(
-            'SELECT id FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const memberResult = { rows: _m ? [_m] : [] };
 
         if (memberResult.rows.length === 0) {
             return res.status(404).json({ error: 'Member profile not found' });
@@ -5358,10 +5453,10 @@ app.put('/members/me/function-email-password', authenticateToken, async (req, re
         }
 
         // Get member with function
-        const memberResult = await pool.query(
-            'SELECT id, funktion FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const memberResult = { rows: _m ? [_m] : [] };
 
         if (memberResult.rows.length === 0) {
             return res.status(404).json({ error: 'Mitglied nicht gefunden' });
@@ -5597,12 +5692,14 @@ async function agentAufruf(methode, pfad, daten) {
 }
 
 async function mitgliedAusToken(req, res) {
-    const r = await pool.query('SELECT id, vorname, nachname FROM members WHERE email = $1', [req.user.email]);
-    if (r.rows.length === 0) {
+    // Ueber mitgliedZurAnmeldung statt direkt ueber die E-Mail: Mitglieder
+    // ohne E-Mail-Adresse werden sonst nie gefunden.
+    const m = await mitgliedZurAnmeldung(req);
+    if (!m) {
         res.status(404).json({ error: 'Mitglied nicht gefunden' });
         return null;
     }
-    return r.rows[0];
+    return m;
 }
 
 // Eigene Zugaenge auflisten
@@ -6340,10 +6437,10 @@ app.delete('/kiosk/sender/:id', authenticateToken, async (req, res) => {
 app.get('/members/me/accesses', authenticateToken, async (req, res) => {
     try {
         // Get member with function and authentik info
-        const memberResult = await pool.query(
-            'SELECT id, funktion, authentik_user_id FROM members WHERE email = $1',
-            [req.user.email]
-        );
+        const _m = await mitgliedZurAnmeldung(req);
+        // Ueber die zentrale Aufloesung: Mitglieder ohne E-Mail
+        // werden ueber ihre Kennung oder den Benutzernamen gefunden.
+        const memberResult = { rows: _m ? [_m] : [] };
 
         if (memberResult.rows.length === 0) {
             return res.status(404).json({ error: 'Mitglied nicht gefunden' });
@@ -6803,6 +6900,9 @@ async function periodicAuthentikSync() {
 // DEUTSCH: Server starten, periodische Synchronisationen und Passwort-Rotation einrichten
 app.listen(PORT, () => {
     console.log(`API-Members running on port ${PORT}`);
+
+    // Benutzernamen fuer Mitglieder ohne E-Mail (siehe benutzernamenSicherstellen)
+    benutzernamenSicherstellen();
 
     // Run initial sync and rotation after 30 seconds (to allow container to fully start)
     setTimeout(() => {
