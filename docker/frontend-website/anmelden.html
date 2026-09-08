@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anmelden — Feuerwehrverein Raura</title>
+    <!-- DEUTSCH: Landeseite fuer den gedruckten Anmeldebon. Der QR auf dem
+         Bon fuehrt hierher; diese Seite tauscht den einmaligen Code gegen
+         eine Anmeldung und leitet in den Mitgliederbereich weiter.
+
+         Bewusst eine eigene Seite und nicht mein.html: Wer vom Bon kommt,
+         soll nicht erst ein Anmeldeformular sehen, das er ja gerade nicht
+         ausfuellen kann — er kennt seine Zugangsdaten nicht, deshalb der
+         Bon. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { fire: {
+            500: '#ef4444', 600: '#dc2626', 700: '#b91c1c' } } } } };
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Feuerwehrverein Raura</h1>
+
+        <div id="laeuft">
+            <div class="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-fire-500 my-6"></div>
+            <p class="text-gray-600">Einen Moment, du wirst angemeldet …</p>
+        </div>
+
+        <div id="fehler" class="hidden">
+            <p class="text-red-600 font-semibold mt-6 mb-2" id="fehlertext"></p>
+            <p class="text-sm text-gray-600 mb-6">
+                Lass dir am Bondrucker einen neuen Bon ausdrucken — jeder Bon
+                gilt nur ein einziges Mal.
+            </p>
+            <a href="/mein.html" class="inline-block bg-fire-500 hover:bg-fire-600 text-white px-5 py-2 rounded-lg font-medium">
+                Zur normalen Anmeldung
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://api.fwv-raura.ch';
+
+        function zeigeFehler(text) {
+            document.getElementById('laeuft').classList.add('hidden');
+            document.getElementById('fehlertext').textContent = text;
+            document.getElementById('fehler').classList.remove('hidden');
+        }
+
+        (async function () {
+            const code = new URLSearchParams(window.location.search).get('code');
+            if (!code) return zeigeFehler('Dieser Aufruf enthält keinen Code.');
+
+            try {
+                const antwort = await fetch(`${API_BASE}/auth/member/code-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                const daten = await antwort.json().catch(() => ({}));
+                if (!antwort.ok) return zeigeFehler(daten.error || 'Die Anmeldung hat nicht geklappt.');
+
+                localStorage.setItem('auth_token', daten.token);
+                // Code aus der Adresse nehmen, bevor weitergeleitet wird: Er
+                // ist zwar schon verbraucht, hat aber im Verlauf des Browsers
+                // nichts verloren.
+                window.history.replaceState({}, document.title, window.location.pathname);
+                window.location.replace('/mein.html');
+            } catch (e) {
+                zeigeFehler('Keine Verbindung zum Vereinsserver.');
+            }
+        })();
+    </script>
+</body>
+</html>

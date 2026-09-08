@@ -673,6 +673,13 @@
                             <button type="button" id="datenblatt-btn" class="px-4 py-2 bg-fire-600 text-white rounded-lg hover:bg-fire-700 text-sm">
                                 📄 Login-Datenblatt drucken
                             </button>
+                            <!-- DEUTSCH: Anmeldebon auf den Bondrucker im Roten Schopf.
+                                 Fuer Helfereinsaetze: Wer seine Zugangsdaten nicht
+                                 kennt, bekommt einen QR in die Hand statt einen vom
+                                 Bildschirm abzufotografieren. Der Code gilt einmalig. -->
+                            <button type="button" id="anmeldebon-btn" class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 text-sm">
+                                🧾 Anmeldebon drucken
+                            </button>
                         </div>
                         <div id="password-result" class="hidden mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm"></div>
                         <div id="set-password-form" class="hidden mt-2">
@@ -4288,6 +4295,49 @@
             } catch (error) {
                 console.error('Error deleting photo:', error);
                 alert('Fehler beim Entfernen des Fotos');
+            }
+        }
+
+        // DEUTSCH: Anmeldebon auf dem Bondrucker im Roten Schopf ausgeben.
+        //
+        // Anders als das Datenblatt setzt das KEIN Passwort zurueck und
+        // beruehrt den App-Token nicht. Gedruckt wird ein eigener Code, der
+        // genau einmal funktioniert.
+        async function anmeldebonDrucken() {
+            // Dieselbe Quelle wie das Datenblatt daneben.
+            const memberId = document.getElementById('password-section').dataset.memberId;
+            if (!memberId) return;
+            const knopf = document.getElementById('anmeldebon-btn');
+            const resultEl = document.getElementById('password-result');
+
+            knopf.disabled = true;
+            const alt = knopf.textContent;
+            knopf.textContent = 'Wird gedruckt …';
+            try {
+                const response = await fetch(`${API_BASE}/members/${memberId}/anmeldebon`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await response.json().catch(() => ({}));
+                resultEl.classList.remove('hidden');
+                if (!response.ok) {
+                    resultEl.className = 'mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm';
+                    resultEl.textContent = data.error || 'Der Bon konnte nicht gedruckt werden.';
+                    return;
+                }
+                const bis = new Date(data.gilt_bis).toLocaleString('de-CH',
+                    { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                resultEl.className = 'mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm';
+                resultEl.innerHTML = `<strong>Bon gedruckt.</strong> Er liegt am Drucker im Roten Schopf. ` +
+                    `Gilt einmalig, spätestens bis ${bis} Uhr. Ein früher gedruckter Bon für ` +
+                    `dieselbe Person ist damit ungültig.`;
+            } catch (e) {
+                resultEl.classList.remove('hidden');
+                resultEl.className = 'mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm';
+                resultEl.textContent = 'Keine Verbindung zum Vereinsserver.';
+            } finally {
+                knopf.disabled = false;
+                knopf.textContent = alt;
             }
         }
 
@@ -9819,6 +9869,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         // Password management
         document.getElementById('reset-password-btn').addEventListener('click', resetMemberPassword);
         document.getElementById('datenblatt-btn').addEventListener('click', generateDatenblatt);
+        document.getElementById('anmeldebon-btn').addEventListener('click', anmeldebonDrucken);
         document.getElementById('set-password-btn').addEventListener('click', () => {
             const form = document.getElementById('set-password-form');
             form.classList.toggle('hidden');

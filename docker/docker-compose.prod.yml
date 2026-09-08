@@ -71,6 +71,7 @@ services:
       VNC_PASSWORT_STEUERN: ${VNC_PASSWORT_STEUERN}
       KIOSK_KEY: ${KIOSK_KEY}          # DEUTSCH: Laptop im Roten Schopf meldet Bibliothek und holt Playlists/Sender
       KIOSK_MUSIK_PFAD: /app/musik     # DEUTSCH: Nur lesend — zum Vorhoeren beim Playlist-Bauen
+      BONDRUCKER_IP: ${BONDRUCKER_IP:-192.168.88.11}  # DEUTSCH: Epson TM-m30III im Roten Schopf, fuer den Anmeldebon
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       NEXTCLOUD_URL: https://nextcloud.fwv-raura.ch
       NEXTCLOUD_USER: ${NEXTCLOUD_ADMIN_USER:-admin}

@@ -11,6 +11,7 @@ const { ImapFlow } = require('imapflow');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');   // DEUTSCH: fuer den Bondrucker (ePOS ueber HTTPS)
 const PDFDocument = require('pdfkit');
 const admin = require('firebase-admin');
 // DEUTSCH: Authentifizierungs-Middleware importieren (Token-Prüfung, Rollen-Prüfung)
@@ -3641,6 +3642,214 @@ app.post('/members/:id/datenblatt', authenticateVorstand, async (req, res) => {
     } catch (error) {
         console.error('Datenblatt error:', error.message);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Anmeldebon: Login-QR auf den Bondrucker
+//
+// An Helfereinsaetzen steht regelmaessig jemand da, der seine Zugangsdaten
+// nicht kennt. Einen QR vom Bildschirm abzufotografieren ist muehsam —
+// gedruckt liegt er in der Hand und laesst sich in Ruhe scannen.
+//
+// Was gedruckt wird, ist bewusst NICHT der dauerhafte App-Token:
+//
+//   * **Einmalig.** Der erste Scan verbraucht ihn. Ein Bon, der danach
+//     liegen bleibt, ist wertlos.
+//   * **Befristet.** Wurde er nie gescannt, verfaellt er nach sieben Tagen,
+//     statt auf Dauer als gueltiger Zugang in der Kiste zu liegen.
+//
+// Ein Restrisiko bleibt: Zwischen Druck und Scan ist der Bon ein Zugang.
+// Wer ihn anfordert, steht aber neben dem Drucker.
+// ---------------------------------------------------------------------------
+
+const BONDRUCKER = process.env.BONDRUCKER_IP || '192.168.88.11';
+// Sieben Tage: Die Chilbi laeuft vom Aufbau am Mittwoch bis zum Abbau am
+// Montag. Ein Bon, der am ersten Tag gedruckt wird, muss am letzten noch
+// gehen — sonst steht am Sonntag jemand mit einem toten Bon da.
+//
+// Die Frist ist ohnehin die schwaechere der beiden Schranken: Der Code ist
+// EINMALIG. Nach dem ersten Scan ist er verbraucht, egal wie lange er noch
+// gueltig waere. Die Frist greift nur fuer Bons, die nie gescannt wurden.
+const ANMELDEBON_STUNDEN = parseInt(process.env.ANMELDEBON_STUNDEN, 10) || 168;
+
+async function anmeldecodeTabelle() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS member_login_codes (
+            code TEXT PRIMARY KEY,
+            member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            erstellt_am TIMESTAMP DEFAULT NOW(),
+            erstellt_von VARCHAR(200),
+            gilt_bis TIMESTAMP NOT NULL,
+            benutzt_am TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_member_login_codes_member
+            ON member_login_codes(member_id);
+    `);
+}
+
+function xmlSicher(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+// Druckt ueber ePOS-Print (HTTPS/XML) — derselbe Weg, den das Bestellsystem
+// fuer die Bons nimmt. Das Geraet ist ein Epson TM-m30III.
+function bonDrucken(xmlInhalt) {
+    const eposXml = `<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+${xmlInhalt}
+    </epos-print>
+  </s:Body>
+</s:Envelope>`;
+
+    return new Promise((resolve, reject) => {
+        const anfrage = https.request({
+            hostname: BONDRUCKER,
+            port: 443,
+            path: '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000',
+            method: 'POST',
+            // Der Drucker traegt ein selbst ausgestelltes Zertifikat. Er
+            // steht im eigenen Netz hinter dem Tunnel; die Pruefung braeuchte
+            // eine eigene Zertifikatsverwaltung fuer ein Geraet, das ohnehin
+            // nur ueber WireGuard erreichbar ist.
+            rejectUnauthorized: false,
+            headers: {
+                'Content-Type': 'text/xml; charset=utf-8',
+                'Content-Length': Buffer.byteLength(eposXml),
+                'SOAPAction': '""'
+            }
+        }, (antwort) => {
+            let daten = '';
+            antwort.on('data', (teil) => daten += teil);
+            antwort.on('end', () => {
+                if (daten.includes('success="true"')) return resolve();
+                const code = daten.match(/code="([^"]+)"/);
+                reject(new Error(code ? code[1] : 'Drucker meldet einen Fehler'));
+            });
+        });
+        anfrage.on('error', reject);
+        anfrage.setTimeout(20000, () => anfrage.destroy(new Error('Drucker antwortet nicht')));
+        anfrage.write(eposXml);
+        anfrage.end();
+    });
+}
+
+// Anmeldebon fuer ein Mitglied drucken.
+app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        await anmeldecodeTabelle();
+        const m = await pool.query(
+            'SELECT id, vorname, nachname FROM members WHERE id = $1', [req.params.id]
+        );
+        if (!m.rows.length) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        const mitglied = m.rows[0];
+
+        // Aeltere, noch unbenutzte Codes desselben Mitglieds entwerten. Sonst
+        // sammeln sich bei jedem Nachdrucken gueltige Bons an, und der
+        // verlorene von letzter Woche oeffnet dasselbe Konto.
+        await pool.query(
+            'UPDATE member_login_codes SET benutzt_am = NOW() ' +
+            'WHERE member_id = $1 AND benutzt_am IS NULL', [mitglied.id]
+        );
+
+        const code = crypto.randomBytes(24).toString('base64url');
+        const giltBis = new Date(Date.now() + ANMELDEBON_STUNDEN * 3600 * 1000);
+        await pool.query(
+            'INSERT INTO member_login_codes (code, member_id, erstellt_von, gilt_bis) ' +
+            'VALUES ($1, $2, $3, $4)',
+            [code, mitglied.id, req.user.email || null, giltBis]
+        );
+
+        const adresse = 'https://www.fwv-raura.ch/anmelden.html?code=' + code;
+        const name = `${mitglied.vorname} ${mitglied.nachname}`;
+        const bis = giltBis.toLocaleString('de-CH', {
+            timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+        });
+
+        // Der Name steht drauf, damit auf einem Tisch mit drei Bons klar
+        // ist, welcher wem gehoert.
+        await bonDrucken(`      <text align="center" font="font_a" em="true" width="2" height="2"/>
+      <text>Anmeldung&#10;</text>
+      <text width="1" height="1" em="false"/>
+      <text>Feuerwehrverein Raura&#10;&#10;</text>
+      <text em="true" width="2" height="2"/>
+      <text>${xmlSicher(name)}&#10;</text>
+      <text em="false" width="1" height="1"/>
+      <text>&#10;</text>
+      <symbol type="qrcode_model_2" level="level_m" width="6" height="6">${xmlSicher(adresse)}</symbol>
+      <text>&#10;Mit der Handykamera scannen.&#10;&#10;</text>
+      <text>Gilt EINMALIG.&#10;</text>
+      <text>Spaetestens bis ${xmlSicher(bis)} Uhr.&#10;</text>
+      <text>Nach dem Scannen ist dieser Bon&#10;wertlos - er darf in den Abfall.&#10;</text>
+      <feed line="3"/>
+      <cut type="feed"/>`);
+
+        await logAudit(pool, 'MEMBER_ANMELDEBON_GEDRUCKT', mitglied.id, req.user.email,
+            getClientIp(req), { member_name: name, gilt_bis: giltBis.toISOString() });
+
+        res.json({ success: true, name, gilt_bis: giltBis.toISOString() });
+    } catch (error) {
+        console.error('POST /members/:id/anmeldebon:', error.message);
+        // Der Drucker ist die haeufigste Fehlerquelle — im Roten Schopf
+        // haengt er im WLAN und ist zeitweise weg. Das gehoert so gesagt,
+        // damit niemand den Fehler im Konto sucht.
+        res.status(502).json({ error: 'Der Bondrucker antwortet nicht: ' + error.message });
+    }
+});
+
+// Code gegen eine Anmeldung tauschen. Ohne Anmeldung erreichbar — der Code
+// IST der Nachweis, genau wie beim QR-Login der App.
+app.post('/auth/member/code-login', async (req, res) => {
+    const clientIp = getClientIp(req);
+    try {
+        await anmeldecodeTabelle();
+        const code = String(req.body?.code || '');
+        if (!code) return res.status(400).json({ error: 'Kein Code uebermittelt' });
+
+        // Einlösen und Entwerten in einem Zug: Zwei gleichzeitige Scans
+        // duerfen nicht beide durchgehen.
+        const treffer = await pool.query(`
+            UPDATE member_login_codes
+            SET benutzt_am = NOW()
+            WHERE code = $1 AND benutzt_am IS NULL AND gilt_bis > NOW()
+            RETURNING member_id
+        `, [code]);
+
+        if (!treffer.rows.length) {
+            await logAudit(pool, 'MEMBER_CODE_LOGIN_FAILED', null, null, clientIp,
+                { reason: 'unbekannt, verbraucht oder abgelaufen' });
+            return res.status(401).json({
+                error: 'Dieser Code ist nicht mehr gueltig. Er gilt einmalig — ' +
+                       'lass dir einen neuen Bon drucken.'
+            });
+        }
+
+        const m = await pool.query(
+            'SELECT id, email, vorname, nachname FROM members WHERE id = $1',
+            [treffer.rows[0].member_id]
+        );
+        if (!m.rows.length) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        const mitglied = m.rows[0];
+
+        // Dasselbe Token wie beim QR-Login der App: type=member, 8 Stunden.
+        const token = jwt.sign({
+            id: mitglied.id,
+            email: mitglied.email,
+            name: `${mitglied.vorname} ${mitglied.nachname}`,
+            type: 'member',
+            groups: ['mitglied']
+        }, process.env.JWT_SECRET, { expiresIn: '8h' });
+
+        await logAudit(pool, 'MEMBER_CODE_LOGIN_SUCCESS', mitglied.id, mitglied.email, clientIp, {});
+        res.json({ token, name: `${mitglied.vorname} ${mitglied.nachname}` });
+    } catch (error) {
+        console.error('POST /auth/member/code-login:', error.message);
+        res.status(500).json({ error: 'Anmeldung fehlgeschlagen' });
     }
 });
 
