@@ -2387,18 +2387,37 @@ app.get('/registrations/confirm', async (req, res) => {
 // oder ueber guest_email == req.user.email als Fallback.
 app.get('/registrations/mine', authenticateAny, async (req, res) => {
     try {
+        // Das Mitglied ueber alle drei Kennungen suchen, nicht nur ueber die
+        // E-Mail: Sieben Mitglieder haben keine, und die bekamen hier
+        // stillschweigend eine leere Liste zurueck — nicht als Fehler,
+        // sondern als "du bist nirgends eingeteilt". Genau die Leute, die am
+        // Fest wissen wollen, wann sie dran sind.
         const email = (req.user?.email || '').toLowerCase();
-        if (!email) return res.json([]);
+        const kennung = req.user?.id;
+        const benutzername = req.user?.benutzername || null;
+        const istUuid = typeof kennung === 'string' &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(kennung);
+
+        let memberId = istUuid ? kennung : null;
+        if (!memberId && (email || benutzername)) {
+            const m = await pool.query(
+                'SELECT id FROM members WHERE LOWER(email) = $1 OR LOWER(benutzername) = LOWER($2) LIMIT 1',
+                [email, benutzername]
+            );
+            if (m.rows.length) memberId = m.rows[0].id;
+        }
+        if (!memberId && !email) return res.json([]);
+
         const result = await pool.query(
             `SELECT r.*, e.title AS event_title, e.slug AS event_slug,
                     e.start_date AS event_start_date, e.end_date AS event_end_date,
                     e.location AS event_location
              FROM registrations r
              JOIN events e ON r.event_id = e.id
-             WHERE LOWER(r.guest_email) = $1
-                OR r.member_id IN (SELECT id FROM members WHERE LOWER(email) = $1)
+             WHERE ($1 <> '' AND LOWER(r.guest_email) = $1)
+                OR ($2::uuid IS NOT NULL AND r.member_id = $2::uuid)
              ORDER BY e.start_date DESC`,
-            [email]
+            [email, memberId]
         );
         // Schicht-Namen fuer alle vorkommenden shift_ids in einer einzigen Query holen
         const allShiftIds = Array.from(new Set(
