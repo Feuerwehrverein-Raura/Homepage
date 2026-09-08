@@ -519,6 +519,34 @@
                         <input type="text" id="playlist-name" maxlength="120" placeholder="Name der Playlist"
                                class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-fire-500">
 
+                        <!-- Liste einfügen. Bringt nicht die Musik, sondern die
+                             Titelnamen — abgeglichen wird gegen das, was auf dem
+                             Laptop wirklich liegt. Was fehlt, wird benannt statt
+                             stillschweigend weggelassen. -->
+                        <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                            <button id="import-auf" class="text-fire-600 hover:text-fire-700 text-sm font-semibold">
+                                Liste einfügen (aus Spotify, Apple Music, YouTube Music …)
+                            </button>
+                            <div id="import-feld" class="hidden mt-3">
+                                <p class="text-sm text-gray-600 mb-2">
+                                    Eine Zeile pro Titel, «Interpret – Titel». Kopierte Listen und
+                                    CSV-Exporte gehen auch. Geholt werden nur die Namen; abgespielt
+                                    wird, was der Laptop selbst hat.
+                                </p>
+                                <textarea id="import-text" rows="7" placeholder="Queen - Bohemian Rhapsody&#10;LMFAO - Party Rock Anthem&#10;…"
+                                          class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-fire-500"></textarea>
+                                <div class="flex gap-2 mt-2">
+                                    <button id="import-start" class="bg-fire-500 hover:bg-fire-600 text-white px-4 py-2 rounded-lg font-medium">
+                                        Abgleichen
+                                    </button>
+                                    <button id="import-zu" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                                        Schliessen
+                                    </button>
+                                </div>
+                                <div id="import-ergebnis" class="hidden mt-3"></div>
+                            </div>
+                        </div>
+
                         <div class="grid md:grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-semibold text-gray-700 mb-1">Titel suchen</label>
@@ -2032,6 +2060,145 @@
             return (t.pfad || '').split('/').pop().replace(/\.[^.]+$/, '');
         }
 
+        // Vorhören. Ein einziges Audio-Element für die ganze Seite: Zwei
+        // gleichzeitig laufende Titel wären beim Aussuchen unbrauchbar.
+        //
+        // Die Datei wird über fetch geholt und als Blob abgespielt, nicht per
+        // src-Adresse: Der Browser schickt an ein <audio src> keinen
+        // Authorization-Header, und ein Titel-Link ohne Anmeldung wäre ein
+        // offener Zugang zur ganzen Sammlung.
+        const spieler = new Audio();
+        let laeuftPfad = null;
+
+        function hoerknopf(t) {
+            const k = document.createElement('button');
+            k.className = 'shrink-0 w-8 h-8 mr-1 rounded-full text-fire-600 hover:bg-fire-50 flex items-center justify-center';
+            k.textContent = laeuftPfad === t.pfad ? '⏸' : '▶';
+            k.title = 'Vorhören';
+            k.setAttribute('aria-label', 'Vorhören: ' + titelText(t));
+            k.onclick = (e) => { e.stopPropagation(); hoere(t, k); };
+            return k;
+        }
+
+        function waehlknopf(t) {
+            const k = document.createElement('button');
+            k.className = 'flex-1 text-left text-sm truncate';
+            k.textContent = titelText(t);
+            k.onclick = () => {
+                if (playlistAuswahl.some(a => a.pfad === t.pfad)) return;
+                playlistAuswahl.push({ ...t, vorhanden: true });
+                zeigeAuswahl();
+            };
+            return k;
+        }
+
+        async function hoere(t, knopf) {
+            // Nochmal auf denselben Titel: anhalten statt neu laden.
+            if (laeuftPfad === t.pfad) {
+                spieler.pause();
+                laeuftPfad = null;
+                knopf.textContent = '▶';
+                return;
+            }
+            document.querySelectorAll('[aria-label^="Vorhören"]').forEach(b => b.textContent = '▶');
+            knopf.textContent = '…';
+            try {
+                const antwort = await fetch(`${API_BASE}/kiosk/anhoeren?pfad=${encodeURIComponent(t.pfad)}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!antwort.ok) { knopf.textContent = '✕'; knopf.title = 'Diese Datei liegt nicht auf dem Server'; return; }
+                if (spieler.src) URL.revokeObjectURL(spieler.src);
+                spieler.src = URL.createObjectURL(await antwort.blob());
+                await spieler.play();
+                laeuftPfad = t.pfad;
+                knopf.textContent = '⏸';
+            } catch (e) {
+                knopf.textContent = '▶';
+            }
+        }
+
+        spieler.addEventListener('ended', () => {
+            laeuftPfad = null;
+            document.querySelectorAll('[aria-label^="Vorhören"]').forEach(b => b.textContent = '▶');
+        });
+
+        // --- Liste einfügen ---
+
+        async function starteImport() {
+            const text = document.getElementById('import-text').value;
+            const ziel = document.getElementById('import-ergebnis');
+            const knopf = document.getElementById('import-start');
+            if (!text.trim()) return;
+
+            knopf.disabled = true;
+            knopf.textContent = 'Wird abgeglichen …';
+            try {
+                const antwort = await fetch(`${API_BASE}/kiosk/abgleich`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text })
+                });
+                const d = await antwort.json().catch(() => ({}));
+                if (!antwort.ok) {
+                    ziel.className = 'mt-3 text-sm text-red-600';
+                    ziel.textContent = d.error || 'Abgleich fehlgeschlagen.';
+                    ziel.classList.remove('hidden');
+                    return;
+                }
+
+                // Treffer in die Auswahl, Doppelte übergehen.
+                let neu = 0;
+                d.gefunden.forEach(g => {
+                    if (playlistAuswahl.some(a => a.pfad === g.pfad)) return;
+                    playlistAuswahl.push({ pfad: g.pfad, interpret: g.interpret, titel: g.titel, vorhanden: true });
+                    neu++;
+                });
+                zeigeAuswahl();
+
+                ziel.className = 'mt-3 text-sm';
+                ziel.innerHTML = '';
+
+                const kopf = document.createElement('p');
+                kopf.className = 'font-semibold text-gray-800 mb-1';
+                kopf.textContent = `${neu} von ${d.gelesen} Titeln übernommen.`;
+                ziel.appendChild(kopf);
+
+                const knapp = d.gefunden.filter(g => !g.sicher);
+                if (knapp.length) {
+                    const p = document.createElement('p');
+                    p.className = 'text-amber-700 mb-2';
+                    p.textContent = `${knapp.length} davon nur knapp getroffen — bitte in der Liste rechts nachsehen.`;
+                    ziel.appendChild(p);
+                }
+
+                if (d.fehlend.length) {
+                    const p = document.createElement('p');
+                    p.className = 'text-gray-600 mb-1';
+                    p.textContent = `${d.fehlend.length} nicht in der Sammlung:`;
+                    ziel.appendChild(p);
+                    const box = document.createElement('div');
+                    box.className = 'border border-gray-200 rounded bg-gray-50 p-2 max-h-32 overflow-y-auto text-xs text-gray-600 font-mono';
+                    d.fehlend.forEach(z => {
+                        const d1 = document.createElement('div');
+                        d1.textContent = z;
+                        box.appendChild(d1);
+                    });
+                    ziel.appendChild(box);
+                }
+                ziel.classList.remove('hidden');
+            } catch (e) {
+                ziel.className = 'mt-3 text-sm text-red-600';
+                ziel.textContent = 'Abgleich fehlgeschlagen.';
+                ziel.classList.remove('hidden');
+            } finally {
+                knopf.disabled = false;
+                knopf.textContent = 'Abgleichen';
+            }
+        }
+
         async function ladePlaylists() {
             try {
                 const antwort = await fetch(`${API_BASE}/kiosk/playlists`, {
@@ -2093,6 +2260,11 @@
             }
 
             document.getElementById('playlist-editor').classList.remove('hidden');
+            // Import beim Öffnen zusammengeklappt: Das Ergebnis der letzten
+            // Playlist gehört nicht zur nächsten.
+            document.getElementById('import-feld').classList.add('hidden');
+            document.getElementById('import-text').value = '';
+            document.getElementById('import-ergebnis').classList.add('hidden');
             zeigeAuswahl();
             sucheTitel('');
             document.getElementById('playlist-editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -2101,6 +2273,10 @@
         function schliessePlaylist() {
             document.getElementById('playlist-editor').classList.add('hidden');
             document.getElementById('playlist-suche').value = '';
+            // Ein Titel, der nach dem Schliessen weiterspielt, ist ein Rätsel
+            // ohne Knopf zum Abstellen.
+            spieler.pause();
+            laeuftPfad = null;
             playlistBearbeitet = null;
             playlistAuswahl = [];
         }
@@ -2112,9 +2288,10 @@
 
             playlistAuswahl.forEach((t, i) => {
                 const zeile = document.createElement('div');
-                zeile.className = 'flex items-center justify-between px-3 py-2 text-sm';
+                zeile.className = 'flex items-center px-2 py-1 text-sm';
+                if (t.vorhanden !== false) zeile.appendChild(hoerknopf(t));
                 const name = document.createElement('span');
-                name.className = 'truncate mr-2';
+                name.className = 'truncate mr-2 flex-1';
                 name.textContent = titelText(t);
                 // Titel, die der Laptop nicht mehr meldet, bleiben sichtbar und
                 // werden als fehlend markiert — still zu verschwinden waere
@@ -2156,14 +2333,9 @@
                 const behaelter = document.getElementById('playlist-treffer');
                 behaelter.innerHTML = '';
                 titel.forEach(t => {
-                    const zeile = document.createElement('button');
-                    zeile.className = 'w-full text-left px-3 py-2 text-sm hover:bg-gray-50 truncate';
-                    zeile.textContent = titelText(t);
-                    zeile.onclick = () => {
-                        if (playlistAuswahl.some(a => a.pfad === t.pfad)) return;
-                        playlistAuswahl.push({ ...t, vorhanden: true });
-                        zeigeAuswahl();
-                    };
+                    const zeile = document.createElement('div');
+                    zeile.className = 'flex items-center px-2 py-1 hover:bg-gray-50';
+                    zeile.append(hoerknopf(t), waehlknopf(t));
                     behaelter.appendChild(zeile);
                 });
                 if (!titel.length) {
@@ -2301,6 +2473,13 @@
             }
         }
 
+        document.getElementById('import-auf').addEventListener('click', () => {
+            document.getElementById('import-feld').classList.toggle('hidden');
+        });
+        document.getElementById('import-zu').addEventListener('click', () => {
+            document.getElementById('import-feld').classList.add('hidden');
+        });
+        document.getElementById('import-start').addEventListener('click', starteImport);
         document.getElementById('playlist-neu').addEventListener('click', () => oeffnePlaylist(null));
         document.getElementById('playlist-abbrechen').addEventListener('click', schliessePlaylist);
         document.getElementById('playlist-speichern').addEventListener('click', speicherePlaylist);
