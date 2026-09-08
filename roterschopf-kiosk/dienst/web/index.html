@@ -526,6 +526,13 @@ body {
 }
 .lampentext span { font-size: 13px; color: var(--schrift-leise); }
 .gruppenknopf { border-left-color: var(--feuer); }
+/* Teilweise an: eigener Zustand, damit man nicht zwischen "an" und "aus"
+   raten muss, wenn beides zugleich stimmt. */
+.lampe.teilweise { border-left-color: var(--warnung); }
+.lampe.teilweise .lampenpunkt {
+  border-color: var(--warnung);
+  background: linear-gradient(90deg, var(--warnung) 50%, transparent 50%);
+}
 
 .bereich {
   margin-left: 10px;
@@ -1079,14 +1086,31 @@ function zeichneLicht() {
     // schaltet, ist schlimmer als kein Knopf.
     if (!mitglieder.length) return;
     const teile = lichtDaten.lampen.filter(l => mitglieder.indexOf(l.kennung) >= 0);
-    // Der Zustand kommt vom Schalter auf der Zentrale, nicht aus den
-    // Lampen: Sie ist die Stelle, die ihn haelt — und dieselbe, die der
-    // Taster an der Wand umlegt.
-    const an = (lichtDaten.schalter || {})[name] === true;
     const da = teile.some(l => l.erreichbar);
-    gruppen.appendChild(lampenknopf(
-      name, mitglieder.length + (an ? " Lampen · an" : " Lampen · aus"),
-      an, da, function () { schalteLicht("gruppe:" + name, !an); }, true));
+
+    // Der Zustand kommt aus den LAMPEN, nicht aus dem Schalter der Zentrale.
+    //
+    // Der Schalter ist ein Wunsch: Wer eine einzelne Lampe von Hand umlegt,
+    // aendert ihn nicht. Ein Gruppenschalter, der "an" zeigt, waehrend drei
+    // von acht Lampen dunkel sind, ist eine Falschaussage — und man merkt
+    // sie erst, wenn man im Saal steht.
+    //
+    // Geschaltet wird trotzdem ueber den Schalter der Zentrale, damit der
+    // Taster an der Wand dieselbe Wahrheit sieht.
+    const anzahlAn = teile.filter(l => l.an).length;
+    const alleAn = teile.length > 0 && anzahlAn === teile.length;
+    const teilweise = anzahlAn > 0 && !alleAn;
+
+    const unterzeile = teilweise
+      ? anzahlAn + " von " + teile.length + " an"
+      : mitglieder.length + (alleAn ? " Lampen · an" : " Lampen · aus");
+
+    const knopf = lampenknopf(name, unterzeile, alleAn, da,
+      // Nicht alles an? Dann einschalten. Sonst ausschalten. Ein Druck
+      // bringt die Gruppe damit immer in einen eindeutigen Zustand.
+      function () { schalteLicht("gruppe:" + name, !alleAn); }, true);
+    if (teilweise) knopf.classList.add("teilweise");
+    gruppen.appendChild(knopf);
   });
 
   if (!lichtDaten.lampen.length) {
@@ -1108,8 +1132,6 @@ function schalteLicht(kennung, an) {
   // Abfragetakt korrigiert, falls die Lampe doch nicht reagiert hat.
   if (kennung.startsWith("gruppe:")) {
     const name = kennung.slice(7);
-    if (!lichtDaten.schalter) lichtDaten.schalter = {};
-    lichtDaten.schalter[name] = an;
     (lichtDaten.gruppen[name] || []).forEach(function (m) {
       const l = lichtDaten.lampen.find(x => x.kennung === m);
       if (l) l.an = an;
