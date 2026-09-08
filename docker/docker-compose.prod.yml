@@ -65,6 +65,10 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fwv-raura.ch}     # DEUTSCH: Admin-E-Mail für Systembenachrichtigungen
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      # DEUTSCH: Passwoerter der beiden x11vnc-Dienste auf dem T400.
+      # Der Mitgliederbereich gibt je nach Rolle das passende heraus.
+      VNC_PASSWORT_SCHAUEN: ${VNC_PASSWORT_SCHAUEN}
+      VNC_PASSWORT_STEUERN: ${VNC_PASSWORT_STEUERN}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       NEXTCLOUD_URL: https://nextcloud.fwv-raura.ch
       NEXTCLOUD_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
@@ -245,6 +249,65 @@ services:
   # ============================================
   # DEUTSCH: FRONTENDS — Weboberflächen
   # ============================================
+
+  # DEUTSCH: noVNC — Blick auf den Bildschirm im Roten Schopf.
+  # Vermittelt zwischen dem Browser (WebSocket) und x11vnc auf dem T400 (VNC).
+  # Der Laptop bekommt dadurch KEINEN Port ins Internet: Der Container
+  # erreicht ihn ueber den WireGuard-Tunnel unter seiner festen Adresse.
+  #
+  # Zwei Container, weil es zwei Berechtigungen gibt. Die Trennung liegt auf
+  # dem Laptop selbst (zwei x11vnc-Dienste mit eigenen Passwoertern), nicht
+  # nur in der Oberflaeche — wer den Zuschau-Link weitergibt, gibt damit
+  # keine Steuerung weiter.
+  novnc:
+    image: ghcr.io/feuerwehrverein-raura/novnc:latest
+    container_name: fwv-novnc
+    restart: unless-stopped
+    environment:
+      # Feste DHCP-Reservierung auf dem MikroTik — siehe memory/network.md
+      VNC_ZIEL: 192.168.88.10:5900
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.novnc.rule=(Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)) && PathPrefix(`/bildschirm`)
+      # Hoehere Prioritaet als der Website-Router, sonst gewinnt dessen
+      # allgemeinere Host-Regel und der Pfad landet im Frontend.
+      - traefik.http.routers.novnc.priority=100
+      - traefik.http.routers.novnc.entrypoints=https
+      - traefik.http.routers.novnc.tls=true
+      - traefik.http.routers.novnc.tls.certresolver=letsencrypt
+      # authentik@file: dieselbe Anmeldung wie ueberall. Ohne sie koennte
+      # jeder im Internet in das Vereinslokal schauen.
+      - traefik.http.routers.novnc.middlewares=novnc-strip,authentik@file
+      - traefik.http.middlewares.novnc-strip.stripprefix.prefixes=/bildschirm
+      - traefik.http.services.novnc.loadbalancer.server.port=6080
+      - com.centurylinklabs.watchtower.enable=true
+
+  # DEUTSCH: Wie oben, aber mit Steuerung (Port 5901 auf dem T400).
+  # Eigenes Passwort, eigener Pfad — gedacht fuer Vorstand und Administration.
+  novnc-steuern:
+    image: ghcr.io/feuerwehrverein-raura/novnc:latest
+    container_name: fwv-novnc-steuern
+    restart: unless-stopped
+    environment:
+      VNC_ZIEL: 192.168.88.10:5901
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.novnc-steuern.rule=(Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)) && PathPrefix(`/bildschirm-steuern`)
+      # Hoeher als /bildschirm, sonst greift dessen Praefix zuerst.
+      - traefik.http.routers.novnc-steuern.priority=110
+      - traefik.http.routers.novnc-steuern.entrypoints=https
+      - traefik.http.routers.novnc-steuern.tls=true
+      - traefik.http.routers.novnc-steuern.tls.certresolver=letsencrypt
+      - traefik.http.routers.novnc-steuern.middlewares=novnc-steuern-strip,authentik@file
+      - traefik.http.middlewares.novnc-steuern-strip.stripprefix.prefixes=/bildschirm-steuern
+      - traefik.http.services.novnc-steuern.loadbalancer.server.port=6080
+      - com.centurylinklabs.watchtower.enable=true
 
   # DEUTSCH: Öffentliche Website — fwv-raura.ch (Hauptseite, Vorstand-Dashboard, Mitgliederbereich)
   frontend-website:

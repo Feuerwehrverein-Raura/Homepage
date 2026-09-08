@@ -5282,6 +5282,53 @@ async function getNextcloudGroupFolders(userGroups) {
 // Get all accesses for the current user
 // DEUTSCH: Sammelt alle Zugänge eines Mitglieds: Funktions-E-Mails, Nextcloud-Ordner, System-Zugänge und Organisator-Events
 // ---------------------------------------------------------------------------
+// Blick auf den Bildschirm im Roten Schopf (noVNC)
+//
+// Zwei Stufen, und die Trennung liegt auf dem Laptop selbst: Dort laufen
+// zwei x11vnc-Dienste mit eigenen Passwoertern — 5900 nur zuschauen, 5901
+// mit Steuerung. Wer den Zuschau-Link weitergibt, gibt damit keine
+// Steuerung weiter.
+//
+// Dieser Endpunkt entscheidet, WELCHES Passwort jemand bekommt. Er gibt
+// das Passwort fuer die Steuerung nur an Vorstand und Administration
+// heraus — die Entscheidung faellt hier im Backend und nicht in der
+// Oberflaeche, wo sie sich umgehen liesse.
+app.get('/members/me/bildschirm', authenticateToken, async (req, res) => {
+    try {
+        const member = await mitgliedAusToken(req, res);
+        if (!member) return;
+
+        const rollen = [req.user.role, ...(req.user.roles || [])].filter(Boolean).map(r => String(r).toLowerCase());
+        const darfSteuern = rollen.includes('vorstand') || rollen.includes('admin');
+
+        const schauen = process.env.VNC_PASSWORT_SCHAUEN || '';
+        const steuern = process.env.VNC_PASSWORT_STEUERN || '';
+
+        if (!schauen) {
+            return res.status(503).json({ error: 'Bildschirmzugriff ist nicht eingerichtet' });
+        }
+
+        // autoconnect+resize: der Betrachter soll nichts einstellen muessen,
+        // und 1280x800 vom Laptop passt sonst auf keinem Handy aufs Bild.
+        const parameter = 'autoconnect=true&resize=scale&reconnect=true';
+
+        res.json({
+            schauen: {
+                url: `/bildschirm/vnc.html?${parameter}&password=${encodeURIComponent(schauen)}`,
+                beschreibung: 'Zuschauen, ohne eingreifen zu koennen'
+            },
+            steuern: darfSteuern && steuern ? {
+                url: `/bildschirm-steuern/vnc.html?${parameter}&password=${encodeURIComponent(steuern)}`,
+                beschreibung: 'Mit Tastatur und Maus eingreifen'
+            } : null
+        });
+    } catch (error) {
+        console.error('GET /members/me/bildschirm:', error.message);
+        res.status(500).json({ error: 'Bildschirmzugriff konnte nicht geladen werden' });
+    }
+});
+
+// ---------------------------------------------------------------------------
 // VPN-Zugaenge (WireGuard) zur Selbstbedienung
 //
 // Der Weg dahin: Diese API fasst den Netzwerkstapel NICHT selbst an — sie

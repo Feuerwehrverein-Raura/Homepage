@@ -393,6 +393,26 @@
                         </div>
                     </div>
 
+                    <!-- DEUTSCH: Blick auf den Bildschirm im Roten Schopf.
+                         Der Laptop hat keinen Port im Internet — noVNC auf dem
+                         Server vermittelt ueber den WireGuard-Tunnel. Welches
+                         Passwort jemand bekommt, entscheidet das Backend
+                         anhand der Rolle, nicht diese Seite. -->
+                    <div class="bg-white rounded-lg shadow p-6" id="bildschirm-karte">
+                        <h2 class="text-xl font-bold text-gray-800 mb-1 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-fire-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                            Bildschirm Roter Schopf
+                        </h2>
+                        <p class="text-sm text-gray-600 mb-4">
+                            Zeigt den Bildschirm des Rechners im Vereinslokal, live —
+                            zum Beispiel um zu sehen, ob die Musik läuft.
+                        </p>
+                        <div id="bildschirm-knoepfe" class="flex flex-col sm:flex-row gap-2"></div>
+                        <p id="bildschirm-hinweis" class="text-sm text-gray-500 mt-3 hidden"></p>
+                    </div>
+
                     <!-- DEUTSCH: VPN-Zugaenge (WireGuard) zur Selbstbedienung.
                          Legt ueber /members/me/vpn einen Zugang an; die API reicht
                          das an wg-agent auf dem Server weiter. Die Konfiguration
@@ -1073,6 +1093,54 @@
         // Die API liefert 4 Bereiche: Funktions-E-Mails, Nextcloud-Ordner, Organisator-Events, System-Zugaenge.
         // Bei API-Fehler werden Fallback-Daten basierend auf den Profildaten des Mitglieds angezeigt.
         // ============================================
+        // DEUTSCH: Bildschirm im Roten Schopf
+        //
+        // Die Seite fragt nur nach — welche Zugaenge sie bekommt, entscheidet
+        // das Backend anhand der Rolle. Steht in der Antwort kein Eintrag fuer
+        // die Steuerung, gibt es hier auch keinen Knopf dafuer.
+        // ============================================
+
+        async function ladeBildschirm() {
+            const knoepfe = document.getElementById('bildschirm-knoepfe');
+            const hinweis = document.getElementById('bildschirm-hinweis');
+            if (!knoepfe) return;
+            try {
+                const response = await fetch(`${API_BASE}/members/me/bildschirm`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) {
+                    document.getElementById('bildschirm-karte')?.classList.add('hidden');
+                    return;
+                }
+                const daten = await response.json();
+                knoepfe.innerHTML = '';
+
+                if (daten.schauen) {
+                    const a = document.createElement('a');
+                    a.href = daten.schauen.url;
+                    a.target = '_blank';
+                    a.rel = 'noopener';
+                    a.className = 'flex-1 text-center bg-fire-500 hover:bg-fire-600 text-white px-4 py-2 rounded-lg font-medium';
+                    a.textContent = 'Bildschirm ansehen';
+                    knoepfe.appendChild(a);
+                }
+                if (daten.steuern) {
+                    const b = document.createElement('a');
+                    b.href = daten.steuern.url;
+                    b.target = '_blank';
+                    b.rel = 'noopener';
+                    b.className = 'flex-1 text-center border border-fire-500 text-fire-600 hover:bg-fire-50 px-4 py-2 rounded-lg font-medium';
+                    b.textContent = 'Steuern';
+                    knoepfe.appendChild(b);
+                    hinweis.textContent = 'Beim Steuern siehst du dasselbe wie die Leute vor Ort — sie sehen deine Mausbewegungen mit.';
+                    hinweis.classList.remove('hidden');
+                }
+            } catch (e) {
+                document.getElementById('bildschirm-karte')?.classList.add('hidden');
+            }
+        }
+
+        // ============================================
         // DEUTSCH: VPN-Zugaenge (WireGuard)
         //
         // Die Seite spricht nur mit /members/me/vpn. Alles Weitere — die
@@ -1226,6 +1294,7 @@
 
                 // DEUTSCH: Alle 6 Bereiche rendern mit den Daten aus der API
                 ladeVpnZugaenge();
+                ladeBildschirm();
                 renderFunctionEmails(data.functionEmails || []);
                 renderNextcloudFolders(data.nextcloudFolders || []);
                 renderSmbCredentials(data.smbCredentials || null);
