@@ -5731,6 +5731,12 @@ function kioskNormalisiere(text) {
         // Akzente abtrennen und verwerfen: "Céline" und "Celine" sind dasselbe.
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
         .replace(/\.(mp3|m4a|flac|wav|ogg|opus)\s*$/, '')
+        // "K.I.Z" und "A.C.D.C." zu einem Wort zusammenziehen, BEVOR die
+        // Punkte zu Leerzeichen werden. Sonst zerfaellt der Interpret in
+        // Einzelbuchstaben und faellt gleich darauf durch das Laengenraster
+        // — "K.I.Z - Kannibalenlied - Live" blieb so als einziger von
+        // vierzig Testtiteln unerkannt.
+        .replace(/\b(?:[a-z]\.){2,}/g, m => m.replace(/\./g, ''))
         // Klammern raus — dort steht bei YouTube der ganze Ballast:
         // "(Official Video)", "[4K Remaster]", "(Lyrics)".
         .replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
@@ -5740,9 +5746,13 @@ function kioskNormalisiere(text) {
         .trim();
 }
 
-// Einbuchstabige Reste tragen nichts bei und verzerren nur das Mass.
+// Einbuchstabige Reste tragen nichts bei und verzerren nur das Mass — es
+// sei denn, es bleibt sonst nichts uebrig. Bei kurzen Titeln ("U 2 - One")
+// ist ein schwaches Wort besser als gar keines.
 function kioskWorte(text) {
-    return kioskNormalisiere(text).split(' ').filter(w => w.length > 1);
+    const alle = kioskNormalisiere(text).split(' ').filter(Boolean);
+    const lang = alle.filter(w => w.length > 1);
+    return lang.length >= 2 ? lang : alle;
 }
 
 // Aehnlichkeit zweier Wortmengen (Dice). Bewusst wortbasiert und nicht
