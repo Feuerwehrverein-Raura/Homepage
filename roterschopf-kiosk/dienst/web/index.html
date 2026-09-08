@@ -480,6 +480,53 @@ body {
 }
 .rahmenhinweis[hidden] { display: none !important; }
 
+.lampen {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  align-content: start;
+}
+.lampen:empty { display: none; }
+.lampe {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  border-left: 3px solid var(--linie);
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--schrift);
+}
+/* Eingeschaltet ist der einzige Zustand mit Farbe — man soll ueber den Raum
+   hinweg sehen, was brennt. */
+.lampe.an { border-left-color: var(--warnung); }
+.lampe.weg { opacity: .5; cursor: not-allowed; }
+.lampe:focus-visible { outline: 3px solid var(--warnung); outline-offset: 2px; }
+.lampenpunkt {
+  width: 14px; height: 14px; border-radius: 50%;
+  flex: none;
+  border: 2px solid var(--linie);
+}
+.lampe.an .lampenpunkt {
+  background: var(--warnung);
+  border-color: var(--warnung);
+  box-shadow: 0 0 0 4px rgba(216,163,58,.18);
+}
+.lampentext { min-width: 0; flex: 1; }
+.lampentext b {
+  display: block;
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: 17px;
+  font-weight: 600;
+}
+.lampentext span { font-size: 13px; color: var(--schrift-leise); }
+.gruppenknopf { border-left-color: var(--feuer); }
+
 .bereich {
   margin-left: 10px;
   font-size: 14px;
@@ -845,7 +892,20 @@ body {
 
     </section>
 
-    <!-- ---------------- Kasse ---------------- -->
+    <!-- ---------------- Licht ----------------
+         Jeder Kanal einzeln. Beim Einrichten wusste niemand mehr, welches
+         Geraet welche Lampe schaltet — einzeln schaltbar ist die Anlage
+         sofort brauchbar und zugleich der Weg, das herauszufinden.
+         Gruppen erscheinen, sobald sie zugeordnet sind. -->
+    <section class="ansicht" id="ansicht-licht" hidden>
+      <div class="ansicht-kopf">
+        <h2>Licht</h2>
+        <span class="zusatz" id="licht-stand">—</span>
+      </div>
+      <div class="lampen" id="gruppenliste"></div>
+      <div class="lampen" id="lampenliste"></div>
+    </section>
+
     <!-- ---------------- Kasse ----------------
          Wie die Bar: die echte Kasse eingebettet, nicht nachgebaut. Den
          Zugang holt der Kiosk-Dienst; hier tippt niemand ein Passwort. -->
@@ -879,6 +939,9 @@ body {
       </button>
       <button class="modul" data-ziel="plan" aria-current="false">
         <span class="glyph" aria-hidden="true">◷</span> Arbeitsplan
+      </button>
+      <button class="modul" data-ziel="licht" aria-current="false">
+        <span class="glyph" aria-hidden="true">☀</span> Licht
       </button>
       <button class="modul" data-ziel="kasse" aria-current="false">
         <span class="glyph" aria-hidden="true">▦</span> Kasse
@@ -915,7 +978,8 @@ setInterval(stelleUhr, 1000);
 const module = $$(".modul[data-ziel]");
 const ansichten = {
   musik: $("#ansicht-musik"), bar: $("#ansicht-bar"),
-  plan:  $("#ansicht-plan"),  kasse: $("#ansicht-kasse")
+  plan:  $("#ansicht-plan"),  kasse: $("#ansicht-kasse"),
+  licht: $("#ansicht-licht")
 };
 module.forEach(function (k) {
   k.addEventListener("click", function () {
@@ -928,6 +992,7 @@ module.forEach(function (k) {
     // vorletzter Woche. Nur hier und nicht bei jedem Neuzeichnen: Sonst
     // ruckte die Liste dem zurueck, der gerade selbst blaettert.
     if (k.dataset.ziel === "plan") zeigeHeute();
+    if (k.dataset.ziel === "licht") zeichneLicht();
     if (k.dataset.ziel === "bar") ladeBestellansicht("bar");
     if (k.dataset.ziel === "kasse") ladeBestellansicht("kasse");
   });
@@ -968,6 +1033,88 @@ function ladeBestellansicht(welche) {
   }).catch(function () {
     h.textContent = "Der Zugang konnte nicht geholt werden.";
   });
+}
+
+// --- Licht ---------------------------------------------------------------
+//
+// Der Zustand kommt aus derselben Abfrage wie alles andere, damit die Seite
+// nicht zwei Takte hat. Geschaltet wird sofort und die Anzeige gleich
+// mitgezogen: Auf den naechsten Abfragetakt zu warten fuehlt sich an, als
+// haette der Knopf nicht funktioniert — und dann drueckt man zweimal.
+
+let lichtDaten = { lampen: [], gruppen: {} };
+
+function lampenknopf(beschriftung, unterzeile, an, erreichbar, beiKlick, gruppe) {
+  const k = document.createElement("button");
+  k.className = "lampe" + (an ? " an" : "") + (erreichbar ? "" : " weg") +
+                (gruppe ? " gruppenknopf" : "");
+  k.disabled = !erreichbar;
+  k.setAttribute("aria-pressed", String(!!an));
+
+  const punkt = document.createElement("span");
+  punkt.className = "lampenpunkt";
+
+  const text = document.createElement("span");
+  text.className = "lampentext";
+  const name = document.createElement("b");
+  name.textContent = beschriftung;
+  const unten = document.createElement("span");
+  unten.textContent = unterzeile;
+  text.append(name, unten);
+
+  k.append(punkt, text);
+  if (erreichbar) k.addEventListener("click", beiKlick);
+  return k;
+}
+
+function zeichneLicht() {
+  const gruppen = $("#gruppenliste");
+  const lampen = $("#lampenliste");
+  gruppen.textContent = "";
+  lampen.textContent = "";
+
+  Object.keys(lichtDaten.gruppen || {}).forEach(function (name) {
+    const mitglieder = lichtDaten.gruppen[name] || [];
+    // Gruppen ohne Mitglieder werden nicht gezeigt. Ein Knopf, der nichts
+    // schaltet, ist schlimmer als kein Knopf.
+    if (!mitglieder.length) return;
+    const teile = lichtDaten.lampen.filter(l => mitglieder.indexOf(l.kennung) >= 0);
+    const an = teile.some(l => l.an);
+    const da = teile.some(l => l.erreichbar);
+    gruppen.appendChild(lampenknopf(
+      name, mitglieder.length + (an ? " Lampen · an" : " Lampen · aus"),
+      an, da, function () { schalteLicht("gruppe:" + name, !an); }, true));
+  });
+
+  if (!lichtDaten.lampen.length) {
+    lampen.appendChild(hinweis("Keine Lampen eingerichtet."));
+    return;
+  }
+
+  lichtDaten.lampen.forEach(function (l) {
+    const unten = !l.erreichbar ? "nicht erreichbar"
+                : l.an ? (l.watt ? l.watt + " W" : "an")
+                : "aus";
+    lampen.appendChild(lampenknopf(l.name, unten, l.an, l.erreichbar,
+      function () { schalteLicht(l.kennung, !l.an); }));
+  });
+}
+
+function schalteLicht(kennung, an) {
+  // Anzeige sofort mitziehen, damit der Druck spuerbar ist. Der naechste
+  // Abfragetakt korrigiert, falls die Lampe doch nicht reagiert hat.
+  if (kennung.startsWith("gruppe:")) {
+    const name = kennung.slice(7);
+    (lichtDaten.gruppen[name] || []).forEach(function (m) {
+      const l = lichtDaten.lampen.find(x => x.kennung === m);
+      if (l) l.an = an;
+    });
+  } else {
+    const l = lichtDaten.lampen.find(x => x.kennung === kennung);
+    if (l) l.an = an;
+  }
+  zeichneLicht();
+  befehl("licht", { kennung: kennung, an: an });
 }
 
 function zeigeHeute() {
@@ -1227,6 +1374,16 @@ function zeichne(z) {
         apBehaelter.appendChild(artikel);
       });
     });
+  }
+
+  // Licht
+  if (z.licht) {
+    lichtDaten = z.licht;
+    const stand = z.licht.lampen.filter(l => l.erreichbar).length;
+    $("#licht-stand").textContent = stand
+      ? stand + " von " + z.licht.lampen.length + " erreichbar"
+      : "keine Lampe erreichbar";
+    if (!$("#ansicht-licht").hidden) zeichneLicht();
   }
 
   const alter = z.arbeitsplan && z.arbeitsplan.alter;

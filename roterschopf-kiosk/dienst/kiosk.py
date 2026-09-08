@@ -22,6 +22,7 @@ import socket
 import urllib.request
 import threading
 import time
+from concurrent import futures
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 WEB = "/usr/local/lib/kiosk/web"
@@ -258,6 +259,144 @@ def arbeitsplan_ansicht():
 
 
 # --------------------------------------------------------------------------
+# Licht
+# --------------------------------------------------------------------------
+#
+# Die Lampen sind Shelly Plus 2PM, je zwei Kanaele. Sie haengen im selben
+# Netz wie dieser Rechner; geschaltet wird direkt ueber ihre HTTP-Schnittstelle
+# (Gen2-RPC), ohne Umweg ueber Cloud oder Zentrale.
+#
+# Warum jeder Kanal einzeln und nicht nur Gruppen: Beim Einrichten wusste
+# niemand mehr, welches Geraet welche Lampe schaltet. Einzeln schaltbar ist
+# die Anlage sofort brauchbar — und zugleich der Weg, die Zuordnung
+# herauszufinden.
+#
+# Die Adressen stehen fest im Router reserviert. Die Liste liegt trotzdem in
+# einer Datei: Wer eine Lampe umbenennt oder eine dazuhaengt, soll dafuer
+# keinen Dienst anfassen muessen.
+LICHT_DATEI = os.path.join(DATEN, "licht.json")
+
+LICHT_VORGABE = {
+    "geraete": [
+        {"adresse": "192.168.88.100", "kanaele": [0, 1]},
+        {"adresse": "192.168.88.101", "kanaele": [0, 1]},
+        {"adresse": "192.168.88.102", "kanaele": [0, 1]},
+        {"adresse": "192.168.88.103", "kanaele": [0, 1]},
+        {"adresse": "192.168.88.104", "kanaele": [0, 1]},
+        # .105 ist ein PM Mini — ein reiner Zaehler ohne Relais, also nichts
+        # zum Schalten. Er steht hier nur, damit niemand ihn spaeter sucht.
+    ],
+    # Gruppen: Namen der Zentrale, Mitglieder als "adresse:kanal".
+    # Leer, solange niemand weiss, welche Lampe wo haengt — eine geratene
+    # Zuordnung waere schlimmer als keine.
+    "gruppen": {"Spots": [], "Arbeitsleuchten": [], "Girlanden": []},
+}
+
+lichtzustand = {"lampen": [], "geprueft": 0}
+
+
+def licht_einstellung():
+    try:
+        with open(LICHT_DATEI) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return LICHT_VORGABE
+
+
+def shelly(adresse, methode, **werte):
+    """Ruft die RPC-Schnittstelle eines Shelly auf.
+
+    Kurzer Zeitablauf: Eine Lampe, die aus ist, darf die Anzeige nicht
+    aufhalten. Antwortet sie nicht, gilt sie als nicht erreichbar — was am
+    Fest genau die richtige Auskunft ist.
+    """
+    teile = "&".join("%s=%s" % (k, str(v).lower()) for k, v in werte.items())
+    url = "http://%s/rpc/%s%s" % (adresse, methode, ("?" + teile) if teile else "")
+    try:
+        with urllib.request.urlopen(url, timeout=3) as antwort:
+            roh = antwort.read().decode()
+        return json.loads(roh) if roh.strip() else {}
+    except Exception:
+        return None
+
+
+def geraet_abfragen(g):
+    """Fragt ein Geraet ab und liefert seine Kanaele.
+
+    Erst ein einziger Ruf, um zu sehen, ob das Geraet ueberhaupt da ist. Ist
+    es das nicht, werden seine uebrigen Kanaele gar nicht erst versucht —
+    sonst kostet jede abgeschaltete Lampe zweimal den vollen Zeitablauf.
+    """
+    adresse = g.get("adresse")
+    kanaele = g.get("kanaele", [0])
+    lampen = []
+    lebt = None
+    for i, kanal in enumerate(kanaele):
+        zustand = shelly(adresse, "Switch.GetStatus", id=kanal) if (lebt or i == 0) else None
+        if i == 0:
+            lebt = zustand is not None
+        name = None
+        if zustand is not None:
+            cfg = shelly(adresse, "Switch.GetConfig", id=kanal)
+            if cfg:
+                name = cfg.get("name")
+        lampen.append({
+            "kennung": "%s:%d" % (adresse, kanal),
+            # Kein Name auf dem Geraet: Dann sagt die Adresse wenigstens,
+            # welches Geraet gemeint ist.
+            "name": name or ("Gerät .%s · Kanal %d" % (adresse.split(".")[-1], kanal + 1)),
+            "erreichbar": zustand is not None,
+            "an": bool(zustand.get("output")) if zustand else False,
+            "watt": round(zustand.get("apower", 0)) if zustand else None,
+        })
+    return lampen
+
+
+def lichtschleife():
+    """Fragt die Lampen im Hintergrund ab.
+
+    Wie bei der Ampel: Die Oberflaeche soll nie auf einen Zeitablauf warten.
+    Parallel ueber die Geraete, weil sonst schon fuenf ausgeschaltete Lampen
+    einen Durchgang auf eine halbe Minute strecken.
+    """
+    while True:
+        geraete = licht_einstellung().get("geraete", [])
+        lampen = []
+        if geraete:
+            with futures.ThreadPoolExecutor(max_workers=8) as gleichzeitig:
+                for teil in gleichzeitig.map(geraet_abfragen, geraete):
+                    lampen.extend(teil)
+        with sperre:
+            lichtzustand["lampen"] = lampen
+            lichtzustand["geprueft"] = time.time()
+        time.sleep(10)
+
+
+def licht_schalten(kennung, an):
+    """Schaltet einen Kanal oder eine Gruppe."""
+    einstellung = licht_einstellung()
+    if kennung.startswith("gruppe:"):
+        ziele = einstellung.get("gruppen", {}).get(kennung[7:], [])
+    else:
+        ziele = [kennung]
+
+    erfolg = 0
+    for ziel in ziele:
+        try:
+            adresse, kanal = ziel.rsplit(":", 1)
+        except ValueError:
+            continue
+        # Nur Adressen aus der Einstellung — die Kennung kommt aus dem
+        # Browser, und dieser Dienst soll nicht zum Werkzeug werden, mit dem
+        # sich beliebige Geraete im Netz ansprechen lassen.
+        if adresse not in [g.get("adresse") for g in einstellung.get("geraete", [])]:
+            continue
+        if shelly(adresse, "Switch.Set", id=int(kanal), on=bool(an)) is not None:
+            erfolg += 1
+    return {"geschaltet": erfolg, "von": len(ziele)}
+
+
+# --------------------------------------------------------------------------
 # Zugang zu den Bestellansichten (Bar und Kasse)
 # --------------------------------------------------------------------------
 
@@ -326,6 +465,7 @@ class Handler(BaseHTTPRequestHandler):
         if pfad == "/api/zustand":
             with sperre:
                 ampel = dict(zustand["ampel"])
+                lampen_jetzt = list(lichtzustand["lampen"])
             # "Alle Titel" steht immer vorn: Sie braucht keinen Server und
             # keine Pflege. Ohne sie stuende der Rechner beim allerersten
             # Einschalten ohne jede Auswahl da.
@@ -340,6 +480,17 @@ class Handler(BaseHTTPRequestHandler):
                 "playlists": pl,
                 "sender": se,
                 "arbeitsplan": arbeitsplan_ansicht(),
+                "licht": {"lampen": lampen_jetzt, "gruppen": licht_einstellung().get("gruppen", {})},
+            })
+
+        if pfad == "/api/licht":
+            with sperre:
+                lampen = list(lichtzustand["lampen"])
+                geprueft = lichtzustand["geprueft"]
+            return self.sende(200, {
+                "lampen": lampen,
+                "gruppen": licht_einstellung().get("gruppen", {}),
+                "geprueft": geprueft,
             })
 
         if pfad == "/api/bestellsystem":
@@ -386,6 +537,9 @@ class Handler(BaseHTTPRequestHandler):
             url = str(daten.get("url", ""))
             if url.startswith("http"):
                 mpd("clear", 'add "%s"' % url.replace('"', ""), "random 0", "play")
+        elif p == "/api/licht":
+            return self.sende(200, licht_schalten(
+                str(daten.get("kennung", "")), bool(daten.get("an"))))
         elif p == "/api/abmelden":
             # Beendet ALLE Sitzungen des Kiosk-Benutzers.
             #
@@ -426,6 +580,7 @@ if __name__ == "__main__":
     os.makedirs(DATEN, exist_ok=True)
     threading.Thread(target=musik_bereitlegen, daemon=True).start()
     threading.Thread(target=ampelschleife, daemon=True).start()
+    threading.Thread(target=lichtschleife, daemon=True).start()
     # Nur auf 127.0.0.1: Die Oberflaeche wird ausschliesslich vom Browser
     # dieses Rechners aufgerufen. Nach aussen gibt es nichts zu sehen.
     ThreadingHTTPServer(("127.0.0.1", 8080), Handler).serve_forever()
