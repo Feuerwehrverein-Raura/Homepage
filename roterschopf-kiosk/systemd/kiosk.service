@@ -7,6 +7,10 @@ Wants=mpd.service
 
 [Service]
 Type=simple
+# Braucht KIOSK_KEY, um den Zugang zur Bar-Bestellansicht beim
+# Vereinsserver zu holen. Ohne die Datei laeuft alles Uebrige weiter —
+# nur der Bar-Tab bleibt dann leer.
+EnvironmentFile=-/etc/kiosk/umgebung
 ExecStart=/usr/bin/python3 /usr/local/lib/kiosk/kiosk.py
 Restart=always
 RestartSec=5
