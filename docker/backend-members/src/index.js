@@ -333,7 +333,15 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
 }));
-app.use(express.json());
+// Die Musikbibliothek des Kiosk-Laptops ist gut 200 KB gross und scheitert
+// am Standardlimit von express.json (100 KB). Statt das Limit fuer jeden
+// Endpunkt zu lockern, wird genau dieser eine Pfad ausgenommen und bekommt
+// weiter unten einen eigenen Parser mit hoeherem Limit.
+const jsonKoerper = express.json();
+app.use((req, res, next) => {
+    if (req.path === '/kiosk/bibliothek') return next();
+    return jsonKoerper(req, res, next);
+});
 
 // ===========================================
 // REQUEST LOGGING MIDDLEWARE
@@ -5554,7 +5562,7 @@ function kioskSchluessel(req, res, next) {
 // Der Laptop meldet seine Musikbibliothek. Vollstaendig, nicht als Zuwachs:
 // So verschwinden geloeschte Dateien auch aus der Auswahl im
 // Mitgliederbereich, statt dort ewig als tote Eintraege zu stehen.
-app.post('/kiosk/bibliothek', kioskSchluessel, async (req, res) => {
+app.post('/kiosk/bibliothek', kioskSchluessel, express.json({ limit: '4mb' }), async (req, res) => {
     const client = await pool.connect();
     try {
         await kioskTabellen();

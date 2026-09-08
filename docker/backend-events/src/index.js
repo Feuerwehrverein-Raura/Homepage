@@ -3534,12 +3534,18 @@ app.get('/arbeitsplan/kiosk', async (req, res) => {
     try {
         // Laufender Anlass zuerst (end_date kann fehlen — dann gilt der
         // Starttag), sonst der naechste. Vergangenes faellt raus.
+        //
+        // Nur Anlaesse MIT Schichten: In der Agenda stehen auch Einladungen
+        // anderer Vereine und Termine ohne Arbeitsplan. Ohne diese Bedingung
+        // zeigte die Kachel den naechstgelegenen davon an — mit leerem Plan,
+        // waehrend die Chilbi mit ihren Schichten dahinter unsichtbar blieb.
         const anlass = await pool.query(`
-            SELECT id, title, start_date, end_date
-            FROM events
-            WHERE status != 'cancelled'
-              AND COALESCE(end_date, start_date)::date >= CURRENT_DATE
-            ORDER BY start_date
+            SELECT e.id, e.title, e.start_date, e.end_date
+            FROM events e
+            WHERE e.status != 'cancelled'
+              AND COALESCE(e.end_date, e.start_date)::date >= CURRENT_DATE
+              AND EXISTS (SELECT 1 FROM shifts s WHERE s.event_id = e.id)
+            ORDER BY e.start_date
             LIMIT 1
         `);
         if (!anlass.rows.length) {
