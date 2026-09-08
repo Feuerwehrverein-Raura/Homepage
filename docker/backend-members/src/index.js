@@ -1305,10 +1305,14 @@ async function createAuthentikUser(member) {
         return null;
     }
 
-    if (!member.email) {
-        console.warn('Member has no email - skipping Authentik sync');
-        return null;
-    }
+    // Frueher wurde hier abgebrochen, wenn ein Mitglied keine E-Mail-Adresse
+    // hat. Authentik braucht aber keine — es identifiziert ueber den
+    // Benutzernamen. Die Folge war, dass sieben Mitglieder gar kein Konto
+    // hatten und damit von Nextcloud bis Kasse ausgesperrt waren.
+    //
+    // Ohne E-Mail funktioniert lediglich die Passwort-Wiederherstellung per
+    // Mail nicht. Die brauchen wir hier nicht: Der Anmeldebon erzeugt den
+    // Wiederherstellungs-Link direkt ueber die API.
 
     try {
         // DEUTSCH: Benutzername aus dem NAMEN, nicht aus der Adresse.
@@ -1319,15 +1323,21 @@ async function createAuthentikUser(member) {
         // "reinerberg47" fuer Helen, "martin.gisela" fuer Gisela. Und das
         // zweite Konto liess sich gar nicht anlegen, weil der Benutzername
         // schon vergeben war; der Fehler blieb unbemerkt.
-        const username = await freierBenutzername(member, AUTHENTIK_API_URL, {
-            'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
-            'Content-Type': 'application/json'
-        });
+        // Den Anmeldenamen aus der Mitgliederdatenbank nehmen, wenn es ihn
+        // gibt: Sonst hiesse dasselbe Mitglied im Portal anders als in
+        // Authentik, und man muesste beim Helfen wissen, welcher Name wo gilt.
+        const username = member.benutzername || await freierBenutzername(
+            member, AUTHENTIK_API_URL, {
+                'Authorization': `Bearer ${AUTHENTIK_API_TOKEN}`,
+                'Content-Type': 'application/json'
+            });
 
         const userData = {
             username: username,
             name: `${member.vorname} ${member.nachname}`,
-            email: member.email,
+            // Leer statt null: Authentik nimmt beides, aber ein leeres Feld
+            // ist in der Oberflaeche unmissverstaendlich.
+            email: member.email || '',
             is_active: true,
             path: 'users',
             type: 'internal',
@@ -3843,13 +3853,38 @@ ${xmlInhalt}
     });
 }
 
+// Einmaligen Anmeldelink von Authentik holen.
+//
+// Der fuehrt in den Wiederherstellungs-Fluss: Wer ihn oeffnet, vergibt ein
+// Passwort und ist danach in Authentik angemeldet — und damit ueberall, von
+// Nextcloud bis zur Kasse. Das ist der Unterschied zum lokalen Code, der nur
+// den Mitgliederbereich oeffnet.
+//
+// Dass dabei ein Passwort gesetzt wird, ist kein Umweg: Wer den Bon braucht,
+// kennt seines ohnehin nicht.
+async function authentikAnmeldelink(authentikUserId) {
+    const url = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+    const token = process.env.AUTHENTIK_API_TOKEN;
+    if (!token || !authentikUserId) return null;
+    try {
+        const antwort = await axios.post(
+            `${url}/api/v3/core/users/${authentikUserId}/recovery/`, null,
+            { headers: { 'Authorization': `Bearer ${token}` }, timeout: 10000 }
+        );
+        return antwort.data?.link || null;
+    } catch (e) {
+        console.error('Authentik-Anmeldelink fehlgeschlagen:', e.message);
+        return null;
+    }
+}
+
 // Anmeldebon fuer ein Mitglied drucken.
 app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         await anmeldecodeTabelle();
         const m = await pool.query(
-            'SELECT id, vorname, nachname, benutzername FROM members WHERE id = $1',
-            [req.params.id]
+            'SELECT id, vorname, nachname, benutzername, authentik_user_id ' +
+            'FROM members WHERE id = $1', [req.params.id]
         );
         if (!m.rows.length) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
         const mitglied = m.rows[0];
@@ -3862,15 +3897,28 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
             'WHERE member_id = $1 AND benutzt_am IS NULL', [mitglied.id]
         );
 
-        const code = crypto.randomBytes(24).toString('base64url');
+        // Erste Wahl ist der Authentik-Link: Er meldet ueberall an, nicht nur
+        // im Mitgliederbereich. Der lokale Code bleibt als Rueckfallebene fuer
+        // den Fall, dass Authentik gerade nicht antwortet oder das Mitglied
+        // (noch) kein Konto hat — dann ist ein halber Zugang besser als gar
+        // keiner.
+        const anmeldelink = await authentikAnmeldelink(mitglied.authentik_user_id);
+        let adresse, umfang;
         const giltBis = new Date(Date.now() + ANMELDEBON_STUNDEN * 3600 * 1000);
-        await pool.query(
-            'INSERT INTO member_login_codes (code, member_id, erstellt_von, gilt_bis) ' +
-            'VALUES ($1, $2, $3, $4)',
-            [code, mitglied.id, req.user.email || null, giltBis]
-        );
 
-        const adresse = 'https://www.fwv-raura.ch/anmelden.html?code=' + code;
+        if (anmeldelink) {
+            adresse = anmeldelink;
+            umfang = 'sso';
+        } else {
+            const code = crypto.randomBytes(24).toString('base64url');
+            await pool.query(
+                'INSERT INTO member_login_codes (code, member_id, erstellt_von, gilt_bis) ' +
+                'VALUES ($1, $2, $3, $4)',
+                [code, mitglied.id, req.user.email || null, giltBis]
+            );
+            adresse = 'https://www.fwv-raura.ch/anmelden.html?code=' + code;
+            umfang = 'mitgliederbereich';
+        }
         const name = `${mitglied.vorname} ${mitglied.nachname}`;
         const bis = giltBis.toLocaleString('de-CH', {
             timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit',
@@ -3889,9 +3937,12 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
       <text>&#10;</text>
       <symbol type="qrcode_model_2" level="level_m" width="6" height="6">${xmlSicher(adresse)}</symbol>
       <text>&#10;Mit der Handykamera scannen.&#10;&#10;</text>
-      <text>Gilt EINMALIG und nur bis&#10;</text>
+      ${umfang === 'sso'
+        ? `<text>Du vergibst ein neues Passwort&#10;und bist danach ueberall&#10;angemeldet.&#10;&#10;</text>
+      <text>Gilt EINMALIG und nur kurz.&#10;</text>`
+        : `<text>Gilt EINMALIG und nur bis&#10;</text>
       <text em="true">${xmlSicher(bis)} Uhr.&#10;</text>
-      <text em="false">Danach bleibst du 7 Tage&#10;angemeldet.&#10;</text>
+      <text em="false">Danach bleibst du 7 Tage&#10;angemeldet.&#10;</text>`}
       <text>Nach dem Scannen ist dieser Bon&#10;wertlos - er darf in den Abfall.&#10;</text>
       <text>&#10;Anmeldename (falls du ihn&#10;spaeter brauchst):&#10;</text>
       <text em="true">${xmlSicher(mitglied.benutzername || '-')}&#10;</text>
@@ -3900,9 +3951,9 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
       <cut type="feed"/>`);
 
         await logAudit(pool, 'MEMBER_ANMELDEBON_GEDRUCKT', mitglied.id, req.user.email,
-            getClientIp(req), { member_name: name, gilt_bis: giltBis.toISOString() });
+            getClientIp(req), { member_name: name, umfang, gilt_bis: giltBis.toISOString() });
 
-        res.json({ success: true, name, gilt_bis: giltBis.toISOString() });
+        res.json({ success: true, name, umfang, gilt_bis: giltBis.toISOString() });
     } catch (error) {
         console.error('POST /members/:id/anmeldebon:', error.message);
         // Der Drucker ist die haeufigste Fehlerquelle — im Roten Schopf
@@ -5073,12 +5124,12 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
         }
 
         // Get all members with email that haven't been synced yet
+        // Ohne die E-Mail-Bedingung: Auch Mitglieder ohne Adresse brauchen ein
+        // Konto, sonst kommen sie an keine der Anwendungen hinter Authentik.
         const result = await pool.query(`
-            SELECT id, vorname, nachname, email
+            SELECT id, vorname, nachname, email, benutzername
             FROM members
-            WHERE email IS NOT NULL
-            AND email != ''
-            AND authentik_user_id IS NULL
+            WHERE authentik_user_id IS NULL
             ORDER BY nachname, vorname
         `);
 
