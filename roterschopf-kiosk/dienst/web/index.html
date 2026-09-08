@@ -1,0 +1,1212 @@
+<title>Kiosk Roter Schopf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+
+<style>
+/* Entwurf fuer die Kiosk-Oberflaeche des Roten Schopfs.
+   Bewusst dunkel und einfarbig: Der Bildschirm steht abends in einem
+   halbdunklen Vereinslokal hinter der Bar. Eine helle Flaeche waere dort
+   eine Blendquelle, kein Werkzeug. Deshalb eine einzige, festgelegte
+   Farbwelt statt heller und dunkler Fassung. */
+:root {
+  /* Akzent aus der Website uebernommen (tailwind.config, "fire"):
+     500 #ef4444, 600 #dc2626, 700 #b91c1c, 200 #fecaca.
+     Die Neutraltoene sind leicht ins Rote gezogen, damit sie neben dem
+     Akzent gewaehlt wirken und nicht wie ein zufaelliges Grau. */
+  --grund:        #16110f;
+  --flaeche:      #1f1917;
+  --flaeche-hoch: #2a2220;
+  --linie:        #3a2f2d;
+  --schrift:      #f6efed;
+  --schrift-leise:#a3928e;
+  --feuer:        #ef4444;
+  --feuer-dunkel: #b91c1c;
+  --feuer-hell:   #fecaca;
+  --laeuft:       #63a866;
+  --warnung:      #d8a33a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  background: var(--grund);
+  color: var(--schrift);
+  font-family: "Barlow", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  /* Kein Textmarkieren und keine Auswahlmenues: Auf einem Bedienbildschirm
+     ist beides nur eine Falle. */
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+.kopf {
+  max-width: 1280px;
+  margin: 0 auto 24px;
+}
+.kopf h1 {
+  font-family: "Barlow Condensed", "Barlow", sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: .01em;
+  margin: 0 0 6px;
+  text-wrap: balance;
+}
+.kopf p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--schrift-leise);
+  font-size: 15px;
+}
+.kopf .marke {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--feuer);
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* --- Der Bildschirm selbst -------------------------------------------- */
+/* 1280x800 ist die tatsaechliche Aufloesung des T400. Der Entwurf haelt
+   dieses Seitenverhaeltnis ein, damit nichts versprochen wird, was auf dem
+   Geraet nicht hinpasst. */
+.geraet { height: 100%; background: var(--flaeche); }
+
+.schirm {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+/* --- Kopfzeile: Ampel und Uhr ----------------------------------------- */
+/* Steht ueber allem, nicht in einem Modul: Der Zustand der Anlage ist
+   nichts, wofuer man erst irgendwohin wechseln soll. */
+.kopfzeile {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 34px;
+  border-bottom: 1px solid var(--linie);
+  background: var(--flaeche);
+}
+.ampeln {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.ampel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--schrift-leise);
+  white-space: nowrap;
+}
+.punkt {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--schrift-leise);
+}
+.ampel.gut .punkt   { background: var(--laeuft); box-shadow: 0 0 0 3px rgba(99,168,102,.16); }
+.ampel.warn .punkt  { background: var(--warnung); box-shadow: 0 0 0 3px rgba(216,163,58,.16); }
+.ampel.warn         { color: var(--warnung); }
+.ampel.fehler .punkt{ background: var(--feuer); box-shadow: 0 0 0 3px rgba(239,68,68,.18); }
+.ampel.fehler       { color: var(--feuer); font-weight: 600; }
+
+.uhr {
+  margin-left: auto;
+  font-family: "Barlow Condensed", sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1;
+  text-align: right;
+  flex: none;
+}
+.uhr .zeit-gross { display: block; font-size: 34px; letter-spacing: .01em; }
+/* Sekunden kleiner und leiser: Sie sollen den Puls zeigen, nicht das Auge
+   binden. Gleiche Grundlinie wie die Minuten, damit die Zeile ruhig bleibt. */
+.uhr .sek { font-size: 20px; color: var(--schrift-leise); margin-left: 3px; }
+.uhr .datum { display: block; font-size: 13px; color: var(--schrift-leise); font-weight: 500; letter-spacing: .04em; }
+
+/* --- Ansicht ---------------------------------------------------------- */
+.ansicht {
+  padding: 30px 34px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ansicht[hidden] { display: none !important; }
+
+.ansicht-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--linie);
+  padding-bottom: 12px;
+}
+.ansicht-kopf h2 {
+  font-family: "Barlow Condensed", sans-serif;
+  font-weight: 600;
+  font-size: 26px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 0;
+}
+.ansicht-kopf .zusatz {
+  font-size: 13px;
+  color: var(--schrift-leise);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Musik ------------------------------------------------------------ */
+.jetzt {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 22px;
+}
+.pegel {
+  width: 64px; height: 64px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  grid-auto-flow: column;
+}
+.pegel span {
+  width: 5px;
+  background: var(--laeuft);
+  border-radius: 1px;
+  animation: puls 1.1s ease-in-out infinite;
+}
+.pegel span:nth-child(1) { height: 18px; animation-delay: 0s; }
+.pegel span:nth-child(2) { height: 34px; animation-delay: .18s; }
+.pegel span:nth-child(3) { height: 26px; animation-delay: .36s; }
+.pegel span:nth-child(4) { height: 40px; animation-delay: .12s; }
+@keyframes puls { 0%,100% { transform: scaleY(.45); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .pegel span { animation: none; }
+}
+
+.titel {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.1;
+  margin: 0 0 2px;
+}
+.interpret {
+  margin: 0;
+  color: var(--schrift-leise);
+  font-size: 17px;
+}
+
+.leiste {
+  height: 9px;
+  background: var(--flaeche-hoch);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.leiste i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--feuer);
+  transition: width .9s linear;
+}
+@media (prefers-reduced-motion: reduce) { .leiste i { transition: none; } }
+.zeiten {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--schrift-leise);
+  font-variant-numeric: tabular-nums;
+  margin-top: 6px;
+}
+
+.knopfreihe {
+  display: flex;
+  flex: none;
+  gap: 12px;
+  align-items: center;
+}
+.rundknopf {
+  width: 74px; height: 74px;
+  border-radius: 50%;
+  border: 1px solid var(--linie);
+  background: var(--flaeche-hoch);
+  color: var(--schrift);
+  font-size: 26px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-family: inherit;
+}
+.rundknopf.gross {
+  width: 92px; height: 92px;
+  background: var(--feuer);
+  border-color: var(--feuer);
+  color: #fff;
+  font-size: 32px;
+}
+.rundknopf:focus-visible,
+.modul:focus-visible,
+.liste li:focus-visible { outline: 3px solid var(--warnung); outline-offset: 2px; }
+
+.laut {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+.lautbalken {
+  flex: 1;
+  height: 14px;
+  cursor: pointer;
+  background: var(--flaeche-hoch);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.lautbalken i { display: block; height: 100%; width: 62%; background: var(--schrift-leise); }
+
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+}
+.liste li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--flaeche-hoch);
+  border-left: 3px solid transparent;
+  font-size: 15px;
+}
+.liste li.aktiv {
+  border-left-color: var(--laeuft);
+  color: var(--schrift);
+}
+.liste li .nr {
+  color: var(--schrift-leise);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  width: 22px;
+  flex: none;
+}
+.liste li .dauer {
+  margin-left: auto;
+  color: var(--schrift-leise);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* Quellenumschaltung: eigene Musik oder Radio. Als zusammenhaengender
+   Schalter gezeichnet, nicht als zwei lose Knoepfe — es ist ein Entweder-Oder,
+   und das soll man sehen. */
+.quelle {
+  display: inline-flex;
+  /* flex: none — sonst zerdrueckt die Flex-Spalte den Umschalter, sobald
+     der Inhalt darunter waechst. Er ist ein Bedienelement, kein Fuellstoff. */
+  flex: none;
+  border: 1px solid var(--linie);
+  border-radius: 3px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+.quellknopf {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 10px 22px;
+  border: 0;
+  background: transparent;
+  color: var(--schrift-leise);
+  cursor: pointer;
+}
+.quellknopf + .quellknopf { border-left: 1px solid var(--linie); }
+.quellknopf[aria-pressed="true"] { background: var(--flaeche-hoch); color: var(--schrift); }
+.quellknopf:focus-visible { outline: 3px solid var(--warnung); outline-offset: -3px; }
+
+.sender {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+}
+.senderknopf {
+  width: 100%;
+  text-align: left;
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  border-left: 3px solid var(--linie);
+  color: var(--schrift);
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: inherit;
+  display: grid;
+  gap: 2px;
+}
+.senderknopf[aria-pressed="true"] { border-left-color: var(--laeuft); }
+.senderknopf:focus-visible { outline: 3px solid var(--warnung); outline-offset: 2px; }
+.sendername {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.senderinfo { font-size: 13px; color: var(--schrift-leise); }
+
+.radiohinweis {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--schrift-leise);
+  max-width: 62ch;
+}
+.radiohinweis strong { color: var(--schrift); }
+
+.wahl {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: none;
+}
+.wahl button {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 3px;
+  border: 1px solid var(--linie);
+  background: transparent;
+  color: var(--schrift-leise);
+  cursor: pointer;
+}
+.wahl button[aria-pressed="true"] {
+  background: var(--feuer-dunkel);
+  border-color: var(--feuer);
+  color: #fff;
+}
+
+/* --- Kueche ----------------------------------------------------------- */
+.bons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  overflow-y: auto;
+}
+.bon {
+  background: var(--flaeche-hoch);
+  border-top: 3px solid var(--warnung);
+  padding: 12px 14px;
+}
+.bon.spaet { border-top-color: var(--feuer); }
+.bon h3 {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 20px;
+  margin: 0 0 2px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.bon .wann {
+  font-size: 12px;
+  color: var(--schrift-leise);
+  font-variant-numeric: tabular-nums;
+  margin: 0 0 10px;
+}
+.bon ul { list-style: none; margin: 0; padding: 0; font-size: 15px; display: grid; gap: 4px; }
+.bon li span { color: var(--feuer); font-weight: 600; }
+
+/* --- Arbeitsplan ------------------------------------------------------ */
+.schichten {
+  display: grid;
+  gap: 8px;
+  overflow-y: auto;
+}
+.bereich {
+  margin-left: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  color: var(--schrift-leise);
+}
+/* Teilweise besetzt: sichtbar, aber nicht so laut wie "unbesetzt". */
+.marker.fehlt { color: var(--warnung); border-color: var(--warnung); }
+.tagkopf {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--schrift-leise);
+  margin: 14px 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.tagkopf:first-child { margin-top: 0; }
+/* Der heutige Tag ist der einzige hervorgehobene. Waeren es mehrere,
+   hiesse die Hervorhebung nichts mehr. */
+.tagkopf.heute { color: var(--schrift); }
+.tagkopf.heute span {
+  font-size: 12px;
+  letter-spacing: .1em;
+  background: var(--feuer);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 2px;
+}
+.tagkopf.vorbei { opacity: .45; }
+.schicht.vorbei { opacity: .45; }
+.schicht {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: var(--flaeche-hoch);
+  border-left: 3px solid var(--linie);
+  padding: 12px 16px;
+}
+/* Die laufende Schicht ist die einzige, die farbig hervorgehoben wird —
+   sonst waere die Hervorhebung wertlos. */
+.schicht.jetzt { border-left-color: var(--laeuft); }
+.zeit {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  flex: none;
+  width: 76px;
+}
+.zeit span {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--schrift-leise);
+}
+.wer { min-width: 0; flex: 1; }
+.wer h4 {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 19px;
+  margin: 0 0 1px;
+}
+.wer p { margin: 0; font-size: 15px; color: var(--schrift-leise); }
+.wer p.offen { color: var(--feuer-hell); }
+.marker {
+  flex: none;
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 2px;
+  background: rgba(99,168,102,.16);
+  color: var(--laeuft);
+}
+.marker.naechste { background: transparent; color: var(--schrift-leise); }
+.marker.offen-marker { background: rgba(239,68,68,.16); color: var(--feuer); }
+
+.hinweis {
+  background: var(--flaeche-hoch);
+  border-left: 3px solid var(--feuer);
+  padding: 14px 16px;
+  font-size: 15px;
+  color: var(--schrift-leise);
+  max-width: 62ch;
+}
+.hinweis strong { color: var(--schrift); }
+
+/* --- Modulleiste ------------------------------------------------------ */
+.leiste-unten {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  background: var(--linie);
+  border-top: 1px solid var(--linie);
+}
+.modul {
+  flex: 1;
+  background: var(--flaeche);
+  border: 0;
+  color: var(--schrift-leise);
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-weight: 600;
+  font-size: 17px;
+  padding: 18px 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+.modul .glyph { font-size: 22px; line-height: 1; }
+.modul[aria-current="true"] {
+  color: var(--schrift);
+  background: var(--flaeche-hoch);
+}
+.modul[aria-current="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--feuer);
+}
+.modul.abmelden {
+  flex: 0 0 190px;
+  color: var(--schrift-leise);
+  background: #191412;
+}
+.modul.abmelden .glyph { color: var(--feuer); }
+
+/* --- Erlaeuterung unter dem Bild -------------------------------------- */
+.notizen {
+  max-width: 1280px;
+  margin: 26px auto 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+.notiz h3 {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 13px;
+  color: var(--feuer);
+  margin: 0 0 6px;
+}
+.notiz p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--schrift-leise);
+}
+.notiz strong { color: var(--schrift); font-weight: 600; }
+
+@media (max-width: 720px) {
+  .bons { grid-template-columns: 1fr; }
+  .modul { font-size: 14px; padding: 14px 6px; }
+  .modul.abmelden { flex: 0 0 120px; }
+  .jetzt { flex-wrap: wrap; }
+}
+
+/* Hinweis, wenn eine Liste leer ist. Wichtiger als er aussieht: Ein leerer
+   Bereich ohne Text sieht nach Fehler aus, ein Satz sagt, was zu tun ist. */
+.leerhinweis { font-size: 14px; color: var(--schrift-leise); }
+
+.abmeldefrage {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.72);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+.abmeldefrage[hidden] { display: none !important; }
+.frageblatt {
+  background: var(--flaeche-hoch);
+  border: 1px solid var(--linie);
+  border-top: 3px solid var(--feuer);
+  padding: 30px 34px;
+  max-width: 44ch;
+}
+.frageblatt h2 {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+.frageblatt p { margin: 0 0 22px; color: var(--schrift-leise); font-size: 16px; }
+.fragknoepfe { display: flex; gap: 12px; justify-content: flex-end; }
+.fragknoepfe button {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-weight: 600;
+  font-size: 17px;
+  padding: 14px 26px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid var(--linie);
+}
+.knopf-ruhig { background: transparent; color: var(--schrift); }
+.knopf-rot { background: var(--feuer); border-color: var(--feuer); color: #fff; }
+.fragknoepfe button:focus-visible { outline: 3px solid var(--warnung); outline-offset: 2px; }
+
+/* Was als Naechstes kommt. Bewusst unauffaellig gesetzt — es ist eine
+   Nebeninformation, keine Bedienflaeche. */
+.naechste-titel { display: grid; gap: 4px; min-height: 0; overflow-y: auto; }
+.naechste-titel .ueberschrift {
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-size: 12px;
+  color: var(--schrift-leise);
+  margin-bottom: 2px;
+}
+.naechste-titel .zeileneintrag {
+  display: flex;
+  gap: 12px;
+  font-size: 15px;
+  color: var(--schrift-leise);
+  padding: 3px 0;
+}
+.naechste-titel .zeileneintrag .nr {
+  width: 20px;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+/* Lautstaerke: bewusst grosse Knoepfe statt kleiner Symbole. Der Bildschirm
+   wird aus einem Meter Entfernung und im Stehen bedient. */
+.lautknopf {
+  width: 46px; height: 46px;
+  flex: none;
+  border-radius: 3px;
+  border: 1px solid var(--linie);
+  background: var(--flaeche-hoch);
+  color: var(--schrift);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.lautknopf:focus-visible, .lautbalken:focus-visible { outline: 3px solid var(--warnung); outline-offset: 2px; }
+.lautzahl {
+  flex: none;
+  min-width: 52px;
+  text-align: right;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  color: var(--schrift-leise);
+}
+.laut { min-width: 320px; gap: 10px; }
+</style>
+
+<div class="geraet">
+  <div class="schirm">
+
+    <!-- ---------------- Kopfzeile ----------------
+         Zeigt, ob die Anlage traegt. Bewusst nur die vier Dinge, von denen
+         der Betrieb wirklich abhaengt — eine laengere Liste liest am
+         Festabend niemand. Gruen heisst: nichts zu tun. -->
+    <header class="kopfzeile">
+      <div class="ampeln" id="ampeln">
+        <span class="ampel gut"><span class="punkt"></span> Musik</span>
+        <span class="ampel gut"><span class="punkt"></span> Bondrucker</span>
+        <span class="ampel warn"><span class="punkt"></span> Internet — langsam</span>
+        <span class="ampel fehler"><span class="punkt"></span> Vereinsserver — nicht erreichbar</span>
+      </div>
+      <div class="uhr">
+        <span class="zeit-gross"><span id="uhrzeit">14:12</span><span class="sek" id="sekunden">:07</span></span>
+        <span class="datum" id="datum">Sa, 12. September</span>
+      </div>
+    </header>
+
+    <!-- ---------------- Musik ---------------- -->
+    <section class="ansicht" id="ansicht-musik">
+      <div class="ansicht-kopf">
+        <h2>Musik</h2>
+        <span class="zusatz">1153 Titel · Überblendung 2 s · Lautstärke angeglichen</span>
+      </div>
+
+      <div class="jetzt">
+        <div class="pegel" id="pegel" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+        <div style="min-width:0">
+          <p class="titel" id="titel">Nichts läuft</p>
+          <p class="interpret" id="interpret">Abspielen drücken — 1153 Titel liegen bereit</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="leiste"><i id="fortschritt"></i></div>
+        <div class="zeiten"><span id="zeit-jetzt">—</span><span id="zeit-ganz"></span></div>
+      </div>
+
+      <div class="knopfreihe">
+        <button class="rundknopf gross" id="abspielen" aria-label="Pause">⏸</button>
+        <button class="rundknopf" id="weiter" aria-label="Nächster Titel">⏭</button>
+        <div class="laut">
+          <button class="lautknopf" id="leiser" aria-label="Leiser">−</button>
+          <div class="lautbalken" id="lautbalken" role="slider"
+               aria-label="Lautstärke" tabindex="0"><i id="lautstand"></i></div>
+          <button class="lautknopf" id="lauter" aria-label="Lauter">+</button>
+          <span class="lautzahl" id="lautzahl">—</span>
+        </div>
+      </div>
+
+      <div class="quelle" role="group" aria-label="Quelle wählen">
+        <button class="quellknopf" data-quelle="playlist" aria-pressed="true">Playlists</button>
+        <button class="quellknopf" data-quelle="radio" aria-pressed="false">Radio</button>
+      </div>
+
+      <!-- Quelle: eigene Musik ------------------------------------------ -->
+      <div class="naechste-titel" id="naechste-titel"></div>
+
+      <div id="quelle-playlist">
+        <div class="wahl" id="playlisten" role="group" aria-label="Playlist wählen"></div>
+        
+      </div>
+
+      <!-- Quelle: Radio -------------------------------------------------- -->
+      <div id="quelle-radio" hidden>
+        <ul class="sender" id="senderliste" aria-label="Radiosender"></ul>
+        <p class="radiohinweis">
+          Ohne Internet spielt kein Radio. Reisst die Verbindung mitten im
+          Betrieb ab, wechselt der Rechner nach <strong>zwanzig Sekunden</strong>
+          selbständig auf die zuletzt benutzte Playlist — statt still zu bleiben.
+        </p>
+      </div>
+    </section>
+
+    <!-- ---------------- Bar ----------------
+         Die Anwendung heisst im Bestellsystem "Kuechendisplay", steht hier
+         aber an der BAR. Beschriftet ist sie deshalb nach dem Ort, an dem
+         sie benutzt wird, nicht nach ihrem technischen Namen. -->
+    <section class="ansicht" id="ansicht-bar" hidden>
+      <div class="ansicht-kopf">
+        <h2>Bar</h2>
+        <span class="zusatz">3 offen · älteste seit 6 min</span>
+      </div>
+      <div class="bons">
+      </div>
+    </section>
+
+    <!-- ---------------- Arbeitsplan ----------------
+         Alle Tage des Anlasses, vom Aufbau bis zum Abbau. Der heutige Tag
+         ist hervorgehoben und die laufende Schicht darin markiert; wer nur
+         wissen will, wer jetzt dran ist, findet es sofort. Vergangene Tage
+         bleiben gedaempft stehen, statt zu verschwinden. -->
+    <section class="ansicht" id="ansicht-plan" hidden>
+      <div class="ansicht-kopf">
+        <h2>Arbeitsplan</h2>
+        <span class="zusatz"><span id="plan-anlass"></span> · <span id="plan-alter">—</span></span>
+      </div>
+
+      <div class="schichten" id="schichten">
+      </div>
+
+    </section>
+
+    <!-- ---------------- Kasse ---------------- -->
+    <section class="ansicht" id="ansicht-kasse" hidden>
+      <div class="ansicht-kopf">
+        <h2>Kasse</h2>
+        <span class="zusatz">Bondrucker Bar · 192.168.88.11 · bereit</span>
+      </div>
+      <p class="hinweis">
+        Öffnet das Bestellsystem im Vollbild. <strong>Läuft auch ohne Internet</strong>,
+        weil Kasse und Drucker im selben Netz stehen — nur die Übermittlung an
+        den Vereinsserver wartet dann, bis die Verbindung zurück ist.
+      </p>
+      <p class="hinweis">
+        Kommt ein Bon nicht aus dem Drucker, erscheint hier ein <strong>rotes
+        Band</strong> mit Bestellnummer und Grund. Es bleibt stehen, bis es
+        jemand bestätigt.
+      </p>
+    </section>
+
+    <!-- Rueckfrage vor dem Abmelden. Bewusst in der Seite und nicht als
+         Browserdialog: Der waere ungestaltet und wuerde die Oberflaeche
+         zerreissen. -->
+    <div class="abmeldefrage" id="abmeldefrage" hidden>
+      <div class="frageblatt">
+        <h2>Abmelden?</h2>
+        <p>Die Musik läuft weiter. Danach erscheint der Anmeldebildschirm,
+           und du kannst dich mit deinem Vereinskonto anmelden.</p>
+        <div class="fragknoepfe">
+          <button id="abmelden-nein" class="knopf-ruhig">Bleiben</button>
+          <button id="abmelden-ja" class="knopf-rot">Abmelden</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------------- Modulleiste ---------------- -->
+    <nav class="leiste-unten" aria-label="Module">
+      <button class="modul" data-ziel="musik" aria-current="true">
+        <span class="glyph" aria-hidden="true">♫</span> Musik
+      </button>
+      <button class="modul" data-ziel="bar" aria-current="false">
+        <span class="glyph" aria-hidden="true">▤</span> Bar
+      </button>
+      <button class="modul" data-ziel="plan" aria-current="false">
+        <span class="glyph" aria-hidden="true">◷</span> Arbeitsplan
+      </button>
+      <button class="modul" data-ziel="kasse" aria-current="false">
+        <span class="glyph" aria-hidden="true">▦</span> Kasse
+      </button>
+      <button class="modul abmelden" type="button">
+        <span class="glyph" aria-hidden="true">⏻</span> Abmelden
+      </button>
+    </nav>
+
+  </div>
+</div>
+
+<script>
+/* Kiosk-Logik. Spricht ausschliesslich mit dem lokalen Dienst auf
+   127.0.0.1:8080 — nie direkt mit dem Vereinsserver. Faellt der aus, merkt
+   die Oberflaeche es nur an der Ampel; bedienbar bleibt sie. */
+
+const $  = function (s) { return document.querySelector(s); };
+const $$ = function (s) { return document.querySelectorAll(s); };
+const zwei = function (n) { return String(n).padStart(2, "0"); };
+
+// --- Uhr -----------------------------------------------------------------
+function stelleUhr() {
+  const j = new Date();
+  $("#uhrzeit").textContent  = zwei(j.getHours()) + ":" + zwei(j.getMinutes());
+  $("#sekunden").textContent = ":" + zwei(j.getSeconds());
+  $("#datum").textContent = j.toLocaleDateString("de-CH",
+    { weekday: "short", day: "numeric", month: "long" });
+}
+stelleUhr();
+setInterval(stelleUhr, 1000);
+
+// --- Module --------------------------------------------------------------
+const module = $$(".modul[data-ziel]");
+const ansichten = {
+  musik: $("#ansicht-musik"), bar: $("#ansicht-bar"),
+  plan:  $("#ansicht-plan"),  kasse: $("#ansicht-kasse")
+};
+module.forEach(function (k) {
+  k.addEventListener("click", function () {
+    module.forEach(function (x) { x.setAttribute("aria-current", String(x === k)); });
+    Object.keys(ansichten).forEach(function (n) {
+      ansichten[n].hidden = (n !== k.dataset.ziel);
+    });
+    // Der Arbeitsplan zeigt alle Tage des Anlasses — bei der Chilbi fuenf.
+    // Beim Oeffnen soll der heutige oben stehen, nicht der Aufbau von
+    // vorletzter Woche. Nur hier und nicht bei jedem Neuzeichnen: Sonst
+    // ruckte die Liste dem zurueck, der gerade selbst blaettert.
+    if (k.dataset.ziel === "plan") zeigeHeute();
+  });
+});
+
+function zeigeHeute() {
+  const behaelter = $("#schichten");
+  const heute = behaelter.querySelector(".tagkopf.heute");
+  behaelter.scrollTop = heute ? heute.offsetTop - behaelter.offsetTop : 0;
+}
+
+// --- Befehle an den Dienst ----------------------------------------------
+function befehl(pfad, daten) {
+  return fetch("/api/" + pfad, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(daten || {})
+  }).then(function () { return holeZustand(); }).catch(function () {});
+}
+
+let lautstaerkeJetzt = 60;
+
+function setzeLautstaerke(wert) {
+  wert = Math.max(0, Math.min(100, Math.round(wert)));
+  lautstaerkeJetzt = wert;
+  // Sofort zeichnen, nicht erst wenn der Dienst geantwortet hat — sonst
+  // fuehlt sich der Knopf traege an.
+  $("#lautstand").style.width = wert + "%";
+  $("#lautzahl").textContent = wert + " %";
+  befehl("musik/lautstaerke", { wert: wert });
+}
+
+$("#leiser").addEventListener("click", function () { setzeLautstaerke(lautstaerkeJetzt - 5); });
+$("#lauter").addEventListener("click", function () { setzeLautstaerke(lautstaerkeJetzt + 5); });
+$("#lautbalken").addEventListener("click", function (e) {
+  const r = this.getBoundingClientRect();
+  setzeLautstaerke((e.clientX - r.left) / r.width * 100);
+});
+
+$("#abspielen").addEventListener("click", function () { befehl("musik/umschalten"); });
+$("#weiter").addEventListener("click",    function () { befehl("musik/weiter"); });
+
+$(".modul.abmelden").addEventListener("click", function () {
+  $("#abmeldefrage").hidden = false;
+});
+$("#abmelden-nein").addEventListener("click", function () {
+  $("#abmeldefrage").hidden = true;
+});
+$("#abmelden-ja").addEventListener("click", function () {
+  $("#abmeldefrage").hidden = true;
+  befehl("abmelden");
+});
+
+// --- Zustand holen und anzeigen -----------------------------------------
+let letzteQuelle = "playlist";
+
+function holeZustand() {
+  return fetch("/api/zustand").then(function (r) { return r.json(); })
+    .then(zeichne).catch(function () {
+      // Der Dienst selbst antwortet nicht — das ist der einzige Fall, in dem
+      // die Oberflaeche ehrlich nichts weiss.
+      $("#ampeln").innerHTML =
+        '<span class="ampel fehler"><span class="punkt"></span> Kiosk-Dienst antwortet nicht</span>';
+    });
+}
+
+function zeichne(z) {
+  // Ampel
+  const reihenfolge = ["musik", "drucker", "internet", "server"];
+  $("#ampeln").innerHTML = reihenfolge.map(function (k) {
+    const a = (z.ampel || {})[k];
+    if (!a) return "";
+    return '<span class="ampel ' + (a.gut ? "gut" : "fehler") + '">' +
+           '<span class="punkt"></span> ' + a.name +
+           (a.gut ? "" : " — nicht erreichbar") + "</span>";
+  }).join("");
+
+  // Musik
+  const m = z.musik || {};
+  if (m.laeuft || (m.titel && m.titel !== "—")) {
+    $("#titel").textContent = m.titel;
+    $("#interpret").textContent = m.interpret || "";
+  } else {
+    // Ein leeres Feld sieht nach Fehler aus. Ein Satz sagt, was zu tun ist.
+    $("#titel").textContent = "Nichts läuft";
+    $("#interpret").textContent = "Abspielen drücken oder eine Playlist wählen";
+  }
+  $("#abspielen").textContent = m.laeuft ? "⏸" : "▶";
+  $("#abspielen").setAttribute("aria-label", m.laeuft ? "Pause" : "Abspielen");
+  $("#pegel").style.visibility = m.laeuft ? "visible" : "hidden";
+
+  if (m.dauer > 0) {
+    $("#fortschritt").style.width = Math.min(100, m.position / m.dauer * 100) + "%";
+    $("#zeit-jetzt").textContent = zeit(m.position);
+    $("#zeit-ganz").textContent  = zeit(m.dauer);
+  } else {
+    $("#fortschritt").style.width = "0%";
+    $("#zeit-jetzt").textContent = "—";
+    $("#zeit-ganz").textContent  = "";
+  }
+  if (m.lautstaerke >= 0) {
+    $("#lautstand").style.width = m.lautstaerke + "%";
+    $("#lautzahl").textContent = m.lautstaerke + " %";
+    $("#lautbalken").setAttribute("aria-valuenow", m.lautstaerke);
+    lautstaerkeJetzt = m.lautstaerke;
+  }
+
+  // Was als Naechstes kommt
+  const nx = m.naechste || [];
+  const nxBehaelter = $("#naechste-titel");
+  nxBehaelter.textContent = "";
+  if (nx.length) {
+    const ueber = document.createElement("div");
+    ueber.className = "ueberschrift";
+    ueber.textContent = "Als Nächstes";
+    nxBehaelter.appendChild(ueber);
+    nx.slice(0, 5).forEach(function (t, i) {
+      const zeile = document.createElement("div");
+      zeile.className = "zeileneintrag";
+      const nr = document.createElement("span");
+      nr.className = "nr";
+      nr.textContent = i + 1;
+      const name = document.createElement("span");
+      name.textContent = t.name;
+      zeile.append(nr, name);
+      nxBehaelter.appendChild(zeile);
+    });
+  }
+
+  // Playlists, Sender und Schichten werden als Knoten gebaut, nicht als
+  // HTML-Text zusammengeklebt. Die Namen kommen aus der Mitgliederdatenbank
+  // und aus dem Mitgliederbereich — ein "&" im Sendernamen oder ein "<" in
+  // einem Nachnamen wuerde eine zusammengeklebte Zeichenkette zerlegen.
+  // Ausserdem bleibt der Playlist-Name so unveraendert und taugt weiter als
+  // Kennung fuer MPD.
+
+  // Playlists
+  const pl = (z.playlists && z.playlists.daten) || [];
+  const plBehaelter = $("#playlisten");
+  plBehaelter.textContent = "";
+  if (!pl.length) {
+    plBehaelter.appendChild(hinweis("Noch keine Playlist eingerichtet — im Mitgliederbereich anlegen."));
+  } else {
+    pl.forEach(function (p) {
+      const b = document.createElement("button");
+      b.textContent = p.name;
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", function () {
+        $$("#playlisten button").forEach(function (x) {
+          x.setAttribute("aria-pressed", String(x === b));
+        });
+        befehl("musik/playlist", { name: p.name });
+      });
+      plBehaelter.appendChild(b);
+    });
+  }
+
+  // Sender
+  const se = (z.sender && z.sender.daten) || [];
+  const seBehaelter = $("#senderliste");
+  seBehaelter.textContent = "";
+  if (!se.length) {
+    const li = document.createElement("li");
+    li.appendChild(hinweis("Noch kein Sender eingerichtet — im Mitgliederbereich anlegen."));
+    seBehaelter.appendChild(li);
+  } else {
+    se.forEach(function (s) {
+      const b = document.createElement("button");
+      b.className = "senderknopf";
+      b.setAttribute("aria-pressed", "false");
+      const name = document.createElement("span");
+      name.className = "sendername";
+      name.textContent = s.name;
+      const info = document.createElement("span");
+      info.className = "senderinfo";
+      info.textContent = s.beschreibung || "";
+      b.append(name, info);
+      b.addEventListener("click", function () {
+        $$("#senderliste .senderknopf").forEach(function (x) {
+          x.setAttribute("aria-pressed", String(x === b));
+        });
+        befehl("musik/radio", { url: s.url });
+      });
+      const li = document.createElement("li");
+      li.appendChild(b);
+      seBehaelter.appendChild(li);
+    });
+  }
+
+  // Arbeitsplan
+  const ap = (z.arbeitsplan && z.arbeitsplan.daten) || [];
+  const apBehaelter = $("#schichten");
+  apBehaelter.textContent = "";
+  $("#plan-anlass").textContent = (z.arbeitsplan && z.arbeitsplan.anlass) || "";
+  if (!ap.length) {
+    apBehaelter.appendChild(hinweis("Kein Anlass in Sicht."));
+  } else {
+    ap.forEach(function (tag) {
+      const kopf = document.createElement("h3");
+      kopf.className = "tagkopf" + (tag.ist_heute ? " heute" : "") + (tag.vorbei ? " vorbei" : "");
+      kopf.textContent = tag.titel;
+      if (tag.ist_heute) {
+        const marke = document.createElement("span");
+        marke.textContent = "heute";
+        kopf.appendChild(marke);
+      }
+      apBehaelter.appendChild(kopf);
+
+      tag.schichten.forEach(function (s) {
+        const artikel = document.createElement("article");
+        artikel.className = "schicht" + (s.laeuft ? " jetzt" : "") + (tag.vorbei ? " vorbei" : "");
+
+        const zeitfeld = document.createElement("div");
+        zeitfeld.className = "zeit";
+        zeitfeld.textContent = s.von;
+        const bis = document.createElement("span");
+        bis.textContent = s.bis;
+        zeitfeld.appendChild(bis);
+
+        const wer = document.createElement("div");
+        wer.className = "wer";
+        const aufgabe = document.createElement("h4");
+        aufgabe.textContent = s.aufgabe;
+        // Der Bereich gehoert neben den Namen, nicht in die Markerspalte:
+        // Am Samstag heissen zwei Schichten um 12:00 beide "Schicht 1" —
+        // ohne "Bar" und "Kueche" daneben sind sie nicht zu unterscheiden.
+        // Bei "Aufbau" heisst der Bereich auch "Aufbau" — das doppelt zu
+        // setzen sieht nach Fehler aus.
+        if (s.bereich && s.bereich.toLowerCase() !== (s.aufgabe || "").toLowerCase()) {
+          const bereich = document.createElement("span");
+          bereich.className = "bereich";
+          bereich.textContent = s.bereich;
+          aufgabe.appendChild(bereich);
+        }
+        const leer = s.anzahl === 0;
+        const leute = document.createElement("p");
+        if (leer && !tag.vorbei) leute.className = "offen";
+        leute.textContent = s.leute || "";
+        wer.append(aufgabe, leute);
+
+        // Drei Zustaende statt zwei: Wer nur "unbesetzt" oder nichts sieht,
+        // erkennt nicht, ob noch eine Person fehlt oder die Schicht voll ist.
+        const marker = document.createElement("span");
+        if (s.laeuft) {
+          marker.className = "marker";
+          marker.textContent = "läuft";
+        } else if (leer && !tag.vorbei) {
+          marker.className = "marker offen-marker";
+          marker.textContent = "unbesetzt";
+        } else if (s.gebraucht) {
+          marker.className = "marker" +
+            (s.anzahl < s.gebraucht && !tag.vorbei ? " fehlt" : " naechste");
+          marker.textContent = s.anzahl + " von " + s.gebraucht;
+        } else {
+          marker.className = "marker naechste";
+          marker.textContent = "";
+        }
+
+        artikel.append(zeitfeld, wer, marker);
+        apBehaelter.appendChild(artikel);
+      });
+    });
+  }
+
+  const alter = z.arbeitsplan && z.arbeitsplan.alter;
+  $("#plan-alter").textContent = alter === null || alter === undefined
+    ? "noch nie geholt"
+    : "Stand vor " + Math.round(alter / 60) + " min";
+}
+
+function hinweis(text) {
+  const span = document.createElement("span");
+  span.className = "leerhinweis";
+  span.textContent = text;
+  return span;
+}
+
+function zeit(s) {
+  s = Math.floor(s || 0);
+  return Math.floor(s / 60) + ":" + zwei(s % 60);
+}
+
+// Quelle umschalten
+$$(".quellknopf").forEach(function (k) {
+  k.addEventListener("click", function () {
+    letzteQuelle = k.dataset.quelle;
+    $$(".quellknopf").forEach(function (x) {
+      x.setAttribute("aria-pressed", String(x === k));
+    });
+    $("#quelle-playlist").hidden = (letzteQuelle !== "playlist");
+    $("#quelle-radio").hidden    = (letzteQuelle !== "radio");
+  });
+});
+
+// Alle zwei Sekunden nachfragen. Haeufiger waere auf diesem Rechner
+// Verschwendung, seltener wuerde sich der Titelwechsel traege anfuehlen.
+holeZustand();
+setInterval(holeZustand, 2000);
+</script>

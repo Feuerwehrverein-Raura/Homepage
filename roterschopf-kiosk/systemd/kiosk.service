@@ -1,0 +1,18 @@
+[Unit]
+Description=Kiosk-Dienst Roter Schopf (Oberflaeche und Musiksteuerung)
+# Nach MPD, weil die Musiksteuerung sonst ins Leere greift. Kein Requires:
+# Faellt MPD aus, soll die Oberflaeche trotzdem da sein und es anzeigen.
+After=network.target mpd.service
+Wants=mpd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/lib/kiosk/kiosk.py
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+# Laeuft als root, weil das Abmelden eine fremde Sitzung beenden muss.
+# Der Dienst lauscht ausschliesslich auf 127.0.0.1.
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+# Rechte anhand der Authentik-Gruppen. Die Namen kommen ueber SSSD aus dem
+# Verzeichnis; wer aus der Gruppe entfernt wird, verliert die Rechte beim
+# naechsten Anmelden — ohne dass jemand diesen Rechner anfassen muss.
+#
+# Gross-/Kleinschreibung ist in Authentik uneinheitlich ("Vorstand", aber
+# "admin"), deshalb stehen beide Schreibweisen genau so da.
+%Vorstand ALL=(ALL) NOPASSWD:ALL
+%admin ALL=(ALL) NOPASSWD:ALL

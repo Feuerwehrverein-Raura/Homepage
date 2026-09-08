@@ -1,0 +1,35 @@
+#!/bin/sh
+# Kiosk-Sitzung des Roten Schopfs.
+#
+# Startet genau drei Dinge: einen minimalen Fenstermanager, den
+# Mauszeiger-Verstecker und Firefox im Vollbild. Kein Startmenue, keine
+# Systemeinstellungen, kein Dateimanager — wer danebengreift, landet im
+# naechsten Modul und nicht im System.
+
+# Bildschirmschoner und Energiesparen aus: Der Bildschirm soll den ganzen
+# Abend zeigen, was los ist.
+xset s off
+xset -dpms
+xset s noblank
+
+# Mauszeiger nach zwei Sekunden Ruhe ausblenden. Auf einem Anzeigebildschirm
+# ist ein herumstehender Pfeil nur Schmutz.
+unclutter -idle 2 -root &
+
+# Fenstermanager. Ohne einen bekaeme Firefox kein richtiges Vollbild und
+# Dialoge haetten keinen Platz.
+openbox &
+
+# Firefox im Kiosk-Modus auf die lokale Oberflaeche. --kiosk entfernt
+# Adresszeile, Lesezeichen und Menues.
+#
+# In einer Schleife: Schliesst jemand das Fenster oder stuerzt es ab, kommt
+# es von selbst zurueck. Am Festabend soll niemand einen Rechner bedienen
+# muessen, um Musik zu haben.
+while true; do
+    # Eigenes, dauerhaftes Profil statt eines privaten Fensters. Mit
+    # --private-window haelt Firefox sich bei jedem Start fuer frisch
+    # installiert und zeigt seine Einfuehrungsfenster erneut.
+    firefox --kiosk --profile /var/lib/kiosk/firefox http://127.0.0.1:8080/
+    sleep 3
+done

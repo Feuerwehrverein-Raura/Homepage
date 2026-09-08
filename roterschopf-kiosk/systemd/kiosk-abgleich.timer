@@ -1,0 +1,14 @@
+[Unit]
+Description=Kiosk regelmaessig abgleichen
+
+[Timer]
+# Kurz nach dem Hochfahren, dann alle fuenf Minuten. Wer im
+# Mitgliederbereich eine Playlist aendert, sieht sie am Fest zeitnah —
+# haeufiger waere Verkehr ohne Nutzen.
+OnBootSec=90s
+OnUnitActiveSec=5min
+# Damit ein Lauf nachgeholt wird, der waehrend des Ausschaltens ausfiel.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

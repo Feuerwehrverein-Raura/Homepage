@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <!-- Kiosk-Regeln: Jedes Fenster ohne Rahmen und im Vollbild.
+       Der Kiosk-Modus von Firefox allein genuegt nicht — nach einem
+       Neustart bekam das Fenster 1152x720 statt der vollen 1280x800.
+       Der Fenstermanager muss es erzwingen. -->
+  <applications>
+    <application class="*">
+      <decor>no</decor>
+      <maximized>yes</maximized>
+      <fullscreen>yes</fullscreen>
+      <focus>yes</focus>
+      <layer>normal</layer>
+    </application>
+  </applications>
+  <keyboard>
+    <!-- Bewusst keine Tastenkuerzel: Am Festabend soll niemand versehentlich
+         ein Fenster schliessen oder den Arbeitsplatz wechseln. -->
+  </keyboard>
+  <mouse>
+    <dragThreshold>8</dragThreshold>
+  </mouse>
+</openbox_config>

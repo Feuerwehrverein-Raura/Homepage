@@ -1,0 +1,6 @@
+#!/bin/sh
+# Wird von LightDM nach dem Ende einer Sitzung aufgerufen. Entfernt die
+# automatische Anmeldung, damit nach dem Abmelden der Anmeldebildschirm
+# erscheint statt sofort wieder der Kiosk.
+rm -f /etc/lightdm/lightdm.conf.d/60-autologin.conf
+exit 0

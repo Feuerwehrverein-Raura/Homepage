@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Roter Schopf (Kiosk)
+Comment=Bedienoberflaeche fuer den Festbetrieb
+Exec=/usr/local/bin/kiosk-sitzung
+Type=Application
+DesktopNames=Kiosk

@@ -1,0 +1,15 @@
+#!/bin/sh
+# Legt die automatische Anmeldung fuer diesen Systemstart bereit.
+# Nach dem ersten Abmelden entfernt LightDM sie wieder (siehe
+# lightdm-autologin-entfernen) und der Anmeldebildschirm erscheint.
+mkdir -p /etc/lightdm/lightdm.conf.d
+cat > /etc/lightdm/lightdm.conf.d/60-autologin.conf <<'INNEN'
+[Seat:*]
+autologin-user=roterschopf
+# Kiosk statt Cinnamon: kein Startmenue, keine Einstellungen, kein
+# Dateimanager. Cinnamon bleibt fuer angemeldete Personen erhalten.
+autologin-session=kiosk
+# 0 statt 30: kein halbminuetiges Warten beim Hochfahren.
+autologin-user-timeout=0
+INNEN
+exit 0

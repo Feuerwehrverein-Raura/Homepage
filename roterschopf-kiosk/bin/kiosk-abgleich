@@ -1,0 +1,243 @@
+#!/usr/bin/env python3
+"""Gleicht den Kiosk mit dem Vereinsserver ab.
+
+Laeuft alle paar Minuten per Timer und macht drei Dinge:
+
+  * meldet dem Server, welche Musik auf diesem Rechner liegt
+  * holt Playlists und Radiosender und legt sie fuer MPD bereit
+  * holt den Arbeitsplan des naechsten Anlasses
+
+Grundsatz: Faellt der Server aus, aendert sich hier nichts. Es wird nur
+ueberschrieben, was vollstaendig angekommen ist — ein abgebrochener Abgleich
+darf die Musik am Festabend nicht anhalten. Deshalb wird jede Datei erst
+danebengeschrieben und dann umbenannt; ein halb geschriebenes JSON gibt es
+nicht.
+
+Ohne Fremdbibliotheken, wie der Kiosk-Dienst selbst.
+"""
+
+import hashlib
+import json
+import os
+import socket
+import sys
+import urllib.error
+import urllib.request
+
+DATEN = "/var/lib/kiosk"
+PLAYLISTS = "/var/lib/mpd/playlists"
+MPD_HOST, MPD_PORT = "127.0.0.1", 6600
+
+# Wird vom systemd-Dienst aus /etc/kiosk/umgebung gesetzt.
+BASIS = os.environ.get("KIOSK_API", "https://api.fwv-raura.ch")
+SCHLUESSEL = os.environ.get("KIOSK_KEY", "")
+
+
+def melde(text):
+    # Nach stderr, damit es im Journal des Dienstes landet.
+    print(text, file=sys.stderr)
+
+
+# --------------------------------------------------------------------------
+# MPD
+# --------------------------------------------------------------------------
+
+def bibliothek():
+    """Liest alle Titel aus MPD, mit Interpret und Titel wo vorhanden.
+
+    Fehlen die Tags — bei unserer Sammlung die Regel — wird der Dateiname
+    zerlegt, der fast immer "Interpret - Titel.mp3" lautet. So steht im
+    Mitgliederbereich etwas Lesbares statt eines Pfads.
+    """
+    s = socket.create_connection((MPD_HOST, MPD_PORT), timeout=10)
+    s.settimeout(30)
+    datei = s.makefile("rw", encoding="utf-8", newline="\n")
+    datei.readline()  # Begruessung
+    datei.write("listallinfo\n")
+    datei.flush()
+
+    titel, aktuell = [], None
+    for zeile in datei:
+        zeile = zeile.rstrip("\n")
+        if zeile.startswith("OK"):
+            break
+        if zeile.startswith("ACK"):
+            raise RuntimeError(zeile)
+        if ": " not in zeile:
+            continue
+        schluessel, wert = zeile.split(": ", 1)
+        if schluessel == "file":
+            if aktuell:
+                titel.append(aktuell)
+            aktuell = {"pfad": wert, "interpret": None, "titel": None}
+        elif schluessel == "directory":
+            # Verzeichniseintraege beenden keinen Titel, sie stehen dazwischen.
+            continue
+        elif aktuell is not None:
+            if schluessel == "Artist":
+                aktuell["interpret"] = wert
+            elif schluessel == "Title":
+                aktuell["titel"] = wert
+    if aktuell:
+        titel.append(aktuell)
+    s.close()
+
+    for t in titel:
+        if not t["titel"]:
+            name = os.path.splitext(os.path.basename(t["pfad"]))[0]
+            if " - " in name:
+                t["interpret"], t["titel"] = name.split(" - ", 1)
+            else:
+                t["titel"] = name
+    return titel
+
+
+def mpd_befehl(*befehle):
+    """Kurzer Ruf an MPD ohne Auswertung — fuer Aufraeumarbeiten."""
+    try:
+        s = socket.create_connection((MPD_HOST, MPD_PORT), timeout=5)
+        datei = s.makefile("rw", encoding="utf-8", newline="\n")
+        datei.readline()
+        for b in befehle:
+            datei.write(b + "\n")
+        datei.flush()
+        datei.readline()
+        s.close()
+    except Exception:
+        pass
+
+
+# --------------------------------------------------------------------------
+# Server
+# --------------------------------------------------------------------------
+
+def hole(pfad):
+    anfrage = urllib.request.Request(
+        BASIS + pfad, headers={"X-Kiosk-Key": SCHLUESSEL}
+    )
+    with urllib.request.urlopen(anfrage, timeout=30) as antwort:
+        return json.loads(antwort.read().decode())
+
+
+def sende(pfad, inhalt):
+    anfrage = urllib.request.Request(
+        BASIS + pfad,
+        data=json.dumps(inhalt).encode(),
+        headers={"X-Kiosk-Key": SCHLUESSEL, "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(anfrage, timeout=60) as antwort:
+        return json.loads(antwort.read().decode())
+
+
+def schreibe(name, inhalt):
+    """Erst daneben, dann umbenennen. Ein Leser sieht immer eine vollstaendige
+    Datei, nie eine halbe."""
+    pfad = os.path.join(DATEN, name)
+    vorlaeufig = pfad + ".neu"
+    with open(vorlaeufig, "w") as f:
+        json.dump(inhalt, f, ensure_ascii=False)
+    os.replace(vorlaeufig, pfad)
+
+
+# --------------------------------------------------------------------------
+# Die drei Aufgaben
+# --------------------------------------------------------------------------
+
+def bibliothek_melden():
+    """Meldet die Sammlung — aber nur, wenn sie sich geaendert hat.
+
+    Die Liste ist gut 150 KB. Sie alle fuenf Minuten unveraendert
+    hochzuladen belastet die Leitung im Schopf ohne jeden Gewinn.
+    """
+    titel = bibliothek()
+    if not titel:
+        melde("MPD meldet keine Titel — Bibliothek nicht uebertragen")
+        return
+
+    finger = hashlib.sha256(
+        "\n".join(sorted(t["pfad"] for t in titel)).encode()
+    ).hexdigest()
+    merker = os.path.join(DATEN, "bibliothek.fingerabdruck")
+    try:
+        if open(merker).read().strip() == finger:
+            return
+    except OSError:
+        pass
+
+    antwort = sende("/kiosk/bibliothek", {"titel": titel})
+    with open(merker, "w") as f:
+        f.write(finger)
+    melde("Bibliothek gemeldet: %s Titel" % antwort.get("titel"))
+
+
+def playlists_und_sender_holen():
+    daten = hole("/kiosk/daten")
+    playlists = daten.get("playlists", [])
+    sender = daten.get("sender", [])
+
+    verwaltet = []
+    for pl in playlists:
+        name = str(pl.get("name", "")).strip()
+        # Schraegstriche wuerden aus dem Playlist-Verzeichnis herausfuehren.
+        if not name or "/" in name or name.startswith("."):
+            continue
+        datei = os.path.join(PLAYLISTS, name + ".m3u")
+        vorlaeufig = datei + ".neu"
+        with open(vorlaeufig, "w") as f:
+            for pfad in pl.get("titel", []):
+                f.write(pfad + "\n")
+        os.replace(vorlaeufig, datei)
+        os.chmod(datei, 0o644)
+        verwaltet.append(name)
+
+    # Playlists, die es auf dem Server nicht mehr gibt, hier entfernen — aber
+    # nur die, die dieser Abgleich selbst angelegt hat. Was jemand von Hand
+    # ins Verzeichnis gelegt hat, bleibt liegen.
+    merker = os.path.join(DATEN, "playlists-verwaltet.json")
+    try:
+        frueher = json.load(open(merker))
+    except (OSError, ValueError):
+        frueher = []
+    for alt in frueher:
+        if alt not in verwaltet:
+            try:
+                os.remove(os.path.join(PLAYLISTS, alt + ".m3u"))
+            except OSError:
+                pass
+    schreibe("playlists-verwaltet.json", verwaltet)
+
+    # Fuer die Oberflaeche: nur Namen und Umfang, nicht die Titel selbst.
+    schreibe("playlists.json", [
+        {"name": pl["name"], "anzahl": len(pl.get("titel", []))}
+        for pl in playlists if pl.get("name") in verwaltet
+    ])
+    schreibe("sender.json", sender)
+    melde("Playlists: %d, Sender: %d" % (len(verwaltet), len(sender)))
+
+
+def arbeitsplan_holen():
+    schreibe("arbeitsplan.json", hole("/arbeitsplan/kiosk"))
+
+
+if __name__ == "__main__":
+    if not SCHLUESSEL:
+        melde("KIOSK_KEY fehlt — siehe /etc/kiosk/umgebung")
+        sys.exit(1)
+    os.makedirs(DATEN, exist_ok=True)
+
+    # Jede Aufgabe fuer sich: Ist der Arbeitsplan-Endpunkt kaputt, sollen
+    # Playlists trotzdem ankommen. Ein Fehler beendet den Lauf nicht.
+    fehler = 0
+    for name, aufgabe in (("Bibliothek", bibliothek_melden),
+                          ("Playlists/Sender", playlists_und_sender_holen),
+                          ("Arbeitsplan", arbeitsplan_holen)):
+        try:
+            aufgabe()
+        except urllib.error.HTTPError as e:
+            melde("%s: Server antwortet %s" % (name, e.code))
+            fehler += 1
+        except Exception as e:
+            melde("%s: %s" % (name, e))
+            fehler += 1
+    sys.exit(1 if fehler == 3 else 0)

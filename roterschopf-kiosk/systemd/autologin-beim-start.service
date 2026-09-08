@@ -1,0 +1,14 @@
+[Unit]
+Description=Automatische Anmeldung fuer den naechsten Start bereitlegen
+# Muss vor LightDM laufen, sonst liest LightDM die Datei nicht mehr.
+Before=display-manager.service
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/autologin-bereitlegen
+
+[Install]
+WantedBy=multi-user.target

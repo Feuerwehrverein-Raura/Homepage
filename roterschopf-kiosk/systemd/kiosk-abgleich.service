@@ -1,0 +1,13 @@
+[Unit]
+Description=Kiosk mit dem Vereinsserver abgleichen
+# Nach dem Netz, aber ohne harte Abhaengigkeit: Ist der Server nicht
+# erreichbar, beendet sich der Lauf still und der Timer versucht es spaeter.
+After=network-online.target mpd.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/kiosk/umgebung
+ExecStart=/usr/local/bin/kiosk-abgleich
+# Als root, weil die Playlists nach /var/lib/mpd/playlists geschrieben werden.
+User=root

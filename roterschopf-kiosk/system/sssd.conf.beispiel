@@ -1,0 +1,60 @@
+# Anmeldung an diesem Rechner mit dem Vereinskonto aus Authentik.
+#
+# Der Weg: SSSD -> LDAP-Outpost auf dem Vereinsserver (10.10.0.1:389)
+# -> Authentik. Die Verbindung laeuft durch den WireGuard-Tunnel und ist
+# dadurch verschluesselt, auch wenn LDAP hier im Klartext spricht.
+
+[sssd]
+config_file_version = 2
+services = nss, pam
+domains = fwv-raura
+
+[nss]
+# Damit ein neu angemeldetes Mitglied nicht ohne Heimatverzeichnis dasteht.
+override_shell = /bin/bash
+
+[pam]
+# Wie viele Tage eine zwischengespeicherte Anmeldung gilt, wenn der Server
+# nicht erreichbar ist. Der entscheidende Punkt fuer den Festbetrieb: Ist
+# das WLAN weg, kommt trotzdem hinein, wer sich hier schon einmal
+# angemeldet hat.
+offline_credentials_expiration = 60
+
+[domain/fwv-raura]
+id_provider = ldap
+auth_provider = ldap
+chpass_provider = none
+
+ldap_uri = ldap://10.10.0.1:389
+ldap_search_base = DC=fwv-raura,DC=ch
+# Getrennte Pfade fuer Benutzer und Gruppen. Ohne sie sucht SSSD ab der
+# Wurzel und findet die Zugehoerigkeiten nicht zuverlaessig.
+ldap_user_search_base = ou=users,DC=fwv-raura,DC=ch
+ldap_group_search_base = ou=groups,DC=fwv-raura,DC=ch
+
+# Suchkonto. Ohne es koennte SSSD nicht einmal pruefen, ob es einen
+# Benutzer dieses Namens gibt.
+ldap_default_bind_dn = cn=sssd-suche,ou=users,DC=fwv-raura,DC=ch
+ldap_default_authtok = <Passwort des Suchkontos sssd-suche — steht in Vaultwarden>
+
+# Authentik bildet Benutzer und Gruppen unter cn ab, nicht unter uid.
+ldap_user_object_class = user
+ldap_user_name = cn
+ldap_group_object_class = group
+ldap_group_name = cn
+# Authentik nutzt RFC2307bis: Mitgliedschaft steht als "member" an der
+# Gruppe, nicht als "memberUid". Ohne diese Zeilen bleibt jeder Benutzer
+# ohne Gruppen — und ohne Rechte.
+ldap_schema = rfc2307bis
+ldap_group_member = member
+
+# Klartext-LDAP ist hier vertretbar, weil die Strecke im WireGuard-Tunnel
+# liegt. SSSD verlangt fuer diesen Fall eine ausdrueckliche Bestaetigung.
+ldap_auth_disable_tls_never_use_in_production = true
+
+# Anmeldedaten zwischenspeichern — siehe offline_credentials_expiration.
+cache_credentials = true
+
+# Kein Auflisten aller Benutzer: Auf einem Core2 Duo mit 60 Konten waere
+# jede Anmeldung sonst spuerbar langsamer, ohne Nutzen.
+enumerate = false

@@ -1,0 +1,20 @@
+#!/bin/sh
+# Waechter vor jeder grafischen Sitzung.
+#
+# LightDM ruft diesen Wrapper mit dem Sitzungsbefehl als Argument auf. Fuer
+# roterschopf wird dieses Argument verworfen und stattdessen immer der Kiosk
+# gestartet — unabhaengig davon, was im Anmeldebildschirm gewaehlt wurde oder
+# was AccountsService gespeichert hat.
+#
+# Warum so und nicht ueber AccountsService: Die dortige Sitzungswahl schreibt
+# sich neu, sobald jemand im Anmeldebildschirm etwas anderes anklickt. Sie ist
+# ein Wunsch, keine Regel. Der Cinnamon-Desktop mit Startmenue, Dateimanager
+# und Systemeinstellungen darf am Festabend nicht erreichbar sein, also muss
+# die Regel an einer Stelle stehen, die niemand versehentlich umstellt.
+#
+# Alle anderen Konten (Vorstand, Admins, persoenliche Anmeldungen) bekommen
+# unveraendert ihre gewaehlte Sitzung.
+if [ "$(id -un)" = "roterschopf" ]; then
+    exec /usr/sbin/lightdm-session /usr/local/bin/kiosk-sitzung
+fi
+exec /usr/sbin/lightdm-session "$@"
