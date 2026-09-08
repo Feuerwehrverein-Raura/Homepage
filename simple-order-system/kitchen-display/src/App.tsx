@@ -553,7 +553,11 @@ function App() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <img src="/logo-192.png" alt="Logo" className="w-12 h-12 rounded-full bg-white p-1" />
-            <h1 className="text-3xl font-bold text-white">Küche</h1>
+            {/* Der Titel folgt der Vorauswahl: Auf dem Schirm hinter der
+                Bar "Küche" zu lesen, waere schlicht falsch. */}
+            <h1 className="text-3xl font-bold text-white">
+              {station === 'bar' ? 'Bar' : station === 'kitchen' ? 'Küche' : 'Bestellungen'}
+            </h1>
           </div>
 
           <div className="flex gap-2">
@@ -599,13 +603,18 @@ function App() {
               <span>Putzen</span>
             </button>
 
-            {/* Logout Button */}
-            <button
-              onClick={logout}
-              className="px-4 py-2 bg-red-800 hover:bg-red-900 rounded-lg font-bold"
-            >
-              Logout
-            </button>
+            {/* Logout Button — nicht im Rahmen: Der Kiosk meldet sich nicht
+                persoenlich an, und die Abmeldung fuehrt zu Authentik, das
+                sich nicht einbetten laesst. Der Knopf ergaebe eine leere
+                Flaeche ohne Weg zurueck. */}
+            {!imRahmen && (
+              <button
+                onClick={logout}
+                className="px-4 py-2 bg-red-800 hover:bg-red-900 rounded-lg font-bold"
+              >
+                Logout
+              </button>
+            )}
 
             {!soundEnabled ? (
               <button

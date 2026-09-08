@@ -165,6 +165,17 @@ body {
   letter-spacing: .06em;
   margin: 0;
 }
+/* Der Anlass steht neben der Ueberschrift, nicht als Zusatz rechts: Er
+   sagt, WAS man hier sieht, und gehoert damit zum Titel. Rechts bleibt,
+   wie alt der Stand ist. */
+.anlassname {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--schrift-leise);
+}
+.anlassname:not(:empty)::before { content: "· "; }
+
 .ansicht-kopf .zusatz {
   font-size: 13px;
   color: var(--schrift-leise);
@@ -832,8 +843,8 @@ body {
          bleiben gedaempft stehen, statt zu verschwinden. -->
     <section class="ansicht" id="ansicht-plan" hidden>
       <div class="ansicht-kopf">
-        <h2>Arbeitsplan</h2>
-        <span class="zusatz"><span id="plan-anlass"></span> · <span id="plan-alter">—</span></span>
+        <h2>Arbeitsplan <span class="anlassname" id="plan-anlass"></span></h2>
+        <span class="zusatz" id="plan-alter">—</span>
       </div>
 
       <div class="schichten" id="schichten">
