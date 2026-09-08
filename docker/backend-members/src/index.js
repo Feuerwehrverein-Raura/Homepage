@@ -5298,8 +5298,12 @@ app.get('/members/me/bildschirm', authenticateToken, async (req, res) => {
         const member = await mitgliedAusToken(req, res);
         if (!member) return;
 
-        const rollen = [req.user.role, ...(req.user.roles || [])].filter(Boolean).map(r => String(r).toLowerCase());
-        const darfSteuern = rollen.includes('vorstand') || rollen.includes('admin');
+        // Die Rollen stecken in den Gruppen des Anmelde-Tokens — dieselbe
+        // Quelle, die requireRole im ganzen uebrigen Backend benutzt.
+        // Gross-/Kleinschreibung ist in Authentik uneinheitlich ("Vorstand",
+        // aber "admin"), deshalb wird hier verglichen, nicht gematcht.
+        const gruppen = (req.user.groups || []).map(g => String(g).toLowerCase());
+        const darfSteuern = gruppen.includes('vorstand') || gruppen.includes('admin');
 
         const schauen = process.env.VNC_PASSWORT_SCHAUEN || '';
         const steuern = process.env.VNC_PASSWORT_STEUERN || '';

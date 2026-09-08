@@ -280,7 +280,10 @@ services:
       - traefik.http.routers.novnc.tls.certresolver=letsencrypt
       # authentik@file: dieselbe Anmeldung wie ueberall. Ohne sie koennte
       # jeder im Internet in das Vereinslokal schauen.
-      - traefik.http.routers.novnc.middlewares=novnc-strip,authentik@file
+      # Reihenfolge ist entscheidend: Authentik ZUERST, damit es den vollen
+      # Pfad sieht und nach der Anmeldung dorthin zurueckleitet. Schneidet
+      # man vorher ab, landet die Rueckleitung auf /vnc.html im Nichts.
+      - traefik.http.routers.novnc.middlewares=authentik@file,novnc-strip
       - traefik.http.middlewares.novnc-strip.stripprefix.prefixes=/bildschirm
       - traefik.http.services.novnc.loadbalancer.server.port=6080
       - com.centurylinklabs.watchtower.enable=true
@@ -304,7 +307,7 @@ services:
       - traefik.http.routers.novnc-steuern.entrypoints=https
       - traefik.http.routers.novnc-steuern.tls=true
       - traefik.http.routers.novnc-steuern.tls.certresolver=letsencrypt
-      - traefik.http.routers.novnc-steuern.middlewares=novnc-steuern-strip,authentik@file
+      - traefik.http.routers.novnc-steuern.middlewares=authentik@file,novnc-steuern-strip
       - traefik.http.middlewares.novnc-steuern-strip.stripprefix.prefixes=/bildschirm-steuern
       - traefik.http.services.novnc-steuern.loadbalancer.server.port=6080
       - com.centurylinklabs.watchtower.enable=true
