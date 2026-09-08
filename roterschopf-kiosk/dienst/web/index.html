@@ -455,10 +455,12 @@ body {
   gap: 8px;
   overflow-y: auto;
 }
-#ansicht-bar { padding: 0; gap: 0; }
+#ansicht-bar,
+#ansicht-kasse { padding: 0; gap: 0; }
 /* Der Rahmen bekommt die ganze Flaeche: Ein eigener Kopf darueber wuerde
    den der eingebetteten Anzeige doppeln. */
-#barrahmen {
+#barrahmen,
+#kassenrahmen {
   /* flex:1 statt height:100% — die Ansicht ist eine Flex-Spalte, dort greift
      eine Prozenthoehe nicht. */
   flex: 1;
@@ -467,15 +469,16 @@ body {
   display: block;
   background: var(--flaeche);
 }
-#barrahmen[hidden] { display: none !important; }
-.barhinweis {
+#barrahmen[hidden],
+#kassenrahmen[hidden] { display: none !important; }
+.rahmenhinweis {
   margin: auto;
   padding: 40px;
   text-align: center;
   color: var(--schrift-leise);
   font-size: 16px;
 }
-.barhinweis[hidden] { display: none !important; }
+.rahmenhinweis[hidden] { display: none !important; }
 
 .bereich {
   margin-left: 10px;
@@ -562,16 +565,6 @@ body {
 }
 .marker.naechste { background: transparent; color: var(--schrift-leise); }
 .marker.offen-marker { background: rgba(239,68,68,.16); color: var(--feuer); }
-
-.hinweis {
-  background: var(--flaeche-hoch);
-  border-left: 3px solid var(--feuer);
-  padding: 14px 16px;
-  font-size: 15px;
-  color: var(--schrift-leise);
-  max-width: 62ch;
-}
-.hinweis strong { color: var(--schrift); }
 
 /* --- Modulleiste ------------------------------------------------------ */
 .leiste-unten {
@@ -833,7 +826,7 @@ body {
          eintippen muss. -->
     <section class="ansicht" id="ansicht-bar" hidden>
       <iframe id="barrahmen" title="Bestellungen Bar"></iframe>
-      <p class="barhinweis" id="barhinweis">Zugang wird geholt …</p>
+      <p class="rahmenhinweis" id="barhinweis">Zugang wird geholt …</p>
     </section>
 
     <!-- ---------------- Arbeitsplan ----------------
@@ -853,21 +846,12 @@ body {
     </section>
 
     <!-- ---------------- Kasse ---------------- -->
+    <!-- ---------------- Kasse ----------------
+         Wie die Bar: die echte Kasse eingebettet, nicht nachgebaut. Den
+         Zugang holt der Kiosk-Dienst; hier tippt niemand ein Passwort. -->
     <section class="ansicht" id="ansicht-kasse" hidden>
-      <div class="ansicht-kopf">
-        <h2>Kasse</h2>
-        <span class="zusatz">Bondrucker Bar · 192.168.88.11 · bereit</span>
-      </div>
-      <p class="hinweis">
-        Öffnet das Bestellsystem im Vollbild. <strong>Läuft auch ohne Internet</strong>,
-        weil Kasse und Drucker im selben Netz stehen — nur die Übermittlung an
-        den Vereinsserver wartet dann, bis die Verbindung zurück ist.
-      </p>
-      <p class="hinweis">
-        Kommt ein Bon nicht aus dem Drucker, erscheint hier ein <strong>rotes
-        Band</strong> mit Bestellnummer und Grund. Es bleibt stehen, bis es
-        jemand bestätigt.
-      </p>
+      <iframe id="kassenrahmen" title="Kasse"></iframe>
+      <p class="rahmenhinweis" id="kassenhinweis">Zugang wird geholt …</p>
     </section>
 
     <!-- Rueckfrage vor dem Abmelden. Bewusst in der Seite und nicht als
@@ -944,39 +928,45 @@ module.forEach(function (k) {
     // vorletzter Woche. Nur hier und nicht bei jedem Neuzeichnen: Sonst
     // ruckte die Liste dem zurueck, der gerade selbst blaettert.
     if (k.dataset.ziel === "plan") zeigeHeute();
-    if (k.dataset.ziel === "bar") ladeBar();
+    if (k.dataset.ziel === "bar") ladeBestellansicht("bar");
+    if (k.dataset.ziel === "kasse") ladeBestellansicht("kasse");
   });
 });
 
 // Erst beim ersten Oeffnen laden, danach stehen lassen.
 //
-// Erst dann: Die Bestellansicht haelt eine offene Verbindung und meldet
-// neue Bons mit Ton — im Hintergrund waere das ein Piepen aus dem Nichts,
-// waehrend jemand Musik einstellt.
+// Erst dann: Beide Ansichten halten eine offene Verbindung, und die Bar
+// meldet neue Bons mit Ton — im Hintergrund waere das ein Piepen aus dem
+// Nichts, waehrend jemand Musik einstellt.
 //
-// Danach stehen lassen: Wer zwischen Musik und Bar hin und her wechselt,
-// soll nicht jedes Mal auf einen Neuaufbau warten.
-let barGeladen = false;
-function ladeBar() {
-  if (barGeladen) return;
-  const rahmen = $("#barrahmen");
-  const hinweis = $("#barhinweis");
-  rahmen.hidden = true;
-  hinweis.hidden = false;
-  hinweis.textContent = "Zugang wird geholt …";
+// Danach stehen lassen: Wer zwischen Musik, Bar und Kasse hin und her
+// wechselt, soll nicht jedes Mal auf einen Neuaufbau warten.
+const geladen = { bar: false, kasse: false };
+const rahmen = {
+  bar:   { rahmen: "#barrahmen",    hinweis: "#barhinweis" },
+  kasse: { rahmen: "#kassenrahmen", hinweis: "#kassenhinweis" }
+};
 
-  fetch("/api/bar").then(function (r) { return r.json(); }).then(function (d) {
-    if (!d.url) {
-      hinweis.textContent = "Der Vereinsserver ist nicht erreichbar. " +
-        "Die Bestellungen erscheinen, sobald er wieder antwortet.";
+function ladeBestellansicht(welche) {
+  if (geladen[welche]) return;
+  const r = $(rahmen[welche].rahmen);
+  const h = $(rahmen[welche].hinweis);
+  r.hidden = true;
+  h.hidden = false;
+  h.textContent = "Zugang wird geholt …";
+
+  fetch("/api/bestellsystem").then(function (a) { return a.json(); }).then(function (d) {
+    if (!d[welche]) {
+      h.textContent = "Der Vereinsserver ist nicht erreichbar. " +
+        "Die Ansicht erscheint, sobald er wieder antwortet.";
       return;
     }
-    rahmen.src = d.url;
-    rahmen.hidden = false;
-    hinweis.hidden = true;
-    barGeladen = true;
+    r.src = d[welche];
+    r.hidden = false;
+    h.hidden = true;
+    geladen[welche] = true;
   }).catch(function () {
-    hinweis.textContent = "Der Zugang konnte nicht geholt werden.";
+    h.textContent = "Der Zugang konnte nicht geholt werden.";
   });
 }
 

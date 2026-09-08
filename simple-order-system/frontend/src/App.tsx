@@ -133,6 +133,11 @@ function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
   const [user, setUser] = useState<User | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
+  // In einem Rahmen (Kiosk im Roten Schopf) laeuft die Anmeldung anders:
+  // Authentik erlaubt sich nicht einbetten (X-Frame-Options: DENY), eine
+  // Weiterleitung landete auf einer leeren Flaeche. Der Kiosk reicht
+  // stattdessen ein Token mit.
+  const imRahmen = window.self !== window.top;
   const [showCustomItem, setShowCustomItem] = useState(false);
   const [customItem, setCustomItem] = useState({ name: '', price: '', category: 'Sonstiges', printer_station: 'bar' });
   const [historyData, setHistoryData] = useState<any[]>([]);
@@ -179,7 +184,13 @@ function App() {
       const urlToken = urlParams.get('token')!;
       localStorage.setItem('order_token', urlToken);
       setToken(urlToken);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Nur das Token entfernen, nicht die ganze Abfrage — sonst gingen
+      // andere Parameter beim naechsten Neuladen verloren.
+      const rest = new URLSearchParams(window.location.search);
+      rest.delete('token');
+      const abfrage = rest.toString();
+      window.history.replaceState({}, document.title,
+        window.location.pathname + (abfrage ? '?' + abfrage : ''));
     }
 
     const storedToken = urlParams.has('token') ? urlParams.get('token')! : localStorage.getItem('order_token');
@@ -830,6 +841,20 @@ function App() {
 
   // Redirect to Authentik if not authenticated
   if (sessionChecked && !token) {
+    if (imRahmen) {
+      // Nicht weiterleiten — das gaebe im Rahmen eine leere Flaeche.
+      return (
+        <div className="min-h-screen flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="text-gray-700 text-xl mb-2">Keine Verbindung zum Bestellsystem</div>
+            <div className="text-gray-500">
+              Der Zugang wird vom Vereinsserver geholt. Ist er nicht
+              erreichbar, erscheint diese Meldung.
+            </div>
+          </div>
+        </div>
+      );
+    }
     redirectToLogin();
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -931,12 +956,18 @@ function App() {
             </div>
             <div className="flex items-center gap-2">
               {user && <span className="text-xs sm:text-sm">Hallo, {user.name}</span>}
-              <button
-                onClick={logout}
-                className="px-2 py-1 sm:px-4 sm:py-2 rounded bg-red-800 text-xs sm:text-base min-h-[36px] sm:min-h-[40px] touch-manipulation"
-              >
-                Logout
-              </button>
+              {/* Kein Logout im Rahmen: Der Kiosk meldet sich nicht
+                  persoenlich an, und die Abmeldung fuehrt zu Authentik, das
+                  sich nicht einbetten laesst — eine leere Flaeche ohne Weg
+                  zurueck, mitten im Kassenbetrieb. */}
+              {!imRahmen && (
+                <button
+                  onClick={logout}
+                  className="px-2 py-1 sm:px-4 sm:py-2 rounded bg-red-800 text-xs sm:text-base min-h-[36px] sm:min-h-[40px] touch-manipulation"
+                >
+                  Logout
+                </button>
+              )}
             </div>
           </div>
 

@@ -5629,12 +5629,12 @@ app.get('/kiosk/daten', kioskSchluessel, async (req, res) => {
     }
 });
 
-// Zugang zur Bar-Bestellansicht fuer den Kiosk.
+// Zugang zu den Bestellansichten fuer den Kiosk (Bar und Kasse).
 //
-// Der Schirm hinter der Bar gehoert keiner Person — dort meldet sich
-// niemand an, und niemand soll es muessen. Er bekommt deshalb denselben
-// Zugang wie Kasse und Kueche: das gemeinsame Passwort, das das
-// Bestellsystem woechentlich selbst rotiert.
+// Die Schirme im Vereinslokal gehoeren keiner Person — dort meldet sich
+// niemand an, und niemand soll es muessen. Sie bekommen deshalb denselben
+// Zugang wie Kasse und Kueche ueberall sonst: das gemeinsame Passwort, das
+// das Bestellsystem woechentlich selbst rotiert.
 //
 // Der Tausch passiert hier und nicht auf dem Laptop. So liegt das Passwort
 // nie auf dem Geraet im Vereinslokal; der Laptop kennt nur seinen
@@ -5642,7 +5642,7 @@ app.get('/kiosk/daten', kioskSchluessel, async (req, res) => {
 //
 // Das Token laeuft 30 Tage. Der Laptop holt es sich neu, wenn er es
 // braucht — eine Rotation faellt damit nicht auf.
-app.get('/kiosk/bar-zugang', kioskSchluessel, async (req, res) => {
+app.get('/kiosk/bestellsystem', kioskSchluessel, async (req, res) => {
     const ORDER_URL = process.env.ORDER_INTERNAL_URL || 'http://order-backend:3000';
     const ORDER_API_KEY = process.env.ORDER_API_KEY;
     if (!ORDER_API_KEY) {
@@ -5656,12 +5656,16 @@ app.get('/kiosk/bar-zugang', kioskSchluessel, async (req, res) => {
         const anmeldung = await axios.post(`${ORDER_URL}/api/auth/login`,
             { password: zugang.data.password }, { timeout: 5000 });
 
+        // Ein Token fuer beide: Es ist dasselbe gemeinsame Konto, und ein
+        // zweiter Anmeldevorgang brachte nichts ausser einer weiteren
+        // Gelegenheit zu scheitern.
+        const token = encodeURIComponent(anmeldung.data.token);
         res.json({
-            url: 'https://kitchen.fwv-raura.ch/?station=bar&token=' +
-                 encodeURIComponent(anmeldung.data.token)
+            bar: 'https://kitchen.fwv-raura.ch/?station=bar&token=' + token,
+            kasse: 'https://order.fwv-raura.ch/?token=' + token
         });
     } catch (error) {
-        console.error('GET /kiosk/bar-zugang:', error.message);
+        console.error('GET /kiosk/bestellsystem:', error.message);
         res.status(502).json({ error: 'Bestellsystem antwortet nicht' });
     }
 });

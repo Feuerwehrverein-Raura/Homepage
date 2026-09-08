@@ -258,24 +258,24 @@ def arbeitsplan_ansicht():
 
 
 # --------------------------------------------------------------------------
-# Zugang zur Bar-Bestellansicht
+# Zugang zu den Bestellansichten (Bar und Kasse)
 # --------------------------------------------------------------------------
 
-# Die Adresse traegt ein Anmeldetoken und wird deshalb nur im Speicher
+# Die Adressen tragen ein Anmeldetoken und werden deshalb nur im Speicher
 # gehalten, nicht in /var/lib/kiosk abgelegt. Ein Neustart des Dienstes holt
 # sie neu; das dauert einen Wimpernschlag und ist die geringere Sorge.
-bar_zugang = {"url": None, "geholt": 0}
+bestellzugang = {"adressen": None, "geholt": 0}
 
 
-def bar_url():
-    """Holt die Adresse der Bar-Ansicht vom Vereinsserver.
+def bestellsystem():
+    """Holt die Adressen von Bar- und Kassenansicht vom Vereinsserver.
 
-    Zwischengespeichert, weil die Ansicht bei jedem Umschalten danach fragt
-    und der Server sonst fuer nichts befragt wuerde. Zwoelf Stunden: Das
-    Token laeuft dreissig Tage, ein Fest dauert keine zwoelf.
+    Zwischengespeichert, weil beide Ansichten bei jedem Umschalten danach
+    fragen und der Server sonst fuer nichts befragt wuerde. Zwoelf Stunden:
+    Das Token laeuft dreissig Tage, ein Fest dauert keine zwoelf.
     """
-    if bar_zugang["url"] and time.time() - bar_zugang["geholt"] < 12 * 3600:
-        return bar_zugang["url"]
+    if bestellzugang["adressen"] and time.time() - bestellzugang["geholt"] < 12 * 3600:
+        return bestellzugang["adressen"]
 
     schluessel = os.environ.get("KIOSK_KEY", "")
     basis = os.environ.get("KIOSK_API", "https://api.fwv-raura.ch")
@@ -283,18 +283,19 @@ def bar_url():
         return None
     try:
         anfrage = urllib.request.Request(
-            basis + "/kiosk/bar-zugang", headers={"X-Kiosk-Key": schluessel}
+            basis + "/kiosk/bestellsystem", headers={"X-Kiosk-Key": schluessel}
         )
         with urllib.request.urlopen(anfrage, timeout=15) as antwort:
-            url = json.loads(antwort.read().decode()).get("url")
-        if url:
-            bar_zugang["url"] = url
-            bar_zugang["geholt"] = time.time()
-        return url
+            adressen = json.loads(antwort.read().decode())
+        if adressen.get("bar") and adressen.get("kasse"):
+            bestellzugang["adressen"] = adressen
+            bestellzugang["geholt"] = time.time()
+            return adressen
+        return bestellzugang["adressen"]
     except Exception:
         # Der zuletzt geholte Zugang bleibt gueltig — faellt der Server aus,
-        # laeuft die Bar-Ansicht weiter.
-        return bar_zugang["url"]
+        # laufen Bar und Kasse weiter.
+        return bestellzugang["adressen"]
 
 
 # --------------------------------------------------------------------------
@@ -341,8 +342,8 @@ class Handler(BaseHTTPRequestHandler):
                 "arbeitsplan": arbeitsplan_ansicht(),
             })
 
-        if pfad == "/api/bar":
-            return self.sende(200, {"url": bar_url()})
+        if pfad == "/api/bestellsystem":
+            return self.sende(200, bestellsystem() or {})
 
         # Statische Dateien
         if pfad == "/":
