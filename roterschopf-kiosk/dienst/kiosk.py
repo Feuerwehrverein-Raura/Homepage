@@ -313,6 +313,18 @@ LICHT_VORGABE = {
 
 lichtzustand = {"lampen": [], "geprueft": 0, "zentrale": False, "schalter": {}}
 lichtports = {}
+# Was zuletzt befohlen wurde, je Kanal: (Wert, Zeitpunkt).
+#
+# Ohne das ueberschreibt eine Abfrage, die vor dem Druck begonnen hat, den
+# frisch geschalteten Zustand mit dem alten — der Knopf springt zurueck und
+# es sieht aus, als haette er nicht funktioniert. Genau dann drueckt man
+# noch einmal und schaltet wieder zurueck.
+lichtbefehle = {}
+
+# Wie lange ein Befehl der Messung vorgeht. Danach gewinnt das Geraet, auch
+# wenn es widerspricht — sonst bliebe ein fehlgeschlagener Schaltvorgang auf
+# ewig als Erfolg stehen, und das ist die schlimmere Luege.
+BEFEHL_GILT = 15
 
 
 def licht_einstellung():
@@ -336,7 +348,18 @@ def shelly(ziel, methode, **werte):
     try:
         with urllib.request.urlopen(url, timeout=6) as antwort:
             roh = antwort.read().decode()
-        return json.loads(roh) if roh.strip() else {}
+        # Boolean.Set antwortet mit dem JSON-Wert "null". Der wird zu None —
+        # und damit ununterscheidbar von "keine Antwort". Der Dienst hielt
+        # deshalb jedes Gruppenschalten fuer gescheitert und liess sowohl die
+        # Ueberlagerung als auch das Nachlesen aus; die Seite zeigte den alten
+        # Zustand, bis die regulaere Messung ihn zufaellig einholte.
+        #
+        # Deshalb: geantwortet ist geantwortet. None gibt es nur noch, wenn
+        # das Geraet wirklich schweigt.
+        if not roh.strip():
+            return {}
+        daten = json.loads(roh)
+        return {} if daten is None else daten
     except Exception:
         return None
 
@@ -376,6 +399,60 @@ def lampe_abfragen(auftrag):
     return lampen
 
 
+def lampen_jetzt():
+    """Der Lampenzustand, wie er der Oberflaeche gemeldet wird.
+
+    Hier — und nicht nur beim Abfragen — werden offene Befehle ueberlagert.
+    Sonst liefert die Auskunft zwischen Druck und naechster Messung noch den
+    alten Wert, die Seite zeichnet damit neu, und der Knopf springt zurueck.
+    Kopien, damit das Ueberlagern den gemessenen Stand nicht ueberschreibt.
+    """
+    with sperre:
+        lampen = [dict(l) for l in lichtzustand["lampen"]]
+    return befehle_anwenden(lampen)
+
+
+def befehle_anwenden(lampen):
+    """Legt offene Befehle ueber die gemessenen Werte.
+
+    Zwischen "geschaltet" und "das Geraet meldet es" vergehen bei einer
+    Gruppe mehrere Sekunden — die Zentrale schaltet nacheinander. Ohne diese
+    Ueberlagerung zeigte die Seite in dieser Zeit den alten Zustand, der
+    Knopf spraenge zurueck, und man drueckte ein zweites Mal.
+    """
+    jetzt = time.time()
+    for l in lampen:
+        befehl = lichtbefehle.get(l["kennung"])
+        if befehl and jetzt - befehl[1] < BEFEHL_GILT:
+            l["an"] = befehl[0]
+    return lampen
+
+
+def licht_auffrischen(adressen, verzoegerung=0.0):
+    """Liest einzelne Geraete sofort neu, ohne auf den naechsten Durchgang zu
+    warten.
+
+    Nach einem Druck dauert der regulaere Durchgang bis zu zehn Sekunden.
+    Das ist fuer eine Ampel in Ordnung und fuer einen Lichtschalter nicht:
+    Wer drueckt, will sofort sehen, dass etwas passiert ist.
+    """
+    def lauf():
+        if verzoegerung:
+            time.sleep(verzoegerung)
+        auftraege = [(a, lichtports[a]) for a in adressen if a in lichtports]
+        neu = []
+        for a in auftraege:
+            neu.extend(lampe_abfragen(a))
+        if not neu:
+            return
+        with sperre:
+            bekannt = {l["kennung"]: l for l in lichtzustand["lampen"]}
+            for l in befehle_anwenden(neu):
+                bekannt[l["kennung"]] = l
+            lichtzustand["lampen"] = sorted(bekannt.values(), key=lambda x: x["kennung"])
+    threading.Thread(target=lauf, daemon=True).start()
+
+
 def lichtschleife():
     """Fragt die Lampen im Hintergrund ab.
 
@@ -400,6 +477,7 @@ def lichtschleife():
                     for teil in gleichzeitig.map(lampe_abfragen, auftraege):
                         lampen.extend(teil)
             lampen.sort(key=lambda l: l["kennung"])
+            befehle_anwenden(lampen)
         # Zustand der Gruppen von der Zentrale holen, nicht aus den Lampen
         # ableiten: Sie ist die Stelle, die ihn haelt.
         schalter = {}
@@ -414,6 +492,11 @@ def lichtschleife():
             lichtzustand["zentrale"] = klienten is not None
             lichtzustand["schalter"] = schalter
             lichtzustand["geprueft"] = time.time()
+        # Zehn Sekunden, bewusst nicht schneller: Jeder Durchgang schickt
+        # fuenfzehn Anfragen durch den Range Extender der Zentrale — und
+        # durch denselben Engpass gehen ihre eigenen Schaltbefehle. Haeufiger
+        # abzufragen macht die Anzeige nicht schneller, sondern das Schalten
+        # langsamer. Fuer die schnelle Rueckmeldung sorgt licht_auffrischen.
         time.sleep(10)
 
 
@@ -429,6 +512,18 @@ def licht_schalten(kennung, an):
         if nummer is None:
             return {"geschaltet": 0, "von": 0}
         ergebnis = shelly(zentrale, "Boolean.Set", id=nummer, value=bool(an))
+        if ergebnis is not None:
+            # Die Zentrale schaltet die Lampen nacheinander; bis alle folgen,
+            # vergehen ein paar Sekunden. Solange gilt der Befehl.
+            mitglieder = einstellung.get("gruppen", {}).get(kennung[7:], [])
+            jetzt = time.time()
+            for m in mitglieder:
+                lichtbefehle[m] = (bool(an), jetzt)
+            adressen = {m.rsplit(":", 1)[0] for m in mitglieder}
+            # Zweimal nachlesen: einmal frueh fuer die schnelle Rueckmeldung,
+            # einmal spaeter, wenn die Zentrale durch ist.
+            licht_auffrischen(adressen, 2.0)
+            licht_auffrischen(adressen, 8.0)
         return {"geschaltet": 1 if ergebnis is not None else 0, "von": 1}
 
     ziele = [kennung]
@@ -447,6 +542,8 @@ def licht_schalten(kennung, an):
             continue
         if shelly("192.168.88.84:%d" % port, "Switch.Set",
                   id=int(kanal), on=bool(an)) is not None:
+            lichtbefehle[ziel] = (bool(an), time.time())
+            licht_auffrischen({ap_adresse})
             erfolg += 1
     return {"geschaltet": erfolg, "von": len(ziele)}
 
@@ -520,9 +617,9 @@ class Handler(BaseHTTPRequestHandler):
         if pfad == "/api/zustand":
             with sperre:
                 ampel = dict(zustand["ampel"])
-                lampen_jetzt = list(lichtzustand["lampen"])
                 zentrale_da = lichtzustand["zentrale"]
                 schalter_jetzt = dict(lichtzustand["schalter"])
+            lampen = lampen_jetzt()
             # "Alle Titel" steht immer vorn: Sie braucht keinen Server und
             # keine Pflege. Ohne sie stuende der Rechner beim allerersten
             # Einschalten ohne jede Auswahl da.
@@ -537,7 +634,7 @@ class Handler(BaseHTTPRequestHandler):
                 "playlists": pl,
                 "sender": se,
                 "arbeitsplan": arbeitsplan_ansicht(),
-                "licht": {"lampen": lampen_jetzt,
+                "licht": {"lampen": lampen,
                           "gruppen": licht_einstellung().get("gruppen", {}),
                           "schalter": schalter_jetzt,
                           "zentrale": zentrale_da},
@@ -545,10 +642,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if pfad == "/api/licht":
             with sperre:
-                lampen = list(lichtzustand["lampen"])
                 geprueft = lichtzustand["geprueft"]
             return self.sende(200, {
-                "lampen": lampen,
+                "lampen": lampen_jetzt(),
                 "gruppen": licht_einstellung().get("gruppen", {}),
                 "geprueft": geprueft,
             })
