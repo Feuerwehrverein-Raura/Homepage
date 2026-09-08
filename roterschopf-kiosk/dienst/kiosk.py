@@ -293,19 +293,21 @@ LICHT_VORGABE = {
     # Lampen nach. Wuerde diese Seite die Lampen direkt schalten, haetten
     # Taster und Laptop nach dem ersten Mal getrennte Vorstellungen davon,
     # was an ist.
-    "schalter": {"Spots": 200, "Arbeitsleuchten": 201, "Girlanden": 202},
+    # Nur zwei Gruppen: Die Girlanden laufen mit den Spots und sind keine
+    # eigene. boolean:202 heisst auf dem Geraet noch "Girlanden", wird aber
+    # von niemandem beachtet.
+    "schalter": {"Spots": 200, "Arbeitsleuchten": 201},
     # Womit die Gruppe belegt ist — nur fuer die Anzeige. Geschaltet wird
     # ueber den Schalter oben. Gepflegt wird die Zuordnung im Skript
     # "Lichtgruppen" auf der Zentrale.
     "gruppen": {
+        # Die drei Girlanden laufen mit: Am Taster ist das eine Stimmung
+        # und kein zweiter Handgriff.
         "Spots": ["192.168.33.4:1", "192.168.33.5:0", "192.168.33.6:0",
-                  "192.168.33.7:0", "192.168.33.8:1"],
+                  "192.168.33.7:0", "192.168.33.8:1",
+                  "192.168.33.5:1", "192.168.33.12:0", "192.168.33.13:0"],
         "Arbeitsleuchten": ["192.168.33.4:0", "192.168.33.6:1",
                             "192.168.33.7:1", "192.168.33.8:0"],
-        # Die Girlanden stehen in keinem der alten Skripte. Uebrig bleiben
-        # 192.168.33.5:1 sowie die beiden Mini-Schalter .12 und .13; welcher
-        # es ist, sagt einem nur das Einschalten.
-        "Girlanden": [],
     },
 }
 

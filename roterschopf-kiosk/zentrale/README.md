@@ -9,9 +9,12 @@ der drei Lichtgruppen.
 
 Verbindet die drei virtuellen Schalter mit den Lampen:
 
-    boolean:200  Spots
+    boolean:200  Spots (die drei Girlanden laufen mit)
     boolean:201  Arbeitsleuchten
-    boolean:202  Girlanden (noch nicht belegt)
+
+boolean:202 hiess "Girlanden" und ist keine eigene Gruppe: Am Taster ist
+das eine Stimmung und kein zweiter Handgriff. Der Schalter steht noch auf
+dem Geraet, wird aber von niemandem beachtet.
 
 Wer den Schalter umlegt, ist gleich — der BLU-Taster an der Wand oder die
 Lichtseite auf dem Laptop. Das Skript hoert auf die Aenderung und setzt
@@ -22,6 +25,11 @@ Der BLU-Taster hat vier Tasten mit fester Absicht statt Umschaltung — zwei
 zum Ein-, zwei zum Ausschalten. Ein versehentlicher zweiter Druck laesst
 das Licht dann an, statt es wieder auszuschalten. Aus demselben Grund gilt
 jeder Druck (einfach, doppelt, lang) als dieselbe Absicht.
+
+**Die Aufrufe gehen nacheinander raus, nicht auf einmal.** Die
+Aufrufwarteschlange eines Shelly-Skripts ist kurz: Bei acht gleichzeitigen
+HTTP-Aufrufen kamen die letzten drei nie an - die Girlanden blieben
+dunkel, waehrend die fuenf Spots angingen.
 
 **Nur ASCII in dieser Datei.** Der JSON-Parser des Geraets bricht ab,
 sobald ein mehrbyteiges Zeichen an einer Uebertragungsgrenze landet — ein

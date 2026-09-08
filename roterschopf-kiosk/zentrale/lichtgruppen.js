@@ -3,9 +3,12 @@
 // Die Zentrale haelt den Zustand, nicht die einzelnen Lampen. Die drei
 // virtuellen Schalter sind die Wahrheit:
 //
-//     boolean:200  Spots
+//     boolean:200  Spots (die Girlanden gehoeren dazu)
 //     boolean:201  Arbeitsleuchten
-//     boolean:202  Girlanden
+//
+// boolean:202 hiess "Girlanden" und ist keine eigene Gruppe: Die Girlanden
+// laufen mit den Spots. Der Schalter bleibt auf dem Geraet stehen, wird
+// aber von niemandem mehr beachtet.
 //
 // Wer sie umlegt, ist gleich: der BLU-Taster an der Wand oder die
 // Lichtseite auf dem Laptop. Dieses Skript hoert auf die Aenderung und
@@ -27,17 +30,19 @@ let GRUPPEN = {
     { ip: "192.168.33.5", k: 0 },
     { ip: "192.168.33.6", k: 0 },
     { ip: "192.168.33.7", k: 0 },
-    { ip: "192.168.33.8", k: 1 }
+    { ip: "192.168.33.8", k: 1 },
+    // Die Girlanden laufen mit den Spots: Am Taster ist das eine Stimmung
+    // und kein zweiter Handgriff.
+    { ip: "192.168.33.5", k: 1 },
+    { ip: "192.168.33.12", k: 0 },
+    { ip: "192.168.33.13", k: 0 }
   ],
   201: [
     { ip: "192.168.33.4", k: 0 },
     { ip: "192.168.33.6", k: 1 },
     { ip: "192.168.33.7", k: 1 },
     { ip: "192.168.33.8", k: 0 }
-  ],
-  // Girlanden: noch nicht zugeordnet. Uebrig sind 192.168.33.5 Kanal 2
-  // sowie die beiden Mini-Schalter .12 und .13.
-  202: []
+  ]
 };
 
 // BLU-Taster mit vier Tasten.
@@ -54,17 +59,30 @@ let TASTEN = {
   3: { schalter: 201, wert: false }
 };
 
+// Nacheinander, nicht auf einmal.
+//
+// Die Aufrufwarteschlange eines Shelly-Skripts ist kurz: Bei acht
+// gleichzeitigen HTTP-Aufrufen kamen die letzten drei nie an - die
+// Girlanden blieben dunkel, waehrend die fuenf Spots angingen. Jeder
+// Aufruf loest deshalb im Rueckruf den naechsten aus.
+function sendeAb(lampen, i, an, id) {
+  if (i >= lampen.length) {
+    print("Gruppe", id, an ? "ein" : "aus", "-", lampen.length, "Lampen");
+    return;
+  }
+  let l = lampen[i];
+  Shelly.call("HTTP.GET", {
+    url: "http://" + l.ip + "/rpc/Switch.Set?id=" + JSON.stringify(l.k) +
+         "&on=" + (an ? "true" : "false")
+  }, function () {
+    sendeAb(lampen, i + 1, an, id);
+  });
+}
+
 function setzeGruppe(id, an) {
   let lampen = GRUPPEN[id];
   if (!lampen) return;
-  for (let i = 0; i < lampen.length; i++) {
-    let l = lampen[i];
-    Shelly.call("HTTP.GET", {
-      url: "http://" + l.ip + "/rpc/Switch.Set?id=" + JSON.stringify(l.k) +
-           "&on=" + (an ? "true" : "false")
-    });
-  }
-  print("Gruppe", id, an ? "ein" : "aus", "-", lampen.length, "Lampen");
+  sendeAb(lampen, 0, an, id);
 }
 
 // Aenderung an einem der drei Schalter: Lampen nachziehen.
