@@ -262,92 +262,114 @@ def arbeitsplan_ansicht():
 # Licht
 # --------------------------------------------------------------------------
 #
-# Die Lampen sind Shelly Plus 2PM, je zwei Kanaele. Sie haengen im selben
-# Netz wie dieser Rechner; geschaltet wird direkt ueber ihre HTTP-Schnittstelle
-# (Gen2-RPC), ohne Umweg ueber Cloud oder Zentrale.
+# Die Lampen haengen NICHT am Hausnetz, sondern am eigenen Zugangspunkt des
+# Shelly Pro 3EM (SSID ShellyPro3EM-…, Netz 192.168.33.0/24). Von hier aus
+# waeren sie damit unerreichbar — waere da nicht der Range Extender des
+# Pro 3EM: Er reicht jeden seiner Klienten unter einem eigenen Port auf
+# seiner Hausnetz-Adresse durch.
 #
-# Warum jeder Kanal einzeln und nicht nur Gruppen: Beim Einrichten wusste
-# niemand mehr, welches Geraet welche Lampe schaltet. Einzeln schaltbar ist
-# die Anlage sofort brauchbar — und zugleich der Weg, die Zuordnung
-# herauszufinden.
+#     192.168.88.84:10760  ->  192.168.33.4  (Lampe)
 #
-# Die Adressen stehen fest im Router reserviert. Die Liste liegt trotzdem in
-# einer Datei: Wer eine Lampe umbenennt oder eine dazuhaengt, soll dafuer
-# keinen Dienst anfassen muessen.
+# Diese Ports vergibt der Pro 3EM selbst und kann sie beim Neuverbinden
+# aendern. Deshalb wird die Zuordnung bei jedem Durchgang neu erfragt statt
+# in eine Datei geschrieben — eine notierte Portnummer waere genau bis zum
+# naechsten Stromausfall richtig.
+#
+# Angesprochen werden die Lampen ueber ihre feste Adresse im AP-Netz
+# ("192.168.33.4:1" = Geraet .4, Kanal 2). Die ist statisch vergeben und
+# bleibt, auch wenn der Port wechselt.
 LICHT_DATEI = os.path.join(DATEN, "licht.json")
 
 LICHT_VORGABE = {
-    "geraete": [
-        {"adresse": "192.168.88.100", "kanaele": [0, 1]},
-        {"adresse": "192.168.88.101", "kanaele": [0, 1]},
-        {"adresse": "192.168.88.102", "kanaele": [0, 1]},
-        {"adresse": "192.168.88.103", "kanaele": [0, 1]},
-        {"adresse": "192.168.88.104", "kanaele": [0, 1]},
-        # .105 ist ein PM Mini — ein reiner Zaehler ohne Relais, also nichts
-        # zum Schalten. Er steht hier nur, damit niemand ihn spaeter sucht.
-    ],
-    # Gruppen: Namen der Zentrale, Mitglieder als "adresse:kanal".
-    # Leer, solange niemand weiss, welche Lampe wo haengt — eine geratene
-    # Zuordnung waere schlimmer als keine.
-    "gruppen": {"Spots": [], "Arbeitsleuchten": [], "Girlanden": []},
+    "zentrale": "192.168.88.84",
+    # Uebernommen aus dem Skript "Taster Eingang" auf der Zentrale, das
+    # dieselben zwei Gruppen ueber dieselben Kanaele kennt. Bestaetigt durch
+    # die Kanalnamen auf den Geraeten: In Gruppe 1 heissen zwei Kanaele
+    # "Spot" bzw. "Roter Schopf Regler 1 Spot", in Gruppe 2 heissen drei
+    # "Arbeitscheinwerfer" — kein einziger Widerspruch.
+    # Die Gruppen liegen als virtuelle Schalter auf der Zentrale. Sie sind
+    # die Wahrheit, nicht die einzelnen Lampen: Der BLU-Taster an der Wand
+    # legt dieselben Schalter um, und ein Skript auf der Zentrale zieht die
+    # Lampen nach. Wuerde diese Seite die Lampen direkt schalten, haetten
+    # Taster und Laptop nach dem ersten Mal getrennte Vorstellungen davon,
+    # was an ist.
+    "schalter": {"Spots": 200, "Arbeitsleuchten": 201, "Girlanden": 202},
+    # Womit die Gruppe belegt ist — nur fuer die Anzeige. Geschaltet wird
+    # ueber den Schalter oben. Gepflegt wird die Zuordnung im Skript
+    # "Lichtgruppen" auf der Zentrale.
+    "gruppen": {
+        "Spots": ["192.168.33.4:1", "192.168.33.5:0", "192.168.33.6:0",
+                  "192.168.33.7:0", "192.168.33.8:1"],
+        "Arbeitsleuchten": ["192.168.33.4:0", "192.168.33.6:1",
+                            "192.168.33.7:1", "192.168.33.8:0"],
+        # Die Girlanden stehen in keinem der alten Skripte. Uebrig bleiben
+        # 192.168.33.5:1 sowie die beiden Mini-Schalter .12 und .13; welcher
+        # es ist, sagt einem nur das Einschalten.
+        "Girlanden": [],
+    },
 }
 
-lichtzustand = {"lampen": [], "geprueft": 0}
+lichtzustand = {"lampen": [], "geprueft": 0, "zentrale": False, "schalter": {}}
+lichtports = {}
 
 
 def licht_einstellung():
     try:
         with open(LICHT_DATEI) as f:
-            return json.load(f)
+            gespeichert = json.load(f)
+        return {**LICHT_VORGABE, **gespeichert}
     except (OSError, ValueError):
         return LICHT_VORGABE
 
 
-def shelly(adresse, methode, **werte):
-    """Ruft die RPC-Schnittstelle eines Shelly auf.
+def shelly(ziel, methode, **werte):
+    """Ruft die RPC-Schnittstelle eines Shelly auf ("host:port" oder "host").
 
-    Kurzer Zeitablauf: Eine Lampe, die aus ist, darf die Anzeige nicht
-    aufhalten. Antwortet sie nicht, gilt sie als nicht erreichbar — was am
+    Kurzer Zeitablauf: Ein Geraet, das schweigt, darf die Anzeige nicht
+    aufhalten. Antwortet es nicht, gilt es als nicht erreichbar — was am
     Fest genau die richtige Auskunft ist.
     """
     teile = "&".join("%s=%s" % (k, str(v).lower()) for k, v in werte.items())
-    url = "http://%s/rpc/%s%s" % (adresse, methode, ("?" + teile) if teile else "")
+    url = "http://%s/rpc/%s%s" % (ziel, methode, ("?" + teile) if teile else "")
     try:
-        with urllib.request.urlopen(url, timeout=3) as antwort:
+        with urllib.request.urlopen(url, timeout=6) as antwort:
             roh = antwort.read().decode()
         return json.loads(roh) if roh.strip() else {}
     except Exception:
         return None
 
 
-def geraet_abfragen(g):
-    """Fragt ein Geraet ab und liefert seine Kanaele.
-
-    Erst ein einziger Ruf, um zu sehen, ob das Geraet ueberhaupt da ist. Ist
-    es das nicht, werden seine uebrigen Kanaele gar nicht erst versucht —
-    sonst kostet jede abgeschaltete Lampe zweimal den vollen Zeitablauf.
-    """
-    adresse = g.get("adresse")
-    kanaele = g.get("kanaele", [0])
+def lampe_abfragen(auftrag):
+    """Fragt ein Geraet hinter der Zentrale ab und liefert seine Kanaele."""
+    ap_adresse, port = auftrag
     lampen = []
-    lebt = None
-    for i, kanal in enumerate(kanaele):
-        zustand = shelly(adresse, "Switch.GetStatus", id=kanal) if (lebt or i == 0) else None
-        if i == 0:
-            lebt = zustand is not None
-        name = None
-        if zustand is not None:
-            cfg = shelly(adresse, "Switch.GetConfig", id=kanal)
-            if cfg:
-                name = cfg.get("name")
+    for kanal in (0, 1):
+        zustand = shelly("192.168.88.84:%d" % port, "Switch.GetStatus", id=kanal)
+        # Kanal 2 gibt es nur bei den 2PM. Fehlt er, ist das kein Fehler,
+        # sondern ein einkanaliges Geraet.
+        if zustand is None:
+            if kanal == 0:
+                # Antwortet das Geraet sonst, hat es einfach kein Relais —
+                # das BLU-Gateway etwa. Es als "nicht erreichbar" zu zeigen
+                # waere falsch: Es ist da, es schaltet nur nichts.
+                if shelly("192.168.88.84:%d" % port, "Shelly.GetDeviceInfo") is not None:
+                    return []
+                lampen.append({
+                    "kennung": "%s:0" % ap_adresse,
+                    "name": "Gerät .%s" % ap_adresse.split(".")[-1],
+                    "erreichbar": False, "an": False, "watt": None,
+                })
+            break
+        cfg = shelly("192.168.88.84:%d" % port, "Switch.GetConfig", id=kanal) or {}
         lampen.append({
-            "kennung": "%s:%d" % (adresse, kanal),
+            "kennung": "%s:%d" % (ap_adresse, kanal),
             # Kein Name auf dem Geraet: Dann sagt die Adresse wenigstens,
             # welches Geraet gemeint ist.
-            "name": name or ("Gerät .%s · Kanal %d" % (adresse.split(".")[-1], kanal + 1)),
-            "erreichbar": zustand is not None,
-            "an": bool(zustand.get("output")) if zustand else False,
-            "watt": round(zustand.get("apower", 0)) if zustand else None,
+            "name": cfg.get("name") or ("Gerät .%s · Kanal %d"
+                                        % (ap_adresse.split(".")[-1], kanal + 1)),
+            "erreichbar": True,
+            "an": bool(zustand.get("output")),
+            "watt": round(zustand.get("apower") or 0),
         })
     return lampen
 
@@ -356,18 +378,39 @@ def lichtschleife():
     """Fragt die Lampen im Hintergrund ab.
 
     Wie bei der Ampel: Die Oberflaeche soll nie auf einen Zeitablauf warten.
-    Parallel ueber die Geraete, weil sonst schon fuenf ausgeschaltete Lampen
+    Parallel ueber die Geraete, weil sonst schon wenige schweigende Lampen
     einen Durchgang auf eine halbe Minute strecken.
     """
     while True:
-        geraete = licht_einstellung().get("geraete", [])
+        zentrale = licht_einstellung().get("zentrale", "192.168.88.84")
+        klienten = shelly(zentrale, "WiFi.ListAPClients")
         lampen = []
-        if geraete:
-            with futures.ThreadPoolExecutor(max_workers=8) as gleichzeitig:
-                for teil in gleichzeitig.map(geraet_abfragen, geraete):
-                    lampen.extend(teil)
+        if klienten:
+            auftraege = [(k["ip"], k["mport"]) for k in klienten.get("ap_clients", [])]
+            lichtports.clear()
+            lichtports.update({a: p for a, p in auftraege})
+            if auftraege:
+                # Nur zwei gleichzeitig: Der Range Extender des Pro 3EM
+                # ist ein kleines Geraet und laesst bei acht parallelen
+                # Verbindungen die Haelfte fallen — die Lampen erschienen
+                # dann als "nicht erreichbar", obwohl sie antworten.
+                with futures.ThreadPoolExecutor(max_workers=2) as gleichzeitig:
+                    for teil in gleichzeitig.map(lampe_abfragen, auftraege):
+                        lampen.extend(teil)
+            lampen.sort(key=lambda l: l["kennung"])
+        # Zustand der Gruppen von der Zentrale holen, nicht aus den Lampen
+        # ableiten: Sie ist die Stelle, die ihn haelt.
+        schalter = {}
+        if klienten is not None:
+            for name, nummer in licht_einstellung().get("schalter", {}).items():
+                st = shelly(zentrale, "Boolean.GetStatus", id=nummer)
+                if st is not None:
+                    schalter[name] = bool(st.get("value"))
+
         with sperre:
             lichtzustand["lampen"] = lampen
+            lichtzustand["zentrale"] = klienten is not None
+            lichtzustand["schalter"] = schalter
             lichtzustand["geprueft"] = time.time()
         time.sleep(10)
 
@@ -375,23 +418,33 @@ def lichtschleife():
 def licht_schalten(kennung, an):
     """Schaltet einen Kanal oder eine Gruppe."""
     einstellung = licht_einstellung()
+    zentrale = einstellung.get("zentrale", "192.168.88.84")
+
+    # Gruppen laufen ueber den Schalter auf der Zentrale, nicht ueber die
+    # einzelnen Lampen. Von dort zieht das Skript "Lichtgruppen" nach.
     if kennung.startswith("gruppe:"):
-        ziele = einstellung.get("gruppen", {}).get(kennung[7:], [])
-    else:
-        ziele = [kennung]
+        nummer = einstellung.get("schalter", {}).get(kennung[7:])
+        if nummer is None:
+            return {"geschaltet": 0, "von": 0}
+        ergebnis = shelly(zentrale, "Boolean.Set", id=nummer, value=bool(an))
+        return {"geschaltet": 1 if ergebnis is not None else 0, "von": 1}
+
+    ziele = [kennung]
 
     erfolg = 0
     for ziel in ziele:
         try:
-            adresse, kanal = ziel.rsplit(":", 1)
+            ap_adresse, kanal = ziel.rsplit(":", 1)
         except ValueError:
             continue
-        # Nur Adressen aus der Einstellung — die Kennung kommt aus dem
-        # Browser, und dieser Dienst soll nicht zum Werkzeug werden, mit dem
-        # sich beliebige Geraete im Netz ansprechen lassen.
-        if adresse not in [g.get("adresse") for g in einstellung.get("geraete", [])]:
+        # Nur Geraete, die die Zentrale gerade als ihre Klienten nennt. Die
+        # Kennung kommt aus dem Browser, und dieser Dienst soll nicht das
+        # Werkzeug sein, mit dem sich beliebige Adressen ansprechen lassen.
+        port = lichtports.get(ap_adresse)
+        if not port:
             continue
-        if shelly(adresse, "Switch.Set", id=int(kanal), on=bool(an)) is not None:
+        if shelly("192.168.88.84:%d" % port, "Switch.Set",
+                  id=int(kanal), on=bool(an)) is not None:
             erfolg += 1
     return {"geschaltet": erfolg, "von": len(ziele)}
 
@@ -466,6 +519,8 @@ class Handler(BaseHTTPRequestHandler):
             with sperre:
                 ampel = dict(zustand["ampel"])
                 lampen_jetzt = list(lichtzustand["lampen"])
+                zentrale_da = lichtzustand["zentrale"]
+                schalter_jetzt = dict(lichtzustand["schalter"])
             # "Alle Titel" steht immer vorn: Sie braucht keinen Server und
             # keine Pflege. Ohne sie stuende der Rechner beim allerersten
             # Einschalten ohne jede Auswahl da.
@@ -480,7 +535,10 @@ class Handler(BaseHTTPRequestHandler):
                 "playlists": pl,
                 "sender": se,
                 "arbeitsplan": arbeitsplan_ansicht(),
-                "licht": {"lampen": lampen_jetzt, "gruppen": licht_einstellung().get("gruppen", {})},
+                "licht": {"lampen": lampen_jetzt,
+                          "gruppen": licht_einstellung().get("gruppen", {}),
+                          "schalter": schalter_jetzt,
+                          "zentrale": zentrale_da},
             })
 
         if pfad == "/api/licht":

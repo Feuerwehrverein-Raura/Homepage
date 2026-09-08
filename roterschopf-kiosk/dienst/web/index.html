@@ -1079,7 +1079,10 @@ function zeichneLicht() {
     // schaltet, ist schlimmer als kein Knopf.
     if (!mitglieder.length) return;
     const teile = lichtDaten.lampen.filter(l => mitglieder.indexOf(l.kennung) >= 0);
-    const an = teile.some(l => l.an);
+    // Der Zustand kommt vom Schalter auf der Zentrale, nicht aus den
+    // Lampen: Sie ist die Stelle, die ihn haelt — und dieselbe, die der
+    // Taster an der Wand umlegt.
+    const an = (lichtDaten.schalter || {})[name] === true;
     const da = teile.some(l => l.erreichbar);
     gruppen.appendChild(lampenknopf(
       name, mitglieder.length + (an ? " Lampen · an" : " Lampen · aus"),
@@ -1105,6 +1108,8 @@ function schalteLicht(kennung, an) {
   // Abfragetakt korrigiert, falls die Lampe doch nicht reagiert hat.
   if (kennung.startsWith("gruppe:")) {
     const name = kennung.slice(7);
+    if (!lichtDaten.schalter) lichtDaten.schalter = {};
+    lichtDaten.schalter[name] = an;
     (lichtDaten.gruppen[name] || []).forEach(function (m) {
       const l = lichtDaten.lampen.find(x => x.kennung === m);
       if (l) l.an = an;
@@ -1380,9 +1385,12 @@ function zeichne(z) {
   if (z.licht) {
     lichtDaten = z.licht;
     const stand = z.licht.lampen.filter(l => l.erreichbar).length;
-    $("#licht-stand").textContent = stand
-      ? stand + " von " + z.licht.lampen.length + " erreichbar"
-      : "keine Lampe erreichbar";
+    // Die Zentrale getrennt melden: Ist SIE weg, sind zwangslaeufig alle
+    // Lampen weg — und dann sucht man den Fehler dort und nicht bei den
+    // einzelnen Leuchten.
+    $("#licht-stand").textContent = !z.licht.zentrale
+      ? "Zentrale nicht erreichbar"
+      : stand + " von " + z.licht.lampen.length + " erreichbar";
     if (!$("#ansicht-licht").hidden) zeichneLicht();
   }
 
