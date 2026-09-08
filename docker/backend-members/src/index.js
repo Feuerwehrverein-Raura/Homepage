@@ -3656,22 +3656,26 @@ app.post('/members/:id/datenblatt', authenticateVorstand, async (req, res) => {
 //
 //   * **Einmalig.** Der erste Scan verbraucht ihn. Ein Bon, der danach
 //     liegen bleibt, ist wertlos.
-//   * **Befristet.** Wurde er nie gescannt, verfaellt er nach sieben Tagen,
-//     statt auf Dauer als gueltiger Zugang in der Kiste zu liegen.
+//   * **Kurz gueltig.** Wurde er nie gescannt, verfaellt er nach einer
+//     Stunde. Zwischen Druck und Scan ist der Bon ein Zugang — dieses
+//     Fenster soll so klein sein wie moeglich. Gescannt wird er ohnehin
+//     innerhalb von Minuten; wer ihn anfordert, steht neben dem Drucker.
 //
-// Ein Restrisiko bleibt: Zwischen Druck und Scan ist der Bon ein Zugang.
-// Wer ihn anfordert, steht aber neben dem Drucker.
+// Die Anmeldung danach haelt dagegen sieben Tage. Das ist kein
+// Widerspruch, sondern der Sinn der Sache: Das Papier soll schnell wertlos
+// werden, das Konto auf dem Handy aber den ganzen Anlass durchhalten —
+// sonst steht dieselbe Person am zweiten Festtag wieder da.
 // ---------------------------------------------------------------------------
 
 const BONDRUCKER = process.env.BONDRUCKER_IP || '192.168.88.11';
-// Sieben Tage: Die Chilbi laeuft vom Aufbau am Mittwoch bis zum Abbau am
-// Montag. Ein Bon, der am ersten Tag gedruckt wird, muss am letzten noch
-// gehen — sonst steht am Sonntag jemand mit einem toten Bon da.
-//
-// Die Frist ist ohnehin die schwaechere der beiden Schranken: Der Code ist
-// EINMALIG. Nach dem ersten Scan ist er verbraucht, egal wie lange er noch
-// gueltig waere. Die Frist greift nur fuer Bons, die nie gescannt wurden.
-const ANMELDEBON_STUNDEN = parseInt(process.env.ANMELDEBON_STUNDEN, 10) || 168;
+// Eine Stunde fuer den Bon: Er wird innerhalb von Minuten gescannt, und
+// solange er ungescannt herumliegt, ist er ein Zugang.
+const ANMELDEBON_STUNDEN = parseInt(process.env.ANMELDEBON_STUNDEN, 10) || 1;
+
+// Sieben Tage fuer die Anmeldung danach: Die Chilbi laeuft vom Aufbau am
+// Mittwoch bis zum Abbau am Montag. Wer sich am ersten Tag anmeldet, soll
+// am letzten nicht wieder anstehen muessen.
+const ANMELDEBON_SITZUNG = process.env.ANMELDEBON_SITZUNG || '7d';
 
 async function anmeldecodeTabelle() {
     await pool.query(`
@@ -3783,9 +3787,9 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
       <text>&#10;</text>
       <symbol type="qrcode_model_2" level="level_m" width="6" height="6">${xmlSicher(adresse)}</symbol>
       <text>&#10;Mit der Handykamera scannen.&#10;&#10;</text>
-      <text>Gilt EINMALIG.&#10;</text>
-      <text>Spaetestens bis ${xmlSicher(bis)} Uhr.&#10;</text>
-      <text>Die Anmeldung danach laeuft 8 Std.&#10;</text>
+      <text>Gilt EINMALIG und nur bis&#10;</text>
+      <text em="true">${xmlSicher(bis)} Uhr.&#10;</text>
+      <text em="false">Danach bleibst du 7 Tage&#10;angemeldet.&#10;</text>
       <text>Nach dem Scannen ist dieser Bon&#10;wertlos - er darf in den Abfall.&#10;</text>
       <feed line="3"/>
       <cut type="feed"/>`);
@@ -3837,10 +3841,10 @@ app.post('/auth/member/code-login', async (req, res) => {
         if (!m.rows.length) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
         const mitglied = m.rows[0];
 
-        // Dasselbe Token wie beim QR-Login der App: type=member, 8 Stunden.
-        //
-        // Die Anmeldung gilt also 8 Stunden, nicht sieben Tage — die sieben
-        // Tage sind die Frist des Codes auf dem Bon, nicht die der Sitzung.
+        // Dieselbe Form wie beim QR-Login der App (type=member), aber laenger
+        // gueltig: sieben Tage statt acht Stunden. Der Bon wird an einem
+        // mehrtaegigen Anlass ausgegeben, und niemand soll am zweiten Tag
+        // erneut anstehen.
         //
         // sub und member_id muessen mit drin sein: authenticateToken setzt
         // req.user.id auf "sub || member_id || email". Ohne sie fiele die
@@ -3854,7 +3858,7 @@ app.post('/auth/member/code-login', async (req, res) => {
             name: `${mitglied.vorname} ${mitglied.nachname}`.trim(),
             type: 'member',
             groups: []
-        }, process.env.JWT_SECRET, { expiresIn: '8h' });
+        }, process.env.JWT_SECRET, { expiresIn: ANMELDEBON_SITZUNG });
 
         await logAudit(pool, 'MEMBER_CODE_LOGIN_SUCCESS', mitglied.id, mitglied.email, clientIp, {});
         res.json({ token, name: `${mitglied.vorname} ${mitglied.nachname}` });
