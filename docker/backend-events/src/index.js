@@ -3516,6 +3516,87 @@ app.get('/calendar/ics', async (req, res) => {
 // ============================================
 
 // DEUTSCH: Generiert Arbeitsplan als PDF. Unterstützt Einzel-Event, Multi-Event und Legacy-Format
+// ---------------------------------------------------------------------------
+// Arbeitsplan fuer den Kiosk im Roten Schopf
+//
+// Der Laptop im Schopf hat keine angemeldete Person und weist sich mit einem
+// Schluessel aus. Er holt genau einen Anlass: den, der gerade laeuft, sonst
+// den naechsten. Mehr braucht die Kachel nicht, und alles andere waere auf
+// einem 1280x800-Schirm ohnehin nicht lesbar.
+//
+// Bewusst nur bestaetigte Anmeldungen: Am Fest zaehlt, wer eingeteilt ist.
+// Wer noch auf Bestaetigung wartet, steht nicht im Plan an der Wand.
+// ---------------------------------------------------------------------------
+app.get('/arbeitsplan/kiosk', async (req, res) => {
+    if (!process.env.KIOSK_KEY || req.headers['x-kiosk-key'] !== process.env.KIOSK_KEY) {
+        return res.status(401).json({ error: 'Kein gueltiger Kiosk-Schluessel' });
+    }
+    try {
+        // Laufender Anlass zuerst (end_date kann fehlen — dann gilt der
+        // Starttag), sonst der naechste. Vergangenes faellt raus.
+        const anlass = await pool.query(`
+            SELECT id, title, start_date, end_date
+            FROM events
+            WHERE status != 'cancelled'
+              AND COALESCE(end_date, start_date)::date >= CURRENT_DATE
+            ORDER BY start_date
+            LIMIT 1
+        `);
+        if (!anlass.rows.length) {
+            return res.json({ anlass: null, tage: [] });
+        }
+        const e = anlass.rows[0];
+
+        const schichten = await pool.query(`
+            SELECT s.id, s.name, s.date, s.start_time, s.end_time, s.needed, s.bereich,
+                   COALESCE(
+                       json_agg(
+                           COALESCE(m.vorname || ' ' || m.nachname, r.guest_name)
+                           ORDER BY COALESCE(m.vorname, r.guest_name)
+                       ) FILTER (WHERE r.id IS NOT NULL),
+                       '[]'
+                   ) AS besetzt
+            FROM shifts s
+            LEFT JOIN registrations r
+                   ON s.id = ANY(r.shift_ids) AND r.status = 'approved'
+            LEFT JOIN members m ON m.id = r.member_id
+            WHERE s.event_id = $1
+            GROUP BY s.id
+            ORDER BY s.date, s.start_time
+        `, [e.id]);
+
+        // Nach Tagen gruppieren, damit die Kachel den heutigen Tag
+        // hervorheben kann, ohne selbst zu rechnen.
+        const tage = [];
+        for (const s of schichten.rows) {
+            const tag = s.date instanceof Date
+                ? s.date.toISOString().slice(0, 10)
+                : String(s.date).slice(0, 10);
+            let eintrag = tage.find(t => t.tag === tag);
+            if (!eintrag) {
+                eintrag = { tag, schichten: [] };
+                tage.push(eintrag);
+            }
+            eintrag.schichten.push({
+                name: s.name,
+                bereich: s.bereich,
+                von: s.start_time ? String(s.start_time).slice(0, 5) : null,
+                bis: s.end_time ? String(s.end_time).slice(0, 5) : null,
+                gebraucht: s.needed,
+                besetzt: s.besetzt
+            });
+        }
+
+        res.json({
+            anlass: { titel: e.title, beginn: e.start_date, ende: e.end_date },
+            tage
+        });
+    } catch (error) {
+        console.error('GET /arbeitsplan/kiosk:', error.message);
+        res.status(500).json({ error: 'Arbeitsplan konnte nicht geladen werden' });
+    }
+});
+
 app.post('/arbeitsplan/pdf', async (req, res) => {
     try {
         // Support both old format (eventId, shifts) and new format (event object or events array)

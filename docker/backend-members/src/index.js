@@ -5476,6 +5476,394 @@ app.delete('/members/me/vpn/:name', authenticateToken, async (req, res) => {
     }
 });
 
+// ---------------------------------------------------------------------------
+// Kiosk im Roten Schopf — Playlists, Sender, Musikbibliothek
+//
+// Wer was macht:
+//
+//   Der Laptop meldet, welche Titel er hat (POST /kiosk/bibliothek) und holt
+//   sich, was gespielt werden soll (GET /kiosk/daten). Beides mit einem
+//   Schluessel, nicht mit einem Mitgliederkonto — der Laptop steht im
+//   Festbetrieb ohne angemeldete Person da.
+//
+//   Mitglieder stellen im Mitgliederbereich zusammen, was auf dem Laptop
+//   landet. Sie sehen die Bibliothek, die der Laptop gemeldet hat, und
+//   bauen daraus Playlists.
+//
+// Warum die Bibliothek hier liegt und nicht im Browser zusammengesucht wird:
+// Die Musik liegt auf dem Laptop im Roten Schopf, nicht auf dem Server. Ohne
+// diese Meldung wuesste der Mitgliederbereich nicht, welche Titel es zur
+// Auswahl gibt, und man muesste Dateinamen abtippen.
+// ---------------------------------------------------------------------------
+
+// Tabellen anlegen, falls noch nicht vorhanden. Wie im uebrigen Backend
+// idempotent beim ersten Zugriff, nicht ueber ein Migrationswerkzeug.
+async function kioskTabellen() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS kiosk_sender (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            name VARCHAR(120) NOT NULL,
+            url TEXT NOT NULL,
+            sortierung INT DEFAULT 0,
+            erstellt_von UUID REFERENCES members(id) ON DELETE SET NULL,
+            erstellt_am TIMESTAMP DEFAULT NOW()
+        );
+
+        -- Was der Laptop an Musik hat. Der Pfad ist der Schluessel, weil MPD
+        -- Titel ueber genau diesen Pfad anspricht.
+        CREATE TABLE IF NOT EXISTS kiosk_titel (
+            pfad TEXT PRIMARY KEY,
+            interpret VARCHAR(250),
+            titel VARCHAR(250),
+            gemeldet_am TIMESTAMP DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_kiosk_titel_suche
+            ON kiosk_titel (lower(interpret), lower(titel));
+
+        CREATE TABLE IF NOT EXISTS kiosk_playlists (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            name VARCHAR(120) NOT NULL UNIQUE,
+            erstellt_von UUID REFERENCES members(id) ON DELETE SET NULL,
+            erstellt_am TIMESTAMP DEFAULT NOW(),
+            geaendert_am TIMESTAMP DEFAULT NOW()
+        );
+
+        -- Kein Fremdschluessel auf kiosk_titel: Verschwindet eine Datei vom
+        -- Laptop, soll die Playlist bestehen bleiben und den Titel nur nicht
+        -- mehr abspielen. Ein CASCADE wuerde hier still Playlists ausduennen.
+        CREATE TABLE IF NOT EXISTS kiosk_playlist_titel (
+            playlist_id UUID REFERENCES kiosk_playlists(id) ON DELETE CASCADE,
+            pfad TEXT NOT NULL,
+            sortierung INT NOT NULL,
+            PRIMARY KEY (playlist_id, pfad)
+        );
+    `);
+}
+
+// Der Laptop weist sich mit einem Schluessel aus, nicht mit einem Konto.
+function kioskSchluessel(req, res, next) {
+    const schluessel = req.headers['x-kiosk-key'];
+    if (!process.env.KIOSK_KEY || schluessel !== process.env.KIOSK_KEY) {
+        return res.status(401).json({ error: 'Kein gueltiger Kiosk-Schluessel' });
+    }
+    next();
+}
+
+// --- Was der Laptop ruft ---------------------------------------------------
+
+// Der Laptop meldet seine Musikbibliothek. Vollstaendig, nicht als Zuwachs:
+// So verschwinden geloeschte Dateien auch aus der Auswahl im
+// Mitgliederbereich, statt dort ewig als tote Eintraege zu stehen.
+app.post('/kiosk/bibliothek', kioskSchluessel, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        await kioskTabellen();
+        const titel = Array.isArray(req.body?.titel) ? req.body.titel : [];
+        if (!titel.length) {
+            return res.status(400).json({ error: 'Keine Titel uebermittelt' });
+        }
+
+        await client.query('BEGIN');
+        // Erst leeren, dann fuellen — in einer Transaktion, damit der
+        // Mitgliederbereich nie eine halb gefuellte Bibliothek sieht.
+        await client.query('DELETE FROM kiosk_titel');
+        for (const t of titel) {
+            const pfad = String(t?.pfad || '').slice(0, 2000);
+            if (!pfad) continue;
+            await client.query(
+                'INSERT INTO kiosk_titel (pfad, interpret, titel) VALUES ($1, $2, $3) ' +
+                'ON CONFLICT (pfad) DO NOTHING',
+                [pfad, String(t?.interpret || '').slice(0, 250) || null,
+                 String(t?.titel || '').slice(0, 250) || null]
+            );
+        }
+        await client.query('COMMIT');
+
+        const anzahl = await pool.query('SELECT COUNT(*)::int AS n FROM kiosk_titel');
+        res.json({ success: true, titel: anzahl.rows[0].n });
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        console.error('POST /kiosk/bibliothek:', error.message);
+        res.status(500).json({ error: 'Bibliothek konnte nicht uebernommen werden' });
+    } finally {
+        client.release();
+    }
+});
+
+// Alles, was der Laptop zum Abspielen braucht, in einem Zug. Ein Aufruf statt
+// mehrerer: Bricht die Verbindung mittendrin ab, hat der Laptop entweder den
+// alten oder den neuen Stand, nie eine Mischung.
+app.get('/kiosk/daten', kioskSchluessel, async (req, res) => {
+    try {
+        await kioskTabellen();
+
+        const playlists = await pool.query(`
+            SELECT p.name,
+                   COALESCE(
+                       json_agg(t.pfad ORDER BY t.sortierung)
+                       FILTER (WHERE t.pfad IS NOT NULL),
+                       '[]'
+                   ) AS titel
+            FROM kiosk_playlists p
+            LEFT JOIN kiosk_playlist_titel t ON t.playlist_id = p.id
+            GROUP BY p.id, p.name
+            ORDER BY p.name
+        `);
+
+        const sender = await pool.query(
+            'SELECT name, url FROM kiosk_sender ORDER BY sortierung, name'
+        );
+
+        res.json({ playlists: playlists.rows, sender: sender.rows });
+    } catch (error) {
+        console.error('GET /kiosk/daten:', error.message);
+        res.status(500).json({ error: 'Kiosk-Daten konnten nicht geladen werden' });
+    }
+});
+
+// --- Was der Mitgliederbereich ruft ----------------------------------------
+
+// Die Bibliothek zum Durchsuchen. Ohne Suchbegriff kommen nicht alle 1153
+// Titel: Diese Liste wandert sonst bei jedem Oeffnen der Seite ueber die
+// Leitung, und niemand scrollt durch 1153 Zeilen.
+app.get('/kiosk/bibliothek', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const suche = String(req.query.suche || '').trim();
+        const grenze = Math.min(parseInt(req.query.grenze, 10) || 100, 500);
+
+        if (!suche) {
+            const gesamt = await pool.query('SELECT COUNT(*)::int AS n FROM kiosk_titel');
+            const anfang = await pool.query(
+                'SELECT pfad, interpret, titel FROM kiosk_titel ' +
+                'ORDER BY lower(interpret), lower(titel) LIMIT $1', [grenze]
+            );
+            return res.json({ gesamt: gesamt.rows[0].n, titel: anfang.rows });
+        }
+
+        const muster = '%' + suche.toLowerCase() + '%';
+        const treffer = await pool.query(
+            'SELECT pfad, interpret, titel FROM kiosk_titel ' +
+            'WHERE lower(coalesce(interpret, \'\')) LIKE $1 ' +
+            '   OR lower(coalesce(titel, \'\')) LIKE $1 ' +
+            '   OR lower(pfad) LIKE $1 ' +
+            'ORDER BY lower(interpret), lower(titel) LIMIT $2',
+            [muster, grenze]
+        );
+        const gesamt = await pool.query('SELECT COUNT(*)::int AS n FROM kiosk_titel');
+        res.json({ gesamt: gesamt.rows[0].n, titel: treffer.rows });
+    } catch (error) {
+        console.error('GET /kiosk/bibliothek:', error.message);
+        res.status(500).json({ error: 'Bibliothek konnte nicht geladen werden' });
+    }
+});
+
+app.get('/kiosk/playlists', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const ergebnis = await pool.query(`
+            SELECT p.id, p.name, p.geaendert_am,
+                   COUNT(t.pfad)::int AS anzahl,
+                   m.vorname || ' ' || m.nachname AS erstellt_von_name
+            FROM kiosk_playlists p
+            LEFT JOIN kiosk_playlist_titel t ON t.playlist_id = p.id
+            LEFT JOIN members m ON m.id = p.erstellt_von
+            GROUP BY p.id, p.name, p.geaendert_am, m.vorname, m.nachname
+            ORDER BY p.name
+        `);
+        res.json(ergebnis.rows);
+    } catch (error) {
+        console.error('GET /kiosk/playlists:', error.message);
+        res.status(500).json({ error: 'Playlists konnten nicht geladen werden' });
+    }
+});
+
+app.get('/kiosk/playlists/:id', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const kopf = await pool.query(
+            'SELECT id, name FROM kiosk_playlists WHERE id = $1', [req.params.id]
+        );
+        if (!kopf.rows.length) {
+            return res.status(404).json({ error: 'Playlist nicht gefunden' });
+        }
+        // LEFT JOIN: Ein Titel, den der Laptop nicht mehr meldet, bleibt in
+        // der Liste stehen — sichtbar als Eintrag ohne Interpret. Ihn still
+        // wegzulassen waere schlimmer: Man wuerde nie erfahren, dass die
+        // Playlist kuerzer geworden ist.
+        const titel = await pool.query(`
+            SELECT pt.pfad, kt.interpret, kt.titel,
+                   (kt.pfad IS NOT NULL) AS vorhanden
+            FROM kiosk_playlist_titel pt
+            LEFT JOIN kiosk_titel kt ON kt.pfad = pt.pfad
+            WHERE pt.playlist_id = $1
+            ORDER BY pt.sortierung
+        `, [req.params.id]);
+        res.json({ ...kopf.rows[0], titel: titel.rows });
+    } catch (error) {
+        console.error('GET /kiosk/playlists/:id:', error.message);
+        res.status(500).json({ error: 'Playlist konnte nicht geladen werden' });
+    }
+});
+
+// Anlegen und Aendern teilen sich diese Funktion: In beiden Faellen wird die
+// Titelliste vollstaendig ersetzt, weil die Oberflaeche immer die ganze Liste
+// schickt.
+async function playlistSchreiben(req, res, id) {
+    const client = await pool.connect();
+    try {
+        await kioskTabellen();
+        const member = await mitgliedAusToken(req, res);
+        if (!member) return;
+
+        const name = String(req.body?.name || '').trim().slice(0, 120);
+        const pfade = Array.isArray(req.body?.pfade) ? req.body.pfade : [];
+        if (!name) return res.status(400).json({ error: 'Die Playlist braucht einen Namen' });
+        // "Alle Titel" ist auf dem Laptop fest eingebaut und braucht keinen
+        // Server. Gaebe es sie hier auch, haette man zwei Eintraege gleichen
+        // Namens mit verschiedenem Inhalt.
+        if (name.toLowerCase() === 'alle titel') {
+            return res.status(400).json({ error: 'Dieser Name ist auf dem Laptop schon vergeben' });
+        }
+
+        await client.query('BEGIN');
+        let playlistId = id;
+        if (id) {
+            const vorhanden = await client.query(
+                'UPDATE kiosk_playlists SET name = $2, geaendert_am = NOW() ' +
+                'WHERE id = $1 RETURNING id', [id, name]
+            );
+            if (!vorhanden.rows.length) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ error: 'Playlist nicht gefunden' });
+            }
+            await client.query('DELETE FROM kiosk_playlist_titel WHERE playlist_id = $1', [id]);
+        } else {
+            const neu = await client.query(
+                'INSERT INTO kiosk_playlists (name, erstellt_von) VALUES ($1, $2) RETURNING id',
+                [name, member.id]
+            );
+            playlistId = neu.rows[0].id;
+        }
+
+        let position = 0;
+        for (const p of pfade) {
+            const pfad = String(p || '').slice(0, 2000);
+            if (!pfad) continue;
+            await client.query(
+                'INSERT INTO kiosk_playlist_titel (playlist_id, pfad, sortierung) ' +
+                'VALUES ($1, $2, $3) ON CONFLICT (playlist_id, pfad) DO NOTHING',
+                [playlistId, pfad, position++]
+            );
+        }
+        await client.query('COMMIT');
+        res.json({ success: true, id: playlistId, name, titel: position });
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        if (error.code === '23505') {
+            return res.status(409).json({ error: 'Eine Playlist mit diesem Namen gibt es schon' });
+        }
+        console.error('Playlist schreiben:', error.message);
+        res.status(500).json({ error: 'Playlist konnte nicht gespeichert werden' });
+    } finally {
+        client.release();
+    }
+}
+
+// Jedes Mitglied darf Playlists anlegen und aendern. Bewusst keine
+// Rollenpruefung: Es geht um Musik am Fest, nicht um Vereinsdaten, und eine
+// Genehmigungsschleife dafuer wuerde niemand benutzen.
+app.post('/kiosk/playlists', authenticateToken, (req, res) => playlistSchreiben(req, res, null));
+app.put('/kiosk/playlists/:id', authenticateToken, (req, res) => playlistSchreiben(req, res, req.params.id));
+
+// Loeschen dagegen nur Vorstand und Administration: Eine Playlist, an der
+// jemand einen Abend lang gebaut hat, soll nicht mit einem Fehlklick weg sein.
+app.delete('/kiosk/playlists/:id', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const gruppen = (req.user.groups || []).map(g => String(g).toLowerCase());
+        const member = await mitgliedAusToken(req, res);
+        if (!member) return;
+
+        const besitzer = await pool.query(
+            'SELECT erstellt_von FROM kiosk_playlists WHERE id = $1', [req.params.id]
+        );
+        if (!besitzer.rows.length) {
+            return res.status(404).json({ error: 'Playlist nicht gefunden' });
+        }
+        const eigene = besitzer.rows[0].erstellt_von === member.id;
+        const darf = eigene || gruppen.includes('vorstand') || gruppen.includes('admin');
+        if (!darf) {
+            return res.status(403).json({ error: 'Nur Vorstand und Administration koennen fremde Playlists loeschen' });
+        }
+
+        await pool.query('DELETE FROM kiosk_playlists WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DELETE /kiosk/playlists/:id:', error.message);
+        res.status(500).json({ error: 'Playlist konnte nicht geloescht werden' });
+    }
+});
+
+// --- Radiosender -----------------------------------------------------------
+
+app.get('/kiosk/sender', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const ergebnis = await pool.query(
+            'SELECT id, name, url, sortierung FROM kiosk_sender ORDER BY sortierung, name'
+        );
+        res.json(ergebnis.rows);
+    } catch (error) {
+        console.error('GET /kiosk/sender:', error.message);
+        res.status(500).json({ error: 'Sender konnten nicht geladen werden' });
+    }
+});
+
+app.post('/kiosk/sender', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const member = await mitgliedAusToken(req, res);
+        if (!member) return;
+
+        const name = String(req.body?.name || '').trim().slice(0, 120);
+        const url = String(req.body?.url || '').trim().slice(0, 2000);
+        if (!name) return res.status(400).json({ error: 'Der Sender braucht einen Namen' });
+        // Nur http/https: MPD wuerde bei einer file:-Adresse im Dateisystem
+        // des Laptops landen, und das hat hier niemand einzugeben.
+        if (!/^https?:\/\/\S+$/i.test(url)) {
+            return res.status(400).json({ error: 'Die Adresse muss mit http:// oder https:// beginnen' });
+        }
+
+        const ergebnis = await pool.query(
+            'INSERT INTO kiosk_sender (name, url, sortierung, erstellt_von) ' +
+            'VALUES ($1, $2, (SELECT COALESCE(MAX(sortierung), 0) + 1 FROM kiosk_sender), $3) ' +
+            'RETURNING id, name, url, sortierung',
+            [name, url, member.id]
+        );
+        res.status(201).json(ergebnis.rows[0]);
+    } catch (error) {
+        console.error('POST /kiosk/sender:', error.message);
+        res.status(500).json({ error: 'Sender konnte nicht gespeichert werden' });
+    }
+});
+
+app.delete('/kiosk/sender/:id', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const ergebnis = await pool.query(
+            'DELETE FROM kiosk_sender WHERE id = $1 RETURNING id', [req.params.id]
+        );
+        if (!ergebnis.rows.length) {
+            return res.status(404).json({ error: 'Sender nicht gefunden' });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DELETE /kiosk/sender/:id:', error.message);
+        res.status(500).json({ error: 'Sender konnte nicht geloescht werden' });
+    }
+});
+
 app.get('/members/me/accesses', authenticateToken, async (req, res) => {
     try {
         // Get member with function and authentik info

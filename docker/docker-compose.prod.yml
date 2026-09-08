@@ -69,6 +69,7 @@ services:
       # Der Mitgliederbereich gibt je nach Rolle das passende heraus.
       VNC_PASSWORT_SCHAUEN: ${VNC_PASSWORT_SCHAUEN}
       VNC_PASSWORT_STEUERN: ${VNC_PASSWORT_STEUERN}
+      KIOSK_KEY: ${KIOSK_KEY}          # DEUTSCH: Laptop im Roten Schopf meldet Bibliothek und holt Playlists/Sender
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       NEXTCLOUD_URL: https://nextcloud.fwv-raura.ch
       NEXTCLOUD_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
@@ -101,7 +102,7 @@ services:
       - traefik.enable=true
       - traefik.docker.network=proxy
       # DEUTSCH: Traefik routet diese Pfade zum Members-Backend
-      - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/uploads`) || PathPrefix(`/member-registrations`) || PathPrefix(`/funktionen`) || PathPrefix(`/internal`))
+      - traefik.http.routers.api-members.rule=Host(`api.fwv-raura.ch`) && (PathPrefix(`/members`) || PathPrefix(`/auth`) || PathPrefix(`/roles`) || PathPrefix(`/audit`) || PathPrefix(`/vorstand`) || PathPrefix(`/uploads`) || PathPrefix(`/member-registrations`) || PathPrefix(`/funktionen`) || PathPrefix(`/internal`) || PathPrefix(`/kiosk`))
       - traefik.http.routers.api-members.entrypoints=https
       - traefik.http.routers.api-members.tls=true
       - traefik.http.routers.api-members.tls.certresolver=letsencrypt
@@ -120,6 +121,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       API_KEY: ${API_KEY}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}    # DEUTSCH: Fuer interne Calls an api-members (FCM-Push)
+      KIOSK_KEY: ${KIOSK_KEY}                  # DEUTSCH: Laptop im Roten Schopf holt damit den Arbeitsplan
       AUTHENTIK_URL: https://auth.fwv-raura.ch
       MEMBERS_API_URL: http://api-members:3000
       DISPATCH_API_URL: http://api-dispatch:3000

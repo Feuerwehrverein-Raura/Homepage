@@ -72,6 +72,9 @@
                 <button id="tab-accesses" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
                     Zugänge
                 </button>
+                <button id="tab-musik" class="tab-btn py-4 px-2 font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
+                    Musik
+                </button>
             </div>
         </div>
     </section>
@@ -474,6 +477,106 @@
                     </div>
 
                 </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- DEUTSCH: Musik fuer den Laptop im Roten Schopf.
+         Hier zusammengestellt, dort abgespielt. Der Laptop holt sich diese
+         Listen von selbst — es gibt nichts zu uebertragen und nichts zu
+         bestaetigen. Die Titelauswahl stammt aus der Bibliothek, die der
+         Laptop gemeldet hat; steht er aus, ist sie leer. -->
+    <div id="musik-section" class="hidden">
+        <section class="py-8">
+            <div class="container mx-auto px-4 max-w-4xl space-y-6">
+
+                <!-- Playlists -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-1 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-fire-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+                        </svg>
+                        Playlists
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Der Laptop im Roten Schopf spielt sie in zufälliger Reihenfolge.
+                        Änderungen sind dort innerhalb weniger Minuten da.
+                    </p>
+
+                    <div id="playlist-liste" class="space-y-2 mb-4"></div>
+                    <div id="playlist-leer" class="text-sm text-gray-500 mb-4 hidden">
+                        Noch keine Playlist. Der Laptop spielt dann alle Titel.
+                    </div>
+
+                    <button id="playlist-neu" class="bg-fire-500 hover:bg-fire-600 text-white px-4 py-2 rounded-lg font-medium">
+                        Neue Playlist
+                    </button>
+
+                    <!-- Bearbeiten. Erscheint an Ort und Stelle statt in einem
+                         eigenen Fenster: Man sieht beim Zusammenstellen noch,
+                         welche Listen es sonst gibt. -->
+                    <div id="playlist-editor" class="hidden mt-6 border-t pt-6">
+                        <input type="text" id="playlist-name" maxlength="120" placeholder="Name der Playlist"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-fire-500">
+
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-1">Titel suchen</label>
+                                <input type="text" id="playlist-suche" placeholder="Interpret oder Titel"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg mb-2 focus:outline-none focus:ring-2 focus:ring-fire-500">
+                                <div id="playlist-treffer" class="border border-gray-200 rounded-lg h-72 overflow-y-auto divide-y"></div>
+                                <p id="playlist-bibliothek-info" class="text-xs text-gray-500 mt-1"></p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-1">
+                                    In der Playlist (<span id="playlist-anzahl">0</span>)
+                                </label>
+                                <div id="playlist-auswahl" class="border border-gray-200 rounded-lg h-72 overflow-y-auto divide-y"></div>
+                            </div>
+                        </div>
+
+                        <p id="playlist-fehler" class="text-sm text-red-600 mt-3 hidden"></p>
+                        <div class="flex gap-2 mt-4">
+                            <button id="playlist-speichern" class="bg-fire-500 hover:bg-fire-600 text-white px-4 py-2 rounded-lg font-medium">
+                                Speichern
+                            </button>
+                            <button id="playlist-abbrechen" class="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+                                Abbrechen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Radiosender -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-bold text-gray-800 mb-1 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-fire-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                        </svg>
+                        Radiosender
+                    </h2>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Für Abende, an denen niemand Musik aussuchen mag. Die Adresse ist
+                        die des Streams, nicht die der Webseite des Senders.
+                    </p>
+
+                    <div id="sender-liste" class="space-y-2 mb-4"></div>
+                    <div id="sender-leer" class="text-sm text-gray-500 mb-4 hidden">
+                        Noch kein Sender eingetragen.
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="text" id="sender-name" maxlength="120" placeholder="Name, z.B. SRF 3"
+                               class="sm:w-48 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <input type="url" id="sender-url" placeholder="https://…"
+                               class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
+                        <button id="sender-anlegen" class="bg-fire-500 hover:bg-fire-600 text-white px-4 py-2 rounded-lg font-medium">
+                            Hinzufügen
+                        </button>
+                    </div>
+                    <p id="sender-fehler" class="text-sm text-red-600 mt-2 hidden"></p>
+                </div>
+
             </div>
         </section>
     </div>
@@ -1862,6 +1965,7 @@
             document.getElementById('notifications-section').classList.add('hidden');
             document.getElementById('events-section').classList.add('hidden');
             document.getElementById('accesses-section').classList.add('hidden');
+            document.getElementById('musik-section').classList.add('hidden');
 
             // DEUTSCH: Gewaehlte Sektion anzeigen und Tab-Button aktivieren
             if (tab === 'profile') {
@@ -1886,8 +1990,328 @@
                 document.getElementById('accesses-section').classList.remove('hidden');
                 // DEUTSCH: Zugaenge nur beim ersten Mal laden (Lazy Loading mit accessesLoaded-Flag)
                 if (!accessesLoaded) loadAccesses();
+            } else if (tab === 'musik') {
+                document.getElementById('tab-musik').classList.add('border-fire-500', 'text-fire-600');
+                document.getElementById('tab-musik').classList.remove('border-transparent', 'text-gray-600');
+                document.getElementById('musik-section').classList.remove('hidden');
+                // Bei jedem Wechsel neu laden: Andere Mitglieder aendern die
+                // Listen, und ein veralteter Stand waere hier verwirrend.
+                ladePlaylists();
+                ladeSender();
             }
         }
+
+
+        // ============================================
+        // DEUTSCH: MUSIK FUER DEN LAPTOP IM ROTEN SCHOPF
+        // ============================================
+        //
+        // Playlists und Radiosender werden hier zusammengestellt und vom
+        // Laptop von selbst geholt. Diese Seite spricht nie mit dem Laptop —
+        // steht er aus, merkt man hier nichts, und beim naechsten Einschalten
+        // ist er auf dem neuesten Stand.
+
+        // Welche Playlist gerade bearbeitet wird (null = eine neue).
+        let playlistBearbeitet = null;
+        // Die Titel der offenen Playlist, in Reihenfolge. Objekte statt blosser
+        // Pfade, damit die Liste ohne erneute Abfrage anzeigbar bleibt.
+        let playlistAuswahl = [];
+        let sucheZeitgeber = null;
+
+        function musikFehler(feld, text) {
+            const p = document.getElementById(feld);
+            p.textContent = text;
+            p.classList.toggle('hidden', !text);
+        }
+
+        // Titel lesbar machen. Fehlen die Tags, bleibt der Dateiname — besser
+        // als eine leere Zeile, in der niemand erkennt, was gemeint ist.
+        function titelText(t) {
+            if (t.interpret && t.titel) return t.interpret + ' — ' + t.titel;
+            if (t.titel) return t.titel;
+            return (t.pfad || '').split('/').pop().replace(/\.[^.]+$/, '');
+        }
+
+        async function ladePlaylists() {
+            try {
+                const antwort = await fetch(`${API_BASE}/kiosk/playlists`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!antwort.ok) return;
+                const listen = await antwort.json();
+
+                const behaelter = document.getElementById('playlist-liste');
+                behaelter.innerHTML = '';
+                document.getElementById('playlist-leer').classList.toggle('hidden', listen.length > 0);
+
+                listen.forEach(pl => {
+                    const zeile = document.createElement('div');
+                    zeile.className = 'flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3';
+                    const links = document.createElement('div');
+                    links.innerHTML = `<div class="font-semibold text-gray-800"></div>
+                                       <div class="text-sm text-gray-500">${pl.anzahl} Titel${pl.erstellt_von_name ? ' · von ' + pl.erstellt_von_name : ''}</div>`;
+                    links.querySelector('.font-semibold').textContent = pl.name;
+
+                    const rechts = document.createElement('div');
+                    rechts.className = 'flex gap-2';
+                    const bearbeiten = document.createElement('button');
+                    bearbeiten.className = 'text-fire-600 hover:text-fire-700 text-sm font-medium';
+                    bearbeiten.textContent = 'Bearbeiten';
+                    bearbeiten.onclick = () => oeffnePlaylist(pl.id);
+                    const loeschen = document.createElement('button');
+                    loeschen.className = 'text-gray-400 hover:text-red-600 text-sm';
+                    loeschen.textContent = 'Löschen';
+                    loeschen.onclick = () => loeschePlaylist(pl.id, pl.name);
+                    rechts.append(bearbeiten, loeschen);
+
+                    zeile.append(links, rechts);
+                    behaelter.appendChild(zeile);
+                });
+            } catch (e) {
+                /* Stillschweigend: Die Seite bleibt bedienbar, nur diese Liste fehlt. */
+            }
+        }
+
+        async function oeffnePlaylist(id) {
+            musikFehler('playlist-fehler', '');
+            playlistBearbeitet = id;
+            playlistAuswahl = [];
+
+            if (id) {
+                try {
+                    const antwort = await fetch(`${API_BASE}/kiosk/playlists/${id}`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    if (antwort.ok) {
+                        const pl = await antwort.json();
+                        document.getElementById('playlist-name').value = pl.name;
+                        playlistAuswahl = pl.titel;
+                    }
+                } catch (e) { /* leer weiter */ }
+            } else {
+                document.getElementById('playlist-name').value = '';
+            }
+
+            document.getElementById('playlist-editor').classList.remove('hidden');
+            zeigeAuswahl();
+            sucheTitel('');
+            document.getElementById('playlist-editor').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function schliessePlaylist() {
+            document.getElementById('playlist-editor').classList.add('hidden');
+            document.getElementById('playlist-suche').value = '';
+            playlistBearbeitet = null;
+            playlistAuswahl = [];
+        }
+
+        function zeigeAuswahl() {
+            const behaelter = document.getElementById('playlist-auswahl');
+            behaelter.innerHTML = '';
+            document.getElementById('playlist-anzahl').textContent = playlistAuswahl.length;
+
+            playlistAuswahl.forEach((t, i) => {
+                const zeile = document.createElement('div');
+                zeile.className = 'flex items-center justify-between px-3 py-2 text-sm';
+                const name = document.createElement('span');
+                name.className = 'truncate mr-2';
+                name.textContent = titelText(t);
+                // Titel, die der Laptop nicht mehr meldet, bleiben sichtbar und
+                // werden als fehlend markiert — still zu verschwinden waere
+                // schlimmer, dann wuerde niemand merken, dass etwas fehlt.
+                if (t.vorhanden === false) {
+                    name.className += ' text-amber-600';
+                    name.title = 'Diese Datei meldet der Laptop nicht mehr';
+                }
+                const weg = document.createElement('button');
+                weg.className = 'text-gray-400 hover:text-red-600 shrink-0';
+                weg.textContent = '×';
+                weg.onclick = () => { playlistAuswahl.splice(i, 1); zeigeAuswahl(); };
+                zeile.append(name, weg);
+                behaelter.appendChild(zeile);
+            });
+
+            if (!playlistAuswahl.length) {
+                behaelter.innerHTML = '<p class="px-3 py-3 text-sm text-gray-400">Noch nichts ausgewählt.</p>';
+            }
+        }
+
+        async function sucheTitel(begriff) {
+            try {
+                const antwort = await fetch(`${API_BASE}/kiosk/bibliothek?suche=${encodeURIComponent(begriff)}`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!antwort.ok) return;
+                const { gesamt, titel } = await antwort.json();
+
+                const info = document.getElementById('playlist-bibliothek-info');
+                if (!gesamt) {
+                    info.textContent = 'Der Laptop hat noch keine Titel gemeldet.';
+                } else if (begriff) {
+                    info.textContent = `${titel.length} von ${gesamt} Titeln`;
+                } else {
+                    info.textContent = `${gesamt} Titel in der Bibliothek — such nach Interpret oder Titel.`;
+                }
+
+                const behaelter = document.getElementById('playlist-treffer');
+                behaelter.innerHTML = '';
+                titel.forEach(t => {
+                    const zeile = document.createElement('button');
+                    zeile.className = 'w-full text-left px-3 py-2 text-sm hover:bg-gray-50 truncate';
+                    zeile.textContent = titelText(t);
+                    zeile.onclick = () => {
+                        if (playlistAuswahl.some(a => a.pfad === t.pfad)) return;
+                        playlistAuswahl.push({ ...t, vorhanden: true });
+                        zeigeAuswahl();
+                    };
+                    behaelter.appendChild(zeile);
+                });
+                if (!titel.length) {
+                    behaelter.innerHTML = '<p class="px-3 py-3 text-sm text-gray-400">Kein Treffer.</p>';
+                }
+            } catch (e) { /* Suche bleibt leer */ }
+        }
+
+        async function speicherePlaylist() {
+            const name = document.getElementById('playlist-name').value.trim();
+            if (!name) return musikFehler('playlist-fehler', 'Gib der Playlist einen Namen.');
+            if (!playlistAuswahl.length) return musikFehler('playlist-fehler', 'Wähle mindestens einen Titel aus.');
+            musikFehler('playlist-fehler', '');
+
+            const knopf = document.getElementById('playlist-speichern');
+            knopf.disabled = true;
+            try {
+                const ziel = playlistBearbeitet
+                    ? `${API_BASE}/kiosk/playlists/${playlistBearbeitet}`
+                    : `${API_BASE}/kiosk/playlists`;
+                const antwort = await fetch(ziel, {
+                    method: playlistBearbeitet ? 'PUT' : 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, pfade: playlistAuswahl.map(t => t.pfad) })
+                });
+                const daten = await antwort.json().catch(() => ({}));
+                if (!antwort.ok) return musikFehler('playlist-fehler', daten.error || 'Speichern fehlgeschlagen.');
+                schliessePlaylist();
+                ladePlaylists();
+            } catch (e) {
+                musikFehler('playlist-fehler', 'Speichern fehlgeschlagen.');
+            } finally {
+                knopf.disabled = false;
+            }
+        }
+
+        async function loeschePlaylist(id, name) {
+            if (!confirm(`Playlist «${name}» löschen?`)) return;
+            try {
+                const antwort = await fetch(`${API_BASE}/kiosk/playlists/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!antwort.ok) {
+                    const daten = await antwort.json().catch(() => ({}));
+                    return musikFehler('playlist-fehler', daten.error || 'Löschen fehlgeschlagen.');
+                }
+                if (playlistBearbeitet === id) schliessePlaylist();
+                ladePlaylists();
+            } catch (e) {
+                musikFehler('playlist-fehler', 'Löschen fehlgeschlagen.');
+            }
+        }
+
+        // --- Radiosender ---
+
+        async function ladeSender() {
+            try {
+                const antwort = await fetch(`${API_BASE}/kiosk/sender`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!antwort.ok) return;
+                const sender = await antwort.json();
+
+                const behaelter = document.getElementById('sender-liste');
+                behaelter.innerHTML = '';
+                document.getElementById('sender-leer').classList.toggle('hidden', sender.length > 0);
+
+                sender.forEach(s => {
+                    const zeile = document.createElement('div');
+                    zeile.className = 'flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3';
+                    const links = document.createElement('div');
+                    links.className = 'min-w-0 mr-3';
+                    const name = document.createElement('div');
+                    name.className = 'font-semibold text-gray-800';
+                    name.textContent = s.name;
+                    const url = document.createElement('div');
+                    url.className = 'text-sm text-gray-500 truncate';
+                    url.textContent = s.url;
+                    links.append(name, url);
+
+                    const weg = document.createElement('button');
+                    weg.className = 'text-gray-400 hover:text-red-600 text-sm shrink-0';
+                    weg.textContent = 'Löschen';
+                    weg.onclick = () => loescheSender(s.id, s.name);
+
+                    zeile.append(links, weg);
+                    behaelter.appendChild(zeile);
+                });
+            } catch (e) { /* Liste bleibt leer */ }
+        }
+
+        async function legeSenderAn() {
+            const name = document.getElementById('sender-name').value.trim();
+            const url = document.getElementById('sender-url').value.trim();
+            if (!name || !url) return musikFehler('sender-fehler', 'Name und Adresse werden beide gebraucht.');
+            musikFehler('sender-fehler', '');
+
+            const knopf = document.getElementById('sender-anlegen');
+            knopf.disabled = true;
+            try {
+                const antwort = await fetch(`${API_BASE}/kiosk/sender`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, url })
+                });
+                const daten = await antwort.json().catch(() => ({}));
+                if (!antwort.ok) return musikFehler('sender-fehler', daten.error || 'Sender konnte nicht gespeichert werden.');
+                document.getElementById('sender-name').value = '';
+                document.getElementById('sender-url').value = '';
+                ladeSender();
+            } catch (e) {
+                musikFehler('sender-fehler', 'Sender konnte nicht gespeichert werden.');
+            } finally {
+                knopf.disabled = false;
+            }
+        }
+
+        async function loescheSender(id, name) {
+            if (!confirm(`Sender «${name}» löschen?`)) return;
+            try {
+                await fetch(`${API_BASE}/kiosk/sender/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                ladeSender();
+            } catch (e) {
+                musikFehler('sender-fehler', 'Löschen fehlgeschlagen.');
+            }
+        }
+
+        document.getElementById('playlist-neu').addEventListener('click', () => oeffnePlaylist(null));
+        document.getElementById('playlist-abbrechen').addEventListener('click', schliessePlaylist);
+        document.getElementById('playlist-speichern').addEventListener('click', speicherePlaylist);
+        document.getElementById('sender-anlegen').addEventListener('click', legeSenderAn);
+        // Kurze Verzoegerung: Bei jedem Tastendruck zu suchen schickt bei
+        // 1153 Titeln unnoetig viele Abfragen los.
+        document.getElementById('playlist-suche').addEventListener('input', (e) => {
+            clearTimeout(sucheZeitgeber);
+            const begriff = e.target.value;
+            sucheZeitgeber = setTimeout(() => sucheTitel(begriff), 250);
+        });
 
         // ============================================
         // DEUTSCH: PROFILFOTO HOCHLADEN UND LOESCHEN
@@ -1976,6 +2400,7 @@
         document.getElementById('tab-notifications').addEventListener('click', () => switchTab('notifications'));
         document.getElementById('tab-events').addEventListener('click', () => switchTab('events'));
         document.getElementById('tab-accesses').addEventListener('click', () => switchTab('accesses'));
+        document.getElementById('tab-musik').addEventListener('click', () => switchTab('musik'));
 
         // DEUTSCH: Logout: Token aus localStorage entfernen und Authentik-Session beenden.
         // Die Weiterleitung zur end-session-URL invalidiert die Authentik-Session (Single Sign-Out).
