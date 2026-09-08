@@ -3785,6 +3785,7 @@ app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'ad
       <text>&#10;Mit der Handykamera scannen.&#10;&#10;</text>
       <text>Gilt EINMALIG.&#10;</text>
       <text>Spaetestens bis ${xmlSicher(bis)} Uhr.&#10;</text>
+      <text>Die Anmeldung danach laeuft 8 Std.&#10;</text>
       <text>Nach dem Scannen ist dieser Bon&#10;wertlos - er darf in den Abfall.&#10;</text>
       <feed line="3"/>
       <cut type="feed"/>`);
@@ -3837,12 +3838,22 @@ app.post('/auth/member/code-login', async (req, res) => {
         const mitglied = m.rows[0];
 
         // Dasselbe Token wie beim QR-Login der App: type=member, 8 Stunden.
+        //
+        // Die Anmeldung gilt also 8 Stunden, nicht sieben Tage — die sieben
+        // Tage sind die Frist des Codes auf dem Bon, nicht die der Sitzung.
+        //
+        // sub und member_id muessen mit drin sein: authenticateToken setzt
+        // req.user.id auf "sub || member_id || email". Ohne sie fiele die
+        // Kennung auf die E-Mail zurueck, und das Token saehe anders aus als
+        // das der App — zwei Formen desselben Tokens waeren eine Falle fuer
+        // den Naechsten, der hier etwas aendert.
         const token = jwt.sign({
-            id: mitglied.id,
+            sub: mitglied.id,
+            member_id: mitglied.id,
             email: mitglied.email,
-            name: `${mitglied.vorname} ${mitglied.nachname}`,
+            name: `${mitglied.vorname} ${mitglied.nachname}`.trim(),
             type: 'member',
-            groups: ['mitglied']
+            groups: []
         }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
         await logAudit(pool, 'MEMBER_CODE_LOGIN_SUCCESS', mitglied.id, mitglied.email, clientIp, {});
