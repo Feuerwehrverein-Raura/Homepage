@@ -190,7 +190,17 @@ function actuallyPlaySound() {
 
 function App() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [station, setStation] = useState<string>('all');
+  // Station aus der Adresse vorwaehlen. Der Kiosk im Roten Schopf bettet
+  // diese Anzeige mit ?station=bar ein — dort steht der Schirm hinter der
+  // Bar und soll nicht bei jedem Aufruf erst umgestellt werden muessen.
+  const [station, setStation] = useState<string>(() => {
+    const wunsch = new URLSearchParams(window.location.search).get('station');
+    return wunsch === 'bar' || wunsch === 'kitchen' ? wunsch : 'all';
+  });
+  // In einem Rahmen (Kiosk) laeuft die Anmeldung anders: Authentik erlaubt
+  // sich nicht einbetten (X-Frame-Options: DENY), eine Weiterleitung landete
+  // auf einer leeren Flaeche. Der Kiosk reicht deshalb ein Token mit.
+  const imRahmen = window.self !== window.top;
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [cleaningMode, setCleaningMode] = useState(false);
@@ -500,6 +510,21 @@ function App() {
 
   // Redirect to Authentik if not authenticated
   if (sessionChecked && !sessionToken) {
+    if (imRahmen) {
+      // Nicht weiterleiten — das gaebe im Rahmen eine leere Flaeche, und
+      // niemand am Fest wuesste, warum. Lieber sagen, was los ist.
+      return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="text-gray-300 text-xl mb-2">Keine Verbindung zum Bestellsystem</div>
+            <div className="text-gray-500">
+              Der Zugang wird vom Vereinsserver geholt. Ist er nicht
+              erreichbar, erscheint diese Meldung.
+            </div>
+          </div>
+        </div>
+      );
+    }
     redirectToLogin();
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">

@@ -5629,6 +5629,43 @@ app.get('/kiosk/daten', kioskSchluessel, async (req, res) => {
     }
 });
 
+// Zugang zur Bar-Bestellansicht fuer den Kiosk.
+//
+// Der Schirm hinter der Bar gehoert keiner Person — dort meldet sich
+// niemand an, und niemand soll es muessen. Er bekommt deshalb denselben
+// Zugang wie Kasse und Kueche: das gemeinsame Passwort, das das
+// Bestellsystem woechentlich selbst rotiert.
+//
+// Der Tausch passiert hier und nicht auf dem Laptop. So liegt das Passwort
+// nie auf dem Geraet im Vereinslokal; der Laptop kennt nur seinen
+// KIOSK_KEY und bekommt eine fertige Adresse zurueck.
+//
+// Das Token laeuft 30 Tage. Der Laptop holt es sich neu, wenn er es
+// braucht — eine Rotation faellt damit nicht auf.
+app.get('/kiosk/bar-zugang', kioskSchluessel, async (req, res) => {
+    const ORDER_URL = process.env.ORDER_INTERNAL_URL || 'http://order-backend:3000';
+    const ORDER_API_KEY = process.env.ORDER_API_KEY;
+    if (!ORDER_API_KEY) {
+        return res.status(503).json({ error: 'Bestellsystem ist nicht angebunden' });
+    }
+    try {
+        const zugang = await axios.get(`${ORDER_URL}/api/internal/pos-credential`, {
+            headers: { 'X-Order-API-Key': ORDER_API_KEY },
+            timeout: 5000
+        });
+        const anmeldung = await axios.post(`${ORDER_URL}/api/auth/login`,
+            { password: zugang.data.password }, { timeout: 5000 });
+
+        res.json({
+            url: 'https://kitchen.fwv-raura.ch/?station=bar&token=' +
+                 encodeURIComponent(anmeldung.data.token)
+        });
+    } catch (error) {
+        console.error('GET /kiosk/bar-zugang:', error.message);
+        res.status(502).json({ error: 'Bestellsystem antwortet nicht' });
+    }
+});
+
 // --- Was der Mitgliederbereich ruft ----------------------------------------
 
 // Die Bibliothek zum Durchsuchen. Ohne Suchbegriff kommen nicht alle 1153

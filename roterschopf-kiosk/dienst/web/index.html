@@ -415,12 +415,7 @@ body {
 }
 
 /* --- Kueche ----------------------------------------------------------- */
-.bons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  overflow-y: auto;
-}
+
 .bon {
   background: var(--flaeche-hoch);
   border-top: 3px solid var(--warnung);
@@ -449,6 +444,28 @@ body {
   gap: 8px;
   overflow-y: auto;
 }
+#ansicht-bar { padding: 0; gap: 0; }
+/* Der Rahmen bekommt die ganze Flaeche: Ein eigener Kopf darueber wuerde
+   den der eingebetteten Anzeige doppeln. */
+#barrahmen {
+  /* flex:1 statt height:100% — die Ansicht ist eine Flex-Spalte, dort greift
+     eine Prozenthoehe nicht. */
+  flex: 1;
+  width: 100%;
+  border: 0;
+  display: block;
+  background: var(--flaeche);
+}
+#barrahmen[hidden] { display: none !important; }
+.barhinweis {
+  margin: auto;
+  padding: 40px;
+  text-align: center;
+  color: var(--schrift-leise);
+  font-size: 16px;
+}
+.barhinweis[hidden] { display: none !important; }
+
 .bereich {
   margin-left: 10px;
   font-size: 14px;
@@ -614,7 +631,6 @@ body {
 .notiz strong { color: var(--schrift); font-weight: 600; }
 
 @media (max-width: 720px) {
-  .bons { grid-template-columns: 1fr; }
   .modul { font-size: 14px; padding: 14px 6px; }
   .modul.abmelden { flex: 0 0 120px; }
   .jetzt { flex-wrap: wrap; }
@@ -796,13 +812,17 @@ body {
          Die Anwendung heisst im Bestellsystem "Kuechendisplay", steht hier
          aber an der BAR. Beschriftet ist sie deshalb nach dem Ort, an dem
          sie benutzt wird, nicht nach ihrem technischen Namen. -->
+    <!-- ---------------- Bar ----------------
+         Die Bestellansicht des Vereins, auf die Bar vorgewaehlt. Sie wird
+         eingebettet und nicht nachgebaut: Zwei Anzeigen fuer dieselben Bons
+         waeren zwei Staende, und einer davon waere irgendwann falsch.
+
+         Der Schirm hinter der Bar gehoert keiner Person. Den Zugang holt
+         der Kiosk-Dienst vom Vereinsserver, damit hier niemand ein Passwort
+         eintippen muss. -->
     <section class="ansicht" id="ansicht-bar" hidden>
-      <div class="ansicht-kopf">
-        <h2>Bar</h2>
-        <span class="zusatz">3 offen · älteste seit 6 min</span>
-      </div>
-      <div class="bons">
-      </div>
+      <iframe id="barrahmen" title="Bestellungen Bar"></iframe>
+      <p class="barhinweis" id="barhinweis">Zugang wird geholt …</p>
     </section>
 
     <!-- ---------------- Arbeitsplan ----------------
@@ -913,8 +933,41 @@ module.forEach(function (k) {
     // vorletzter Woche. Nur hier und nicht bei jedem Neuzeichnen: Sonst
     // ruckte die Liste dem zurueck, der gerade selbst blaettert.
     if (k.dataset.ziel === "plan") zeigeHeute();
+    if (k.dataset.ziel === "bar") ladeBar();
   });
 });
+
+// Erst beim ersten Oeffnen laden, danach stehen lassen.
+//
+// Erst dann: Die Bestellansicht haelt eine offene Verbindung und meldet
+// neue Bons mit Ton — im Hintergrund waere das ein Piepen aus dem Nichts,
+// waehrend jemand Musik einstellt.
+//
+// Danach stehen lassen: Wer zwischen Musik und Bar hin und her wechselt,
+// soll nicht jedes Mal auf einen Neuaufbau warten.
+let barGeladen = false;
+function ladeBar() {
+  if (barGeladen) return;
+  const rahmen = $("#barrahmen");
+  const hinweis = $("#barhinweis");
+  rahmen.hidden = true;
+  hinweis.hidden = false;
+  hinweis.textContent = "Zugang wird geholt …";
+
+  fetch("/api/bar").then(function (r) { return r.json(); }).then(function (d) {
+    if (!d.url) {
+      hinweis.textContent = "Der Vereinsserver ist nicht erreichbar. " +
+        "Die Bestellungen erscheinen, sobald er wieder antwortet.";
+      return;
+    }
+    rahmen.src = d.url;
+    rahmen.hidden = false;
+    hinweis.hidden = true;
+    barGeladen = true;
+  }).catch(function () {
+    hinweis.textContent = "Der Zugang konnte nicht geholt werden.";
+  });
+}
 
 function zeigeHeute() {
   const behaelter = $("#schichten");

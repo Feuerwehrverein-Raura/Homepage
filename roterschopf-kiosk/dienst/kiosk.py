@@ -19,6 +19,7 @@ import datetime
 import json
 import os
 import socket
+import urllib.request
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -257,6 +258,46 @@ def arbeitsplan_ansicht():
 
 
 # --------------------------------------------------------------------------
+# Zugang zur Bar-Bestellansicht
+# --------------------------------------------------------------------------
+
+# Die Adresse traegt ein Anmeldetoken und wird deshalb nur im Speicher
+# gehalten, nicht in /var/lib/kiosk abgelegt. Ein Neustart des Dienstes holt
+# sie neu; das dauert einen Wimpernschlag und ist die geringere Sorge.
+bar_zugang = {"url": None, "geholt": 0}
+
+
+def bar_url():
+    """Holt die Adresse der Bar-Ansicht vom Vereinsserver.
+
+    Zwischengespeichert, weil die Ansicht bei jedem Umschalten danach fragt
+    und der Server sonst fuer nichts befragt wuerde. Zwoelf Stunden: Das
+    Token laeuft dreissig Tage, ein Fest dauert keine zwoelf.
+    """
+    if bar_zugang["url"] and time.time() - bar_zugang["geholt"] < 12 * 3600:
+        return bar_zugang["url"]
+
+    schluessel = os.environ.get("KIOSK_KEY", "")
+    basis = os.environ.get("KIOSK_API", "https://api.fwv-raura.ch")
+    if not schluessel:
+        return None
+    try:
+        anfrage = urllib.request.Request(
+            basis + "/kiosk/bar-zugang", headers={"X-Kiosk-Key": schluessel}
+        )
+        with urllib.request.urlopen(anfrage, timeout=15) as antwort:
+            url = json.loads(antwort.read().decode()).get("url")
+        if url:
+            bar_zugang["url"] = url
+            bar_zugang["geholt"] = time.time()
+        return url
+    except Exception:
+        # Der zuletzt geholte Zugang bleibt gueltig — faellt der Server aus,
+        # laeuft die Bar-Ansicht weiter.
+        return bar_zugang["url"]
+
+
+# --------------------------------------------------------------------------
 # Weboberflaeche
 # --------------------------------------------------------------------------
 
@@ -299,6 +340,9 @@ class Handler(BaseHTTPRequestHandler):
                 "sender": se,
                 "arbeitsplan": arbeitsplan_ansicht(),
             })
+
+        if pfad == "/api/bar":
+            return self.sende(200, {"url": bar_url()})
 
         # Statische Dateien
         if pfad == "/":
