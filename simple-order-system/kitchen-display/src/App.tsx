@@ -220,7 +220,17 @@ function App() {
       const urlToken = urlParams.get('token')!;
       localStorage.setItem('kitchen_token', urlToken);
       setSessionToken(urlToken);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Nur das Token aus der Adresse entfernen, nicht die ganze Abfrage.
+      //
+      // Vorher flog auch ?station=bar mit raus. Das faellt erst auf, wenn
+      // der Service Worker nach einem Update von selbst neu laedt: Dann
+      // wird die bereinigte Adresse geladen, die Station ist weg, und der
+      // Schirm hinter der Bar zeigt ploetzlich alle Bestellungen.
+      const rest = new URLSearchParams(window.location.search);
+      rest.delete('token');
+      const abfrage = rest.toString();
+      window.history.replaceState({}, document.title,
+        window.location.pathname + (abfrage ? '?' + abfrage : ''));
     }
 
     const storedToken = urlParams.has('token') ? urlParams.get('token')! : localStorage.getItem('kitchen_token');
