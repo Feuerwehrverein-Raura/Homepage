@@ -285,6 +285,20 @@ services:
       # man vorher ab, landet die Rueckleitung auf /vnc.html im Nichts.
       - traefik.http.routers.novnc.middlewares=authentik@file,novnc-strip
       - traefik.http.middlewares.novnc-strip.stripprefix.prefixes=/bildschirm
+      # DEUTSCH: Der Datenstrom selbst laeuft OHNE Anmeldepruefung.
+      # Grund: noVNC baut die Verbindung bei jedem Aussetzer neu auf, und
+      # jeder Neuaufbau liefe sonst durch Authentik — meldet sich jemand ab,
+      # reisst das Bild ab. Im Festbetrieb soll es stehen bleiben, solange
+      # der Rechner laeuft.
+      # Die Seite drumherum bleibt geschuetzt; der eigentliche Zugang haengt
+      # am VNC-Passwort, das der Mitgliederbereich je nach Rolle herausgibt.
+      - traefik.http.routers.novnc-strom.rule=(Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)) && PathPrefix(`/bildschirm/websockify`)
+      - traefik.http.routers.novnc-strom.priority=150
+      - traefik.http.routers.novnc-strom.entrypoints=https
+      - traefik.http.routers.novnc-strom.tls=true
+      - traefik.http.routers.novnc-strom.tls.certresolver=letsencrypt
+      - traefik.http.routers.novnc-strom.middlewares=novnc-strip
+      - traefik.http.routers.novnc-strom.service=novnc
       - traefik.http.services.novnc.loadbalancer.server.port=6080
       - com.centurylinklabs.watchtower.enable=true
 
@@ -309,6 +323,13 @@ services:
       - traefik.http.routers.novnc-steuern.tls.certresolver=letsencrypt
       - traefik.http.routers.novnc-steuern.middlewares=authentik@file,novnc-steuern-strip
       - traefik.http.middlewares.novnc-steuern-strip.stripprefix.prefixes=/bildschirm-steuern
+      - traefik.http.routers.novnc-steuern-strom.rule=(Host(`fwv-raura.ch`) || Host(`www.fwv-raura.ch`)) && PathPrefix(`/bildschirm-steuern/websockify`)
+      - traefik.http.routers.novnc-steuern-strom.priority=160
+      - traefik.http.routers.novnc-steuern-strom.entrypoints=https
+      - traefik.http.routers.novnc-steuern-strom.tls=true
+      - traefik.http.routers.novnc-steuern-strom.tls.certresolver=letsencrypt
+      - traefik.http.routers.novnc-steuern-strom.middlewares=novnc-steuern-strip
+      - traefik.http.routers.novnc-steuern-strom.service=novnc-steuern
       - traefik.http.services.novnc-steuern.loadbalancer.server.port=6080
       - com.centurylinklabs.watchtower.enable=true
 

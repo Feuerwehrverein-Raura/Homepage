@@ -1,0 +1,29 @@
+[Unit]
+Description=x11vnc (mit Steuerung) - Bildschirm des Roten Schopfs
+After=network-online.target
+
+[Service]
+Type=simple
+# Haengt bewusst am SYSTEM, nicht an einer Anmeldung.
+#
+# -auth guess  sucht den gueltigen Berechtigungsschluessel selbst. Fest auf
+#              /home/<benutzer>/.Xauthority zu zeigen war der Fehler der
+#              ersten Fassung: Meldet sich der Benutzer ab, wird die Datei
+#              ungueltig und der Bildschirm ist aus der Ferne tot — genau
+#              dann, wenn man nachschauen will, was los ist.
+# -loop        x11vnc beendet sich, wenn der X-Server verschwindet (Abmelden,
+#              Neustart der grafischen Oberflaeche). Mit -loop wartet es
+#              stattdessen und faengt sich selbst wieder. Damit ueberlebt es
+#              auch den Anmeldebildschirm.
+# -forever     nach dem Trennen eines Zuschauers weiterlaufen
+# -shared      mehrere Zuschauer gleichzeitig
+# -noxdamage   auf dem alten Grafikchip zuverlaessiger als die Optimierung
+ExecStart=/usr/bin/x11vnc -display :0 -auth guess -loop \
+    -rfbauth /etc/x11vnc-steuern.pass -rfbport 5901 \
+    -forever -shared -noxdamage -quiet
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target
