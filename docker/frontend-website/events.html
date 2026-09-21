@@ -1679,28 +1679,67 @@
                             <label class="block text-sm font-medium text-gray-700 mb-2">Schichten auswählen *</label>
                             <p class="text-sm text-gray-500 mb-2">💡 Tipp: Bitte buche 2 Schichten am Stück für optimalen Ablauf</p>
                             <div class="space-y-2 max-h-80 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                                ${event.shifts.map((shift, index) => {
+                                ${(() => {
+                                    // DEUTSCH: Nach Tagen gruppiert. Ohne den Tag sind die Zeilen
+                                    // bei einem mehrtaegigen Anlass nicht unterscheidbar: Die
+                                    // Chilbi hat "Bar 12:00 - 14:00" am Samstag UND am Sonntag.
+                                    // Wer sich am Handy anmeldet, sah zweimal dasselbe und konnte
+                                    // nur raten, welche Zeile welcher Tag ist.
+                                    const sortiert = [...event.shifts].sort((a, b) => {
+                                        const t = String(a.date || '').localeCompare(String(b.date || ''));
+                                        return t !== 0 ? t : String(a.start_time || '').localeCompare(String(b.start_time || ''));
+                                    });
+                                    let letzterTag = null;
+                                    return sortiert.map((shift, index) => {
                                     const regs = shift.registrations || { approved: [], pending: [], spotsLeft: shift.needed };
                                     const isFull = regs.spotsLeft <= 0;
                                     const bereich = shift.bereich || 'Allgemein';
                                     const timeStr = shift.start_time && shift.end_time
                                         ? `${shift.start_time} - ${shift.end_time}`
                                         : (shift.start_time || 'ganztägig');
-                                    const shiftLabel = shift.name || `Schicht ${index + 1}`;
-                                    return `
+
+                                    // Datum aus den Teilen bauen, nicht per new Date(text):
+                                    // Ein ISO-String wird als UTC gelesen und rutscht in unserer
+                                    // Zeitzone auf den Vortag.
+                                    const tag = String(shift.date || '').slice(0, 10);
+                                    const [j, m, t] = tag ? tag.split('-').map(Number) : [];
+                                    const d = tag ? new Date(j, m - 1, t) : null;
+
+                                    let tagKopf = '';
+                                    if (tag && tag !== letzterTag) {
+                                        letzterTag = tag;
+                                        const lang = d.toLocaleDateString('de-CH',
+                                            { weekday: 'long', day: 'numeric', month: 'long' });
+                                        tagKopf = `<div class="sticky top-0 bg-white pt-2 pb-1 -mx-1 px-1">
+                                            <h4 class="text-sm font-bold text-gray-800 border-b border-gray-300 pb-1">${lang}</h4>
+                                        </div>`;
+                                    }
+
+                                    // Selbsterklaerend, weil dieser Text in der Bestaetigung und
+                                    // beim Vorstand wieder auftaucht. "Schicht 1" allein sagt dort
+                                    // niemandem, welcher Tag und welcher Bereich gemeint war.
+                                    const kurzerTag = d
+                                        ? d.toLocaleDateString('de-CH', { weekday: 'short', day: 'numeric', month: 'short' })
+                                        : '';
+                                    const shiftLabel = [kurzerTag, timeStr, bereich].filter(Boolean).join(' · ');
+                                    return tagKopf + `
                                     <div class="p-3 border rounded-lg ${isFull ? 'bg-gray-100 opacity-60' : 'hover:bg-gray-50'}">
                                         <label class="flex items-start space-x-3 cursor-pointer ${isFull ? 'cursor-not-allowed' : ''}">
                                             <input type="checkbox" name="shifts" value="${shift.id || index}"
                                                    data-name="${shiftLabel}"
                                                    ${isFull ? 'disabled' : ''}
                                                    class="mt-1 w-4 h-4 text-fire-500 border-gray-300 rounded focus:ring-fire-500">
-                                            <div class="flex-1">
-                                                <div class="flex justify-between items-center">
-                                                    <div>
+                                            <div class="flex-1 min-w-0">
+                                                <!-- flex-wrap und gap: Auf einem schmalen Handy
+                                                     passen Bereich, Zeit und die freien Plaetze
+                                                     nicht nebeneinander. Ohne Umbruch quetschen
+                                                     sie sich ineinander. -->
+                                                <div class="flex flex-wrap justify-between items-baseline gap-x-2">
+                                                    <div class="min-w-0">
                                                         <span class="font-medium text-sm">${bereich}</span>
-                                                        <span class="text-gray-500 text-sm ml-2">${timeStr}</span>
+                                                        <span class="text-gray-500 text-sm ml-2 whitespace-nowrap">${timeStr}</span>
                                                     </div>
-                                                    <span class="text-xs ${regs.spotsLeft > 1 ? 'text-green-600' : regs.spotsLeft === 1 ? 'text-orange-600' : 'text-red-600'}">
+                                                    <span class="text-xs whitespace-nowrap ${regs.spotsLeft > 1 ? 'text-green-600' : regs.spotsLeft === 1 ? 'text-orange-600' : 'text-red-600'}">
                                                         ${isFull ? 'Voll' : `${regs.spotsLeft}/${shift.needed} frei`}
                                                     </span>
                                                 </div>
@@ -1717,7 +1756,8 @@
                                             </div>
                                         </label>
                                     </div>
-                                `}).join('')}
+                                `}).join('');
+                                })()}
                             </div>
                         </div>
 
