@@ -123,6 +123,14 @@ function parseRegNotes(notes: unknown): RegExtra {
   return out;
 }
 
+// Kurzform fuer Ueberschriften: nur Bereich und Name, ohne Datum und Zeit —
+// die stehen in der Karte ohnehin darunter.
+function shiftHeadLabel(s: Shift): string {
+  const bereich = s.bereich?.trim();
+  const lesbar = bereich === "Kueche" ? "K\u00fcche" : bereich;
+  return lesbar && lesbar !== "Allgemein" ? `${lesbar} \u2013 ${s.name}` : s.name;
+}
+
 function shiftDisplayLabel(s: Shift): string {
   const head = `${s.bereich ? s.bereich + " - " : ""}${s.name}`;
   const bits: string[] = [];
@@ -750,7 +758,10 @@ export function EventDetailPage() {
           {event.shifts?.map((shift) => (
             <div key={shift.id} className="rounded-lg border bg-card p-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold">{shift.name}</h4>
+                {/* Bereich vor den Namen: Mehrere Schichten heissen "Schicht 1",
+                    und Bar und Kueche laufen zur selben Zeit. Datum und Zeit
+                    stehen darunter, der Bereich fehlte ganz. */}
+                <h4 className="font-semibold">{shiftHeadLabel(shift)}</h4>
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-muted-foreground">
                     {shift.registrations?.approved?.length ?? 0} / {shift.needed || "?"} besetzt

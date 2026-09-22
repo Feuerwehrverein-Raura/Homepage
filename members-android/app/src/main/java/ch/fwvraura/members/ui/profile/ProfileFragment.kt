@@ -123,11 +123,28 @@ class ProfileFragment : Fragment() {
             item.regStatus.text = label
             item.regStatus.setTextColor(color)
 
+            // Bereich und Tag gehoeren dazu: Bei der Chilbi hiess es sonst
+            // viermal "Schicht 1 (12:00\u201314:00)" \u2014 Samstag und Sonntag, Bar
+            // und Kueche \u2014 und niemand wusste, wofuer er eingeteilt war.
             val shiftLabels = r.shifts.orEmpty().mapNotNull { s ->
                 val name = s.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val bereich = s.bereich?.trim()
+                    ?.takeIf { it.isNotBlank() && it != "Allgemein" }
+                    ?.let { if (it == "Kueche") "K\u00fcche" else it }
+                val kopf = if (bereich != null) "$bereich \u2013 $name" else name
+
+                val tag = s.date?.take(10)?.let { iso ->
+                    runCatching {
+                        java.time.LocalDate.parse(iso).format(
+                            java.time.format.DateTimeFormatter.ofPattern(
+                                "EE dd.MM.", java.util.Locale("de", "CH")))
+                    }.getOrNull()
+                }
                 val time = listOfNotNull(s.startTime?.take(5), s.endTime?.take(5))
-                    .joinToString("–")
-                if (time.isNotBlank()) "$name ($time)" else name
+                    .joinToString("\u2013")
+
+                listOfNotNull(kopf, tag, time.takeIf { it.isNotBlank() })
+                    .joinToString(", ")
             }
             if (shiftLabels.isNotEmpty()) {
                 item.regShifts.text = "Schichten: " + shiftLabels.joinToString(", ")

@@ -133,11 +133,17 @@ struct MyRegistration: Codable, Identifiable {
 struct RegistrationShift: Codable, Identifiable {
     let id: String
     let name: String?
+    /// Bereich/Posten, z.B. "Bar", "Kueche". Ohne ihn sind zwei Schichten
+    /// zur selben Zeit nicht zu unterscheiden.
+    let bereich: String?
+    /// Tag der Schicht. Die Chilbi faehrt am Samstag und am Sonntag
+    /// dasselbe Programm — ohne Datum sieht man zweimal dieselbe Zeile.
+    let date: String?
     let startTime: String?
     let endTime: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name
+        case id, name, bereich, date
         case startTime = "start_time"
         case endTime = "end_time"
     }

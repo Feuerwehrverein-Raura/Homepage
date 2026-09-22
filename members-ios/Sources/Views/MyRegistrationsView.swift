@@ -83,13 +83,53 @@ private struct RegistrationRow: View {
         .padding(.vertical, 4)
     }
 
+    /// Baut "Bar – Schicht 1 · Sa 17.10. · 12:00 – 14:00".
+    ///
+    /// Vorher stand hier nur der Name und die Zeit. Bei der Chilbi ergab das
+    /// viermal "Schicht 1 · 12:00 – 14:00" — Samstag und Sonntag, Bar und
+    /// Kueche — und niemand wusste, wofuer er sich eingetragen hatte.
     private func shiftLabel(_ shift: RegistrationShift) -> String {
         let name = shift.name ?? "Schicht"
+        let bereich = shift.bereich?.trimmingCharacters(in: .whitespaces)
+        let lesbar: String? = {
+            guard let b = bereich, !b.isEmpty, b != "Allgemein" else { return nil }
+            return b == "Kueche" ? "Küche" : b
+        }()
+        let kopf = lesbar.map { "\($0) – \(name)" } ?? name
+
+        var teile = [kopf]
+        if let tag = kurzerTag(shift.date) { teile.append(tag) }
         switch (shift.startTime, shift.endTime) {
-        case let (start?, end?): return "\(name) · \(start) – \(end)"
-        case let (start?, nil): return "\(name) · \(start)"
-        default: return name
+        case let (start?, end?): teile.append("\(start) – \(end)")
+        case let (start?, nil): teile.append(start)
+        default: break
         }
+        return teile.joined(separator: " · ")
+    }
+
+    /// "2026-10-17" → "Sa 17.10."
+    ///
+    /// Aus den Bestandteilen gebaut, nicht per ISO8601DateFormatter: Ein
+    /// reines Datum wird sonst als UTC gelesen und rutscht bei uns auf den
+    /// Vortag.
+    private func kurzerTag(_ iso: String?) -> String? {
+        guard let iso, iso.count >= 10 else { return nil }
+        let teile = iso.prefix(10).split(separator: "-")
+        guard teile.count == 3,
+              let jahr = Int(teile[0]), let monat = Int(teile[1]), let tag = Int(teile[2])
+        else { return nil }
+        var komponenten = DateComponents()
+        komponenten.year = jahr
+        komponenten.month = monat
+        komponenten.day = tag
+        var kalender = Calendar(identifier: .gregorian)
+        kalender.timeZone = TimeZone(identifier: "Europe/Zurich") ?? .current
+        guard let datum = kalender.date(from: komponenten) else { return nil }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "de_CH")
+        f.timeZone = kalender.timeZone
+        f.dateFormat = "EE dd.MM."
+        return f.string(from: datum)
     }
 }
 

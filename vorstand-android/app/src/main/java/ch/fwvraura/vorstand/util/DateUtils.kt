@@ -61,6 +61,29 @@ object DateUtils {
      *         ein leerer String falls der Input null/leer ist,
      *         oder der Original-String falls das Parsen fehlschlaegt.
      */
+    /**
+     * Formatter mit Wochentag vorweg.
+     * Format: EE dd.MM.yyyy \u2014 z.B. "Sa 17.10.2026"
+     */
+    private val swissDateWeekdayFormatter =
+        DateTimeFormatter.ofPattern("EE dd.MM.yyyy", Locale("de", "CH"))
+
+    /**
+     * Wie formatDate, aber mit vorangestelltem Wochentag.
+     *
+     * Gebraucht dort, wo mehrere Tage untereinander stehen: Bei der Chilbi
+     * laeuft am Samstag und am Sonntag dasselbe Programm, und "17.10." von
+     * "18.10." zu unterscheiden verlangt Hinsehen \u2014 "Sa" von "So" nicht.
+     */
+    fun formatDateWithWeekday(isoDate: String?): String {
+        if (isoDate.isNullOrEmpty()) return ""
+        return try {
+            LocalDate.parse(isoDate.take(10), isoFormatter).format(swissDateWeekdayFormatter)
+        } catch (e: Exception) {
+            isoDate
+        }
+    }
+
     fun formatDate(isoDate: String?): String {
         if (isoDate.isNullOrEmpty()) return ""
         return try {

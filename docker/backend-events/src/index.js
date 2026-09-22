@@ -2426,11 +2426,20 @@ app.get('/registrations/mine', authenticateAny, async (req, res) => {
         const shiftMap = {};
         if (allShiftIds.length > 0) {
             const shifts = await pool.query(
-                `SELECT id, name, start_time, end_time FROM shifts WHERE id = ANY($1::uuid[])`,
+                // bereich und date muessen mit: Ohne sie zeigen die
+                // Mitglieder-Apps "Schicht 1 - 12:00-14:00" und sonst nichts.
+                // Bei der Chilbi gibt es das am Samstag und am Sonntag, in Bar
+                // und Kueche - vier identische Zeilen, und niemand weiss, fuer
+                // welche er sich eingetragen hat.
+                `SELECT id, name, bereich, date, start_time, end_time
+                 FROM shifts WHERE id = ANY($1::uuid[])`,
                 [allShiftIds]
             );
             for (const s of shifts.rows) {
-                shiftMap[s.id] = { id: s.id, name: s.name, start_time: s.start_time, end_time: s.end_time };
+                shiftMap[s.id] = {
+                    id: s.id, name: s.name, bereich: s.bereich, date: s.date,
+                    start_time: s.start_time, end_time: s.end_time
+                };
             }
         }
         for (const reg of result.rows) {

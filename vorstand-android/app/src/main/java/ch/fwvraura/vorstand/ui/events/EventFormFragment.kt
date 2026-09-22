@@ -670,9 +670,15 @@ class EventFormFragment : Fragment() {
             gravity = Gravity.CENTER_VERTICAL
         }
 
-        // Schichtname als Label (nimmt den verfuegbaren Platz ein)
+        // Bereich und Name als Label (nimmt den verfuegbaren Platz ein).
+        // Der Name allein unterscheidet nichts \u2014 bei einem mehrtaegigen
+        // Anlass heissen mehrere Schichten "Schicht 1".
         val nameLabel = TextView(requireContext()).apply {
-            text = shift.name
+            text = listOfNotNull(
+                shift.bereich?.trim()?.takeIf { it.isNotBlank() && it != "Allgemein" }
+                    ?.let { if (it == "Kueche") "K\u00fcche" else it },
+                shift.name.takeIf { it.isNotBlank() }
+            ).joinToString(" \u2013 ").ifBlank { "Schicht" }
             textSize = 16f
             setTextColor(requireContext().getColor(R.color.text_primary))
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)

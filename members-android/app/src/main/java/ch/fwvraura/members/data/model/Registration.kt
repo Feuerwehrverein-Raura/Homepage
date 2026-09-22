@@ -37,6 +37,12 @@ data class MyRegistration(
 data class RegistrationShift(
     val id: String,
     val name: String? = null,
+    /** Bereich/Posten, z.B. "Bar". Ohne ihn sind zwei Schichten zur
+     *  selben Zeit nicht zu unterscheiden. */
+    val bereich: String? = null,
+    /** Tag der Schicht. Die Chilbi faehrt Samstag und Sonntag dasselbe
+     *  Programm \u2014 ohne Datum sieht man zweimal dieselbe Zeile. */
+    val date: String? = null,
     @SerializedName("start_time") val startTime: String? = null,
     @SerializedName("end_time") val endTime: String? = null
 )

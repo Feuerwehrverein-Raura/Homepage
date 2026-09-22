@@ -139,6 +139,20 @@ class EventRegistrationsFragment : Fragment() {
      *
      * @param event Das Event-Objekt mit allen Schichten und Anmeldungen
      */
+    /**
+     * Macht aus dem gespeicherten Bereich einen lesbaren Namen.
+     *
+     * In der Datenbank steht "Kueche" \u2013 historisch, weil Umlaute in
+     * Schluesselwerten Aerger machen. Auf dem Schirm gehoert der Umlaut hin.
+     */
+    private fun bereichLesbar(bereich: String?): String? {
+        val b = bereich?.trim()?.takeIf { it.isNotBlank() && it != "Allgemein" } ?: return null
+        return when (b) {
+            "Kueche" -> "K\u00fcche"
+            else -> b
+        }
+    }
+
     private fun displayShifts(event: Event) {
         binding.shiftsContainer.removeAllViews()
         val shifts = event.shifts ?: return
@@ -151,8 +165,16 @@ class EventRegistrationsFragment : Fragment() {
             val recycler = shiftView.findViewById<RecyclerView>(R.id.registrationsRecycler)
             val btnAddPerson = shiftView.findViewById<MaterialButton>(R.id.btnAddPerson)
 
-            // Schichtname als Titel setzen
-            title.text = shift.name
+            // Bereich VOR den Namen.
+            //
+            // Der Name allein unterscheidet nichts: Bei einem mehrtaegigen
+            // Anlass heissen mehrere Schichten "Schicht 1", und Bar und
+            // Kueche laufen zur selben Zeit am selben Tag. Dann standen hier
+            // zwei Eintraege mit identischem Titel UND identischer Info-Zeile.
+            title.text = listOfNotNull(
+                bereichLesbar(shift.bereich),
+                shift.name.takeIf { it.isNotBlank() }
+            ).joinToString(" \u2013 ").ifBlank { "Schicht" }
 
             // Info-Zeile: Anmeldezahlen und Zeitraum zusammenbauen
             val regs = shift.registrations
@@ -167,7 +189,10 @@ class EventRegistrationsFragment : Fragment() {
                 regs?.approvedCount ?: 0
             }
             val needed = shift.needed ?: 0
-            info.text = "$registered / $needed | ${DateUtils.formatDate(shift.date)} ${shift.startTime ?: ""}-${shift.endTime ?: ""}"
+            // Mit Wochentag: An der Chilbi laeuft Samstag und Sonntag
+            // dasselbe Programm; "Sa" von "So" zu unterscheiden geht schneller
+            // als "17.10." von "18.10.".
+            info.text = "$registered / $needed | ${DateUtils.formatDateWithWeekday(shift.date)} ${shift.startTime ?: ""}-${shift.endTime ?: ""}"
 
             // Alle Anmeldungen (genehmigte + ausstehende) zusammenfuehren
             // und sicherstellen dass der Status korrekt gesetzt ist
@@ -560,7 +585,7 @@ class EventRegistrationsFragment : Fragment() {
 
         // Dialog mit dem Schichtnamen im Titel erstellen
         val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Person hinzufügen – ${shift.name}")
+            .setTitle("Person hinzufügen – ${shiftLabel(shift)}")
             .setView(dialogView)
             .setPositiveButton("Speichern", null)
             .setNegativeButton("Abbrechen", null)
@@ -746,11 +771,22 @@ class EventRegistrationsFragment : Fragment() {
 
     /**
      * Baut ein menschenlesbares Label fuer eine Schicht:
-     * "Name – Datum Startzeit-Endzeit" (z.B. "Bar – 14.06.2025 18:00-22:00").
+     * "Bereich – Name, Wochentag Datum Zeit"
+     * (z.B. "Bar – Schicht 1, Sa 17.10.2026 18:00-22:00").
+     *
+     * Ohne Bereich und Wochentag sind zwei Schichten nicht zu unterscheiden:
+     * Bar und Kueche laufen zur selben Zeit, und die Chilbi faehrt am Samstag
+     * und Sonntag dasselbe Programm.
      */
     private fun shiftLabel(shift: Shift): String {
-        val time = "${shift.startTime ?: ""}-${shift.endTime ?: ""}"
-        return "${shift.name} – ${DateUtils.formatDate(shift.date)} $time".trim()
+        val kopf = listOfNotNull(
+            bereichLesbar(shift.bereich),
+            shift.name.takeIf { it.isNotBlank() }
+        ).joinToString(" \u2013 ").ifBlank { "Schicht" }
+        val time = "${shift.startTime ?: ""}-${shift.endTime ?: ""}".trim('-')
+        val wann = listOf(DateUtils.formatDateWithWeekday(shift.date), time)
+            .filter { it.isNotBlank() }.joinToString(" ")
+        return if (wann.isBlank()) kopf else "$kopf, $wann"
     }
 
     /**
