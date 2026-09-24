@@ -2378,7 +2378,19 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            PDF
+                            Teilnehmerliste
+                        </button>
+                        <!-- DEUTSCH: Arbeitsplan als PDF. Das Backend bot den Endpunkt
+                             (/events/:id/pdf/arbeitsplan) schon lange an, im
+                             Vorstandsbereich fehlte nur der Knopf dazu. Er erscheint
+                             nur bei Anlaessen mit Schichten — ohne Schichten gibt es
+                             keinen Plan, und ein Knopf, der das erst nach dem Druecken
+                             sagt, ist ein Aergernis. -->
+                        <button id="arbeitsplan-pdf-btn" onclick="downloadArbeitsplan()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                            Arbeitsplan
                         </button>
                         <button onclick="closeEventRegistrationsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
                     </div>
@@ -5836,6 +5848,9 @@
             if (!event) return;
 
             currentEventForRegistrations = event;
+            // Arbeitsplan nur bei Anlaessen mit Schichten anbieten.
+            const apBtn = document.getElementById('arbeitsplan-pdf-btn');
+            if (apBtn) apBtn.classList.toggle('hidden', !(event.shifts && event.shifts.length > 0));
             document.getElementById('event-reg-modal-title').textContent = `Anmeldungen: ${event.title}`;
 
             renderEventRegistrations();
@@ -6516,6 +6531,47 @@
                 closeSuggestAlternativeModal();
             } catch (error) {
                 alert(error.message);
+            }
+        }
+
+        // Lädt den Arbeitsplan eines Events als PDF herunter.
+        //
+        // Anders als die Teilnehmerliste, die im Browser aus den geladenen
+        // Daten zusammengebaut wird, erzeugt das Backend diesen Plan: Er soll
+        // aussehen wie der Aushang, und das Layout liegt dort.
+        async function downloadArbeitsplan() {
+            const event = currentEventForRegistrations;
+            if (!event) {
+                alert('Keine Eventdaten vorhanden');
+                return;
+            }
+            const knopf = document.getElementById('arbeitsplan-pdf-btn');
+            const vorher = knopf ? knopf.innerHTML : null;
+            if (knopf) {
+                knopf.disabled = true;
+                knopf.textContent = 'Wird erstellt …';
+            }
+            try {
+                const response = await fetch(`${API_BASE}/events/${event.id}/pdf/arbeitsplan`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(`Server antwortet ${response.status}`);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Arbeitsplan_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                alert('Fehler beim Erstellen des Arbeitsplans: ' + error.message);
+            } finally {
+                if (knopf) {
+                    knopf.disabled = false;
+                    knopf.innerHTML = vorher;
+                }
             }
         }
 
