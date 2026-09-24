@@ -259,6 +259,76 @@
                     </div>
                 </div>
 
+                <!-- DEUTSCH: Vorstand Desktop - dieselbe Verwaltung am Rechner.
+                     Eigene Karte statt eines Hinweises auf der Android-Karte:
+                     Es ist ein eigenes Programm mit eigener Version und eigenen
+                     Installationsdateien fuer drei Betriebssysteme. -->
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                    <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
+                        <div class="w-20 h-20 rounded-2xl overflow-hidden shadow-md flex-shrink-0 bg-white p-1">
+                            <img src="images/apps/vorstand.png" alt="Vorstand Desktop" class="w-full h-full object-contain">
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="text-xl font-bold text-gray-800">Vorstand Desktop</h3>
+                            <p class="text-gray-500 text-sm">Vereinsverwaltung am Rechner</p>
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Windows
+                                </span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
+                                    macOS
+                                </span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                    Linux
+                                </span>
+                                <span id="vorstand-desktop-version" class="text-gray-400 text-xs">Lade...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <p class="text-gray-600 mb-4">Dieselbe Vereinsverwaltung wie die Vorstand-App, aber am grossen Bildschirm: Mitgliederlisten, Serienbriefe und Auswertungen lassen sich dort bequemer bearbeiten als am Handy.</p>
+                        <ul class="space-y-2 mb-6">
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Mitglieder- und Event-Verwaltung
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Serienbriefe und PDF-Ausgaben
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Buchhaltung und Auswertungen
+                            </li>
+                            <li class="flex items-center text-sm text-gray-600">
+                                <svg class="w-4 h-4 text-fire-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                Auto-Update
+                            </li>
+                        </ul>
+                        <!-- DEUTSCH: Der Knopf bietet die Datei fuer das System an, von dem
+                             aus die Seite aufgerufen wird. Sechs Dateien fuer drei Systeme
+                             zur Auswahl zu stellen, laedt zum Fehlgriff ein. -->
+                        <a id="vorstand-desktop-download" href="#" class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
+                            <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                            </svg>
+                            <span id="vorstand-desktop-label">Herunterladen</span>
+                        </a>
+                        <p class="text-center mt-3">
+                            <a id="vorstand-desktop-alle" href="https://github.com/Feuerwehrverein-Raura/Homepage/releases"
+                               class="text-sm text-fire-600 hover:underline">Alle Systeme und ältere Fassungen</a>
+                        </p>
+                    </div>
+                </div>
+
                 <!-- DEUTSCH: Kuechenanzeige (KDS) App Karte - Echtzeit-Bestellanzeige fuer Kueche und Bar -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                     <!-- DEUTSCH: Karten-Header mit App-Icon, Name und Versionsinfo -->
@@ -674,6 +744,63 @@
         // DEUTSCH: Bei der Mitglieder-App nur die Versionsnummer — der
         // Download-Knopf zeigt fest auf den rollenden Tag members-latest.
         loadLatestRelease('members');
+
+        // DEUTSCH: Das Desktop-Programm braucht eine eigene Funktion.
+        //
+        // Es liegen sechs Dateien im Release (exe, msi, dmg, AppImage, deb,
+        // rpm) plus Signaturen. Eine Auswahlliste daraus laedt zum Fehlgriff
+        // ein, deshalb bietet der Knopf die Datei fuer das System an, von dem
+        // aus die Seite aufgerufen wird; der Link darunter fuehrt zum Rest.
+        //
+        // Der Tag-Prefix ist "vorstand-desktop-v" und kollidiert nicht mit
+        // "vorstand-v" der Android-App: startsWith unterscheidet die beiden.
+        async function loadVorstandDesktop() {
+            const knopf = document.getElementById('vorstand-desktop-download');
+            const beschriftung = document.getElementById('vorstand-desktop-label');
+            const version = document.getElementById('vorstand-desktop-version');
+            const alle = document.getElementById('vorstand-desktop-alle');
+
+            try {
+                let release = null;
+                let page = 1;
+                while (!release && page <= 5) {
+                    const antwort = await fetch(
+                        `https://api.github.com/repos/Feuerwehrverein-Raura/Homepage/releases?per_page=100&page=${page}`
+                    );
+                    const liste = await antwort.json();
+                    if (!Array.isArray(liste) || !liste.length) break;
+                    release = liste.find(r => r.tag_name.startsWith('vorstand-desktop-v'));
+                    page++;
+                }
+                if (!release) throw new Error('kein Desktop-Release gefunden');
+
+                version.textContent = release.tag_name.replace('vorstand-desktop-v', 'v');
+                if (alle) alle.href = release.html_url;
+
+                // Welches System? Die Signaturdateien (.sig) fallen weg, weil
+                // die Endungen exakt verglichen werden.
+                const kennung = `${navigator.userAgent} ${navigator.platform || ''}`;
+                const system = /Win/i.test(kennung) ? { endung: '-setup.exe', name: 'Windows' }
+                             : /Mac/i.test(kennung) ? { endung: '.dmg', name: 'macOS' }
+                             : { endung: '.AppImage', name: 'Linux' };
+
+                const datei = release.assets.find(a => a.name.endsWith(system.endung));
+                if (datei) {
+                    knopf.href = datei.browser_download_url;
+                    beschriftung.textContent = `Für ${system.name} herunterladen`;
+                } else {
+                    // Kein Paket fuer dieses System: zur Release-Seite statt
+                    // zu einem Knopf, der ins Leere greift.
+                    knopf.href = release.html_url;
+                    beschriftung.textContent = 'Zu den Downloads';
+                }
+            } catch (fehler) {
+                knopf.href = 'https://github.com/Feuerwehrverein-Raura/Homepage/releases';
+                beschriftung.textContent = 'Zu den Downloads';
+                version.textContent = '';
+            }
+        }
+        loadVorstandDesktop();
     </script>
 
 </body>
