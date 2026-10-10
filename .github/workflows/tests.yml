@@ -49,7 +49,8 @@ jobs:
         working-directory: docker/backend-events
         env:
           TEST_DATABASE_URL: postgres://test:test@localhost:5432/fwvtest
-        run: node --test test/
+        # nacheinander: mehrere Testdateien bauen die Datenbank neu auf
+        run: node --test --test-concurrency=1 test/
 
   website:
     name: Website

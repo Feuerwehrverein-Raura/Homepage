@@ -698,6 +698,50 @@ app.get('/health', (req, res) => {
 // DEUTSCH: CRUD-Endpunkte fuer Anlässe/Events inkl. Schichten und Registrierungen
 // ============================================
 
+// ---------------------------------------------------------------------------
+// Kontaktdaten der Angemeldeten nur fuer den Vorstand
+//
+// /events und /events/:id sind oeffentlich (Eventseite, Kalender). Sie lieferten
+// zu jeder Anmeldung auch E-Mail, Telefon und Bemerkungen mit — jeder konnte
+// so die Adressen aller Helfer abrufen (Oktober 2026: 96 E-Mail-Adressen, 56
+// Bemerkungen, darin z.B. Allergien). Die oeffentliche Seite zeigt nur Namen
+// und Zahlen; die Kontaktdaten braucht nur die Verwaltung, und die schickt
+// immer ihr Token mit (vorstand.html, Vorstand-App, Desktop).
+// ---------------------------------------------------------------------------
+function istVorstandAnfrage(req) {
+    if (!req.headers.authorization && !req.headers['x-api-key']) return Promise.resolve(false);
+    return new Promise(resolve => {
+        // authenticateAny antwortet bei ungueltigem Token selbst mit 401 — hier
+        // soll es nur "kein Vorstand" heissen, die Liste bleibt oeffentlich.
+        const abgelehnt = {
+            status: () => abgelehnt,
+            json: () => resolve(false),
+            send: () => resolve(false),
+            sendStatus: () => resolve(false)
+        };
+        try {
+            authenticateAny(req, abgelehnt, () =>
+                resolve((req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g))));
+        } catch (_) {
+            resolve(false);
+        }
+    });
+}
+
+function ohneKontaktdaten(event) {
+    const nurName = ({ id, name }) => ({ id, name });
+    const regs = r => r && {
+        ...r,
+        approved: (r.approved || []).map(nurName),
+        pending: (r.pending || []).map(nurName)
+    };
+    return {
+        ...event,
+        shifts: (event.shifts || []).map(shift => ({ ...shift, registrations: regs(shift.registrations) })),
+        directRegistrations: regs(event.directRegistrations)
+    };
+}
+
 // DEUTSCH: Alle Events auflisten, optional gefiltert nach upcoming/category, inkl. Schichten und Registrierungen
 app.get('/events', async (req, res) => {
     try {
@@ -805,7 +849,7 @@ app.get('/events', async (req, res) => {
             };
         }));
 
-        res.json(events);
+        res.json(await istVorstandAnfrage(req) ? events : events.map(ohneKontaktdaten));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1065,7 +1109,7 @@ app.get('/events/:id', async (req, res, next) => {
         const directApproved = directRegistrations.rows.filter(r => r.status === 'approved');
         const directPending = directRegistrations.rows.filter(r => r.status === 'pending');
 
-        res.json({
+        const antwort = {
             ...event,
             shifts: shiftsWithRegistrations,
             directRegistrations: {
@@ -1084,7 +1128,8 @@ app.get('/events/:id', async (req, res, next) => {
                 approvedCount: directApproved.length,
                 pendingCount: directPending.length
             }
-        });
+        };
+        res.json(await istVorstandAnfrage(req) ? antwort : ohneKontaktdaten(antwort));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

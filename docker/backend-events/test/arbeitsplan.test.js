@@ -14,6 +14,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { buildArbeitsplan, registrationDetailsText, bereichLesbar, renderArbeitsplanPdf } = require('../src/arbeitsplan');
+const { schemaAufbauen } = require('./datenbank');
 
 const fixtures = path.join(__dirname, 'fixtures');
 const lies = name => JSON.parse(fs.readFileSync(path.join(fixtures, name), 'utf8'));
@@ -169,13 +170,3 @@ test('Echte Datenbank: SQL liefert denselben Plan', { skip: !process.env.TEST_DA
         await pool.end();
     }
 });
-
-async function schemaAufbauen(pool) {
-    const pg = path.join(__dirname, '..', '..', 'postgres');
-    await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-    await pool.query(fs.readFileSync(path.join(pg, 'init.sql'), 'utf8'));
-    const migrationen = fs.readdirSync(path.join(pg, 'migrations')).filter(f => f.endsWith('.sql')).sort();
-    for (const datei of migrationen) {
-        await pool.query(fs.readFileSync(path.join(pg, 'migrations', datei), 'utf8'));
-    }
-}
