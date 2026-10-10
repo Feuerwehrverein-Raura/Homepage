@@ -21,6 +21,7 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <!-- SheetJS fuer XLSX-Export mit mehreren Tabellenblaettern -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="scripts/arbeitsplan.js"></script>
     <style>
         /* Brief-Maske: editierbare Felder unsichtbar eingebettet */
         .brief-input {
@@ -2380,13 +2381,12 @@
                             </svg>
                             Teilnehmerliste
                         </button>
-                        <!-- DEUTSCH: Arbeitsplan als PDF. Das Backend bot den Endpunkt
-                             (/events/:id/pdf/arbeitsplan) schon lange an, im
-                             Vorstandsbereich fehlte nur der Knopf dazu. Er erscheint
-                             nur bei Anlaessen mit Schichten — ohne Schichten gibt es
-                             keinen Plan, und ein Knopf, der das erst nach dem Druecken
-                             sagt, ist ein Aergernis. -->
-                        <button id="arbeitsplan-pdf-btn" onclick="downloadArbeitsplan()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+                        <!-- DEUTSCH: Oeffnet den Arbeitsplan als Tabelle, gebaut wie auf
+                             der Eventseite ("Arbeitsplan ansehen"); das PDF gibt es von
+                             dort aus. Er erscheint nur bei Anlaessen mit Schichten —
+                             ohne Schichten gibt es keinen Plan, und ein Knopf, der das
+                             erst nach dem Druecken sagt, ist ein Aergernis. -->
+                        <button id="arbeitsplan-btn" onclick="openArbeitsplanModal()" class="hidden px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                             </svg>
@@ -2397,6 +2397,37 @@
                 </div>
                 <div id="event-reg-content">
                     <!-- Content will be loaded dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEUTSCH: Arbeitsplan-Modal - gleicher Aufbau wie auf der Eventseite
+         (events.html): Schicht-Zuordnungen als Tabelle im Stil des PDF, darunter
+         PDF herunterladen, Bearbeiten und Schliessen. Liegt ueber dem
+         Anmeldungs-Fenster. -->
+    <div id="arbeitsplan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-gray-800">Arbeitsplan</h3>
+                    <button onclick="closeArbeitsplanModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                </div>
+                <div id="arbeitsplan-content"></div>
+                <div class="mt-6 flex gap-3">
+                    <button id="arbeitsplan-pdf-btn" onclick="downloadArbeitsplan()" class="flex-1 bg-fire-500 text-white px-4 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
+                        <span>📄</span>
+                        <span>PDF herunterladen</span>
+                    </button>
+                    <!-- DEUTSCH: Bearbeitet wird im Vorstand im Anmeldungs-Fenster
+                         darunter, also fuehrt "Bearbeiten" dorthin zurueck. -->
+                    <button onclick="closeArbeitsplanModal()" class="flex-1 border border-blue-500 text-blue-500 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
+                        <span>✏️</span>
+                        <span>Bearbeiten</span>
+                    </button>
+                    <button onclick="closeArbeitsplanModal()" class="flex-1 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                        Schließen
+                    </button>
                 </div>
             </div>
         </div>
@@ -5849,7 +5880,7 @@
 
             currentEventForRegistrations = event;
             // Arbeitsplan nur bei Anlaessen mit Schichten anbieten.
-            const apBtn = document.getElementById('arbeitsplan-pdf-btn');
+            const apBtn = document.getElementById('arbeitsplan-btn');
             if (apBtn) apBtn.classList.toggle('hidden', !(event.shifts && event.shifts.length > 0));
             document.getElementById('event-reg-modal-title').textContent = `Anmeldungen: ${event.title}`;
 
@@ -6532,6 +6563,31 @@
             } catch (error) {
                 alert(error.message);
             }
+        }
+
+        // Zeigt den Arbeitsplan des Events als Tabelle, wie auf der Eventseite.
+        // Der Plan kommt fertig aus dem Backend, gezeichnet wird er von
+        // scripts/arbeitsplan.js.
+        async function openArbeitsplanModal() {
+            const event = currentEventForRegistrations;
+            if (!event) return;
+            const content = document.getElementById('arbeitsplan-content');
+            content.innerHTML = '<div class="text-center py-8 text-gray-500">Arbeitsplan wird geladen …</div>';
+            const modal = document.getElementById('arbeitsplan-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            try {
+                const plan = await ladeArbeitsplan(API_BASE, event.id);
+                content.innerHTML = `<div class="max-w-none">${zeichneArbeitsplan(plan)}</div>`;
+            } catch (error) {
+                content.innerHTML = `<div class="text-center py-8 text-red-600">Arbeitsplan konnte nicht geladen werden: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function closeArbeitsplanModal() {
+            const modal = document.getElementById('arbeitsplan-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
 
         // Lädt den Arbeitsplan eines Events als PDF herunter.

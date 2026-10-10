@@ -10,6 +10,7 @@
     <title>Veranstaltungen - Feuerwehrverein Raura</title>
     <!-- DEUTSCH: Tailwind CSS via CDN fuer Utility-basiertes Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="scripts/arbeitsplan.js"></script>
     <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierter Farbpalette "fire" (Feuerwehr-Rot) -->
     <script>
         tailwind.config = {
@@ -187,7 +188,7 @@
                     <button id="close-arbeitsplan-modal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
                 </div>
                 <div id="arbeitsplan-content">
-                    <!-- DEUTSCH: Arbeitsplan-Tabelle wird per generateArbeitsplanFromShifts() generiert -->
+                    <!-- DEUTSCH: Arbeitsplan-Tabelle aus dem Backend, gezeichnet von scripts/arbeitsplan.js -->
                 </div>
                 <div class="mt-6 flex gap-3">
                     <button id="download-arbeitsplan" onclick="eventsManager.downloadArbeitsplanPDF()" class="flex-1 bg-fire-500 text-white px-4 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
@@ -236,7 +237,6 @@
                 this.viewMode = 'list';        // DEUTSCH: Ansichtsmodus ('list' oder 'grid')
                 this.selectedEvent = null;     // DEUTSCH: Aktuell im Modal angezeigte Veranstaltung
                 this.selectedShifts = [];      // DEUTSCH: Ausgewaehlte Schichten fuer Anmeldung
-                this.arbeitsplanData = {};     // DEUTSCH: Vorberechnete Arbeitsplan-HTML-Daten pro Event
                 this.memberData = null;        // DEUTSCH: Eingeloggter Mitglieder-Daten (nach OAuth)
                 this.authToken = localStorage.getItem('auth_token'); // DEUTSCH: JWT-Token aus dem LocalStorage
                 this.pendingGuestPayload = null; // DEUTSCH: Zwischengespeicherte Anmeldedaten fuer "trotzdem als Gast anmelden"
@@ -331,9 +331,8 @@
                     this.authToken = localStorage.getItem('auth_token');
                 }
 
-                // DEUTSCH: Hauptladeprozess: Events von API laden, Arbeitsplaene generieren, Listener einrichten
+                // DEUTSCH: Hauptladeprozess: Events von API laden, Listener einrichten
                 await this.loadEvents();
-                await this.loadArbeitsplanData();
                 this.setupEventListeners();
                 this.filterEvents();
                 this.renderEvents();
@@ -603,142 +602,6 @@
                     .replace(/^- (.*$)/gim, '<li>$1</li>')
                     .replace(/(<li>.*<\/li>)/gs, '<ul class="mb-3 list-none">$1</ul>')
                     .replace(/<p class="mb-3"><\/p>/g, '');
-            }
-
-            // DEUTSCH: Generiert fuer jedes Event mit Schichten den Arbeitsplan-HTML-Code
-            // DEUTSCH: Wird einmalig beim Laden aufgerufen und in arbeitsplanData zwischengespeichert
-            async loadArbeitsplanData() {
-                this.arbeitsplanData = {};
-                for (const event of this.events) {
-                    if (event.shifts && event.shifts.length > 0) {
-                        this.arbeitsplanData[event.id] = this.generateArbeitsplanFromShifts(event);
-                    }
-                }
-            }
-
-            // DEUTSCH: Erzeugt den Arbeitsplan als HTML-Tabelle aus den Schichtdaten eines Events
-            // DEUTSCH: Gruppiert nach Datum und Zeitfenster, Spalten sind die verschiedenen Bereiche
-            // DEUTSCH: Zeigt zugewiesene Helfer und offene Plaetze (Striche) an
-            generateArbeitsplanFromShifts(event) {
-                const shifts = event.shifts || [];
-                if (shifts.length === 0) return null;
-
-                // DEUTSCH: Alle eindeutigen Arbeitsbereiche sammeln (z.B. "Grill", "Bar", "Kasse")
-                const bereiche = [...new Set(shifts.map(s => s.bereich || 'Allgemein'))].sort();
-
-                // DEUTSCH: Schichten nach Datum und Zeitfenster gruppieren fuer die Tabellenstruktur
-                const shiftsByDate = {};
-                shifts.forEach(shift => {
-                    const date = shift.date;
-                    if (!shiftsByDate[date]) {
-                        shiftsByDate[date] = {};
-                    }
-                    const timeKey = `${shift.start_time}-${shift.end_time}`;
-                    if (!shiftsByDate[date][timeKey]) {
-                        shiftsByDate[date][timeKey] = {
-                            start_time: shift.start_time,
-                            end_time: shift.end_time,
-                            bereiche: {}
-                        };
-                    }
-                    const bereich = shift.bereich || 'Allgemein';
-                    // DEUTSCH: Genehmigte Anmeldungen als Zuweisungen im Arbeitsplan anzeigen
-                    const approvedRegs = shift.registrations?.approved || [];
-                    shiftsByDate[date][timeKey].bereiche[bereich] = {
-                        needed: shift.max_helpers || shift.needed || 1,
-                        assignments: approvedRegs.map(r => ({ member_name: r.name }))
-                    };
-                });
-
-                // DEUTSCH: Datumsangaben chronologisch sortieren
-                const sortedDates = Object.keys(shiftsByDate).sort();
-
-                // DEUTSCH: HTML-Kopfzeile im Stil der PDF-Vorlage generieren
-                let html = `
-                    <div class="arbeitsplan-header text-center mb-6">
-                        <div class="text-lg font-semibold">Feuerwehrverein Raura, Kaiseraugst</div>
-                        <div class="text-2xl font-bold underline mt-2">Arbeitsplan ${event.title}</div>
-                    </div>
-                `;
-
-                // DEUTSCH: Fuer jedes Datum eine Tabelle mit Zeitfenstern und Bereichen erzeugen
-                sortedDates.forEach(date => {
-                    // DEUTSCH: Datum im Schweizer Format anzeigen (z.B. "Samstag, 01.06.2025")
-                    const dateObj = new Date(date + 'T12:00:00');
-                    const formattedDate = dateObj.toLocaleDateString('de-CH', {
-                        weekday: 'long',
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    });
-
-                    html += `<div class="mt-6 mb-4">
-                        <h3 class="text-lg font-bold underline">${formattedDate}</h3>
-                    </div>`;
-
-                    // DEUTSCH: Tabelle fuer dieses Datum erzeugen (horizontal scrollbar auf kleinen Bildschirmen)
-                    html += '<div class="overflow-x-auto"><table class="w-full border-collapse text-sm">';
-
-                    // DEUTSCH: Tabellenkopf mit Bereichsnamen als Spaltenkoepfe
-                    html += '<thead><tr class="border-b-2 border-black">';
-                    html += '<th class="px-3 py-2 text-left font-bold border border-gray-400 bg-gray-50 w-32">Zeit</th>';
-                    bereiche.forEach(bereich => {
-                        html += `<th class="px-3 py-2 text-left font-bold border border-gray-400 bg-gray-50">${bereich}</th>`;
-                    });
-                    html += '</tr></thead><tbody>';
-
-                    // DEUTSCH: Zeitfenster chronologisch sortieren
-                    const timeSlots = Object.keys(shiftsByDate[date]).sort((a, b) => {
-                        return a.localeCompare(b);
-                    });
-
-                    timeSlots.forEach(timeKey => {
-                        const slot = shiftsByDate[date][timeKey];
-                        const startTime = slot.start_time ? slot.start_time.substring(0, 5) : '';
-                        const endTime = slot.end_time ? slot.end_time.substring(0, 5) : '';
-                        const endDisplay = endTime || '';
-
-                        html += '<tr class="border-b border-gray-300">';
-                        html += `<td class="px-3 py-2 border border-gray-400 font-medium align-top">${startTime}-${endDisplay}</td>`;
-
-                        bereiche.forEach(bereich => {
-                            const data = slot.bereiche[bereich];
-
-                            if (data) {
-                                // DEUTSCH: Bereich hat Schicht - Zuweisungen und offene Plaetze anzeigen
-                                html += '<td class="px-3 py-2 border border-gray-400 align-top bg-white">';
-                                const assignments = data.assignments || [];
-                                const needed = data.needed || 1;
-
-                                if (assignments.length > 0) {
-                                    assignments.forEach(a => {
-                                        html += `<div>-${a.member_name || 'Unbekannt'}</div>`;
-                                    });
-                                    // DEUTSCH: Restliche offene Plaetze mit Strichen auffuellen
-                                    for (let i = assignments.length; i < needed; i++) {
-                                        html += '<div class="text-gray-400">-</div>';
-                                    }
-                                } else {
-                                    // DEUTSCH: Keine Zuweisungen - alle Plaetze als leer anzeigen
-                                    for (let i = 0; i < needed; i++) {
-                                        html += '<div class="text-gray-400">-</div>';
-                                    }
-                                }
-                            } else {
-                                // DEUTSCH: Keine Schicht fuer diese Zeit/Bereich-Kombination - schwarze Zelle
-                                html += '<td class="px-3 py-2 border border-gray-400 align-top bg-gray-900">';
-                            }
-
-                            html += '</td>';
-                        });
-
-                        html += '</tr>';
-                    });
-
-                    html += '</tbody></table></div>';
-                });
-
-                return html;
             }
 
             // DEUTSCH: Registriert alle Event-Listener fuer Buttons, Eingabefelder und Modals
@@ -1129,7 +992,7 @@
                                 👷 Für Schicht anmelden
                             </button>
                         `;
-                        if (this.arbeitsplanData[event.id]) {
+                        if (event.dbId) {
                             buttons += `
                                 <button onclick="eventsManager.showArbeitsplan()"
                                         class="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
@@ -1165,7 +1028,7 @@
                                 👷 Für Schicht anmelden
                             </button>
                         `;
-                        if (this.arbeitsplanData[event.id]) {
+                        if (event.dbId) {
                             buttons += `
                                 <button onclick="eventsManager.showArbeitsplan()"
                                         class="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
@@ -2383,37 +2246,25 @@
                 alert(message);
             }
 
-            // DEUTSCH: Oeffnet das Arbeitsplan-Modal und zeigt die vorberechnete Schicht-Tabelle
-            // DEUTSCH: Falls noch kein Arbeitsplan vorhanden, wird er on-the-fly generiert
-            showArbeitsplan() {
+            // DEUTSCH: Oeffnet das Arbeitsplan-Modal. Der Plan kommt fertig aus dem
+            // DEUTSCH: Backend (GET /events/:id/arbeitsplan) und wird von
+            // DEUTSCH: scripts/arbeitsplan.js gezeichnet — wie im Vorstand und in den Apps
+            async showArbeitsplan() {
                 const event = this.selectedEvent;
                 if (!event) return;
 
                 const modal = document.getElementById('arbeitsplan-modal');
                 const content = document.getElementById('arbeitsplan-content');
-
-                // DEUTSCH: Vorgenerierten Arbeitsplan verwenden oder jetzt neu erzeugen
-                let arbeitsplanHTML = this.arbeitsplanData[event.id];
-                if (!arbeitsplanHTML && event.shifts && event.shifts.length > 0) {
-                    arbeitsplanHTML = this.generateArbeitsplanFromShifts(event);
-                }
-
-                if (!arbeitsplanHTML) {
-                    content.innerHTML = `
-                        <div class="text-center py-8 text-gray-500">
-                            <p>Keine Schichten für dieses Event vorhanden.</p>
-                        </div>
-                    `;
-                } else {
-                    content.innerHTML = `
-                        <div class="max-w-none">
-                            ${arbeitsplanHTML}
-                        </div>
-                    `;
-                }
-
+                content.innerHTML = '<div class="text-center py-8 text-gray-500">Arbeitsplan wird geladen …</div>';
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
+
+                try {
+                    const plan = await ladeArbeitsplan(API_BASE, event.dbId);
+                    content.innerHTML = `<div class="max-w-none">${zeichneArbeitsplan(plan)}</div>`;
+                } catch (error) {
+                    content.innerHTML = '<div class="text-center py-8 text-red-600">Arbeitsplan konnte nicht geladen werden.</div>';
+                }
             }
 
             // DEUTSCH: Leitet zum Event-Dashboard weiter, wo der Arbeitsplan bearbeitet werden kann
