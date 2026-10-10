@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
 const arbeitsplan = require('./arbeitsplan');
-const { formatDateDE, bereichLesbar } = arbeitsplan;
+const { formatDateDE, bereichLesbar, renderArbeitsplanPdf } = arbeitsplan;
 const buildArbeitsplan = eventId => arbeitsplan.buildArbeitsplan(pool, eventId);
 const registrationDetailsText = (eventId, shiftIds) => arbeitsplan.registrationDetailsText(pool, eventId, shiftIds);
 
@@ -3982,63 +3982,6 @@ app.get('/events/:id/arbeitsplan', async (req, res) => {
     }
 });
 
-// DEUTSCH: Arbeitsplan (aus buildArbeitsplan) als PDF rendern. Liefert einen
-// Buffer — gebraucht vom GET-Download und vom Versand eine Woche vor dem Anlass.
-function renderArbeitsplanPdf(plan) {
-    const doc = new PDFDocument({
-        size: 'A4',
-        margin: 50,
-        info: {
-            Title: `Arbeitsplan ${plan.anlass}`,
-            Author: 'Feuerwehrverein Raura'
-        }
-    });
-    const chunks = [];
-    doc.on('data', chunk => chunks.push(chunk));
-    const done = new Promise((resolve, reject) => {
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', reject);
-    });
-
-    // Header
-    doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
-    doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
-    doc.moveDown(0.3);
-    doc.fontSize(16).font('Helvetica-Bold').text(plan.anlass, { align: 'center' });
-    doc.moveDown(1);
-
-    plan.tage.forEach(tag => {
-        doc.fontSize(12).font('Helvetica-Bold').text(tag.bezeichnung);
-        doc.moveDown(0.5);
-
-        tag.zeilen.forEach(zeile => {
-            doc.fontSize(10).font('Helvetica-Bold').text(`  ${zeile.zeit.replace('-', ' - ')}`);
-
-            plan.bereiche.forEach((bereich, i) => {
-                const data = zeile.zellen[i];
-                if (data) {
-                    const helperList = data.besetzt.length > 0 ? data.besetzt.join(', ') : '(noch offen)';
-                    const countStr = `${data.besetzt.length}/${data.gebraucht}`;
-                    doc.fontSize(9).font('Helvetica').text(`      ${bereich} [${countStr}]: ${helperList}`);
-                } else {
-                    // No shift exists for this time/bereich - show as blocked
-                    doc.fontSize(9).font('Helvetica').fillColor('#666666')
-                        .text(`      ${bereich}: ▬▬▬`)
-                        .fillColor('#000000');
-                }
-            });
-            doc.moveDown(0.3);
-        });
-        doc.moveDown(0.5);
-    });
-
-    doc.moveDown(2);
-    doc.fontSize(8).font('Helvetica').fillColor('#666666')
-        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
-
-    doc.end();
-    return done;
-}
 
 // DEUTSCH: Arbeitsplan-PDF direkt per GET abrufen (per Event-ID). Inhalt aus buildArbeitsplan()
 app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {

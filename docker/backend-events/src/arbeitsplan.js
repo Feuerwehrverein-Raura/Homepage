@@ -3,6 +3,8 @@
 // ohne laufenden Server getestet werden koennen (test/arbeitsplan.test.js);
 // die Datenbank wird deshalb hineingereicht statt global genommen.
 
+const PDFDocument = require('pdfkit');
+
 function formatDateDE(dateStr) {
     if (!dateStr) return '-';
     const date = new Date(dateStr + 'T12:00:00');
@@ -152,4 +154,62 @@ async function buildArbeitsplan(pool, eventId) {
     };
 }
 
-module.exports = { formatDateDE, bereichLesbar, registrationDetailsText, buildArbeitsplan };
+// DEUTSCH: Arbeitsplan (aus buildArbeitsplan) als PDF rendern. Liefert einen
+// Buffer — gebraucht vom GET-Download und vom Versand eine Woche vor dem Anlass.
+//
+// Pro Zeitfenster nur die Bereiche, die dann eine Schicht haben. Frueher stand
+// jeder Bereich da, leere mit "▬▬▬" — das Zeichen kennt die eingebaute
+// Helvetica nicht, im PDF wurde daraus "%¬%¬%¬", und der Plan war doppelt so
+// lang wie noetig. `compress` nur fuer Tests abschaltbar.
+function renderArbeitsplanPdf(plan, { compress = true } = {}) {
+    const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+        compress,
+        info: {
+            Title: `Arbeitsplan ${plan.anlass}`,
+            Author: 'Feuerwehrverein Raura'
+        }
+    });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    const done = new Promise((resolve, reject) => {
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+    });
+
+    doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+    doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(16).font('Helvetica-Bold').text(plan.anlass, { align: 'center' });
+    doc.moveDown(1);
+
+    plan.tage.forEach(tag => {
+        doc.fontSize(12).font('Helvetica-Bold').text(tag.bezeichnung);
+        doc.moveDown(0.5);
+
+        tag.zeilen.forEach(zeile => {
+            const schichten = zeile.zellen
+                .map((zelle, i) => zelle && { bereich: plan.bereiche[i], ...zelle })
+                .filter(Boolean);
+            if (schichten.length === 0) return;
+
+            doc.fontSize(10).font('Helvetica-Bold').text(`  ${zeile.zeit.replace('-', ' - ')}`);
+            schichten.forEach(s => {
+                const helfer = s.besetzt.length > 0 ? s.besetzt.join(', ') : '(noch offen)';
+                doc.fontSize(9).font('Helvetica').text(`      ${s.bereich} [${s.besetzt.length}/${s.gebraucht}]: ${helfer}`);
+            });
+            doc.moveDown(0.3);
+        });
+        doc.moveDown(0.5);
+    });
+
+    doc.moveDown(2);
+    doc.fontSize(8).font('Helvetica').fillColor('#666666')
+        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
+
+    doc.end();
+    return done;
+}
+
+module.exports = { formatDateDE, bereichLesbar, registrationDetailsText, buildArbeitsplan, renderArbeitsplanPdf };

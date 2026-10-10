@@ -13,7 +13,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { buildArbeitsplan, registrationDetailsText, bereichLesbar } = require('../src/arbeitsplan');
+const { buildArbeitsplan, registrationDetailsText, bereichLesbar, renderArbeitsplanPdf } = require('../src/arbeitsplan');
 
 const fixtures = path.join(__dirname, 'fixtures');
 const lies = name => JSON.parse(fs.readFileSync(path.join(fixtures, name), 'utf8'));
@@ -87,6 +87,25 @@ test('Mailtext: ohne Schichten keine Schicht-Zeilen', async () => {
     const text = await registrationDetailsText(pool, 'x', null);
     assert.ok(!text.includes('Schicht'));
     assert.ok(text.startsWith('Anlass: GV\nDatum: Sonntag, 1. März 2026'));
+});
+
+// Text aus einem unkomprimierten pdfkit-PDF: jede TJ-Anweisung ist eine Zeile,
+// die Zeichen stehen hex-kodiert (WinAnsi) in <...>.
+function pdfZeilen(buffer) {
+    return [...buffer.toString('latin1').matchAll(/\[(.*?)\] TJ/g)]
+        .map(m => [...m[1].matchAll(/<([0-9a-f]*)>/g)].map(h => Buffer.from(h[1], 'hex').toString('latin1')).join(''));
+}
+
+test('PDF: nur Bereiche mit Schicht, kein Zeichensalat', async () => {
+    const zeilen = pdfZeilen(await renderArbeitsplanPdf(erwartet, { compress: false })).map(z => z.trim());
+    assert.ok(zeilen.includes('Chilbi'));
+    assert.ok(zeilen.includes('Samstag, 17.10.2026'));
+    assert.ok(zeilen.includes('Grill [0/1]: (noch offen)'));
+    assert.ok(zeilen.includes('Bar [1/2]: Anna A'));
+    assert.ok(zeilen.includes('Allgemein [2/1]: Bea B, Cem C'));
+    // leere Bereiche erscheinen gar nicht mehr (frueher "Bar: ▬▬▬" -> "%¬%¬%¬")
+    assert.ok(!zeilen.some(z => /^(Allgemein|Bar|Grill):/.test(z)), zeilen.join('\n'));
+    assert.ok(!zeilen.some(z => z.includes('¬')));
 });
 
 test('Echte Datenbank: SQL liefert denselben Plan', { skip: !process.env.TEST_DATABASE_URL && 'TEST_DATABASE_URL nicht gesetzt' }, async () => {
