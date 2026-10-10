@@ -2274,56 +2274,26 @@
                 }
             }
 
-            // DEUTSCH: Generiert den Arbeitsplan als PDF ueber die Backend-API und startet den Download
-            // DEUTSCH: Laedt zuerst das Vereinslogo als Base64 und sendet es mit den Schichtdaten an die API
+            // DEUTSCH: Laedt den Arbeitsplan als PDF — dasselbe PDF wie in Vorstand und
+            // DEUTSCH: Apps (GET /events/:id/pdf/arbeitsplan: Aushang mit Logo, Stand und
+            // DEUTSCH: Seitenzahlen). Frueher eigener Weg per POST /arbeitsplan/pdf.
             async downloadArbeitsplanPDF() {
                 const event = this.selectedEvent;
-                if (!event || !event.shifts || event.shifts.length === 0) {
+                if (!event || !event.dbId) {
                     alert('Keine Schichten für dieses Event vorhanden.');
                     return;
                 }
 
                 const downloadBtn = document.getElementById('download-arbeitsplan');
                 const originalHTML = downloadBtn.innerHTML;
-                downloadBtn.innerHTML = '<span>⏳</span><span>Wird generiert...</span>';
+                downloadBtn.innerHTML = '<span>⏳</span><span>Wird erstellt …</span>';
                 downloadBtn.disabled = true;
 
                 try {
-                    // DEUTSCH: Vereinslogo als Base64 laden fuer die PDF-Kopfzeile
-                    let logoBase64 = null;
-                    try {
-                        const logoResponse = await fetch('images/logo.png');
-                        const logoBlob = await logoResponse.blob();
-                        logoBase64 = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                            reader.readAsDataURL(logoBlob);
-                        });
-                    } catch (e) {
-                        console.warn('Logo konnte nicht geladen werden:', e);
-                    }
-
-                    // DEUTSCH: PDF-Generierungs-API aufrufen (Backend erzeugt das PDF serverseitig)
-                    const response = await fetch('https://api.fwv-raura.ch/arbeitsplan/pdf', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            event: {
-                                dbId: event.dbId, // Database ID for fresh registration lookup
-                                title: event.title,
-                                shifts: event.shifts,
-                                springer: event.springer || null,
-                                notes: event.notes || null
-                            },
-                            logoBase64
-                        })
-                    });
-
+                    const response = await fetch(`${API_BASE}/events/${event.dbId}/pdf/arbeitsplan`);
                     if (!response.ok) {
                         throw new Error(`PDF-Generierung fehlgeschlagen: ${response.status}`);
                     }
-
-                    // DEUTSCH: PDF als Blob herunterladen und ueber einen temporaeren Link-Klick speichern
                     const blob = await response.blob();
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
@@ -2333,7 +2303,7 @@
                     URL.revokeObjectURL(url);
                 } catch (error) {
                     console.error('PDF Download Fehler:', error);
-                    alert('PDF konnte nicht generiert werden. Bitte versuchen Sie es später erneut.');
+                    alert('PDF konnte nicht erstellt werden. Bitte versuchen Sie es später erneut.');
                 } finally {
                     downloadBtn.innerHTML = originalHTML;
                     downloadBtn.disabled = false;
