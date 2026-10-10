@@ -1949,12 +1949,22 @@ app.post('/registrations', authenticateAny, async (req, res) => {
 
         const reg = result.rows[0];
 
-        // E-Mail-Benachrichtigung an Vorstand senden
+        // Benachrichtigungen. Frueher ging nur eine Mail an den ganzen Vorstand
+        // ("Status: approved", ohne Schicht) — der Vorstand informierte sich
+        // ueber seine eigene Arbeit, waehrend die eingetragene Person nichts
+        // erfuhr. Jetzt: die Person wie beim Eintrag durch einen Organisator,
+        // der Organisator (wenn er es nicht selbst war) und der Vorstand, alle
+        // mit Anlass, Datum, Ort und Schichten.
         try {
-            const event = await pool.query('SELECT title, category FROM events WHERE id = $1', [event_id]);
+            const event = await pool.query('SELECT title, organizer_email FROM events WHERE id = $1', [event_id]);
             const eventTitle = event.rows[0]?.title || 'Unbekanntes Event';
 
-            // Name ermitteln: Gast-Name oder Mitglied nachschlagen
+            notifyRegistrationChange({
+                eventId: event_id, eventTitle,
+                memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+                action: 'added', shiftIds: reg.shift_ids
+            }).catch(() => {});
+
             let personName = guest_name;
             if (!personName && member_id) {
                 const member = await pool.query('SELECT vorname, nachname FROM members WHERE id = $1', [member_id]);
@@ -1962,28 +1972,28 @@ app.post('/registrations', authenticateAny, async (req, res) => {
                     personName = `${member.rows[0].vorname} ${member.rows[0].nachname}`;
                 }
             }
-
             const eingetragenVon = req.user.email || req.user.name || 'Vorstand';
+            const statusText = { approved: 'bestätigt', pending: 'offen', rejected: 'abgelehnt' }[regStatus] || regStatus;
+            const details = await registrationDetailsText(event_id, reg.shift_ids);
 
-            const notifyBody = `Neue Anmeldung durch Vorstand eingetragen!
+            const body = `${personName || 'Unbekannt'} wurde für ${eventTitle} eingetragen (${statusText}).
 
-Event: ${eventTitle}
-Person: ${personName || 'Unbekannt'}${guest_email ? `\nE-Mail: ${guest_email}` : ''}
-Status: ${regStatus}
+${details}
+${guest_email ? `\nE-Mail: ${guest_email}` : ''}
 Eingetragen von: ${eingetragenVon}${notes ? `\nBemerkungen: ${notes}` : ''}`;
+            const subject = `Neue Anmeldung: ${personName || 'Unbekannt'} – ${eventTitle}`;
 
-            const notifyEmail = (event.rows[0]?.category === 'GV')
-                ? 'vorstand@fwv-raura.ch'
-                : (process.env.CONTACT_EMAIL || 'vorstand@fwv-raura.ch');
-
-            await axios.post(`${DISPATCH_API}/email/send`, {
-                to: notifyEmail,
-                subject: `Neue Anmeldung für ${eventTitle} (durch Vorstand)`,
-                body: notifyBody,
-                event_id: event_id
-            });
+            const empfaenger = [process.env.CONTACT_EMAIL || 'vorstand@fwv-raura.ch'];
+            const organisator = (event.rows[0]?.organizer_email || '').trim();
+            if (organisator && organisator.toLowerCase() !== String(eingetragenVon).toLowerCase()
+                && !empfaenger.some(e => e.toLowerCase() === organisator.toLowerCase())) {
+                empfaenger.push(organisator);
+            }
+            for (const to of empfaenger) {
+                await axios.post(`${DISPATCH_API}/email/send`, { to, subject, body, event_id });
+            }
         } catch (emailErr) {
-            console.error('Vorstand-Benachrichtigungs-E-Mail fehlgeschlagen:', emailErr.message);
+            console.error('Benachrichtigung zur Vorstands-Anmeldung fehlgeschlagen:', emailErr.message);
         }
 
         res.status(201).json(reg);
