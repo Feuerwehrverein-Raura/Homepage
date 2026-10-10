@@ -1,0 +1,73 @@
+name: Flutter-Apps
+
+# Die Flutter-Apps, die die nativen Apps ersetzen (docs/flutter-entscheidung.md):
+# flutter/fwv_core (gemeinsamer Kern), flutter/mitglieder (Mitglieder +
+# Organisatoren), spaeter flutter/vorstand. Laeuft auch, wenn sich der Vertrag
+# des Backends aendert — der Kern testet gegen dieselben Dateien.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'flutter/**'
+      - 'docker/backend-events/test/fixtures/**'
+      - '.github/workflows/flutter-apps.yml'
+  pull_request:
+    paths:
+      - 'flutter/**'
+      - 'docker/backend-events/test/fixtures/**'
+      - '.github/workflows/flutter-apps.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Analyse und Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        paket: [fwv_core, mitglieder]
+    defaults:
+      run:
+        working-directory: flutter/${{ matrix.paket }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Abhaengigkeiten
+        run: flutter pub get
+
+      - name: Analyse
+        run: flutter analyze
+
+      - name: Tests (Kern inkl. Vertrag mit dem Backend)
+        run: flutter test
+
+  android:
+    name: Mitglieder-App Android (debug)
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter/mitglieder
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: APK bauen
+        run: flutter build apk --debug

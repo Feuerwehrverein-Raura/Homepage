@@ -23,20 +23,32 @@ der vier Apps.
 - **Öffentliche Website bleibt HTML.** Sie muss schnell laden und von
   Suchmaschinen gefunden werden; Flutter Web zeichnet die Seite selbst, lädt
   beim ersten Aufruf mehrere MB und ist für Suchmaschinen schlecht lesbar.
-- **Alle Apps werden eine Flutter-Codebasis**: Android, iOS, Desktop (macOS,
-  Windows, Linux) und — später — Web für den Vorstandsbereich. Mitglieder-
-  und Vorstands-Funktionen in einer App, freigeschaltet nach Anmeldung.
+- **Alle Apps werden Flutter**, aufgeteilt in zwei Apps mit gemeinsamem Kern:
+  - **Mitglieder-App** für Mitglieder und Organisatoren (Android, iOS).
+  - **Vorstand-App** bleibt eine eigene App (Android, Desktop — macOS,
+    Windows, Linux — und später Web für den Vorstandsbereich).
+  - **`fwv_core`**: gemeinsame Modelle, API-Zugriff, Anmeldung und
+    Vertrags-Tests. Was beide Apps brauchen, wird nur einmal gebaut.
 
-Aus fünf Oberflächen werden zwei.
+Aus fünf getrennten Codebasen werden zwei: die Website und das
+Flutter-Repo (`flutter/`).
+
+```
+flutter/
+  fwv_core/     gemeinsam: Modelle, API, Anmeldung, Vertrags-Tests
+  mitglieder/   Mitglieder + Organisatoren (com.fwv.members)
+  vorstand/     Vorstand (später, ch.fwvraura.vorstand)
+```
 
 ## Vorgehen
 
 Schrittweise, die bestehenden Apps laufen weiter, bis der Ersatz fertig ist.
 
-1. **Mitglieder-App** in Flutter (ersetzt `members-android` und
-   `members-ios`). Kleinster Umfang, Android und iOS heute doppelt.
-2. **Vorstand-Funktionen** dazu (ersetzt `vorstand-android` und
-   `vorstand-desktop`).
+1. **Mitglieder-App inklusive Organisator** in Flutter (ersetzt
+   `members-android` und `members-ios`). Wird noch wenig genutzt, Android und
+   iOS heute doppelt.
+2. **Vorstand-App** in Flutter (ersetzt `vorstand-android` und
+   `vorstand-desktop`), auf demselben Kern.
 3. Danach entscheiden, ob `vorstand.html` durch die Web-Version ersetzt wird.
 
 ## Regeln für den Flutter-Code
