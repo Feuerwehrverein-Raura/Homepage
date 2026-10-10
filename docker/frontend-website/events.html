@@ -180,29 +180,29 @@
 
     <!-- DEUTSCH: Arbeitsplan-Modal - zeigt die Schicht-Zuordnungen als Tabelle (aehnlich dem PDF-Layout) -->
     <!-- DEUTSCH: Enthaelt Buttons zum PDF-Download, Bearbeiten und Schliessen -->
-    <div id="arbeitsplan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div class="p-6">
-                <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-2xl font-bold text-gray-800">Arbeitsplan</h3>
-                    <button id="close-arbeitsplan-modal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
-                </div>
-                <div id="arbeitsplan-content">
-                    <!-- DEUTSCH: Arbeitsplan-Tabelle aus dem Backend, gezeichnet von scripts/arbeitsplan.js -->
-                </div>
-                <div class="mt-6 flex gap-3">
-                    <button id="download-arbeitsplan" onclick="eventsManager.downloadArbeitsplanPDF()" class="flex-1 bg-fire-500 text-white px-4 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
-                        <span>📄</span>
-                        <span>PDF herunterladen</span>
-                    </button>
-                    <button id="edit-arbeitsplan" onclick="eventsManager.editArbeitsplan()" class="flex-1 border border-blue-500 text-blue-500 px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
-                        <span>✏️</span>
-                        <span>Bearbeiten</span>
-                    </button>
-                    <button id="close-arbeitsplan-modal-btn" class="flex-1 border border-gray-300 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors">
-                        Schließen
-                    </button>
-                </div>
+    <!-- DEUTSCH: Kopf und Knopfleiste bleiben stehen, nur der Plan dazwischen
+         scrollt — sonst verschwinden die Knoepfe auf dem Handy unter dem Plan. -->
+    <div id="arbeitsplan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-2 sm:p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b shrink-0">
+                <h3 class="text-xl sm:text-2xl font-bold text-gray-800">Arbeitsplan</h3>
+                <button id="close-arbeitsplan-modal" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
+            <div id="arbeitsplan-content" class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+                <!-- DEUTSCH: Arbeitsplan aus dem Backend, gezeichnet von scripts/arbeitsplan.js -->
+            </div>
+            <div class="flex gap-2 sm:gap-3 px-4 py-3 sm:px-6 sm:py-4 border-t shrink-0">
+                <button id="download-arbeitsplan" onclick="eventsManager.downloadArbeitsplanPDF()" class="flex-1 bg-fire-500 text-white px-3 py-3 rounded-lg hover:bg-fire-600 transition-colors flex items-center justify-center space-x-2">
+                    <span>📄</span>
+                    <span>PDF<span class="hidden sm:inline"> herunterladen</span></span>
+                </button>
+                <button id="edit-arbeitsplan" onclick="eventsManager.editArbeitsplan()" class="flex-1 border border-blue-500 text-blue-500 px-3 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2">
+                    <span>✏️</span>
+                    <span>Bearbeiten</span>
+                </button>
+                <button id="close-arbeitsplan-modal-btn" class="flex-1 border border-gray-300 text-gray-700 px-3 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    Schließen
+                </button>
             </div>
         </div>
     </div>
