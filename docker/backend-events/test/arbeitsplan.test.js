@@ -100,9 +100,13 @@ test('PDF: Aushang mit Logo, Tabelle pro Tag, nur Bereiche dieses Tages', async 
     const pdf = await renderArbeitsplanPdf(erwartet, { compress: false });
     const zeilen = pdfZeilen(pdf).map(z => z.trim());
     assert.ok(pdf.toString('latin1').includes('/Subtype /Image'), 'Logo fehlt');
+    assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1, 'keine Leerseiten');
     assert.ok(zeilen.includes('Feuerwehrverein Raura, Kaiseraugst'));
     assert.ok(zeilen.includes('Arbeitsplan Chilbi'));
     assert.ok(zeilen.includes('Samstag, 17.10.2026'));
+    // Stand im Kopf und auf jeder Seite unten, damit man die Fassung erkennt
+    assert.ok(zeilen.some(z => /^Stand: \d\d\.\d\d\.\d{4}, \d\d:\d\d Uhr$/.test(z)), 'Stand im Kopf fehlt');
+    assert.ok(zeilen.some(z => /^Stand: .*·\s+Seite 1 von 1$/.test(z)), 'Fusszeile fehlt');
 
     // 17.10.: Spalten Zeit, Bar, Grill (Allgemein hat dort keine Schicht)
     const sa = zeilen.indexOf('Samstag, 17.10.2026');

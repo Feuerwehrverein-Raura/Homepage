@@ -172,6 +172,7 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
         size: 'A4',
         margin: 50,
         compress,
+        bufferPages: true, // fuer "Seite x von y" am Schluss
         info: {
             Title: plan.titel,
             Author: 'Feuerwehrverein Raura'
@@ -183,6 +184,12 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
     });
+
+    // Stand: damit man auf dem Ausdruck sieht, welche Fassung an der Wand
+    // haengt. Der Server laeuft auf UTC, deshalb die Zeitzone ausdruecklich.
+    const jetzt = new Date();
+    const stand = `${jetzt.toLocaleDateString('de-CH', { timeZone: 'Europe/Zurich', day: '2-digit', month: '2-digit', year: 'numeric' })}, `
+        + `${jetzt.toLocaleTimeString('de-CH', { timeZone: 'Europe/Zurich', hour: '2-digit', minute: '2-digit' })} Uhr`;
 
     const links = doc.page.margins.left;
     const breite = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -199,6 +206,9 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
         .text(plan.verein, textX, kopfY + 6, { width: textBreite });
     doc.fontSize(16).font('Helvetica-Bold').fillColor('#000000')
         .text(plan.titel, textX, kopfY + 26, { width: textBreite, underline: true });
+    doc.fontSize(9).font('Helvetica').fillColor('#444444')
+        .text(`Stand: ${stand}`, textX, doc.y + 4, { width: textBreite });
+    doc.fillColor('#000000');
     doc.x = links;
     doc.y = kopfY + logoHoehe + 15;
 
@@ -286,11 +296,21 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
         doc.y = y + 12;
     });
 
-    doc.moveDown(1);
-    doc.fontSize(8).font('Helvetica').fillColor('#666666')
-        // Der Server laeuft auf UTC; ohne Zeitzone stand hier 15:57 statt 17:57.
-        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH', { timeZone: 'Europe/Zurich' })} um ${new Date().toLocaleTimeString('de-CH', { timeZone: 'Europe/Zurich' })}`,
-            links, doc.y, { width: breite, align: 'center' });
+    // Fusszeile auf jeder Seite: Stand und Seitenzahl — fehlt ein Blatt, sieht
+    // man es; liegen zwei Fassungen herum, auch.
+    const seiten = doc.bufferedPageRange();
+    for (let n = 0; n < seiten.count; n++) {
+        doc.switchToPage(seiten.start + n);
+        // Unterhalb des Rands wuerde pdfkit sonst eine neue (leere) Seite
+        // anfangen — Rand fuer die Fusszeile kurz aufheben.
+        const rand = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
+        doc.fontSize(8).font('Helvetica').fillColor('#666666')
+            .text(`Stand: ${stand}  ·  Seite ${n + 1} von ${seiten.count}`, links, doc.page.height - rand + 15,
+                { width: breite, align: 'center', lineBreak: false });
+        doc.page.margins.bottom = rand;
+    }
+    doc.fillColor('#000000');
 
     doc.end();
     return done;
