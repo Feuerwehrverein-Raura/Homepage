@@ -81,33 +81,52 @@ final class ArbeitsplanContractTests: XCTestCase {
         XCTAssertEqual(zelle.offen, 0)
     }
 
-    // MARK: - Was die Tabelle zeichnet
+    // MARK: - Was die Karten zeigen (Handy-Ansicht)
 
-    func testZelleAtIndex() {
+    func testKarteSamstagVormittag() {
+        let zeile = plan.tage[0].zeilen[0]
+        XCTAssertEqual(zeile.zeitText, "10:00–14:00 Uhr")
+        let karte = zeile.karte(bereiche: plan.bereiche)
+        XCTAssertEqual(karte, [.init(bereich: "Grill", namenText: "", offen: 1)])
+        XCTAssertEqual(karte.first?.freiText, "1 Platz frei")
+    }
+
+    func testKarteSamstagAbend() {
         let zeile = plan.tage[0].zeilen[1]
-        XCTAssertNil(zeile.zelle(at: 0))
-        XCTAssertNotNil(zeile.zelle(at: 1))
-        XCTAssertNil(zeile.zelle(at: 2))
-        // Fehlende Eintraege gelten als "keine Schicht".
-        XCTAssertNil(zeile.zelle(at: 3))
-        XCTAssertNil(zeile.zelle(at: -1))
+        XCTAssertEqual(zeile.zeitText, "18:00–22:00 Uhr")
+        let karte = zeile.karte(bereiche: plan.bereiche)
+        XCTAssertEqual(karte, [.init(bereich: "Bar", namenText: "Anna A", offen: 1)])
+        XCTAssertEqual(karte.first?.freiText, "1 Platz frei")
     }
 
-    func testLinien() {
-        XCTAssertEqual(plan.tage[0].zeilen[0].zelle(at: 2)?.linien, [.offen])
-        XCTAssertEqual(plan.tage[0].zeilen[1].zelle(at: 1)?.linien,
-                       [.name("Anna A"), .offen])
-        // Ueberbucht: alle Namen, kein Strich.
-        XCTAssertEqual(plan.tage[1].zeilen[0].zelle(at: 0)?.linien,
-                       [.name("Bea B"), .name("Cem C")])
+    func testKarteSonntagUeberbucht() {
+        let karte = plan.tage[1].zeilen[0].karte(bereiche: plan.bereiche)
+        XCTAssertEqual(karte, [.init(bereich: "Allgemein", namenText: "Bea B, Cem C", offen: 0)])
+        XCTAssertNil(karte.first?.freiText)
     }
 
-    func testLinienOhneAngaben() throws {
-        let leer = try APIClient.makeDecoder()
-            .decode(Arbeitsplan.Zelle.self, from: Data("{}".utf8))
-        XCTAssertEqual(leer.linien, [])
-        let negativ = try APIClient.makeDecoder()
-            .decode(Arbeitsplan.Zelle.self, from: Data(#"{"offen": -2}"#.utf8))
-        XCTAssertEqual(negativ.linien, [])
+    func testFreiText() {
+        XCTAssertNil(Arbeitsplan.KartenEintrag(bereich: "", namenText: "", offen: 0).freiText)
+        XCTAssertEqual(Arbeitsplan.KartenEintrag(bereich: "", namenText: "", offen: 3).freiText,
+                       "3 Plätze frei")
+    }
+
+    func testBereichAnzeige() {
+        XCTAssertEqual(Arbeitsplan.bereichAnzeige("Kueche"), "Küche")
+        XCTAssertEqual(Arbeitsplan.bereichAnzeige("Bar"), "Bar")
+    }
+
+    func testKarteOhneAngaben() throws {
+        let zeile = try APIClient.makeDecoder().decode(
+            Arbeitsplan.Zeile.self,
+            from: Data(#"{"zeit": null, "zellen": [null, {"offen": -2}, {}]}"#.utf8))
+        // Fehlender Bereichsname, negative/fehlende Zahlen: robust, nie negativ.
+        XCTAssertEqual(zeile.karte(bereiche: ["Kueche"]), [
+            .init(bereich: "", namenText: "", offen: 0),
+            .init(bereich: "", namenText: "", offen: 0),
+        ])
+        XCTAssertEqual(zeile.zeitText, " Uhr")
+        XCTAssertTrue(Arbeitsplan.Zeile(zeit: "x", zellen: [nil, nil])
+            .karte(bereiche: ["A", "B"]).isEmpty)
     }
 }

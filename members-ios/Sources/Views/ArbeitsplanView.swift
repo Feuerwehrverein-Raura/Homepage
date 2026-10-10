@@ -1,16 +1,15 @@
 import SwiftUI
 
-/// Arbeitsplan eines Anlasses als Tabelle — Gegenstück zum Arbeitsplan-Modal
-/// auf der Website.
+/// Arbeitsplan eines Anlasses — Gegenstück zum Arbeitsplan-Modal auf der
+/// Website (Handy-Ansicht).
 ///
-/// Die Tabelle baut allein das Backend (GET /events/:id/arbeitsplan); die
+/// Den Plan baut allein das Backend (GET /events/:id/arbeitsplan); die
 /// App gruppiert und zählt nichts selbst, sie zeichnet nur, was kommt. So
 /// sehen Web, App und PDF garantiert dasselbe.
 ///
-/// Pro Tag eine Tabelle: Zeilen sind die Zeitfenster, Spalten die Bereiche.
-/// In jeder Zelle stehen die genehmigten Helfer als "-Name", danach ein
-/// grauer Strich pro noch offenem Platz. Wo es zu einer Zeit in einem
-/// Bereich keine Schicht gibt, ist die Zelle schwarz — wie im PDF.
+/// Pro Tag eine Überschrift, pro Zeitfenster eine Karte mit den Bereichen,
+/// in denen es eine Schicht gibt: Helfer mit Komma getrennt, dazu orange
+/// "N Plätze frei". Nur senkrecht scrollen; die Knöpfe stehen fest unten.
 struct ArbeitsplanView: View {
     @EnvironmentObject var auth: AuthManager
     @Environment(\.dismiss) private var dismiss
@@ -103,16 +102,18 @@ struct ArbeitsplanView: View {
 
     @ViewBuilder
     private func content(_ plan: Arbeitsplan) -> some View {
+        // Nur senkrecht scrollen: pro Zeitfenster eine Karte, darin nur die
+        // Bereiche mit Schicht — wie die Handy-Ansicht der Website.
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(spacing: 6) {
                     Text(plan.verein ?? "Feuerwehrverein Raura, Kaiseraugst")
-                        .font(.headline)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                     Text(plan.titel ?? "Arbeitsplan \(event.title)")
                         .font(.title2.bold())
-                        .underline()
-                        .multilineTextAlignment(.center)
                 }
+                .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
                 if plan.tage.isEmpty {
@@ -123,19 +124,24 @@ struct ArbeitsplanView: View {
                 }
 
                 ForEach(Array(plan.tage.enumerated()), id: \.offset) { _, tag in
-                    if let bezeichnung = tag.bezeichnung ?? tag.datum {
-                        Text(bezeichnung)
-                            .font(.headline)
-                            .underline()
-                            .padding(.top, 8)
-                    }
-                    ScrollView(.horizontal, showsIndicators: true) {
-                        DayTable(tag: tag, bereiche: plan.bereiche)
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let bezeichnung = tag.bezeichnung ?? tag.datum {
+                            Text(bezeichnung)
+                                .font(.headline)
+                                .padding(.top, 8)
+                        }
+                        ForEach(Array(tag.zeilen.enumerated()), id: \.offset) { _, zeile in
+                            let eintraege = zeile.karte(bereiche: plan.bereiche)
+                            if !eintraege.isEmpty {
+                                ZeitKarte(titel: zeile.zeitText, eintraege: eintraege)
+                            }
+                        }
                     }
                 }
             }
             .padding()
         }
+        .background(Color(.systemGroupedBackground))
     }
 
     private func load() async {
@@ -158,94 +164,90 @@ struct ArbeitsplanView: View {
     }
 }
 
-// MARK: - Zelleninhalt
+// MARK: - Karten (rein, ohne SwiftUI — vom Vertragstest geprüft)
+
+extension Arbeitsplan {
+    /// Ein Bereich in der Karte eines Zeitfensters.
+    struct KartenEintrag: Equatable {
+        /// Bereich zum Anzeigen, z.B. "Küche".
+        let bereich: String
+        /// Bestätigte Helfer, mit ", " verbunden; leer = noch niemand.
+        let namenText: String
+        /// Anzahl offener Plätze (nie negativ).
+        let offen: Int
+
+        /// "1 Platz frei" / "N Plätze frei", nil wenn nichts frei ist.
+        var freiText: String? {
+            switch offen {
+            case ..<1: return nil
+            case 1: return "1 Platz frei"
+            default: return "\(offen) Plätze frei"
+            }
+        }
+    }
+
+    /// "Kueche" -> "Küche"; alles andere unverändert.
+    static func bereichAnzeige(_ bereich: String) -> String {
+        let b = bereich.trimmingCharacters(in: .whitespaces)
+        return b == "Kueche" ? "Küche" : b
+    }
+}
 
 extension Arbeitsplan.Zeile {
-    /// Zelle in Spalte `index` (parallel zu `bereiche`). Fehlt der Eintrag
-    /// oder ist er null, gibt es dort keine Schicht (schwarze Zelle).
-    func zelle(at index: Int) -> Arbeitsplan.Zelle? {
-        guard zellen.indices.contains(index) else { return nil }
-        return zellen[index]
+    /// Kartentitel, z.B. "10:00–14:00 Uhr".
+    var zeitText: String {
+        "\((zeit ?? "").replacingOccurrences(of: "-", with: "–")) Uhr"
+    }
+
+    /// Karte eines Zeitfensters wie auf der Website (zeichneTagAlsListe):
+    /// nur Bereiche mit Schicht, Felder ohne Schicht (nil) fallen weg. Leer
+    /// heisst: das Zeitfenster wird nicht gezeichnet.
+    func karte(bereiche: [String]) -> [Arbeitsplan.KartenEintrag] {
+        zellen.enumerated().compactMap { i, zelle in
+            guard let zelle else { return nil }
+            return Arbeitsplan.KartenEintrag(
+                bereich: Arbeitsplan.bereichAnzeige(
+                    bereiche.indices.contains(i) ? bereiche[i] : ""),
+                namenText: (zelle.besetzt ?? []).joined(separator: ", "),
+                offen: max(0, zelle.offen ?? 0)
+            )
+        }
     }
 }
 
-extension Arbeitsplan.Zelle {
-    enum Linie: Equatable {
-        /// Genehmigter Helfer, gezeichnet als "-Name".
-        case name(String)
-        /// Noch offener Platz, gezeichnet als grauer Strich.
-        case offen
-    }
+// MARK: - Karte
 
-    /// Zeilen der Zelle: erst die Helfer, dann ein Strich pro offenem Platz.
-    /// Ueberbuchte Schichten (`offen: 0`) bekommen keinen Strich.
-    var linien: [Linie] {
-        (besetzt ?? []).map(Linie.name)
-            + Array(repeating: .offen, count: max(0, offen ?? 0))
-    }
-}
-
-// MARK: - Tabelle
-
-/// Bewusst in festen Farben (weiss/schwarz) wie das gedruckte PDF, auch im
-/// Dunkelmodus: sonst wären die schwarzen "keine Schicht"-Zellen nicht vom
-/// Hintergrund zu unterscheiden.
-private struct DayTable: View {
-    let tag: Arbeitsplan.Tag
-    let bereiche: [String]
+private struct ZeitKarte: View {
+    let titel: String
+    let eintraege: [Arbeitsplan.KartenEintrag]
 
     var body: some View {
-        Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
-            GridRow {
-                header("Zeit")
-                ForEach(bereiche, id: \.self) { header($0) }
-            }
-            ForEach(Array(tag.zeilen.enumerated()), id: \.offset) { _, zeile in
-                GridRow {
-                    cell {
-                        Text(zeile.zeit ?? "").fontWeight(.medium)
-                    }
-                    ForEach(bereiche.indices, id: \.self) { i in
-                        if let zelle = zeile.zelle(at: i) {
-                            cell {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    ForEach(Array(zelle.linien.enumerated()), id: \.offset) { _, linie in
-                                        switch linie {
-                                        case .name(let name):
-                                            Text("-\(name)")
-                                        case .offen:
-                                            Text("-").foregroundColor(.gray)
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            cell(background: .black) { Color.clear.frame(height: 1) }
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 10) {
+            Text(titel).font(.headline)
+            ForEach(Array(eintraege.enumerated()), id: \.offset) { _, e in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(e.bereich.uppercased())
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    zeile(e)
                 }
             }
         }
-        .font(.footnote)
-        .foregroundColor(.black)
-        .overlay(Rectangle().stroke(Color.gray, lineWidth: 1))
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10)
+            .stroke(Color(.separator), lineWidth: 0.5))
     }
 
-    private func header(_ title: String) -> some View {
-        cell(background: Color(white: 0.95)) {
-            Text(title).fontWeight(.bold)
+    private func zeile(_ e: Arbeitsplan.KartenEintrag) -> Text {
+        var text = e.namenText.isEmpty
+            ? Text("noch niemand").foregroundColor(.secondary)
+            : Text(e.namenText)
+        if let frei = e.freiText {
+            text = text + Text(" · ") + Text(frei).foregroundColor(.orange)
         }
-    }
-
-    private func cell<Content: View>(
-        background: Color = .white,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(minWidth: 90, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(background)
-            .border(Color.gray, width: 0.5)
+        return text
     }
 }
