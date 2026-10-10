@@ -96,15 +96,25 @@ function pdfZeilen(buffer) {
         .map(m => [...m[1].matchAll(/<([0-9a-f]*)>/g)].map(h => Buffer.from(h[1], 'hex').toString('latin1')).join(''));
 }
 
-test('PDF: nur Bereiche mit Schicht, kein Zeichensalat', async () => {
-    const zeilen = pdfZeilen(await renderArbeitsplanPdf(erwartet, { compress: false })).map(z => z.trim());
-    assert.ok(zeilen.includes('Chilbi'));
+test('PDF: Aushang mit Logo, Tabelle pro Tag, nur Bereiche dieses Tages', async () => {
+    const pdf = await renderArbeitsplanPdf(erwartet, { compress: false });
+    const zeilen = pdfZeilen(pdf).map(z => z.trim());
+    assert.ok(pdf.toString('latin1').includes('/Subtype /Image'), 'Logo fehlt');
+    assert.ok(zeilen.includes('Feuerwehrverein Raura, Kaiseraugst'));
+    assert.ok(zeilen.includes('Arbeitsplan Chilbi'));
     assert.ok(zeilen.includes('Samstag, 17.10.2026'));
-    assert.ok(zeilen.includes('Grill [0/1]: (noch offen)'));
-    assert.ok(zeilen.includes('Bar [1/2]: Anna A'));
-    assert.ok(zeilen.includes('Allgemein [2/1]: Bea B, Cem C'));
-    // leere Bereiche erscheinen gar nicht mehr (frueher "Bar: ▬▬▬" -> "%¬%¬%¬")
-    assert.ok(!zeilen.some(z => /^(Allgemein|Bar|Grill):/.test(z)), zeilen.join('\n'));
+
+    // 17.10.: Spalten Zeit, Bar, Grill (Allgemein hat dort keine Schicht)
+    const sa = zeilen.indexOf('Samstag, 17.10.2026');
+    assert.deepEqual(zeilen.slice(sa + 1, sa + 4), ['Zeit', 'Bar', 'Grill']);
+    // 18.10.: nur Allgemein
+    const so = zeilen.indexOf('Sonntag, 18.10.2026');
+    assert.deepEqual(zeilen.slice(so + 1, so + 3), ['Zeit', 'Allgemein']);
+
+    // Helfer und offene Plaetze
+    for (const name of ['- Anna A', '- Bea B', '- Cem C']) assert.ok(zeilen.includes(name), name);
+    // offene Plaetze: Grill 1 + Bar 1 = 2 Striche, ueberbucht 0
+    assert.equal(zeilen.filter(z => z === '-').length, 2);
     assert.ok(!zeilen.some(z => z.includes('¬')));
 });
 

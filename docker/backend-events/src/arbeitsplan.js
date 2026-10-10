@@ -3,6 +3,8 @@
 // ohne laufenden Server getestet werden koennen (test/arbeitsplan.test.js);
 // die Datenbank wird deshalb hineingereicht statt global genommen.
 
+const fs = require('fs');
+const path = require('path');
 const PDFDocument = require('pdfkit');
 
 function formatDateDE(dateStr) {
@@ -154,20 +156,24 @@ async function buildArbeitsplan(pool, eventId) {
     };
 }
 
-// DEUTSCH: Arbeitsplan (aus buildArbeitsplan) als PDF rendern. Liefert einen
-// Buffer — gebraucht vom GET-Download und vom Versand eine Woche vor dem Anlass.
+// DEUTSCH: Arbeitsplan (aus buildArbeitsplan) als PDF — im Layout des Aushangs:
+// Logo, Vereinsname rot, "Arbeitsplan <Anlass>", pro Tag eine Tabelle mit der
+// Zeit links und den Bereichen dieses Tages als Spalten; in den Zellen die
+// Helfer ("- Name") und je ein "-" pro offenem Platz. Liefert einen Buffer —
+// gebraucht vom Download in Apps/Vorstand und vom Versand eine Woche vorher.
 //
-// Pro Zeitfenster nur die Bereiche, die dann eine Schicht haben. Frueher stand
-// jeder Bereich da, leere mit "▬▬▬" — das Zeichen kennt die eingebaute
-// Helvetica nicht, im PDF wurde daraus "%¬%¬%¬", und der Plan war doppelt so
-// lang wie noetig. `compress` nur fuer Tests abschaltbar.
+// Frueher gab es hier eine schlichte Textliste, waehrend die Eventseite den
+// Aushang bekam (POST /arbeitsplan/pdf). Jetzt sehen alle denselben Plan.
+// `compress` nur fuer Tests abschaltbar.
+const LOGO = path.join(__dirname, 'assets', 'logo.png');
+
 function renderArbeitsplanPdf(plan, { compress = true } = {}) {
     const doc = new PDFDocument({
         size: 'A4',
         margin: 50,
         compress,
         info: {
-            Title: `Arbeitsplan ${plan.anlass}`,
+            Title: plan.titel,
             Author: 'Feuerwehrverein Raura'
         }
     });
@@ -178,41 +184,113 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
         doc.on('error', reject);
     });
 
-    doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
-    doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
-    doc.moveDown(0.3);
-    doc.fontSize(16).font('Helvetica-Bold').text(plan.anlass, { align: 'center' });
-    doc.moveDown(1);
+    const links = doc.page.margins.left;
+    const breite = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const unten = () => doc.page.height - doc.page.margins.bottom;
+
+    // Kopf: Logo (proportional, 303x228) links, Text rechts daneben
+    const kopfY = doc.y;
+    const logoBreite = 70;
+    const logoHoehe = 53;
+    if (fs.existsSync(LOGO)) doc.image(LOGO, links, kopfY, { fit: [logoBreite, logoHoehe] });
+    const textX = links + logoBreite + 15;
+    const textBreite = breite - logoBreite - 15;
+    doc.fontSize(14).font('Helvetica-Bold').fillColor('#cc0000')
+        .text(plan.verein, textX, kopfY + 6, { width: textBreite });
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#000000')
+        .text(plan.titel, textX, kopfY + 26, { width: textBreite, underline: true });
+    doc.x = links;
+    doc.y = kopfY + logoHoehe + 15;
+
+    const zeitBreite = 80;
+    const pad = 5;
+    const zeileH = 14;
+    const schrift = 9;
 
     plan.tage.forEach(tag => {
-        doc.fontSize(12).font('Helvetica-Bold').text(tag.bezeichnung);
-        doc.moveDown(0.5);
+        // Nur Bereiche, die an diesem Tag eine Schicht haben — sonst werden
+        // die Spalten an Tagen mit wenig Betrieb unnoetig schmal.
+        const spalten = plan.bereiche
+            .map((bereich, i) => ({ bereich, i }))
+            .filter(({ i }) => tag.zeilen.some(z => z.zellen[i]));
+        const spaltenBreite = (breite - zeitBreite) / Math.max(spalten.length, 1);
+        const textW = spaltenBreite - 2 * pad;
+
+        // Ueberschrift + Kopfzeile + erste Zeile muessen zusammen passen
+        if (doc.y + 70 > unten()) doc.addPage();
+        doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000').text(tag.bezeichnung, links, doc.y);
+        doc.moveDown(0.4);
+
+        let y = doc.y;
+        const kopfzeile = () => {
+            const h = 22;
+            doc.lineWidth(0.5);
+            doc.rect(links, y, zeitBreite, h).stroke();
+            doc.fontSize(schrift).font('Helvetica-Bold')
+                .text('Zeit', links + pad, y + 6, { width: zeitBreite - 2 * pad, lineBreak: false });
+            spalten.forEach(({ bereich }, k) => {
+                const x = links + zeitBreite + k * spaltenBreite;
+                doc.rect(x, y, spaltenBreite, h).stroke();
+                doc.text(bereich, x + pad, y + 6, { width: textW, lineBreak: false, ellipsis: true });
+            });
+            y += h;
+        };
+        kopfzeile();
 
         tag.zeilen.forEach(zeile => {
-            const schichten = zeile.zellen
-                .map((zelle, i) => zelle && { bereich: plan.bereiche[i], ...zelle })
-                .filter(Boolean);
-            if (schichten.length === 0) return;
+            doc.fontSize(schrift).font('Helvetica');
+            const hoehe = Math.max(22, 2 * pad + Math.max(zeileH, ...spalten.map(({ i }) => {
+                const zelle = zeile.zellen[i];
+                if (!zelle) return 0;
+                return zelle.besetzt.reduce((h, name) => h + doc.heightOfString(`- ${name}`, { width: textW }), 0)
+                    + zelle.offen * zeileH;
+            })));
 
-            // Zeitfenster nicht ueber den Seitenumbruch reissen: passt der
-            // Block nicht mehr, neue Seite (grob 13 pt pro Zeile).
-            const hoehe = 14 + schichten.length * 13;
-            if (doc.y + hoehe > doc.page.height - doc.page.margins.bottom) doc.addPage();
+            // Seitenumbruch: neue Seite mit wiederholter Kopfzeile
+            if (y + hoehe > unten()) {
+                doc.addPage();
+                y = doc.page.margins.top;
+                kopfzeile();
+            }
 
-            doc.fontSize(10).font('Helvetica-Bold').text(`  ${zeile.zeit.replace('-', ' - ')}`);
-            schichten.forEach(s => {
-                const helfer = s.besetzt.length > 0 ? s.besetzt.join(', ') : '(noch offen)';
-                doc.fontSize(9).font('Helvetica').text(`      ${s.bereich} [${s.besetzt.length}/${s.gebraucht}]: ${helfer}`);
+            doc.lineWidth(0.5).rect(links, y, zeitBreite, hoehe).stroke();
+            doc.fontSize(schrift).font('Helvetica-Bold')
+                .text(zeile.zeit, links + pad, y + pad, { width: zeitBreite - 2 * pad, lineBreak: false });
+
+            spalten.forEach(({ i }, k) => {
+                const x = links + zeitBreite + k * spaltenBreite;
+                const zelle = zeile.zellen[i];
+                if (!zelle) {
+                    // keine Schicht: grau hinterlegt (schwarz wie am Bildschirm
+                    // waere beim Ausdrucken reine Tintenverschwendung)
+                    doc.rect(x, y, spaltenBreite, hoehe).fillAndStroke('#d9d9d9', '#000000');
+                    doc.fillColor('#000000');
+                    return;
+                }
+                doc.rect(x, y, spaltenBreite, hoehe).stroke();
+                doc.fontSize(schrift).font('Helvetica');
+                let ty = y + pad;
+                zelle.besetzt.forEach(name => {
+                    doc.text(`- ${name}`, x + pad, ty, { width: textW });
+                    ty += doc.heightOfString(`- ${name}`, { width: textW });
+                });
+                for (let n = 0; n < zelle.offen; n++) {
+                    doc.text('-', x + pad, ty, { width: textW });
+                    ty += zeileH;
+                }
             });
-            doc.moveDown(0.3);
+            y += hoehe;
         });
-        doc.moveDown(0.5);
+
+        doc.x = links;
+        doc.y = y + 12;
     });
 
-    doc.moveDown(2);
+    doc.moveDown(1);
     doc.fontSize(8).font('Helvetica').fillColor('#666666')
         // Der Server laeuft auf UTC; ohne Zeitzone stand hier 15:57 statt 17:57.
-        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH', { timeZone: 'Europe/Zurich' })} um ${new Date().toLocaleTimeString('de-CH', { timeZone: 'Europe/Zurich' })}`, { align: 'center' });
+        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH', { timeZone: 'Europe/Zurich' })} um ${new Date().toLocaleTimeString('de-CH', { timeZone: 'Europe/Zurich' })}`,
+            links, doc.y, { width: breite, align: 'center' });
 
     doc.end();
     return done;
