@@ -32,12 +32,47 @@ data class ArbeitsplanZelle(
     val offen: Int? = null
 )
 
+/** Ein Bereich in der Karte eines Zeitfensters (Handy-Ansicht). */
+data class KartenEintrag(
+    /** Bereich zum Anzeigen, z.B. "Küche". */
+    val bereich: String,
+
+    /** Bestaetigte Helfer, mit ", " verbunden; leer = noch niemand. */
+    val namenText: String,
+
+    /** Anzahl offener Plaetze (nie negativ). */
+    val offen: Int
+)
+
+/** "Kueche" -> "Küche"; alles andere unveraendert (Backend schickt bald selbst "Küche"). */
+fun bereichAnzeige(bereich: String): String = when (bereich.trim()) {
+    "Kueche" -> "K\u00fcche"
+    else -> bereich.trim()
+}
+
+/** Kartentitel, z.B. "10:00–14:00 Uhr". */
+fun ArbeitsplanZeile.zeitText(): String = "${zeit.orEmpty().replace('-', '\u2013')} Uhr"
+
 /**
- * Textzeilen eines Feldes, wie sie gezeichnet werden: "-Name" pro
- * bestaetigtem Helfer, danach ein "-" pro offenem Platz. Das Boolean ist
- * true fuer offene Plaetze (grau gezeichnet). Rein, ohne Android-Abhaengigkeit,
- * damit der Vertragstest die Darstellung pruefen kann.
+ * Karte eines Zeitfensters wie auf der Website (zeichneTagAlsListe):
+ * nur Bereiche mit Schicht, Felder ohne Schicht (null) fallen weg. Leere
+ * Liste = Zeitfenster wird nicht gezeichnet. Rein, ohne
+ * Android-Abhaengigkeit, damit der Vertragstest die Darstellung prueft.
  */
-fun ArbeitsplanZelle.zeilenText(): List<Pair<String, Boolean>> =
-    besetzt.orEmpty().map { "-$it" to false } +
-        List((offen ?: 0).coerceAtLeast(0)) { "-" to true }
+fun ArbeitsplanZeile.karte(bereiche: List<String>): List<KartenEintrag> =
+    zellen.orEmpty().mapIndexedNotNull { i, zelle ->
+        zelle?.let {
+            KartenEintrag(
+                bereich = bereichAnzeige(bereiche.getOrNull(i).orEmpty()),
+                namenText = it.besetzt.orEmpty().joinToString(", "),
+                offen = (it.offen ?: 0).coerceAtLeast(0)
+            )
+        }
+    }
+
+/** "1 Platz frei" / "N Plätze frei", null wenn nichts frei ist. */
+fun KartenEintrag.freiText(): String? = when {
+    offen <= 0 -> null
+    offen == 1 -> "1 Platz frei"
+    else -> "$offen Pl\u00e4tze frei"
+}

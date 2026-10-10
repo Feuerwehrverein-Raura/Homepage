@@ -101,20 +101,41 @@ class ArbeitsplanContractTest {
     }
 
     @Test
-    fun zellenText() {
-        val leer = plan.tage!![0].zeilen!![0].zellen!![2]!!
-        assertEquals(listOf("-" to true), leer.zeilenText())
+    fun kartenNurMitSchicht() {
+        val bereiche = plan.bereiche!!
+        val sa = plan.tage!![0].zeilen!!
+        val so = plan.tage!![1].zeilen!!
 
-        val bar = plan.tage!![0].zeilen!![1].zellen!![1]!!
-        assertEquals(listOf("-Anna A" to false, "-" to true), bar.zeilenText())
+        assertEquals("10:00\u201314:00 Uhr", sa[0].zeitText())
+        assertEquals(listOf(KartenEintrag("Grill", "", 1)), sa[0].karte(bereiche))
 
-        val ueberbucht = plan.tage!![1].zeilen!![0].zellen!![0]!!
-        assertEquals(listOf("-Bea B" to false, "-Cem C" to false), ueberbucht.zeilenText())
+        assertEquals("18:00\u201322:00 Uhr", sa[1].zeitText())
+        assertEquals(listOf(KartenEintrag("Bar", "Anna A", 1)), sa[1].karte(bereiche))
+
+        // Ueberbucht: offen 0 -> kein "frei"
+        val allgemein = so[0].karte(bereiche)
+        assertEquals(listOf(KartenEintrag("Allgemein", "Bea B, Cem C", 0)), allgemein)
+        assertNull(allgemein[0].freiText())
     }
 
     @Test
-    fun zellenTextOhneFelder() {
-        assertEquals(emptyList<Pair<String, Boolean>>(), ArbeitsplanZelle().zeilenText())
-        assertEquals(emptyList<Pair<String, Boolean>>(), ArbeitsplanZelle(offen = -1).zeilenText())
+    fun freiText() {
+        assertEquals("1 Platz frei", KartenEintrag("Bar", "", 1).freiText())
+        assertEquals("3 Pl\u00e4tze frei", KartenEintrag("Bar", "", 3).freiText())
+        assertNull(KartenEintrag("Bar", "", 0).freiText())
+    }
+
+    @Test
+    fun karteOhneFelder() {
+        assertEquals(emptyList<KartenEintrag>(), ArbeitsplanZeile().karte(listOf("Bar")))
+        assertEquals(emptyList<KartenEintrag>(), ArbeitsplanZeile(zellen = listOf(null, null)).karte(listOf("Bar", "Grill")))
+        assertEquals(0, ArbeitsplanZeile(zellen = listOf(ArbeitsplanZelle(offen = -1))).karte(listOf("Bar"))[0].offen)
+    }
+
+    @Test
+    fun kuecheLesbar() {
+        assertEquals("K\u00fcche", bereichAnzeige("Kueche"))
+        assertEquals("K\u00fcche", bereichAnzeige("K\u00fcche"))
+        assertEquals("Bar", bereichAnzeige("Bar"))
     }
 }

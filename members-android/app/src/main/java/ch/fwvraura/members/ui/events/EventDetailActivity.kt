@@ -8,13 +8,10 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import android.widget.TextView
 import ch.fwvraura.members.MembersApp
 import ch.fwvraura.members.R
 import ch.fwvraura.members.data.api.ApiModule
-import ch.fwvraura.members.data.model.Arbeitsplan
-import ch.fwvraura.members.data.model.zeilenText
 import ch.fwvraura.members.data.model.Event
 import ch.fwvraura.members.data.model.PublicRegistrationRequest
 import ch.fwvraura.members.data.model.Shift
@@ -65,27 +62,32 @@ class EventDetailActivity : AppCompatActivity() {
     }
 
     // ============================================================
-    // Arbeitsplan — die Tabelle wird komplett im Backend aufbereitet
+    // Arbeitsplan — der Plan wird komplett im Backend aufbereitet
     // (GET /events/:id/arbeitsplan). Die App gruppiert/rechnet nichts,
-    // sondern zeichnet nur: Zeilen = Zeitfenster, Spalten = Bereiche,
-    // Zelle = "-Name" je Helfer + graue "-" je offenem Platz,
-    // null-Zelle (keine Schicht) -> schwarz.
+    // sondern zeichnet nur (ArbeitsplanView): pro Tag eine Ueberschrift,
+    // pro Zeitfenster eine Karte mit den Bereichen, die eine Schicht
+    // haben — handytauglich, ohne seitliches Scrollen. Die Knoepfe liegen
+    // in der festen Knopfleiste des Dialogs und bleiben immer sichtbar.
     // ============================================================
 
     private fun showArbeitsplan(e: Event) {
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(8))
+        // Platzhalter, der nach dem Laden durch den Plan oder eine Meldung ersetzt wird
+        val container = android.widget.FrameLayout(this).apply {
+            setPadding(0, dp(16), 0, dp(16))
+            addView(
+                android.widget.ProgressBar(this@EventDetailActivity),
+                android.widget.FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.Gravity.CENTER
+                )
+            )
         }
-        val loading = android.widget.ProgressBar(this)
-        root.addView(loading, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = android.view.Gravity.CENTER_HORIZONTAL; topMargin = dp(16); bottomMargin = dp(16) })
-
-        val scroll = androidx.core.widget.NestedScrollView(this).apply { addView(root) }
+        // Auf schmalen Handys kurze Knopf-Beschriftung, damit die Knoepfe
+        // nebeneinander in die feste Knopfleiste passen
+        val schmal = resources.configuration.screenWidthDp < 480
         val builder = AlertDialog.Builder(this)
-            .setView(scroll)
-            .setPositiveButton("PDF herunterladen", null)
+            .setView(container)
+            .setPositiveButton(if (schmal) "PDF" else "PDF herunterladen", null)
             .setNegativeButton("Schließen", null)
         // "Bearbeiten" nur fuer den Organisator (E-Mail-Match wie im Backend) —
         // entspricht dem Link aufs event-dashboard auf der Website.
@@ -104,105 +106,29 @@ class EventDetailActivity : AppCompatActivity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { downloadArbeitsplanPdf(e) }
 
         lifecycleScope.launch {
-            val message: String? = try {
+            val content: View = try {
                 val resp = ApiModule.eventsApi.getArbeitsplan(e.id)
                 val plan = resp.body()
                 if (resp.isSuccessful && plan != null) {
-                    renderArbeitsplan(root, plan)
-                    null
-                } else if (resp.code() == 404) "Event nicht gefunden."
-                else "Arbeitsplan konnte nicht geladen werden (Fehler ${resp.code()})."
+                    ArbeitsplanView.build(this@EventDetailActivity, plan)
+                } else if (resp.code() == 404) arbeitsplanMeldung("Event nicht gefunden.")
+                else arbeitsplanMeldung("Arbeitsplan konnte nicht geladen werden (Fehler ${resp.code()}).")
             } catch (ex: Exception) {
-                "Netzwerkfehler: ${ex.message}"
+                arbeitsplanMeldung("Netzwerkfehler: ${ex.message}")
             }
-            root.removeView(loading)
-            if (message != null) root.addView(arbeitsplanText(message, 14f, bold = false), matchWrap())
+            if (!dialog.isShowing) return@launch
+            container.removeAllViews()
+            container.setPadding(0, 0, 0, 0)
+            container.addView(content)
         }
     }
 
-    /** Zeichnet den vom Backend gelieferten Arbeitsplan in [root]. */
-    private fun renderArbeitsplan(root: LinearLayout, plan: Arbeitsplan) {
-        root.addView(arbeitsplanText(plan.verein ?: "Feuerwehrverein Raura, Kaiseraugst", 15f, bold = true).apply {
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
-        }, matchWrap())
-        root.addView(arbeitsplanText(plan.titel ?: "Arbeitsplan ${plan.anlass.orEmpty()}", 19f, bold = true).apply {
-            paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(4), 0, dp(8))
-        }, matchWrap())
-
-        val tage = plan.tage.orEmpty()
-        if (tage.isEmpty()) {
-            root.addView(arbeitsplanText("Keine Schichten für dieses Event vorhanden.", 14f, bold = false), matchWrap())
-            return
-        }
-        val bereiche = plan.bereiche.orEmpty()
-
-        for (tag in tage) {
-            root.addView(arbeitsplanText(tag.bezeichnung ?: tag.datum ?: "Ohne Datum", 16f, bold = true).apply {
-                paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG
-                setPadding(0, dp(16), 0, dp(8))
-            }, matchWrap())
-
-            val table = android.widget.TableLayout(this)
-            // Kopfzeile: "Zeit" + ein Bereich pro Spalte
-            val header = android.widget.TableRow(this)
-            header.addView(arbeitsplanCell(listOf("Zeit" to false), HEADER_BG, bold = true))
-            bereiche.forEach { header.addView(arbeitsplanCell(listOf(it to false), HEADER_BG, bold = true)) }
-            table.addView(header)
-
-            for (zeile in tag.zeilen.orEmpty()) {
-                val row = android.widget.TableRow(this)
-                row.addView(arbeitsplanCell(listOf(zeile.zeit.orEmpty() to false), android.graphics.Color.WHITE, bold = true))
-                val zellen = zeile.zellen.orEmpty()
-                for (i in bereiche.indices) {
-                    val zelle = zellen.getOrNull(i)
-                    if (zelle == null) {
-                        row.addView(arbeitsplanCell(emptyList(), android.graphics.Color.parseColor("#111827")))
-                    } else {
-                        row.addView(arbeitsplanCell(zelle.zeilenText(), android.graphics.Color.WHITE))
-                    }
-                }
-                table.addView(row)
-            }
-
-            val hScroll = android.widget.HorizontalScrollView(this).apply { addView(table) }
-            root.addView(hScroll, matchWrap())
-        }
-    }
-
-    private fun arbeitsplanText(text: String, size: Float, bold: Boolean) = TextView(this).apply {
+    /** Meldung im Arbeitsplan-Dialog anstelle des Plans. */
+    private fun arbeitsplanMeldung(text: String) = TextView(this).apply {
         this.text = text
-        textSize = size
-        if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
+        textSize = 14f
         setTextColor(getColor(R.color.text_primary))
-    }
-
-    /** Baut eine umrandete Tabellen-Zelle; lines = (Text, grau?). */
-    private fun arbeitsplanCell(lines: List<Pair<String, Boolean>>, bg: Int, bold: Boolean = false): View {
-        val cell = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(8), dp(6), dp(8), dp(6))
-            minimumWidth = dp(90)
-            background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(bg)
-                setStroke(dp(1), android.graphics.Color.parseColor("#9CA3AF"))
-            }
-        }
-        for ((text, gray) in lines) {
-            cell.addView(TextView(this).apply {
-                this.text = text
-                textSize = 13f
-                if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-                setTextColor(if (gray) android.graphics.Color.parseColor("#9CA3AF") else android.graphics.Color.parseColor("#111827"))
-            })
-        }
-        return cell.apply {
-            layoutParams = android.widget.TableRow.LayoutParams(
-                android.widget.TableRow.LayoutParams.MATCH_PARENT,
-                android.widget.TableRow.LayoutParams.MATCH_PARENT
-            )
-        }
+        setPadding(dp(24), dp(16), dp(24), dp(8))
     }
 
     /** Laedt das Arbeitsplan-PDF (GET /events/:id/pdf/arbeitsplan, oeffentlich) und oeffnet es. */
@@ -223,10 +149,6 @@ class EventDetailActivity : AppCompatActivity() {
             }
         }
     }
-
-    private fun matchWrap() = LinearLayout.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-    )
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
@@ -553,6 +475,5 @@ class EventDetailActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_EVENT_ID = "event_id"
-        private val HEADER_BG = android.graphics.Color.parseColor("#F9FAFB")
     }
 }

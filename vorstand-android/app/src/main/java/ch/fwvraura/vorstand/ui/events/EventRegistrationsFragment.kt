@@ -85,7 +85,7 @@ class EventRegistrationsFragment : Fragment() {
         binding.btnTeilnehmerlistePdf.setOnClickListener { downloadTeilnehmerlistePdf() }
         binding.btnAushangPdf.setOnClickListener { downloadAushangPdf() }
 
-        // Arbeitsplan als Tabelle anzeigen (Knopf nur bei Anlaessen mit Schichten)
+        // Arbeitsplan anzeigen (Knopf nur bei Anlaessen mit Schichten)
         binding.btnArbeitsplan.setOnClickListener { showArbeitsplanDialog() }
 
         // Alle Angemeldeten ueber eine Aenderung informieren
@@ -1017,9 +1017,11 @@ class EventRegistrationsFragment : Fragment() {
     }
 
     /**
-     * Zeigt den Arbeitsplan des Events als Tabelle (wie im Vorstand-Web).
+     * Zeigt den Arbeitsplan des Events als Karten pro Zeitfenster (wie im
+     * Vorstand-Web auf dem Handy), ohne seitliches Scrollen. Die Knoepfe
+     * liegen in der festen Knopfleiste des Dialogs und bleiben sichtbar.
      *
-     * Die Tabelle kommt fertig vom Backend (GET /events/{id}/arbeitsplan);
+     * Der Plan kommt fertig vom Backend (GET /events/{id}/arbeitsplan);
      * waehrend des Ladens zeigt der Dialog einen Fortschrittsbalken, bei
      * einem Fehler eine Meldung. "PDF herunterladen" laesst den Dialog offen,
      * "Bearbeiten" fuehrt zurueck zu den Anmeldungen – dort wird im Vorstand
@@ -1029,8 +1031,11 @@ class EventRegistrationsFragment : Fragment() {
         val id = eventId ?: return
         val ctx = requireContext()
         val pad = (24 * resources.displayMetrics.density).toInt()
+        // Auf schmalen Handys kurze Knopf-Beschriftung, damit alle drei
+        // Knoepfe nebeneinander in die feste Knopfleiste passen
+        val schmal = resources.configuration.screenWidthDp < 480
 
-        // Platzhalter, der nach dem Laden durch Tabelle oder Fehlermeldung ersetzt wird
+        // Platzhalter, der nach dem Laden durch den Plan oder Fehlermeldung ersetzt wird
         val container = android.widget.FrameLayout(ctx).apply {
             setPadding(0, pad, 0, pad)
             addView(
@@ -1045,7 +1050,7 @@ class EventRegistrationsFragment : Fragment() {
         val dialog = MaterialAlertDialogBuilder(ctx)
             .setTitle("Arbeitsplan")
             .setView(container)
-            .setPositiveButton("PDF herunterladen", null)
+            .setPositiveButton(if (schmal) "PDF" else "PDF herunterladen", null)
             .setNeutralButton("Bearbeiten", null)
             .setNegativeButton("Schließen", null)
             .create()
@@ -1061,7 +1066,7 @@ class EventRegistrationsFragment : Fragment() {
                 val response = ApiModule.eventsApi.getArbeitsplan(id)
                 val plan = response.body()
                 if (response.isSuccessful && plan != null) {
-                    ArbeitsplanView.build(ctx, plan) { bereichLesbar(it) ?: it }
+                    ArbeitsplanView.build(ctx, plan)
                 } else {
                     arbeitsplanFehler(ctx, pad, "Fehler beim Laden des Arbeitsplans (${response.code()})")
                 }
@@ -1075,7 +1080,7 @@ class EventRegistrationsFragment : Fragment() {
         }
     }
 
-    /** Fehlermeldung im Arbeitsplan-Dialog anstelle der Tabelle. */
+    /** Fehlermeldung im Arbeitsplan-Dialog anstelle des Plans. */
     private fun arbeitsplanFehler(ctx: android.content.Context, pad: Int, text: String) =
         TextView(ctx).apply {
             this.text = text
@@ -1086,7 +1091,7 @@ class EventRegistrationsFragment : Fragment() {
 
     /**
      * Laedt den Arbeitsplan als PDF und oeffnet ihn im System-PDF-Viewer.
-     * Anders als die Tabelle im Dialog erzeugt das Backend dieses PDF: Es soll
+     * Anders als die Ansicht im Dialog erzeugt das Backend dieses PDF: Es soll
      * aussehen wie der Aushang, und das Layout liegt dort.
      */
     private fun downloadArbeitsplanPdf(button: View) {
