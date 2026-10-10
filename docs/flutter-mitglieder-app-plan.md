@@ -91,9 +91,12 @@ Material, PDFs (Teilnehmerliste, Aushang, Arbeitsplan). Alle unter
 
 ## Offene Fragen
 
-1. **Adressbuch**: Android hat heute einen eigenen Kontakt-Abgleich (nur mit
-   nativem Code machbar), iOS nutzt CardDAV über Nextcloud. Vorschlag: beide
-   über CardDAV — einheitlich, kein Sondercode.
+1. ~~Adressbuch~~ — **entschieden (11.10.2026): jede Plattform ihr nativer
+   Weg, wie heute.** Android: eigener Kontakt-Abgleich (Konto "FWV Raura",
+   SyncAdapter); der bestehende Kotlin-Code zieht in den Android-Teil der
+   Flutter-App um, die Oberfläche löst ihn nur aus. iOS: CardDAV über
+   Nextcloud (`carddav.mobileconfig`) — Apple erlaubt Apps keinen eigenen
+   Abgleich.
 2. **Organisator-Login per E-Mail/Passwort und Organisator-QR**: weiter
    anbieten oder nur noch über das Mitgliederkonto?
 3. **Neu anmelden nach dem Update** in Kauf nehmen (wenig Nutzer) oder
