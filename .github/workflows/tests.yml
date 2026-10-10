@@ -1,0 +1,65 @@
+name: Tests
+
+# Backend (inkl. echter Postgres-Datenbank) und Website.
+#
+# Laeuft bei Pull Requests selbst; bei Pushes auf main ruft
+# build-containers.yml diesen Workflow auf und baut/deployt erst, wenn er
+# gruen ist. Die Apps testen ihren Teil des Arbeitsplan-Vertrags in ihren
+# eigenen Workflows.
+
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  backend-events:
+    name: Backend Events
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: fwvtest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Abhaengigkeiten
+        working-directory: docker/backend-events
+        run: npm install --no-audit --no-fund
+
+      - name: Syntax
+        working-directory: docker/backend-events
+        run: node --check src/index.js
+
+      - name: Tests (mit Datenbank)
+        working-directory: docker/backend-events
+        env:
+          TEST_DATABASE_URL: postgres://test:test@localhost:5432/fwvtest
+        run: node --test test/
+
+  website:
+    name: Website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Tests
+        run: node --test tests/

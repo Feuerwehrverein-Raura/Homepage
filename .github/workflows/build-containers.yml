@@ -10,7 +10,13 @@ env:
   IMAGE_PREFIX: feuerwehrverein-raura/fwv-raura
 
 jobs:
+  # Erst testen, dann bauen: Watchtower spielt jedes neue Image automatisch
+  # aus, ein Build mit roten Tests waere also sofort live.
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   release:
+    needs: tests
     runs-on: ubuntu-latest
     permissions:
       contents: write
