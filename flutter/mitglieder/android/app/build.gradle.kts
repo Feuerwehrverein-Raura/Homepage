@@ -29,6 +29,9 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // Anmeldung ueber Authentik: AppAuth faengt die Rueckleitung
+        // com.fwv.members:/oauth2redirect ab (wie members-android).
+        manifestPlaceholders += mapOf("appAuthRedirectScheme" to "com.fwv.members")
     }
 
     buildTypes {
@@ -48,4 +51,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Nur fuer die Uebernahme der Anmeldung aus der alten App
+    // (EncryptedSharedPreferences "fwv_members_prefs", siehe MainActivity.kt).
+    implementation("androidx.security:security-crypto:1.1.0")
 }

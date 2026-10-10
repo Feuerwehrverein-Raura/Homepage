@@ -1,5 +1,5 @@
 name: fwv_core
-description: "Gemeinsamer Kern der FWV-Apps: Modelle, API, Vertrags-Tests"
+description: "Gemeinsamer Kern der FWV-Apps: Modelle, API, Anmeldung, Vertrags-Tests"
 version: 0.1.0
 publish_to: none
 
@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_secure_storage: ^11.2.0
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

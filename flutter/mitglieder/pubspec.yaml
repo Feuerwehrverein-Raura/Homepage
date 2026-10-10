@@ -38,7 +38,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   material_ui: ^1.6.0
   http: ^1.6.0
-
+  flutter_appauth: ^12.1.0
+  mobile_scanner: ^7.4.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

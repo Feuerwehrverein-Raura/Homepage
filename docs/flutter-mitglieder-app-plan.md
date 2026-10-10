@@ -33,6 +33,37 @@ späteren Vorstand-App). Flutter 3.47, Material aus `material_ui`.
 
 Basis-URL `https://api.fwv-raura.ch/`, überall `Authorization: Bearer`.
 
+### Stand Phase 1 (11.10.2026)
+
+**Anmeldung — fertig.** Getestet mit Nachbauten; dazu am 11.10.2026 im
+Android-Emulator: als Update über die alte App installiert, die alte
+Anmeldung wurde übernommen ("Angemeldet als …" ohne neues Login), die alte
+Datei `fwv_members_prefs` ist gelöscht.
+
+- `fwv_core` (ohne Oberfläche, auch für die Vorstand-App): `ApiClient`
+  (JSON, Bearer, bei 401/403 einmal erneuern und wiederholen),
+  `SitzungsVerwaltung` (QR-Login, externer Organisator über
+  `events/login`, Passwort-Reset, Erneuern: OIDC-Refresh → stiller
+  QR-Login → "Sitzung abgelaufen"; parallele Aufrufe teilen einen
+  Versuch; ohne Netz wird nicht abgemeldet), `SitzungsSpeicher` auf
+  `flutter_secure_storage` (Schlüssel wie `TokenManager.kt`),
+  QR-Code-Leser, Übernahme der alten Anmeldung.
+- `mitglieder`: Login-Screen (Reiter Mitglied / QR-Code, darunter
+  "Externer Organisator"), Passwort-Reset, QR-Scanner (`mobile_scanner`),
+  Authentik über `flutter_appauth` (PKCE, `state` prüft AppAuth),
+  Platzhalter-Startseite mit Abmelden. Haken fürs Abmelden des
+  Push-Tokens: `pushTokenAbmelden` in `lib/dienste.dart`.
+- Übernahme alter Anmeldungen (Entscheidung 3): Kotlin
+  (`AltdatenUebernahme.kt`, `security-crypto`, gleicher MasterKey) und
+  Swift (`AppDelegate.swift`, Schlüsselbund) über den Kanal
+  `ch.fwvraura.members/altdaten`; einmalig, danach gelöscht.
+- Tests: `flutter test` in beiden Paketen, `flutter build apk --debug` und
+  `flutter build ios --simulator --no-codesign` laufen durch.
+
+Noch offen bei der Anmeldung: Push-Token (kommt mit den
+Benachrichtigungen), Kontakt-Abgleich-Frage nach dem Login (kommt mit dem
+Adressbuch). Auf einem echten Gerät gegen Authentik ausprobieren.
+
 ## Phase 2 — Organisator
 
 Übersicht der eigenen Anlässe, Anmeldungen bestätigen/ablehnen/ändern/
@@ -52,6 +83,11 @@ Material, PDFs (Teilnehmerliste, Aushang, Arbeitsplan). Alle unter
 - **iOS**: gleiche Bundle-ID `ch.fwvraura.members`. Es gibt noch **keinen
   Apple-Developer-Account, keine Signierung und kein TestFlight** — das
   blockiert iOS im Store unabhängig von Flutter.
+- **Kontakt-Abgleich vor dem Store-Update umziehen**: Das Android-Konto
+  "FWV Raura" (Typ `com.fwv.members`) gehört zur App. Fehlt der native
+  Abgleich in der neuen App, kann Android das Konto samt Kontakten entfernen
+  (meist beim nächsten Neustart). Im Emulator am 11.10.2026 nach dem Update
+  noch vorhanden (61 Kontakte) — der Umzug muss trotzdem vorher fertig sein.
 - **Angemeldet bleiben**: Android speichert das Token heute in
   `EncryptedSharedPreferences` (`fwv_members_prefs`), die neue App liest
   anderswo. Ohne Übernahme-Code müssen sich alle einmal neu anmelden.
@@ -81,6 +117,9 @@ Material, PDFs (Teilnehmerliste, Aushang, Arbeitsplan). Alle unter
 - iOS: Beim Login wird `state` nicht geprüft.
 - Android: zwei Aufrufe ohne Backend-Route (`auth/organizer/qr-login`,
   `GET events/my-event/registrations`).
+- Android: Organisator-Login liest `event_id` oben in der Antwort,
+  `events/login` liefert die ID aber in `event.id` — gespeichert wurde nie
+  eine.
 - Beide: Abmelden meldet das Push-Token nicht ab.
 
 ## Bausteine (Flutter-Pakete, Versionen beim Einbau prüfen)
@@ -89,7 +128,7 @@ Material, PDFs (Teilnehmerliste, Aushang, Arbeitsplan). Alle unter
 `image_picker`, `firebase_messaging`, `url_launcher`, `share_plus`,
 `open_filex`, `package_info_plus`.
 
-## Offene Fragen
+## Entscheidungen
 
 1. ~~Adressbuch~~ — **entschieden (11.10.2026): jede Plattform ihr nativer
    Weg, wie heute.** Android: eigener Kontakt-Abgleich (Konto "FWV Raura",
