@@ -4,9 +4,22 @@ on:
   push:
     tags:
       - 'vorstand-desktop-v*'
+    # Push auf main: nur der Test-Job laeuft (build ist unten per `if`
+    # ausgeschlossen). Pfad-Filter gelten bei Tag-Pushes nicht — das
+    # Release ueber den Tag bleibt also unveraendert.
+    branches:
+      - main
+    paths:
+      - 'vorstand-desktop/**'
+      - 'docker/backend-events/test/fixtures/**'
+      - '.github/workflows/build-desktop-vorstand.yml'
   pull_request:
     paths:
       - 'vorstand-desktop/**'
+      # Vertrags-Datei des Backends (Arbeitsplan) — aendert sie sich, muss
+      # die App weiter damit zurechtkommen.
+      - 'docker/backend-events/test/fixtures/**'
+      - '.github/workflows/build-desktop-vorstand.yml'
   workflow_dispatch:
     inputs:
       version:
@@ -16,7 +29,38 @@ on:
         type: string
 
 jobs:
+  # Schneller Vorab-Check auf Linux: Typen + Tests (u.a. gegen die
+  # Vertrags-Datei docker/backend-events/test/fixtures/arbeitsplan.json).
+  # Die teuren Tauri-Builds laufen erst, wenn das gruen ist.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: vorstand-desktop/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: vorstand-desktop
+        run: npm ci --ignore-scripts
+
+      - name: Typecheck
+        working-directory: vorstand-desktop
+        run: npx tsc --noEmit
+
+      - name: Tests
+        working-directory: vorstand-desktop
+        run: npm test
+
   build:
+    needs: test
+    # Push auf main = nur testen; gebaut wird bei Tags, PRs und manuell.
+    if: github.event_name != 'push' || startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
       matrix:

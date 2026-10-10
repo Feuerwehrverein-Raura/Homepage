@@ -1,0 +1,37 @@
+{
+  "event": {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "title": "Chilbi"
+  },
+  "schichten": [
+    {
+      "date": "2026-10-17",
+      "start_time": "18:00:00",
+      "end_time": "22:00:00",
+      "needed": 2,
+      "bereich": "Bar",
+      "besetzt": [
+        "Anna A"
+      ]
+    },
+    {
+      "date": "2026-10-17",
+      "start_time": "10:00:00",
+      "end_time": "14:00:00",
+      "needed": 1,
+      "bereich": "Grill",
+      "besetzt": []
+    },
+    {
+      "date": "2026-10-18",
+      "start_time": "10:00:00",
+      "end_time": "14:00:00",
+      "needed": null,
+      "bereich": null,
+      "besetzt": [
+        "Bea B",
+        "Cem C"
+      ]
+    }
+  ]
+}

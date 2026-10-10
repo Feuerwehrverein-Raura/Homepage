@@ -7,6 +7,9 @@ on:
   pull_request:
     paths:
       - 'members-android/**'
+      # Vertrags-Fixture des Backends: aendert sie sich, muessen die
+      # Unit-Tests der App erneut laufen.
+      - 'docker/backend-events/test/fixtures/**'
   workflow_dispatch:
     inputs:
       create_release:
@@ -64,6 +67,10 @@ jobs:
           sed -i "s/versionCode = .*/versionCode = $VCODE/" "$GRADLE_FILE"
           echo "Set version: $VERSION (code: $VCODE)"
           grep -E "version(Code|Name)" "$GRADLE_FILE"
+
+      - name: Unit tests (Arbeitsplan-Vertrag u.a.)
+        working-directory: members-android
+        run: gradle testDebugUnitTest --stacktrace
 
       - name: Build Debug APK
         working-directory: members-android

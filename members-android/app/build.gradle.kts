@@ -160,4 +160,16 @@ dependencies {
     // gemerged.
     implementation(platform("com.google.firebase:firebase-bom:34.12.0"))
     implementation("com.google.firebase:firebase-messaging")
+
+    // Unit-Tests (JVM) – u.a. Vertragstest gegen die Backend-Fixture
+    testImplementation("junit:junit:4.13.2")
+}
+
+// Der Vertragstest liest die Backend-Fixture ausserhalb des Moduls. Als
+// Eingabe deklarieren, sonst haelt Gradle den Test bei geaenderter Fixture
+// fuer "up to date" bzw. nimmt ihn aus dem Build-Cache.
+tasks.withType<Test>().configureEach {
+    inputs.files(fileTree(rootProject.file("../docker/backend-events/test/fixtures")))
+        .withPropertyName("arbeitsplanFixtures")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

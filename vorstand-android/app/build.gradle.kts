@@ -109,4 +109,16 @@ dependencies {
     // ohne Native Libraries -> kompatibel mit 16 KB Page-Size-Geraeten
     // wie Pixel 9 / Fairphone 6 (Android 15+).
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
+    // Unit-Tests (JVM) – u.a. Vertragstest gegen die Backend-Fixture
+    testImplementation("junit:junit:4.13.2")
+}
+
+// Der Vertragstest liest die Backend-Fixture ausserhalb des Moduls. Als
+// Eingabe deklarieren, sonst haelt Gradle den Test bei geaenderter Fixture
+// fuer "up to date" bzw. nimmt ihn aus dem Build-Cache.
+tasks.withType<Test>().configureEach {
+    inputs.files(fileTree(rootProject.file("../docker/backend-events/test/fixtures")))
+        .withPropertyName("arbeitsplanFixtures")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -1,0 +1,65 @@
+{
+  "verein": "Feuerwehrverein Raura, Kaiseraugst",
+  "titel": "Arbeitsplan Chilbi",
+  "anlass": "Chilbi",
+  "bereiche": [
+    "Allgemein",
+    "Bar",
+    "Grill"
+  ],
+  "tage": [
+    {
+      "datum": "2026-10-17",
+      "bezeichnung": "Samstag, 17.10.2026",
+      "zeilen": [
+        {
+          "zeit": "10:00-14:00",
+          "zellen": [
+            null,
+            null,
+            {
+              "besetzt": [],
+              "gebraucht": 1,
+              "offen": 1
+            }
+          ]
+        },
+        {
+          "zeit": "18:00-22:00",
+          "zellen": [
+            null,
+            {
+              "besetzt": [
+                "Anna A"
+              ],
+              "gebraucht": 2,
+              "offen": 1
+            },
+            null
+          ]
+        }
+      ]
+    },
+    {
+      "datum": "2026-10-18",
+      "bezeichnung": "Sonntag, 18.10.2026",
+      "zeilen": [
+        {
+          "zeit": "10:00-14:00",
+          "zellen": [
+            {
+              "besetzt": [
+                "Bea B",
+                "Cem C"
+              ],
+              "gebraucht": 1,
+              "offen": 0
+            },
+            null,
+            null
+          ]
+        }
+      ]
+    }
+  ]
+}
