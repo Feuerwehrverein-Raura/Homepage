@@ -200,6 +200,41 @@ Der Plan zeigt:
 2. Wähle die Empfänger (Mitglieder mit Post-Zustellung)
 3. Der Plan wird via Pingen versendet
 
+### Automatischer Versand eine Woche vorher
+
+Eine Woche vor dem Anlass verschickt das System den aktuellen Arbeitsplan
+automatisch an alle eingeteilten Helfer — einmal pro Anlass, ohne Zutun.
+
+> **Noch ausgeschaltet.** Der Versand läuft erst, wenn im Events-Backend
+> `ARBEITSPLAN_REMINDER_ENABLED=true` gesetzt ist. Vorher zeigt
+> `GET /reminders/arbeitsplan/preview`, wer was bekäme.
+
+- **Wann:** täglich ab 08:00 Uhr, sobald der Anlass (Eventstart oder erste
+  Schicht, was früher ist) höchstens 7 Tage entfernt ist. Wurde ein Tag
+  verpasst, wird der Versand nachgeholt — aber nie am Tag des Anlasses oder
+  danach. Abgesagte Anlässe und Vorschläge werden übersprungen.
+- **Wer:** alle bestätigten Schicht-Anmeldungen, Mitglieder und Gäste. Wer
+  mehrere Schichten hat, bekommt eine einzige E-Mail mit seinen Schichten und
+  dem Arbeitsplan als PDF. Mitglieder erhalten zusätzlich eine
+  Push-Nachricht.
+- **Post:** Mitglieder, die keine E-Mails wollen, bekommen den Plan wie beim
+  bisherigen Versand per Brief (Pingen) — sofern der Anlass noch mindestens
+  3 Tage entfernt ist, sonst käme der Brief zu spät.
+- **Meldung an Organisator und Vorstand:** Wer den Plan nicht per E-Mail
+  erhalten hat (keine E-Mail-Adresse, Brief zu spät oder fehlgeschlagen,
+  E-Mail-Fehler), wird mit Telefon und Adresse in einer Mail an den
+  Organisator gemeldet, Kopie an vorstand@fwv-raura.ch, PDF im Anhang. Diese
+  Personen bitte persönlich informieren. Per Post Versendete stehen
+  ebenfalls in der Mail, dort ist nichts zu tun.
+- **Unabhängig vom Versand "alle Schichten besetzt":** Wurde der Arbeitsplan
+  schon früher verschickt, kommt eine Woche vorher trotzdem der aktuelle
+  Stand.
+- Ist noch niemand bestätigt eingeteilt, wird nichts verschickt; der nächste
+  Lauf prüft erneut. Wer nach dem Versand bestätigt wird, bekommt den Plan
+  nicht automatisch nachgeschickt.
+
+Vorschau (wer bekäme was): `GET /reminders/arbeitsplan/preview`.
+
 ## Anmeldungen verwalten
 
 ### Anmeldungen einsehen

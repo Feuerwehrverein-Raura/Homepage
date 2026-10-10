@@ -153,7 +153,51 @@ async function notifySlotFreed({ eventId, prevStatus, freedPersons = 1 }) {
     }
 }
 
-async function notifyRegistrationChange({ eventId, eventTitle, memberId, guestName, guestEmail, action }) {
+// Was in jede Anmelde-Mail gehoert: Anlass, Datum, Ort, die eigenen Schichten,
+// an wen man sich wendet und wo der Arbeitsplan steht. Vorher stand in der
+// Bestaetigung nur "Deine Anmeldung wurde bestaetigt." — man musste raten,
+// wofuer und wann.
+async function registrationDetailsText(eventId, shiftIds) {
+    const ev = await pool.query(
+        'SELECT title, slug, start_date, end_date, location, organizer_name, organizer_email FROM events WHERE id = $1',
+        [eventId]
+    );
+    const e = ev.rows[0];
+    if (!e) return '';
+
+    const tag = d => (d ? String(d).slice(0, 10) : null);
+    const lines = [`Anlass: ${e.title}`];
+    if (e.start_date) {
+        const von = tag(e.start_date), bis = tag(e.end_date);
+        lines.push(`Datum: ${formatDateDE(von)}${bis && bis !== von ? ` bis ${formatDateDE(bis)}` : ''}`);
+    }
+    if (e.location) lines.push(`Ort: ${e.location}`);
+
+    if (shiftIds && shiftIds.length > 0) {
+        const s = await pool.query(
+            'SELECT name, date, start_time, end_time, bereich FROM shifts WHERE id = ANY($1) ORDER BY date, start_time',
+            [shiftIds]
+        );
+        if (s.rows.length > 0) {
+            lines.push('', s.rows.length === 1 ? 'Schicht:' : 'Schichten:');
+            for (const sh of s.rows) {
+                const zeit = sh.start_time
+                    ? `, ${String(sh.start_time).slice(0, 5)}${sh.end_time ? `–${String(sh.end_time).slice(0, 5)}` : ''} Uhr`
+                    : '';
+                const wo = [sh.bereich, sh.name].filter(Boolean).join(' – ');
+                lines.push(`- ${sh.date ? formatDateDE(tag(sh.date)) : 'Datum offen'}${zeit}${wo ? ` · ${wo}` : ''}`);
+            }
+        }
+    }
+
+    if (e.organizer_name || e.organizer_email) {
+        lines.push('', `Fragen an: ${[e.organizer_name, e.organizer_email].filter(Boolean).join(', ')}`);
+    }
+    lines.push('', `Details und aktueller Arbeitsplan: https://fwv-raura.ch/events.html?event=${e.slug || eventId}`);
+    return lines.join('\n');
+}
+
+async function notifyRegistrationChange({ eventId, eventTitle, memberId, guestName, guestEmail, action, shiftIds }) {
     const titles = {
         added:    `Anmeldung: ${eventTitle}`,
         approved: `Anmeldung bestaetigt: ${eventTitle}`,
@@ -191,7 +235,13 @@ async function notifyRegistrationChange({ eventId, eventTitle, memberId, guestNa
     if (!targetEmail) return;
 
     const greeting = targetName ? `Guten Tag ${targetName}` : 'Guten Tag';
-    const emailBody = `${greeting},\n\n${title}\n\n${body}\n\nMit freundlichen Gruessen\nFeuerwehrverein Raura`;
+    let details = '';
+    try {
+        details = await registrationDetailsText(eventId, shiftIds);
+    } catch (e) {
+        console.error('Anmelde-Details fuer E-Mail nicht ladbar:', e.message);
+    }
+    const emailBody = `${greeting},\n\n${body}${details ? `\n\n${details}` : ''}\n\nMit freundlichen Gruessen\nFeuerwehrverein Raura`;
     try {
         await axios.post(`${DISPATCH_API}/email/send`, {
             to: targetEmail,
@@ -1570,6 +1620,7 @@ app.post('/events/my-event/registrations/:id/approve', authenticateEventOrganize
         notifyRegistrationChange({
             eventId, eventTitle: event.rows[0]?.title || 'Event',
             memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            shiftIds: reg.shift_ids,
             action: 'approved'
         }).catch(() => {});
 
@@ -1620,6 +1671,7 @@ app.post('/events/my-event/registrations/:id/reject', authenticateEventOrganizer
         notifyRegistrationChange({
             eventId, eventTitle: event.rows[0]?.title || 'Event',
             memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            shiftIds: reg.shift_ids,
             action: 'rejected'
         }).catch(() => {});
 
@@ -2070,14 +2122,22 @@ async function finalizeRegistration(ctx) {
         }
     }
 
+    // Gleicher Block wie in der spaeteren Bestaetigung (Datum, Ort, Schichten, Kontakt)
+    let details = `Event: ${eventTitle}\n${shiftInfo}`;
+    try {
+        details = await registrationDetailsText(eventId, type === 'shift' ? shiftIds : null) || details;
+    } catch (e) {
+        console.error('Anmelde-Details fuer E-Mail nicht ladbar:', e.message);
+    }
+
     const confirmSubject = `Bestätigung Ihrer Anmeldung - ${eventTitle}`;
     const confirmBody = `
 Guten Tag ${name},
 
 Vielen Dank für Ihre Anmeldung${type === 'shift' ? ' als Helfer/in' : ''}!
 
-Event: ${eventTitle}
-${shiftInfo}
+${details}
+
 ${requestedPersons ? `Anzahl Personen: ${requestedPersons}` : ''}${mealInfo}
 ${notes ? `\nBemerkungen: ${notes}` : ''}
 
@@ -2644,6 +2704,7 @@ app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, a
         notifyRegistrationChange({
             eventId, eventTitle: event.title,
             memberId: updated?.member_id, guestName: updated?.guest_name, guestEmail: updated?.guest_email,
+            shiftIds: updated?.shift_ids,
             action
         }).catch(() => {});
         // Status-Wechsel approved -> nicht-approved kann Platz freimachen
@@ -2665,7 +2726,7 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
 
         // Vor dem DELETE Member-/Guest-Daten holen — nach dem DELETE haben wir nichts mehr.
         const before = await pool.query(
-            'SELECT member_id, guest_name, guest_email, status, notes FROM registrations WHERE id = $1 AND event_id = $2',
+            'SELECT member_id, guest_name, guest_email, status, notes, shift_ids FROM registrations WHERE id = $1 AND event_id = $2',
             [regId, eventId]
         );
         if (before.rows.length === 0) return res.status(404).json({ error: 'Anmeldung nicht gefunden' });
@@ -2680,6 +2741,7 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
             eventId, eventTitle: event.title,
             memberId: before.rows[0].member_id,
             guestName: before.rows[0].guest_name, guestEmail: before.rows[0].guest_email,
+            shiftIds: before.rows[0].shift_ids,
             action: 'deleted'
         }).catch(() => {});
         notifySlotFreed({ eventId, prevStatus: before.rows[0].status, freedPersons: registrationPersons(before.rows[0]) }).catch(() => {});
@@ -2733,6 +2795,7 @@ app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, 
             eventId: id, eventTitle: ev.rows[0]?.title || 'Event',
             memberId: newReg.member_id,
             guestName: newReg.guest_name, guestEmail: newReg.guest_email,
+            shiftIds: newReg.shift_ids,
             action: 'added'
         }).catch(() => {});
     } catch (error) {
@@ -2895,6 +2958,7 @@ async function organizerActOnRegistration(req, res, newStatus) {
         notifyRegistrationChange({
             eventId, eventTitle: event.rows[0].title,
             memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            shiftIds: reg.shift_ids,
             action: newStatus === 'approved' ? 'approved' : 'rejected'
         }).catch(() => {});
         if (prevStatus === 'approved' && newStatus !== 'approved') {
@@ -2980,6 +3044,7 @@ app.post('/registrations/:id/approve', authenticateAny, requireRole('vorstand', 
         notifyRegistrationChange({
             eventId: reg.event_id, eventTitle: ev.rows[0]?.title || 'Event',
             memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            shiftIds: reg.shift_ids,
             action: 'approved'
         }).catch(() => {});
 
@@ -3019,6 +3084,7 @@ app.post('/registrations/:id/reject', authenticateAny, requireRole('vorstand', '
         notifyRegistrationChange({
             eventId: reg.event_id, eventTitle: ev.rows[0]?.title || 'Event',
             memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+            shiftIds: reg.shift_ids,
             action: 'rejected'
         }).catch(() => {});
 
@@ -3951,146 +4017,547 @@ app.post('/arbeitsplan/pdf', async (req, res) => {
 // DEUTSCH: GET-Endpunkte für direkten PDF-Download (z.B. Link in E-Mail)
 // ============================================
 
-// DEUTSCH: Arbeitsplan-PDF direkt per GET abrufen (per Event-ID). Lädt Schichten und Registrierungen aus DB
+// ---------------------------------------------------------------------------
+// Arbeitsplan als fertige Tabelle
+//
+// Website, Vorstand, Desktop- und Handy-Apps zeigen denselben Plan. Damit er
+// ueberall gleich aussieht, wird er nur hier gebaut; die Oberflaechen zeichnen
+// die Tabelle bloss noch ab und rechnen nichts selbst.
+//
+// Form: pro Tag eine Tabelle. Spalten sind die Bereiche (`bereiche`), Zeilen
+// die Zeitfenster. `zellen` steht parallel zu `bereiche`: null heisst "in
+// diesem Zeitfenster keine Schicht in diesem Bereich" (wird schwarz gezeigt),
+// sonst die eingeteilten Helfer und wie viele Plaetze noch offen sind.
+// Eingeteilt ist nur, wer bestaetigt ist — wie auf dem Aushang.
+//
+// Liefert null, wenn es den Anlass nicht gibt.
+// ---------------------------------------------------------------------------
+async function buildArbeitsplan(eventId) {
+    const eventResult = await pool.query('SELECT id, title FROM events WHERE id = $1', [eventId]);
+    if (eventResult.rows.length === 0) return null;
+    const event = eventResult.rows[0];
+
+    const shiftsResult = await pool.query(`
+        SELECT s.id, s.date, s.start_time, s.end_time, s.needed, s.bereich,
+               COALESCE(
+                   json_agg(
+                       COALESCE(m.vorname || ' ' || m.nachname, r.guest_name, 'Unbekannt')
+                       ORDER BY r.created_at
+                   ) FILTER (WHERE r.id IS NOT NULL),
+                   '[]'
+               ) AS besetzt
+        FROM shifts s
+        LEFT JOIN registrations r
+               ON s.id = ANY(r.shift_ids) AND r.status IN ('approved', 'confirmed')
+        LEFT JOIN members m ON m.id = r.member_id
+        WHERE s.event_id = $1
+        GROUP BY s.id
+        ORDER BY s.date, s.start_time
+    `, [eventId]);
+
+    const bereiche = [...new Set(shiftsResult.rows.map(s => s.bereich || 'Allgemein'))].sort();
+
+    // Tag -> Zeitfenster -> Bereich -> Schicht
+    const raster = {};
+    for (const s of shiftsResult.rows) {
+        const datum = s.date instanceof Date
+            ? s.date.toISOString().slice(0, 10)
+            : (s.date ? String(s.date).slice(0, 10) : '');
+        const von = s.start_time ? String(s.start_time).slice(0, 5) : '';
+        const bis = s.end_time ? String(s.end_time).slice(0, 5) : '';
+        const zeit = `${von}-${bis}`;
+        raster[datum] ??= {};
+        raster[datum][zeit] ??= {};
+        raster[datum][zeit][s.bereich || 'Allgemein'] = {
+            gebraucht: s.needed || 1,
+            besetzt: s.besetzt
+        };
+    }
+
+    const tage = Object.keys(raster).sort().map(datum => ({
+        datum: datum || null,
+        bezeichnung: datum
+            ? new Date(datum + 'T12:00:00').toLocaleDateString('de-CH', {
+                weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+            })
+            : 'Ohne Datum',
+        zeilen: Object.keys(raster[datum]).sort((a, b) => a.localeCompare(b)).map(zeit => ({
+            zeit,
+            zellen: bereiche.map(bereich => {
+                const zelle = raster[datum][zeit][bereich];
+                if (!zelle) return null;
+                return {
+                    besetzt: zelle.besetzt,
+                    gebraucht: zelle.gebraucht,
+                    offen: Math.max(zelle.gebraucht - zelle.besetzt.length, 0)
+                };
+            })
+        }))
+    }));
+
+    return {
+        verein: 'Feuerwehrverein Raura, Kaiseraugst',
+        titel: `Arbeitsplan ${event.title}`,
+        anlass: event.title,
+        bereiche,
+        tage
+    };
+}
+
+// DEUTSCH: Arbeitsplan als Tabelle (JSON) fuer alle Oberflaechen. Oeffentlich
+// wie das PDF und die Schichtbelegung auf der Eventseite.
+app.get('/events/:id/arbeitsplan', async (req, res) => {
+    try {
+        const plan = await buildArbeitsplan(req.params.id);
+        if (!plan) return res.status(404).json({ error: 'Event not found' });
+        res.json(plan);
+    } catch (error) {
+        console.error('GET /events/:id/arbeitsplan:', error.message);
+        res.status(500).json({ error: 'Arbeitsplan konnte nicht geladen werden' });
+    }
+});
+
+// DEUTSCH: Arbeitsplan (aus buildArbeitsplan) als PDF rendern. Liefert einen
+// Buffer — gebraucht vom GET-Download und vom Versand eine Woche vor dem Anlass.
+function renderArbeitsplanPdf(plan) {
+    const doc = new PDFDocument({
+        size: 'A4',
+        margin: 50,
+        info: {
+            Title: `Arbeitsplan ${plan.anlass}`,
+            Author: 'Feuerwehrverein Raura'
+        }
+    });
+    const chunks = [];
+    doc.on('data', chunk => chunks.push(chunk));
+    const done = new Promise((resolve, reject) => {
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+    });
+
+    // Header
+    doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
+    doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fontSize(16).font('Helvetica-Bold').text(plan.anlass, { align: 'center' });
+    doc.moveDown(1);
+
+    plan.tage.forEach(tag => {
+        doc.fontSize(12).font('Helvetica-Bold').text(tag.bezeichnung);
+        doc.moveDown(0.5);
+
+        tag.zeilen.forEach(zeile => {
+            doc.fontSize(10).font('Helvetica-Bold').text(`  ${zeile.zeit.replace('-', ' - ')}`);
+
+            plan.bereiche.forEach((bereich, i) => {
+                const data = zeile.zellen[i];
+                if (data) {
+                    const helperList = data.besetzt.length > 0 ? data.besetzt.join(', ') : '(noch offen)';
+                    const countStr = `${data.besetzt.length}/${data.gebraucht}`;
+                    doc.fontSize(9).font('Helvetica').text(`      ${bereich} [${countStr}]: ${helperList}`);
+                } else {
+                    // No shift exists for this time/bereich - show as blocked
+                    doc.fontSize(9).font('Helvetica').fillColor('#666666')
+                        .text(`      ${bereich}: ▬▬▬`)
+                        .fillColor('#000000');
+                }
+            });
+            doc.moveDown(0.3);
+        });
+        doc.moveDown(0.5);
+    });
+
+    doc.moveDown(2);
+    doc.fontSize(8).font('Helvetica').fillColor('#666666')
+        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
+
+    doc.end();
+    return done;
+}
+
+// DEUTSCH: Arbeitsplan-PDF direkt per GET abrufen (per Event-ID). Inhalt aus buildArbeitsplan()
 app.get('/events/:id/pdf/arbeitsplan', async (req, res) => {
     try {
-        const { id } = req.params;
-
-        // Load event from database
-        const eventResult = await pool.query('SELECT * FROM events WHERE id = $1', [id]);
-        if (eventResult.rows.length === 0) {
+        const plan = await buildArbeitsplan(req.params.id);
+        if (!plan) {
             return res.status(404).json({ error: 'Event not found' });
         }
-        const event = eventResult.rows[0];
-
-        // Load shifts with registrations
-        const shiftsResult = await pool.query(
-            'SELECT * FROM shifts WHERE event_id = $1 ORDER BY date, start_time',
-            [id]
-        );
-
-        const shiftsWithRegs = await Promise.all(shiftsResult.rows.map(async (shift) => {
-            const regsResult = await pool.query(`
-                SELECT r.id, r.guest_name, r.status, r.member_id, m.vorname, m.nachname
-                FROM registrations r
-                LEFT JOIN members m ON r.member_id = m.id
-                WHERE $1 = ANY(r.shift_ids) AND r.status IN ('approved', 'confirmed')
-            `, [shift.id]);
-
-            const dateStr = shift.date instanceof Date
-                ? shift.date.toISOString().split('T')[0]
-                : shift.date;
-
-            return {
-                ...shift,
-                date: dateStr,
-                registrations: {
-                    approved: regsResult.rows.map(r => ({
-                        id: r.id,
-                        name: r.member_id ? `${r.vorname} ${r.nachname}` : r.guest_name
-                    }))
-                }
-            };
-        }));
-
-        if (shiftsWithRegs.length === 0) {
+        if (plan.tage.length === 0) {
             return res.status(400).json({ error: 'No shifts found for this event' });
         }
-
-        // Create PDF document
-        const doc = new PDFDocument({
-            size: 'A4',
-            margin: 50,
-            info: {
-                Title: `Arbeitsplan ${event.title}`,
-                Author: 'Feuerwehrverein Raura'
-            }
-        });
+        const buffer = await renderArbeitsplanPdf(plan);
 
         res.setHeader('Content-Type', 'application/pdf');
-        const safeTitle = event.title.replace(/[^a-zA-Z0-9äöüÄÖÜ ]/g, '_').substring(0, 50);
+        const safeTitle = plan.anlass.replace(/[^a-zA-Z0-9äöüÄÖÜ ]/g, '_').substring(0, 50);
         res.setHeader('Content-Disposition', `attachment; filename="Arbeitsplan_${safeTitle}.pdf"`);
-        doc.pipe(res);
-
-        // Header
-        doc.fontSize(18).font('Helvetica-Bold').text('Feuerwehrverein Raura', { align: 'center' });
-        doc.fontSize(14).font('Helvetica').text('Arbeitsplan', { align: 'center' });
-        doc.moveDown(0.3);
-        doc.fontSize(16).font('Helvetica-Bold').text(event.title, { align: 'center' });
-        doc.moveDown(1);
-
-        // Get all unique Bereiche
-        const allBereiche = [...new Set(shiftsWithRegs.map(s => s.bereich || 'Allgemein'))].sort();
-
-        // Group shifts by date
-        const shiftsByDate = {};
-        shiftsWithRegs.forEach(shift => {
-            const date = shift.date || 'Unbekannt';
-            if (!shiftsByDate[date]) shiftsByDate[date] = [];
-            shiftsByDate[date].push(shift);
-        });
-
-        Object.keys(shiftsByDate).sort().forEach(date => {
-            const dateObj = new Date(date + 'T12:00:00');
-            const dateStr = dateObj.toLocaleDateString('de-CH', {
-                weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
-            });
-
-            doc.fontSize(12).font('Helvetica-Bold').text(dateStr);
-            doc.moveDown(0.5);
-
-            const byTimeSlot = {};
-            shiftsByDate[date].forEach(shift => {
-                const startTime = shift.start_time || '';
-                const endTime = shift.end_time || '';
-                const timeKey = `${startTime}-${endTime}`;
-
-                if (!byTimeSlot[timeKey]) {
-                    byTimeSlot[timeKey] = { startTime, endTime, bereiche: {} };
-                }
-
-                const bereich = shift.bereich || 'Allgemein';
-                const helpers = shift.registrations?.approved?.map(r => r.name) || [];
-
-                byTimeSlot[timeKey].bereiche[bereich] = {
-                    needed: shift.max_helpers || shift.needed || 1,
-                    helpers
-                };
-            });
-
-            Object.entries(byTimeSlot).sort((a, b) => a[0].localeCompare(b[0])).forEach(([timeKey, slot]) => {
-                const timeDisplay = slot.startTime && slot.endTime
-                    ? `${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}`
-                    : timeKey;
-
-                doc.fontSize(10).font('Helvetica-Bold').text(`  ${timeDisplay}`);
-
-                allBereiche.forEach(bereich => {
-                    const data = slot.bereiche[bereich];
-                    if (data) {
-                        const helperList = data.helpers.length > 0 ? data.helpers.join(', ') : '(noch offen)';
-                        const countStr = `${data.helpers.length}/${data.needed}`;
-                        doc.fontSize(9).font('Helvetica').text(`      ${bereich} [${countStr}]: ${helperList}`);
-                    } else {
-                        // No shift exists for this time/bereich - show as blocked
-                        doc.fontSize(9).font('Helvetica').fillColor('#666666')
-                            .text(`      ${bereich}: ▬▬▬`)
-                            .fillColor('#000000');
-                    }
-                });
-                doc.moveDown(0.3);
-            });
-            doc.moveDown(0.5);
-        });
-
-        doc.moveDown(2);
-        doc.fontSize(8).font('Helvetica').fillColor('#666666')
-            .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
-
-        doc.end();
-
+        res.send(buffer);
     } catch (error) {
         console.error('Direct Arbeitsplan PDF error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
+// ARBEITSPLAN EINE WOCHE VOR DEM ANLASS
+// DEUTSCH: Taeglicher Job — schickt den aktuellen Arbeitsplan einmalig an alle
+// eingeteilten Helfer (Schicht-Anmeldungen, bestaetigt, Gaeste inklusive).
+// Wer ihn nicht per E-Mail bekommt (keine Adresse, Mitglied mit Post-
+// Zustellung, Versandfehler), wird dem Organisator und dem Vorstand in EINER
+// Mail gemeldet — mit dem PDF im Anhang, damit sie ihn zustellen koennen.
+// Unabhaengig von arbeitsplan_sent_at (Versand sobald alle Schichten besetzt):
+// das hier ist die Erinnerung mit dem Stand eine Woche vorher.
+// Eigenes Flag events.arbeitsplan_reminder_sent_at (Migration 025) -> einmalig.
+// ============================================
+const ARBEITSPLAN_REMINDER_DAYS = 7;   // so viele Tage vor dem Anlass (oder weniger, falls verpasst)
+const ARBEITSPLAN_REMINDER_HOUR = 8;   // Timer verschickt fruehestens ab 08:00 Uhr Schweizer Zeit
+const ARBEITSPLAN_POST_MIN_DAYS = 3;   // Brief (Pingen) nur, wenn er sicher vor dem Anlass ankommt
+const VORSTAND_EMAIL = 'vorstand@fwv-raura.ch';
+
+async function ensureArbeitsplanReminderSchema() {
+    await pool.query('ALTER TABLE events ADD COLUMN IF NOT EXISTS arbeitsplan_reminder_sent_at TIMESTAMP');
+}
+
+// DEUTSCH: Anlaesse, deren Beginn (Eventstart oder erste Schicht, was frueher ist)
+// zwischen morgen und in 7 Tagen liegt und die noch keinen Versand hatten.
+// Vergangene und heutige Anlaesse nie — dann ist es zu spaet.
+async function findDueArbeitsplanReminders() {
+    const result = await pool.query(`
+        WITH ev AS (
+            SELECT e.id, e.title, e.location, e.status, e.organizer_name,
+                   COALESCE(NULLIF(TRIM(e.organizer_email), ''), om.email) AS organizer_email,
+                   e.arbeitsplan_reminder_sent_at,
+                   LEAST(e.start_date::date,
+                         (SELECT MIN(s.date) FROM shifts s WHERE s.event_id = e.id)) AS beginn
+            FROM events e
+            LEFT JOIN members om ON om.id = e.organizer_id
+            WHERE EXISTS (SELECT 1 FROM shifts s WHERE s.event_id = e.id)
+        )
+        SELECT ev.*, (ev.beginn - (NOW() AT TIME ZONE 'Europe/Zurich')::date) AS tage_bis
+        FROM ev
+        WHERE ev.arbeitsplan_reminder_sent_at IS NULL
+          AND COALESCE(ev.status, '') NOT IN ('cancelled', 'proposed', 'rejected', 'completed')
+          AND ev.beginn >  (NOW() AT TIME ZONE 'Europe/Zurich')::date
+          AND ev.beginn <= (NOW() AT TIME ZONE 'Europe/Zurich')::date + $1::int
+        ORDER BY ev.beginn
+    `, [ARBEITSPLAN_REMINDER_DAYS]);
+    return result.rows;
+}
+
+// DEUTSCH: Telefon/Adresse fuer die Meldung an Organisator/Vorstand.
+function reminderContactInfo(p) {
+    const parts = [];
+    if (p.phone) parts.push(`Tel. ${p.phone}`);
+    if (p.address) parts.push(p.address);
+    return parts.length ? parts.join(', ') : 'keine Kontaktdaten hinterlegt';
+}
+
+// DEUTSCH: Arbeitsplan fuer EINEN Anlass verschicken. dryRun: nur ermitteln,
+// wer was bekaeme (nichts senden, nichts markieren).
+async function sendArbeitsplanReminder(event, { dryRun = false } = {}) {
+    // Atomar beanspruchen — verhindert Doppelversand (mehrere Replicas, Timer + manueller Aufruf)
+    if (!dryRun) {
+        const claim = await pool.query(`
+            UPDATE events SET arbeitsplan_reminder_sent_at = NOW()
+            WHERE id = $1 AND arbeitsplan_reminder_sent_at IS NULL
+            RETURNING id
+        `, [event.id]);
+        if (claim.rows.length === 0) return { eventId: event.id, title: event.title, skipped: 'bereits versendet' };
+    }
+    const releaseClaim = async () => {
+        if (dryRun) return;
+        await pool.query('UPDATE events SET arbeitsplan_reminder_sent_at = NULL WHERE id = $1', [event.id])
+            .catch(e => logError('Arbeitsplan-Versand: Flag zuruecksetzen fehlgeschlagen', { eventId: event.id, error: e.message }));
+    };
+
+    try {
+        const plan = await buildArbeitsplan(event.id);
+        if (!plan || plan.tage.length === 0) {
+            await releaseClaim();
+            return { eventId: event.id, title: event.title, skipped: 'keine Schichten' };
+        }
+
+        // Eingeteilte Helfer: bestaetigte Schicht-Anmeldungen (Mitglieder und Gaeste)
+        const regsResult = await pool.query(`
+            SELECT r.id, r.member_id, r.guest_name, r.guest_email, r.shift_ids, r.notes,
+                   m.vorname, m.nachname, m.email AS member_email, m.zustellung_email,
+                   m.telefon, m.mobile, m.strasse, m.plz, m.ort
+            FROM registrations r
+            LEFT JOIN members m ON m.id = r.member_id
+            WHERE r.event_id = $1
+              AND r.status IN ('approved', 'confirmed')
+              AND r.shift_ids IS NOT NULL AND cardinality(r.shift_ids) > 0
+            ORDER BY r.created_at
+        `, [event.id]);
+
+        // Noch niemand eingeteilt: Flag wieder freigeben, damit spaeter Bestaetigte
+        // (innerhalb der Woche) den Plan beim naechsten Lauf noch bekommen.
+        if (regsResult.rows.length === 0) {
+            await releaseClaim();
+            return { eventId: event.id, title: event.title, skipped: 'keine eingeteilten Helfer' };
+        }
+
+        const shiftsResult = await pool.query(
+            'SELECT id, name, date, start_time, end_time, bereich FROM shifts WHERE event_id = $1',
+            [event.id]
+        );
+        const shiftById = new Map(shiftsResult.rows.map(s => [s.id, s]));
+
+        // Pro Person nur EINE Nachricht (mehrere Anmeldungen derselben Person zusammenfassen)
+        const persons = new Map();
+        for (const r of regsResult.rows) {
+            const email = (r.member_id ? r.member_email : r.guest_email) || null;
+            const name = r.member_id ? `${r.vorname} ${r.nachname}` : (r.guest_name || 'Unbekannt');
+            const key = r.member_id ? `m:${r.member_id}` : (email ? `e:${email.toLowerCase()}` : `r:${r.id}`);
+            let notes = {};
+            try { notes = typeof r.notes === 'string' ? JSON.parse(r.notes) : (r.notes || {}); } catch (_) { /* alte notes */ }
+            const address = r.member_id && r.strasse
+                ? `${r.strasse}, ${[r.plz, r.ort].filter(Boolean).join(' ')}`.trim()
+                : null;
+            if (!persons.has(key)) {
+                persons.set(key, {
+                    name, email,
+                    memberId: r.member_id || null,
+                    postOnly: !!r.member_id && r.zustellung_email === false,
+                    phone: r.member_id ? (r.mobile || r.telefon || notes?.phone || null) : (notes?.phone || null),
+                    address,
+                    shiftIds: new Set()
+                });
+            }
+            r.shift_ids.forEach(id => persons.get(key).shiftIds.add(id));
+        }
+
+        const datum = formatDateDE(String(event.beginn).slice(0, 10));
+        const wann = event.tage_bis === 1 ? 'Morgen' : (event.tage_bis === 7 ? 'In einer Woche' : `In ${event.tage_bis} Tagen`);
+        const pdfBase64 = dryRun ? null : (await renderArbeitsplanPdf(plan)).toString('base64');
+        const attachment = {
+            filename: `Arbeitsplan_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+            content: pdfBase64,
+            contentType: 'application/pdf'
+        };
+
+        const perEmail = [];   // per E-Mail erhalten
+        const perPost = [];    // per Post (Pingen) versendet
+        const offen = [];      // noch zuzustellen (mit Grund)
+
+        for (const p of persons.values()) {
+            const schichten = [...p.shiftIds].map(id => shiftById.get(id)).filter(Boolean)
+                .sort((a, b) => `${a.date} ${a.start_time}`.localeCompare(`${b.date} ${b.start_time}`))
+                .map(s => {
+                    const zeit = s.start_time && s.end_time
+                        ? `${String(s.start_time).slice(0, 5)} - ${String(s.end_time).slice(0, 5)}` : 'ganztägig';
+                    return `- ${formatDateDE(String(s.date).slice(0, 10))}, ${zeit}: ${s.name || 'Schicht'}${s.bereich ? ` (${s.bereich})` : ''}`;
+                });
+
+            // Mitglied will Post statt E-Mail -> wie beim bisherigen Arbeitsplan-Versand per Pingen
+            if (p.postOnly) {
+                if (event.tage_bis < ARBEITSPLAN_POST_MIN_DAYS) {
+                    offen.push({ ...p, grund: 'möchte Post, ein Brief käme aber zu spät' });
+                    continue;
+                }
+                if (dryRun) { perPost.push(p); continue; }
+                try {
+                    const pingen = await axios.post(`${DISPATCH_API}/pingen/send-arbeitsplan`, {
+                        event_id: event.id,
+                        member_id: p.memberId,
+                        pdf_base64: pdfBase64
+                    });
+                    if (pingen.data?.success) {
+                        perPost.push({ ...p, letterId: pingen.data.letterId });
+                        logInfo('Arbeitsplan per Post versendet', { eventId: event.id, name: p.name, letterId: pingen.data.letterId });
+                    } else {
+                        offen.push({ ...p, grund: 'möchte Post, Brief-Versand fehlgeschlagen' });
+                    }
+                } catch (err) {
+                    logError('Arbeitsplan Pingen-Versand fehlgeschlagen', { eventId: event.id, name: p.name, error: err.response?.data?.error || err.message });
+                    offen.push({ ...p, grund: `möchte Post, Brief-Versand fehlgeschlagen (${err.response?.data?.error || err.message})` });
+                }
+                continue;
+            }
+
+            if (!p.email) {
+                offen.push({ ...p, grund: 'keine E-Mail-Adresse' });
+                continue;
+            }
+            if (dryRun) { perEmail.push(p); continue; }
+
+            try {
+                await axios.post(`${DISPATCH_API}/email/send`, {
+                    to: p.email,
+                    subject: `Arbeitsplan - ${event.title}`,
+                    body: `Guten Tag ${p.name},
+
+${wann} ist es soweit: "${event.title}" am ${datum}${event.location ? ` (${event.location})` : ''}.
+
+Sie sind für folgende Schichten eingeteilt:
+${schichten.join('\n')}
+
+Anbei finden Sie den aktuellen Arbeitsplan als PDF mit allen Schichten und Helfern.
+
+Falls Sie verhindert sind, melden Sie sich bitte so bald wie möglich${event.organizer_name ? ` bei ${event.organizer_name}` : ' bei uns'}.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura`,
+                    attachments: [attachment],
+                    event_id: event.id
+                });
+                perEmail.push(p);
+                logInfo('Arbeitsplan per E-Mail versendet', { eventId: event.id, email: p.email });
+            } catch (err) {
+                logError('Arbeitsplan per E-Mail fehlgeschlagen', { eventId: event.id, email: p.email, error: err.message });
+                offen.push({ ...p, grund: `E-Mail an ${p.email} fehlgeschlagen` });
+            }
+
+            if (p.memberId) {
+                pushToMember(p.memberId, 'event_update', `Arbeitsplan: ${event.title}`,
+                    `Der Arbeitsplan für ${datum} ist da.`, { eventId: event.id }).catch(() => {});
+            }
+        }
+
+        const summary = {
+            eventId: event.id,
+            title: event.title,
+            beginn: String(event.beginn).slice(0, 10),
+            tageBis: event.tage_bis,
+            perEmail: perEmail.map(p => ({ name: p.name, email: p.email })),
+            perPost: perPost.map(p => ({ name: p.name, address: p.address })),
+            offen: offen.map(p => ({ name: p.name, phone: p.phone, address: p.address, grund: p.grund })),
+            meldungAn: null
+        };
+
+        // Dispatch komplett nicht erreichbar -> niemand hat etwas bekommen: Flag
+        // freigeben, der naechste Lauf versucht es erneut.
+        if (!dryRun && perEmail.length === 0 && perPost.length === 0 && offen.some(p => p.grund.startsWith('E-Mail an'))) {
+            await releaseClaim();
+            logWarn('Arbeitsplan-Versand: keine Zustellung erfolgreich, wird erneut versucht', { eventId: event.id });
+            return { ...summary, retry: true };
+        }
+
+        // Meldung an Organisator + Vorstand: wer hat den Plan NICHT per E-Mail bekommen
+        if (offen.length > 0 || perPost.length > 0) {
+            const to = event.organizer_email || VORSTAND_EMAIL;
+            const cc = to.toLowerCase() !== VORSTAND_EMAIL ? VORSTAND_EMAIL : undefined;
+            summary.meldungAn = cc ? [to, cc] : [to];
+
+            if (!dryRun) {
+                const offenText = offen.length
+                    ? offen.map(p => `- ${p.name} — ${reminderContactInfo(p)} (${p.grund})`).join('\n')
+                    : '- niemand';
+                const postText = perPost.length
+                    ? `\n\nPer Post (Pingen) versendet — nichts zu tun:\n${perPost.map(p => `- ${p.name}${p.address ? ` — ${p.address}` : ''}`).join('\n')}`
+                    : '';
+                try {
+                    await axios.post(`${DISPATCH_API}/email/send`, {
+                        to,
+                        cc,
+                        subject: offen.length
+                            ? `Arbeitsplan ${event.title}: ${offen.length} Person(en) noch zustellen`
+                            : `Arbeitsplan ${event.title}: per Post versendet`,
+                        body: `Guten Tag${event.organizer_name ? ` ${event.organizer_name}` : ''},
+
+Der Arbeitsplan für "${event.title}" am ${datum} wurde heute an die eingeteilten Helferinnen und Helfer verschickt (${perEmail.length} per E-Mail).
+
+Diese Personen haben den Arbeitsplan nicht per E-Mail erhalten — bitte zustellen:
+${offenText}${postText}
+
+Der aktuelle Arbeitsplan ist als PDF angehängt.
+
+Mit freundlichen Grüssen
+Feuerwehrverein Raura (automatische Nachricht)`,
+                        attachments: [attachment],
+                        event_id: event.id
+                    });
+                    logInfo('Arbeitsplan: Meldung an Organisator/Vorstand gesendet', { eventId: event.id, to, cc, offen: offen.length });
+                } catch (err) {
+                    logError('Arbeitsplan: Meldung an Organisator/Vorstand fehlgeschlagen', { eventId: event.id, to, error: err.message });
+                    summary.meldungFehler = err.message;
+                }
+            }
+        }
+
+        if (!dryRun) {
+            try {
+                await pool.query(`
+                    INSERT INTO audit_log (action, entity_type, entity_id, new_values, created_at)
+                    VALUES ('ARBEITSPLAN_REMINDER_SENT', 'event', $1, $2, NOW())
+                `, [event.id, JSON.stringify({
+                    title: event.title,
+                    perEmail: perEmail.length,
+                    perPost: perPost.length,
+                    offen: summary.offen
+                })]);
+            } catch (auditError) {
+                console.error('Audit-Log fuer Arbeitsplan-Versand fehlgeschlagen:', auditError.message);
+            }
+            logInfo('Arbeitsplan eine Woche vorher versendet', {
+                eventId: event.id, title: event.title,
+                perEmail: perEmail.length, perPost: perPost.length, offen: offen.length
+            });
+        }
+        return summary;
+    } catch (error) {
+        await releaseClaim();
+        throw error;
+    }
+}
+
+// DEUTSCH: Alle faelligen Anlaesse abarbeiten. Ein Fehler bei einem Anlass
+// haelt die anderen nicht auf.
+async function runArbeitsplanReminders({ dryRun = false } = {}) {
+    const events = await findDueArbeitsplanReminders();
+    const results = [];
+    for (const event of events) {
+        try {
+            results.push(await sendArbeitsplanReminder(event, { dryRun }));
+        } catch (err) {
+            logError('Arbeitsplan-Versand fehlgeschlagen', { eventId: event.id, error: err.message });
+            results.push({ eventId: event.id, title: event.title, error: err.message });
+        }
+    }
+    return results;
+}
+
+// DEUTSCH: Timer im Container — prueft stuendlich, verschickt aber erst ab
+// 08:00 Uhr Schweizer Zeit. Dank Flag nur einmal pro Anlass; ein verpasster
+// Tag (Container down) wird beim naechsten Lauf nachgeholt.
+let arbeitsplanReminderRunning = false;
+async function arbeitsplanReminderTick() {
+    if (arbeitsplanReminderRunning) return;
+    const hour = Number(new Intl.DateTimeFormat('de-CH', {
+        timeZone: 'Europe/Zurich', hour: '2-digit', hour12: false
+    }).format(new Date()));
+    if (hour < ARBEITSPLAN_REMINDER_HOUR) return;
+    arbeitsplanReminderRunning = true;
+    try {
+        const results = await runArbeitsplanReminders();
+        if (results.length > 0) logInfo('Arbeitsplan-Versand-Lauf beendet', { events: results.length });
+    } catch (err) {
+        logError('Arbeitsplan-Versand-Lauf fehlgeschlagen', { error: err.message });
+    } finally {
+        arbeitsplanReminderRunning = false;
+    }
+}
+
+// DEUTSCH: Manuell / per Cron ausloesen (API-Key). { dry_run: true } = nur Vorschau.
+// Ignoriert die 08:00-Uhr-Grenze.
+app.post('/reminders/arbeitsplan', requireApiKey, async (req, res) => {
+    try {
+        const dryRun = req.body?.dry_run === true || req.query.dry_run === 'true';
+        const results = await runArbeitsplanReminders({ dryRun });
+        res.json({ success: true, dry_run: dryRun, events: results });
+    } catch (error) {
+        logError('POST /reminders/arbeitsplan', { error: error.message });
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Vorschau fuer den Vorstand: welche Anlaesse sind faellig, wer bekaeme
+// den Arbeitsplan per E-Mail / Post, wer muesste ihn persoenlich bekommen.
+app.get('/reminders/arbeitsplan/preview', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const results = await runArbeitsplanReminders({ dryRun: true });
+        res.json({ events: results });
+    } catch (error) {
+        logError('GET /reminders/arbeitsplan/preview', { error: error.message });
         res.status(500).json({ error: error.message });
     }
 });
@@ -5846,4 +6313,20 @@ app.listen(PORT, () => {
     ensureRegistrationConfirmationsSchema()
         .then(() => console.log('Registrierungs-Bestätigungs-Schema bereit'))
         .catch(e => console.error('ensureRegistrationConfirmationsSchema failed:', e.message));
+
+    // Arbeitsplan eine Woche vor dem Anlass: stuendlich pruefen (erster Lauf nach
+    // 1 Minute). Bewusst nur mit ARBEITSPLAN_REMINDER_ENABLED=true: der Versand
+    // schickt echte Mails und kostenpflichtige Briefe, das soll niemand durch
+    // ein blosses Deploy ausloesen.
+    ensureArbeitsplanReminderSchema()
+        .then(() => {
+            if (process.env.ARBEITSPLAN_REMINDER_ENABLED !== 'true') {
+                console.log('Arbeitsplan-Versand eine Woche vorher: aus (ARBEITSPLAN_REMINDER_ENABLED=true zum Einschalten)');
+                return;
+            }
+            setTimeout(arbeitsplanReminderTick, 60 * 1000);
+            setInterval(arbeitsplanReminderTick, 60 * 60 * 1000);
+            console.log('Arbeitsplan-Versand eine Woche vorher: Timer gestartet');
+        })
+        .catch(e => console.error('ensureArbeitsplanReminderSchema failed:', e.message));
 });

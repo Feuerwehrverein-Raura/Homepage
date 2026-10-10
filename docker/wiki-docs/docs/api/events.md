@@ -289,6 +289,19 @@ POST /reminders/send-daily
 X-API-Key: <api-key>
 ```
 
+### Arbeitsplan eine Woche vorher
+```http
+POST /reminders/arbeitsplan
+X-API-Key: <api-key>
+
+GET /reminders/arbeitsplan/preview
+Authorization: Bearer <token>
+```
+
+Läuft stündlich im Container (ab 08:00 Uhr), aber nur mit
+`ARBEITSPLAN_REMINDER_ENABLED=true` — ohne die Variable ist er aus. `POST` löst den Lauf sofort aus
+(`{"dry_run": true}` = nur Vorschau). Siehe Vorstand-Doku "Event-Management".
+
 ### Erinnerungs-Vorschau (Vorstand)
 ```http
 GET /reminders/preview
