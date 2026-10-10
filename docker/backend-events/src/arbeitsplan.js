@@ -256,10 +256,14 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
                     + zelle.offen * zeileH;
             })));
 
-            // Seitenumbruch: neue Seite mit wiederholter Kopfzeile
+            // Seitenumbruch: neue Seite mit Tag und Kopfzeile — wer nur das
+            // zweite Blatt an der Wand sieht, soll wissen, welcher Tag das ist.
             if (y + hoehe > unten()) {
                 doc.addPage();
-                y = doc.page.margins.top;
+                doc.fontSize(12).font('Helvetica-Bold').fillColor('#000000')
+                    .text(`${tag.bezeichnung} (Fortsetzung)`, links, doc.page.margins.top);
+                doc.moveDown(0.4);
+                y = doc.y;
                 kopfzeile();
             }
 

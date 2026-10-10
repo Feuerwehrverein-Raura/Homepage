@@ -122,6 +122,19 @@ test('PDF: Aushang mit Logo, Tabelle pro Tag, nur Bereiche dieses Tages', async 
     assert.ok(!zeilen.some(z => z.includes('¬')));
 });
 
+test('PDF: Seitenumbruch mitten im Tag wiederholt den Tag', async () => {
+    // ein Tag mit so vielen Zeitfenstern, dass er nicht auf eine Seite passt
+    const zeilen = Array.from({ length: 30 }, (_, n) => ({
+        zeit: `${String(n % 24).padStart(2, '0')}:00-${String((n + 1) % 24).padStart(2, '0')}:00`,
+        zellen: [{ besetzt: ['Anna A', 'Bea B'], gebraucht: 3, offen: 1 }]
+    }));
+    const plan = { ...erwartet, bereiche: ['Bar'], tage: [{ datum: '2026-10-17', bezeichnung: 'Samstag, 17.10.2026', zeilen }] };
+    const pdf = await renderArbeitsplanPdf(plan, { compress: false });
+    const text = pdfZeilen(pdf).map(z => z.trim());
+    assert.ok((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length >= 2);
+    assert.ok(text.includes('Samstag, 17.10.2026 (Fortsetzung)'));
+});
+
 test('Echte Datenbank: SQL liefert denselben Plan', { skip: !process.env.TEST_DATABASE_URL && 'TEST_DATABASE_URL nicht gesetzt' }, async () => {
     const { Pool, types } = require('pg');
     // wie in src/index.js: Datum/Zeit als Text, nicht als Date
