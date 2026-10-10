@@ -97,8 +97,15 @@ Material, PDFs (Teilnehmerliste, Aushang, Arbeitsplan). Alle unter
    Flutter-App um, die Oberfläche löst ihn nur aus. iOS: CardDAV über
    Nextcloud (`carddav.mobileconfig`) — Apple erlaubt Apps keinen eigenen
    Abgleich.
-2. **Organisator-Login per E-Mail/Passwort und Organisator-QR**: weiter
-   anbieten oder nur noch über das Mitgliederkonto?
-3. **Neu anmelden nach dem Update** in Kauf nehmen (wenig Nutzer) oder
-   Übernahme-Code bauen?
-4. **iOS**: Apple-Developer-Account für den Verein beantragen?
+2. ~~Organisator-Login~~ — **entschieden (11.10.2026): beides.** Ist der
+   Organisator Mitglied, meldet er sich mit seinem Mitgliederkonto an und
+   sieht seine Anlässe dort (verknüpft über `events/organized-by-me`). Externe
+   Organisatoren melden sich mit E-Mail und Passwort an (`POST events/login`).
+   Der Organisator-QR der alten Android-App entfällt — dafür gibt es im
+   Backend keine Route.
+3. ~~Neu anmelden nach dem Update~~ — **entschieden: Übernahme-Code.** Die
+   App liest beim ersten Start einmal die alten Anmeldedaten (Android:
+   `EncryptedSharedPreferences` `fwv_members_prefs`; iOS: Schlüsselbund,
+   Dienst `ch.fwvraura.members`), übernimmt sie und löscht die alten.
+4. ~~iOS~~ — **entschieden: Apple-Developer-Account für den Verein wird
+   beantragt** (als Organisation, mit D-U-N-S-Nummer).
