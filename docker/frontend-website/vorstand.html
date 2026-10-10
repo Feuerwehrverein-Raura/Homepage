@@ -248,7 +248,7 @@
         <!-- Header -->
         <section class="bg-white border-b">
             <div class="container mx-auto px-4 py-6">
-                <div class="flex justify-between items-center">
+                <div class="flex flex-wrap justify-between items-center gap-3">
                     <div>
                         <h1 class="text-3xl font-bold text-gray-800">Mitgliederverwaltung</h1>
                         <p class="text-gray-600 mt-1">Mitglieder verwalten und Statistiken einsehen</p>
@@ -2372,9 +2372,14 @@
     <div id="event-registrations-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto">
             <div class="p-6">
-                <div class="flex justify-between items-center mb-6">
+                <!-- DEUTSCH: Titel und "x" in einer Zeile, die Knoepfe darunter mit
+                     flex-wrap: auf dem Handy passte alles nebeneinander nicht, das "x"
+                     zum Schliessen lag ausserhalb des Bildschirms. -->
+                <div class="flex justify-between items-start gap-3 mb-6">
                     <h3 id="event-reg-modal-title" class="text-2xl font-bold text-gray-800">Anmeldungen verwalten</h3>
-                    <div class="flex items-center gap-3">
+                    <button onclick="closeEventRegistrationsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 mb-6 -mt-3">
                         <button onclick="downloadTeilnehmerliste()" class="px-4 py-2 bg-fire-500 text-white rounded-lg hover:bg-fire-600 flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -2392,8 +2397,6 @@
                             </svg>
                             Arbeitsplan
                         </button>
-                        <button onclick="closeEventRegistrationsModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-                    </div>
                 </div>
                 <div id="event-reg-content">
                     <!-- Content will be loaded dynamically -->
@@ -2406,8 +2409,10 @@
          (events.html): Tabelle im Stil des PDF, auf dem Handy als Liste. Kopf
          und Knopfleiste bleiben stehen, nur der Plan scrollt. Liegt ueber dem
          Anmeldungs-Fenster. -->
+    <!-- DEUTSCH: dvh statt vh: auf dem Handy zaehlt vh die Flaeche hinter der
+         Adressleiste mit, der Kopf des Fensters war dann halb verdeckt. -->
     <div id="arbeitsplan-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-[60] items-center justify-center p-2 sm:p-4">
-        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] flex flex-col">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[95dvh] sm:max-h-[90dvh] flex flex-col">
             <div class="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b shrink-0">
                 <h3 class="text-xl sm:text-2xl font-bold text-gray-800">Arbeitsplan</h3>
                 <button onclick="closeArbeitsplanModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
