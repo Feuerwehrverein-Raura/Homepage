@@ -161,3 +161,38 @@ export interface OrganizerNoteCreate {
   content?: string;
   attachments?: OrganizerNoteAttachmentInput[];
 }
+
+// ---------------------------------------------------------------------------
+// Arbeitsplan (GET /events/:id/arbeitsplan). Die Tabelle baut das Backend
+// fertig auf — Clients zeichnen sie nur, ohne selbst zu gruppieren.
+// ---------------------------------------------------------------------------
+
+/** Ein Feld der Tabelle: bestaetigte Helfer plus Anzahl offener Plaetze. */
+export interface ArbeitsplanZelle {
+  besetzt: string[];
+  gebraucht: number;
+  offen: number;
+}
+
+export interface ArbeitsplanZeile {
+  /** z.B. "08:00-12:00" */
+  zeit: string;
+  /** Parallel zu `bereiche`; null = keine Schicht (schwarzes Feld). */
+  zellen: (ArbeitsplanZelle | null)[];
+}
+
+export interface ArbeitsplanTag {
+  datum: string | null;
+  /** Fertig formatiert, z.B. "Samstag, 01.06.2026". */
+  bezeichnung: string;
+  zeilen: ArbeitsplanZeile[];
+}
+
+export interface Arbeitsplan {
+  verein: string;
+  titel: string;
+  anlass: string;
+  bereiche: string[];
+  /** Leer, wenn der Anlass keine Schichten hat. */
+  tage: ArbeitsplanTag[];
+}

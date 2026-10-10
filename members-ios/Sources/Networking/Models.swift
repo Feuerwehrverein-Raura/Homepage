@@ -75,6 +75,36 @@ struct Shift: Codable, Identifiable {
     }
 }
 
+/// Fertiger Arbeitsplan aus GET /events/:id/arbeitsplan.
+///
+/// Das Backend gruppiert und zaehlt alles selbst — die App zeichnet nur.
+/// `zellen` laeuft parallel zu `bereiche`; `nil` heisst: zu dieser Zeit gibt
+/// es in diesem Bereich keine Schicht (schwarze Zelle).
+struct Arbeitsplan: Decodable {
+    let verein: String?
+    let titel: String?
+    let anlass: String?
+    let bereiche: [String]
+    let tage: [Tag]
+
+    struct Tag: Decodable {
+        let datum: String?
+        let bezeichnung: String?
+        let zeilen: [Zeile]
+    }
+
+    struct Zeile: Decodable {
+        let zeit: String?
+        let zellen: [Zelle?]
+    }
+
+    struct Zelle: Decodable {
+        let besetzt: [String]?
+        let gebraucht: Int?
+        let offen: Int?
+    }
+}
+
 struct MemberProfile: Codable {
     let id: String?
     let vorname: String?

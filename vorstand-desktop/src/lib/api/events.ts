@@ -1,5 +1,10 @@
 import { apiClient } from "./client";
-import type { Event, EventCreate, ShiftCreate } from "@/lib/types/event";
+import type {
+  Arbeitsplan,
+  Event,
+  EventCreate,
+  ShiftCreate,
+} from "@/lib/types/event";
 
 export async function getEvents(): Promise<Event[]> {
   return await apiClient.get<Event[]>("/events");
@@ -17,6 +22,11 @@ export async function getProposals(): Promise<Event[]> {
 
 export async function getEvent(id: string): Promise<Event> {
   return await apiClient.get<Event>(`/events/${id}`);
+}
+
+/** Fertig aufgebauter Arbeitsplan eines Anlasses (Tabelle kommt vom Backend). */
+export async function getArbeitsplan(id: string): Promise<Arbeitsplan> {
+  return await apiClient.get<Arbeitsplan>(`/events/${id}/arbeitsplan`);
 }
 
 export async function createEvent(data: EventCreate): Promise<Event> {

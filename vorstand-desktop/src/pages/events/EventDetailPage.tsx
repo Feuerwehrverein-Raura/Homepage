@@ -14,6 +14,7 @@ import {
 } from "@/lib/api/events";
 import { OrganizerNotes } from "./OrganizerNotes";
 import { EventMaterials } from "./EventMaterials";
+import { ArbeitsplanView } from "./ArbeitsplanView";
 import type {
   Event,
   Shift,
@@ -33,6 +34,7 @@ import {
   XCircle,
   AlertCircle,
   FileText,
+  ClipboardList,
   Paperclip,
   ArrowLeftRight,
   UserPlus,
@@ -190,9 +192,11 @@ export function EventDetailPage() {
     type: "error" | "success";
     text: string;
   } | null>(null);
-  const [pdfLoading, setPdfLoading] = useState<"aushang" | "teilnehmer" | null>(
-    null
-  );
+  const [pdfLoading, setPdfLoading] = useState<
+    "aushang" | "teilnehmer" | "arbeitsplan" | null
+  >(null);
+  // Arbeitsplan-Ansicht (Modal) — gleicher Aufbau wie auf der Website.
+  const [arbeitsplanOpen, setArbeitsplanOpen] = useState(false);
 
   // Bestehende Schicht bearbeiten (Modal) — nutzt updateShift/deleteShift.
   const [editShiftId, setEditShiftId] = useState<string | null>(null);
@@ -346,6 +350,32 @@ export function EventDetailPage() {
         type: "error",
         text:
           e instanceof Error ? e.message : "Fehler beim Erstellen der Liste",
+      });
+    } finally {
+      setPdfLoading(null);
+    }
+  };
+
+  // Anders als die Ansicht im Modal erzeugt das Backend dieses PDF: Es soll
+  // aussehen wie der Aushang, und das Layout liegt dort.
+  const handleArbeitsplanPdf = async () => {
+    if (!event) return;
+    setNotice(null);
+    setPdfLoading("arbeitsplan");
+    try {
+      const safe = event.title.replace(/[^a-zA-Z0-9]/g, "_");
+      await downloadPdf(
+        `/events/${event.id}/pdf/arbeitsplan`,
+        `Arbeitsplan_${safe}.pdf`
+      );
+    } catch (e) {
+      setArbeitsplanOpen(false);
+      setNotice({
+        type: "error",
+        text:
+          e instanceof Error
+            ? e.message
+            : "Fehler beim Erstellen des Arbeitsplans",
       });
     } finally {
       setPdfLoading(null);
@@ -868,6 +898,16 @@ export function EventDetailPage() {
                 Person hinzufuegen
               </button>
             )}
+            {/* Nur bei Anlaessen mit Schichten — ohne gibt es keinen Plan. */}
+            {hasShifts && (
+              <button
+                onClick={() => setArbeitsplanOpen(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md border text-sm hover:bg-muted transition-colors"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Arbeitsplan
+              </button>
+            )}
             {allRegistrations.length > 0 && (
               <button
                 onClick={handleTeilnehmerlistePdf}
@@ -1016,6 +1056,58 @@ export function EventDetailPage() {
 
       {/* Notizen Tab */}
       {activeTab === "notes" && <OrganizerNotes eventId={event.id} />}
+
+      {/* Arbeitsplan Modal */}
+      {arbeitsplanOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border rounded-lg max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4">
+              <h3 className="font-semibold text-lg">Arbeitsplan</h3>
+              <button
+                onClick={() => setArbeitsplanOpen(false)}
+                className="p-1 rounded-md opacity-70 hover:opacity-100 hover:bg-muted"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-6 overflow-y-auto">
+              <ArbeitsplanView eventId={event.id} />
+            </div>
+            <div className="flex justify-end gap-2 px-6 py-4 border-t mt-4">
+              <button
+                onClick={handleArbeitsplanPdf}
+                disabled={pdfLoading === "arbeitsplan"}
+                className="flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+              >
+                {pdfLoading === "arbeitsplan" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                PDF herunterladen
+              </button>
+              {/* Bearbeitet wird im Anmeldungen-Tab darunter, also fuehrt
+                  "Bearbeiten" dorthin zurueck. */}
+              <button
+                onClick={() => {
+                  setArbeitsplanOpen(false);
+                  setActiveTab("registrations");
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-md border text-sm hover:bg-muted"
+              >
+                <Pencil className="h-4 w-4" />
+                Bearbeiten
+              </button>
+              <button
+                onClick={() => setArbeitsplanOpen(false)}
+                className="px-4 py-2 rounded-md border text-sm hover:bg-muted"
+              >
+                Schließen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Angemeldete informieren Modal */}
       {notifyOpen && (

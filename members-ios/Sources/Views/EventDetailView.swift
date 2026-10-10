@@ -7,6 +7,7 @@ struct EventDetailView: View {
     @State private var event: Event?
     @State private var showRegistration = false
     @State private var registered = false
+    @State private var showArbeitsplan = false
 
     private var current: Event { event ?? fallback }
 
@@ -46,6 +47,14 @@ struct EventDetailView: View {
                     ForEach(shifts) { shift in
                         ShiftRow(shift: shift)
                     }
+                    Button {
+                        showArbeitsplan = true
+                    } label: {
+                        Label("Arbeitsplan ansehen", systemImage: "list.clipboard")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.top, 4)
                 }
 
             }
@@ -88,6 +97,12 @@ struct EventDetailView: View {
         .sheet(isPresented: $showRegistration) {
             RegistrationSheet(event: current) {
                 registered = true
+                Task { await load() }
+            }
+            .environmentObject(auth)
+        }
+        .sheet(isPresented: $showArbeitsplan) {
+            ArbeitsplanView(event: current) {
                 Task { await load() }
             }
             .environmentObject(auth)

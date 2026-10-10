@@ -278,6 +278,10 @@ interface EventsApi {
         @Path("attId") attId: String
     ): Response<ResponseBody>
 
+    /** Arbeitsplan als fertig gruppierte Tabelle (oeffentlich, kein Auth noetig). */
+    @GET("events/{id}/arbeitsplan")
+    suspend fun getArbeitsplan(@Path("id") id: String): Response<ch.fwvraura.members.data.model.Arbeitsplan>
+
     // ============================================================
     // PDFs (binaer). Endpunkte sind serverseitig oeffentlich lesbar.
     // ============================================================
@@ -285,6 +289,11 @@ interface EventsApi {
     @Streaming
     @GET("events/{id}/pdf/teilnehmerliste")
     suspend fun getTeilnehmerlistePdf(@Path("id") id: String): Response<ResponseBody>
+
+    /** Arbeitsplan (Schicht-Tabelle mit bestaetigten Helfern) als PDF. */
+    @Streaming
+    @GET("events/{id}/pdf/arbeitsplan")
+    suspend fun getArbeitsplanPdf(@Path("id") id: String): Response<ResponseBody>
 
     @Streaming
     @GET("events/{id}/pdf")

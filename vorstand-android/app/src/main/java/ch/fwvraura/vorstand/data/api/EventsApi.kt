@@ -75,6 +75,14 @@ interface EventsApi {
     suspend fun getEvent(@Path("id") id: String): Response<Event>
 
     /**
+     * Laedt den fertig aufgebauten Arbeitsplan eines Events (Tage, Zeilen,
+     * Felder). Gruppiert wird im Backend, die App zeichnet nur.
+     * 404 wenn das Event nicht existiert; "tage" leer ohne Schichten.
+     */
+    @GET("events/{id}/arbeitsplan")
+    suspend fun getArbeitsplan(@Path("id") id: String): Response<Arbeitsplan>
+
+    /**
      * Erstellt ein neues Event.
      *
      * Sendet einen POST-Request an "events" mit den Event-Daten im Request-Body.
@@ -312,6 +320,14 @@ interface EventsApi {
     @Streaming
     @GET("events/{id}/pdf/teilnehmerliste")
     suspend fun getTeilnehmerlistePdf(@Path("id") id: String): Response<ResponseBody>
+
+    /**
+     * Laedt den Arbeitsplan eines Events als PDF-Binaerstrom.
+     * Das Layout (wie der Aushang) erzeugt das Backend.
+     */
+    @Streaming
+    @GET("events/{id}/pdf/arbeitsplan")
+    suspend fun getArbeitsplanPdf(@Path("id") id: String): Response<ResponseBody>
 
     // =====================================================================
     // Rezepte & Einkaufsliste (read-only Proxy zur Inventar-API; Zugriff

@@ -63,6 +63,16 @@
                         android:textSize="12sp" />
                 </LinearLayout>
 
+                <!-- Arbeitsplan: nur sichtbar bei Anlaessen mit Schichten -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnArbeitsplan"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Arbeitsplan"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnNotifyRegistrants"
                     style="@style/Widget.Material3.Button.OutlinedButton"
