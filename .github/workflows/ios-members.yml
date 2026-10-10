@@ -6,10 +6,12 @@ on:
     paths:
       - 'members-ios/**'
       - '.github/workflows/ios-members.yml'
+      - 'docker/backend-events/test/fixtures/**'
   pull_request:
     paths:
       - 'members-ios/**'
       - '.github/workflows/ios-members.yml'
+      - 'docker/backend-events/test/fixtures/**'
 
 jobs:
   build:
@@ -43,3 +45,36 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      # Vertragstests: dekodieren docker/backend-events/test/fixtures/
+      # arbeitsplan.json (dieselbe Datei wie der Backend-Test). Simulator
+      # wird dynamisch gewaehlt — welche iPhones/Runtimes das Runner-Image
+      # mitbringt, aendert sich mit jeder Xcode-Version.
+      - name: Pick iOS Simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devs = json.load(sys.stdin)["devices"]
+          cands = [(rt, d) for rt, ds in devs.items() if ".iOS-" in rt
+                   for d in ds if d["name"].startswith("iPhone")]
+          if not cands:
+              sys.exit("Kein verfuegbarer iPhone-Simulator")
+          cands.sort(key=lambda c: [int(x) for x in c[0].rsplit("iOS-", 1)[1].split("-")])
+          rt, d = cands[-1]
+          print(d["name"], rt, file=sys.stderr)
+          print(d["udid"])
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Run unit tests
+        working-directory: members-ios
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project FWVMembers.xcodeproj \
+            -scheme FWVMembers \
+            -configuration Debug \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            test

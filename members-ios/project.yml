@@ -31,3 +31,37 @@ targets:
           Damit du dein Profilfoto direkt aufnehmen kannst.
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+  FWVMembersTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - Tests
+      # Vertrag mit dem Backend: dieselbe Datei, die auch der Backend-Test
+      # prueft. Bewusst referenziert statt kopiert — aendert sich das Format,
+      # wird dieser Test rot. Siehe docker/backend-events/test/fixtures/README.md.
+      - path: ../docker/backend-events/test/fixtures/arbeitsplan.json
+        buildPhase: resources
+    dependencies:
+      - target: FWVMembers
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ch.fwvraura.members.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+schemes:
+  FWVMembers:
+    build:
+      targets:
+        FWVMembers: all
+        FWVMembersTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - FWVMembersTests
+    archive:
+      config: Release

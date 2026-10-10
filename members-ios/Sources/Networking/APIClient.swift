@@ -14,21 +14,27 @@ struct APIClient {
         case noResponse
     }
 
+    /// Decoder fuer alle Antworten. Die Unit-Tests dekodieren die
+    /// Vertrags-Fixtures damit, damit App und Backend nicht auseinanderlaufen.
+    static func makeDecoder() -> JSONDecoder {
+        JSONDecoder()
+    }
+
     func get<T: Decodable>(_ path: String) async throws -> T {
         let data = try await send(path: path, method: "GET", body: nil)
-        return try JSONDecoder().decode(T.self, from: data)
+        return try Self.makeDecoder().decode(T.self, from: data)
     }
 
     func post<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
         let encoded = try JSONEncoder().encode(body)
         let data = try await send(path: path, method: "POST", body: encoded)
-        return try JSONDecoder().decode(T.self, from: data)
+        return try Self.makeDecoder().decode(T.self, from: data)
     }
 
     func put<Body: Encodable, T: Decodable>(_ path: String, body: Body) async throws -> T {
         let encoded = try JSONEncoder().encode(body)
         let data = try await send(path: path, method: "PUT", body: encoded)
-        return try JSONDecoder().decode(T.self, from: data)
+        return try Self.makeDecoder().decode(T.self, from: data)
     }
 
     /// PUT ohne verwertbare Antwort — das Backend schickt bei manchen
@@ -69,7 +75,7 @@ struct APIClient {
             body: body,
             contentType: "multipart/form-data; boundary=\(boundary)"
         )
-        return try JSONDecoder().decode(T.self, from: response)
+        return try Self.makeDecoder().decode(T.self, from: response)
     }
 
     /// Rohe Bytes holen — fuer Anhaenge und PDFs.
