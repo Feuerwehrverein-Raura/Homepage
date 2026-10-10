@@ -194,6 +194,11 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
                 .filter(Boolean);
             if (schichten.length === 0) return;
 
+            // Zeitfenster nicht ueber den Seitenumbruch reissen: passt der
+            // Block nicht mehr, neue Seite (grob 13 pt pro Zeile).
+            const hoehe = 14 + schichten.length * 13;
+            if (doc.y + hoehe > doc.page.height - doc.page.margins.bottom) doc.addPage();
+
             doc.fontSize(10).font('Helvetica-Bold').text(`  ${zeile.zeit.replace('-', ' - ')}`);
             schichten.forEach(s => {
                 const helfer = s.besetzt.length > 0 ? s.besetzt.join(', ') : '(noch offen)';
@@ -206,7 +211,8 @@ function renderArbeitsplanPdf(plan, { compress = true } = {}) {
 
     doc.moveDown(2);
     doc.fontSize(8).font('Helvetica').fillColor('#666666')
-        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH')} um ${new Date().toLocaleTimeString('de-CH')}`, { align: 'center' });
+        // Der Server laeuft auf UTC; ohne Zeitzone stand hier 15:57 statt 17:57.
+        .text(`Erstellt am ${new Date().toLocaleDateString('de-CH', { timeZone: 'Europe/Zurich' })} um ${new Date().toLocaleTimeString('de-CH', { timeZone: 'Europe/Zurich' })}`, { align: 'center' });
 
     doc.end();
     return done;
