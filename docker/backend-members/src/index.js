@@ -1155,45 +1155,14 @@ async function issueMemberJwt(memberId, email, name, benutzername, dauer) {
     );
 }
 
-// DEUTSCH: App-Login mit E-Mail + Passwort (kein Browser). Prueft das Passwort
-// ZUERST direkt gegen Authentik (das bestehende Web-Passwort funktioniert sofort,
-// ohne vorherigen Reset); Fallback ist der lokale bcrypt-Hash (z.B. Mitglied ohne
-// Authentik-Konto oder per App-Reset gesetzt). Gibt ein Member-JWT zurueck.
-app.post('/auth/member/login', async (req, res) => {
-    const clientIp = getClientIp(req);
-    try {
-        // Das Feld heisst aus Ruecksicht auf die bestehende App weiter
-        // "email", nimmt aber auch den Benutzernamen. Sieben Mitglieder
-        // haben keine E-Mail-Adresse und koennten sich sonst nie anmelden.
-        const { email, password } = req.body || {};
-        if (!email || !password) return res.status(400).json({ error: 'Anmeldename und Passwort erforderlich' });
-        const r = await pool.query(
-            'SELECT id, email, benutzername, vorname, nachname, password_hash FROM members ' +
-            'WHERE LOWER(email) = LOWER($1) OR LOWER(benutzername) = LOWER($1) LIMIT 1',
-            [email]
-        );
-        const m = r.rows[0];
-        if (!m) {
-            await logAudit(pool, 'MEMBER_LOGIN_FAILED', null, email, clientIp, { reason: 'unbekannter Anmeldename' });
-            return res.status(401).json({ error: 'Anmeldename oder Passwort ist falsch.' });
-        }
-        // 1) Direkt gegen Authentik pruefen (bestehendes Passwort, kein Reset noetig).
-        // Ohne E-Mail gibt es kein Authentik-Konto — dann gleich der lokale
-        // Hash, den das Login-Datenblatt setzt.
-        let ok = m.email ? await verifyAuthentikPassword(m.email, String(password)) : false;
-        // 2) Fallback: lokaler bcrypt-Hash (Mitglied ohne Authentik-Konto / App-Reset).
-        if (!ok && m.password_hash) ok = await bcrypt.compare(String(password), m.password_hash);
-        if (!ok) {
-            await logAudit(pool, 'MEMBER_LOGIN_FAILED', m.id, email, clientIp, { reason: 'wrong_password' });
-            return res.status(401).json({ error: 'Anmeldename oder Passwort ist falsch.' });
-        }
-        const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
-        const token = await issueMemberJwt(m.id, m.email, name, m.benutzername);
-        await logAudit(pool, 'MEMBER_LOGIN_SUCCESS', m.id, email, clientIp, {});
-        res.json({ success: true, token, user: { id: m.id, email: m.email, name } });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+// DEUTSCH: App-Login mit E-Mail + Passwort ohne Browser — abgeschaltet (11.10.2026).
+// Keine App nutzte ihn (Anmeldung laeuft ueber Authentik im Browser oder den
+// QR-Code), er war aber offen und ohne Begrenzung der Versuche: man haette
+// darueber Authentik-Passwoerter von Mitgliedern durchprobieren koennen.
+app.post('/auth/member/login', (req, res) => {
+    res.status(410).json({
+        error: 'Die Anmeldung mit Passwort direkt in der App gibt es nicht mehr. Bitte über «Anmelden» (Authentik) oder mit dem QR-Code anmelden.'
+    });
 });
 
 // DEUTSCH: Passwort vergessen -> 6-stelliger Code per E-Mail (15 Min gueltig).
@@ -1258,9 +1227,6 @@ app.post('/auth/member/reset', async (req, res) => {
             const okAk = await setAuthentikPassword(m.authentik_user_id, String(new_password));
             if (!okAk) return res.status(502).json({ error: 'Passwort konnte nicht gesetzt werden. Bitte später erneut versuchen.' });
         }
-        // Lokalen bcrypt-Hash speichern (App-Login).
-        const hash = await bcrypt.hash(String(new_password), 10);
-        await pool.query('UPDATE members SET password_hash = $1 WHERE id = $2', [hash, m.id]);
         await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
         const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
         const token = await issueMemberJwt(m.id, m.email, name, m.benutzername);
@@ -3731,7 +3697,7 @@ app.post('/members/:id/reset-password', authenticateVorstand, async (req, res) =
             return res.status(400).json({ error: 'Mitglied hat keinen Authentik-Account' });
         }
 
-        const tempPassword = `FWV-${Math.floor(100000 + Math.random() * 900000)}`;
+        const tempPassword = `FWV-${crypto.randomInt(100000, 1000000)}`;
         await setAuthentikUserPassword(authentik_user_id, tempPassword);
 
         await logAudit(pool, 'MEMBER_PASSWORD_RESET', null, req.user.email, getClientIp(req), {
@@ -3745,7 +3711,7 @@ app.post('/members/:id/reset-password', authenticateVorstand, async (req, res) =
     }
 });
 
-// DEUTSCH: Login-Datenblatt — setzt ein bekanntes Passwort (App-bcrypt + Authentik),
+// DEUTSCH: Login-Datenblatt — setzt ein bekanntes Authentik-Passwort (nur mit Konto),
 // stellt einen QR-Login-Token sicher und gibt beides im Klartext zurück, damit der
 // Vorstand pro Mitglied eine Login-Seite drucken kann (v.a. für ältere Mitglieder).
 app.post('/members/:id/datenblatt', authenticateVorstand, async (req, res) => {
@@ -3755,15 +3721,16 @@ app.post('/members/:id/datenblatt', authenticateVorstand, async (req, res) => {
         if (m.rows.length === 0) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
         const member = m.rows[0];
 
-        // Lesbares Passwort erzeugen (z.B. FWV-482913)
-        const password = `FWV-${Math.floor(100000 + Math.random() * 900000)}`;
-
-        // Lokalen bcrypt-Hash setzen (App-Login) + Authentik-Passwort (Web-Login, falls Konto)
-        const hash = await bcrypt.hash(password, 10);
-        await pool.query('UPDATE members SET password_hash = $1 WHERE id = $2', [hash, id]);
+        // Passwort nur fuer Mitglieder mit Authentik-Konto (Website und
+        // "Anmelden" in der App). Ohne Konto gibt es kein Passwort, das
+        // irgendwo funktioniert — dann bleibt nur der QR-Code.
+        let password = null;
         if (member.authentik_user_id) {
-            try { await setAuthentikUserPassword(member.authentik_user_id, password); }
-            catch (e) { console.error('Authentik-Passwort (Datenblatt) fehlgeschlagen:', e.message); }
+            const kandidat = `FWV-${crypto.randomInt(100000, 1000000)}`;
+            try {
+                await setAuthentikUserPassword(member.authentik_user_id, kandidat);
+                password = kandidat;
+            } catch (e) { console.error('Authentik-Passwort (Datenblatt) fehlgeschlagen:', e.message); }
         }
 
         // QR-Login-Token sicherstellen (bestehenden wiederverwenden, sonst neu)

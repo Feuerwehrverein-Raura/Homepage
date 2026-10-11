@@ -31,10 +31,10 @@ Authorization: Bearer <token>
 ```
 
 **Mitglieder-Token:** RS256-signiert von Authentik, validiert mit Public Key —
-oder (QR-Code, Anmeldebon, App-Passwort, Passwort-Reset) HS256-signiert von
+oder (QR-Code, Anmeldebon, Passwort-Reset) HS256-signiert von
 api-members, `type: "member"`, mit denselben Authentik-Gruppen im
 `groups`-Claim. Siehe
-[Authentifizierung](/api/authentifizierung#mitglieder-token-qr-code-anmeldebon-app-passwort-passwort-reset).
+[Authentifizierung](/api/authentifizierung#mitglieder-token-qr-code-anmeldebon-passwort-reset).
 **Vorstand-Token:** HS256-signiert, 8 Stunden gültig, enthält `type: "vorstand"`.
 
 ### API Key (intern)

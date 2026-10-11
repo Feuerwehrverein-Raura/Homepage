@@ -51,12 +51,14 @@ Tokens sind 8 Stunden gültig. Nach Ablauf muss ein neuer Login durchgeführt we
 | materialwart | vorstand | Lesen, Erstellen, Bearbeiten |
 | beisitzer | vorstand | Lesen, Erstellen, Bearbeiten |
 
-## Mitglieder-Token (QR-Code, Anmeldebon, App-Passwort, Passwort-Reset)
+## Mitglieder-Token (QR-Code, Anmeldebon, Passwort-Reset)
 
 Neben dem Login über Authentik (OIDC, RS256) stellt api-members selbst ein
 Token für Mitglieder aus — bei `POST /auth/member/qr-login`,
-`POST /auth/member/code-login` (Anmeldebon), `POST /auth/member/login`
-(App-Passwort) und `POST /auth/member/reset`. Es ist HS256-signiert, hat
+`POST /auth/member/code-login` (Anmeldebon) und `POST /auth/member/reset`.
+(`POST /auth/member/login`, das App-Passwort, ist seit 11.10.2026
+abgeschaltet: keine App nutzte es, und es war ohne Begrenzung der Versuche
+offen.) Es ist HS256-signiert, hat
 keinen Issuer und gilt 8 Stunden (Anmeldebon: 7 Tage):
 
 ```json

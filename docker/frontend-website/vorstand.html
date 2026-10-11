@@ -4451,14 +4451,16 @@
   <div class="cols">
     <div style="flex:1">
       <h2>Deine Zugangsdaten</h2>
-      <div class="box cred">E-Mail / Benutzer:<br><code>${esc(data.email) || '—'}</code><br><br>Passwort:<br><code>${esc(data.password)}</code></div>
+      ${data.password
+        ? `<div class="box cred">E-Mail / Benutzer:<br><code>${esc(data.email) || '—'}</code><br><br>Passwort:<br><code>${esc(data.password)}</code><br><span class="small">Für fwv-raura.ch und «Anmelden» in der App</span></div>`
+        : `<div class="box cred">Anmeldung mit dem QR-Code unten.<br><span class="small">Ohne Vereins-Konto gibt es kein Passwort.</span></div>`}
       <h2>So meldest du dich an</h2>
       <ol>
         <li>App „FWV Mitglieder" installieren (QR rechts scannen).</li>
         <li>App öffnen und auf <b>„QR-Code scannen"</b> tippen.</li>
         <li>Den grossen QR-Code unten scannen — fertig, du bist angemeldet.</li>
       </ol>
-      <p class="small">Alternativ: in der App mit E-Mail und Passwort (oben) anmelden.</p>
+      ${data.password ? '<p class="small">Alternativ: in der App auf «Anmelden» tippen und mit E-Mail und Passwort (oben) anmelden.</p>' : ''}
     </div>
     <div class="qrbox"><div class="small">App installieren</div>${appImg}</div>
   </div>
@@ -4475,7 +4477,9 @@
                 setTimeout(() => { try { w.print(); } catch (e) {} }, 400);
 
                 const resultEl = document.getElementById('password-result');
-                resultEl.innerHTML = `<strong>Datenblatt erstellt.</strong> Neues Passwort: <code class="bg-white px-2 py-1 rounded border select-all">${esc(data.password)}</code> — das Druckfenster wurde geöffnet.`;
+                resultEl.innerHTML = data.password
+                    ? `<strong>Datenblatt erstellt.</strong> Neues Passwort: <code class="bg-white px-2 py-1 rounded border select-all">${esc(data.password)}</code> — das Druckfenster wurde geöffnet.`
+                    : `<strong>Datenblatt erstellt.</strong> Kein Vereins-Konto — Anmeldung nur mit dem QR-Code. Das Druckfenster wurde geöffnet.`;
                 resultEl.classList.remove('hidden');
             } catch (error) {
                 console.error('Datenblatt error:', error);

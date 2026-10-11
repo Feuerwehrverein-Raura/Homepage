@@ -80,14 +80,16 @@ Gibt das aktuelle Mitglieder-Profil zurück.
 ```http
 POST /auth/member/qr-login      {"token": "<qr-code>"}
 POST /auth/member/code-login    {"code": "<anmeldebon>"}
-POST /auth/member/login         {"email": "<e-mail oder benutzername>", "password": "..."}
 POST /auth/member/reset         {"email": "...", "code": "123456", "new_password": "..."}
 ```
 
 Geben ein Mitglieder-Token zurück (HS256, `type: "member"`, 8 h; Anmeldebon
 7 Tage). Es enthält im `groups`-Claim die aktuellen Authentik-Gruppen des
 Mitglieds — dieselben Rechte wie nach dem Login über Authentik. Details:
-[Authentifizierung](/api/authentifizierung#mitglieder-token-qr-code-anmeldebon-app-passwort-passwort-reset).
+[Authentifizierung](/api/authentifizierung#mitglieder-token-qr-code-anmeldebon-passwort-reset).
+
+`POST /auth/member/login` (Anmeldung mit Passwort direkt in der App) ist
+seit 11.10.2026 abgeschaltet und antwortet mit `410`.
 
 ### Mitglieder-Token prüfen
 ```http
