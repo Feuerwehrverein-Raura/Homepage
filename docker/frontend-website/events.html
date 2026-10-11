@@ -804,7 +804,7 @@
                                         <div class="space-y-2">
                                             <div class="flex items-center">
                                                 <span class="mr-2">📅</span>
-                                                <span>${event.datumOffen ? 'Termin noch offen' : this.formatDate(event.startDate)}</span>
+                                                <span>${event.datumOffen ? 'Datum noch offen' : this.formatDate(event.startDate)}</span>
                                             </div>
                                             ${event.datumOffen ? '' : `
                                             <div class="flex items-center">
@@ -881,7 +881,7 @@
                             <div class="space-y-2 text-sm text-gray-500 mb-4">
                                 <div class="flex items-center">
                                     <span class="mr-2">📅</span>
-                                    <span>${event.datumOffen ? 'Termin noch offen' : this.formatDate(event.startDate)}</span>
+                                    <span>${event.datumOffen ? 'Datum noch offen' : this.formatDate(event.startDate)}</span>
                                 </div>
                                 <div class="flex items-center">
                                     <span class="mr-2">📍</span>
@@ -1109,8 +1109,8 @@
                             <div class="space-y-3">
                                 <h4 class="font-semibold text-gray-800 text-lg">📅 Termin</h4>
                                 <div class="space-y-2 text-sm">
-                                    <div><strong>Datum:</strong> ${this.formatDate(event.startDate)}</div>
-                                    <div><strong>Zeit:</strong> ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</div>
+                                    <div><strong>Datum:</strong> ${event.datumOffen ? 'Datum noch offen' : this.formatDate(event.startDate)}</div>
+                                    ${event.datumOffen ? '' : `<div><strong>Zeit:</strong> ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</div>`}
                                     <div><strong>Ort:</strong> ${event.location}</div>
                                 </div>
                             </div>

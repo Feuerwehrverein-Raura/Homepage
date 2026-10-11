@@ -146,8 +146,17 @@ function istAktuell(event, zeit = jetzt()) {
 
 // Gruende, aus denen am ganzen Anlass keine Anmeldung (mehr) geht — null,
 // wenn nichts dagegen spricht.
+// "Termin steht noch nicht fest" (Haekchen im Vorstand, Spalte datum_offen,
+// seit Commit 27b473c): start_date ist nur ein Platzhalter (meist 31.12.).
+// Angezeigt wird "Datum noch offen", nie das Platzhalter-Datum, und
+// angemeldet werden kann noch nicht.
+function istDatumOffen(event) {
+    return event.datum_offen === true;
+}
+
 function sperrgrund(event, zeit) {
     if (event.status === 'cancelled') return 'Anlass abgesagt';
+    if (istDatumOffen(event)) return 'Anmeldung, sobald das Datum feststeht';
     if (event.status === 'completed' || !istAktuell(event, zeit)) return 'Anlass ist vorbei';
     const frist = zerlege(event.registration_deadline);
     if (frist) {
@@ -207,8 +216,11 @@ function anlassAnsicht(event, { belegtePersonen = 0, kannBearbeiten = false, zei
         ...event,
         shifts: mitSchichten,
         app: {
-            datum_text: anlassDatumText(event.start_date, event.end_date),
-            zeit_text: anlassZeitText(event.start_date, event.end_date),
+            datum_text: istDatumOffen(event) ? 'Datum noch offen' : anlassDatumText(event.start_date, event.end_date),
+            zeit_text: istDatumOffen(event) ? null : anlassZeitText(event.start_date, event.end_date),
+            datum_offen: istDatumOffen(event),
+            // Abschnitt in der Liste: anstehende Anlaesse, dann Ideen ohne Datum
+            gruppe: istDatumOffen(event) ? 'datum_offen' : 'kommend',
             abgesagt: event.status === 'cancelled',
             anmeldung: {
                 moeglich: grund === null,
@@ -268,7 +280,7 @@ function kalenderAnsicht(items, { vorstand = false } = {}) {
 module.exports = {
     ANMELDEPFLICHTIGE_KATEGORIEN, KATEGORIEN, BEREICHE,
     jetzt, zuerich, zerlege, datumLang, datumKurz, zeitspanne,
-    anlassDatumText, anlassZeitText, zeitpunktText, anmeldungPflicht, plaetzeText,
+    anlassDatumText, anlassZeitText, istDatumOffen, zeitpunktText, anmeldungPflicht, plaetzeText,
     istAktuell, sperrgrund, schichtAnsicht, anlassAnsicht,
     anmeldungStatus, schichtBeschriftung, anmeldungAnsicht, kalenderAnsicht
 };

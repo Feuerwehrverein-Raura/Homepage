@@ -2207,7 +2207,7 @@
                                 <span class="text-sm text-gray-700">
                                     <span class="font-medium">Termin steht noch nicht fest</span>
                                     <span class="block text-xs text-gray-500">
-                                        Statt des Datums erscheint überall «Termin noch offen».
+                                        Statt des Datums erscheint überall «Datum noch offen».
                                         Das Datum oben dient nur der Einordnung in der Liste.
                                     </span>
                                 </span>
@@ -7999,7 +7999,7 @@
                             variables: evt ? {
                                 event_title: evt.title || '',
                                 event_date: evt.datum_offen
-                                    ? 'Termin noch offen'
+                                    ? 'Datum noch offen'
                                     : (evt.start_date ? formatEventDate(evt.start_date) : ''),
                                 event_location: evt.location || ''
                             } : {},
@@ -9102,7 +9102,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                 // Steht der Termin noch nicht fest, waere ein Datum schlicht
                 // falsch — das gespeicherte dient nur der Sortierung.
                 .replace(/\{\{event_date\}\}/g, event.datum_offen
-                    ? 'Termin noch offen'
+                    ? 'Datum noch offen'
                     : (event.start_date ? formatEventDate(event.start_date) : ''))
                 .replace(/\{\{event_location\}\}/g, event.location || '')
                 .replace(/\{\{organizer\}\}/g, orgName)
@@ -9119,7 +9119,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             // Bei offenem Termin steht in der Wann-Zeile der Hinweis statt
             // eines Datums, das nur der Sortierung dient.
             const startDate = event.datum_offen
-                ? 'Termin noch offen'
+                ? 'Datum noch offen'
                 : formatEventDate(event.start_date);
             const endDate = event.end_date ? formatEventDate(event.end_date) : '';
             const deadline = event.registration_deadline ? formatEventDate(event.registration_deadline) : '';

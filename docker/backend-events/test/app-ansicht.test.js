@@ -129,3 +129,19 @@ test('Kalender: E-Mail/Brief nur fuer den Vorstand, datum_text, sortiert', () =>
     assert.deepEqual(a.kalenderAnsicht(items, { vorstand: true }).map(i => i.id),
         ['dispatch:1', 'dispatch:2', 'event:a', 'event:b']);
 });
+
+test('Datum offen: "Datum noch offen" statt Platzhalter-Datum, keine Anmeldung', () => {
+    const idee = a.anlassAnsicht({ status: 'draft', datum_offen: true, category: 'Ausflug', start_date: '2026-12-31 00:00:00', shifts: [] },
+        { zeit: new Date('2026-10-11T10:00:00+02:00') });
+    assert.equal(idee.app.datum_text, 'Datum noch offen');
+    assert.equal(idee.app.zeit_text, null);
+    assert.equal(idee.app.datum_offen, true);
+    assert.equal(idee.app.gruppe, 'datum_offen');
+    assert.equal(idee.app.anmeldung.moeglich, false);
+    assert.equal(idee.app.anmeldung.grund, 'Anmeldung, sobald das Datum feststeht');
+    // ein echter Anlass am 31.12. bleibt ein echter Anlass
+    const silvester = a.anlassAnsicht({ status: 'planned', category: 'Sonstiges', start_date: '2026-12-31 19:00:00', shifts: [] },
+        { zeit: new Date('2026-10-11T10:00:00+02:00') });
+    assert.equal(silvester.app.datum_text, 'Donnerstag, 31. Dezember 2026');
+    assert.equal(silvester.app.gruppe, 'kommend');
+});

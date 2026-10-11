@@ -1524,7 +1524,7 @@ function renderUpcomingEvents(events) {
         // DEUTSCH: Datum im Schweizer Format formatieren (z.B. "15. Juni 2026").
         // Steht der Termin noch nicht fest, waere ein Datum irrefuehrend.
         const dateStr = event.datumOffen
-            ? 'Termin noch offen'
+            ? 'Datum noch offen'
             : event.startDate.toLocaleDateString('de-CH', {
                 year: 'numeric',
                 month: 'long',

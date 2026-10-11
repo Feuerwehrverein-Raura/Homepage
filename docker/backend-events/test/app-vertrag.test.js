@@ -54,10 +54,11 @@ async function seed(pool) {
     const ev = (n, slug, title, category, start, end, extra = {}) => q(
         `INSERT INTO events (id, slug, title, category, start_date, end_date, location, status,
                              registration_required, registration_deadline, max_participants, organizer_id,
-                             created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'2026-09-01 12:00:00','2026-09-01 12:00:00')`,
+                             datum_offen, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'2026-09-01 12:00:00','2026-09-01 12:00:00')`,
         [E(n), slug, title, category, start, end, extra.location || null, extra.status || 'planned',
-            extra.registration_required || false, extra.deadline || null, extra.max || null, extra.organizer || null]);
+            extra.registration_required || false, extra.deadline || null, extra.max || null, extra.organizer || null,
+            extra.datum_offen || false]);
     await ev(1, 'chilbi-2026', 'Chilbi 2026', 'Dorffest', '2026-10-17 10:00', '2026-10-18 20:00',
         { location: 'Roter Schopf', deadline: '2026-10-15 23:59', organizer: ERIKA });
     await ev(2, 'ausflug-2026', 'Vereinsausflug', 'Ausflug mit Anmeldung', '2026-10-24 09:00', '2026-10-24 18:00',
@@ -67,6 +68,10 @@ async function seed(pool) {
     await ev(5, 'abgesagt', 'Abgesagter Anlass', 'Sonstiges', '2026-10-20 19:00', null, { status: 'cancelled' });
     await ev(6, 'vergangen', 'Vergangener Anlass', 'Sonstiges', '2026-10-01 19:00', null, { registration_required: true });
     await ev(7, 'laeuft-noch', 'Herbstmarkt', 'Sonstiges', '2026-10-10 18:00', '2026-10-11 16:00', { registration_required: true });
+    // "Datum noch offen" (datum_offen), Platzhalter 31.12. — auch einer vom
+    // Vorjahr darf nicht als "vorbei" herausfallen
+    await ev(8, 'idee-rega', 'Rega Besichtigung', 'Ausflug', '2026-12-31 00:00', null, { status: 'draft', datum_offen: true });
+    await ev(9, 'idee-alt', 'Bäckerei-Besuch', 'Ausflug', '2025-12-31 00:00', null, { status: 'draft', datum_offen: true });
 
     const sh = (n, event, name, bereich, date, von, bis, needed) => q(
         `INSERT INTO shifts (id, event_id, name, bereich, date, start_time, end_time, needed, created_at)
@@ -158,7 +163,7 @@ test('Vertrag Mitglieder-App gegen den echten Server', { skip: !DB && 'TEST_DATA
 
     await t.test('GET /events ohne aktuell: alle wie bisher, mit app-Block', async () => {
         const alle = await hole('/events');
-        assert.equal(alle.length, 7);
+        assert.equal(alle.length, 9);
         assert.equal(alle.find(e => e.id === E(5)).app.anmeldung.grund, 'Anlass abgesagt');
         assert.equal(alle.find(e => e.id === E(6)).app.anmeldung.grund, 'Anlass ist vorbei');
         const einzeln = await hole(`/events/${E(1)}`);

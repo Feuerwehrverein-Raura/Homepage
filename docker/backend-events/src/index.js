@@ -830,13 +830,16 @@ app.get('/events', async (req, res) => {
         }
         // Fuer die Mitglieder-App: nicht abgesagt und noch nicht vorbei
         // (Ende bzw. Beginn ist heute oder spaeter, Ortszeit Zuerich).
+        // Anlaesse mit "Datum noch offen" gehoeren dazu, egal welcher
+        // Platzhalter im Datum steht — und kommen ans Ende.
         if (aktuell === 'true') {
             params.push(appAnsicht.zuerich(appAnsicht.jetzt()).datum);
             query += ` AND COALESCE(e.status, '') <> 'cancelled'`
-                + ` AND COALESCE(e.end_date, e.start_date)::date >= $${params.length}::date`;
+                + ` AND (e.datum_offen IS TRUE OR COALESCE(e.end_date, e.start_date)::date >= $${params.length}::date)`;
+            query += ` ORDER BY (e.datum_offen IS TRUE), CASE WHEN e.datum_offen IS TRUE THEN e.title END, e.start_date, e.id`;
+        } else {
+            query += ' ORDER BY e.start_date, e.id';
         }
-
-        query += ' ORDER BY e.start_date, e.id';
         const eventsResult = await pool.query(query, params);
 
         // Fetch shifts for all events with registration info
@@ -3548,7 +3551,9 @@ app.get('/calendar/items', authenticateAny, async (req, res) => {
                  FROM events
                  WHERE COALESCE(end_date, start_date)::date >= $1::date
                    AND start_date::date <= $2::date
-                   AND COALESCE(status, '') <> 'cancelled'`,
+                   AND COALESCE(status, '') <> 'cancelled'
+                   -- "Datum noch offen": das Datum ist nur ein Platzhalter
+                   AND datum_offen IS NOT TRUE`,
                 [from, to]
             );
             for (const e of ev.rows) {

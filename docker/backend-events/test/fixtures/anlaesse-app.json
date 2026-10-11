@@ -14,6 +14,8 @@
     "app": {
       "datum_text": "Sa 10.10. – So 11.10.2026",
       "zeit_text": "ab 18:00 Uhr",
+      "datum_offen": false,
+      "gruppe": "kommend",
       "abgesagt": false,
       "anmeldung": {
         "moeglich": true,
@@ -43,6 +45,8 @@
     "app": {
       "datum_text": "Sa 17.10. – So 18.10.2026",
       "zeit_text": "ab 10:00 Uhr",
+      "datum_offen": false,
+      "gruppe": "kommend",
       "abgesagt": false,
       "anmeldung": {
         "moeglich": true,
@@ -139,6 +143,8 @@
     "app": {
       "datum_text": "Samstag, 24. Oktober 2026",
       "zeit_text": "09:00–18:00 Uhr",
+      "datum_offen": false,
+      "gruppe": "kommend",
       "abgesagt": false,
       "anmeldung": {
         "moeglich": false,
@@ -168,6 +174,8 @@
     "app": {
       "datum_text": "Samstag, 31. Oktober 2026",
       "zeit_text": "19:00–23:00 Uhr",
+      "datum_offen": false,
+      "gruppe": "kommend",
       "abgesagt": false,
       "anmeldung": {
         "moeglich": false,
@@ -197,10 +205,74 @@
     "app": {
       "datum_text": "Samstag, 7. November 2026",
       "zeit_text": "18:00 Uhr",
+      "datum_offen": false,
+      "gruppe": "kommend",
       "abgesagt": false,
       "anmeldung": {
         "moeglich": false,
         "grund": "Keine Anmeldung nötig",
+        "art": null,
+        "pflicht": false,
+        "anmeldeschluss_text": null,
+        "plaetze_frei": null,
+        "plaetze_text": null
+      },
+      "kann_bearbeiten": false
+    },
+    "shifts": []
+  },
+  {
+    "id": "00000000-0000-0000-0000-e00000000009",
+    "slug": "idee-alt",
+    "title": "Bäckerei-Besuch",
+    "category": "Ausflug",
+    "status": "draft",
+    "location": null,
+    "start_date": "2025-12-31 00:00:00",
+    "end_date": null,
+    "registration_deadline": null,
+    "max_participants": null,
+    "registration_required": false,
+    "app": {
+      "datum_text": "Datum noch offen",
+      "zeit_text": null,
+      "datum_offen": true,
+      "gruppe": "datum_offen",
+      "abgesagt": false,
+      "anmeldung": {
+        "moeglich": false,
+        "grund": "Anmeldung, sobald das Datum feststeht",
+        "art": null,
+        "pflicht": false,
+        "anmeldeschluss_text": null,
+        "plaetze_frei": null,
+        "plaetze_text": null
+      },
+      "kann_bearbeiten": false
+    },
+    "shifts": []
+  },
+  {
+    "id": "00000000-0000-0000-0000-e00000000008",
+    "slug": "idee-rega",
+    "title": "Rega Besichtigung",
+    "category": "Ausflug",
+    "status": "draft",
+    "location": null,
+    "start_date": "2026-12-31 00:00:00",
+    "end_date": null,
+    "registration_deadline": null,
+    "max_participants": null,
+    "registration_required": false,
+    "app": {
+      "datum_text": "Datum noch offen",
+      "zeit_text": null,
+      "datum_offen": true,
+      "gruppe": "datum_offen",
+      "abgesagt": false,
+      "anmeldung": {
+        "moeglich": false,
+        "grund": "Anmeldung, sobald das Datum feststeht",
         "art": null,
         "pflicht": false,
         "anmeldeschluss_text": null,
