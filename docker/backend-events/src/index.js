@@ -2819,7 +2819,9 @@ app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
               WHERE ( LOWER(organizer_email) = ANY($1::text[])
                       OR ($2::uuid IS NOT NULL AND organizer_id = $2::uuid) )
                 AND (status IS NULL OR status NOT IN ('proposed', 'rejected'))
-                AND (end_date IS NULL OR end_date >= NOW() - INTERVAL '7 days')
+                -- ohne Enddatum zaehlt der Beginn — sonst blieben eintaegige
+                -- Anlaesse ohne end_date fuer immer "aktuell"
+                AND COALESCE(end_date, start_date) >= NOW() - INTERVAL '7 days'
               ORDER BY start_date ASC`,
             [identity.emails, identity.memberId]
         );
