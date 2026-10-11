@@ -3,7 +3,8 @@
 // Die Screens kennen keine Routen.
 //
 // Heute gibt es einen Zugang: [ApiLagerZugang] auf die Inventar-API mit dem
-// Authentik-Token der App. Die Vorstand-App bindet dasselbe Paket ein.
+// Token der App (Authentik oder Mitglieder-Token von api-members). Die
+// Vorstand-App bindet dasselbe Paket ein.
 
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
@@ -17,7 +18,9 @@ import 'ui/scanner_screen.dart';
 /// entscheidet damit nur, ob sie den Reiter zeigt.
 const lagerGruppen = ['Lager', 'Vorstand', 'admin'];
 
-/// Darf diese Sitzung ins Lager? (QR-Login und externe Organisatoren nie.)
+/// Darf diese Sitzung ins Lager? Ueber Authentik oder per QR-Code
+/// angemeldet gleich (die Gruppen stehen in beiden Tokens); externe
+/// Organisatoren nie.
 bool hatLagerZugang(Sitzung? sitzung) => sitzung?.hatGruppe(lagerGruppen) ?? false;
 
 abstract class LagerZugang {

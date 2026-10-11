@@ -61,8 +61,10 @@ function authenticateToken(req, res, next) {
 
     // DEUTSCH: 1. Versuch — Member-JWT (HS256, type='member'). Wird durch den QR-Login
     // ausgestellt (POST /auth/member/qr-login, backend-members). Aelteren Mitgliedern
-    // kann so per QR-Code Zugang gegeben werden ohne OIDC-Konto. Bewusst OHNE Vorstand-/
-    // Admin-Gruppen — requireRole('vorstand','admin')-Endpunkte bleiben gesperrt.
+    // kann so per QR-Code Zugang gegeben werden ohne OIDC-Konto. Seit Oktober 2026
+    // traegt das Token die Authentik-Gruppen des Mitglieds (wie ein Authentik-
+    // Token) — ein Vorstand mit QR-Login hat also dieselben Rechte. Die Gruppen
+    // kommen aus dem signierten Token, nicht vom Client.
     // Identisch zum Muster in backend-members/src/auth-middleware.js.
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -106,14 +108,25 @@ function authenticateToken(req, res, next) {
  * DEUTSCH: Prüft ob der Benutzer eine der geforderten Rollen/Gruppen hat.
  * Verwendung: requireRole('vorstand', 'admin')
  */
+/**
+ * DEUTSCH: Hat der Benutzer eine der Rollen/Gruppen? Gross-/Kleinschreibung
+ * egal: Authentik nennt die Gruppe "Vorstand", die Vorstand-Logins (IMAP/QR)
+ * schreiben "vorstand". Gilt fuer Authentik- und Mitglieder-Tokens
+ * (QR-Code, Anmeldebon, App-Passwort) gleich — beide tragen die
+ * Authentik-Gruppen im `groups`-Claim.
+ */
+function hatRolle(user, ...roles) {
+    const gesucht = new Set(roles.map(r => String(r).trim().toLowerCase()));
+    return (user?.groups || []).some(g => typeof g === 'string' && gesucht.has(g.trim().toLowerCase()));
+}
+
 function requireRole(...roles) {
     return (req, res, next) => {
         if (!req.user) {
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
-        const userGroups = req.user.groups || [];
-        const hasRole = roles.some(role => userGroups.includes(role));
+        const hasRole = hatRolle(req.user, ...roles);
 
         if (!hasRole) {
             return res.status(403).json({ error: 'Insufficient permissions' });
@@ -181,6 +194,7 @@ function authenticateAny(req, res, next) {
 module.exports = {
     authenticateToken,  // Authentik OIDC (RS256) — Mitglieder
     requireRole,        // Rollenprüfung
+    hatRolle,           // Rollenprüfung ohne Middleware (Gross-/Kleinschreibung egal)
     requireApiKey,      // API-Key — interne Aufrufe
     authenticateAny     // Kombiniert: API-Key / Vorstand / Authentik
 };

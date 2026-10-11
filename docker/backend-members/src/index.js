@@ -17,6 +17,7 @@ const admin = require('firebase-admin');
 // DEUTSCH: Authentifizierungs-Middleware importieren (Token-Prüfung, Rollen-Prüfung)
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
+const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -453,6 +454,34 @@ app.get('/avatar/:name', (req, res) => {
 // DEUTSCH: Gibt die Benutzer-Info aus dem Authentik-Token zurück
 app.get('/auth/me', authenticateToken, (req, res) => {
     res.json(req.user);
+});
+
+// Token-Pruefung fuer andere Backends (z.B. das Inventar), die das
+// JWT_SECRET nicht kennen: Der Aufrufer reicht das Mitglieder-Token
+// (HS256, type 'member') weiter, das er selbst bekommen hat, und erfaehrt,
+// ob es gilt und welche Gruppen das Mitglied JETZT hat (Authentik, 60 s
+// zwischengespeichert; ohne Konto bzw. bei Fehler die Gruppen aus dem Token).
+// Auskunft gibt es nur ueber das mitgeschickte Token selbst — nie ueber
+// jemand anderen. Authentik- und Vorstand-Tokens sind hier nicht gemeint.
+app.get('/auth/member/pruefen', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const auth = req.headers['authorization'] || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+    const inhalt = mitgliedTokenPruefen(token, process.env.JWT_SECRET);
+    if (!inhalt) return res.status(401).json({ valid: false });
+    try {
+        const r = await pool.query(
+            'SELECT id, email, benutzername, vorname, nachname, authentik_user_id FROM members WHERE id = $1',
+            [inhalt.sub || inhalt.member_id]);
+        const m = r.rows[0];
+        // Mitglied geloescht -> das Token gilt nicht mehr.
+        if (!m) return res.status(401).json({ valid: false });
+        const gruppen = m.authentik_user_id ? await authentikGruppenFuer(m.authentik_user_id) : null;
+        res.json(pruefAntwort(inhalt, m, gruppen));
+    } catch (e) {
+        console.error('GET /auth/member/pruefen:', e.message);
+        res.status(500).json({ valid: false, error: 'Pruefung fehlgeschlagen' });
+    }
 });
 
 // Redirect to Authentik for login
@@ -911,7 +940,7 @@ app.post('/auth/member/qr-login', async (req, res) => {
             return res.status(400).json({ error: 'Token fehlt' });
         }
         const result = await pool.query(`
-            SELECT t.id, t.member_id, m.email, m.vorname, m.nachname
+            SELECT t.id, t.member_id, m.email, m.benutzername, m.vorname, m.nachname
             FROM member_app_tokens t
             JOIN members m ON t.member_id = m.id
             WHERE t.token = $1 AND t.revoked_at IS NULL
@@ -920,18 +949,13 @@ app.post('/auth/member/qr-login', async (req, res) => {
             await logAudit(pool, 'MEMBER_QR_LOGIN_FAILED', null, null, clientIp, { reason: 'Invalid token' });
             return res.status(401).json({ error: 'Ungueltiger oder widerrufener Token' });
         }
-        const { id: tokenId, member_id, email, vorname, nachname } = result.rows[0];
+        const { id: tokenId, member_id, email, benutzername, vorname, nachname } = result.rows[0];
         await pool.query('UPDATE member_app_tokens SET last_used_at = NOW() WHERE id = $1', [tokenId]);
 
-        const jwtToken = jwt.sign(
-            {
-                sub: member_id, member_id, email,
-                name: `${vorname || ''} ${nachname || ''}`.trim(),
-                type: 'member', groups: []
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '8h' }
-        );
+        // Gleiches Token wie die anderen Mitglieder-Logins, mit den
+        // Authentik-Gruppen des Mitglieds (issueMemberJwt).
+        const jwtToken = await issueMemberJwt(
+            member_id, email, `${vorname || ''} ${nachname || ''}`.trim(), benutzername);
         await logAudit(pool, 'MEMBER_QR_LOGIN_SUCCESS', member_id, email, clientIp, { token_id: tokenId });
         res.json({
             success: true,
@@ -1092,10 +1116,40 @@ async function mitgliedZurAnmeldung(req) {
     return null;
 }
 
-function issueMemberJwt(memberId, email, name, benutzername, dauer) {
+// Authentik-Gruppen (Namen) eines Mitglieds, 60 s zwischengespeichert —
+// src/member-gruppen.js. Dieselbe Admin-API wie syncMemberAuthentikGroups.
+const authentikGruppenFuer = gruppenAbfrage({
+    authentikUrl: process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch',
+    apiToken: process.env.AUTHENTIK_API_TOKEN
+});
+
+// Aktuelle Authentik-Gruppen eines Mitglieds (per Mitglieds-UUID), oder null,
+// wenn es kein Authentik-Konto hat bzw. Authentik nicht antwortet.
+async function mitgliedGruppen(memberId) {
+    try {
+        const r = await pool.query('SELECT authentik_user_id FROM members WHERE id = $1', [memberId]);
+        const akId = r.rows[0]?.authentik_user_id;
+        if (!akId) {
+            console.log(`Mitglieder-Token fuer ${memberId}: kein Authentik-Konto — ohne Gruppen`);
+            return null;
+        }
+        return await authentikGruppenFuer(akId);
+    } catch (e) {
+        console.error(`Gruppen fuer Mitglied ${memberId} nicht ermittelbar:`, e.message);
+        return null;
+    }
+}
+
+// Stellt das Mitglieder-Token aus — fuer ALLE Mitglieder-Logins (QR-Code,
+// Anmeldebon, App-Passwort, Passwort-Reset). `groups` sind die aktuellen
+// Authentik-Gruppen, damit diese Anmeldung dieselben Rechte hat wie die
+// ueber Authentik (Lager, Vorstand, admin, ...). Ohne Authentik-Konto oder
+// bei Fehler: leer wie frueher. Die Gruppen gelten bis zum Ablauf des Tokens;
+// GET /auth/member/pruefen liefert jeweils die aktuellen.
+async function issueMemberJwt(memberId, email, name, benutzername, dauer) {
+    const gruppen = await mitgliedGruppen(memberId);
     return jwt.sign(
-        { sub: memberId, member_id: memberId, email, name, benutzername,
-          type: 'member', groups: [] },
+        memberJwtInhalt({ memberId, email, name, benutzername }, gruppen),
         process.env.JWT_SECRET,
         { expiresIn: dauer || '8h' }
     );
@@ -1134,7 +1188,7 @@ app.post('/auth/member/login', async (req, res) => {
             return res.status(401).json({ error: 'Anmeldename oder Passwort ist falsch.' });
         }
         const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
-        const token = issueMemberJwt(m.id, m.email, name, m.benutzername);
+        const token = await issueMemberJwt(m.id, m.email, name, m.benutzername);
         await logAudit(pool, 'MEMBER_LOGIN_SUCCESS', m.id, email, clientIp, {});
         res.json({ success: true, token, user: { id: m.id, email: m.email, name } });
     } catch (err) {
@@ -1182,7 +1236,7 @@ app.post('/auth/member/reset', async (req, res) => {
         const { email, code, new_password } = req.body || {};
         if (!email || !code || !new_password) return res.status(400).json({ error: 'E-Mail, Code und neues Passwort erforderlich' });
         if (String(new_password).length < 8) return res.status(400).json({ error: 'Das Passwort muss mindestens 8 Zeichen haben.' });
-        const r = await pool.query('SELECT id, email, vorname, nachname, authentik_user_id FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
+        const r = await pool.query('SELECT id, email, benutzername, vorname, nachname, authentik_user_id FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
         const m = r.rows[0];
         const rr = m ? (await pool.query('SELECT code_hash, attempts, expires_at FROM member_password_resets WHERE member_id = $1', [m.id])).rows[0] : null;
         if (!m || !rr) return res.status(400).json({ error: 'Kein gültiger Reset angefordert. Bitte „Passwort vergessen" erneut nutzen.' });
@@ -1209,7 +1263,7 @@ app.post('/auth/member/reset', async (req, res) => {
         await pool.query('UPDATE members SET password_hash = $1 WHERE id = $2', [hash, m.id]);
         await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
         const name = `${m.vorname || ''} ${m.nachname || ''}`.trim();
-        const token = issueMemberJwt(m.id, m.email, name);
+        const token = await issueMemberJwt(m.id, m.email, name, m.benutzername);
         await logAudit(pool, 'MEMBER_RESET_SUCCESS', m.id, m.email, clientIp, {});
         res.json({ success: true, token, user: { id: m.id, email: m.email, name } });
     } catch (err) {
@@ -3999,7 +4053,7 @@ app.post('/auth/member/code-login', async (req, res) => {
         // Stelle gibt, an der ein Mitglieder-Token entsteht — nur laenger
         // gueltig: sieben Tage statt acht Stunden, weil der Bon an einem
         // mehrtaegigen Anlass ausgegeben wird.
-        const token = issueMemberJwt(
+        const token = await issueMemberJwt(
             mitglied.id, mitglied.email,
             `${mitglied.vorname} ${mitglied.nachname}`.trim(),
             mitglied.benutzername, ANMELDEBON_SITZUNG);
@@ -4909,6 +4963,9 @@ async function syncMemberAuthentikGroups(authentikUserId, funktion) {
                 }
             );
             console.log(`Synced Authentik groups for user ${authentikUserId}: ${Array.from(shouldBeInGroups).join(', ')}`);
+            // Neue Mitglieder-Tokens und /auth/member/pruefen sollen die
+            // geaenderten Gruppen sofort sehen, nicht erst nach 60 s.
+            authentikGruppenFuer.vergessen(authentikUserId);
         }
 
         return true;

@@ -76,6 +76,30 @@ Authorization: Bearer <token>
 
 Gibt das aktuelle Mitglieder-Profil zurück.
 
+### Mitglieder-Logins ohne Browser
+```http
+POST /auth/member/qr-login      {"token": "<qr-code>"}
+POST /auth/member/code-login    {"code": "<anmeldebon>"}
+POST /auth/member/login         {"email": "<e-mail oder benutzername>", "password": "..."}
+POST /auth/member/reset         {"email": "...", "code": "123456", "new_password": "..."}
+```
+
+Geben ein Mitglieder-Token zurück (HS256, `type: "member"`, 8 h; Anmeldebon
+7 Tage). Es enthält im `groups`-Claim die aktuellen Authentik-Gruppen des
+Mitglieds — dieselben Rechte wie nach dem Login über Authentik. Details:
+[Authentifizierung](/api/authentifizierung#mitglieder-token-qr-code-anmeldebon-app-passwort-passwort-reset).
+
+### Mitglieder-Token prüfen
+```http
+GET /auth/member/pruefen
+Authorization: Bearer <mitglieder-token>
+```
+
+Für andere Backends (z.B. Inventar), die das `JWT_SECRET` nicht kennen.
+200 `{valid: true, member_id, email, name, benutzername, groups, exp}` mit
+den aktuellen Authentik-Gruppen, sonst 401 `{valid: false}`. Prüft nur das
+mitgeschickte Token.
+
 ### Vorstand-Login (IMAP)
 ```http
 POST /auth/vorstand/login

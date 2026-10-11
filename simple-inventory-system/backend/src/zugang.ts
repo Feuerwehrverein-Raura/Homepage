@@ -12,6 +12,13 @@
  * Tokens gelten deshalb nur mit der Gruppe Lager, Vorstand oder admin
  * (Gross-/Kleinschreibung egal) — der `groups`-Claim kommt aus dem
  * Standard-Profil-Mapping von Authentik.
+ *
+ * Dazu die Mitglieder-Tokens von api-members (QR-Code, Anmeldebon,
+ * App-Passwort, Passwort-Reset; HS256, `type: 'member'`, ohne Issuer). Deren
+ * Schluessel kennt das Inventar nicht — es fragt api-members
+ * (GET /auth/member/pruefen), ob das Token gilt und welche Authentik-Gruppen
+ * das Mitglied hat. Danach gilt dieselbe Regel wie fuer die Mitglieder-App
+ * ([MITGLIEDER_TOKEN] statt einer Authentik-Anwendung).
  */
 
 /** Authentik-Anwendung (Provider-Slug) der Inventar-PWA. */
@@ -22,6 +29,50 @@ export const MITGLIEDER_ANWENDUNGEN = ['fwv-members-app', 'fwv-members'] as cons
 
 /** Alle Anwendungen, deren Tokens das Inventar annimmt. */
 export const ANWENDUNGEN = [INVENTAR_ANWENDUNG, ...MITGLIEDER_ANWENDUNGEN] as const;
+
+/**
+ * Pseudo-Anwendung fuer Mitglieder-Tokens von api-members — fuer
+ * [lagerZugang]/[ausleiheZugang] wie eine Mitglieder-Anwendung.
+ */
+export const MITGLIEDER_TOKEN = 'api-members';
+
+/**
+ * Ist das (noch ungepruefte) Token ein Mitglieder-Token von api-members?
+ * Typ 'member' und kein Issuer — Authentik-Tokens haben immer einen.
+ */
+export function istMitgliederToken(claims: { type?: unknown; iss?: unknown } | null | undefined): boolean {
+  return !!claims && claims.type === 'member' && (claims.iss === undefined || claims.iss === null);
+}
+
+/** Antwort von GET /auth/member/pruefen (api-members), gelesen. */
+export type MitgliedPruefung = {
+  memberId: string;
+  email: string;
+  name: string;
+  groups: string[];
+  /** Ablauf des Tokens (Sekunden seit 1970), falls angegeben. */
+  exp: number | null;
+};
+
+/**
+ * Liest die Antwort von api-members. null, wenn das Token nicht gilt oder
+ * die Antwort keinen Sinn ergibt.
+ */
+export function mitgliedPruefungLesen(antwort: unknown): MitgliedPruefung | null {
+  if (!antwort || typeof antwort !== 'object') return null;
+  const a = antwort as Record<string, unknown>;
+  if (a.valid !== true) return null;
+  const id = a.member_id;
+  if ((typeof id !== 'string' || !id) && typeof id !== 'number') return null;
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  return {
+    memberId: String(id),
+    email: text(a.email),
+    name: text(a.name),
+    groups: gruppenAusClaims({ groups: a.groups }),
+    exp: typeof a.exp === 'number' && Number.isFinite(a.exp) ? a.exp : null
+  };
+}
 
 /** Gruppen mit Lager-Berechtigung (klein geschrieben verglichen). */
 export const LAGER_GRUPPEN = ['lager', 'vorstand', 'admin'] as const;

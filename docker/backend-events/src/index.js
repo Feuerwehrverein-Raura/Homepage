@@ -8,7 +8,7 @@ const axios = require('axios');
 const PDFDocument = require('pdfkit');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { authenticateToken, authenticateAny, requireRole } = require('./auth-middleware');
+const { authenticateToken, authenticateAny, requireRole, hatRolle } = require('./auth-middleware');
 const arbeitsplan = require('./arbeitsplan');
 const { formatDateDE, bereichLesbar, renderArbeitsplanPdf } = arbeitsplan;
 const buildArbeitsplan = eventId => arbeitsplan.buildArbeitsplan(pool, eventId);
@@ -749,7 +749,7 @@ function optionalerBenutzer(req) {
     });
 }
 
-const istVorstandBenutzer = user => (user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+const istVorstandBenutzer = user => hatRolle(user, 'vorstand', 'admin');
 
 // Wer fragt an — fuer `app.kann_bearbeiten`: Vorstand darf alles, ein
 // Organisator seinen Anlass (gleiche Regel wie GET /events/organized-by-me),
@@ -977,7 +977,7 @@ const INVENTORY_KEY = process.env.INVENTORY_KEY || process.env.ORDER_API_KEY || 
 
 async function requireEventRecipeAccess(req, res, next) {
     try {
-        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+        const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
         const ev = await pool.query(
             'SELECT slug, organizer_email, organizer_id FROM events WHERE slug = $1 OR id::text = $1 LIMIT 1',
             [req.params.id]
@@ -2171,7 +2171,7 @@ app.post('/registrations', authenticateAny, async (req, res) => {
         const { event_id, member_id, guest_name, guest_email, shift_ids, notes, status } = req.body;
 
         // Vorstand/Admin darf Status direkt setzen, sonst immer 'pending'
-        const isPrivileged = req.user?.groups?.some(g => ['vorstand', 'admin'].includes(g));
+        const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
         const regStatus = (isPrivileged && status) ? status : 'pending';
 
         const result = await pool.query(`
@@ -2947,7 +2947,7 @@ app.get('/events/:id/ics', async (req, res) => {
 app.get('/events/:id/organizer-registrations', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
-        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+        const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
 
         const event = await pool.query('SELECT id, organizer_email, organizer_id FROM events WHERE id = $1', [id]);
         if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -2993,7 +2993,7 @@ app.post('/events/:eventId/registrations/:regId/reject-as-organizer', authentica
 // DEUTSCH: Hilfs-Funktion fuer organisator-auth (E-Mail-Match auf event.organizer_email
 // oder Vorstand/Admin). Setzt req.event als Side-Effect.
 async function ensureOrganizerAccess(req, res, eventId) {
-    const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+    const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
     const event = await pool.query('SELECT id, title, organizer_email, organizer_id FROM events WHERE id = $1', [eventId]);
     if (event.rows.length === 0) { res.status(404).json({ error: 'Event nicht gefunden' }); return null; }
     let isOrganizer = false;
@@ -3111,7 +3111,7 @@ app.delete('/events/:eventId/registrations/:regId/as-organizer', authenticateAny
 app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, res) => {
     try {
         const { id } = req.params;
-        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+        const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
 
         const event = await pool.query('SELECT id, organizer_email, organizer_id FROM events WHERE id = $1', [id]);
         if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -3280,7 +3280,7 @@ app.delete('/events/:eventId/shifts/:shiftId/as-organizer', authenticateAny, asy
 async function organizerActOnRegistration(req, res, newStatus) {
     try {
         const { eventId, regId } = req.params;
-        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+        const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
 
         const event = await pool.query('SELECT id, title, organizer_email, organizer_id FROM events WHERE id = $1', [eventId]);
         if (event.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -3790,7 +3790,7 @@ app.delete('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin
  */
 app.get('/calendar/items', authenticateAny, async (req, res) => {
     try {
-        const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+        const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
         // Fertig fuer die Apps: datum_text, sortiert; E-Mails und Briefe nur
         // fuer den Vorstand (src/app-ansicht.js).
         const fertig = items => res.json(appAnsicht.kalenderAnsicht(items, { vorstand: isPrivileged }));

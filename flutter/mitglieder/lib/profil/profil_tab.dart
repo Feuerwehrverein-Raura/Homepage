@@ -161,25 +161,11 @@ class _ProfilTabState extends State<ProfilTab> {
     );
   }
 
-  /// Ausleihe aus dem Vereinslager: jedes Mitglied mit Authentik-Anmeldung.
-  /// Mit QR-Code angemeldet geht es nicht (die Inventar-API nimmt nur
-  /// Authentik-Tokens an) — dann ein Hinweis statt der Eintraege.
+  /// Ausleihe aus dem Vereinslager: jedes angemeldete Mitglied, ueber
+  /// Authentik oder per QR-Code gleich.
   List<Widget> _ausleihe(BuildContext context) {
     final d = widget.dienste;
-    if (!d.ausleiheMoeglich) {
-      return const [
-        ListTile(
-          key: Key('ausleihe-hinweis'),
-          enabled: false,
-          leading: Icon(Icons.handshake_outlined),
-          title: Text('Material ausleihen'),
-          subtitle: Text(
-            'Nur mit Anmeldung über das Vereinskonto, nicht per QR-Code. '
-            'Zum Ausleihen abmelden und mit dem Vereinskonto anmelden.',
-          ),
-        ),
-      ];
-    }
+    if (!d.ausleiheMoeglich) return const [];
     return [
       ListTile(
         key: const Key('material-ausleihen'),

@@ -61,16 +61,21 @@ class Sitzung {
   final String? name;
   final String? email;
 
-  /// Authentik-Gruppen aus dem Access-Token (z.B. `Lager`, `Vorstand`).
-  /// Leer bei QR-Login, Passwort-Reset und externen Organisatoren — deren
-  /// Tokens haben keine Gruppen. Wird bei jedem Zugriff aus dem aktuellen
-  /// Token gelesen, gilt also auch nach dem Erneuern.
+  /// Authentik-Gruppen des Mitglieds aus dem Access-Token (z.B. `Lager`,
+  /// `Vorstand`) — gleich, ob ueber Authentik oder per QR-Code, Anmeldebon,
+  /// App-Passwort oder Passwort-Reset angemeldet (api-members schreibt die
+  /// Gruppen ins Mitglieder-Token). Leer bei externen Organisatoren. Wird bei
+  /// jedem Zugriff aus dem aktuellen Token gelesen, gilt also auch nach dem
+  /// Erneuern.
   List<String> get gruppen => kontotyp == Kontotyp.mitglied ? jwtGruppen(accessToken) : const [];
 
-  /// Mitglied mit Authentik-Anmeldung (nicht QR-Code, nicht Passwort-Reset,
-  /// kein externer Organisator). Nur solche Tokens nimmt das Inventar an
-  /// (z.B. fuer die Ausleihe).
-  bool get vonAuthentik => kontotyp == Kontotyp.mitglied && jwtVonAuthentik(accessToken);
+  /// Angemeldetes Mitglied — ueber Authentik oder mit einem Mitglieder-Token
+  /// von api-members (QR-Code, Anmeldebon, App-Passwort, Passwort-Reset).
+  /// Beide gelten ueberall gleich, auch im Inventar (z.B. fuer die
+  /// Ausleihe). Externe Organisatoren nie.
+  bool get mitgliedAngemeldet =>
+      kontotyp == Kontotyp.mitglied &&
+      (jwtVonAuthentik(accessToken) || jwtMitgliederToken(accessToken));
 
   /// Ob die Sitzung eine der [namen] als Gruppe hat (Gross-/Kleinschreibung
   /// egal: Authentik kennt `Lager` und `admin`).

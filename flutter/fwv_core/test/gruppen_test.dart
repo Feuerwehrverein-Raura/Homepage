@@ -1,4 +1,5 @@
-// Authentik-Gruppen in der Sitzung (fuer Reiter wie "Lager") und der
+// Authentik-Gruppen in der Sitzung (fuer Reiter wie "Lager") — aus
+// Authentik-Tokens und aus Mitglieder-Tokens (QR-Code usw.) gleich — und der
 // Zugriff auf ein zweites Backend mit demselben Token (Inventar-API).
 
 import 'dart:convert';
@@ -26,9 +27,27 @@ void main() {
       );
     });
 
-    test('QR-Login/Passwort-Reset (HS256, type member): nie Gruppen', () {
-      expect(jwtGruppen(_jwt({'type': 'member', 'iss': _iss, 'groups': ['Vorstand']})), isEmpty);
-      expect(jwtGruppen(_jwt({'type': 'member', 'email': 'e@x.ch'})), isEmpty);
+    test('QR-Login/Anmeldebon/Passwort-Reset (HS256, type member): dieselben Gruppen', () {
+      expect(
+        jwtGruppen(_jwt({'type': 'member', 'sub': 'm1', 'groups': ['Mitglieder', 'Vorstand']})),
+        ['Mitglieder', 'Vorstand'],
+      );
+      expect(
+        jwtGruppen(_jwt({'type': 'member', 'email': 'e@x.ch'})),
+        isEmpty,
+        reason: 'ohne Claim',
+      );
+      expect(jwtGruppen(_jwt({'type': 'member', 'groups': []})), isEmpty);
+    });
+
+    test('andere Tokens: keine Gruppen', () {
+      expect(
+        jwtGruppen(_jwt({'type': 'member', 'iss': _iss, 'groups': ['Vorstand']})),
+        isEmpty,
+        reason: 'Mitglieder-Token haben keinen Issuer',
+      );
+      expect(jwtGruppen(_jwt({'type': 'event-organizer', 'groups': ['Lager']})), isEmpty);
+      expect(jwtGruppen(_jwt({'type': 'vorstand', 'groups': ['vorstand']})), isEmpty);
     });
 
     test('ohne Issuer, ohne Claim, kein JWT', () {
@@ -56,8 +75,17 @@ void main() {
       expect(mitglied(_jwt({'iss': _iss, 'groups': ['Lagerist']})).hatGruppe(['Lager']), isFalse);
     });
 
-    test('QR-Token und externer Organisator: keine Gruppen', () {
-      expect(mitglied(_jwt({'type': 'member', 'groups': ['Lager']})).hatGruppe(['Lager']), isFalse);
+    test('QR-Token: Gruppen wie Authentik; externer Organisator: keine', () {
+      expect(mitglied(_jwt({'type': 'member', 'groups': ['Lager']})).hatGruppe(['lager']), isTrue);
+      expect(
+        mitglied(_jwt({'type': 'member', 'groups': ['Mitglieder']})).hatGruppe(['Lager']),
+        isFalse,
+      );
+      final orgQr = Sitzung(
+        accessToken: _jwt({'type': 'member', 'groups': ['Lager']}),
+        kontotyp: Kontotyp.organisator,
+      );
+      expect(orgQr.gruppen, isEmpty);
       final org = Sitzung(
         accessToken: _jwt({'iss': _iss, 'groups': ['Lager']}),
         kontotyp: Kontotyp.organisator,
@@ -73,17 +101,23 @@ void main() {
     });
   });
 
-  group('vonAuthentik (Ausleihe: nur Authentik-Tokens)', () {
+  group('mitgliedAngemeldet (z.B. Ausleihe)', () {
     Sitzung s(String token, [Kontotyp typ = Kontotyp.mitglied]) =>
         Sitzung(accessToken: token, kontotyp: typ);
 
-    test('Authentik-Mitglied ja, QR/Reset/Organisator/kein JWT nein', () {
-      expect(s(_jwt({'iss': _iss})).vonAuthentik, isTrue);
-      expect(s(_jwt({'type': 'member', 'iss': _iss})).vonAuthentik, isFalse);
-      expect(s(_jwt({'email': 'e@x.ch'})).vonAuthentik, isFalse);
-      expect(s(_jwt({'iss': _iss}), Kontotyp.organisator).vonAuthentik, isFalse);
-      expect(s('kein-jwt').vonAuthentik, isFalse);
+    test('Authentik und QR-Code/Reset ja; Organisator, fremde Tokens, kein JWT nein', () {
+      expect(s(_jwt({'iss': _iss})).mitgliedAngemeldet, isTrue);
+      expect(s(_jwt({'type': 'member', 'sub': 'm1'})).mitgliedAngemeldet, isTrue);
+      expect(s(_jwt({'type': 'member', 'iss': _iss})).mitgliedAngemeldet, isFalse);
+      expect(s(_jwt({'email': 'e@x.ch'})).mitgliedAngemeldet, isFalse);
+      expect(s(_jwt({'iss': _iss}), Kontotyp.organisator).mitgliedAngemeldet, isFalse);
+      expect(s(_jwt({'type': 'member'}), Kontotyp.organisator).mitgliedAngemeldet, isFalse);
+      expect(s(_jwt({'type': 'event-organizer'})).mitgliedAngemeldet, isFalse);
+      expect(s('kein-jwt').mitgliedAngemeldet, isFalse);
       expect(jwtVonAuthentik(null), isFalse);
+      expect(jwtMitgliederToken(null), isFalse);
+      expect(jwtMitgliederToken(_jwt({'type': 'member'})), isTrue);
+      expect(jwtVonAuthentik(_jwt({'type': 'member'})), isFalse);
     });
   });
 

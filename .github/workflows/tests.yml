@@ -1,6 +1,7 @@
 name: Tests
 
-# Backends (Events, Inventar — je mit echter Postgres-Datenbank) und Website.
+# Backends (Events, Inventar — je mit echter Postgres-Datenbank; Members ohne)
+# und Website.
 #
 # Laeuft bei Pull Requests selbst; bei Pushes auf main ruft
 # build-containers.yml diesen Workflow auf und baut/deployt erst, wenn er
@@ -51,6 +52,31 @@ jobs:
           TEST_DATABASE_URL: postgres://test:test@localhost:5432/fwvtest
         # nacheinander: mehrere Testdateien bauen die Datenbank neu auf
         run: node --test --test-concurrency=1 test/
+
+  backend-members:
+    name: Backend Members
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Abhaengigkeiten
+        working-directory: docker/backend-members
+        # kein package-lock im Repo (das Image installiert ebenfalls frisch)
+        run: npm install --no-audit --no-fund --no-package-lock
+
+      - name: Syntax
+        working-directory: docker/backend-members
+        run: node --check src/index.js
+
+      - name: Tests
+        working-directory: docker/backend-members
+        # Gruppen der Mitglieder-Tokens und Token-Pruefung, gegen ein
+        # nachgebautes Authentik (ohne Datenbank)
+        run: npm test
 
   inventory-backend:
     name: Inventar-Backend

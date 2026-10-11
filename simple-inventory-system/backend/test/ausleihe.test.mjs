@@ -65,6 +65,11 @@ function festschreiben(wert) {
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const KID = 'test-kid';
+// Mitglieder-Tokens von api-members (QR-Code usw.): HS256, Schluessel nur
+// beim nachgebauten api-members, das sie ueber /auth/member/pruefen prueft.
+const MEMBERS_SECRET = 'members-geheim';
+const mitgliedToken = (claims) => jwt.sign({ type: 'member', ...claims }, MEMBERS_SECRET, { expiresIn: '8h' });
+
 function token(claims) {
   return jwt.sign(claims, privateKey, {
     algorithm: 'RS256', keyid: KID, issuer: `${AUTH}/application/o/fwv-members-app/`, expiresIn: '10m'
@@ -99,6 +104,12 @@ test('Ausleihe', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (t) =
         assert.equal(req.headers['x-internal-key'], 'intern-key');
         const email = new URL(req.url, 'http://x').searchParams.get('email');
         return res.end(JSON.stringify({ memberId: email === 'erika@example.ch' ? 42 : null }));
+      }
+      if (req.url === '/auth/member/pruefen') {
+        let d = null;
+        try { d = jwt.verify((req.headers.authorization || '').replace(/^Bearer /, ''), MEMBERS_SECRET); } catch { /* ungueltig */ }
+        if (!d || d.type !== 'member') { res.statusCode = 401; return res.end('{"valid":false}'); }
+        return res.end(JSON.stringify({ valid: true, member_id: d.sub, email: d.email, name: d.name, groups: d.groups || [], exp: d.exp }));
       }
       if (req.url === '/internal/push-to-member') {
         pushes.push(JSON.parse(body));
@@ -150,6 +161,8 @@ test('Ausleihe', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (t) =
   const max = token({ sub: 'u2', email: 'max@example.ch', name: 'Max Beispiel', groups: [] });
   const lager = token({ sub: 'u3', email: 'lager-person@example.ch', name: 'Lea Lager', groups: ['Lager'] });
   const qr = jwt.sign({ type: 'member', email: 'erika@example.ch' }, 'irgendwas');
+  const erikaQr = mitgliedToken({ sub: 'm-erika', email: 'erika@example.ch', name: 'Erika Muster', groups: ['Mitglieder'] });
+  const lagerQr = mitgliedToken({ sub: 'm-lea', email: 'lager-person@example.ch', name: 'Lea Lager', groups: ['Mitglieder', 'Lager'] });
 
   const aufruf = async (methode, pfad, { body, tok, kopf = {} } = {}) => {
     const r = await fetch(BASE + pfad, {
@@ -177,11 +190,16 @@ test('Ausleihe', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (t) =
   const vertrag = {};
   const ids = {};
 
-  await t.test('Anmeldung: jedes Mitglied, aber nur mit Authentik-Token', async () => {
+  await t.test('Anmeldung: jedes Mitglied, Authentik oder QR-Code gleich', async () => {
     const z = `?von=${tag(2)}&bis=${tag(4)}`;
     assert.equal((await aufruf('GET', `/ausleihe/angebot${z}`)).status, 401);
     const mitQr = await aufruf('GET', `/ausleihe/angebot${z}`, { tok: qr });
-    assert.equal(mitQr.status, 403, 'QR-/Reset-Tokens (HS256) nimmt das Inventar nicht an');
+    assert.equal(mitQr.status, 403, 'Mitglieder-Token, das api-members nicht bestaetigt');
+    assert.equal((await aufruf('GET', `/ausleihe/angebot${z}`, { tok: erikaQr })).status, 200,
+      'QR-Login ohne Lager-Gruppe darf ausleihen wie mit Authentik');
+    assert.equal((await aufruf('GET', '/ausleihe', { tok: erikaQr })).status, 403, 'verwalten nur mit Gruppe Lager');
+    assert.equal((await aufruf('GET', '/ausleihe', { tok: lagerQr })).status, 200, 'QR-Login mit Gruppe Lager verwaltet');
+    assert.equal((await aufruf('GET', '/ausleihe/meine', { tok: erikaQr })).status, 200);
     const r = await aufruf('GET', `/ausleihe/angebot${z}`, { tok: erika });
     assert.equal(r.status, 200, 'Mitglied ohne Lager-Gruppe darf ausleihen');
     assert.deepEqual([r.json.artikel, r.json.kisten], [[], []], 'noch nichts ausleihbar');

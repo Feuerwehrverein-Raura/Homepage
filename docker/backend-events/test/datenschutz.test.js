@@ -65,6 +65,21 @@ test('oeffentliche Anlass-Listen ohne Kontaktdaten', { skip: !DB && 'TEST_DATABA
         const vorstand = jwt.sign({ type: 'vorstand', email: 'aktuar@example.ch', groups: ['vorstand'] }, 'test-geheim');
         const mit = await (await fetch(url, { headers: { Authorization: `Bearer ${vorstand}` } })).text();
         assert.ok(kontaktdaten(mit), `${url}: Vorstand bekommt die Kontaktdaten weiterhin`);
+
+        // QR-Code/Anmeldebon/App-Passwort: Mitglieder-Token mit den
+        // Authentik-Gruppen — "Vorstand" wie bei Authentik gross geschrieben.
+        const qrVorstand = jwt.sign({ type: 'member', sub: 'qr-vorstand', email: 'qr-vorstand@example.ch',
+            groups: ['Mitglieder', 'Vorstand'] }, 'test-geheim');
+        const mitQr = await (await fetch(url, { headers: { Authorization: `Bearer ${qrVorstand}` } })).text();
+        assert.ok(kontaktdaten(mitQr), `${url}: QR-Login mit Gruppe Vorstand = Vorstand`);
+        const qrMitglied = jwt.sign({ type: 'member', sub: 'qr-mitglied', email: 'qr-mitglied@example.ch',
+            groups: ['Mitglieder'] }, 'test-geheim');
+        const ohneQr = await (await fetch(url, { headers: { Authorization: `Bearer ${qrMitglied}` } })).text();
+        assert.ok(!kontaktdaten(ohneQr), `${url}: QR-Login ohne Gruppe Vorstand bekommt keine Kontaktdaten`);
+        const gefaelscht = jwt.sign({ type: 'member', sub: 'boese', email: 'boese@example.ch',
+            groups: ['Vorstand'] }, 'falsches-geheim');
+        const ohneFalsch = await (await fetch(url, { headers: { Authorization: `Bearer ${gefaelscht}` } })).text();
+        assert.ok(!kontaktdaten(ohneFalsch), `${url}: selbst signierte Gruppen zaehlen nicht`);
     }
 
     // Organisator-Uebersicht: Kontaktdaten nur fuer den, der den Anlass
@@ -81,6 +96,16 @@ test('oeffentliche Anlass-Listen ohne Kontaktdaten', { skip: !DB && 'TEST_DATABA
     const fremdText = await (await mit(fremd)).text();
     assert.deepEqual(JSON.parse(fremdText), { zugang: 'mitglied', anlaesse: [] }, 'fremdes Mitglied sieht nichts');
     assert.ok(!kontaktdaten(fremdText));
+
+    const qrVorstand = jwt.sign({ type: 'member', sub: 'qr-vorstand', email: 'qr-vorstand@example.ch',
+        groups: ['Vorstand'] }, 'test-geheim');
+    const qrText = await (await mit(qrVorstand)).text();
+    assert.equal(JSON.parse(qrText).zugang, 'vorstand', 'QR-Login mit Gruppe Vorstand: Vorstand-Uebersicht');
+    assert.ok(kontaktdaten(qrText.replace(/login-geheim|deadbeefhash/g, '')), 'QR-Vorstand sieht die Kontakte');
+    const qrOhne = jwt.sign({ type: 'member', sub: 'qr-mitglied', email: 'qr-mitglied@example.ch',
+        groups: ['Mitglieder'] }, 'test-geheim');
+    const qrOhneText = await (await mit(qrOhne)).text();
+    assert.deepEqual(JSON.parse(qrOhneText), { zugang: 'mitglied', anlaesse: [] }, 'QR-Login ohne Gruppe: wie jedes Mitglied');
 
     const login = jwt.sign({ type: 'event-organizer', event_id: EVENT }, 'test-geheim');
     const loginText = await (await mit(login)).text();
@@ -102,4 +127,6 @@ test('oeffentliche Anlass-Listen ohne Kontaktdaten', { skip: !DB && 'TEST_DATABA
     assert.equal(vorstandPdf.status, 200, 'Teilnehmerliste: Vorstand darf');
     assert.match(vorstandPdf.headers.get('content-type') || '', /pdf/);
     assert.equal((await pdf(login)).status, 200, 'Teilnehmerliste: Organisator-Login seines Anlasses darf');
+    assert.equal((await pdf(qrVorstand)).status, 200, 'Teilnehmerliste: QR-Login mit Gruppe Vorstand darf');
+    assert.equal((await pdf(qrOhne)).status, 403, 'Teilnehmerliste: QR-Login ohne Gruppe nicht');
 });

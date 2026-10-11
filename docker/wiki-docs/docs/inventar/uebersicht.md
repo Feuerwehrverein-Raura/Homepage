@@ -10,7 +10,12 @@ Das Inventar-System ermöglicht die professionelle Verwaltung aller Vereinsgüte
 
 **URL:** [inventar.fwv-raura.ch](https://inventar.fwv-raura.ch) (Cloud) oder lokale Adresse
 
-**Authentifizierung:** Authentik OAuth oder lokales Passwort (Raspberry Pi)
+**Authentifizierung:** Authentik OAuth oder lokales Passwort (Raspberry Pi).
+Die Mitglieder-App darf auch mit einem QR-Code-/Anmeldebon-Login aufs Lager
+zugreifen: Solche Mitglieder-Tokens prüft das Inventar bei api-members
+(`GET /auth/member/pruefen`, Variable `MEMBERS_API_URL`, Standard
+`http://api-members:3000`) — gleiche Regel wie bei Authentik (Lager nur mit
+Gruppe Lager, Vorstand oder admin; ausleihen darf jedes Mitglied).
 
 ## System-Architektur
 

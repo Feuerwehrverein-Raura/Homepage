@@ -146,7 +146,8 @@ class Dienste {
   final Uri inventarBasis;
 
   /// Darf diese Sitzung ins Lager? Authentik-Gruppe Lager, Vorstand oder
-  /// admin; QR-Login und externe Organisatoren nie.
+  /// admin — auch mit QR-Code angemeldet (die Gruppen stehen im Token);
+  /// externe Organisatoren nie.
   bool get lagerSichtbar => hatLagerZugang(sitzung.sitzung);
 
   /// Lager (Paket fwv_lager, gemeinsam mit der spaeteren Vorstand-App):
@@ -157,10 +158,10 @@ class Dienste {
     ausleihen: ausleihen,
   );
 
-  /// Darf diese Sitzung ausleihen? Jedes Mitglied, aber nur mit
-  /// Authentik-Anmeldung — QR-Login und Passwort-Reset (HS256) nimmt die
-  /// Inventar-API nicht an, externe Organisatoren sind keine Mitglieder.
-  bool get ausleiheMoeglich => sitzung.sitzung?.vonAuthentik ?? false;
+  /// Darf diese Sitzung ausleihen? Jedes angemeldete Mitglied, ob ueber
+  /// Authentik oder per QR-Code (die Inventar-API prueft Mitglieder-Tokens
+  /// bei api-members); externe Organisatoren sind keine Mitglieder.
+  bool get ausleiheMoeglich => sitzung.sitzung?.mitgliedAngemeldet ?? false;
 
   /// Ausleihe (Paket fwv_lager): Inventar-API mit demselben Token; Fotos
   /// von Schaeden wie bei Belegen (Rueckkamera, 1600 px).

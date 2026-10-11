@@ -23,13 +23,18 @@ Alle geschützten Endpoints erfordern einen der folgenden Auth-Methoden:
 
 ### Bearer Token (JWT)
 
-Für Mitglieder (Authentik OIDC, RS256) und Vorstand (IMAP, HS256):
+Für Mitglieder (Authentik OIDC, RS256, oder Mitglieder-Token von
+api-members, HS256) und Vorstand (IMAP, HS256):
 
 ```http
 Authorization: Bearer <token>
 ```
 
-**Mitglieder-Token:** RS256-signiert von Authentik, validiert mit Public Key.
+**Mitglieder-Token:** RS256-signiert von Authentik, validiert mit Public Key —
+oder (QR-Code, Anmeldebon, App-Passwort, Passwort-Reset) HS256-signiert von
+api-members, `type: "member"`, mit denselben Authentik-Gruppen im
+`groups`-Claim. Siehe
+[Authentifizierung](/api/authentifizierung#mitglieder-token-qr-code-anmeldebon-app-passwort-passwort-reset).
 **Vorstand-Token:** HS256-signiert, 8 Stunden gültig, enthält `type: "vorstand"`.
 
 ### API Key (intern)

@@ -298,9 +298,10 @@ das echte Authentik ausprobiert.
   Artikel zuordnen. Vertrag `fwv_lager/test/fixtures/inventar-api.json`
   schreibt und prüft der Backend-Test.
 - `fwv_core`: `Sitzung.gruppen`/`hatGruppe` aus dem `groups`-Claim des
-  Authentik-Tokens (QR-Login, Passwort-Reset und externe Organisatoren haben
-  nie Gruppen), `SitzungsVerwaltung.apiFuer` (zweites Backend, gleiches
-  Token und Erneuern), `ApiClient.patch`, `hochladen` mit Text-Feldern.
+  Tokens — Authentik oder Mitglieder-Token (QR-Code usw., siehe "Stand
+  QR-Login gleichwertig"); externe Organisatoren haben nie Gruppen.
+  `SitzungsVerwaltung.apiFuer` (zweites Backend, gleiches Token und
+  Erneuern), `ApiClient.patch`, `hochladen` mit Text-Feldern.
 - Mitglieder-App: Reiter "Lager" für Lager, Vorstand, admin.
 - Einkauf im Organisator-Bereich (Reiter Material, Recht
   `aktionen.einkauf`): Positionen abhaken (mit gekaufter Menge), Belege
@@ -374,10 +375,9 @@ gegen nachgebaute Dienste.
   `simple-inventory-system/backend/test/ausleihe.test.mjs` ("heute" darin
   immer 11.10.2026).
 - Mitglieder-App: Profil → "Material ausleihen" und "Meine Ausleihen" für
-  alle mit Authentik-Anmeldung; mit QR-Code angemeldet ein Hinweis (die
-  Inventar-API nimmt QR-Tokens nicht an); externe Organisatoren haben kein
-  Profil. Im Reiter Lager oben "Ausleihen verwalten". `fwv_core`:
-  `Sitzung.vonAuthentik`.
+  alle angemeldeten Mitglieder, über Authentik oder per QR-Code gleich;
+  externe Organisatoren haben kein Profil. Im Reiter Lager oben "Ausleihen
+  verwalten". `fwv_core`: `Sitzung.mitgliedAngemeldet`.
 
 **Vor dem Einschalten auf dem Server** (`simple-inventory-system/.env`,
 Werte aus der `.env` des Haupt-Stacks; nichts davon ist gesetzt):
@@ -402,6 +402,48 @@ Offen:
 - Ausgeben verlangt genug Bestand; stimmt der Kisten-Inhalt
   (`item_locations`) nicht mit dem Gesamtbestand, meldet es 409.
 - Kein Bearbeiten einer Ausleihe (Zeitraum/Mengen) — absagen und neu.
+
+### Stand QR-Login gleichwertig (11.10.2026)
+
+Wer sich per QR-Code, Anmeldebon, App-Passwort oder Passwort-Reset
+anmeldet, hat dieselben Rechte wie nach dem Login über Authentik. Getestet
+mit nachgebautem Authentik bzw. api-members, noch nicht gegen das echte
+Authentik.
+
+- api-members: Das Mitglieder-Token (HS256, `type: member`) enthält in
+  `groups` die Namen der Authentik-Gruppen des Mitglieds
+  (`src/member-gruppen.js`; Admin-API `GET /api/v3/core/users/<pk>/`,
+  `groups_obj`, 60 s zwischengespeichert, nach dem Gruppen-Abgleich sofort
+  neu). Ohne Authentik-Konto oder bei Fehler wie bisher `[]` (Log). Die
+  Gruppen gelten bis zum Ablauf des Tokens (8 h, Anmeldebon 7 Tage); die
+  App holt beim Erneuern per QR-Code ein neues.
+- Neu `GET /auth/member/pruefen` (Bearer Mitglieder-Token): `{valid,
+  member_id, email, name, benutzername, groups, exp}` mit den aktuellen
+  Gruppen, sonst 401. Prüft nur das mitgeschickte Token.
+- Inventar: nimmt Mitglieder-Tokens an und fragt dafür api-members
+  (`MEMBERS_API_URL`, 60 s pro Token gemerkt, kein gemeinsames Geheimnis);
+  danach dieselbe Regel wie für die App (Lager nur mit Lager/Vorstand/admin,
+  ausleihen jedes Mitglied). api-members weg → 503.
+- Events-Backend: Gruppen-Vergleich unabhängig von Gross-/Kleinschreibung
+  (`Vorstand` aus Authentik = `vorstand`), für alle Tokens.
+- App: `jwtGruppen` liest auch Mitglieder-Tokens; Lager-Reiter und
+  Ausleihe für QR-Logins wie für Authentik; der Hinweis "nicht per
+  QR-Code" ist weg. Externe Organisatoren weiterhin nie.
+- Tests: `docker/backend-members/test/member-gruppen.test.js` (neu, CI-Job
+  "Backend Members"), Inventar `api.test.mjs`/`ausleihe.test.mjs`/
+  `zugang.test.mjs`, Events `datenschutz.test.js`/`organisator.test.js`,
+  `fwv_core`, `fwv_lager`, Mitglieder-App.
+
+Offen:
+
+- Auf dem Server prüfen, dass `AUTHENTIK_API_TOKEN` von api-members Benutzer
+  und Gruppen lesen darf und dass das Inventar `http://api-members:3000`
+  erreicht (sonst `MEMBERS_API_URL` setzen).
+- Mitglieder ohne E-Mail-Adresse können nicht ausleihen (die Ausleihe hängt
+  an der E-Mail) und werden im Events-Backend weiterhin nicht als Mitglied
+  erkannt (es verlangt `email` im Token).
+- Das Members-Backend selbst vergleicht `requireRole` weiter exakt
+  (`vorstand`); unverändert, weil es dort nur um Vorstand-Logins geht.
 
 ## Phase 3 — Ablösung der alten Apps
 

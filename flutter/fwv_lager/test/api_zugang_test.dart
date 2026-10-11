@@ -174,7 +174,7 @@ void main() {
     expect(codeAusScan('https://boese.example/item/FWV1'), 'https://boese.example/item/FWV1');
   });
 
-  test('Lager-Reiter nur fuer Lager, Vorstand, admin', () {
+  test('Lager-Reiter nur fuer Lager, Vorstand, admin — Authentik oder QR-Code', () {
     String jwt(Map<String, Object?> c) {
       String teil(Object o) => base64Url.encode(utf8.encode(jsonEncode(o))).replaceAll('=', '');
       return '${teil({'alg': 'RS256'})}.${teil(c)}.x';
@@ -188,18 +188,27 @@ void main() {
     expect(hatLagerZugang(s(['admin'])), isTrue);
     expect(hatLagerZugang(s(['Mitglieder'])), isFalse);
     expect(hatLagerZugang(null), isFalse);
+    // QR-Code, Anmeldebon, App-Passwort: Mitglieder-Token mit denselben
+    // Gruppen wie bei Authentik.
+    Sitzung qr(List<String> g) => Sitzung(
+      accessToken: jwt({'type': 'member', 'sub': 'm1', 'groups': g}),
+      kontotyp: Kontotyp.mitglied,
+    );
+    expect(hatLagerZugang(qr(['Mitglieder', 'Lager'])), isTrue, reason: 'QR-Login mit Lager');
+    expect(hatLagerZugang(qr(['Vorstand'])), isTrue, reason: 'QR-Login mit Vorstand');
+    expect(hatLagerZugang(qr(['Mitglieder'])), isFalse, reason: 'QR-Login ohne Lager-Gruppe');
     expect(
       hatLagerZugang(
         Sitzung(
           accessToken: jwt({
-            'type': 'member',
+            'type': 'event-organizer',
             'groups': ['Lager'],
           }),
-          kontotyp: Kontotyp.mitglied,
+          kontotyp: Kontotyp.organisator,
         ),
       ),
       isFalse,
-      reason: 'QR-Login',
+      reason: 'externer Organisator',
     );
   });
 }

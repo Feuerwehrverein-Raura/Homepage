@@ -18,17 +18,21 @@ Map<String, dynamic> jwtAngaben(String? token) {
   }
 }
 
-/// Authentik-Gruppen aus dem `groups`-Claim eines Access-Tokens.
+/// Gruppen aus dem `groups`-Claim eines Access-Tokens (z.B. `Lager`,
+/// `Vorstand`).
 ///
-/// Nur Authentik-Tokens (RS256, mit `iss`) tragen Gruppen. Die Tokens vom
-/// QR-Login und Passwort-Reset (HS256, `type: member`) und die des
-/// Organisator-Logins haben keine — dort gibt es also nie eine Gruppe, auch
-/// wenn jemand eine hineinschreiben wollte.
+/// Zwei Arten von Tokens tragen Gruppen, und zwar dieselben:
+///  - Authentik-Tokens (RS256, mit `iss`, ohne `type`),
+///  - Mitglieder-Tokens von api-members (QR-Code, Anmeldebon, App-Passwort,
+///    Passwort-Reset: HS256, `type: member`, ohne `iss`). api-members
+///    schreibt die Authentik-Gruppen des Mitglieds hinein, damit diese
+///    Anmeldung dieselben Rechte hat.
+/// Organisator-Logins (`type: event-organizer`) und alles andere: keine.
+/// Die Signatur prueft das Backend — eine hineingeschriebene Gruppe zeigt
+/// hoechstens einen Reiter, dessen Aufrufe dann scheitern.
 List<String> jwtGruppen(String? token) {
   final angaben = jwtAngaben(token);
-  if (angaben['type'] != null) return const [];
-  final iss = angaben['iss'];
-  if (iss is! String || iss.isEmpty) return const [];
+  if (!_vonAuthentik(angaben) && !_mitgliederToken(angaben)) return const [];
   final g = angaben['groups'];
   if (g is! List) return const [];
   return List.unmodifiable([
@@ -39,10 +43,17 @@ List<String> jwtGruppen(String? token) {
 
 /// Stammt das Token von Authentik (RS256, mit `iss`)? QR-Login und
 /// Passwort-Reset (HS256, `type: member`) und Organisator-Logins nicht.
-/// Andere Backends (z.B. das Inventar) nehmen nur Authentik-Tokens an.
-bool jwtVonAuthentik(String? token) {
-  final angaben = jwtAngaben(token);
+bool jwtVonAuthentik(String? token) => _vonAuthentik(jwtAngaben(token));
+
+/// Ist es ein Mitglieder-Token von api-members (QR-Code, Anmeldebon,
+/// App-Passwort, Passwort-Reset: `type: member`, ohne `iss`)?
+bool jwtMitgliederToken(String? token) => _mitgliederToken(jwtAngaben(token));
+
+bool _vonAuthentik(Map<String, dynamic> angaben) {
   if (angaben['type'] != null) return false;
   final iss = angaben['iss'];
   return iss is String && iss.isNotEmpty;
 }
+
+bool _mitgliederToken(Map<String, dynamic> angaben) =>
+    angaben['type'] == 'member' && angaben['iss'] == null;

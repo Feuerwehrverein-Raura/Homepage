@@ -155,17 +155,38 @@ void main() {
     expect(reiter('Profil'), findsOneWidget);
   });
 
-  testWidgets('QR-Login (HS256, type member): nie Lager', (tester) async {
+  Sitzung qrMitGruppen(List<String> g) => Sitzung(
+    accessToken: _jwt({'type': 'member', 'sub': 'm1', 'email': 'e@x.ch', 'groups': g}),
+    qrToken: 'qr',
+    kontotyp: Kontotyp.mitglied,
+  );
+
+  testWidgets('QR-Login mit Gruppe Lager: Lager wie ueber Authentik', (tester) async {
+    final s = qrMitGruppen(['Mitglieder', 'Lager']);
+    await starten(tester, s);
+    expect(reiter('Lager'), findsOneWidget);
+    await tester.tap(reiter('Lager'));
+    await tester.pumpAndSettle();
+    expect(find.text('Mineral 1.5l'), findsOneWidget);
+    final a = anfragen.firstWhere((a) => a.url.host == 'inventar.fwv-raura.ch');
+    expect(a.headers['Authorization'], 'Bearer ${s.accessToken}');
+  });
+
+  testWidgets('QR-Login ohne Lager-Gruppe: kein Reiter', (tester) async {
+    await starten(tester, qrMitGruppen(['Mitglieder']));
+    expect(reiter('Lager'), findsNothing);
+  });
+
+  testWidgets('Externer Organisator: nie Lager, auch mit Gruppen im Token', (tester) async {
     await starten(
       tester,
       Sitzung(
         accessToken: _jwt({
-          'type': 'member',
-          'email': 'e@x.ch',
+          'iss': _iss,
           'groups': ['Lager'],
         }),
-        qrToken: 'qr',
-        kontotyp: Kontotyp.mitglied,
+        kontotyp: Kontotyp.organisator,
+        eventId: 'e1',
       ),
     );
     expect(reiter('Lager'), findsNothing);
@@ -207,20 +228,22 @@ void main() {
       expect(find.byKey(const Key('absagen')), findsOneWidget);
     });
 
-    testWidgets('QR-Login: Hinweis statt Ausleihe, keine Anfrage ans Inventar', (tester) async {
-      await starten(
-        tester,
-        Sitzung(
-          accessToken: _jwt({'type': 'member', 'email': 'e@x.ch'}),
-          qrToken: 'qr',
-          kontotyp: Kontotyp.mitglied,
-        ),
+    testWidgets('QR-Login: Ausleihe wie ueber Authentik, mit dem QR-Token', (tester) async {
+      final s = Sitzung(
+        accessToken: _jwt({'type': 'member', 'sub': 'm1', 'email': 'e@x.ch'}),
+        qrToken: 'qr',
+        kontotyp: Kontotyp.mitglied,
       );
+      await starten(tester, s);
       await profil(tester);
-      expect(find.byKey(const Key('ausleihe-hinweis')), findsOneWidget);
-      expect(find.textContaining('nicht per QR-Code'), findsOneWidget);
-      expect(find.byKey(const Key('meine-ausleihen')), findsNothing);
-      expect(anfragen.where((a) => a.url.host == 'inventar.fwv-raura.ch'), isEmpty);
+      expect(find.byKey(const Key('ausleihe-hinweis')), findsNothing);
+      expect(find.byKey(const Key('material-ausleihen')), findsOneWidget);
+      await tester.tap(find.text('Meine Ausleihen'));
+      await tester.pumpAndSettle();
+      final a = anfragen.lastWhere((a) => a.url.host == 'inventar.fwv-raura.ch');
+      expect(a.url.toString(), 'https://inventar.fwv-raura.ch/api/ausleihe/meine');
+      expect(a.headers['Authorization'], 'Bearer ${s.accessToken}');
+      expect(find.text('30 Stück Teller'), findsOneWidget);
     });
 
     testWidgets('Gruppe Lager: Ausleihen verwalten im Lager-Reiter', (tester) async {

@@ -47,6 +47,26 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLen
 const fremd = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
 const KID = 'test-kid';
 
+// Mitglieder-Tokens von api-members (QR-Code, Anmeldebon, App-Passwort):
+// HS256 mit einem Schluessel, den das Inventar NICHT kennt. Das nachgebaute
+// api-members (GET /auth/member/pruefen) prueft sie und nennt die Gruppen.
+const MEMBERS_SECRET = 'members-geheim';
+const pruefAbrufe = [];
+function mitgliedToken(claims = {}, { schluessel = MEMBERS_SECRET, ablauf = '8h' } = {}) {
+  return jwt.sign({ type: 'member', sub: 'm-1', member_id: 'm-1', email: 'erika@example.ch', name: 'Erika', ...claims },
+    schluessel, { expiresIn: ablauf });
+}
+function membersPruefen(req, res) {
+  pruefAbrufe.push(req.headers.authorization);
+  const tok = (req.headers.authorization || '').replace(/^Bearer /, '');
+  let d;
+  try { d = jwt.verify(tok, MEMBERS_SECRET); } catch { d = null; }
+  res.setHeader('Content-Type', 'application/json');
+  if (!d || d.type !== 'member') { res.statusCode = 401; return res.end('{"valid":false}'); }
+  if (d.sub === 'kaputt') { res.statusCode = 500; return res.end('{}'); }
+  res.end(JSON.stringify({ valid: true, member_id: d.sub, email: d.email, name: d.name, groups: d.groups || [], exp: d.exp }));
+}
+
 function token(anwendung, claims = {}, { schluessel = privateKey, ablauf = '5m' } = {}) {
   return jwt.sign(
     { sub: 'u1', email: 'erika@example.ch', name: 'Erika', ...claims },
@@ -62,6 +82,7 @@ test('Inventar-API', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid: KID, alg: 'RS256', use: 'sig' };
   const jwksAbrufe = [];
   const authentik = http.createServer((req, res) => {
+    if (req.url === '/auth/member/pruefen') return membersPruefen(req, res);
     const m = req.url.match(/^\/application\/o\/([^/]+)\/jwks\/$/);
     if (!m) { res.statusCode = 404; return res.end(); }
     jwksAbrufe.push(m[1]);
@@ -75,6 +96,7 @@ test('Inventar-API', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (
   const server = spawn('node', [path.join(HIER, '..', 'dist', 'index.js')], {
     env: {
       ...process.env, PORT: String(PORT), AUTHENTIK_URL: AUTH, ORDER_API_KEY: KEY, UPLOAD_DIR: uploads,
+      MEMBERS_API_URL: AUTH,
       DB_HOST: u.hostname, DB_PORT: u.port || '5432', DB_NAME: u.pathname.slice(1),
       DB_USER: decodeURIComponent(u.username), DB_PASSWORD: decodeURIComponent(u.password),
       LOCAL_MODE: 'false'
@@ -159,6 +181,43 @@ test('Inventar-API', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (
     assert.ok(jwksAbrufe.includes('fwv-members-app'));
     assert.ok(jwksAbrufe.includes('fwv-members'));
     assert.ok(!jwksAbrufe.includes('vorstand-app'), 'fremder Issuer: kein JWKS-Abruf');
+
+    // Mitglieder-Tokens (QR-Code usw.): gleiche Regel, Gruppen von api-members.
+    // Nummern merken: der App-Vertrag unten erwartet die naechste ID/den
+    // naechsten Code wie ohne diese Artikel.
+    const seq = (await q(`SELECT last_value FROM items_id_seq`)).rows[0].last_value;
+    const zaehler = (await q(`SELECT last_number FROM barcode_counter`)).rows[0].last_number;
+    const qrMitglied = await aufruf('POST', '/items', { body: neu(9), tok: mitgliedToken({ groups: ['Mitglieder'] }) });
+    assert.equal(qrMitglied.status, 403);
+    assert.match(qrMitglied.json.error, /Gruppe Lager/);
+    const qrLager = await aufruf('POST', '/items', { body: neu(10), tok: mitgliedToken({ sub: 'm-2', groups: ['Mitglieder', 'Lager'] }) });
+    assert.equal(qrLager.status, 200, 'QR-Login mit Gruppe Lager wie Authentik');
+    const qrVorstand = await aufruf('POST', '/items', { body: neu(11), tok: mitgliedToken({ sub: 'm-3', groups: ['Vorstand'] }) });
+    assert.equal(qrVorstand.status, 200, 'QR-Login mit Gruppe Vorstand');
+    const qrFalsch = await aufruf('POST', '/items', { body: neu(12), tok: mitgliedToken({ groups: ['Lager'] }, { schluessel: 'selbst-gemacht' }) });
+    assert.equal(qrFalsch.status, 403, 'selbst signiert: api-members lehnt ab');
+    assert.equal(qrFalsch.json.error, 'Invalid token');
+    const qrAbgelaufen = await aufruf('POST', '/items', { body: neu(13), tok: mitgliedToken({ groups: ['Lager'] }, { ablauf: '-1m' }) });
+    assert.equal(qrAbgelaufen.status, 403);
+    const qrKaputt = await aufruf('POST', '/items', { body: neu(14), tok: mitgliedToken({ sub: 'kaputt', groups: ['Lager'] }) });
+    assert.equal(qrKaputt.status, 503, 'api-members gestoert: 503, nicht "ungueltig"');
+
+    // 60 s gemerkt: dasselbe Token fragt api-members nicht nochmals.
+    const tok = mitgliedToken({ sub: 'm-4', groups: ['Lager'] });
+    const vorher = pruefAbrufe.length;
+    assert.equal((await aufruf('POST', '/items', { body: neu(15), tok })).status, 200);
+    assert.equal((await aufruf('POST', '/items', { body: neu(17), tok })).status, 200);
+    assert.equal(pruefAbrufe.length, vorher + 1, 'eine Nachfrage fuer zwei Aufrufe');
+    assert.ok(pruefAbrufe.every((h) => h.startsWith('Bearer ')), 'das Token selbst wird weitergereicht');
+
+    // Ein Authentik-Token mit type 'member' im Claim bleibt ein Authentik-Token.
+    const authentikMitTyp = await aufruf('POST', '/items', { body: neu(16), tok: token('fwv-members-app', { type: 'member', groups: ['Lager'] }) });
+    assert.equal(authentikMitTyp.status, 200);
+    assert.equal(pruefAbrufe.length, vorher + 1, 'mit Issuer kein Umweg ueber api-members');
+    await q(`DELETE FROM transactions WHERE item_id > 3`);
+    await q(`DELETE FROM items WHERE id > 3`);
+    await q(`SELECT setval('items_id_seq', $1)`, [seq]);
+    await q(`UPDATE barcode_counter SET last_number = $1`, [zaehler]);
 
     // Angelegte Testartikel wieder weg, damit die Zahlen unten stimmen.
     await q(`DELETE FROM transactions WHERE item_id > 3`);

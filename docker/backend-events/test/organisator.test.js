@@ -169,6 +169,23 @@ test('Organisator-Login und oeffentliche Anmeldung', { skip: !DB && 'TEST_DATABA
         assert.equal(leer.json.meal_options, null);
     });
 
+    await t.test('QR-Login mit Gruppe Vorstand: Rechte wie ueber Authentik, Organisator-Erkennung unveraendert', async () => {
+        const anmeldungen = token => fetch(`${BASE}/events/${E(4)}/organizer-registrations`,
+            { headers: { Authorization: `Bearer ${token}` } });
+        // Hans organisiert Anlass 4 nicht: ohne Gruppe kein Zugriff.
+        assert.equal((await anmeldungen(hans)).status, 403);
+        const hansVorstand = jwt.sign({ type: 'member', sub: HANS, email: 'hans@example.ch',
+            groups: ['Mitglieder', 'Vorstand'] }, SECRET);
+        assert.equal((await anmeldungen(hansVorstand)).status, 200, 'Gruppe Vorstand (gross) aus dem Mitglieder-Token');
+        const hansAdmin = jwt.sign({ type: 'member', sub: HANS, email: 'hans@example.ch', groups: ['admin'] }, SECRET);
+        assert.equal((await anmeldungen(hansAdmin)).status, 200, 'Gruppe admin');
+        const hansLager = jwt.sign({ type: 'member', sub: HANS, email: 'hans@example.ch', groups: ['Lager'] }, SECRET);
+        assert.equal((await anmeldungen(hansLager)).status, 403, 'Lager ist kein Vorstand');
+        // Der Organisator (E-Mail des Anlasses) bleibt Organisator, mit oder ohne Gruppen.
+        const org = jwt.sign({ type: 'member', sub: 'org-ohne-konto', email: 'org@example.ch', groups: ['Mitglieder'] }, SECRET);
+        assert.equal((await anmeldungen(org)).status, 200);
+    });
+
     await t.test('Organisator-Login: vorbei und abgesagt werden abgewiesen', async () => {
         const login = (email, password = PASSWORT) => senden('/events/login', { email, password });
         const ok = await login('login@example.ch');
