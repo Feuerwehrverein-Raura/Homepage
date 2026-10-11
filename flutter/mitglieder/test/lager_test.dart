@@ -17,12 +17,12 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
 
-Map<String, dynamic> _lagerVertrag() {
+Map<String, dynamic> _lagerVertrag([String name = 'inventar-api.json']) {
   var dir = Directory.current;
   while (true) {
-    final f = File('${dir.path}/flutter/fwv_lager/test/fixtures/inventar-api.json');
+    final f = File('${dir.path}/flutter/fwv_lager/test/fixtures/$name');
     if (f.existsSync()) return jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
-    if (dir.parent.path == dir.path) throw StateError('inventar-api.json nicht gefunden');
+    if (dir.parent.path == dir.path) throw StateError('$name nicht gefunden');
     dir = dir.parent;
   }
 }
@@ -50,6 +50,7 @@ class _KeineAltdaten implements AltdatenQuelle {
 
 void main() {
   final vertrag = _lagerVertrag();
+  final ausleihe = _lagerVertrag('ausleihe-api.json');
   late List<http.Request> anfragen;
 
   late final client = MockClient((a) async {
@@ -66,11 +67,17 @@ void main() {
         'GET /api/barcode/lookup/FWV000002' => json(vertrag['lookup_lokal']),
         'GET /api/locations/overview' => json(vertrag['locations_overview']),
         'GET /api/reports/low-stock' => json(vertrag['low_stock']),
+        'GET /api/ausleihe/meine' => json(ausleihe['meine']),
+        'GET /api/ausleihe/1' => json(ausleihe['ausleihe_neu']),
+        'GET /api/ausleihe' => json(
+          a.url.queryParameters['filter'] == 'kommend' ? [ausleihe['ausleihe_extern']] : [],
+        ),
         _ => json({'error': 'nicht gefunden'}, 404),
       };
     }
     return switch ('${a.method} ${a.url.path}') {
       'GET /events' || 'GET /events/organized-by-me' => json([]),
+      'GET /members/me' => json({'id': 'a1', 'vorname': 'Erika', 'nachname': 'Muster'}),
       _ => json({'error': 'nicht gefunden'}, 404),
     };
   });
@@ -162,5 +169,74 @@ void main() {
       ),
     );
     expect(reiter('Lager'), findsNothing);
+  });
+
+  group('Ausleihe', () {
+    Future<void> profil(WidgetTester tester) async {
+      await tester.tap(reiter('Profil'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Material ausleihen'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+    }
+
+    testWidgets('Jedes Mitglied (ohne Lager-Gruppe): Meine Ausleihen aus der Inventar-API', (
+      tester,
+    ) async {
+      final s = mitGruppen(['Mitglieder']);
+      await starten(tester, s);
+      await profil(tester);
+      expect(find.byKey(const Key('ausleihe-hinweis')), findsNothing);
+      await tester.tap(find.text('Meine Ausleihen'));
+      await tester.pumpAndSettle();
+      final a = anfragen.lastWhere((a) => a.url.host == 'inventar.fwv-raura.ch');
+      expect(a.url.toString(), 'https://inventar.fwv-raura.ch/api/ausleihe/meine');
+      expect(a.headers['Authorization'], 'Bearer ${s.accessToken}');
+      expect(find.text('30 Stück Teller'), findsOneWidget);
+      expect(find.text('Reserviert'), findsOneWidget);
+      expect(
+        find.byKey(const Key('ausleihen-neu')),
+        findsOneWidget,
+        reason: 'Ausleihen immer sichtbar',
+      );
+
+      await tester.tap(find.text('30 Stück Teller'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('absagen')), findsOneWidget);
+    });
+
+    testWidgets('QR-Login: Hinweis statt Ausleihe, keine Anfrage ans Inventar', (tester) async {
+      await starten(
+        tester,
+        Sitzung(
+          accessToken: _jwt({'type': 'member', 'email': 'e@x.ch'}),
+          qrToken: 'qr',
+          kontotyp: Kontotyp.mitglied,
+        ),
+      );
+      await profil(tester);
+      expect(find.byKey(const Key('ausleihe-hinweis')), findsOneWidget);
+      expect(find.textContaining('nicht per QR-Code'), findsOneWidget);
+      expect(find.byKey(const Key('meine-ausleihen')), findsNothing);
+      expect(anfragen.where((a) => a.url.host == 'inventar.fwv-raura.ch'), isEmpty);
+    });
+
+    testWidgets('Gruppe Lager: Ausleihen verwalten im Lager-Reiter', (tester) async {
+      await starten(tester, mitGruppen(['Lager']));
+      await tester.tap(reiter('Lager'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Ausleihen verwalten'));
+      await tester.pumpAndSettle();
+      expect(find.text('Hans Muster, Turnverein'), findsOneWidget);
+      expect(
+        anfragen.any(
+          (a) => a.url.path == '/api/ausleihe' && a.url.queryParameters['filter'] == 'kommend',
+        ),
+        isTrue,
+      );
+      expect(find.byKey(const Key('ausleihe-extern')), findsOneWidget);
+    });
   });
 }

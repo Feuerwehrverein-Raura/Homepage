@@ -154,6 +154,23 @@ class Dienste {
   Lager get lager => Lager(
     zugang: ApiLagerZugang(sitzung.apiFuer(inventarBasis)),
     umgebung: LagerUmgebung(scannen: barcodeScannen),
+    ausleihen: ausleihen,
+  );
+
+  /// Darf diese Sitzung ausleihen? Jedes Mitglied, aber nur mit
+  /// Authentik-Anmeldung — QR-Login und Passwort-Reset (HS256) nimmt die
+  /// Inventar-API nicht an, externe Organisatoren sind keine Mitglieder.
+  bool get ausleiheMoeglich => sitzung.sitzung?.vonAuthentik ?? false;
+
+  /// Ausleihe (Paket fwv_lager): Inventar-API mit demselben Token; Fotos
+  /// von Schaeden wie bei Belegen (Rueckkamera, 1600 px).
+  Ausleihen get ausleihen => Ausleihen(
+    zugang: ApiAusleiheZugang(sitzung.apiFuer(inventarBasis)),
+    umgebung: AusleiheUmgebung(
+      fotoWaehlen: dokumentFotoWaehlen,
+      verkleinern: anhangVerkleinern,
+      jetzt: jetzt,
+    ),
   );
 
   /// Aufrufe rund ums eigene Mitglied.
@@ -246,7 +263,8 @@ class Dienste {
       _alsMitgliedAngemeldet &&
       await speicher.lesen(SitzungsSchluessel.kontakteGefragt) != 'true';
 
-  Future<void> kontakteGefragtMerken() => speicher.schreiben(SitzungsSchluessel.kontakteGefragt, 'true');
+  Future<void> kontakteGefragtMerken() =>
+      speicher.schreiben(SitzungsSchluessel.kontakteGefragt, 'true');
 
   // ---------------------------------------------------------------------
   // Newsletter-Stand (nur lokal gemerkt — das Backend kennt keine Abfrage)

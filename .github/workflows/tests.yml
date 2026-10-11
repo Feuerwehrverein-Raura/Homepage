@@ -84,7 +84,8 @@ jobs:
         working-directory: simple-inventory-system/backend
         env:
           TEST_DATABASE_URL: postgres://test:test@localhost:5432/inventartest
-        # npm test = tsc + node --test (Zugangsregeln, API gegen Postgres)
+        # npm test = tsc + node --test (Zugangsregeln, API und Ausleihe gegen
+        # Postgres, Versand nachgebaut)
         run: npm test
 
   website:

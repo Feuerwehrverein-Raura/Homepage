@@ -8,6 +8,7 @@
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'ausleihe/zugang.dart';
 import 'modelle.dart';
 import 'ui/scanner_screen.dart';
 
@@ -54,6 +55,12 @@ abstract class LagerZugang {
 
   Future<Artikel> anlegen(NeuerArtikel artikel);
 
+  /// Artikel fuer die Ausleihe freigeben oder sperren.
+  Future<void> artikelAusleihbar(int artikelId, bool ausleihbar);
+
+  /// Lagerort als ganze Kiste fuer die Ausleihe freigeben oder sperren.
+  Future<void> lagerortAusleihbar(int lagerortId, bool ausleihbar);
+
   /// Volle Adresse eines Artikelbilds, oder null.
   Uri? bildAdresse(String? pfad) => null;
 
@@ -72,10 +79,14 @@ class LagerUmgebung {
 
 /// Zugang und Umgebung zusammen — das, was jeder Screen bekommt.
 class Lager {
-  const Lager({required this.zugang, this.umgebung = const LagerUmgebung()});
+  const Lager({required this.zugang, this.umgebung = const LagerUmgebung(), this.ausleihen});
 
   final LagerZugang zugang;
   final LagerUmgebung umgebung;
+
+  /// Ausleihe verwalten (Kommend/Ausgegeben/...). Ohne: kein Eintrag im
+  /// Lager.
+  final Ausleihen? ausleihen;
 }
 
 /// QR-Etiketten der Inventar-PWA enthalten die Adresse des Artikels

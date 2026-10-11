@@ -75,3 +75,20 @@ export function lagerZugang(anwendung: string | null, claims: { groups?: unknown
   if (hatLagerGruppe(gruppenAusClaims(claims))) return { ok: true, anwendung };
   return { ok: false, status: 403, error: KEIN_LAGER_ZUGRIFF };
 }
+
+/**
+ * Ausleihe: JEDES Mitglied darf mit dem Token der Mitglieder-App bzw.
+ * -Web ausleihen und seine eigenen Ausleihen sehen; verwalten (alle
+ * Ausleihen, Externe erfassen, ausgeben, zuruecknehmen) nur mit der Gruppe
+ * Lager, Vorstand oder admin. Tokens der Inventar-PWA zaehlen als Lager
+ * (wer die PWA oeffnen darf, regelt Authentik).
+ */
+export type AusleiheEntscheid =
+  | { ok: true; anwendung: string; lager: boolean }
+  | { ok: false; status: 401 | 403; error: string };
+
+export function ausleiheZugang(anwendung: string | null, claims: { groups?: unknown }): AusleiheEntscheid {
+  if (anwendung === null) return { ok: false, status: 403, error: 'Invalid token' };
+  if (anwendung === INVENTAR_ANWENDUNG) return { ok: true, anwendung, lager: true };
+  return { ok: true, anwendung, lager: hatLagerGruppe(gruppenAusClaims(claims)) };
+}

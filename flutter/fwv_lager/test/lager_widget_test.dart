@@ -117,6 +117,17 @@ class _FalscherZugang extends LagerZugang {
     artikelListe[99] = a;
     return a;
   }
+
+  @override
+  Future<void> artikelAusleihbar(int artikelId, bool ausleihbar) async {
+    aufrufe.add(('artikelAusleihbar', [artikelId, ausleihbar]));
+    artikelListe[artikelId] = artikelListe[artikelId]!.mitAusleihbar(ausleihbar);
+  }
+
+  @override
+  Future<void> lagerortAusleihbar(int lagerortId, bool ausleihbar) async {
+    aufrufe.add(('lagerortAusleihbar', [lagerortId, ausleihbar]));
+  }
 }
 
 void main() {
@@ -323,6 +334,35 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Mineral 1.5l'), findsOneWidget);
     expect(find.text('Teller'), findsNothing);
+  });
+
+  testWidgets('Ausleihbar: Artikel und ganze Kiste (Lager markiert)', (tester) async {
+    await starten(tester);
+    expect(find.byKey(const Key('ausleihen-verwalten')), findsNothing, reason: 'ohne Ausleihe');
+    await tester.tap(find.text('Teller'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('ausleihbar')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('ausleihbar'))).value, isFalse);
+    await tester.tap(find.byKey(const Key('ausleihbar')));
+    await tester.pumpAndSettle();
+    expect(zugang.letzter('artikelAusleihbar'), [2, true]);
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('ausleihbar'))).value, isTrue);
+    expect(find.text('Kann jetzt ausgeliehen werden'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Lagerorte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kiste 1'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('kiste-ausleihbar')));
+    await tester.pumpAndSettle();
+    expect(zugang.letzter('lagerortAusleihbar'), [2, true]);
+    expect(tester.widget<SwitchListTile>(find.byKey(const Key('kiste-ausleihbar'))).value, isTrue);
   });
 
   testWidgets('Dunkelmodus ohne Fehler', (tester) async {

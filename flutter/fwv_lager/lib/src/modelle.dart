@@ -57,6 +57,7 @@ class Artikel {
     this.notizen,
     this.bild,
     this.orte = const [],
+    this.ausleihbar = false,
   });
 
   factory Artikel.ausJson(Map<String, dynamic> m) => Artikel(
@@ -77,6 +78,7 @@ class Artikel {
     notizen: jsonText(m['notes']),
     bild: jsonText(m['image_url']),
     orte: jsonListe(m['locations'], ArtikelOrt.ausJson),
+    ausleihbar: jsonWahr(m['ausleihbar']) ?? false,
   );
 
   final int id;
@@ -106,6 +108,9 @@ class Artikel {
   /// Bestand je Lagerort/Kiste — nur in der Detailansicht (`GET items/:id`).
   final List<ArtikelOrt> orte;
 
+  /// Darf ausgeliehen werden (setzt das Lager).
+  final bool ausleihbar;
+
   /// Der Code, der auf dem Etikett steht: eigener Code, sonst EAN.
   String? get code => eigenerCode ?? ean;
 
@@ -114,7 +119,11 @@ class Artikel {
   /// "leer" bei Mindestbestand 0).
   bool get nachbestellen => bestand <= mindestbestand;
 
-  Artikel mitBestand(int neu) => Artikel(
+  Artikel mitBestand(int neu) => _kopie(bestand: neu);
+
+  Artikel mitAusleihbar(bool neu) => _kopie(ausleihbar: neu);
+
+  Artikel _kopie({int? bestand, bool? ausleihbar}) => Artikel(
     id: id,
     name: name,
     beschreibung: beschreibung,
@@ -124,7 +133,7 @@ class Artikel {
     lagerort: lagerort,
     ean: ean,
     eigenerCode: eigenerCode,
-    bestand: neu,
+    bestand: bestand ?? this.bestand,
     mindestbestand: mindestbestand,
     einheit: einheit,
     einkaufspreis: einkaufspreis,
@@ -132,6 +141,7 @@ class Artikel {
     notizen: notizen,
     bild: bild,
     orte: orte,
+    ausleihbar: ausleihbar ?? this.ausleihbar,
   );
 }
 
@@ -143,6 +153,7 @@ class Lagerort {
     this.beschreibung,
     this.artikel = 0,
     this.stueckTotal = 0,
+    this.ausleihbar = false,
   });
 
   factory Lagerort.ausJson(Map<String, dynamic> m) => Lagerort(
@@ -151,6 +162,7 @@ class Lagerort {
     beschreibung: jsonText(m['description']),
     artikel: _ganz(m['item_count']) ?? 0,
     stueckTotal: _ganz(m['total_quantity']) ?? 0,
+    ausleihbar: jsonWahr(m['ausleihbar']) ?? false,
   );
 
   final int id;
@@ -162,6 +174,9 @@ class Lagerort {
 
   /// Summe der Mengen aller Artikel hier.
   final int stueckTotal;
+
+  /// Als ganze Kiste ausleihbar (setzt das Lager).
+  final bool ausleihbar;
 }
 
 /// Ein Artikel im Inhalt eines Lagerorts (`GET locations/:id` → `contents`).
@@ -201,6 +216,7 @@ class LagerortInhalt {
     required this.name,
     this.beschreibung,
     this.posten = const [],
+    this.ausleihbar = false,
   });
 
   factory LagerortInhalt.ausJson(Object? json) {
@@ -210,6 +226,7 @@ class LagerortInhalt {
       name: jsonText(m['name']) ?? 'Lagerort',
       beschreibung: jsonText(m['description']),
       posten: jsonListe(m['contents'], LagerortPosten.ausJson),
+      ausleihbar: jsonWahr(m['ausleihbar']) ?? false,
     );
   }
 
@@ -217,6 +234,9 @@ class LagerortInhalt {
   final String name;
   final String? beschreibung;
   final List<LagerortPosten> posten;
+
+  /// Als ganze Kiste ausleihbar.
+  final bool ausleihbar;
 }
 
 class Kategorie {

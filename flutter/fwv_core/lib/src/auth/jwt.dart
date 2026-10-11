@@ -36,3 +36,13 @@ List<String> jwtGruppen(String? token) {
       if (e is String && e.trim().isNotEmpty) e.trim(),
   ]);
 }
+
+/// Stammt das Token von Authentik (RS256, mit `iss`)? QR-Login und
+/// Passwort-Reset (HS256, `type: member`) und Organisator-Logins nicht.
+/// Andere Backends (z.B. das Inventar) nehmen nur Authentik-Tokens an.
+bool jwtVonAuthentik(String? token) {
+  final angaben = jwtAngaben(token);
+  if (angaben['type'] != null) return false;
+  final iss = angaben['iss'];
+  return iss is String && iss.isNotEmpty;
+}

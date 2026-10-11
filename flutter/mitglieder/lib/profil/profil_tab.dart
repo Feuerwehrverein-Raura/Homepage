@@ -3,6 +3,7 @@
 // members-ios ProfileView.
 
 import 'package:fwv_core/fwv_core.dart';
+import 'package:fwv_lager/fwv_lager.dart' show MeineAusleihenScreen, ausleiheNeuOeffnen;
 import 'package:material_ui/material_ui.dart';
 
 import '../anlaesse/meine_anmeldungen_screen.dart';
@@ -144,6 +145,7 @@ class _ProfilTabState extends State<ProfilTab> {
             MaterialPageRoute(builder: (_) => MeineAnmeldungenScreen(dienste: widget.dienste)),
           ),
         ),
+        ..._ausleihe(context),
         const Divider(height: 32),
         ListTile(
           leading: Icon(Icons.exit_to_app, color: Theme.of(context).colorScheme.error),
@@ -157,6 +159,50 @@ class _ProfilTabState extends State<ProfilTab> {
         ),
       ],
     );
+  }
+
+  /// Ausleihe aus dem Vereinslager: jedes Mitglied mit Authentik-Anmeldung.
+  /// Mit QR-Code angemeldet geht es nicht (die Inventar-API nimmt nur
+  /// Authentik-Tokens an) — dann ein Hinweis statt der Eintraege.
+  List<Widget> _ausleihe(BuildContext context) {
+    final d = widget.dienste;
+    if (!d.ausleiheMoeglich) {
+      return const [
+        ListTile(
+          key: Key('ausleihe-hinweis'),
+          enabled: false,
+          leading: Icon(Icons.handshake_outlined),
+          title: Text('Material ausleihen'),
+          subtitle: Text(
+            'Nur mit Anmeldung über das Vereinskonto, nicht per QR-Code. '
+            'Zum Ausleihen abmelden und mit dem Vereinskonto anmelden.',
+          ),
+        ),
+      ];
+    }
+    return [
+      ListTile(
+        key: const Key('material-ausleihen'),
+        leading: const Icon(Icons.handshake_outlined),
+        title: const Text('Material ausleihen'),
+        subtitle: const Text('Festbänke, Geschirr, ganze Kisten'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () async {
+          final a = await ausleiheNeuOeffnen(context, d.ausleihen);
+          if (a != null && context.mounted) {
+            meldung(context, 'Reserviert — das Lager ist informiert.');
+          }
+        },
+      ),
+      ListTile(
+        key: const Key('meine-ausleihen'),
+        leading: const Icon(Icons.assignment_return_outlined),
+        title: const Text('Meine Ausleihen'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => MeineAusleihenScreen(ausleihen: d.ausleihen))),
+      ),
+    ];
   }
 
   Widget _zeile(IconData symbol, String titel, String? wert) {

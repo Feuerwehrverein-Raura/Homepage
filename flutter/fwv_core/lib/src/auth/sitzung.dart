@@ -67,6 +67,11 @@ class Sitzung {
   /// Token gelesen, gilt also auch nach dem Erneuern.
   List<String> get gruppen => kontotyp == Kontotyp.mitglied ? jwtGruppen(accessToken) : const [];
 
+  /// Mitglied mit Authentik-Anmeldung (nicht QR-Code, nicht Passwort-Reset,
+  /// kein externer Organisator). Nur solche Tokens nimmt das Inventar an
+  /// (z.B. fuer die Ausleihe).
+  bool get vonAuthentik => kontotyp == Kontotyp.mitglied && jwtVonAuthentik(accessToken);
+
   /// Ob die Sitzung eine der [namen] als Gruppe hat (Gross-/Kleinschreibung
   /// egal: Authentik kennt `Lager` und `admin`).
   bool hatGruppe(Iterable<String> namen) {

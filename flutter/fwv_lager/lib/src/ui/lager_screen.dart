@@ -7,6 +7,7 @@ import 'dart:async';
 import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, fehlerText, meldung;
 import 'package:material_ui/material_ui.dart';
 
+import '../ausleihe/ui/listen_screens.dart';
 import '../modelle.dart';
 import '../zugang.dart';
 import 'anlegen_screen.dart';
@@ -91,6 +92,15 @@ class _LagerScreenState extends State<LagerScreen> {
         appBar: AppBar(
           title: const Text('Lager'),
           actions: [
+            if (_lager.ausleihen case final ausleihen?)
+              IconButton(
+                key: const Key('ausleihen-verwalten'),
+                onPressed: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => AusleihenVerwaltenScreen(ausleihen: ausleihen)),
+                ),
+                icon: const Icon(Icons.handshake_outlined),
+                tooltip: 'Ausleihen verwalten',
+              ),
             IconButton(
               onPressed: _anlegen,
               icon: const Icon(Icons.add_box_outlined),

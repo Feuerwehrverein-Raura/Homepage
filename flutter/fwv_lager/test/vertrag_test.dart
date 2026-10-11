@@ -29,6 +29,7 @@ void main() {
     expect(a.ean, '7610000000001');
     expect(a.code, 'FWV000001');
     expect([for (final o in a.orte) (o.name, o.menge)], [('Keller', 3), ('Kiste 1', 1)]);
+    expect(a.ausleihbar, isFalse, reason: 'Standard: nicht ausleihbar');
   });
 
   test('Artikelliste (GET items) und Nachbestellen (GET reports/low-stock)', () {
@@ -57,6 +58,7 @@ void main() {
       [('Keller', 1, 3), ('Kiste 1', 2, 51)],
     );
     expect(orte.first.beschreibung, 'Hauptlager');
+    expect(orte.every((o) => !o.ausleihbar), isTrue);
 
     final inhalt = LagerortInhalt.ausJson(v['location']);
     expect(inhalt.name, 'Kiste 1');

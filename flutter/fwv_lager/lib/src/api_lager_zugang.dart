@@ -13,6 +13,7 @@
 //   GET  reports/low-stock
 //   GET  categories, barcode/next
 //   POST items                  ohne EAN vergibt das Backend FWV000123
+//   PATCH items/:id/ausleihbar, locations/:id/ausleihbar  {ausleihbar}
 
 import 'package:fwv_core/fwv_core.dart';
 
@@ -103,6 +104,16 @@ class ApiLagerZugang extends LagerZugang {
     final json = await api.post('items', daten: artikel.alsJson());
     if (json is! Map) throw const ApiFehler('Der Artikel wurde nicht angelegt.');
     return Artikel.ausJson(Map<String, dynamic>.from(json));
+  }
+
+  @override
+  Future<void> artikelAusleihbar(int artikelId, bool ausleihbar) async {
+    await api.patch('items/$artikelId/ausleihbar', daten: {'ausleihbar': ausleihbar});
+  }
+
+  @override
+  Future<void> lagerortAusleihbar(int lagerortId, bool ausleihbar) async {
+    await api.patch('locations/$lagerortId/ausleihbar', daten: {'ausleihbar': ausleihbar});
   }
 
   /// Bilder liegen unter `/api/uploads/…` auf dem Inventar-Server.

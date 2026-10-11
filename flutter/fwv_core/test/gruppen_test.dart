@@ -73,6 +73,20 @@ void main() {
     });
   });
 
+  group('vonAuthentik (Ausleihe: nur Authentik-Tokens)', () {
+    Sitzung s(String token, [Kontotyp typ = Kontotyp.mitglied]) =>
+        Sitzung(accessToken: token, kontotyp: typ);
+
+    test('Authentik-Mitglied ja, QR/Reset/Organisator/kein JWT nein', () {
+      expect(s(_jwt({'iss': _iss})).vonAuthentik, isTrue);
+      expect(s(_jwt({'type': 'member', 'iss': _iss})).vonAuthentik, isFalse);
+      expect(s(_jwt({'email': 'e@x.ch'})).vonAuthentik, isFalse);
+      expect(s(_jwt({'iss': _iss}), Kontotyp.organisator).vonAuthentik, isFalse);
+      expect(s('kein-jwt').vonAuthentik, isFalse);
+      expect(jwtVonAuthentik(null), isFalse);
+    });
+  });
+
   group('apiFuer: zweites Backend mit demselben Token', () {
     test('Bearer, eigene Basis, Erneuern bei 403', () async {
       var gueltig = 'alt';

@@ -45,6 +45,8 @@ void main() {
         ('GET', '/api/categories') => json(v['categories']),
         ('GET', '/api/barcode/next') => json(v['barcode_next']),
         ('POST', '/api/items') => json(v['item_neu']),
+        ('PATCH', '/api/items/2/ausleihbar') => json({...v['item'] as Map, 'ausleihbar': true}),
+        ('PATCH', '/api/locations/2/ausleihbar') => json({'id': 2, 'ausleihbar': true}),
         _ => json({'error': 'nicht gefunden'}, 404),
       };
     });
@@ -144,6 +146,15 @@ void main() {
       'quantity': 0,
       'min_quantity': 0,
     });
+  });
+
+  test('Ausleihbar setzen (Artikel und Lagerort)', () async {
+    await zugang.artikelAusleihbar(2, true);
+    expect(anfragen.last.method, 'PATCH');
+    expect(anfragen.last.url.path, '/api/items/2/ausleihbar');
+    expect(jsonDecode(anfragen.last.body), {'ausleihbar': true});
+    await zugang.lagerortAusleihbar(2, true);
+    expect(anfragen.last.url.path, '/api/locations/2/ausleihbar');
   });
 
   test('Bildadresse gegen den Inventar-Server, Token nur dorthin', () {

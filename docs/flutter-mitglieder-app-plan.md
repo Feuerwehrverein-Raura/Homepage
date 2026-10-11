@@ -308,6 +308,80 @@ Offen:
 - Die Inventar-Leserouten (`GET items`, `locations`, `reports`, …) sind
   weiterhin ohne Anmeldung offen.
 
+### Stand Ausleihe (11.10.2026)
+
+**Gebaut** (Entscheidung "Ausleihe" in `docs/flutter-entscheidung.md`).
+Getestet mit Nachbauten und gegen echte Antworten der Inventar-API; noch
+nicht auf einem Gerät, noch nicht gegen das echte Authentik, Versand nur
+gegen nachgebaute Dienste.
+
+- Inventar-Backend: neue Tabellen `ausleihen`, `ausleihe_positionen`,
+  `ausleihe_kisten_inhalt`, `ausleihe_fotos`, Spalte `ausleihbar` an
+  `items` und `locations` (Standard aus) — angelegt beim Start wie die
+  anderen Tabellen (`CREATE TABLE IF NOT EXISTS`). Routen unter
+  `/api/ausleihe` (Liste im README von `simple-inventory-system`). Regeln in
+  `src/ausleihe.ts`: frei = Bestand + gerade Ausgegebenes − alle
+  überschneidenden Ausleihen (reserviert oder ausgegeben, Kisten mit
+  Inhalt); eine Kiste ist frei, wenn keine überschneidende Ausleihe sie
+  hat; Ausgegebenes belegt bis zur Rückgabe, auch überfällig. Anlegen prüft
+  im Backend (409 mit deutscher Meldung, gesperrt gegen gleichzeitiges
+  Anlegen). Ausgeben bucht aus (`Ausleihe #id`) und hält den Kisten-Inhalt
+  fest; Zurücknehmen bucht Zurückgekommenes ein, Beschädigtes/Fehlendes
+  bleibt ausgebucht (Verlauf mit Grund), Fehlendes aus Kisten wird dort
+  abgezogen. Status, Farbe, Zeitraum, Hinweis ("Seit 2 Tagen überfällig")
+  und erlaubte Aktionen liefert der `app`-Block.
+- Rechte: die Ausleihe-Routen nehmen Tokens der Mitglieder-App/-Web **ohne**
+  Lager-Gruppe an (jedes Mitglied leiht für sich, sieht und sagt eigene ab);
+  verwalten, Externe erfassen, Fotos und "ausleihbar" nur Lager, Vorstand,
+  admin. Alle anderen Inventar-Routen verlangen weiter die Gruppe.
+- Benachrichtigungen: neue Ausleihe eines Mitglieds → E-Mail ans Lager und
+  Bestätigung ans Mitglied (+ Push, wenn api-members das Mitglied über die
+  E-Mail findet); Absage eines Mitglieds → E-Mail ans Lager. Externe erfasst
+  das Lager selbst — keine Meldung. Erinnerungen (stündlich geprüft,
+  höchstens eine pro Ausleihe und Tag): einen Tag vor "bis" und täglich bei
+  Überfälligkeit an die Person (E-Mail, Mitglieder auch Push); beim ersten
+  Überfällig-Tag zusätzlich ans Lager.
+- `fwv_lager`: `AusleiheZugang`/`ApiAusleiheZugang` (eigene Schnittstelle
+  neben `LagerZugang`, weil jedes Mitglied ausleihen darf), Modelle,
+  Screens: Ausleihen (Zeitraum → Angebot mit freier Menge → Mengen/Kisten →
+  bestätigen, 409 lädt neu), Meine Ausleihen, Ausleihe (Absagen/Ausgeben/
+  Zurücknehmen je nach `app`-Block), Ausleihen verwalten (Kommend ·
+  Ausgegeben · Überfällig · Erledigt, "Für Externe"), Rückgabe je Position
+  bzw. Kisten-Zeile (Menge, Zustand, Schaden, Fotos 1600 px).
+  `LagerZugang` setzt "ausleihbar" (Schalter im Artikel und im Lagerort).
+  Vertrag `fwv_lager/test/fixtures/ausleihe-api.json` schreibt und prüft
+  `simple-inventory-system/backend/test/ausleihe.test.mjs` ("heute" darin
+  immer 11.10.2026).
+- Mitglieder-App: Profil → "Material ausleihen" und "Meine Ausleihen" für
+  alle mit Authentik-Anmeldung; mit QR-Code angemeldet ein Hinweis (die
+  Inventar-API nimmt QR-Tokens nicht an); externe Organisatoren haben kein
+  Profil. Im Reiter Lager oben "Ausleihen verwalten". `fwv_core`:
+  `Sitzung.vonAuthentik`.
+
+**Vor dem Einschalten auf dem Server** (`simple-inventory-system/.env`,
+Werte aus der `.env` des Haupt-Stacks; nichts davon ist gesetzt):
+
+- `DISPATCH_API_KEY` = `API_KEY` — sonst geht keine E-Mail raus (nur Log).
+- `INTERNAL_API_KEY` = `INTERNAL_API_KEY` — sonst kein Push.
+- `LAGER_EMAIL` — Standard `lager@fwv-raura.ch`; prüfen, ob es die Adresse
+  gibt.
+- `DISPATCH_API_URL` / `MEMBERS_API_URL` — Standard `http://api-dispatch:3000`
+  bzw. `http://api-members:3000` über das Netz `proxy`; einmal aus dem
+  Container prüfen (sonst `http://fwv-api-dispatch:3000` usw.).
+- Erst danach `AUSLEIHE_ERINNERUNG_ENABLED=true` — bis dahin keine
+  Erinnerungen. Probelauf: `POST /api/ausleihe/erinnerungen` mit
+  `x-order-api-key`.
+
+Offen:
+
+- Das Lager muss zuerst Artikel und Kisten als ausleihbar markieren.
+- Die Inventar-PWA kennt die Ausleihe nicht; der Raspberry-Pi-Sync nimmt
+  die Ausleihe-Tabellen nicht mit.
+- Schadenfotos liegen wie Belege unter `/api/uploads/` ohne Anmeldung.
+- Ausgeben verlangt genug Bestand; stimmt der Kisten-Inhalt
+  (`item_locations`) nicht mit dem Gesamtbestand, meldet es 409.
+- Kein Bearbeiten einer Ausleihe (Zeitraum/Mengen) — absagen und neu.
+
 ## Phase 3 — Ablösung der alten Apps
 
 - **Android**: gleiche App-ID `com.fwv.members`, gleicher Upload-Schlüssel

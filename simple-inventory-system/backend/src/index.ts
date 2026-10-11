@@ -12,6 +12,7 @@ import webpush from 'web-push';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticateToken, optionalAuth, AuthenticatedRequest, localLogin, getAuthMode } from './auth.js';
 import { generateQRCodeWithLogo, getItemUrl } from './qrcode.js';
+import { ausleiheEinrichten, ausleiheTabellen, erinnerungenPlanen } from './ausleihe-routen.js';
 
 const app = express();
 const server = createServer(app);
@@ -384,6 +385,9 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Ausleihe (Tabellen und Spalte "ausleihbar", idempotent)
+  await ausleiheTabellen(pool);
 
   console.log('Database initialized');
 }
@@ -1981,6 +1985,9 @@ async function authenticateEventAccess(req: AuthenticatedRequest, res: express.R
   return authenticateToken(req, res, next);
 }
 
+// Ausleihe (src/ausleihe-routen.ts) — vor den allgemeinen /api/items/:id-Routen
+ausleiheEinrichten({ app, pool, upload, uploadDir, broadcast, orderApiKey: ORDER_API_KEY });
+
 // Create item from order system (API key authentication)
 app.post('/api/items/from-order', authenticateOrderSystem, async (req, res) => {
   try {
@@ -3323,6 +3330,7 @@ app.post('/api/sync/push', authenticateSync, async (req, res) => {
 const PORT = Number(process.env.PORT) || 3000;
 
 initDB().then(() => {
+  erinnerungenPlanen(pool);
   server.listen(PORT, () => {
     console.log(`Inventory API running on port ${PORT}`);
     console.log(`Mode: ${getAuthMode().local ? 'LOCAL' : 'ONLINE'}`);

@@ -97,6 +97,27 @@ class _ArtikelScreenState extends State<ArtikelScreen> {
     }
   }
 
+  Future<void> _ausleihbar(bool neu) async {
+    final a = _artikel;
+    if (a == null) return;
+    setState(() {
+      _laeuft = true;
+      _artikel = a.mitAusleihbar(neu);
+    });
+    try {
+      await _zugang.artikelAusleihbar(a.id, neu);
+      if (mounted) {
+        meldung(context, neu ? 'Kann jetzt ausgeliehen werden' : 'Nicht mehr ausleihbar');
+      }
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() => _artikel = a);
+      meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _laeuft = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final a = _artikel;
@@ -219,6 +240,15 @@ class _ArtikelScreenState extends State<ArtikelScreen> {
             subtitle: o.notiz == null ? null : Text(o.notiz!),
             trailing: Text(mengeMitEinheit(o.menge, a.einheit), style: t.textTheme.titleSmall),
           ),
+        SwitchListTile(
+          key: const Key('ausleihbar'),
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.handshake_outlined),
+          title: const Text('Ausleihbar'),
+          subtitle: const Text('Mitglieder können ihn in der App ausleihen'),
+          value: a.ausleihbar,
+          onChanged: _laeuft ? null : _ausleihbar,
+        ),
         const Abschnitt('Letzte Buchungen'),
         if (verlauf.isEmpty)
           Padding(

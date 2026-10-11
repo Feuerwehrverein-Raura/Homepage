@@ -10,7 +10,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 import {
-  anwendungAusIssuer, Entscheid, gruppenAusClaims, issuerFuer, jwksFuer, lagerZugang
+  anwendungAusIssuer, ausleiheZugang, AusleiheEntscheid, Entscheid, gruppenAusClaims,
+  hatLagerGruppe, issuerFuer, jwksFuer, lagerZugang
 } from './zugang.js';
 
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
@@ -38,7 +39,7 @@ function clientFuer(anwendung: string): jwksClient.JwksClient {
 }
 
 type Benutzer = NonNullable<AuthenticatedRequest['user']>;
-type Pruefung = { user: Benutzer; entscheid: Entscheid };
+type Pruefung = { user: Benutzer; entscheid: Entscheid; ausleihe: AusleiheEntscheid };
 
 /**
  * Prueft ein Authentik-Token (RS256): Issuer bestimmt die Anwendung und
@@ -69,7 +70,8 @@ function authentikPruefen(token: string): Promise<Pruefung> {
           name: decoded.name,
           groups: gruppenAusClaims(decoded)
         },
-        entscheid: lagerZugang(anwendung, decoded)
+        entscheid: lagerZugang(anwendung, decoded),
+        ausleihe: ausleiheZugang(anwendung, decoded)
       });
     });
   });
@@ -82,6 +84,8 @@ export interface AuthenticatedRequest extends Request {
     name: string;
     groups: string[];
   };
+  /** Darf das Lager verwalten (Gruppe Lager/Vorstand/admin, Inventar-PWA). */
+  lager?: boolean;
 }
 
 /**
@@ -133,6 +137,7 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
         name: decoded.name,
         groups: decoded.groups || []
       };
+      req.lager = true;
       return next();
     } catch (err) {
       return res.status(403).json({ error: 'Invalid token' });
@@ -145,6 +150,47 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
       return res.status(entscheid.status).json({ error: entscheid.error });
     }
     req.user = user;
+    req.lager = true;
+    next();
+  }, (err: Error) => {
+    console.error('Token verification failed:', err.message);
+    res.status(403).json({ error: 'Invalid token' });
+  });
+}
+
+/**
+ * Fuer die Ausleihe: nimmt die Tokens der Mitglieder-App und -Web auch
+ * OHNE Lager-Gruppe an (jedes Mitglied darf ausleihen). [req.lager] sagt,
+ * ob die Person verwalten darf. QR-/Passwort-Reset-Tokens (HS256) sind
+ * keine Authentik-Tokens und werden wie ueberall abgelehnt.
+ */
+export function authenticateAusleihe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  if (LOCAL_MODE) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      req.user = {
+        id: decoded.id,
+        email: decoded.email,
+        name: decoded.name,
+        groups: decoded.groups || []
+      };
+      req.lager = hatLagerGruppe(req.user.groups);
+      return next();
+    } catch (err) {
+      return res.status(403).json({ error: 'Invalid token' });
+    }
+  }
+  authentikPruefen(token).then(({ user, ausleihe }) => {
+    if (!ausleihe.ok) {
+      return res.status(ausleihe.status).json({ error: ausleihe.error });
+    }
+    req.user = user;
+    req.lager = ausleihe.lager;
     next();
   }, (err: Error) => {
     console.error('Token verification failed:', err.message);

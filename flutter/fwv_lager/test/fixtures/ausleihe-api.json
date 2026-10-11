@@ -1,0 +1,773 @@
+{
+  "_hinweis": "Antworten der Inventar-API zur Ausleihe (simple-inventory-system/backend/test/ausleihe.test.mjs). \"Heute\" ist hier immer der 11.10.2026.",
+  "ausleihbar_artikel": {
+    "id": 2,
+    "name": "Teller",
+    "description": null,
+    "category_id": 2,
+    "location_id": 1,
+    "ean_code": null,
+    "custom_barcode": null,
+    "quantity": 50,
+    "min_quantity": 0,
+    "unit": "Stück",
+    "purchase_price": null,
+    "supplier": null,
+    "notes": null,
+    "image_url": null,
+    "sellable": false,
+    "sale_price": null,
+    "sale_category": null,
+    "printer_station": "bar",
+    "active": true,
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "updated_at": "2026-10-11T08:00:00.000Z",
+    "ausleihbar": true
+  },
+  "ausleihbar_lagerort": {
+    "id": 2,
+    "name": "Festkiste",
+    "description": "Teller und Mineral fürs Fest",
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "ausleihbar": true
+  },
+  "angebot": {
+    "von": "2026-10-13",
+    "bis": "2026-10-15",
+    "zeitraum_text": "13.10.2026 – 15.10.2026",
+    "artikel": [
+      {
+        "id": 2,
+        "name": "Teller",
+        "einheit": "Stück",
+        "beschreibung": null,
+        "image_url": null,
+        "kategorie": "Geschirr",
+        "frei": 50,
+        "frei_text": "50 Stück frei"
+      },
+      {
+        "id": 1,
+        "name": "Festbank",
+        "einheit": "Stück",
+        "beschreibung": null,
+        "image_url": null,
+        "kategorie": "Mobiliar",
+        "frei": 10,
+        "frei_text": "10 Stück frei"
+      }
+    ],
+    "kisten": [
+      {
+        "id": 2,
+        "name": "Festkiste",
+        "beschreibung": "Teller und Mineral fürs Fest",
+        "frei": true,
+        "frei_text": "Frei",
+        "inhalt": [
+          {
+            "item_id": 3,
+            "name": "Mineral",
+            "einheit": "Flasche",
+            "menge": 6,
+            "menge_text": "6 Flasche Mineral"
+          },
+          {
+            "item_id": 2,
+            "name": "Teller",
+            "einheit": "Stück",
+            "menge": 20,
+            "menge_text": "20 Stück Teller"
+          }
+        ]
+      }
+    ]
+  },
+  "ausleihe_neu": {
+    "id": 1,
+    "status": "reserviert",
+    "von": "2026-10-13",
+    "bis": "2026-10-15",
+    "art": "mitglied",
+    "mitglied_email": "erika@example.ch",
+    "mitglied_name": "Erika Muster",
+    "extern_name": null,
+    "extern_organisation": null,
+    "extern_telefon": null,
+    "extern_email": null,
+    "notizen": "Geburtstag",
+    "rueckgabe_notiz": null,
+    "erstellt_von": "erika@example.ch",
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_at": null,
+    "ausgegeben_von": null,
+    "zurueckgegeben_at": null,
+    "zurueckgegeben_von": null,
+    "abgesagt_at": null,
+    "abgesagt_von": null,
+    "positionen": [
+      {
+        "id": 1,
+        "art": "artikel",
+        "item_id": 2,
+        "location_id": null,
+        "name": "Teller",
+        "einheit": "Stück",
+        "menge": 30,
+        "zurueck_menge": null,
+        "zustand": null,
+        "schaden": null,
+        "zurueck_at": null,
+        "menge_text": "30 Stück Teller",
+        "zustand_text": null,
+        "inhalt": []
+      }
+    ],
+    "fotos": [],
+    "app": {
+      "status_text": "Reserviert",
+      "status_farbe": "gelb",
+      "zeitraum_text": "13.10.2026 – 15.10.2026",
+      "ausleiher_text": "Erika Muster",
+      "hinweis": "Abholen ab 13.10.2026",
+      "ueberfaellig": false,
+      "kann_absagen": true,
+      "kann_ausgeben": false,
+      "kann_zuruecknehmen": false
+    }
+  },
+  "ausleihe_409": {
+    "error": "Von «Teller» sind am 14.10.2026 nur noch 20 Stück frei."
+  },
+  "ausleihe_extern": {
+    "id": 3,
+    "status": "reserviert",
+    "von": "2026-10-14",
+    "bis": "2026-10-14",
+    "art": "extern",
+    "mitglied_email": null,
+    "mitglied_name": null,
+    "extern_name": "Hans Muster",
+    "extern_organisation": "Turnverein",
+    "extern_telefon": "079 123 45 67",
+    "extern_email": "hans@example.ch",
+    "notizen": null,
+    "rueckgabe_notiz": null,
+    "erstellt_von": "lager-person@example.ch",
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_at": null,
+    "ausgegeben_von": null,
+    "zurueckgegeben_at": null,
+    "zurueckgegeben_von": null,
+    "abgesagt_at": null,
+    "abgesagt_von": null,
+    "positionen": [
+      {
+        "id": 3,
+        "art": "kiste",
+        "item_id": null,
+        "location_id": 2,
+        "name": "Festkiste",
+        "einheit": null,
+        "menge": 1,
+        "zurueck_menge": null,
+        "zustand": null,
+        "schaden": null,
+        "zurueck_at": null,
+        "menge_text": "Festkiste",
+        "zustand_text": null,
+        "inhalt": [
+          {
+            "id": null,
+            "position_id": 3,
+            "item_id": 3,
+            "name": "Mineral",
+            "einheit": "Flasche",
+            "menge": 6,
+            "zurueck_menge": null,
+            "zustand": null,
+            "schaden": null,
+            "menge_text": "6 Flasche Mineral",
+            "zustand_text": null
+          },
+          {
+            "id": null,
+            "position_id": 3,
+            "item_id": 2,
+            "name": "Teller",
+            "einheit": "Stück",
+            "menge": 20,
+            "zurueck_menge": null,
+            "zustand": null,
+            "schaden": null,
+            "menge_text": "20 Stück Teller",
+            "zustand_text": null
+          }
+        ]
+      }
+    ],
+    "fotos": [],
+    "app": {
+      "status_text": "Reserviert",
+      "status_farbe": "gelb",
+      "zeitraum_text": "14.10.2026",
+      "ausleiher_text": "Hans Muster, Turnverein",
+      "hinweis": "Abholen ab 14.10.2026",
+      "ueberfaellig": false,
+      "kann_absagen": true,
+      "kann_ausgeben": true,
+      "kann_zuruecknehmen": false
+    }
+  },
+  "angebot_belegt": {
+    "von": "2026-10-14",
+    "bis": "2026-10-14",
+    "zeitraum_text": "14.10.2026",
+    "artikel": [
+      {
+        "id": 2,
+        "name": "Teller",
+        "einheit": "Stück",
+        "beschreibung": null,
+        "image_url": null,
+        "kategorie": "Geschirr",
+        "frei": 0,
+        "frei_text": "Ausgebucht"
+      },
+      {
+        "id": 1,
+        "name": "Festbank",
+        "einheit": "Stück",
+        "beschreibung": null,
+        "image_url": null,
+        "kategorie": "Mobiliar",
+        "frei": 10,
+        "frei_text": "10 Stück frei"
+      }
+    ],
+    "kisten": [
+      {
+        "id": 2,
+        "name": "Festkiste",
+        "beschreibung": "Teller und Mineral fürs Fest",
+        "frei": false,
+        "frei_text": "Schon ausgeliehen",
+        "inhalt": [
+          {
+            "item_id": 3,
+            "name": "Mineral",
+            "einheit": "Flasche",
+            "menge": 6,
+            "menge_text": "6 Flasche Mineral"
+          },
+          {
+            "item_id": 2,
+            "name": "Teller",
+            "einheit": "Stück",
+            "menge": 20,
+            "menge_text": "20 Stück Teller"
+          }
+        ]
+      }
+    ]
+  },
+  "meine": [
+    {
+      "id": 1,
+      "status": "reserviert",
+      "von": "2026-10-13",
+      "bis": "2026-10-15",
+      "art": "mitglied",
+      "mitglied_email": "erika@example.ch",
+      "mitglied_name": "Erika Muster",
+      "extern_name": null,
+      "extern_organisation": null,
+      "extern_telefon": null,
+      "extern_email": null,
+      "notizen": "Geburtstag",
+      "rueckgabe_notiz": null,
+      "erstellt_von": "erika@example.ch",
+      "created_at": "2026-10-11T08:00:00.000Z",
+      "ausgegeben_at": null,
+      "ausgegeben_von": null,
+      "zurueckgegeben_at": null,
+      "zurueckgegeben_von": null,
+      "abgesagt_at": null,
+      "abgesagt_von": null,
+      "positionen": [
+        {
+          "id": 1,
+          "art": "artikel",
+          "item_id": 2,
+          "location_id": null,
+          "name": "Teller",
+          "einheit": "Stück",
+          "menge": 30,
+          "zurueck_menge": null,
+          "zustand": null,
+          "schaden": null,
+          "zurueck_at": null,
+          "menge_text": "30 Stück Teller",
+          "zustand_text": null,
+          "inhalt": []
+        }
+      ],
+      "fotos": [],
+      "app": {
+        "status_text": "Reserviert",
+        "status_farbe": "gelb",
+        "zeitraum_text": "13.10.2026 – 15.10.2026",
+        "ausleiher_text": "Erika Muster",
+        "hinweis": "Abholen ab 13.10.2026",
+        "ueberfaellig": false,
+        "kann_absagen": true,
+        "kann_ausgeben": false,
+        "kann_zuruecknehmen": false
+      }
+    }
+  ],
+  "ausleihe_abgesagt": {
+    "id": 2,
+    "status": "abgesagt",
+    "von": "2026-10-16",
+    "bis": "2026-10-17",
+    "art": "mitglied",
+    "mitglied_email": "max@example.ch",
+    "mitglied_name": "Max Beispiel",
+    "extern_name": null,
+    "extern_organisation": null,
+    "extern_telefon": null,
+    "extern_email": null,
+    "notizen": null,
+    "rueckgabe_notiz": null,
+    "erstellt_von": "max@example.ch",
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_at": null,
+    "ausgegeben_von": null,
+    "zurueckgegeben_at": null,
+    "zurueckgegeben_von": null,
+    "abgesagt_at": "2026-10-11T08:00:00.000Z",
+    "abgesagt_von": "max@example.ch",
+    "positionen": [
+      {
+        "id": 2,
+        "art": "artikel",
+        "item_id": 2,
+        "location_id": null,
+        "name": "Teller",
+        "einheit": "Stück",
+        "menge": 50,
+        "zurueck_menge": null,
+        "zustand": null,
+        "schaden": null,
+        "zurueck_at": null,
+        "menge_text": "50 Stück Teller",
+        "zustand_text": null,
+        "inhalt": []
+      }
+    ],
+    "fotos": [],
+    "app": {
+      "status_text": "Abgesagt",
+      "status_farbe": "grau",
+      "zeitraum_text": "16.10.2026 – 17.10.2026",
+      "ausleiher_text": "Max Beispiel",
+      "hinweis": null,
+      "ueberfaellig": false,
+      "kann_absagen": false,
+      "kann_ausgeben": false,
+      "kann_zuruecknehmen": false
+    }
+  },
+  "ausleihe_ausgegeben": {
+    "id": 3,
+    "status": "ausgegeben",
+    "von": "2026-10-14",
+    "bis": "2026-10-14",
+    "art": "extern",
+    "mitglied_email": null,
+    "mitglied_name": null,
+    "extern_name": "Hans Muster",
+    "extern_organisation": "Turnverein",
+    "extern_telefon": "079 123 45 67",
+    "extern_email": "hans@example.ch",
+    "notizen": null,
+    "rueckgabe_notiz": null,
+    "erstellt_von": "lager-person@example.ch",
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_von": "lager-person@example.ch",
+    "zurueckgegeben_at": null,
+    "zurueckgegeben_von": null,
+    "abgesagt_at": null,
+    "abgesagt_von": null,
+    "positionen": [
+      {
+        "id": 3,
+        "art": "kiste",
+        "item_id": null,
+        "location_id": 2,
+        "name": "Festkiste",
+        "einheit": null,
+        "menge": 1,
+        "zurueck_menge": null,
+        "zustand": null,
+        "schaden": null,
+        "zurueck_at": null,
+        "menge_text": "Festkiste",
+        "zustand_text": null,
+        "inhalt": [
+          {
+            "id": 1,
+            "position_id": 3,
+            "item_id": 3,
+            "name": "Mineral",
+            "einheit": "Flasche",
+            "menge": 6,
+            "zurueck_menge": null,
+            "zustand": null,
+            "schaden": null,
+            "menge_text": "6 Flasche Mineral",
+            "zustand_text": null
+          },
+          {
+            "id": 2,
+            "position_id": 3,
+            "item_id": 2,
+            "name": "Teller",
+            "einheit": "Stück",
+            "menge": 20,
+            "zurueck_menge": null,
+            "zustand": null,
+            "schaden": null,
+            "menge_text": "20 Stück Teller",
+            "zustand_text": null
+          }
+        ]
+      }
+    ],
+    "fotos": [],
+    "app": {
+      "status_text": "Ausgegeben",
+      "status_farbe": "gruen",
+      "zeitraum_text": "14.10.2026",
+      "ausleiher_text": "Hans Muster, Turnverein",
+      "hinweis": "Zurück bis 14.10.2026",
+      "ueberfaellig": false,
+      "kann_absagen": false,
+      "kann_ausgeben": false,
+      "kann_zuruecknehmen": true
+    }
+  },
+  "foto": {
+    "id": 1,
+    "position_id": 1,
+    "image_url": "/api/uploads/item-foto.jpg",
+    "hochgeladen_von": "lager-person@example.ch",
+    "created_at": "2026-10-11T08:00:00.000Z"
+  },
+  "ausleihe_zurueck": {
+    "id": 1,
+    "status": "zurueckgegeben",
+    "von": "2026-10-13",
+    "bis": "2026-10-15",
+    "art": "mitglied",
+    "mitglied_email": "erika@example.ch",
+    "mitglied_name": "Erika Muster",
+    "extern_name": null,
+    "extern_organisation": null,
+    "extern_telefon": null,
+    "extern_email": null,
+    "notizen": "Geburtstag",
+    "rueckgabe_notiz": "Sonst sauber",
+    "erstellt_von": "erika@example.ch",
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_von": "lager-person@example.ch",
+    "zurueckgegeben_at": "2026-10-11T08:00:00.000Z",
+    "zurueckgegeben_von": "lager-person@example.ch",
+    "abgesagt_at": null,
+    "abgesagt_von": null,
+    "positionen": [
+      {
+        "id": 1,
+        "art": "artikel",
+        "item_id": 2,
+        "location_id": null,
+        "name": "Teller",
+        "einheit": "Stück",
+        "menge": 30,
+        "zurueck_menge": 27,
+        "zustand": "beschaedigt",
+        "schaden": "3 Teller zerbrochen",
+        "zurueck_at": "2026-10-11T08:00:00.000Z",
+        "menge_text": "30 Stück Teller",
+        "zustand_text": "Beschädigt",
+        "inhalt": []
+      }
+    ],
+    "fotos": [
+      {
+        "id": 1,
+        "position_id": 1,
+        "image_url": "/api/uploads/item-foto.jpg",
+        "hochgeladen_von": "lager-person@example.ch",
+        "created_at": "2026-10-11T08:00:00.000Z"
+      }
+    ],
+    "app": {
+      "status_text": "Zurückgegeben",
+      "status_farbe": "grau",
+      "zeitraum_text": "13.10.2026 – 15.10.2026",
+      "ausleiher_text": "Erika Muster",
+      "hinweis": null,
+      "ueberfaellig": false,
+      "kann_absagen": false,
+      "kann_ausgeben": false,
+      "kann_zuruecknehmen": false
+    }
+  },
+  "ausleihe_zurueck_kiste": {
+    "id": 3,
+    "status": "zurueckgegeben",
+    "von": "2026-10-14",
+    "bis": "2026-10-14",
+    "art": "extern",
+    "mitglied_email": null,
+    "mitglied_name": null,
+    "extern_name": "Hans Muster",
+    "extern_organisation": "Turnverein",
+    "extern_telefon": "079 123 45 67",
+    "extern_email": "hans@example.ch",
+    "notizen": null,
+    "rueckgabe_notiz": null,
+    "erstellt_von": "lager-person@example.ch",
+    "created_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_at": "2026-10-11T08:00:00.000Z",
+    "ausgegeben_von": "lager-person@example.ch",
+    "zurueckgegeben_at": "2026-10-11T08:00:00.000Z",
+    "zurueckgegeben_von": "lager-person@example.ch",
+    "abgesagt_at": null,
+    "abgesagt_von": null,
+    "positionen": [
+      {
+        "id": 3,
+        "art": "kiste",
+        "item_id": null,
+        "location_id": 2,
+        "name": "Festkiste",
+        "einheit": null,
+        "menge": 1,
+        "zurueck_menge": 1,
+        "zustand": "fehlt",
+        "schaden": null,
+        "zurueck_at": "2026-10-11T08:00:00.000Z",
+        "menge_text": "Festkiste",
+        "zustand_text": "Fehlt",
+        "inhalt": [
+          {
+            "id": 1,
+            "position_id": 3,
+            "item_id": 3,
+            "name": "Mineral",
+            "einheit": "Flasche",
+            "menge": 6,
+            "zurueck_menge": 4,
+            "zustand": "fehlt",
+            "schaden": null,
+            "menge_text": "6 Flasche Mineral",
+            "zustand_text": "Fehlt"
+          },
+          {
+            "id": 2,
+            "position_id": 3,
+            "item_id": 2,
+            "name": "Teller",
+            "einheit": "Stück",
+            "menge": 20,
+            "zurueck_menge": 20,
+            "zustand": "ok",
+            "schaden": null,
+            "menge_text": "20 Stück Teller",
+            "zustand_text": "In Ordnung"
+          }
+        ]
+      }
+    ],
+    "fotos": [],
+    "app": {
+      "status_text": "Zurückgegeben",
+      "status_farbe": "grau",
+      "zeitraum_text": "14.10.2026",
+      "ausleiher_text": "Hans Muster, Turnverein",
+      "hinweis": null,
+      "ueberfaellig": false,
+      "kann_absagen": false,
+      "kann_ausgeben": false,
+      "kann_zuruecknehmen": false
+    }
+  },
+  "ueberfaellig": [
+    {
+      "id": 5,
+      "status": "ausgegeben",
+      "von": "2026-10-07",
+      "bis": "2026-10-09",
+      "art": "mitglied",
+      "mitglied_email": "erika@example.ch",
+      "mitglied_name": "Erika Muster",
+      "extern_name": null,
+      "extern_organisation": null,
+      "extern_telefon": null,
+      "extern_email": null,
+      "notizen": null,
+      "rueckgabe_notiz": null,
+      "erstellt_von": "erika@example.ch",
+      "created_at": "2026-10-11T08:00:00.000Z",
+      "ausgegeben_at": "2026-10-11T08:00:00.000Z",
+      "ausgegeben_von": "lager-person@example.ch",
+      "zurueckgegeben_at": null,
+      "zurueckgegeben_von": null,
+      "abgesagt_at": null,
+      "abgesagt_von": null,
+      "positionen": [
+        {
+          "id": 5,
+          "art": "artikel",
+          "item_id": 1,
+          "location_id": null,
+          "name": "Festbank",
+          "einheit": "Stück",
+          "menge": 2,
+          "zurueck_menge": null,
+          "zustand": null,
+          "schaden": null,
+          "zurueck_at": null,
+          "menge_text": "2 Stück Festbank",
+          "zustand_text": null,
+          "inhalt": []
+        }
+      ],
+      "fotos": [],
+      "app": {
+        "status_text": "Überfällig",
+        "status_farbe": "rot",
+        "zeitraum_text": "07.10.2026 – 09.10.2026",
+        "ausleiher_text": "Erika Muster",
+        "hinweis": "Seit 2 Tagen überfällig",
+        "ueberfaellig": true,
+        "kann_absagen": false,
+        "kann_ausgeben": false,
+        "kann_zuruecknehmen": true
+      }
+    }
+  ],
+  "ausgegeben": [
+    {
+      "id": 5,
+      "status": "ausgegeben",
+      "von": "2026-10-07",
+      "bis": "2026-10-09",
+      "art": "mitglied",
+      "mitglied_email": "erika@example.ch",
+      "mitglied_name": "Erika Muster",
+      "extern_name": null,
+      "extern_organisation": null,
+      "extern_telefon": null,
+      "extern_email": null,
+      "notizen": null,
+      "rueckgabe_notiz": null,
+      "erstellt_von": "erika@example.ch",
+      "created_at": "2026-10-11T08:00:00.000Z",
+      "ausgegeben_at": "2026-10-11T08:00:00.000Z",
+      "ausgegeben_von": "lager-person@example.ch",
+      "zurueckgegeben_at": null,
+      "zurueckgegeben_von": null,
+      "abgesagt_at": null,
+      "abgesagt_von": null,
+      "positionen": [
+        {
+          "id": 5,
+          "art": "artikel",
+          "item_id": 1,
+          "location_id": null,
+          "name": "Festbank",
+          "einheit": "Stück",
+          "menge": 2,
+          "zurueck_menge": null,
+          "zustand": null,
+          "schaden": null,
+          "zurueck_at": null,
+          "menge_text": "2 Stück Festbank",
+          "zustand_text": null,
+          "inhalt": []
+        }
+      ],
+      "fotos": [],
+      "app": {
+        "status_text": "Überfällig",
+        "status_farbe": "rot",
+        "zeitraum_text": "07.10.2026 – 09.10.2026",
+        "ausleiher_text": "Erika Muster",
+        "hinweis": "Seit 2 Tagen überfällig",
+        "ueberfaellig": true,
+        "kann_absagen": false,
+        "kann_ausgeben": false,
+        "kann_zuruecknehmen": true
+      }
+    },
+    {
+      "id": 4,
+      "status": "ausgegeben",
+      "von": "2026-10-11",
+      "bis": "2026-10-12",
+      "art": "mitglied",
+      "mitglied_email": "erika@example.ch",
+      "mitglied_name": "Erika Muster",
+      "extern_name": null,
+      "extern_organisation": null,
+      "extern_telefon": null,
+      "extern_email": null,
+      "notizen": null,
+      "rueckgabe_notiz": null,
+      "erstellt_von": "erika@example.ch",
+      "created_at": "2026-10-11T08:00:00.000Z",
+      "ausgegeben_at": "2026-10-11T08:00:00.000Z",
+      "ausgegeben_von": "lager-person@example.ch",
+      "zurueckgegeben_at": null,
+      "zurueckgegeben_von": null,
+      "abgesagt_at": null,
+      "abgesagt_von": null,
+      "positionen": [
+        {
+          "id": 4,
+          "art": "artikel",
+          "item_id": 1,
+          "location_id": null,
+          "name": "Festbank",
+          "einheit": "Stück",
+          "menge": 2,
+          "zurueck_menge": null,
+          "zustand": null,
+          "schaden": null,
+          "zurueck_at": null,
+          "menge_text": "2 Stück Festbank",
+          "zustand_text": null,
+          "inhalt": []
+        }
+      ],
+      "fotos": [],
+      "app": {
+        "status_text": "Ausgegeben",
+        "status_farbe": "gruen",
+        "zeitraum_text": "11.10.2026 – 12.10.2026",
+        "ausleiher_text": "Erika Muster",
+        "hinweis": "Zurück bis 12.10.2026",
+        "ueberfaellig": false,
+        "kann_absagen": false,
+        "kann_ausgeben": false,
+        "kann_zuruecknehmen": true
+      }
+    }
+  ]
+}

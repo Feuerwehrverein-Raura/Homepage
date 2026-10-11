@@ -49,6 +49,19 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:vorstand@fwv-raura.ch}
+      # Ausleihe (src/ausleihe-routen.ts): Meldungen ans Lager, Bestaetigungen
+      # und Erinnerungen. Ohne DISPATCH_API_KEY geht keine E-Mail raus, ohne
+      # INTERNAL_API_KEY kein Push. Beide Werte = API_KEY bzw. INTERNAL_API_KEY
+      # aus der .env des Haupt-Stacks (docker/docker-compose.prod.yml); die
+      # Dienste sind ueber das Netz "proxy" erreichbar.
+      DISPATCH_API_URL: ${DISPATCH_API_URL:-http://api-dispatch:3000}
+      DISPATCH_API_KEY: ${DISPATCH_API_KEY:-}
+      MEMBERS_API_URL: ${MEMBERS_API_URL:-http://api-members:3000}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      LAGER_EMAIL: ${LAGER_EMAIL:-lager@fwv-raura.ch}
+      # Taegliche Erinnerungen (morgen zurueck / ueberfaellig) — erst auf true
+      # setzen, wenn die Keys oben stimmen.
+      AUSLEIHE_ERINNERUNG_ENABLED: ${AUSLEIHE_ERINNERUNG_ENABLED:-false}
     volumes:
       - ./data/uploads:/app/uploads
     depends_on:

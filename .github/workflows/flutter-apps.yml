@@ -5,9 +5,10 @@ name: Flutter-Apps
 # mit Oberflaeche, Organisator + Vorstand), flutter/fwv_lager (Lager mit
 # Oberflaeche, beide Apps), flutter/mitglieder (Mitglieder + Organisatoren),
 # spaeter flutter/vorstand. Laeuft auch, wenn sich der Vertrag des Backends
-# aendert — der Kern testet gegen dieselben Dateien. Den Vertrag der
-# Inventar-API (flutter/fwv_lager/test/fixtures/inventar-api.json) prueft
-# zusaetzlich der Backend-Test in tests.yml (Inventar-Backend).
+# aendert — der Kern testet gegen dieselben Dateien. Die Vertraege der
+# Inventar-API (flutter/fwv_lager/test/fixtures/inventar-api.json und
+# ausleihe-api.json) prueft zusaetzlich der Backend-Test in tests.yml
+# (Inventar-Backend).
 
 on:
   push:
