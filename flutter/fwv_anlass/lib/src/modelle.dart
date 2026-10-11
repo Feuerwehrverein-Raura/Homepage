@@ -1,0 +1,540 @@
+// Anlass-Verwaltung (Organisator und Vorstand): was
+// `GET events/organisator-uebersicht` liefert
+// (docker/backend-events/src/organisator-ansicht.js) und die Entwuerfe fuers
+// Bearbeiten.
+//
+// Die App rechnet nichts: Personen, Begleitpersonen, Allergien, Menue,
+// Status-Texte, Zahlen und welche Aktionen erlaubt sind — alles kommt fertig
+// vom Backend (Vertrag: fixtures/organisator-uebersicht.json).
+//
+// Die Entwuerfe (AnlassEntwurf, SchichtEntwurf, AnmeldungEntwurf) schicken
+// beim Speichern nur, was sich geaendert hat. Das behebt drei Fehler der
+// alten iOS-App:
+//  - Anlass bearbeiten loeschte Menuewahl und Anmeldeschluss,
+//  - beim Bearbeiten einer Schicht sprang das Datum auf heute,
+//  - Anmeldung bearbeiten ueberschrieb die Bemerkungen (Begleitpersonen,
+//    Allergien, Menue gingen verloren).
+
+import 'package:fwv_core/fwv_core.dart';
+
+/// Mit welchem Zugang die Uebersicht geholt wurde.
+enum ZugangsArt {
+  /// Mitglied, das Anlaesse organisiert.
+  mitglied,
+
+  /// Vorstand/Admin: alle aktuellen Anlaesse.
+  vorstand,
+
+  /// Externer Organisator (`events/login`): ein Anlass, wenige Aktionen.
+  organisatorLogin;
+
+  static ZugangsArt ausText(String? t) => switch (t) {
+    'vorstand' => vorstand,
+    'organisator-login' => organisatorLogin,
+    _ => mitglied,
+  };
+}
+
+class VerwaltungsUebersicht {
+  const VerwaltungsUebersicht({this.zugang = ZugangsArt.mitglied, this.anlaesse = const []});
+
+  factory VerwaltungsUebersicht.ausJson(Object? json) {
+    final m = json is Map ? json : const {};
+    return VerwaltungsUebersicht(
+      zugang: ZugangsArt.ausText(jsonText(m['zugang'])),
+      anlaesse: [
+        if (m['anlaesse'] case final List l)
+          for (final e in l)
+            if (e is Map) VerwalteterAnlass.ausJson(e),
+      ],
+    );
+  }
+
+  final ZugangsArt zugang;
+
+  /// Aktuelle zuerst, dann die eben vergangenen (Reihenfolge des Backends).
+  final List<VerwalteterAnlass> anlaesse;
+
+  VerwalteterAnlass? anlassMitId(String id) {
+    for (final a in anlaesse) {
+      if (a.anlass.id == id || a.anlass.slug == id) return a;
+    }
+    return null;
+  }
+}
+
+/// Ein Anlass der Uebersicht: der Anlass selbst (wie `GET events`) und der
+/// Organisator-Block.
+class VerwalteterAnlass {
+  const VerwalteterAnlass({
+    required this.anlass,
+    this.aktuell = true,
+    this.zahlen = const AnmeldeZahlen(),
+    this.rechte = const AnlassRechte(),
+    this.anmeldungen = const [],
+  });
+
+  factory VerwalteterAnlass.ausJson(Map<dynamic, dynamic> m) {
+    final o = m['organisator'] is Map ? m['organisator'] as Map : const {};
+    return VerwalteterAnlass(
+      anlass: Anlass.ausJson(m),
+      aktuell: jsonWahr(o['aktuell']) ?? true,
+      zahlen: AnmeldeZahlen.ausJson(o['zahlen']),
+      rechte: AnlassRechte.ausJson(o['aktionen']),
+      anmeldungen: jsonListe(o['anmeldungen'], VerwalteteAnmeldung.ausJson),
+    );
+  }
+
+  final Anlass anlass;
+
+  /// false bei Anlaessen, die in den letzten Tagen zu Ende gingen.
+  final bool aktuell;
+  final AnmeldeZahlen zahlen;
+
+  /// Was an diesem Anlass geht (vom Backend, `organisator.aktionen`).
+  final AnlassRechte rechte;
+
+  /// Offene zuerst, dann bestaetigte, dann abgelehnte.
+  final List<VerwalteteAnmeldung> anmeldungen;
+}
+
+class AnmeldeZahlen {
+  const AnmeldeZahlen({
+    this.anmeldungen = 0,
+    this.offen = 0,
+    this.bestaetigt = 0,
+    this.abgelehnt = 0,
+    this.personenTotal = 0,
+    this.text,
+  });
+
+  factory AnmeldeZahlen.ausJson(Object? json) {
+    final m = json is Map ? json : const {};
+    return AnmeldeZahlen(
+      anmeldungen: jsonZahl(m['anmeldungen']) ?? 0,
+      offen: jsonZahl(m['offen']) ?? 0,
+      bestaetigt: jsonZahl(m['bestaetigt']) ?? 0,
+      abgelehnt: jsonZahl(m['abgelehnt']) ?? 0,
+      personenTotal: jsonZahl(m['personen_total']) ?? 0,
+      text: jsonText(m['text']),
+    );
+  }
+
+  final int anmeldungen;
+  final int offen;
+  final int bestaetigt;
+  final int abgelehnt;
+
+  /// Personen (nicht Anmeldungen), offen + bestaetigt.
+  final int personenTotal;
+
+  /// "3 bestätigt · 1 offen · 4 Personen" bzw. "Noch keine Anmeldungen".
+  final String? text;
+}
+
+/// Was der Anfragende an diesem Anlass tun darf (vom Backend). Die
+/// Oberflaeche zeigt nur, was hier erlaubt ist.
+class AnlassRechte {
+  const AnlassRechte({
+    this.bestaetigen = false,
+    this.hinzufuegen = false,
+    this.bearbeiten = false,
+    this.loeschen = false,
+    this.alternative = false,
+    this.mitteilen = false,
+    this.anlassBearbeiten = false,
+    this.schichten = false,
+    this.notizen = false,
+    this.material = false,
+    this.arbeitsplanSenden = false,
+    this.pdfTeilnehmerliste = false,
+    this.pdfArbeitsplan = false,
+    this.pdfAushang = false,
+  });
+
+  factory AnlassRechte.ausJson(Object? json) {
+    final m = json is Map ? json : const {};
+    bool w(String k) => jsonWahr(m[k]) ?? false;
+    return AnlassRechte(
+      bestaetigen: w('bestaetigen'),
+      hinzufuegen: w('hinzufuegen'),
+      bearbeiten: w('bearbeiten'),
+      loeschen: w('loeschen'),
+      alternative: w('alternative'),
+      mitteilen: w('mitteilen'),
+      anlassBearbeiten: w('anlass_bearbeiten'),
+      schichten: w('schichten'),
+      notizen: w('notizen'),
+      material: w('material'),
+      arbeitsplanSenden: w('arbeitsplan_senden'),
+      pdfTeilnehmerliste: w('pdf_teilnehmerliste'),
+      pdfArbeitsplan: w('pdf_arbeitsplan'),
+      pdfAushang: w('pdf_aushang'),
+    );
+  }
+
+  final bool bestaetigen;
+  final bool hinzufuegen;
+  final bool bearbeiten;
+  final bool loeschen;
+  final bool alternative;
+  final bool mitteilen;
+  final bool anlassBearbeiten;
+  final bool schichten;
+  final bool notizen;
+  final bool material;
+  final bool arbeitsplanSenden;
+  final bool pdfTeilnehmerliste;
+  final bool pdfArbeitsplan;
+  final bool pdfAushang;
+
+  bool get einPdf => pdfTeilnehmerliste || pdfArbeitsplan || pdfAushang;
+}
+
+/// Eine Anmeldung, anzeigefertig.
+class VerwalteteAnmeldung {
+  const VerwalteteAnmeldung({
+    required this.id,
+    required this.name,
+    this.status = 'pending',
+    this.statusText,
+    this.statusFarbe,
+    this.art = AnmeldeArt.teilnahme,
+    this.mitglied = false,
+    this.memberId,
+    this.email,
+    this.telefon,
+    this.personen = 1,
+    this.begleitpersonen = const [],
+    this.allergien,
+    this.menue,
+    this.bemerkung,
+    this.schichtIds = const [],
+    this.schichten = const [],
+    this.alternative,
+    this.angemeldetText,
+  });
+
+  factory VerwalteteAnmeldung.ausJson(Map<String, dynamic> m) {
+    final alt = m['alternative'];
+    return VerwalteteAnmeldung(
+      id: jsonText(m['id']) ?? '',
+      name: jsonText(m['name']) ?? '',
+      status: jsonText(m['status']) ?? 'pending',
+      statusText: jsonText(m['status_text']),
+      statusFarbe: jsonText(m['status_farbe']),
+      art: jsonText(m['art']) == 'schicht' ? AnmeldeArt.schicht : AnmeldeArt.teilnahme,
+      mitglied: jsonWahr(m['mitglied']) ?? false,
+      memberId: jsonText(m['member_id']),
+      email: jsonText(m['email']),
+      telefon: jsonText(m['phone']),
+      personen: jsonZahl(m['personen']) ?? 1,
+      begleitpersonen: jsonListe(
+        m['begleitpersonen'],
+        (b) => Begleitperson(
+          name: jsonText(b['name']) ?? '',
+          email: jsonText(b['email']),
+          telefon: jsonText(b['phone']),
+        ),
+      ),
+      allergien: jsonText(m['allergien']),
+      menue: jsonText(m['menue']),
+      bemerkung: jsonText(m['bemerkung']),
+      schichtIds: [
+        if (m['shift_ids'] case final List l)
+          for (final e in l) ?jsonText(e),
+      ],
+      schichten: jsonListe(
+        m['schichten'],
+        (s) => (id: jsonText(s['id']) ?? '', beschriftung: jsonText(s['beschriftung']) ?? ''),
+      ),
+      alternative: alt is Map
+          ? (
+              schichtText: jsonText(alt['schicht_text']) ?? '',
+              vorgeschlagenText: jsonText(alt['vorgeschlagen_text']),
+            )
+          : null,
+      angemeldetText: jsonText(m['angemeldet_text']),
+    );
+  }
+
+  final String id;
+  final String name;
+
+  /// pending, approved, rejected, ...
+  final String status;
+
+  /// "offen", "bestätigt", ...
+  final String? statusText;
+
+  /// gelb, gruen, rot, grau
+  final String? statusFarbe;
+  final AnmeldeArt art;
+  final bool mitglied;
+  final String? memberId;
+  final String? email;
+  final String? telefon;
+  final int personen;
+  final List<Begleitperson> begleitpersonen;
+  final String? allergien;
+  final String? menue;
+  final String? bemerkung;
+  final List<String> schichtIds;
+  final List<({String id, String beschriftung})> schichten;
+
+  /// Eine andere Schicht wurde vorgeschlagen.
+  final ({String schichtText, String? vorgeschlagenText})? alternative;
+
+  /// "15.09.2026"
+  final String? angemeldetText;
+
+  bool get offen => status == 'pending';
+}
+
+class Begleitperson {
+  const Begleitperson({required this.name, this.email, this.telefon});
+
+  final String name;
+  final String? email;
+  final String? telefon;
+}
+
+// ---------------------------------------------------------------------------
+// Entwuerfe: Formularwerte, die nur Aenderungen verschicken
+
+/// Formularwerte einer Anmeldung (`PUT …/registrations/:id/as-organizer`).
+///
+/// Das Backend fuehrt das notes-JSON zusammen; geschickt wird nur, was sich
+/// geaendert hat. Begleitpersonen, Allergien und Menue kommen im Formular gar
+/// nicht vor und bleiben so sicher erhalten.
+class AnmeldungEntwurf {
+  AnmeldungEntwurf({
+    this.name = '',
+    this.email = '',
+    this.telefon = '',
+    this.personen = 1,
+    this.bemerkung = '',
+    this.status = 'pending',
+  });
+
+  factory AnmeldungEntwurf.aus(VerwalteteAnmeldung a) => AnmeldungEntwurf(
+    name: a.name,
+    email: a.email ?? '',
+    telefon: a.telefon ?? '',
+    personen: a.personen,
+    bemerkung: a.bemerkung ?? '',
+    status: a.status,
+  );
+
+  String name;
+  String email;
+  String telefon;
+  int personen;
+  String bemerkung;
+  String status;
+
+  /// Body mit den geaenderten Feldern. Name und E-Mail nur bei Gaesten —
+  /// bei Mitgliedern stehen sie im Mitgliederverzeichnis.
+  Map<String, Object?> aenderungen(AnmeldungEntwurf original, {required bool gast}) => {
+    if (gast && name.trim() != original.name.trim()) 'guest_name': name.trim(),
+    if (gast && email.trim() != original.email.trim()) 'guest_email': email.trim(),
+    if (telefon.trim() != original.telefon.trim()) 'guest_phone': telefon.trim(),
+    if (personen != original.personen) 'participants': personen,
+    if (bemerkung.trim() != original.bemerkung.trim()) 'notes': bemerkung.trim(),
+    if (status != original.status) 'status': status,
+  };
+}
+
+/// Formularwerte eines Anlasses (`PUT events/:id/as-organizer`).
+class AnlassEntwurf {
+  AnlassEntwurf({
+    this.titel = '',
+    this.untertitel = '',
+    this.ort = '',
+    this.kategorie,
+    this.kosten = '',
+    this.beschreibung = '',
+    this.status,
+    this.beginn,
+    this.ende,
+    this.anmeldeschluss,
+    this.maxTeilnehmer,
+    this.anmeldungVerlangt = false,
+    this.menueOptionen = const [],
+  });
+
+  /// Werte aus dem Anlass, so wie das Backend sie liefert — auch die, die
+  /// das Formular nicht zeigt, gehen so nie verloren.
+  factory AnlassEntwurf.aus(Anlass a) => AnlassEntwurf(
+    titel: a.titel,
+    untertitel: a.untertitel ?? '',
+    ort: a.ort ?? '',
+    kategorie: a.kategorie,
+    kosten: a.kosten ?? '',
+    beschreibung: a.beschreibung ?? '',
+    status: a.status,
+    beginn: Zeitpunkt.ausDb(a.beginn),
+    ende: Zeitpunkt.ausDb(a.ende),
+    anmeldeschluss: Zeitpunkt.ausDb(a.anmeldeschluss),
+    maxTeilnehmer: a.maxTeilnehmer,
+    anmeldungVerlangt: a.anmeldungVerlangt,
+    menueOptionen: List.of(a.menueOptionen),
+  );
+
+  String titel;
+  String untertitel;
+  String ort;
+  String? kategorie;
+  String kosten;
+  String beschreibung;
+  String? status;
+  Zeitpunkt? beginn;
+  Zeitpunkt? ende;
+  Zeitpunkt? anmeldeschluss;
+  int? maxTeilnehmer;
+  bool anmeldungVerlangt;
+  List<String> menueOptionen;
+
+  /// Body mit den geaenderten Feldern; leer, wenn nichts geaendert wurde.
+  Map<String, Object?> aenderungen(AnlassEntwurf original) {
+    String? leer(String s) => s.trim().isEmpty ? null : s.trim();
+    final menue = [
+      for (final m in menueOptionen)
+        if (m.trim().isNotEmpty) m.trim(),
+    ];
+    final menueAlt = [
+      for (final m in original.menueOptionen)
+        if (m.trim().isNotEmpty) m.trim(),
+    ];
+    return {
+      if (titel.trim() != original.titel.trim()) 'title': titel.trim(),
+      if (leer(untertitel) != leer(original.untertitel)) 'subtitle': leer(untertitel),
+      if (leer(ort) != leer(original.ort)) 'location': leer(ort),
+      if (kategorie != original.kategorie) 'category': kategorie,
+      if (leer(kosten) != leer(original.kosten)) 'cost': leer(kosten),
+      if (leer(beschreibung) != leer(original.beschreibung)) 'description': leer(beschreibung),
+      if (status != original.status) 'status': status,
+      if (beginn?.alsDb() != original.beginn?.alsDb()) 'start_date': beginn?.alsDb(),
+      if (ende?.alsDb() != original.ende?.alsDb()) 'end_date': ende?.alsDb(),
+      if (anmeldeschluss?.alsDb() != original.anmeldeschluss?.alsDb())
+        'registration_deadline': anmeldeschluss?.alsDb(),
+      if (maxTeilnehmer != original.maxTeilnehmer) 'max_participants': maxTeilnehmer,
+      if (anmeldungVerlangt != original.anmeldungVerlangt)
+        'registration_required': anmeldungVerlangt,
+      if (!_gleich(menue, menueAlt)) 'meal_options': menue.isEmpty ? null : menue,
+    };
+  }
+}
+
+bool _gleich(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+/// Formularwerte einer Schicht (`POST events/:id/shifts-as-organizer`,
+/// `PUT events/:id/shifts/:shiftId/as-organizer`).
+class SchichtEntwurf {
+  SchichtEntwurf({
+    this.name = '',
+    this.bereich = 'Allgemein',
+    this.beschreibung = '',
+    this.datum,
+    this.von = '',
+    this.bis = '',
+    this.gebraucht = 1,
+  });
+
+  /// Werte der bestehenden Schicht — das Datum bleibt, wie es ist.
+  factory SchichtEntwurf.aus(Schicht s) => SchichtEntwurf(
+    name: s.name ?? '',
+    bereich: s.bereich ?? 'Allgemein',
+    beschreibung: s.beschreibung ?? '',
+    datum: jsonDatum(s.datum),
+    von: _hhmm(s.beginn),
+    bis: _hhmm(s.ende),
+    gebraucht: s.gebraucht ?? 1,
+  );
+
+  String name;
+  String bereich;
+  String beschreibung;
+  DateTime? datum;
+
+  /// "HH:MM" oder leer.
+  String von;
+  String bis;
+  int gebraucht;
+
+  /// Body zum Anlegen.
+  Map<String, Object?> alsJson() => {
+    'name': name.trim(),
+    'bereich': bereich,
+    'description': beschreibung.trim().isEmpty ? null : beschreibung.trim(),
+    'date': datum == null ? null : isoDatum(datum!),
+    'start_time': von.trim().isEmpty ? null : von.trim(),
+    'end_time': bis.trim().isEmpty ? null : bis.trim(),
+    'needed': gebraucht,
+  };
+
+  /// Body mit den geaenderten Feldern. Das Backend laesst alles, was fehlt
+  /// (oder null ist), unveraendert — Leeren geht deshalb nicht.
+  Map<String, Object?> aenderungen(SchichtEntwurf original) => {
+    if (name.trim() != original.name.trim()) 'name': name.trim(),
+    if (bereich != original.bereich) 'bereich': bereich,
+    if (beschreibung.trim() != original.beschreibung.trim()) 'description': beschreibung.trim(),
+    if (datum != null && (original.datum == null || isoDatum(datum!) != isoDatum(original.datum!)))
+      'date': isoDatum(datum!),
+    if (von.trim().isNotEmpty && von.trim() != original.von.trim()) 'start_time': von.trim(),
+    if (bis.trim().isNotEmpty && bis.trim() != original.bis.trim()) 'end_time': bis.trim(),
+    if (gebraucht != original.gebraucht) 'needed': gebraucht,
+  };
+}
+
+String _hhmm(String? zeit) {
+  final m = RegExp(r'^(\d{2}):(\d{2})').firstMatch(zeit ?? '');
+  return m == null ? '' : '${m[1]}:${m[2]}';
+}
+
+/// Datum mit oder ohne Uhrzeit, wie die Datenbank es speichert: Ortszeit
+/// ohne Zone, "2026-10-17 10:00:00"; ohne Uhrzeit Mitternacht.
+class Zeitpunkt {
+  const Zeitpunkt(this.datum, {this.stunde, this.minute});
+
+  /// Liest "2026-10-17 10:00:00", "2026-10-17T10:00" oder "2026-10-17".
+  /// Mitternacht heisst "ohne Uhrzeit" (wie app-ansicht.js im Backend).
+  static Zeitpunkt? ausDb(String? wert) {
+    final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?').firstMatch(wert ?? '');
+    if (m == null) return null;
+    final datum = DateTime(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
+    final h = m[4] == null ? null : int.parse(m[4]!);
+    final min = m[5] == null ? null : int.parse(m[5]!);
+    if (h == null || (h == 0 && min == 0)) return Zeitpunkt(datum);
+    return Zeitpunkt(datum, stunde: h, minute: min);
+  }
+
+  /// Nur das Datum zaehlt (Stunden usw. von [datum] werden ignoriert).
+  final DateTime datum;
+  final int? stunde;
+  final int? minute;
+
+  bool get mitZeit => stunde != null;
+
+  Zeitpunkt mitDatum(DateTime d) => Zeitpunkt(d, stunde: stunde, minute: minute);
+
+  Zeitpunkt mitUhrzeit(int? h, int? min) =>
+      Zeitpunkt(datum, stunde: h, minute: h == null ? null : (min ?? 0));
+
+  /// "2026-10-17 10:00:00" bzw. "2026-10-17".
+  String alsDb() =>
+      mitZeit ? '${isoDatum(datum)} ${_zwei(stunde!)}:${_zwei(minute ?? 0)}:00' : isoDatum(datum);
+
+  /// "17.10.2026" bzw. "17.10.2026, 10:00" (nur im Formular).
+  String get anzeige => mitZeit
+      ? '${schweizerDatum(datum)}, ${_zwei(stunde!)}:${_zwei(minute ?? 0)}'
+      : schweizerDatum(datum);
+}
+
+String _zwei(int n) => n.toString().padLeft(2, '0');

@@ -38,6 +38,14 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
   /// darin verhindern das Abmelden nicht.
   final Future<void> Function(ApiClient api)? beimAbmelden;
 
+  /// Wird gerufen, wenn sich das Access-Token aendert: nach dem Laden beim
+  /// Start (nur mit gespeicherter Sitzung), nach jedem Anmelden, nach jedem
+  /// Erneuern und mit null beim Abmelden bzw. wenn die Sitzung ablaeuft. Die
+  /// App gibt das Token damit an Teile weiter, die ohne Flutter laufen (z.B.
+  /// den Kontakt-Abgleich auf Android). Fehler darin stoeren die Sitzung
+  /// nicht.
+  void Function(Sitzung? sitzung)? beiNeuemToken;
+
   /// Angemeldeter Zugriff aufs Backend; erneuert abgelaufene Tokens selbst.
   late final ApiClient api = ApiClient(http: _http, tokenQuelle: this, basis: _basis);
 
@@ -59,6 +67,7 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
   /// Liest die gespeicherte Sitzung beim Start.
   Future<void> laden() async {
     _sitzung = await _speicher.laden();
+    if (_sitzung != null) _tokenMelden();
     notifyListeners();
   }
 
@@ -240,6 +249,7 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     final neu = alt.kopieMit(accessToken: access, refreshToken: refresh);
     await _speicher.speichern(neu);
     _sitzung = neu;
+    _tokenMelden();
     return Erneuerung.erneuert;
   }
 
@@ -247,6 +257,7 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     await _speicher.leeren();
     _sitzung = null;
     hinweis = 'Sitzung abgelaufen — bitte neu anmelden.';
+    _tokenMelden();
     notifyListeners();
   }
 
@@ -265,6 +276,7 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     await _speicher.leeren();
     _sitzung = null;
     hinweis = null;
+    _tokenMelden();
     notifyListeners();
   }
 
@@ -274,7 +286,16 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     await _speicher.speichern(s);
     _sitzung = s;
     hinweis = null;
+    _tokenMelden();
     notifyListeners();
+  }
+
+  void _tokenMelden() {
+    try {
+      beiNeuemToken?.call(_sitzung);
+    } on Object {
+      // Die Sitzung gilt trotzdem.
+    }
   }
 
   /// `{success, token, user: {id, email, name}}` von qr-login und reset.

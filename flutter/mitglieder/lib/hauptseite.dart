@@ -12,6 +12,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'anlaesse/anlaesse_tab.dart';
 import 'dienste.dart';
+import 'einstellungen/adressbuch.dart';
 import 'einstellungen/einstellungen_tab.dart';
 import 'organisator/organisator_tab.dart';
 import 'profil/profil_tab.dart';
@@ -38,6 +39,10 @@ class _HauptseiteState extends State<Hauptseite> {
     super.initState();
     _aktiv = _externerOrganisator ? Reiter.organisator : Reiter.anlaesse;
     widget.dienste.organisator.pruefen();
+    // Nach dem (ersten) Login einmal nach dem Adressbuch fragen (Android).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) kontakteFrageStellen(context, widget.dienste);
+    });
   }
 
   List<Reiter> _reiter(bool organisiert) => _externerOrganisator

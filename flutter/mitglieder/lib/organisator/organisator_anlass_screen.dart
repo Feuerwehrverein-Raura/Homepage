@@ -1,7 +1,8 @@
-// Anlass bearbeiten als Organisator — Platzhalter. Erreichbar aus der
-// Detailansicht, wenn das Backend `kann_bearbeiten` meldet. Gefuellt wird er
-// im Arbeitsschritt "Organisator" (Phase 2, docs/flutter-mitglieder-app-plan.md).
+// Ein Anlass im Organisator-Bereich — duenne Huelle um
+// VerwaltungsAnlassScreen aus fwv_anlass. Erreichbar ueber "Bearbeiten" in
+// der Detailansicht (`kann_bearbeiten`).
 
+import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
@@ -13,15 +14,6 @@ class OrganisatorAnlassScreen extends StatelessWidget {
   final String anlassId;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Anlass bearbeiten')),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('Das Bearbeiten folgt in Kürze.', textAlign: TextAlign.center),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      VerwaltungsAnlassScreen(verwaltung: dienste.anlassVerwaltung, anlassId: anlassId);
 }

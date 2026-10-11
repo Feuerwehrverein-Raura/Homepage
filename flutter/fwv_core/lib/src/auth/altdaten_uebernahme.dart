@@ -11,6 +11,11 @@
 // liefert die Werte unter den Schluesselnamen der alten Android-App
 // (auth_token, refresh_token, qr_token, account_type, event_id, user_name,
 // user_email) — iOS uebersetzt sein "access_token" selbst.
+//
+// Dazu kommt eine App-Einstellung: "contacts_sync_asked" ("true"), wenn die
+// alte Android-App schon nach dem Adressbuch-Abgleich gefragt hat. Sie wird
+// unter [SitzungsSchluessel.kontakteGefragt] gemerkt, damit die Frage nicht
+// nochmals kommt.
 
 import 'package:flutter/services.dart';
 
@@ -94,6 +99,10 @@ class AltdatenUebernahme {
         alt = await quelle.lesen();
       } on PlatformException {
         return UebernahmeErgebnis.fehlgeschlagen;
+      }
+
+      if (alt?[SitzungsSchluessel.kontakteGefragt]?.trim() == 'true') {
+        await speicher.speicher.schreiben(SitzungsSchluessel.kontakteGefragt, 'true');
       }
 
       final sitzung = sitzungAusAltdaten(alt);

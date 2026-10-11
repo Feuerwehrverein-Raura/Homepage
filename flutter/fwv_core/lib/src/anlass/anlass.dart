@@ -27,6 +27,8 @@ class Anlass {
     this.anmeldeschluss,
     this.maxTeilnehmer,
     this.anmeldungVerlangt = false,
+    this.menueOptionen = const [],
+    this.pdfDateiname,
     this.app = const AnlassApp(),
     this.schichten = const [],
   });
@@ -49,6 +51,11 @@ class Anlass {
       anmeldeschluss: jsonText(m['registration_deadline']),
       maxTeilnehmer: jsonZahl(m['max_participants']),
       anmeldungVerlangt: jsonWahr(m['registration_required']) ?? false,
+      menueOptionen: [
+        if (m['meal_options'] case final List l)
+          for (final e in l) ?jsonText(e),
+      ],
+      pdfDateiname: jsonText(m['pdf_filename']),
       app: AnlassApp.ausJson(m['app']),
       schichten: jsonListe(m['shifts'], Schicht.ausJson),
     );
@@ -75,6 +82,12 @@ class Anlass {
   final String? anmeldeschluss;
   final int? maxTeilnehmer;
   final bool anmeldungVerlangt;
+
+  /// Menüwahl (GV), z.B. ["Fleisch", "Vegi"]; leer ohne Menüwahl.
+  final List<String> menueOptionen;
+
+  /// Name des angehängten PDFs (Aushang, `GET events/:id/pdf`), sonst null.
+  final String? pdfDateiname;
   final AnlassApp app;
   final List<Schicht> schichten;
 
@@ -194,6 +207,7 @@ class Schicht {
   const Schicht({
     required this.id,
     this.name,
+    this.beschreibung,
     this.bereich,
     this.datum,
     this.beginn,
@@ -205,6 +219,7 @@ class Schicht {
   factory Schicht.ausJson(Map<String, dynamic> m) => Schicht(
     id: jsonText(m['id']) ?? '',
     name: jsonText(m['name']),
+    beschreibung: jsonText(m['description']),
     bereich: jsonText(m['bereich']),
     datum: jsonText(m['date']),
     beginn: jsonText(m['start_time']),
@@ -215,7 +230,12 @@ class Schicht {
 
   final String id;
   final String? name;
+  final String? beschreibung;
+
+  /// Wert wie in der Datenbank ("Kueche"); lesbar steht in [SchichtApp.bereichText].
   final String? bereich;
+
+  /// "2026-10-17"
   final String? datum;
   final String? beginn;
   final String? ende;

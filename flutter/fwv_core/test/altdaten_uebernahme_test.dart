@@ -72,6 +72,25 @@ void main() {
     expect(plattformDaten, isNull);
   });
 
+  test('Adressbuch-Frage schon gestellt: wird als App-Einstellung gemerkt', () async {
+    plattformDaten = {
+      'auth_token': 't',
+      'contacts_sync_asked': 'true',
+      'contacts_sync_enabled': 'false',
+    };
+    await uebernahme.ausfuehren();
+    expect(roh.werte[SitzungsSchluessel.kontakteGefragt], 'true');
+    // Abmelden loescht nur die Sitzung, nicht die Einstellung.
+    await speicher.leeren();
+    expect(roh.werte[SitzungsSchluessel.kontakteGefragt], 'true');
+  });
+
+  test('Adressbuch-Frage nie gestellt: nichts gemerkt', () async {
+    plattformDaten = {'auth_token': 't', 'contacts_sync_asked': 'false'};
+    await uebernahme.ausfuehren();
+    expect(roh.werte.containsKey(SitzungsSchluessel.kontakteGefragt), isFalse);
+  });
+
   test('Organisator mit Anlass', () async {
     plattformDaten = {'auth_token': 't', 'account_type': 'organizer', 'event_id': '42'};
     await uebernahme.ausfuehren();

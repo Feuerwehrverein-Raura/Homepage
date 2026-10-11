@@ -132,6 +132,7 @@ class EventOptionen {
     this.kategorien = const [],
     this.anmeldepflichtigeKategorien = const [],
     this.bereiche = const [],
+    this.status = const [],
   });
 
   factory EventOptionen.ausJson(Object? json) {
@@ -147,12 +148,19 @@ class EventOptionen {
         m['bereiche'],
         (b) => (wert: jsonText(b['wert']) ?? '', text: jsonText(b['text']) ?? ''),
       ),
+      status: jsonListe(
+        m['status'],
+        (b) => (wert: jsonText(b['wert']) ?? '', text: jsonText(b['text']) ?? ''),
+      ),
     );
   }
 
   final List<String> kategorien;
   final List<String> anmeldepflichtigeKategorien;
   final List<({String wert, String text})> bereiche;
+
+  /// Status eines Anlasses (`planned` → "Geplant" usw.).
+  final List<({String wert, String text})> status;
 }
 
 /// Body fuer `POST events/propose`. Zeitpunkte wie in der Datenbank:

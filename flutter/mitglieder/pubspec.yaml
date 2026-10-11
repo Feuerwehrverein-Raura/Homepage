@@ -30,6 +30,8 @@ environment:
 dependencies:
   fwv_core:
     path: ../fwv_core
+  fwv_anlass:
+    path: ../fwv_anlass
   flutter:
     sdk: flutter
 

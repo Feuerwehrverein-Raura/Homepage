@@ -15,6 +15,10 @@ const fotoMaxKante = 1024;
 /// JPEG-Qualitaet (0-100).
 const fotoQualitaet = 85;
 
+/// Laengste Kante fuer Bilder in Organisator-Notizen (wie die alten Apps:
+/// lesbar fuer Quittungen und Plaene, aber klein genug fuers Base64-JSON).
+const anhangMaxKante = 1600;
+
 /// Verkleinert [roh] (JPEG, PNG, ...) und gibt ein JPEG zurueck.
 /// Wirft [FormatException], wenn sich das Bild nicht lesen laesst.
 Uint8List fotoVerkleinern(
@@ -43,3 +47,10 @@ Future<Uint8List> fotoVerkleinernImHintergrund(Uint8List roh) =>
     compute(_verkleinern, roh, debugLabel: 'fotoVerkleinern');
 
 Uint8List _verkleinern(Uint8List roh) => fotoVerkleinern(roh);
+
+/// Bild fuer einen Notiz-Anhang: hoechstens [anhangMaxKante] Pixel, JPEG,
+/// im Hintergrund.
+Future<Uint8List> anhangBildVerkleinern(Uint8List roh) =>
+    compute(_anhangVerkleinern, roh, debugLabel: 'anhangBildVerkleinern');
+
+Uint8List _anhangVerkleinern(Uint8List roh) => fotoVerkleinern(roh, maxKante: anhangMaxKante);

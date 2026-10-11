@@ -114,12 +114,23 @@ class _KontakteAbschnittState extends State<KontakteAbschnitt> {
   bool _verfuegbar = true;
   bool _laeuft = false;
 
+  /// Zurueck in der App (z.B. aus den System-Einstellungen, wo man das
+  /// Konto "FWV Raura" entfernen kann): Stand neu abfragen.
+  late final AppLifecycleListener _lebenszyklus = AppLifecycleListener(onResume: _status);
+
   KontakteAbgleich get _k => widget.dienste.kontakte;
 
   @override
   void initState() {
     super.initState();
+    _lebenszyklus;
     _status();
+  }
+
+  @override
+  void dispose() {
+    _lebenszyklus.dispose();
+    super.dispose();
   }
 
   Future<void> _status() async {
@@ -147,6 +158,8 @@ class _KontakteAbschnittState extends State<KontakteAbschnitt> {
   }
 
   Future<void> _schalten(bool ein) async {
+    // Wer hier schaltet, hat die Frage nach dem Login beantwortet.
+    await widget.dienste.kontakteGefragtMerken();
     if (ein) {
       final a = await _ausfuehren(_k.aktivieren);
       if (!mounted || a == null || !a.verfuegbar) return;
@@ -240,5 +253,62 @@ class _KontakteAbschnittState extends State<KontakteAbschnitt> {
         ),
       ],
     );
+  }
+}
+
+/// Einmal nach dem Login (Android, Mitglied): "Mitglieder ins Adressbuch
+/// übernehmen?" — wie members-android LoginActivity. Gefragt wird nur, wenn
+/// der Abgleich verfuegbar und noch aus ist; die Antwort wird gemerkt.
+Future<void> kontakteFrageStellen(BuildContext context, Dienste d) async {
+  if (!await d.kontakteFrageOffen()) return;
+  final KontakteAntwort<bool> status;
+  try {
+    status = await d.kontakte.status();
+  } on PlatformException {
+    return;
+  }
+  if (!status.verfuegbar) return;
+  if (status.wert == true) {
+    await d.kontakteGefragtMerken();
+    return;
+  }
+  if (!context.mounted) return;
+  final ja = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      title: const Text('Mitglieder ins Adressbuch übernehmen?'),
+      content: const SingleChildScrollView(
+        child: Text(
+          'Die FWV-Mitglieder erscheinen dann als Kontakte im Konto „FWV Raura“. '
+          'So zeigt das Telefon bei einem Anruf den Namen an.\n\n'
+          'Du kannst das später unter Einstellungen → Adressbuch wieder ausschalten.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Nein, danke'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Ja, übernehmen'),
+        ),
+      ],
+    ),
+  );
+  await d.kontakteGefragtMerken();
+  if (ja != true) return;
+  try {
+    final a = await d.kontakte.aktivieren();
+    if (!context.mounted || !a.verfuegbar) return;
+    meldung(
+      context,
+      a.wert == true
+          ? 'Mitglieder werden ins Adressbuch übernommen.'
+          : 'Ohne Zugriff auf die Kontakte geht es nicht. Einschalten unter Einstellungen.',
+    );
+  } on PlatformException catch (e) {
+    if (context.mounted) meldung(context, e.message ?? 'Kontakt-Abgleich fehlgeschlagen.');
   }
 }

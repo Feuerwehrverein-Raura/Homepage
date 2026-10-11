@@ -7,6 +7,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Rect;
+import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
@@ -49,7 +50,9 @@ class Dienste {
     DateiTeilen? dateiTeilen,
     DateTime Function()? jetzt,
     Plattform? plattform,
+    Future<Uint8List> Function(Uint8List roh)? anhangVerkleinern,
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
+       anhangVerkleinern = anhangVerkleinern ?? anhangBildVerkleinern,
        fotoWaehlen = fotoWaehlen ?? _fotoMitImagePicker,
        appVersion = appVersion ?? _appVersionAusPaket,
        linkOeffnen = linkOeffnen ?? _linkExtern,
@@ -58,6 +61,7 @@ class Dienste {
        plattform = plattform ?? _aktuellePlattform() {
     pushAnmeldung = PushAnmeldung(push: push, speicher: this.speicher);
     organisator = OrganisatorPruefung(sitzung);
+    sitzung.beiNeuemToken = _tokenAnKontakteGeben;
   }
 
   /// Die echte App: Geraete-Schluesselbund, echtes Backend, Firebase.
@@ -119,11 +123,32 @@ class Dienste {
 
   final Plattform plattform;
 
+  /// Bild fuer einen Notiz-Anhang verkleinern (1600 px, JPEG; in Tests
+  /// ersetzt — das echte laeuft in einem eigenen Isolate).
+  final Future<Uint8List> Function(Uint8List roh) anhangVerkleinern;
+
   /// Aufrufe rund ums eigene Mitglied.
   MitgliederDienst get mitglieder => MitgliederDienst(sitzung.api);
 
   /// Anlaesse, Kalender, Arbeitsplan, Anmeldungen.
   AnlaesseDienst get anlaesse => AnlaesseDienst(sitzung.api);
+
+  /// Organisator-Bereich (Paket fwv_anlass, gemeinsam mit der spaeteren
+  /// Vorstand-App): eigene Anlaesse; externe Organisatoren (Event-Login)
+  /// ueber ihre eigenen Routen.
+  AnlassVerwaltung get anlassVerwaltung => AnlassVerwaltung(
+    zugang: OrganisatorZugang(
+      sitzung.api,
+      externerLogin: sitzung.sitzung?.kontotyp == Kontotyp.organisator,
+    ),
+    umgebung: VerwaltungsUmgebung(
+      dateiTeilen: dateiTeilen,
+      fotoWaehlen: ({required bool kamera}) =>
+          fotoWaehlen(kamera ? FotoQuelle.kamera : FotoQuelle.galerie),
+      linkOeffnen: linkOeffnen,
+      anhangVerkleinern: anhangVerkleinern,
+    ),
+  );
 
   /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.
   bool get alsMitglied => _alsMitgliedAngemeldet;
@@ -165,6 +190,36 @@ class Dienste {
   }
 
   // ---------------------------------------------------------------------
+  // Kontakt-Abgleich (nur Android)
+
+  /// Der Abgleich laeuft im Hintergrund ohne Flutter und braucht ein
+  /// gueltiges Token: beim Start, nach jedem Login und Erneuern das neue,
+  /// beim Abmelden null. Externe Organisatoren haben kein Mitgliederkonto
+  /// und duerfen die Mitgliederliste nicht abrufen — fuer sie null.
+  void _tokenAnKontakteGeben(Sitzung? s) {
+    if (plattform != Plattform.android) return;
+    final token = s?.kontotyp == Kontotyp.mitglied ? s!.accessToken : null;
+    unawaited(() async {
+      try {
+        await kontakte.tokenMitteilen(token);
+      } on Object {
+        // Ohne nativen Teil oder bei Fehlern: der Abgleich wartet aufs
+        // naechste Token.
+      }
+    }());
+  }
+
+  /// Soll nach dem Login gefragt werden, ob die Mitglieder ins Adressbuch
+  /// sollen? Nur auf Android, nur Mitglieder, nur einmal (die Antwort aus
+  /// der alten App gilt mit, siehe [AltdatenUebernahme]).
+  Future<bool> kontakteFrageOffen() async =>
+      plattform == Plattform.android &&
+      _alsMitgliedAngemeldet &&
+      await speicher.lesen(SitzungsSchluessel.kontakteGefragt) != 'true';
+
+  Future<void> kontakteGefragtMerken() => speicher.schreiben(SitzungsSchluessel.kontakteGefragt, 'true');
+
+  // ---------------------------------------------------------------------
   // Newsletter-Stand (nur lokal gemerkt — das Backend kennt keine Abfrage)
 
   static const _schluesselNewsletter = 'newsletter_abonniert';
@@ -179,6 +234,9 @@ class Dienste {
 /// Token noch gilt: Push-Token abmelden und auf Android den Kontakt-Abgleich
 /// ausschalten — sonst blieben die FWV-Kontakte auf dem Geraet, wenn sich
 /// danach jemand anders anmeldet (wie members-android SettingsFragment).
+/// Wie in der alten App (TokenManager.clear) wird nach dem naechsten Login
+/// wieder nach dem Adressbuch gefragt — die Kontakte sind ja entfernt. Das
+/// Token erhaelt der Abgleich danach als null ([SitzungsVerwaltung.beiNeuemToken]).
 Future<void> abmeldenAufraeumen(ApiClient api, Dienste dienste) async {
   try {
     if (dienste.sitzung.sitzung?.kontotyp == Kontotyp.mitglied) {
@@ -188,6 +246,7 @@ Future<void> abmeldenAufraeumen(ApiClient api, Dienste dienste) async {
     if (dienste.plattform == Plattform.android) {
       try {
         await dienste.kontakte.deaktivieren();
+        await dienste.speicher.loeschen(SitzungsSchluessel.kontakteGefragt);
       } on Object {
         // Abmelden geht trotzdem.
       }

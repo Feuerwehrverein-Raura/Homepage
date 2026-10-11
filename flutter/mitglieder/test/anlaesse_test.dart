@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_mitglieder/anmeldung/authentik_anmeldung.dart';
 import 'package:fwv_mitglieder/dienste.dart';
@@ -299,7 +300,10 @@ void main() {
 
       await tester.tap(find.byTooltip('Bearbeiten'));
       await tester.pumpAndSettle();
-      expect(find.text('Anlass bearbeiten'), findsOneWidget);
+      // Die Anlass-Verwaltung aus fwv_anlass, geladen ueber die
+      // Organisator-Uebersicht.
+      expect(find.byType(VerwaltungsAnlassScreen), findsOneWidget);
+      expect(backend.zaehle('GET', '/events/organisator-uebersicht'), 1);
     });
 
     testWidgets('Idee ohne Datum: kein Kalender, Grund statt Anmelden', (tester) async {

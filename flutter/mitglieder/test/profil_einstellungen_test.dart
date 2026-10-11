@@ -140,6 +140,21 @@ class _Backend {
             : json({'success': false, 'message': 'Ungültige E-Mail-Adresse'}, 400);
       case 'GET /events/organized-by-me':
         return json(organisiert);
+      case 'GET /events/organisator-uebersicht':
+        return json({
+          'zugang': 'mitglied',
+          'anlaesse': [
+            for (final a in organisiert)
+              {
+                ...(a as Map),
+                'app': {'datum_text': 'Samstag, 17. Oktober 2026'},
+                'organisator': {
+                  'aktuell': true,
+                  'zahlen': {'offen': 1, 'text': '1 offen · 1 Person'},
+                },
+              },
+          ],
+        });
       case 'GET /events':
       case 'GET /registrations/mine':
         return json([]);
@@ -392,7 +407,16 @@ void main() {
       await tippen(tester, find.text('Gelöschte wiederherstellen'));
       expect(find.text('3 gelöschte Mitglieder werden wiederhergestellt.'), findsOneWidget);
       await tippen(tester, find.byKey(const Key('kontakte')));
-      expect(aufrufe, ['status', 'jetztAbgleichen', 'wiederherstellen', 'deaktivieren']);
+      // "token" beim Start, "status" fuer die Frage nach dem Login (Abgleich
+      // schon an: keine Frage) und beim Oeffnen der Einstellungen.
+      expect(aufrufe.where((m) => m != 'token'), [
+        'status',
+        'status',
+        'jetztAbgleichen',
+        'wiederherstellen',
+        'deaktivieren',
+      ]);
+      expect(roh.werte['contacts_sync_asked'], 'true');
       expect(find.text('Jetzt abgleichen'), findsNothing);
     });
 
@@ -498,6 +522,87 @@ void main() {
     });
   });
 
+  group('Kontakt-Abgleich (Android)', () {
+    const kanal = MethodChannel('test/kontakte2');
+    late List<MethodCall> aufrufe;
+    late bool aktiv;
+
+    void kanalNachbauen(WidgetTester tester) {
+      aufrufe = [];
+      aktiv = false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(kanal, (c) async {
+        aufrufe.add(c);
+        switch (c.method) {
+          case 'status':
+            return aktiv;
+          case 'aktivieren':
+            aktiv = true;
+            return true;
+          case 'deaktivieren':
+            aktiv = false;
+        }
+        return null;
+      });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(kanal, null),
+      );
+    }
+
+    List<Object?> tokens() => [
+      for (final c in aufrufe)
+        if (c.method == 'token') (c.arguments as Map)['token'],
+    ];
+
+    testWidgets('Token beim Start, null beim Abmelden; Frage danach wieder offen', (
+      tester,
+    ) async {
+      kanalNachbauen(tester);
+      await roh.schreiben('contacts_sync_asked', 'true');
+      await starten(tester, kontakte: const KontakteAbgleich(kanal));
+      expect(tokens(), ['jwt']);
+      expect(find.text('Mitglieder ins Adressbuch übernehmen?'), findsNothing);
+
+      await reiter(tester, 'Einstellungen');
+      await tippen(tester, find.text('Abmelden'));
+      expect(tokens(), ['jwt', null]);
+      final namen = aufrufe.map((c) => c.method).toList();
+      expect(namen.indexOf('deaktivieren'), lessThan(namen.lastIndexOf('token')));
+      expect(roh.werte.containsKey('contacts_sync_asked'), isFalse);
+    });
+
+    testWidgets('einmalige Frage nach dem Login: Ja schaltet ein', (tester) async {
+      kanalNachbauen(tester);
+      await starten(tester, kontakte: const KontakteAbgleich(kanal));
+      expect(find.text('Mitglieder ins Adressbuch übernehmen?'), findsOneWidget);
+      await tester.tap(find.text('Ja, übernehmen'));
+      await tester.pumpAndSettle();
+      expect(aufrufe.map((c) => c.method), contains('aktivieren'));
+      expect(roh.werte['contacts_sync_asked'], 'true');
+      expect(find.text('Mitglieder werden ins Adressbuch übernommen.'), findsOneWidget);
+
+      // Einstellungen zeigen den Abgleich als eingeschaltet.
+      await reiter(tester, 'Einstellungen');
+      await sichtbar(tester, find.byKey(const Key('kontakte')));
+      expect(tester.widget<SwitchListTile>(find.byKey(const Key('kontakte'))).value, isTrue);
+    });
+
+    testWidgets('Nein wird gemerkt, keine zweite Frage', (tester) async {
+      kanalNachbauen(tester);
+      await starten(tester, kontakte: const KontakteAbgleich(kanal));
+      await tester.tap(find.text('Nein, danke'));
+      await tester.pumpAndSettle();
+      expect(aufrufe.map((c) => c.method), isNot(contains('aktivieren')));
+      expect(roh.werte['contacts_sync_asked'], 'true');
+    });
+
+    testWidgets('iOS: keine Frage, kein Token an den Kanal', (tester) async {
+      kanalNachbauen(tester);
+      await starten(tester, plattform: Plattform.ios, kontakte: const KontakteAbgleich(kanal));
+      expect(find.text('Mitglieder ins Adressbuch übernehmen?'), findsNothing);
+      expect(aufrufe, isEmpty);
+    });
+  });
+
   testWidgets('schmales Handy im Dunkelmodus: nichts laeuft ueber', (tester) async {
     await starten(tester);
     // 320 x 640 Punkte, dunkel. Ueberlaeufe wuerden den Test scheitern lassen.
@@ -529,7 +634,8 @@ void main() {
         findsOneWidget,
       );
       await reiter(tester, 'Organisator');
-      expect(find.text('Hier erscheinen bald die Anlässe, die du organisierst.'), findsOneWidget);
+      expect(find.text('Grillfest'), findsOneWidget);
+      expect(find.text('1 offen · 1 Person'), findsOneWidget);
     });
 
     testWidgets('fehlt ohne eigene Anlaesse', (tester) async {

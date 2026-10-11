@@ -35,4 +35,10 @@ void main() {
   test('kein Bild: FormatException', () {
     expect(() => fotoVerkleinern(Uint8List.fromList([1, 2, 3])), throwsFormatException);
   });
+
+  test('Notiz-Anhang: hoechstens 1600 Pixel', () async {
+    final roh = img.encodePng(img.Image(width: 4000, height: 3000));
+    final b = img.decodeJpg(await anhangBildVerkleinern(roh))!;
+    expect((b.width, b.height), (1600, 1200));
+  });
 }

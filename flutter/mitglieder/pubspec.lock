@@ -373,6 +373,13 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  fwv_anlass:
+    dependency: "direct main"
+    description:
+      path: "../fwv_anlass"
+      relative: true
+    source: path
+    version: "0.1.0"
   fwv_core:
     dependency: "direct main"
     description:

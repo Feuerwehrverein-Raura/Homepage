@@ -130,6 +130,11 @@ abstract final class SitzungsSchluessel {
   /// Gesetzt, sobald die Anmeldedaten der alten App uebernommen sind.
   static const altdatenUebernommen = 'altdaten_uebernommen';
 
+  /// App-Einstellung (keine Sitzung): Die Frage "Mitglieder ins Adressbuch
+  /// übernehmen?" wurde beantwortet. Gleicher Name wie in TokenManager.kt,
+  /// wird aus der alten App uebernommen.
+  static const kontakteGefragt = 'contacts_sync_asked';
+
   /// Alles, was zur Sitzung gehoert (nicht aber [altdatenUebernommen]).
   static const sitzung = [accessToken, refreshToken, qrToken, kontotyp, eventId, name, email];
 }

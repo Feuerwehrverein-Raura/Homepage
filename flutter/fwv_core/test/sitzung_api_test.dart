@@ -371,4 +371,51 @@ void main() {
     expect(v.angemeldet, isFalse);
     expect(roh.werte, {SitzungsSchluessel.altdatenUebernommen: 'ja'});
   });
+
+  group('beiNeuemToken', () {
+    late List<String?> gemeldet;
+
+    setUp(() {
+      gemeldet = [];
+      verwaltung.beiNeuemToken = (s) => gemeldet.add(s?.accessToken);
+    });
+
+    test('Start mit gespeicherter Sitzung, Erneuern, Abmelden', () async {
+      await anmelden(
+        const Sitzung(accessToken: 'alt', refreshToken: 'r1', kontotyp: Kontotyp.mitglied),
+      );
+      expect(gemeldet, ['alt']);
+      await verwaltung.api.get('members/me');
+      expect(gemeldet, ['alt', 'neu-access']);
+      await verwaltung.abmelden();
+      expect(gemeldet, ['alt', 'neu-access', null]);
+    });
+
+    test('Start ohne Sitzung meldet nichts', () async {
+      await verwaltung.laden();
+      expect(gemeldet, isEmpty);
+    });
+
+    test('nach jedem Login', () async {
+      server.qrAntwort = 'qr-access';
+      await verwaltung.mitQrCodeAnmelden('fwv-member-1');
+      expect(gemeldet, ['qr-access']);
+    });
+
+    test('Sitzung abgelaufen -> null', () async {
+      server.refreshAntwort = null;
+      await anmelden(
+        const Sitzung(accessToken: 'alt', refreshToken: 'r1', kontotyp: Kontotyp.mitglied),
+      );
+      await expectLater(verwaltung.api.get('members/me'), throwsA(isA<SitzungAbgelaufen>()));
+      expect(gemeldet, ['alt', null]);
+    });
+
+    test('Fehler im Rueckruf stoert die Anmeldung nicht', () async {
+      verwaltung.beiNeuemToken = (_) => throw StateError('kaputt');
+      server.qrAntwort = 'qr-access';
+      await verwaltung.mitQrCodeAnmelden('fwv-member-1');
+      expect(verwaltung.angemeldet, isTrue);
+    });
+  });
 }

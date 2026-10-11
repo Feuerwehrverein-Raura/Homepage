@@ -36,9 +36,19 @@ Flutter-Repo (`flutter/`).
 ```
 flutter/
   fwv_core/     gemeinsam: Modelle, API, Anmeldung, Vertrags-Tests
+  fwv_anlass/   gemeinsam: Anlass-Verwaltung (Organisator + Vorstand)
+  fwv_lager/    gemeinsam: Lager mit Oberfläche (beide Apps)
   mitglieder/   Mitglieder + Organisatoren (com.fwv.members)
   vorstand/     Vorstand (später, ch.fwvraura.vorstand)
 ```
+
+Was nur der Vorstand braucht, kommt direkt in `vorstand/` und nicht in
+gemeinsame Pakete: Mitgliederverwaltung, Budget, Mitgliederbeiträge,
+Versand (E-Mail, Brief über Pingen) und die übrigen Vorstands-Funktionen.
+Zeigt eine Mitglieder-Funktion dieselben Daten (z.B. der eigene Beitrag),
+teilen sich beide höchstens die Modelle in `fwv_core`, nicht die
+Oberfläche. Vor dem Bau: Bestandsaufnahme von `vorstand-android`,
+`vorstand-desktop` und `vorstand.html`.
 
 ## Vorgehen
 
@@ -50,6 +60,25 @@ Schrittweise, die bestehenden Apps laufen weiter, bis der Ersatz fertig ist.
 2. **Vorstand-App** in Flutter (ersetzt `vorstand-android` und
    `vorstand-desktop`), auf demselben Kern.
 3. Danach entscheiden, ob `vorstand.html` durch die Web-Version ersetzt wird.
+
+## Inventar, Einkauf, Kasse (entschieden 11.10.2026)
+
+Bisher eigene PWAs (`simple-inventory-system`, `simple-order-system`).
+
+- **Lager** (Barcode-Scan, Ein-/Ausbuchen, Lagerorte, Nachbestellen,
+  Rezepte) kommt in **beide Apps**, als Reiter für alle mit
+  Lager-Berechtigung (Authentik-Gruppe). Gebaut einmal als Funktionspaket
+  mit Oberfläche, `flutter/fwv_lager`, das beide Apps einbinden.
+- **Einkauf** (Einkaufsliste pro Anlass, Belege fotografieren,
+  Zurückbuchen ins Lager) kommt in den **Organisator-Bereich** der
+  Mitglieder-App; die Einkaufs-PWA fällt danach weg.
+- **Kasse, Bar, Küchenanzeige** bleiben vorerst eigenständig: feste Geräte
+  am Fest, teils offline über den Raspberry Pi, Bondrucker und SumUp.
+- Voraussetzung: das Inventar-Backend akzeptiert heute nur Anmeldungen
+  seiner eigenen Authentik-Anwendung (`inventory-system`) und muss
+  zusätzlich die der Apps annehmen (wie das Events-Backend).
+
+Reihenfolge: nach dem Organisator-Bereich der Mitglieder-App.
 
 ## Regeln für den Flutter-Code
 

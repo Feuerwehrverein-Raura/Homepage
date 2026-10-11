@@ -60,8 +60,18 @@ Datei `fwv_members_prefs` ist gelöscht.
 - Tests: `flutter test` in beiden Paketen, `flutter build apk --debug` und
   `flutter build ios --simulator --no-codesign` laufen durch.
 
-Noch offen bei der Anmeldung: Kontakt-Abgleich-Frage nach dem Login (kommt
-mit dem nativen Adressbuch). Auf einem echten Gerät gegen Authentik
+Kontakt-Abgleich verdrahtet (11.10.2026): Die App teilt dem nativen
+Abgleich (Android) das Token mit — nach dem Laden beim Start, nach jedem
+Login und jedem Erneuern (`SitzungsVerwaltung.beiNeuemToken` in
+`fwv_core`), beim Abmelden und bei abgelaufener Sitzung `null`; externe
+Organisatoren geben immer `null` weiter. Abmelden schaltet den Abgleich aus.
+Nach dem ersten Login fragt die App einmal "Mitglieder ins Adressbuch
+übernehmen?" (nur Android, nur wenn verfügbar und noch aus); die Antwort
+steht unter `contacts_sync_asked`, ein `true` aus der alten App wird
+übernommen. Wie in der alten App wird nach dem Abmelden wieder gefragt. Die
+Einstellungen fragen den Stand beim Öffnen und bei Rückkehr in die App ab.
+
+Noch offen bei der Anmeldung: auf einem echten Gerät gegen Authentik
 ausprobieren.
 
 **Hauptseite, Profil, Einstellungen, Push — gebaut (11.10.2026).** Getestet
@@ -88,8 +98,8 @@ mit Nachbauten (kein echtes Konto, kein Firebase); `flutter build apk
   Zugänge (Passwörter verdeckt bis Antippen, Kopieren, Passwort einer
   Funktions-Mail ändern, mind. 12 Zeichen), Newsletter-Schalter (Stand nur
   lokal gemerkt), Adressbuch (iOS: `carddav.mobileconfig` + Anleitung;
-  Android: Kanal `ch.fwvraura.members/kontakte` — nur die Dart-Seite, der
-  Kotlin-Abgleich fehlt noch, bis dahin "noch nicht verfügbar"),
+  Android: Kanal `ch.fwvraura.members/kontakte`, Kotlin-Abgleich unter
+  `android/.../kontakte/`),
   App-Version, Abmelden.
 - Push (Android): `firebase_messaging`, dasselbe Firebase-Projekt
   (`google-services.json` aus `members-android`), Kanal `fwv_general`,
@@ -149,23 +159,20 @@ mit Nachbauten (kein echtes Konto, kein Firebase); `flutter build apk
 - Meine Anmeldungen (aus dem Profil): Anlass, Datum, Status-Chip in der
   Farbe des Backends, Schicht-Beschriftungen; Antippen öffnet den Anlass.
 
-Beobachtungen am Backend (offen):
+Beobachtungen am Backend:
 
-- `POST registrations/public` braucht `eventTitle` nicht (Titel kommt aus
-  der Datenbank); die App schickt ihn nicht mehr. `organizerEmail` wird noch
-  gelesen — als Ausweichadresse, wenn der Anlass keine `organizer_email`
-  hat. Ein Client kann so die Benachrichtigung an eine beliebige Adresse
-  umleiten (Punkt 8 unten). Die App schickt es nicht; das Backend sollte es
-  ignorieren.
-- Die Route ist öffentlich: das Mitglied wird nur über die E-Mail im Body
-  erkannt, nicht über das Token. Wer eine andere E-Mail eingibt, wird als
-  Gast behandelt (Bestätigungs-Mail). Besser: mit Token das Mitglied aus
-  dem Token nehmen.
-- `meal_selection` (Menüwahl bei GV) zeigt die App noch nicht; dafür
-  bräuchte es `meal_options` am Anlass im Vertrag.
-- Kalender-Export: Es gibt nur den ganzen Feed `GET calendar/ics`; die App
-  baut die .ics-Datei pro Anlass deshalb selbst aus `start_date`/`end_date`.
-  Kandidat fürs Backend: `GET events/:id/ics`.
+- Erledigt (11.10.2026): `POST registrations/public` ignoriert
+  `eventTitle` und `organizerEmail`; die Meldung geht an `organizer_email`
+  des Anlasses, sonst an `CONTACT_EMAIL` (auch bei alten, noch
+  unbestätigten Gast-Anmeldungen). Mit gültigem Mitglieder-Token zählt das
+  Mitglied aus dem Token (Name, E-Mail, `member_id`), nicht die E-Mail im
+  Formular; ohne Token wie bisher.
+- `meal_selection` (Menüwahl bei GV) zeigt die App beim Anmelden noch
+  nicht; `meal_options` liefert jetzt die Organisator-Übersicht, im
+  Anlass-Vertrag (`anlaesse-app.json`) steht es noch nicht.
+- Erledigt: `GET events/:id/ics` (eine Datei pro Anlass, Ortszeit
+  Europe/Zurich, nicht bei "Datum noch offen"). Die App baut die Datei
+  noch selbst und kann auf die Route umstellen.
 - `POST events/propose` antwortet nur mit der neuen Zeile, ohne Meldung —
   der Dank-Text steht in der App.
 
@@ -195,6 +202,49 @@ Material, PDFs (Teilnehmerliste, Aushang, Arbeitsplan). Alle unter
 `events/:id/organizer-registrations`, `events/:id/organizer-notes`,
 `events/:id/recipes|shopping-list|manual-items`.
 
+### Stand Phase 2 (11.10.2026)
+
+**Gebaut.** Getestet mit Nachbauten und gegen die Vertragsdatei;
+`flutter build apk --debug` und `flutter build ios --simulator --no-codesign
+--debug` laufen durch. Noch nicht auf einem Gerät ausprobiert.
+
+- Backend: `GET events/organisator-uebersicht` — ein Aufruf: eigene
+  Anlässe (Vorstand: alle aktuellen, externer Organisator: sein Anlass),
+  Schichten mit `app`-Block, je Anmeldung anzeigefertig Name, Kontakt,
+  Personen, Begleitpersonen, Allergien, Menü, Bemerkung, Schichten, Status;
+  Zahlen und erlaubte Aktionen (`src/organisator-ansicht.js`, Vertrag
+  `fixtures/organisator-uebersicht.json`, Datenschutz-Test). Organisator-
+  Login (`events/login`) gilt nicht mehr, wenn der Anlass vorbei oder
+  abgesagt ist — auch schon ausgestellte Tokens. `meal_options` liess sich
+  über `PUT events/:id[/as-organizer]` als Liste nie speichern (JSONB,
+  "invalid input syntax for type json") — behoben.
+- Neues Paket `flutter/fwv_anlass` (mit Oberfläche, gemeinsam mit der
+  späteren Vorstand-App): Schnittstelle `AnlassVerwaltungZugang` — die
+  Screens kennen keine Routen. `OrganisatorZugang` (Routen
+  `…-as-organizer`, externer Organisator `events/my-event/…`); ein
+  `VorstandZugang` kommt mit der Vorstand-App dazu (Stelle in
+  `lib/src/zugang.dart` beschrieben). Screens: Übersicht, Anlass mit
+  Reitern (Anmeldungen, Schichten, Notizen, Material), Anmeldung ändern/
+  löschen, Person eintragen (Mitglied aus dem Verzeichnis oder Gast),
+  andere Schicht vorschlagen, Angemeldete informieren (mit Ergebnis und
+  "nicht erreicht"), Anlass bearbeiten (Kategorien/Status aus
+  `event-optionen`), Schichten, Notizen mit Fotos (1600 px, Base64), Rezepte
+  und Material (Werte der Inventar-API), PDFs über das Teilen-Menü.
+  Gemeinsame Bausteine (Laden, Meldungen, Chips) liegen jetzt dort; die
+  Mitglieder-App exportiert sie weiter.
+- Mitglieder-App: `OrganisatorTab` und `OrganisatorAnlassScreen` sind nur
+  noch Hüllen; externe Organisatoren sehen ihren Anlass direkt.
+- Die drei iOS-Fehler unten sind behoben: Bearbeiten schickt nur
+  Geändertes (Tests im Paket).
+
+Offen: externe Organisatoren können nur bestätigen, ablehnen, eintragen
+und den Arbeitsplan senden (mehr Routen hat `events/my-event` nicht).
+Langfristig soll das Backend pro Aktion eine Route haben, die selbst
+prüft "Vorstand oder Organisator dieses Anlasses und nicht vorbei".
+`GET events/:id/pdf/teilnehmerliste` ist ohne Anmeldung abrufbar (mit
+E-Mail-Adressen) — gehört geschützt. Notizen nehmen nur Fotos auf, keine
+anderen Dateien.
+
 ## Phase 3 — Ablösung der alten Apps
 
 - **Android**: gleiche App-ID `com.fwv.members`, gleicher Upload-Schlüssel
@@ -220,16 +270,20 @@ Material, PDFs (Teilnehmerliste, Aushang, Arbeitsplan). Alle unter
 3. Schicht-Belegung als fertiger Text ("1 Platz frei").
 4. `kann_bearbeiten` am Anlass statt Abgleich in der App.
 5. Meine Anmeldungen: Schicht-Text und Status fertig liefern.
-6. Organisator-Übersicht: ein Aufruf mit Zahlen statt einer Abfrage pro
-   Anlass und Auslesen der Bemerkungen.
+6. ~~Organisator-Übersicht: ein Aufruf mit Zahlen statt einer Abfrage pro
+   Anlass und Auslesen der Bemerkungen.~~ Erledigt
+   (`GET events/organisator-uebersicht`).
 7. Anmeldung nötig ja/nein aus der Kategorie im Backend bestimmen.
-8. `POST registrations/public` soll Titel und Organisator-E-Mail nicht vom
-   Gerät übernehmen.
+8. ~~`POST registrations/public` soll Titel und Organisator-E-Mail nicht
+   vom Gerät übernehmen.~~ Erledigt.
 9. Material: "fehlt"-Zahl und Auswahllisten fertig liefern.
 10. Profilfoto: absolute URL; Verkleinern im Backend statt im Gerät.
 11. Newsletter: Abfrage, ob man angemeldet ist (heute nur lokal gemerkt).
 
 ## Fehler in den heutigen Apps (nicht übernehmen)
+
+In der Flutter-App alle behoben (Stand 11.10.2026); die ersten drei mit
+Tests in `flutter/fwv_anlass`.
 
 - iOS: Beim Bearbeiten einer Schicht springt das Datum auf heute.
 - iOS: Anlass bearbeiten löscht Menüwahl und Anmeldeschluss.

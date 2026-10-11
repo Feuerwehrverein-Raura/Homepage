@@ -179,44 +179,6 @@ class _Inhalt extends StatelessWidget {
   }
 }
 
-/// Eine Schicht: Bereich, Tag und Zeit, Belegung als fertiger Text.
-class SchichtZeile extends StatelessWidget {
-  const SchichtZeile({super.key, required this.schicht});
-
-  final Schicht schicht;
-
-  @override
-  Widget build(BuildContext context) {
-    final app = schicht.app;
-    final t = Theme.of(context);
-    final wann = [?app.datumText, ?app.zeitText].join(' · ');
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(app.bereichText ?? schicht.name ?? '', style: t.textTheme.titleSmall),
-                if (wann.isNotEmpty) Text(wann, style: t.textTheme.bodySmall),
-              ],
-            ),
-          ),
-          if (app.belegung.text != null) ...[
-            const SizedBox(width: 8),
-            HinweisChip(
-              app.belegung.text!,
-              art: app.belegung.offen > 0 ? HinweisArt.gut : HinweisArt.neutral,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _KnopfLeiste extends StatelessWidget {
   const _KnopfLeiste({required this.anlass, required this.anmelden, required this.arbeitsplan});
 

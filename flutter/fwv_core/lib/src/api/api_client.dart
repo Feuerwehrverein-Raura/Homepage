@@ -217,7 +217,8 @@ class ApiClient {
   ApiFehler _fehler(http.Response antwort, Object? json) {
     String? meldung;
     if (json is Map) {
-      final e = json['error'] ?? json['message'];
+      // `reason`: z.B. POST events/my-event/send-arbeitsplan
+      final e = json['error'] ?? json['message'] ?? json['reason'];
       if (e is String && e.isNotEmpty) meldung = e;
     }
     return ApiFehler(
