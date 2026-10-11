@@ -105,9 +105,30 @@ mit Nachbauten (kein echtes Konto, kein Firebase); `flutter build apk
   (`google-services.json` aus `members-android`), Kanal `fwv_general`,
   Anzeige im Vordergrund über `flutter_local_notifications`. Token-Anmeldung
   beim Start, nach dem Login und bei neuem Token (`device_id` = zufällige
-  Gerätekennung). iOS vorbereitet, aber aus (`FirebasePush.iosAktiv`), bis
-  es den Apple-Account, den APNs-Schlüssel und `GoogleService-Info.plist`
-  gibt.
+  Gerätekennung).
+- Push (iOS): Firebase-Projekt `fwv-raura-mitglieder`, iOS-App
+  `ch.fwvraura.members`. Die App startet Firebase nur, wenn
+  `ios/Runner/GoogleService-Info.plist` im App-Bundle liegt (Kanal
+  `ch.fwvraura.members/firebase` in `AppDelegate.swift`, geprüft in
+  `FirebasePush.starten`); ohne die Datei läuft sie normal, nur ohne Push.
+  Die Build-Phase "Copy GoogleService-Info.plist" im Runner-Target kopiert
+  die Datei, wenn sie da ist — Ablegen genügt, das Xcode-Projekt muss nicht
+  angefasst werden. Damit Nachrichten tatsächlich ankommen, fehlt noch:
+  1. Apple-Developer-Account des Vereins (beantragt, siehe unten).
+  2. APNs-Authentifizierungsschlüssel (.p8) im Apple-Konto erstellen
+     (Certificates, Identifiers & Profiles → Keys → Apple Push
+     Notifications service) und in der Firebase-Konsole unter
+     Projekteinstellungen → Cloud Messaging → Apple-App-Konfiguration
+     hochladen (mit Key-ID und Team-ID).
+  3. Im App-ID `ch.fwvraura.members` die Fähigkeit "Push Notifications"
+     einschalten und im Xcode-Projekt ergänzen: Datei
+     `Runner/Runner.entitlements` mit `aps-environment` (`development` bzw.
+     `production`), eingetragen als `CODE_SIGN_ENTITLEMENTS`, und in
+     `Info.plist` `UIBackgroundModes` = `remote-notification`. Beides erst
+     mit Signierung sinnvoll — ohne passendes Profil lässt sich die App mit
+     `aps-environment` nicht auf ein Gerät installieren.
+  4. Danach auf einem echten Gerät prüfen (der Simulator bekommt keine
+     FCM-Nachrichten über APNs).
 - Abmelden meldet das Push-Token ab: neue Route
   `DELETE members/me/fcm-token {token}` in `backend-members` (idempotent),
   danach wird das Token auf dem Gerät verworfen; auf Android wird der
@@ -391,6 +412,16 @@ Offen:
 - **iOS**: gleiche Bundle-ID `ch.fwvraura.members`. Es gibt noch **keinen
   Apple-Developer-Account, keine Signierung und kein TestFlight** — das
   blockiert iOS im Store unabhängig von Flutter.
+- **Schwarzer Bildschirm nach dem Update (behoben)**: iOS speichert
+  Szenen-Sitzungen samt Konfiguration (`Library/Saved Application State`)
+  und stellt sie nach einem App-Update wieder her, ohne `Info.plist` erneut
+  zu lesen. Die alte App war eine SwiftUI-App; ihre gespeicherte Sitzung hat
+  `SwiftUI.AppSceneDelegate` als Delegate und kein Storyboard — die
+  Flutter-App bekam dadurch weder Fenster noch Engine. `AppDelegate.swift`
+  erkennt das beim Verbinden der Szene (`UIScene.willConnectNotification`),
+  setzt den Flutter-`SceneDelegate` ein und baut das Fenster aus
+  `Main.storyboard` selbst auf. Im Simulator mit der gespeicherten Sitzung
+  der alten App nachgestellt und geprüft (11.10.2026).
 - **Kontakt-Abgleich vor dem Store-Update umziehen**: Das Android-Konto
   "FWV Raura" (Typ `com.fwv.members`) gehört zur App. Fehlt der native
   Abgleich in der neuen App, kann Android das Konto samt Kontakten entfernen

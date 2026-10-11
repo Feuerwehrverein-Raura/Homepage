@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ab Android 12 zeichnet das System den Startbildschirm selbst: Symbol
+     im Kreis auf einer Farbe. Wir nehmen dasselbe dunkle Rot und dasselbe
+     Logo wie das alte Startbild (drawable/splash_symbol.xml). -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/login_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_symbol</item>
+        <item name="android:statusBarColor">@color/login_background</item>
+        <item name="android:navigationBarColor">@color/login_background</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+</resources>

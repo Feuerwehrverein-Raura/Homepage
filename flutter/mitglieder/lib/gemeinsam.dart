@@ -5,6 +5,9 @@ export 'package:fwv_anlass/fwv_anlass.dart' show Abschnitt, FehlerAnsicht, fehle
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// Logo der alten Apps (members-ios LogoMitglieder) fuer Startbild und Login.
+const logoMitglieder = AssetImage('assets/logo_mitglieder.png');
+
 /// Rundes Profilfoto; ohne Foto oder wenn es nicht laedt ein Symbol.
 class ProfilFoto extends StatelessWidget {
   const ProfilFoto({super.key, required this.adresse, required this.api, this.groesse = 96});
@@ -16,11 +19,12 @@ class ProfilFoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final farben = Theme.of(context).colorScheme;
-    final ersatz = Icon(Icons.person, size: groesse * 0.6, color: farben.onPrimaryContainer);
+    final ersatz = Icon(Icons.person, size: groesse * 0.6, color: farben.onSurfaceVariant);
     final a = adresse;
     return CircleAvatar(
       radius: groesse / 2,
-      backgroundColor: farben.primaryContainer,
+      // Grau wie die Trennlinien; Weiss waere auf Karten unsichtbar.
+      backgroundColor: farben.outlineVariant,
       child: a == null
           ? ersatz
           : ClipOval(

@@ -73,6 +73,11 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # Logo der alten Apps (members-ios LogoMitglieder, freigestellt) fuer
+  # Startbild und Login.
+  assets:
+    - assets/logo_mitglieder.png
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

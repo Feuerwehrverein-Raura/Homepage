@@ -1,5 +1,6 @@
-# Launch Screen Assets
+# Startbild
 
-You can customize the launch screen with your own desired assets by replacing the image files in this directory.
-
-You can also do it by opening your Flutter project's Xcode project with `open ios/Runner.xcworkspace`, selecting `Runner/Assets.xcassets` in the Project Navigator and dropping in the desired images.
+Logo der alten Apps (members-ios `LogoMitglieder`, freigestellt), in
+280/560/840 Pixel fuer 1x/2x/3x. Hintergrund (#7F1D1D) und Groesse (280 pt)
+stehen in `Runner/Base.lproj/LaunchScreen.storyboard` — wie das Startbild
+der alten Android-App.

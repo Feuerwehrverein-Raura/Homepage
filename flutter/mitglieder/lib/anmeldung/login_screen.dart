@@ -1,14 +1,18 @@
-// Login-Screen mit zwei Reitern wie die alten Apps:
+// Login-Screen wie in der alten Android-App (activity_login.xml): Logo und
+// Vereinsname auf dunklem Rot, darunter eine weisse Karte mit zwei Reitern:
 //  - Mitglied: Anmeldung ueber Authentik (Vereinskonto) + "Passwort vergessen?"
 //  - QR-Code:  Login-Code vom Mitglieder-Datenblatt scannen
 // Darunter, unauffaellig, der Zugang fuer externe Organisatoren
 // (E-Mail + Passwort des Anlasses). Organisatoren, die Mitglied sind, melden
 // sich normal als Mitglied an.
 
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
+import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
+import '../gemeinsam.dart' show logoMitglieder;
 import 'authentik_anmeldung.dart';
 import 'organisator_login_screen.dart';
 import 'passwort_reset_screen.dart';
@@ -23,9 +27,18 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   bool _beschaeftigt = false;
   String? _fehler;
+  late final _reiter = TabController(length: 2, vsync: this)..addListener(_reiterGewechselt);
+
+  void _reiterGewechselt() => setState(() {});
+
+  @override
+  void dispose() {
+    _reiter.dispose();
+    super.dispose();
+  }
 
   SitzungsVerwaltung get _sitzung => widget.dienste.sitzung;
 
@@ -93,82 +106,127 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final farben = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final meldung = _fehler ?? _sitzung.hinweis;
 
-    return DefaultTabController(
-      length: 2,
+    final mitglied = _Reiter(
+      erklaerung:
+          'Melde dich mit deinem Vereinskonto an — '
+          'gleiche Angaben wie auf der Website.',
+      knopf: _GrosserKnopf(
+        onPressed: _beschaeftigt ? null : _mitAuthentik,
+        symbol: Icons.login,
+        text: 'Mit Vereinskonto anmelden',
+      ),
+      zusatz: TextButton(
+        onPressed: _beschaeftigt ? null : () => _oeffnen(PasswortResetScreen(sitzung: _sitzung)),
+        child: const Text('Passwort vergessen?'),
+      ),
+    );
+    final qr = _Reiter(
+      erklaerung: 'Scanne den Login-Code auf deinem Mitglieder-Datenblatt.',
+      knopf: _GrosserKnopf(
+        onPressed: _beschaeftigt ? null : _mitQrCode,
+        symbol: Icons.qr_code_scanner,
+        text: 'QR-Code scannen',
+      ),
+    );
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
       child: Scaffold(
+        backgroundColor: FwvFarben.loginHintergrund,
         body: SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 32),
-              Icon(Icons.local_fire_department, size: 56, color: farben.primary),
-              const SizedBox(height: 8),
-              Text('FWV Mitglieder', style: text.headlineSmall),
-              Text('Feuerwehrverein Raura Kaiseraugst', style: text.bodyMedium),
-              const SizedBox(height: 16),
-              if (meldung != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                  child: Text(
-                    meldung,
-                    key: const Key('login-meldung'),
-                    textAlign: TextAlign.center,
-                    style: text.bodyMedium?.copyWith(color: farben.error),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              children: [
+                const SizedBox(height: 32),
+                const Image(image: logoMitglieder, width: 180, height: 180, semanticLabel: 'FWV Logo'),
+                const SizedBox(height: 12),
+                Text(
+                  'Feuerwehrverein Raura',
+                  style: text.titleLarge?.copyWith(
+                    color: FwvFarben.aufRot,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              const TabBar(
-                tabs: [
-                  Tab(text: 'Mitglied'),
-                  Tab(text: 'QR-Code'),
-                ],
-              ),
-              SizedBox(height: 4, child: _beschaeftigt ? const LinearProgressIndicator() : null),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _Reiter(
-                      erklaerung:
-                          'Melde dich mit deinem Vereinskonto an — '
-                          'gleiche Angaben wie auf der Website.',
-                      knopf: FilledButton.icon(
-                        onPressed: _beschaeftigt ? null : _mitAuthentik,
-                        icon: const Icon(Icons.login),
-                        label: const Text('Mit Vereinskonto anmelden'),
-                      ),
-                      zusatz: TextButton(
-                        onPressed: _beschaeftigt
-                            ? null
-                            : () => _oeffnen(PasswortResetScreen(sitzung: _sitzung)),
-                        child: const Text('Passwort vergessen?'),
+                const SizedBox(height: 32),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 548),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Card(
+                        color: FwvFarben.flaeche,
+                        elevation: 8,
+                        margin: EdgeInsets.zero,
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TabBar(
+                              controller: _reiter,
+                              tabs: const [
+                                Tab(text: 'Mitglied'),
+                                Tab(text: 'QR-Code'),
+                              ],
+                            ),
+                            if (_reiter.index == 0) mitglied else qr,
+                            if (_beschaeftigt) const LinearProgressIndicator(),
+                            if (meldung != null)
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(
+                                  meldung,
+                                  key: const Key('login-meldung'),
+                                  textAlign: TextAlign.center,
+                                  style: text.bodyMedium?.copyWith(color: FwvFarben.fehler),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                    _Reiter(
-                      erklaerung: 'Scanne den Login-Code auf deinem Mitglieder-Datenblatt.',
-                      knopf: FilledButton.icon(
-                        onPressed: _beschaeftigt ? null : _mitQrCode,
-                        icon: const Icon(Icons.qr_code_scanner),
-                        label: const Text('QR-Code scannen'),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: TextButton(
+                const SizedBox(height: 16),
+                TextButton(
+                  style: TextButton.styleFrom(foregroundColor: FwvFarben.aufRot),
                   onPressed: _beschaeftigt
                       ? null
                       : () => _oeffnen(OrganisatorLoginScreen(sitzung: _sitzung)),
                   child: const Text('Externer Organisator? Hier anmelden'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Breiter Knopf wie in der alten App (56 hoch, Ecken 12).
+class _GrosserKnopf extends StatelessWidget {
+  const _GrosserKnopf({required this.onPressed, required this.symbol, required this.text});
+
+  final VoidCallback? onPressed;
+  final IconData symbol;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      ),
+      onPressed: onPressed,
+      icon: Icon(symbol),
+      label: Text(text),
     );
   }
 }
@@ -182,15 +240,19 @@ class _Reiter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+    return Padding(
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(erklaerung, textAlign: TextAlign.center),
+          Text(
+            erklaerung,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: FwvFarben.textLeise),
+          ),
           const SizedBox(height: 24),
           knopf,
-          if (zusatz != null) ...[const SizedBox(height: 8), zusatz!],
+          if (zusatz != null) ...[const SizedBox(height: 4), zusatz!],
         ],
       ),
     );

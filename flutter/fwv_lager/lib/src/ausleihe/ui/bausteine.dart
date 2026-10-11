@@ -142,7 +142,7 @@ class AusleiheBild extends StatelessWidget {
     final leer = Container(
       width: groesse,
       height: groesse,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: Theme.of(context).colorScheme.outlineVariant,
       child: const Icon(Icons.image_outlined),
     );
     if (adresse == null) return leer;

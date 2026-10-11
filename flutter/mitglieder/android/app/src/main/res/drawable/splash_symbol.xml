@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Symbol fuer den Startbildschirm ab Android 12: das freigestellte Logo,
+     so weit eingerueckt, dass es ganz in die Kreismaske des Systems passt
+     (sichtbar ist ein Kreis von 2/3 der Flaeche). Das Vordergrund-Bild des
+     App-Symbols taugt dafuer nicht — es hat einen hellen Rand. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/logo_mitglieder"
+    android:inset="24%" />

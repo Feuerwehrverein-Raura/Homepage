@@ -14,9 +14,14 @@
 //    auch dann nichts mehr an, wenn das Abmelden beim Backend scheitert (das
 //    Backend raeumt ungueltige Tokens beim naechsten Versand selbst weg).
 //
-// iOS: vorbereitet, aber aus. Ohne Apple-Developer-Account gibt es keinen
-// APNs-Schluessel und keine GoogleService-Info.plist; Firebase wuerde beim
-// Start scheitern. [FirebasePush.iosAktiv] einschalten, sobald beides da ist.
+// iOS: Push ist an, sobald ios/Runner/GoogleService-Info.plist im App-Bundle
+// liegt (Firebase-Projekt fwv-raura-mitglieder, App ch.fwvraura.members).
+// Das prueft die App beim Start ueber den Kanal "ch.fwvraura.members/firebase"
+// (AppDelegate.swift); ohne die Datei wird Firebase gar nicht erst gestartet
+// — FirebaseApp.configure() wuerde die App sonst abbrechen. Damit Nachrichten
+// tatsaechlich ankommen, braucht es zusaetzlich den APNs-Schluessel in
+// Firebase und die Push-Faehigkeit im Xcode-Projekt (siehe
+// docs/flutter-mitglieder-app-plan.md).
 
 import 'dart:async';
 import 'dart:io' show Platform;
@@ -25,6 +30,7 @@ import 'dart:math';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:fwv_core/fwv_core.dart';
 
@@ -89,10 +95,11 @@ class KeinPush implements PushDienst {
 class FirebasePush implements PushDienst {
   FirebasePush();
 
-  /// iOS-Push einschalten, sobald es den Apple-Developer-Account, den
-  /// APNs-Schluessel in Firebase und `ios/Runner/GoogleService-Info.plist`
-  /// gibt (dazu die Faehigkeit "Push Notifications" im Xcode-Projekt).
-  static const iosAktiv = false;
+  /// Fragt die iOS-App, ob sie eine GoogleService-Info.plist mitbringt.
+  static const _firebaseKanal = MethodChannel('ch.fwvraura.members/firebase');
+
+  /// Auf iOS erst nach [starten] bekannt: Ist Firebase eingerichtet?
+  bool _iosKonfiguriert = false;
 
   /// Kanal wie in der alten App, damit die Einstellungen der Nutzer bleiben.
   static const kanal = AndroidNotificationChannel(
@@ -108,7 +115,7 @@ class FirebasePush implements PushDienst {
   StreamSubscription<RemoteMessage>? _nachrichtAbo;
 
   @override
-  bool get verfuegbar => !kIsWeb && (Platform.isAndroid || (Platform.isIOS && iosAktiv));
+  bool get verfuegbar => !kIsWeb && (Platform.isAndroid || (Platform.isIOS && _iosKonfiguriert));
 
   @override
   String get plattform => Platform.isIOS ? 'ios' : 'android';
@@ -118,7 +125,9 @@ class FirebasePush implements PushDienst {
 
   @override
   Future<void> starten() async {
-    if (!verfuegbar || _bereit) return;
+    if (_bereit || kIsWeb) return;
+    if (Platform.isIOS) _iosKonfiguriert = await _iosFirebaseKonfiguriert();
+    if (!verfuegbar) return;
     try {
       // Android liest die Einstellungen aus google-services.json (Gradle-
       // Plugin), iOS spaeter aus GoogleService-Info.plist.
@@ -148,6 +157,16 @@ class FirebasePush implements PushDienst {
       _bereit = true;
     } on Object catch (e) {
       debugPrint('Push nicht verfuegbar: $e');
+    }
+  }
+
+  /// Liegt GoogleService-Info.plist im App-Bundle? Im Zweifel nein.
+  static Future<bool> _iosFirebaseKonfiguriert() async {
+    try {
+      return await _firebaseKanal.invokeMethod<bool>('konfiguriert') ?? false;
+    } on Object catch (e) {
+      debugPrint('Firebase-Einrichtung unbekannt: $e');
+      return false;
     }
   }
 

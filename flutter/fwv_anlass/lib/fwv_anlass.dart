@@ -9,6 +9,7 @@ export 'src/bausteine.dart';
 export 'src/daten.dart';
 export 'src/modelle.dart';
 export 'src/organisator_zugang.dart';
+export 'src/thema.dart';
 export 'src/ui/anlass_screen.dart';
 export 'src/ui/uebersicht_screen.dart';
 export 'src/zugang.dart';

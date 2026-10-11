@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Farben der alten App (members-android res/values/colors.xml), soweit die
+     nativen Teile sie brauchen: Hintergrund des Startbilds und des
+     App-Symbols. Die Farben der Oberflaeche stehen in Dart
+     (fwv_anlass lib/src/thema.dart). -->
+<resources>
+    <color name="primary">#B91C1C</color>
+    <color name="background">#FAFAFA</color>
+    <color name="login_background">#7F1D1D</color>
+</resources>

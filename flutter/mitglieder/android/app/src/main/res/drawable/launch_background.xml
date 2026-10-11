@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!-- Startbild wie SplashActivity der alten App (activity_splash.xml): Logo
+     (280dp) mittig auf dunklem Vereinsrot. Bis Android 11; ab Android 12
+     siehe values-v31/styles.xml. Danach zeigt Dart dasselbe Bild
+     (StartBild in lib/main.dart), bis die Sitzung geladen ist. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    <item android:drawable="@color/login_background" />
+    <item
+        android:width="280dp"
+        android:height="280dp"
+        android:gravity="center"
+        android:drawable="@drawable/logo_mitglieder" />
 </layer-list>

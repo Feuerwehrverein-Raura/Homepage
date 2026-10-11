@@ -6,15 +6,81 @@ import UIKit
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   override func application(
     _ application: UIApplication,
+    willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+  ) -> Bool {
+    // Muss vor der ersten Szenen-Verbindung registriert sein, siehe
+    // szeneVerbindetSich(_:).
+    NotificationCenter.default.addObserver(
+      self, selector: #selector(szeneVerbindetSich(_:)),
+      name: UIScene.willConnectNotification, object: nil)
+    return super.application(application, willFinishLaunchingWithOptions: launchOptions)
+  }
+
+  override func application(
+    _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  /// Uebernommene Szenen-Sitzung der alten SwiftUI-App reparieren.
+  ///
+  /// Die alte App (members-ios) hatte dieselbe Bundle-ID und war eine
+  /// SwiftUI-App. iOS speichert Szenen-Sitzungen samt Konfiguration
+  /// (Library/Saved Application State) und stellt sie nach einem Update
+  /// wieder her, ohne Info.plist oder configurationForConnecting erneut zu
+  /// fragen. Die wiederhergestellte Szene hat dann `SwiftUI.AppSceneDelegate`
+  /// als Delegate und kein Storyboard: Es entsteht kein Fenster, kein
+  /// FlutterViewController und keine Flutter-Engine - der Bildschirm bleibt
+  /// schwarz. In diesem Fall setzen wir hier unseren SceneDelegate ein und
+  /// bauen das Fenster aus Main.storyboard selbst auf, genau wie UIKit es fuer
+  /// eine frische Sitzung tun wuerde.
+  @objc private func szeneVerbindetSich(_ notification: Notification) {
+    guard let szene = notification.object as? UIWindowScene,
+      szene.session.role == .windowApplication,
+      !(szene.delegate is FlutterSceneDelegate)
+    else { return }
+
+    let delegate = SceneDelegate()
+    let fenster = UIWindow(windowScene: szene)
+    fenster.rootViewController = UIStoryboard(name: "Main", bundle: nil)
+      .instantiateInitialViewController()
+    delegate.window = fenster
+    szene.delegate = delegate
+    fenster.makeKeyAndVisible()
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "AltdatenUebernahme") {
       AltdatenUebernahme.register(with: registrar)
+    }
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "FirebaseKonfiguration") {
+      FirebaseKonfiguration.register(with: registrar)
+    }
+  }
+}
+
+/// Sagt Dart, ob die App eine GoogleService-Info.plist mitbringt. Ohne sie
+/// darf Firebase nicht gestartet werden (FirebaseApp.configure() bricht die
+/// App sonst ab); Push bleibt dann auf iOS aus. Gegenstueck in Dart:
+/// FirebasePush in lib/push/push_dienst.dart.
+///
+/// Methode "konfiguriert": true, wenn die Datei im App-Bundle liegt.
+final class FirebaseKonfiguration: NSObject, FlutterPlugin {
+  static let kanal = "ch.fwvraura.members/firebase"
+
+  static func register(with registrar: FlutterPluginRegistrar) {
+    let channel = FlutterMethodChannel(name: kanal, binaryMessenger: registrar.messenger())
+    registrar.addMethodCallDelegate(FirebaseKonfiguration(), channel: channel)
+  }
+
+  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "konfiguriert":
+      result(Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil)
+    default:
+      result(FlutterMethodNotImplemented)
     }
   }
 }

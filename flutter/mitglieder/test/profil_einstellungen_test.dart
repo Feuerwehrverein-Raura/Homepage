@@ -603,16 +603,17 @@ void main() {
     });
   });
 
-  testWidgets('schmales Handy im Dunkelmodus: nichts laeuft ueber', (tester) async {
+  testWidgets('schmales Handy im Dunkelmodus: bleibt hell, nichts laeuft ueber', (tester) async {
     await starten(tester);
-    // 320 x 640 Punkte, dunkel. Ueberlaeufe wuerden den Test scheitern lassen.
+    // 320 x 640 Punkte, System dunkel. Die App bleibt hell wie die alte
+    // (kein dunkler Modus). Ueberlaeufe wuerden den Test scheitern lassen.
     tester.view.physicalSize = const Size(640, 1280);
     tester.view.devicePixelRatio = 2;
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
     addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
     await tester.pumpAndSettle();
 
-    expect(Theme.of(tester.element(find.byType(NavigationBar))).brightness, Brightness.dark);
+    expect(Theme.of(tester.element(find.byType(NavigationBar))).brightness, Brightness.light);
     await reiter(tester, 'Profil');
     await tippen(tester, find.byTooltip('Profil bearbeiten'));
     await tester.tap(find.byTooltip('Zurück'));

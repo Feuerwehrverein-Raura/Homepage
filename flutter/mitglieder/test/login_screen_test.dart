@@ -185,6 +185,8 @@ void main() {
 
   testWidgets('externer Organisator: falsches, dann richtiges Passwort', (tester) async {
     await starten(tester);
+    await tester.ensureVisible(find.text('Externer Organisator? Hier anmelden'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Externer Organisator? Hier anmelden'));
     await tester.pumpAndSettle();
 
@@ -248,5 +250,38 @@ void main() {
 
     expect(find.text('Sitzung abgelaufen — bitte neu anmelden.'), findsOneWidget);
     expect(find.text('Mit Vereinskonto anmelden'), findsOneWidget);
+  });
+
+  testWidgets('Farben wie die alte App: Rot, rote Leiste, kein dunkler Modus', (tester) async {
+    browser.ergebnis = AuthentikTokens(
+      accessToken: 'a',
+      refreshToken: 'r',
+      idToken: _jwt({'name': 'Erika Muster', 'email': 'e@x.ch'}),
+    );
+    await starten(tester);
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    expect(app.theme!.colorScheme.primary, const Color(0xFFB91C1C));
+    expect(app.themeMode, ThemeMode.light);
+    expect(app.darkTheme, isNull);
+    // Login auf dunklem Rot wie activity_login.xml.
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold).first).backgroundColor,
+      const Color(0xFF7F1D1D),
+    );
+
+    await tester.tap(find.text('Mit Vereinskonto anmelden'));
+    await tester.pumpAndSettle();
+
+    // Die Leiste oben ist rot mit weisser Schrift.
+    final leiste = find.byType(AppBar).first;
+    final flaeche = tester.widget<Material>(
+      find.descendant(of: leiste, matching: find.byType(Material)).first,
+    );
+    expect(flaeche.color, const Color(0xFFB91C1C));
+    final titel = tester.widget<Text>(
+      find.descendant(of: leiste, matching: find.byType(Text)).first,
+    );
+    expect(DefaultTextStyle.of(tester.element(find.byWidget(titel))).style.color, Colors.white);
   });
 }

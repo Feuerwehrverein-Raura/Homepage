@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'thema.dart';
 import 'zugang.dart';
 
 /// Kurze Meldung unten am Bildschirm.
@@ -171,19 +172,14 @@ HinweisArt hinweisArtFuer(StatusFarbe f) => switch (f) {
   StatusFarbe.grau => HinweisArt.neutral,
 };
 
-/// Hintergrund und Schrift, im hellen und dunklen Modus gut lesbar.
-(Color, Color) hinweisFarben(BuildContext context, HinweisArt art) {
-  final dunkel = Theme.of(context).brightness == Brightness.dark;
-  final farben = Theme.of(context).colorScheme;
-  return switch ((art, dunkel)) {
-    (HinweisArt.gut, false) => (const Color(0xFFD7F0DA), const Color(0xFF1B5E20)),
-    (HinweisArt.gut, true) => (const Color(0xFF1E3B22), const Color(0xFFA5D6A7)),
-    (HinweisArt.warnung, false) => (const Color(0xFFFFF0C2), const Color(0xFF6D4C00)),
-    (HinweisArt.warnung, true) => (const Color(0xFF3D3214), const Color(0xFFFFD873)),
-    (HinweisArt.schlecht, _) => (farben.errorContainer, farben.onErrorContainer),
-    (HinweisArt.neutral, _) => (farben.surfaceContainerHighest, farben.onSurfaceVariant),
-  };
-}
+/// Hintergrund und Schrift eines Hinweises, in den Statusfarben der alten
+/// App (gruen, orange, rot, grau). Es gibt nur das helle Theme.
+(Color, Color) hinweisFarben(BuildContext context, HinweisArt art) => switch (art) {
+  HinweisArt.gut => (FwvFarben.gruenHell, FwvFarben.gruen),
+  HinweisArt.warnung => (FwvFarben.orangeHell, FwvFarben.orange),
+  HinweisArt.schlecht => (FwvFarben.rotFlaeche, FwvFarben.rot),
+  HinweisArt.neutral => (FwvFarben.grauFlaeche, FwvFarben.textLeise),
+};
 
 /// Zeile mit Symbol und Text (Datum, Ort, Kosten ...).
 class InfoZeile extends StatelessWidget {

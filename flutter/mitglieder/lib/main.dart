@@ -6,14 +6,14 @@
 // package:flutter/material.dart — die eingebauten Importe werden ab November
 // 2026 abgekuendigt.
 
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
+import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben, fwvThema;
 import 'package:material_ui/material_ui.dart';
 
 import 'anmeldung/login_screen.dart';
 import 'dienste.dart';
+import 'gemeinsam.dart' show logoMitglieder;
 import 'hauptseite.dart';
-
-/// Vereinsrot der bisherigen Apps (members-android colors.xml: primary).
-const vereinsRot = Color(0xFFB91C1C);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -66,15 +66,14 @@ class _FwvAppState extends State<FwvApp> {
       locale: const Locale('de', 'CH'),
       supportedLocales: const [Locale('de', 'CH'), Locale('de')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: vereinsRot)),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: vereinsRot, brightness: Brightness.dark),
-      ),
+      // Farben der alten Apps, kein dunkler Modus (gab es dort auch nicht).
+      theme: fwvThema(),
+      themeMode: ThemeMode.light,
       home: FutureBuilder<void>(
         future: _start,
         builder: (context, start) {
           if (start.connectionState != ConnectionState.done) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            return const StartBild();
           }
           return ListenableBuilder(
             listenable: widget.dienste.sitzung,
@@ -83,6 +82,32 @@ class _FwvAppState extends State<FwvApp> {
                 : LoginScreen(dienste: widget.dienste),
           );
         },
+      ),
+    );
+  }
+}
+
+/// Startbild waehrend die App die Sitzung laedt — wie SplashActivity der
+/// alten App: Logo (280) auf dunklem Vereinsrot. Passt zum nativen
+/// Startbildschirm (Android launch_background, iOS LaunchScreen), damit
+/// beim Uebergang nichts springt.
+class StartBild extends StatelessWidget {
+  const StartBild({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: FwvFarben.loginHintergrund,
+        body: Center(
+          child: Image(
+            image: logoMitglieder,
+            width: 280,
+            height: 280,
+            semanticLabel: 'FWV Raura',
+          ),
+        ),
       ),
     );
   }

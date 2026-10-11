@@ -158,6 +158,7 @@
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				4F1B5E2A2F00000100000001 /* Copy GoogleService-Info.plist */,
 			);
 			buildRules = (
 			);
@@ -235,6 +236,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		4F1B5E2A2F00000100000001 /* Copy GoogleService-Info.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy GoogleService-Info.plist";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Firebase-Einstellungen fuer iOS-Push. Die Datei ist optional: Fehlt sie,\n# baut die App trotzdem und Push bleibt auf iOS aus (FirebasePush prueft\n# zur Laufzeit, ob sie im Bundle liegt).\nQUELLE=\"${SRCROOT}/Runner/GoogleService-Info.plist\"\nZIEL=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\nif [ -f \"$QUELLE\" ]; then\n  cp \"$QUELLE\" \"$ZIEL\"\n  echo \"GoogleService-Info.plist kopiert\"\nelse\n  rm -f \"$ZIEL\"\n  echo \"warning: Keine GoogleService-Info.plist - Push auf iOS bleibt aus\"\nfi\n";
+		};
 		3B06AD1E1E4923F5004D2608 /* Thin Binary */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
