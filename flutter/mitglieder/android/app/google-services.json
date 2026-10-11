@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "368963898299",
+    "project_id": "fwv-raura-mitglieder",
+    "storage_bucket": "fwv-raura-mitglieder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:368963898299:android:70ec19579ee4ea61b8529e",
+        "android_client_info": {
+          "package_name": "com.fwv.members"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADhoW5-WsCq49hJU-JkweoiTChhPotLY0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

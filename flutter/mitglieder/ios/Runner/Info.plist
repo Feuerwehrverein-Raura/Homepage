@@ -38,7 +38,9 @@
 		</dict>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Damit du dich mit dem QR-Code auf deinem Mitglieder-Datenblatt anmelden kannst.</string>
+	<string>Damit du dich mit dem QR-Code auf deinem Mitglieder-Datenblatt anmelden und ein Profilfoto aufnehmen kannst.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Damit du ein Foto aus deiner Mediathek als Profilfoto wählen kannst.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

@@ -11,6 +11,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../auth/konfiguration.dart';
 
@@ -86,6 +87,41 @@ class ApiClient {
 
   Future<dynamic> delete(String pfad, {Object? daten}) => _senden('DELETE', pfad, daten: daten);
 
+  /// Laedt eine Datei als `multipart/form-data` hoch (z.B. das Profilfoto
+  /// unter dem Feld `photo`). Erneuern und Wiederholen wie bei den
+  /// JSON-Aufrufen; die Anfrage wird dafuer neu gebaut.
+  Future<dynamic> hochladen(
+    String pfad, {
+    required String feld,
+    required List<int> bytes,
+    required String dateiname,
+    String inhaltstyp = 'application/octet-stream',
+  }) => _mitErneuern(
+    (token) => _schicken(() {
+      final anfrage = http.MultipartRequest('POST', adresse(pfad))
+        ..headers['Accept'] = 'application/json'
+        ..files.add(
+          http.MultipartFile.fromBytes(
+            feld,
+            bytes,
+            filename: dateiname,
+            contentType: _medientyp(inhaltstyp),
+          ),
+        );
+      if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
+      return anfrage;
+    }),
+  );
+
+  /// Kopfzeilen fuer Abrufe ausserhalb des [ApiClient] (z.B. Bilder ueber
+  /// `Image.network`): das aktuelle Token, aber nur fuer Adressen dieses
+  /// Backends — fremde Server bekommen es nie.
+  Map<String, String> kopfzeilenFuer(Uri ziel) {
+    final token = tokenQuelle?.accessToken;
+    if (token == null || ziel.host != basis.host || ziel.scheme != basis.scheme) return const {};
+    return {'Authorization': 'Bearer $token'};
+  }
+
   /// Volle Adresse fuer einen Pfad wie `auth/member/qr-login`.
   Uri adresse(String pfad, [Map<String, String>? abfrage]) {
     final ziel = basis.resolve(pfad.startsWith('/') ? pfad.substring(1) : pfad);
@@ -97,17 +133,32 @@ class ApiClient {
     String pfad, {
     Map<String, String>? abfrage,
     Object? daten,
-  }) async {
+  }) => _mitErneuern(
+    (token) => _schicken(() {
+      final anfrage = http.Request(methode, adresse(pfad, abfrage))
+        ..headers['Accept'] = 'application/json';
+      if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
+      if (daten != null) {
+        anfrage.headers['Content-Type'] = 'application/json; charset=utf-8';
+        anfrage.body = jsonEncode(daten);
+      }
+      return anfrage;
+    }),
+  );
+
+  /// Schickt einen Aufruf mit dem aktuellen Token; bei 401/403 einmal
+  /// erneuern und mit dem neuen Token wiederholen.
+  Future<dynamic> _mitErneuern(Future<http.Response> Function(String? token) einmal) async {
     final quelle = tokenQuelle;
     final token = quelle?.accessToken;
-    var antwort = await _einmal(methode, pfad, abfrage, daten, token);
+    var antwort = await einmal(token);
 
     if (quelle != null &&
         token != null &&
         (antwort.statusCode == 401 || antwort.statusCode == 403)) {
       switch (await quelle.erneuern(token)) {
         case Erneuerung.erneuert:
-          antwort = await _einmal(methode, pfad, abfrage, daten, quelle.accessToken);
+          antwort = await einmal(quelle.accessToken);
         case Erneuerung.abgelaufen:
           throw const SitzungAbgelaufen();
         case Erneuerung.nichtErreichbar:
@@ -117,22 +168,9 @@ class ApiClient {
     return _auswerten(antwort);
   }
 
-  Future<http.Response> _einmal(
-    String methode,
-    String pfad,
-    Map<String, String>? abfrage,
-    Object? daten,
-    String? token,
-  ) async {
-    final anfrage = http.Request(methode, adresse(pfad, abfrage))
-      ..headers['Accept'] = 'application/json';
-    if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
-    if (daten != null) {
-      anfrage.headers['Content-Type'] = 'application/json; charset=utf-8';
-      anfrage.body = jsonEncode(daten);
-    }
+  Future<http.Response> _schicken(http.BaseRequest Function() bauen) async {
     try {
-      final strom = await _http.send(anfrage).timeout(zeitlimit);
+      final strom = await _http.send(bauen()).timeout(zeitlimit);
       return await http.Response.fromStream(strom).timeout(zeitlimit);
     } on TimeoutException {
       throw const ApiFehler.keineVerbindung();
@@ -162,5 +200,13 @@ class ApiClient {
       meldung ?? 'Der Server meldet einen Fehler (${antwort.statusCode}).',
       status: antwort.statusCode,
     );
+  }
+}
+
+MediaType? _medientyp(String text) {
+  try {
+    return MediaType.parse(text);
+  } on FormatException {
+    return null;
   }
 }

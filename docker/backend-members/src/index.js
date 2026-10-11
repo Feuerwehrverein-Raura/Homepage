@@ -2820,14 +2820,12 @@ app.put('/members/me', authenticateToken, async (req, res) => {
 app.post('/members/me/austritt', authenticateToken, async (req, res) => {
     try {
         const { reason, austrittsdatum } = req.body || {};
-        const memberResult = await pool.query(
-            'SELECT id, vorname, nachname, email, status FROM members WHERE LOWER(email) = LOWER($1)',
-            [req.user.email]
-        );
-        if (memberResult.rows.length === 0) {
+        // Wie alle /members/me-Routen ueber mitgliedZurAnmeldung: nur ueber
+        // die E-Mail gesucht, bekamen Mitglieder ohne E-Mail hier ein 404.
+        const member = await mitgliedZurAnmeldung(req);
+        if (!member) {
             return res.status(404).json({ error: 'Mitglied nicht gefunden' });
         }
-        const member = memberResult.rows[0];
 
         if (member.status === 'Austritt_beantragt' || member.status === 'Ausgetreten') {
             return res.status(409).json({ error: 'Austritt wurde bereits beantragt oder ist erfolgt.' });
@@ -5419,6 +5417,42 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('/members/me/fcm-token error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: FCM-Token abmelden — die Mitglieder-App ruft das beim Abmelden auf,
+// damit auf diesem Geraet keine Push-Nachrichten fuer das bisherige Konto mehr
+// ankommen. Body: { token } (alternativ ?token=). Loescht nur die Zeile dieses
+// Mitglieds mit genau diesem Token. Idempotent: ein unbekannter Token (oder
+// eine noch nicht angelegte Tabelle) ist kein Fehler.
+app.delete('/members/me/fcm-token', authenticateToken, async (req, res) => {
+    try {
+        const token = (req.body && req.body.token) || req.query.token;
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ error: 'token erforderlich' });
+        }
+
+        const _m = await mitgliedZurAnmeldung(req);
+        if (!_m) {
+            return res.status(404).json({ error: 'Member profile not found' });
+        }
+
+        let removed = 0;
+        try {
+            const result = await pool.query(
+                'DELETE FROM fcm_tokens WHERE member_id = $1 AND token = $2',
+                [_m.id, token]
+            );
+            removed = result.rowCount || 0;
+        } catch (dbErr) {
+            // 42P01 = Tabelle existiert nicht: dann gibt es auch nichts zu loeschen.
+            if (dbErr.code !== '42P01') throw dbErr;
+        }
+
+        res.json({ success: true, removed });
+    } catch (error) {
+        console.error('DELETE /members/me/fcm-token error:', error);
         res.status(500).json({ error: error.message });
     }
 });

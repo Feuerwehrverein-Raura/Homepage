@@ -60,9 +60,66 @@ Datei `fwv_members_prefs` ist gelöscht.
 - Tests: `flutter test` in beiden Paketen, `flutter build apk --debug` und
   `flutter build ios --simulator --no-codesign` laufen durch.
 
-Noch offen bei der Anmeldung: Push-Token (kommt mit den
-Benachrichtigungen), Kontakt-Abgleich-Frage nach dem Login (kommt mit dem
-Adressbuch). Auf einem echten Gerät gegen Authentik ausprobieren.
+Noch offen bei der Anmeldung: Kontakt-Abgleich-Frage nach dem Login (kommt
+mit dem nativen Adressbuch). Auf einem echten Gerät gegen Authentik
+ausprobieren.
+
+**Hauptseite, Profil, Einstellungen, Push — gebaut (11.10.2026).** Getestet
+mit Nachbauten (kein echtes Konto, kein Firebase); `flutter build apk
+--debug` läuft durch. Noch nicht auf einem Gerät ausprobiert.
+
+- Hauptseite mit Reitern unten: Anlässe · (Organisator) · Profil ·
+  Einstellungen. "Organisator" erscheint bei Mitgliedern, wenn
+  `events/organized-by-me` etwas liefert; externe Organisatoren starten
+  dort und haben kein Profil. Platzhalter für andere Arbeitsschritte:
+  `AnlaesseTab`, `MeineAnmeldungenScreen` (`lib/anlaesse/`),
+  `OrganisatorTab` (`lib/organisator/`).
+- `fwv_core` (auch für die Vorstand-App): `MitgliederDienst` (Profil, Foto,
+  Austritt, Zugänge, Funktions-Mail-Passwort, Benachrichtigungen,
+  Push-Token, Newsletter, organisiert-Abfrage), Modelle `MitgliedProfil`,
+  `ProfilAenderung`, `Zugaenge`, `BenachrichtigungsEinstellungen`;
+  `ApiClient.hochladen` (multipart, mit Erneuern), `fotoVerkleinern`
+  (max. 1024 px, JPEG 85, EXIF-Drehung eingerechnet — vorerst im Gerät).
+- Profil: Anzeige mit Foto (relativer Pfad gegen die API aufgelöst),
+  Bearbeiten mit Prüfung (Pflichtfelder, E-Mail, Telefon, PLZ) und
+  Datumswähler für den Geburtstag, Foto per Kamera/Galerie
+  (`image_picker`) oder löschen, Austritt mit Bestätigung und Abmelden,
+  Link "Meine Anmeldungen".
+- Einstellungen: Benachrichtigungen (+ Push-Erlaubnis dieses Geräts),
+  Zugänge (Passwörter verdeckt bis Antippen, Kopieren, Passwort einer
+  Funktions-Mail ändern, mind. 12 Zeichen), Newsletter-Schalter (Stand nur
+  lokal gemerkt), Adressbuch (iOS: `carddav.mobileconfig` + Anleitung;
+  Android: Kanal `ch.fwvraura.members/kontakte` — nur die Dart-Seite, der
+  Kotlin-Abgleich fehlt noch, bis dahin "noch nicht verfügbar"),
+  App-Version, Abmelden.
+- Push (Android): `firebase_messaging`, dasselbe Firebase-Projekt
+  (`google-services.json` aus `members-android`), Kanal `fwv_general`,
+  Anzeige im Vordergrund über `flutter_local_notifications`. Token-Anmeldung
+  beim Start, nach dem Login und bei neuem Token (`device_id` = zufällige
+  Gerätekennung). iOS vorbereitet, aber aus (`FirebasePush.iosAktiv`), bis
+  es den Apple-Account, den APNs-Schlüssel und `GoogleService-Info.plist`
+  gibt.
+- Abmelden meldet das Push-Token ab: neue Route
+  `DELETE members/me/fcm-token {token}` in `backend-members` (idempotent),
+  danach wird das Token auf dem Gerät verworfen; auf Android wird der
+  Kontakt-Abgleich ausgeschaltet. Damit ist der Fehler "Abmelden meldet das
+  Push-Token nicht ab" behoben (Backend muss dafür ausgerollt sein).
+
+Unterschiede, die beim Bau aufgefallen sind:
+
+- Benachrichtigungsarten: Das Backend kennt `shift_reminder`,
+  `event_update`, `newsletter`, `general` (Push verschickt nur die drei
+  ohne `newsletter`). Die alte iOS-App zeigte `event_invitation` und
+  `registration_status` — die verwendet kein Backend. Die neue App nimmt
+  die Arten des Backends.
+- Zugänge: Das Backend liefert Nextcloud-Ordner als `name`, die alte
+  Android-App las `mount_point` und zeigte keinen Namen. `organizerEvents`
+  und `smbCredentials` liefert das Backend, angezeigt werden sie (wie
+  bisher) nicht.
+- Funktions-Mail-Passwort: Backend verlangt 8 Zeichen, die App 12.
+- Austritt: `POST members/me/austritt` sucht das Mitglied nur über die
+  E-Mail, nicht wie die anderen `members/me`-Routen über
+  `mitgliedZurAnmeldung` — Mitglieder ohne E-Mail bekommen 404.
 
 ## Phase 2 — Organisator
 

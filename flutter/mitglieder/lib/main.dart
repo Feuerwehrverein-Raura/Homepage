@@ -10,7 +10,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'anmeldung/login_screen.dart';
 import 'dienste.dart';
-import 'start_screen.dart';
+import 'hauptseite.dart';
 
 /// Vereinsrot der bisherigen Apps (members-android colors.xml: primary).
 const vereinsRot = Color(0xFFB91C1C);
@@ -62,6 +62,10 @@ class _FwvAppState extends State<FwvApp> {
     return MaterialApp(
       title: 'FWV Raura',
       navigatorKey: _navigator,
+      // Deutsch (Schweiz) fuer Datumswaehler, Knoepfe usw.
+      locale: const Locale('de', 'CH'),
+      supportedLocales: const [Locale('de', 'CH'), Locale('de')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: vereinsRot)),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: vereinsRot, brightness: Brightness.dark),
@@ -75,7 +79,7 @@ class _FwvAppState extends State<FwvApp> {
           return ListenableBuilder(
             listenable: widget.dienste.sitzung,
             builder: (context, _) => widget.dienste.sitzung.angemeldet
-                ? StartScreen(dienste: widget.dienste)
+                ? Hauptseite(dienste: widget.dienste)
                 : LoginScreen(dienste: widget.dienste),
           );
         },

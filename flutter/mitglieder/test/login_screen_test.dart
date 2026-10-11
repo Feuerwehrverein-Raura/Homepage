@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_mitglieder/anmeldung/authentik_anmeldung.dart';
 import 'package:fwv_mitglieder/dienste.dart';
+import 'package:fwv_mitglieder/einstellungen/einstellungen_tab.dart';
 import 'package:fwv_mitglieder/main.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -82,7 +83,14 @@ void main() {
       authentik: browser,
       uebernahme: AltdatenUebernahme(quelle: _KeineAltdaten(), speicher: speicher),
       qrScannen: () async => gescannt,
+      appVersion: () async => '1.0.0 (1)',
     );
+  }
+
+  /// Nach der Anmeldung steht der Name in den Einstellungen.
+  Future<void> zuDenEinstellungen(WidgetTester tester) async {
+    await tester.tap(find.text('Einstellungen'));
+    await tester.pumpAndSettle();
   }
 
   Future<void> starten(WidgetTester tester) async {
@@ -107,7 +115,7 @@ void main() {
     expect(find.text('Externer Organisator? Hier anmelden'), findsOneWidget);
   });
 
-  testWidgets('Authentik-Anmeldung, Startseite, Abmelden', (tester) async {
+  testWidgets('Authentik-Anmeldung, Hauptseite, Abmelden', (tester) async {
     browser.ergebnis = AuthentikTokens(
       accessToken: 'a',
       refreshToken: 'r',
@@ -118,10 +126,22 @@ void main() {
     await tester.tap(find.text('Mit Vereinskonto anmelden'));
     await tester.pumpAndSettle();
 
+    // Reiter eines Mitglieds; "Organisator" nur, wenn es Anlaesse gibt.
+    expect(find.text('Anlässe'), findsWidgets);
+    expect(find.text('Profil'), findsOneWidget);
+    expect(find.text('Organisator'), findsNothing);
+    await zuDenEinstellungen(tester);
     expect(find.text('Angemeldet als'), findsOneWidget);
     expect(find.text('Erika Muster'), findsOneWidget);
     expect(roh.werte['refresh_token'], 'r');
 
+    await tester.scrollUntilVisible(
+      find.text('Abmelden'),
+      300,
+      scrollable: find
+          .descendant(of: find.byType(EinstellungenTab), matching: find.byType(Scrollable))
+          .first,
+    );
     await tester.tap(find.text('Abmelden'));
     await tester.pumpAndSettle();
 
@@ -146,6 +166,7 @@ void main() {
     await tester.tap(find.text('QR-Code scannen'));
     await tester.pumpAndSettle();
 
+    await zuDenEinstellungen(tester);
     expect(find.text('Erika QR'), findsOneWidget);
     expect(roh.werte['qr_token'], 'fwv-member-123');
   });
@@ -177,8 +198,13 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Anmelden'));
     await tester.pumpAndSettle();
 
+    // Externe Organisatoren starten im Reiter "Organisator", ohne Profil.
+    expect(find.text('Organisator'), findsWidgets);
+    expect(find.text('Profil'), findsNothing);
+    await zuDenEinstellungen(tester);
     expect(find.text('Hans Organisator'), findsOneWidget);
-    expect(find.text('Externer Organisator'), findsOneWidget);
+    expect(find.text('Angemeldet als Externer Organisator'), findsOneWidget);
+    expect(find.text('Benachrichtigungen'), findsNothing);
     expect(roh.werte['account_type'], 'organizer');
     expect(roh.werte['event_id'], '5');
   });
@@ -212,6 +238,7 @@ void main() {
     final d = dienste();
     await tester.pumpWidget(FwvApp(dienste: d));
     await tester.pumpAndSettle();
+    await zuDenEinstellungen(tester);
     expect(find.text('Erika'), findsOneWidget);
 
     await tester.runAsync(() async {

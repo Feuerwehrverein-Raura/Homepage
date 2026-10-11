@@ -374,10 +374,50 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "email_events": true,
-  "email_newsletter": true
+  "preferences": [
+    { "notification_type": "shift_reminder", "enabled": true },
+    { "notification_type": "event_update", "enabled": true },
+    { "notification_type": "newsletter", "enabled": false },
+    { "notification_type": "general", "enabled": true }
+  ]
 }
 ```
+
+`GET` liefert die gespeicherten Zeilen als Liste
+(`notification_type`, `enabled`, `alternative_email`). Typen ohne
+Zeile gelten als eingeschaltet. Die Backends verschicken Push mit
+`shift_reminder`, `event_update` und `general`.
+
+### Push-Token registrieren (Mitglieder-App)
+```http
+POST /members/me/fcm-token
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "token": "<FCM-Token>",
+  "device_id": "<Geraete-Kennung, optional>",
+  "platform": "android"
+}
+```
+
+Beim Start, nach dem Login und bei jedem neuen FCM-Token. Mehrfaches
+Registrieren desselben Tokens ist harmlos.
+
+### Push-Token abmelden (Mitglieder-App)
+```http
+DELETE /members/me/fcm-token
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "token": "<FCM-Token>"
+}
+```
+
+Beim Abmelden in der App. Löscht nur diesen Token des angemeldeten
+Mitglieds; ein unbekannter Token ist kein Fehler (idempotent). Antwort:
+`{ "success": true, "removed": 1 }`.
 
 ### Funktions-E-Mail-Passwort ändern
 ```http

@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -12,6 +13,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications braucht java.time auch auf aelteren
+        // Android-Versionen.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -57,4 +61,5 @@ dependencies {
     // Nur fuer die Uebernahme der Anmeldung aus der alten App
     // (EncryptedSharedPreferences "fwv_members_prefs", siehe MainActivity.kt).
     implementation("androidx.security:security-crypto:1.1.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

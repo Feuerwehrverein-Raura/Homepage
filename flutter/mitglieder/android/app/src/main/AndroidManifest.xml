@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Push-Nachrichten anzeigen (ab Android 13 fragt die App danach). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- allowBackup="false" wie in members-android: die Anmeldedaten liegen
          verschluesselt mit einem Schluessel aus dem Android-Keystore; eine
          Sicherung liesse sich auf einem anderen Geraet nicht entschluesseln.
@@ -30,6 +32,14 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Push im Hintergrund: Android zeigt die Nachricht selbst an — im
+             selben Kanal wie die alte App und mit dem Vereins-Symbol. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="fwv_general" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_benachrichtigung" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
