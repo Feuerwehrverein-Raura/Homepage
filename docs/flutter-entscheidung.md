@@ -81,6 +81,23 @@ Bisher eigene PWAs (`simple-inventory-system`, `simple-order-system`).
 
 Reihenfolge: nach dem Organisator-Bereich der Mitglieder-App.
 
+## Ausleihe (entschieden 11.10.2026)
+
+Neu, gibt es bisher nirgends. Teil des Lagers (`fwv_lager`, beide Apps).
+
+- **Was:** Lager-Artikel mit Menge und ganze Kisten (Lagerorte) samt
+  Inhalt. Das Lager markiert, was ausleihbar ist.
+- **An wen:** Mitglieder leihen selbst in der App aus, **ohne Freigabe**;
+  die Gruppe Lager wird benachrichtigt, das Mitglied bekommt eine
+  Bestätigung. Externe (Vereine, Firmen, Private) erfasst die Gruppe Lager.
+- **Verfügbarkeit vorab:** für den gewünschten Zeitraum, künftige
+  Ausleihen zählen als Reservierung.
+- **Ausgabe und Rückgabe** bucht das Lager; bei der Rückgabe Zustand und
+  Schäden mit Foto, Fehlendes/Kaputtes wird ausgebucht.
+- **Erinnerung** vor dem Rückgabedatum und bei Überfälligkeit; das Lager
+  sieht die überfälligen Ausleihen.
+- Keine Gebühr/Kaution.
+
 ## Regeln für den Flutter-Code
 
 - **Logik gehört ins Backend.** Die App zeigt an, was das Backend fertig
