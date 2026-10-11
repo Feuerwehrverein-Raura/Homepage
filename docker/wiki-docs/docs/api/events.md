@@ -123,20 +123,46 @@ GET /calendar/ics
 
 Gibt alle veröffentlichten Events als iCalendar-Feed zurück. Kann in Google Calendar, Apple Kalender, Outlook etc. abonniert werden.
 
+### Ein Anlass als .ics
+```http
+GET /events/:id/ics
+```
+
+`:id` ist UUID oder Slug. Liefert eine Datei (`text/calendar`,
+`attachment; filename="Chilbi_2026.ics"`) für "Zum Kalender". Zeiten gehen
+als Ortszeit mit `TZID=Europe/Zurich` hinaus (mit `VTIMEZONE`), Mitternacht
+heisst ganztägig (`VALUE=DATE`, Ende exklusiv). Abgesagte Anlässe tragen
+`STATUS:CANCELLED`. Bei "Datum noch offen" (`datum_offen`) gibt es `404`.
+
 ### Öffentliche Anmeldung
 ```http
 POST /registrations/public
 Content-Type: application/json
+Authorization: Bearer <token>   (optional)
 
 {
-  "event_id": 1,
-  "shift_id": 5,
+  "type": "shift",
+  "eventId": "chilbi-2026",
+  "shiftIds": ["…"],
   "name": "Max Muster",
-  "email": "max@example.com"
+  "email": "max@example.com",
+  "phone": "079 000 00 00"
 }
 ```
 
-Ermöglicht Anmeldung ohne Authentifizierung (für Nicht-Mitglieder).
+Teilnahme: `"type": "participant"`, dazu `participants`, `companions`,
+`allergies`, `meal_selection`, `notes`.
+
+- **Ohne Token** (Website): Gehört die E-Mail einem Mitglied, wird die
+  Anmeldung mit ihm verknüpft; sonst ist es ein Gast und muss per Link in
+  einer E-Mail bestätigen (Double-Opt-in).
+- **Mit gültigem Mitglieder-Token** (App): Mitglied, Name und E-Mail kommen
+  aus dem Token, nicht aus dem Formular. Kein Opt-in. Ein ungültiges Token
+  heisst "Gast", kein Fehler.
+- `eventTitle` und `organizerEmail` werden **ignoriert** (ältere Clients
+  schicken sie noch). Die Meldung an den Organisator geht an
+  `organizer_email` des Anlasses, sonst an `CONTACT_EMAIL`
+  (`kontakt@fwv-raura.ch`); GV an `vorstand@fwv-raura.ch`.
 
 ## Geschützte Endpoints
 
@@ -180,10 +206,28 @@ POST /events/login
 Content-Type: application/json
 
 {
-  "event_id": 1,
+  "email": "zugang-anlass@example.ch",
   "password": "event-passwort"
 }
 ```
+
+Antwort: `{ "success": true, "token": "…", "event": { "id", "title", "slug",
+"organizer_name" } }`. Das Token gilt 24 Stunden.
+
+Ist der Anlass vorbei (Ende bzw. Beginn vor heute, Europe/Zurich) oder
+abgesagt, gibt es `403` mit
+
+```json
+{
+  "error": "Der Anlass ist vorbei – der Organisator-Zugang gilt nicht mehr.",
+  "code": "anlass_vorbei"
+}
+```
+
+(bzw. "… wurde abgesagt …"). Auch schon ausgestellte Tokens gelten dann
+nicht mehr: alle `/events/my-event…`-Routen und die Organisator-Übersicht
+antworten mit `401` und derselben Meldung. "Datum noch offen" gilt nicht als
+vorbei.
 
 ### Eigenes Event abrufen
 ```http
@@ -203,6 +247,103 @@ Authorization: Bearer <token>
 POST /events/my-event/send-arbeitsplan
 Authorization: Bearer <token>
 ```
+
+### Organisator-Übersicht (Apps)
+```http
+GET /events/organisator-uebersicht
+Authorization: Bearer <token>
+```
+
+Ein Aufruf für den Organisator-Bereich der Apps: alle eigenen Anlässe mit
+anzeigefertigen Anmeldungen und Zahlen (statt einer Abfrage pro Anlass und
+Auslesen des `notes`-JSON in der App).
+
+| Token | `zugang` | Anlässe |
+|---|---|---|
+| Organisator-Login | `organisator-login` | genau sein Anlass (sonst `401`, siehe oben) |
+| Vorstand/Admin | `vorstand` | alle aktuellen |
+| Mitglied | `mitglied` | die es organisiert (`organizer_id` oder `organizer_email`, wie `organized-by-me`), aktuelle und die der letzten 7 Tage |
+| ohne | — | `401` |
+
+Ein Mitglied, das nichts organisiert, bekommt `{ "zugang": "mitglied",
+"anlaesse": [] }`. Reihenfolge: aktuelle (Ideen ohne Datum zuletzt), dann
+vergangene, neuste zuerst.
+
+Jeder Anlass ist die Zeile aus `events` (ohne Zugangsdaten und ohne
+`pdf_attachment`), mit `shifts[]` und `app`-Block wie bei `GET /events`, dazu
+`organisator`:
+
+```json
+{
+  "zugang": "mitglied",
+  "anlaesse": [{
+    "id": "…", "slug": "helferessen", "title": "Helferessen", "category": "GV",
+    "start_date": "2026-10-31 19:00:00", "max_participants": 2,
+    "meal_options": ["Fleisch", "Vegi"], "registration_deadline": null,
+    "app": { "datum_text": "Samstag, 31. Oktober 2026", "kann_bearbeiten": true, "…": "…" },
+    "shifts": [],
+    "organisator": {
+      "aktuell": true,
+      "zahlen": {
+        "anmeldungen": 2, "offen": 1, "bestaetigt": 0, "abgelehnt": 1,
+        "personen_total": 2, "text": "1 offen · 2 Personen"
+      },
+      "aktionen": {
+        "bestaetigen": true, "hinzufuegen": true, "bearbeiten": true,
+        "loeschen": true, "alternative": false, "mitteilen": true,
+        "anlass_bearbeiten": true, "schichten": true, "notizen": true,
+        "material": true, "arbeitsplan_senden": false,
+        "pdf_teilnehmerliste": true, "pdf_arbeitsplan": false, "pdf_aushang": false
+      },
+      "anmeldungen": [{
+        "id": "…", "status": "pending", "status_text": "offen", "status_farbe": "gelb",
+        "art": "teilnahme", "mitglied": false, "member_id": null,
+        "name": "Paar Gast", "email": "paar@example.ch", "phone": "+41 79 111 22 33",
+        "personen": 2,
+        "begleitpersonen": [{ "name": "Peter Gast", "email": null, "phone": null }],
+        "allergien": "Nüsse", "menue": "Vegi", "bemerkung": "Kommen etwas später",
+        "shift_ids": [], "schichten": [],
+        "alternative": null, "angemeldet_text": "15.09.2026"
+      }]
+    }
+  }]
+}
+```
+
+- `anmeldungen`: offen zuerst, dann bestätigt, dann abgelehnt; je nach Name.
+  `schichten[].beschriftung` wie in "Meine Anmeldungen". `bemerkung` ist
+  bei alten Anmeldungen der ganze `notes`-Text. `alternative` ist gesetzt,
+  wenn eine andere Schicht vorgeschlagen wurde (`schicht_text`,
+  `vorgeschlagen_text`).
+- `zahlen.personen_total` zählt Personen (nicht Anmeldungen) mit Status
+  offen oder bestätigt — wie die Kapazitätsprüfung.
+- `aktionen` sagt, was der Anfragende tun darf. Der Organisator-Login hat
+  nur die `/events/my-event…`-Routen (bestätigen, ablehnen, hinzufügen,
+  Arbeitsplan senden); alles andere ist dort `false`.
+
+Vertrag mit der App: `test/fixtures/organisator-uebersicht.json`
+(`test/app-vertrag.test.js`).
+
+### Organisator-Routen für Mitglieder
+
+Mitglieder, die einen Anlass organisieren (oder Vorstand), mit ihrem
+normalen Token:
+
+| Route | Zweck |
+|---|---|
+| `GET /events/organized-by-me` | eigene Anlässe (Reiter "Organisator" ein/aus) |
+| `GET /events/:id/organizer-registrations` | Anmeldungen roh, mit `parsed_notes` |
+| `POST /events/:id/registrations/:regId/approve-as-organizer` | bestätigen |
+| `POST /events/:id/registrations/:regId/reject-as-organizer` | ablehnen |
+| `PUT /events/:id/registrations/:regId/as-organizer` | ändern: nur mitgeschickte Felder (`guest_name`, `guest_email`, `guest_phone`, `participants`, `notes`, `status`); das `notes`-JSON wird zusammengeführt, Begleitpersonen, Allergien und Menü bleiben |
+| `DELETE /events/:id/registrations/:regId/as-organizer` | löschen |
+| `POST /events/:id/registrations-as-organizer` | Person hinzufügen (`member_id` oder `guest_name`), gleich bestätigt |
+| `POST /events/:id/registrations/:regId/suggest-alternative-as-organizer` | andere Schicht vorschlagen (`newShiftId`, `shiftInfo`, `comment`, `email`) |
+| `POST /events/:id/notify-registrants-as-organizer` | Angemeldete informieren (`subject`, `message`) → `{ emailed, posted, pushed, skipped, unreachable }` |
+| `PUT /events/:id/as-organizer` | Anlass ändern (nur mitgeschickte Felder) |
+| `POST /events/:id/shifts-as-organizer`, `PUT/DELETE /events/:id/shifts/:shiftId/as-organizer` | Schichten |
+| `GET/POST /events/:id/organizer-notes`, `DELETE …/:noteId`, `GET/DELETE …/:noteId/attachments/:attId` | Notizen mit Anhängen (Base64) |
+| `GET /events/:id/recipes`, `…/shopping-list`, `POST …/manual-items` usw. | Rezepte und Material (Inventar) |
 
 ## Schichten
 

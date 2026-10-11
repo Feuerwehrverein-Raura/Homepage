@@ -1,0 +1,377 @@
+{
+  "zugang": "mitglied",
+  "anlaesse": [
+    {
+      "id": "00000000-0000-0000-0000-e00000000001",
+      "slug": "chilbi-2026",
+      "title": "Chilbi 2026",
+      "subtitle": null,
+      "description": null,
+      "category": "Dorffest",
+      "status": "planned",
+      "location": "Roter Schopf",
+      "start_date": "2026-10-17 10:00:00",
+      "end_date": "2026-10-18 20:00:00",
+      "registration_deadline": "2026-10-15 23:59:00",
+      "registration_required": false,
+      "max_participants": null,
+      "cost": null,
+      "meal_options": null,
+      "datum_offen": false,
+      "organizer_name": "Erika Muster",
+      "pdf_filename": null,
+      "app": {
+        "datum_text": "Sa 17.10. – So 18.10.2026",
+        "zeit_text": "ab 10:00 Uhr",
+        "datum_offen": false,
+        "gruppe": "kommend",
+        "abgesagt": false,
+        "anmeldung": {
+          "moeglich": true,
+          "grund": null,
+          "art": "schicht",
+          "pflicht": true,
+          "anmeldeschluss_text": "Donnerstag, 15. Oktober 2026, 23:59 Uhr",
+          "plaetze_frei": null,
+          "plaetze_text": null
+        },
+        "kann_bearbeiten": true
+      },
+      "organisator": {
+        "aktuell": true,
+        "zahlen": {
+          "anmeldungen": 4,
+          "offen": 1,
+          "bestaetigt": 3,
+          "abgelehnt": 0,
+          "personen_total": 4,
+          "text": "3 bestätigt · 1 offen · 4 Personen"
+        },
+        "aktionen": {
+          "bestaetigen": true,
+          "hinzufuegen": true,
+          "bearbeiten": true,
+          "loeschen": true,
+          "alternative": true,
+          "mitteilen": true,
+          "anlass_bearbeiten": true,
+          "schichten": true,
+          "notizen": true,
+          "material": true,
+          "arbeitsplan_senden": false,
+          "pdf_teilnehmerliste": true,
+          "pdf_arbeitsplan": true,
+          "pdf_aushang": false
+        },
+        "anmeldungen": [
+          {
+            "id": "00000000-0000-0000-0000-700000000004",
+            "status": "pending",
+            "status_text": "offen",
+            "status_farbe": "gelb",
+            "art": "schicht",
+            "mitglied": false,
+            "member_id": null,
+            "name": "Gast Neu",
+            "email": "neu@example.ch",
+            "phone": "061 000 00 00",
+            "personen": 1,
+            "begleitpersonen": [],
+            "allergien": null,
+            "menue": null,
+            "bemerkung": "Nur bis 19 Uhr",
+            "shift_ids": [
+              "00000000-0000-0000-0000-500000000003"
+            ],
+            "schichten": [
+              {
+                "id": "00000000-0000-0000-0000-500000000003",
+                "beschriftung": "Küche – Schicht 2 · Sa 17.10. · 17:00–20:00"
+              }
+            ],
+            "alternative": null,
+            "angemeldet_text": "15.09.2026"
+          },
+          {
+            "id": "00000000-0000-0000-0000-700000000001",
+            "status": "approved",
+            "status_text": "bestätigt",
+            "status_farbe": "gruen",
+            "art": "schicht",
+            "mitglied": true,
+            "member_id": "00000000-0000-0000-0000-a00000000001",
+            "name": "Erika Muster",
+            "email": "erika@example.ch",
+            "phone": null,
+            "personen": 1,
+            "begleitpersonen": [],
+            "allergien": null,
+            "menue": null,
+            "bemerkung": null,
+            "shift_ids": [
+              "00000000-0000-0000-0000-500000000001",
+              "00000000-0000-0000-0000-500000000002"
+            ],
+            "schichten": [
+              {
+                "id": "00000000-0000-0000-0000-500000000001",
+                "beschriftung": "Aufbau · Fr 16.10. · 08:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-500000000002",
+                "beschriftung": "Bar – Schicht 1 · Sa 17.10. · 12:00–14:00"
+              }
+            ],
+            "alternative": null,
+            "angemeldet_text": "15.09.2026"
+          },
+          {
+            "id": "00000000-0000-0000-0000-700000000003",
+            "status": "approved",
+            "status_text": "bestätigt",
+            "status_farbe": "gruen",
+            "art": "schicht",
+            "mitglied": false,
+            "member_id": null,
+            "name": "Gast Koch",
+            "email": "koch@example.ch",
+            "phone": null,
+            "personen": 1,
+            "begleitpersonen": [],
+            "allergien": null,
+            "menue": null,
+            "bemerkung": "Bringt Schürze mit",
+            "shift_ids": [
+              "00000000-0000-0000-0000-500000000003"
+            ],
+            "schichten": [
+              {
+                "id": "00000000-0000-0000-0000-500000000003",
+                "beschriftung": "Küche – Schicht 2 · Sa 17.10. · 17:00–20:00"
+              }
+            ],
+            "alternative": null,
+            "angemeldet_text": "15.09.2026"
+          },
+          {
+            "id": "00000000-0000-0000-0000-700000000002",
+            "status": "approved",
+            "status_text": "bestätigt",
+            "status_farbe": "gruen",
+            "art": "schicht",
+            "mitglied": true,
+            "member_id": "00000000-0000-0000-0000-a00000000002",
+            "name": "Hans Helfer",
+            "email": "hans@example.ch",
+            "phone": null,
+            "personen": 1,
+            "begleitpersonen": [],
+            "allergien": null,
+            "menue": null,
+            "bemerkung": null,
+            "shift_ids": [
+              "00000000-0000-0000-0000-500000000002"
+            ],
+            "schichten": [
+              {
+                "id": "00000000-0000-0000-0000-500000000002",
+                "beschriftung": "Bar – Schicht 1 · Sa 17.10. · 12:00–14:00"
+              }
+            ],
+            "alternative": null,
+            "angemeldet_text": "15.09.2026"
+          }
+        ]
+      },
+      "shifts": [
+        {
+          "id": "00000000-0000-0000-0000-500000000001",
+          "name": "Aufbau",
+          "description": null,
+          "bereich": "Allgemein",
+          "date": "2026-10-16",
+          "start_time": "08:00:00",
+          "end_time": null,
+          "needed": 4,
+          "app": {
+            "datum_text": "Freitag, 16. Oktober 2026",
+            "zeit_text": "08:00 Uhr",
+            "bereich_text": "Aufbau",
+            "belegung": {
+              "besetzt": 1,
+              "gebraucht": 4,
+              "offen": 3,
+              "angefragt": 0,
+              "text": "3 Plätze frei"
+            },
+            "waehlbar": true
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-500000000002",
+          "name": "Schicht 1",
+          "description": null,
+          "bereich": "Bar",
+          "date": "2026-10-17",
+          "start_time": "12:00:00",
+          "end_time": "14:00:00",
+          "needed": 2,
+          "app": {
+            "datum_text": "Samstag, 17. Oktober 2026",
+            "zeit_text": "12:00–14:00 Uhr",
+            "bereich_text": "Bar",
+            "belegung": {
+              "besetzt": 2,
+              "gebraucht": 2,
+              "offen": 0,
+              "angefragt": 0,
+              "text": "voll"
+            },
+            "waehlbar": false
+          }
+        },
+        {
+          "id": "00000000-0000-0000-0000-500000000003",
+          "name": "Schicht 2",
+          "description": null,
+          "bereich": "Kueche",
+          "date": "2026-10-17",
+          "start_time": "17:00:00",
+          "end_time": "20:00:00",
+          "needed": 2,
+          "app": {
+            "datum_text": "Samstag, 17. Oktober 2026",
+            "zeit_text": "17:00–20:00 Uhr",
+            "bereich_text": "Küche",
+            "belegung": {
+              "besetzt": 1,
+              "gebraucht": 2,
+              "offen": 1,
+              "angefragt": 1,
+              "text": "1 Platz frei"
+            },
+            "waehlbar": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-0000-0000-e00000000004",
+      "slug": "helferessen",
+      "title": "Helferessen",
+      "subtitle": null,
+      "description": null,
+      "category": "GV",
+      "status": "planned",
+      "location": null,
+      "start_date": "2026-10-31 19:00:00",
+      "end_date": "2026-10-31 23:00:00",
+      "registration_deadline": null,
+      "registration_required": false,
+      "max_participants": 2,
+      "cost": null,
+      "meal_options": [
+        "Fleisch",
+        "Vegi"
+      ],
+      "datum_offen": false,
+      "organizer_name": "Erika Muster",
+      "pdf_filename": null,
+      "app": {
+        "datum_text": "Samstag, 31. Oktober 2026",
+        "zeit_text": "19:00–23:00 Uhr",
+        "datum_offen": false,
+        "gruppe": "kommend",
+        "abgesagt": false,
+        "anmeldung": {
+          "moeglich": false,
+          "grund": "Ausgebucht",
+          "art": "teilnahme",
+          "pflicht": true,
+          "anmeldeschluss_text": null,
+          "plaetze_frei": 0,
+          "plaetze_text": "voll"
+        },
+        "kann_bearbeiten": true
+      },
+      "organisator": {
+        "aktuell": true,
+        "zahlen": {
+          "anmeldungen": 2,
+          "offen": 1,
+          "bestaetigt": 0,
+          "abgelehnt": 1,
+          "personen_total": 2,
+          "text": "1 offen · 2 Personen"
+        },
+        "aktionen": {
+          "bestaetigen": true,
+          "hinzufuegen": true,
+          "bearbeiten": true,
+          "loeschen": true,
+          "alternative": false,
+          "mitteilen": true,
+          "anlass_bearbeiten": true,
+          "schichten": true,
+          "notizen": true,
+          "material": true,
+          "arbeitsplan_senden": false,
+          "pdf_teilnehmerliste": true,
+          "pdf_arbeitsplan": false,
+          "pdf_aushang": false
+        },
+        "anmeldungen": [
+          {
+            "id": "00000000-0000-0000-0000-700000000006",
+            "status": "pending",
+            "status_text": "offen",
+            "status_farbe": "gelb",
+            "art": "teilnahme",
+            "mitglied": false,
+            "member_id": null,
+            "name": "Paar Gast",
+            "email": "paar@example.ch",
+            "phone": "+41 79 111 22 33",
+            "personen": 2,
+            "begleitpersonen": [
+              {
+                "name": "Peter Gast",
+                "email": null,
+                "phone": null
+              }
+            ],
+            "allergien": "Nüsse",
+            "menue": "Vegi",
+            "bemerkung": "Kommen etwas später",
+            "shift_ids": [],
+            "schichten": [],
+            "alternative": null,
+            "angemeldet_text": "15.09.2026"
+          },
+          {
+            "id": "00000000-0000-0000-0000-700000000007",
+            "status": "rejected",
+            "status_text": "abgelehnt",
+            "status_farbe": "rot",
+            "art": "teilnahme",
+            "mitglied": true,
+            "member_id": "00000000-0000-0000-0000-a00000000001",
+            "name": "Erika Muster",
+            "email": "erika@example.ch",
+            "phone": null,
+            "personen": 1,
+            "begleitpersonen": [],
+            "allergien": null,
+            "menue": null,
+            "bemerkung": null,
+            "shift_ids": [],
+            "schichten": [],
+            "alternative": null,
+            "angemeldet_text": "15.09.2026"
+          }
+        ]
+      },
+      "shifts": []
+    }
+  ]
+}

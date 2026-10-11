@@ -1,6 +1,7 @@
 // Datenschutz: die oeffentlichen Anlass-Listen duerfen keine Kontaktdaten der
 // Angemeldeten enthalten (E-Mail, Telefon, Bemerkungen). Bis Oktober 2026
 // lieferte GET /events sie an jeden aus. Der Vorstand bekommt sie weiterhin.
+// Die Organisator-Uebersicht liefert sie nur dem Organisator des Anlasses.
 //
 // Startet das echte src/index.js gegen die Test-Datenbank (TEST_DATABASE_URL;
 // das Schema wird hier frisch aus init.sql + Migrationen aufgebaut).
@@ -65,4 +66,40 @@ test('oeffentliche Anlass-Listen ohne Kontaktdaten', { skip: !DB && 'TEST_DATABA
         const mit = await (await fetch(url, { headers: { Authorization: `Bearer ${vorstand}` } })).text();
         assert.ok(kontaktdaten(mit), `${url}: Vorstand bekommt die Kontaktdaten weiterhin`);
     }
+
+    // Organisator-Uebersicht: Kontaktdaten nur fuer den, der den Anlass
+    // organisiert (bzw. den Vorstand) — nie fuer andere Mitglieder.
+    const UEBERSICHT = `${BASE}/events/organisator-uebersicht`;
+    const mit = token => fetch(UEBERSICHT, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+
+    assert.equal((await mit()).status, 401, 'Uebersicht: ohne Anmeldung gesperrt');
+    const kaputt = await mit('kaputt');
+    assert.ok([401, 403].includes(kaputt.status), 'Uebersicht: ungueltiges Token gesperrt');
+    assert.ok(!kontaktdaten(await kaputt.text()));
+
+    const fremd = jwt.sign({ type: 'member', sub: 'fremd', email: 'fremd@example.ch' }, 'test-geheim');
+    const fremdText = await (await mit(fremd)).text();
+    assert.deepEqual(JSON.parse(fremdText), { zugang: 'mitglied', anlaesse: [] }, 'fremdes Mitglied sieht nichts');
+    assert.ok(!kontaktdaten(fremdText));
+
+    const login = jwt.sign({ type: 'event-organizer', event_id: EVENT }, 'test-geheim');
+    const loginText = await (await mit(login)).text();
+    assert.ok(/gast@example\.ch/.test(loginText), 'Organisator-Login sieht die Kontakte seines Anlasses');
+    assert.ok(!/login-geheim|deadbeefhash/.test(loginText), 'nie die Zugangsdaten des Logins');
+    const anderer = jwt.sign({ type: 'event-organizer', event_id: '00000000-0000-0000-0000-0000000000d6' }, 'test-geheim');
+    const andererAntwort = await mit(anderer);
+    assert.equal(andererAntwort.status, 401, 'Login fuer einen anderen (nicht vorhandenen) Anlass');
+    assert.ok(!kontaktdaten(await andererAntwort.text()));
+
+    // Teilnehmerliste als PDF enthaelt Kontaktdaten — bis Oktober 2026 frei
+    // abrufbar. Nur Vorstand und Organisator dieses Anlasses.
+    const LISTE = `${BASE}/events/${EVENT}/pdf/teilnehmerliste`;
+    const pdf = token => fetch(LISTE, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+    assert.equal((await pdf()).status, 401, 'Teilnehmerliste: ohne Anmeldung gesperrt');
+    assert.equal((await pdf('kaputt')).status, 401, 'Teilnehmerliste: ungueltiges Token gesperrt');
+    assert.equal((await pdf(fremd)).status, 403, 'Teilnehmerliste: fremdes Mitglied gesperrt');
+    const vorstandPdf = await pdf(jwt.sign({ type: 'vorstand', email: 'aktuar@example.ch', groups: ['vorstand'] }, 'test-geheim'));
+    assert.equal(vorstandPdf.status, 200, 'Teilnehmerliste: Vorstand darf');
+    assert.match(vorstandPdf.headers.get('content-type') || '', /pdf/);
+    assert.equal((await pdf(login)).status, 200, 'Teilnehmerliste: Organisator-Login seines Anlasses darf');
 });

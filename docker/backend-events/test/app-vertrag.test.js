@@ -5,6 +5,8 @@
 //   fixtures/anlaesse-app.json      GET /events?aktuell=true (anonym)
 //   fixtures/meine-anmeldungen.json GET /registrations/mine (Mitglied)
 //   fixtures/kalender-app.json      GET /calendar/items (Mitglied)
+//   fixtures/organisator-uebersicht.json
+//                                   GET /events/organisator-uebersicht (Organisatorin)
 //
 // Startet das echte src/index.js gegen die Test-Datenbank (TEST_DATABASE_URL;
 // Schema frisch aus init.sql + Migrationen, feste IDs, festes "jetzt" ueber
@@ -40,11 +42,20 @@ const FELDER = {
     schicht: ['id', 'name', 'bereich', 'date', 'start_time', 'end_time', 'needed', 'app'],
     anmeldung: ['id', 'event_id', 'event_title', 'event_slug', 'event_location', 'event_start_date',
         'event_end_date', 'status', 'status_text', 'status_farbe', 'event_datum_text'],
-    anmeldungSchicht: ['id', 'name', 'bereich', 'date', 'start_time', 'end_time', 'beschriftung']
+    anmeldungSchicht: ['id', 'name', 'bereich', 'date', 'start_time', 'end_time', 'beschriftung'],
+    // Organisator: was die Uebersicht und das Bearbeiten-Formular lesen
+    organisatorAnlass: ['id', 'slug', 'title', 'subtitle', 'description', 'category', 'status', 'location',
+        'start_date', 'end_date', 'registration_deadline', 'registration_required', 'max_participants', 'cost',
+        'meal_options', 'datum_offen', 'organizer_name', 'pdf_filename', 'app', 'organisator'],
+    organisatorSchicht: ['id', 'name', 'description', 'bereich', 'date', 'start_time', 'end_time', 'needed', 'app']
 };
 const nimm = (obj, felder) => Object.fromEntries(felder.map(f => [f, obj[f] === undefined ? '<fehlt>' : obj[f]]));
 const anlassProjektion = e => ({ ...nimm(e, FELDER.anlass), shifts: e.shifts.map(s => nimm(s, FELDER.schicht)) });
 const anmeldungProjektion = r => ({ ...nimm(r, FELDER.anmeldung), shifts: r.shifts.map(s => nimm(s, FELDER.anmeldungSchicht)) });
+const organisatorProjektion = u => ({
+    zugang: u.zugang,
+    anlaesse: u.anlaesse.map(e => ({ ...nimm(e, FELDER.organisatorAnlass), shifts: e.shifts.map(s => nimm(s, FELDER.organisatorSchicht)) }))
+});
 
 async function seed(pool) {
     const q = (sql, p) => pool.query(sql, p);
@@ -54,17 +65,20 @@ async function seed(pool) {
     const ev = (n, slug, title, category, start, end, extra = {}) => q(
         `INSERT INTO events (id, slug, title, category, start_date, end_date, location, status,
                              registration_required, registration_deadline, max_participants, organizer_id,
-                             datum_offen, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'2026-09-01 12:00:00','2026-09-01 12:00:00')`,
+                             datum_offen, meal_options, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'2026-09-01 12:00:00','2026-09-01 12:00:00')`,
         [E(n), slug, title, category, start, end, extra.location || null, extra.status || 'planned',
             extra.registration_required || false, extra.deadline || null, extra.max || null, extra.organizer || null,
-            extra.datum_offen || false]);
+            extra.datum_offen || false, extra.menue ? JSON.stringify(extra.menue) : null]);
     await ev(1, 'chilbi-2026', 'Chilbi 2026', 'Dorffest', '2026-10-17 10:00', '2026-10-18 20:00',
         { location: 'Roter Schopf', deadline: '2026-10-15 23:59', organizer: ERIKA });
     await ev(2, 'ausflug-2026', 'Vereinsausflug', 'Ausflug mit Anmeldung', '2026-10-24 09:00', '2026-10-24 18:00',
         { deadline: '2026-10-10 18:00', max: 10 });
     await ev(3, 'grillabend', 'Grillabend', 'Sonstiges', '2026-11-07 18:00', null, { location: 'Feuerwehrmagazin' });
-    await ev(4, 'helferessen', 'Helferessen', 'GV', '2026-10-31 19:00', '2026-10-31 23:00', { max: 2 });
+    // Erika organisiert auch das Helferessen (Organisator-Uebersicht mit
+    // Teilnehmer-Anmeldungen: Begleitpersonen, Allergien, Menue)
+    await ev(4, 'helferessen', 'Helferessen', 'GV', '2026-10-31 19:00', '2026-10-31 23:00',
+        { max: 2, organizer: ERIKA, menue: ['Fleisch', 'Vegi'] });
     await ev(5, 'abgesagt', 'Abgesagter Anlass', 'Sonstiges', '2026-10-20 19:00', null, { status: 'cancelled' });
     await ev(6, 'vergangen', 'Vergangener Anlass', 'Sonstiges', '2026-10-01 19:00', null, { registration_required: true });
     await ev(7, 'laeuft-noch', 'Herbstmarkt', 'Sonstiges', '2026-10-10 18:00', '2026-10-11 16:00', { registration_required: true });
@@ -86,10 +100,15 @@ async function seed(pool) {
         [R(n), E(event), member, guest && guest[0], guest && guest[1], shifts, status, notes]);
     await reg(1, 1, ERIKA, null, [S(1), S(2)], 'approved');
     await reg(2, 1, HANS, null, [S(2)], 'approved');
-    await reg(3, 1, null, ['Gast Koch', 'koch@example.ch'], [S(3)], 'approved');
-    await reg(4, 1, null, ['Gast Neu', 'neu@example.ch'], [S(3)], 'pending');
+    // alte Anmeldung: Bemerkung als blosser Text
+    await reg(3, 1, null, ['Gast Koch', 'koch@example.ch'], [S(3)], 'approved', 'Bringt Schürze mit');
+    await reg(4, 1, null, ['Gast Neu', 'neu@example.ch'], [S(3)], 'pending',
+        JSON.stringify({ phone: '061 000 00 00', notes: 'Nur bis 19 Uhr' }));
     await reg(5, 2, ERIKA, null, null, 'pending');
-    await reg(6, 4, null, ['Paar Gast', 'paar@example.ch'], null, 'pending', '{"participants":2}');
+    await reg(6, 4, null, ['Paar Gast', 'paar@example.ch'], null, 'pending', JSON.stringify({
+        participants: 2, phone: '+41 79 111 22 33', companions: [{ name: 'Peter Gast' }],
+        allergies: 'Nüsse', meal_selection: 'Vegi', notes: 'Kommen etwas später'
+    }));
     await reg(7, 4, ERIKA, null, null, 'rejected');
     await reg(8, 6, ERIKA, null, null, 'approved');
 
@@ -151,7 +170,7 @@ test('Vertrag Mitglieder-App gegen den echten Server', { skip: !DB && 'TEST_DATA
         const darf = async wer => Object.fromEntries((await hole('/events?aktuell=true', wer))
             .map(e => [e.slug, e.app.kann_bearbeiten]));
         assert.ok(Object.values(await darf()).every(v => v === false), 'anonym nie');
-        assert.deepEqual(Object.entries(await darf('erika')).filter(([, v]) => v).map(([k]) => k), ['chilbi-2026']);
+        assert.deepEqual(Object.entries(await darf('erika')).filter(([, v]) => v).map(([k]) => k), ['chilbi-2026', 'helferessen']);
         assert.ok(Object.values(await darf('hans')).every(v => v === false));
         assert.deepEqual(Object.entries(await darf('organisator2')).filter(([, v]) => v).map(([k]) => k), ['ausflug-2026']);
         const vorstand = await hole('/events?aktuell=true', 'vorstand');
@@ -182,6 +201,37 @@ test('Vertrag Mitglieder-App gegen den echten Server', { skip: !DB && 'TEST_DATA
         assert.ok(!kalender.some(i => ['email', 'letter'].includes(i.type)));
         const vorstand = await hole('/calendar/items', 'vorstand');
         assert.ok(vorstand.some(i => i.type === 'email'), 'Vorstand sieht E-Mails weiterhin');
+    });
+
+    await t.test('organisator-uebersicht.json: GET /events/organisator-uebersicht', async () => {
+        const erika = await hole('/events/organisator-uebersicht', 'erika');
+        vergleiche('organisator-uebersicht.json', organisatorProjektion(erika));
+        assert.deepEqual(erika.anlaesse.map(e => e.slug), ['chilbi-2026', 'helferessen']);
+        assert.ok(!JSON.stringify(erika).includes('event_password_hash'), 'keine Zugangsdaten');
+
+        assert.deepEqual(await hole('/events/organisator-uebersicht', 'hans'), { zugang: 'mitglied', anlaesse: [] });
+
+        const login = await hole('/events/organisator-uebersicht', 'organisator2');
+        assert.equal(login.zugang, 'organisator-login');
+        assert.deepEqual(login.anlaesse.map(e => e.slug), ['ausflug-2026']);
+        assert.equal(login.anlaesse[0].organisator.aktionen.anlass_bearbeiten, false);
+
+        const vorstand = await hole('/events/organisator-uebersicht', 'vorstand');
+        assert.equal(vorstand.zugang, 'vorstand');
+        assert.ok(!vorstand.anlaesse.some(e => e.slug === 'vergangen'), 'nur aktuelle');
+        assert.ok(vorstand.anlaesse.some(e => e.slug === 'ausflug-2026'));
+
+        assert.equal((await fetch(BASE + '/events/organisator-uebersicht')).status, 401);
+    });
+
+    await t.test('GET /events/:id/ics', async () => {
+        const r = await fetch(`${BASE}/events/chilbi-2026/ics`);
+        assert.equal(r.status, 200);
+        assert.match(r.headers.get('content-type'), /text\/calendar/);
+        const ics = await r.text();
+        assert.ok(ics.includes('DTSTART;TZID=Europe/Zurich:20261017T100000'));
+        assert.ok(ics.includes(`UID:anlass-${E(1)}@fwv-raura.ch`));
+        assert.equal((await fetch(`${BASE}/events/idee-rega/ics`)).status, 404, 'Datum noch offen');
     });
 
     await t.test('GET /event-optionen', async () => {

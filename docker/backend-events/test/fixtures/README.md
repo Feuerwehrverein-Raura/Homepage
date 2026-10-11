@@ -25,6 +25,10 @@ Datumstexte, Belegung, ob und warum man sich anmelden kann, Status-Texte
 - `anlaesse-app.json` — `GET /events?aktuell=true` (ohne Token).
 - `meine-anmeldungen.json` — `GET /registrations/mine` (Mitglied).
 - `kalender-app.json` — `GET /calendar/items` (Mitglied).
+- `organisator-uebersicht.json` — `GET /events/organisator-uebersicht`
+  (Erika organisiert Chilbi und Helferessen): Anmeldungen anzeigefertig aus
+  dem `notes`-JSON (Begleitperson, Allergien, Menü, Bemerkung als Text bei
+  einer alten Anmeldung), Zahlen, erlaubte Aktionen, `meal_options`.
 
 `test/app-vertrag.test.js` startet den echten Server gegen Postgres
 (`TEST_DATABASE_URL`), fuellt feste Daten ein (feste IDs, "jetzt" ueber

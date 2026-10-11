@@ -14,6 +14,8 @@ const { formatDateDE, bereichLesbar, renderArbeitsplanPdf } = arbeitsplan;
 const buildArbeitsplan = eventId => arbeitsplan.buildArbeitsplan(pool, eventId);
 const registrationDetailsText = (eventId, shiftIds) => arbeitsplan.registrationDetailsText(pool, eventId, shiftIds);
 const appAnsicht = require('./app-ansicht');
+const organisatorAnsicht = require('./organisator-ansicht');
+const { anlassIcs, icsDateiname } = require('./ics');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -805,6 +807,16 @@ function ohneKontaktdaten(event) {
     };
 }
 
+// DEUTSCH: meal_options ist JSONB. node-pg macht aus einem JS-Array ein
+// Postgres-Array ('{"a","b"}') — das ist kein JSON, das UPDATE scheiterte
+// mit "invalid input syntax for type json". Darum als JSON-Text schicken.
+function jsonbWert(feld, wert) {
+    if (feld === 'meal_options' && wert !== null && wert !== undefined && typeof wert !== 'string') {
+        return JSON.stringify(wert);
+    }
+    return wert;
+}
+
 // DEUTSCH: Alle Events auflisten, optional gefiltert nach upcoming/category, inkl. Schichten und Registrierungen
 app.get('/events', async (req, res) => {
     try {
@@ -1114,7 +1126,7 @@ app.get('/events/proposals', authenticateAny, requireRole('vorstand', 'admin'), 
 app.get('/events/:id', async (req, res, next) => {
     // Reservierte IDs sind eigene Routen — weiterleiten, damit Express
     // den spezifischeren Handler findet (sonst 404 weil dies hier matcht).
-    if (['my-event', 'login', 'organized-by-me', 'proposals'].includes(req.params.id)) return next();
+    if (['my-event', 'login', 'organized-by-me', 'organisator-uebersicht', 'proposals'].includes(req.params.id)) return next();
     try {
         const { id } = req.params;
 
@@ -1414,7 +1426,7 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         const filteredUpdates = {};
         for (const [key, value] of Object.entries(updates)) {
             if (allowedFields.includes(key)) {
-                filteredUpdates[key] = value;
+                filteredUpdates[key] = jsonbWert(key, value);
             }
         }
 
@@ -1590,6 +1602,15 @@ app.post('/events/login', async (req, res) => {
         // Pruefen ob Zugang abgelaufen
         if (event.event_access_expires && new Date(event.event_access_expires) < new Date()) {
             return res.status(401).json({ error: 'Der Zugang ist abgelaufen. Bitte kontaktieren Sie den Vorstand.' });
+        }
+
+        // Nach dem Anlass (oder wenn er abgesagt ist) gilt der Zugang nicht
+        // mehr — erst nach der Passwort-Pruefung melden, damit die Antwort
+        // nicht verraet, ob es die Adresse gibt.
+        const passwortOk = crypto.createHash('sha256').update(password).digest('hex') === event.event_password_hash;
+        const gesperrt = passwortOk ? organisatorAnsicht.organisatorLoginGesperrt(event) : null;
+        if (gesperrt) {
+            return res.status(403).json({ error: gesperrt, code: 'anlass_vorbei' });
         }
 
         // Passwort pruefen
@@ -1838,8 +1859,10 @@ app.post('/events/my-event/registrations', authenticateEventOrganizer, async (re
     }
 });
 
-// DEUTSCH: Middleware: Prüft JWT-Token auf Typ 'event-organizer' und setzt req.eventOrganizer
-function authenticateEventOrganizer(req, res, next) {
+// DEUTSCH: Middleware: Prüft JWT-Token auf Typ 'event-organizer' und setzt req.eventOrganizer.
+// Ist der Anlass inzwischen vorbei oder abgesagt, gilt auch ein noch nicht
+// abgelaufenes Token nicht mehr (wie beim Login).
+async function authenticateEventOrganizer(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
@@ -1847,16 +1870,25 @@ function authenticateEventOrganizer(req, res, next) {
         return res.status(401).json({ error: 'Token erforderlich' });
     }
 
+    let decoded;
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (decoded.type !== 'event-organizer') {
-            return res.status(403).json({ error: 'Nur fuer Event-Organisatoren' });
-        }
-        req.eventOrganizer = decoded;
-        next();
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (err) {
         return res.status(401).json({ error: 'Ungueltiger Token' });
     }
+    if (decoded.type !== 'event-organizer') {
+        return res.status(403).json({ error: 'Nur fuer Event-Organisatoren' });
+    }
+    try {
+        const ev = await pool.query(
+            'SELECT id, status, start_date, end_date, datum_offen FROM events WHERE id = $1', [decoded.event_id]);
+        const gesperrt = organisatorAnsicht.organisatorLoginGesperrt(ev.rows[0]);
+        if (gesperrt) return res.status(401).json({ error: gesperrt, code: 'anlass_vorbei' });
+    } catch (error) {
+        return res.status(500).json({ error: error.message });
+    }
+    req.eventOrganizer = decoded;
+    next();
 }
 
 // ============================================
@@ -2149,7 +2181,7 @@ async function finalizeRegistration(ctx) {
     const {
         ev, memberId, isMember, name, email, phone, type,
         shiftIds, shifts, notes, meal_selection, allergies,
-        requestedPersons, companions, organizerEmail
+        requestedPersons, companions
     } = ctx;
     const eventTitle = ev.title;
     const eventId = ev.id;
@@ -2251,9 +2283,14 @@ ${shiftInfo}
 ${requestedPersons ? `Anzahl Personen: ${requestedPersons}` : ''}${mealInfo}
 ${notes ? `\nBemerkungen: ${notes}` : ''}
     `.trim();
+    // Empfaenger nur aus der Datenbank: Frueher galt eine vom Geraet
+    // mitgeschickte organizerEmail als Ausweichadresse — so liess sich die
+    // Benachrichtigung (mit Name, E-Mail, Telefon) an eine beliebige Adresse
+    // umleiten. Auch alte, noch unbestaetigte Gast-Anmeldungen, deren Payload
+    // sie noch enthaelt, ignorieren sie jetzt.
     const notifyEmail = (ev.category === 'GV')
         ? 'vorstand@fwv-raura.ch'
-        : (ev.organizer_email || organizerEmail || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
+        : (ev.organizer_email || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
     try {
         await axios.post(`${DISPATCH_API}/email/send`, { to: notifyEmail, subject: orgSubject, body: orgBody, event_id: eventId });
     } catch (emailError) {
@@ -2263,11 +2300,39 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
     return registration.rows[0];
 }
 
+// DEUTSCH: Mitglied zum mitgeschickten Token (optional) — oder null. Die Route
+// ist oeffentlich (Website-Formular); schickt die App ihr Token mit, zaehlt
+// das Mitglied aus dem Token, nicht die E-Mail im Formular. Vorstand-
+// Funktions-Tokens, API-Key und Organisator-Login sind keine Mitglieder.
+async function mitgliedAusToken(req) {
+    if (eventOrganisatorToken(req)) return null;
+    const user = await optionalerBenutzer(req);
+    if (!user || user.id === 'api' || user.role) return null;
+    const kennung = user.id ? String(user.id) : null;
+    const email = (user.email || '').toLowerCase();
+    if (!kennung && !email) return null;
+    const m = await pool.query(
+        `SELECT id, vorname, nachname, email
+           FROM members
+          WHERE ($1::text IS NOT NULL AND (id::text = $1 OR authentik_user_id = $1))
+             OR ($2 <> '' AND LOWER(email) = $2)
+          ORDER BY (id::text = COALESCE($1, '')) DESC,
+                   (COALESCE(authentik_user_id, '') = COALESCE($1, '')) DESC
+          LIMIT 1`,
+        [kennung, email]
+    );
+    return m.rows[0] || null;
+}
+
 app.post('/registrations/public', async (req, res) => {
     try {
+        // eventTitle und organizerEmail (aeltere Clients schicken sie noch)
+        // werden bewusst nicht gelesen: Titel und Empfaenger kommen aus der
+        // Datenbank.
+        let { name, email } = req.body;
         const {
-            type, eventId, eventTitle, organizerEmail,
-            name, email, phone,
+            type, eventId,
+            phone,
             shifts, shiftIds, // für Schicht-Anmeldung
             participants, // für Teilnehmer-Anmeldung
             notes,
@@ -2283,10 +2348,20 @@ app.post('/registrations/public', async (req, res) => {
             return res.json({ success: true, message: 'Anmeldung erfolgreich' });
         }
 
-        // Prüfen ob die E-Mail zu einem Mitglied gehört - wenn ja, automatisch verknüpfen
+        // Mit gueltigem Mitglieder-Token: Mitglied, Name und E-Mail aus dem
+        // Token (die E-Mail im Formular koennte jede sein). Ohne: wie bisher
+        // ueber die E-Mail im Formular.
         let memberId = null;
         let isMember = false;
-        if (email) {
+        const tokenMitglied = await mitgliedAusToken(req);
+        if (tokenMitglied) {
+            memberId = tokenMitglied.id;
+            isMember = true;
+            name = [tokenMitglied.vorname, tokenMitglied.nachname].filter(Boolean).join(' ') || name;
+            // Mitglieder ohne E-Mail: die Bestaetigung geht an die Adresse aus
+            // dem Formular (nur Zustellung, nicht Erkennung).
+            email = tokenMitglied.email || email;
+        } else if (email) {
             const memberCheck = await pool.query(
                 'SELECT id, vorname, nachname, email FROM members WHERE LOWER(email) = LOWER($1)',
                 [email]
@@ -2336,14 +2411,15 @@ app.post('/registrations/public', async (req, res) => {
         // Mitglied) hat fuer diesen Anlass schon eine offene/bestaetigte
         // Anmeldung. Nur fuer Teilnehmer-/GV-Anmeldungen: Helfer duerfen
         // spaeter zusaetzliche Schichten nachbuchen.
-        if (type !== 'shift' && email) {
+        if (type !== 'shift' && (email || memberId)) {
             const dupe = await pool.query(
                 `SELECT id FROM registrations
                  WHERE event_id = $1 AND status IN ('pending', 'approved')
-                   AND (LOWER(guest_email) = LOWER($2)
-                        OR member_id = (SELECT id FROM members WHERE LOWER(email) = LOWER($2) LIMIT 1))
+                   AND (($2 <> '' AND LOWER(guest_email) = LOWER($2))
+                        OR ($3::uuid IS NOT NULL AND member_id = $3::uuid)
+                        OR member_id = (SELECT id FROM members WHERE $2 <> '' AND LOWER(email) = LOWER($2) LIMIT 1))
                  LIMIT 1`,
-                [ev.id, email]
+                [ev.id, email || '', memberId]
             );
             if (dupe.rows.length > 0) {
                 return res.status(409).json({
@@ -2405,7 +2481,7 @@ app.post('/registrations/public', async (req, res) => {
         const ctx = {
             ev, memberId, isMember, name, email, phone, type,
             shiftIds, shifts, notes, meal_selection, allergies,
-            requestedPersons, companions, organizerEmail
+            requestedPersons, companions
         };
 
         // DEUTSCH: Double-Opt-in fuer GAESTE (kein erkanntes Mitglied): Anmeldung erst
@@ -2418,7 +2494,7 @@ app.post('/registrations/public', async (req, res) => {
             const payload = {
                 memberId, isMember, name, email, phone, type,
                 shiftIds, shifts, notes, meal_selection, allergies,
-                requestedPersons, companions, organizerEmail
+                requestedPersons, companions
             };
             await pool.query(
                 `INSERT INTO registration_confirmations (token, event_id, email, payload, expires_at)
@@ -2674,6 +2750,116 @@ app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
     }
 });
 
+// DEUTSCH: Organisator-Uebersicht fuer die Apps — ein Aufruf statt einer
+// Abfrage pro Anlass (Punkt 6 in docs/flutter-mitglieder-app-plan.md). Pro
+// Anlass: Zeile, Schichten und app-Block wie GET /events, dazu
+// organisator { aktuell, zahlen, aktionen, anmeldungen } mit anzeigefertigen
+// Anmeldungen (src/organisator-ansicht.js).
+//
+// Wer was sieht:
+//  - Organisator-Login (POST /events/login): genau sein Anlass, solange er
+//    nicht vorbei oder abgesagt ist.
+//  - Vorstand/Admin: alle aktuellen Anlaesse.
+//  - Mitglied: die Anlaesse, die es organisiert (gleiche Regel wie
+//    GET /events/organized-by-me) — aktuelle und die der letzten 7 Tage.
+//  - sonst: leere Liste. Kontaktdaten der Angemeldeten bekommt nur, wer den
+//    Anlass organisiert (test/datenschutz.test.js).
+async function organisatorUebersichtZugang(req, res, next) {
+    const orgToken = eventOrganisatorToken(req);
+    if (orgToken) {
+        req.organisatorLogin = orgToken;
+        return next();
+    }
+    return authenticateAny(req, res, next);
+}
+
+async function anlaesseFuerUebersicht(where, params, zugang) {
+    const zeit = appAnsicht.jetzt();
+    const events = (await pool.query(
+        `SELECT e.*,
+                COALESCE(NULLIF(TRIM(CONCAT(m.vorname, ' ', m.nachname)), ''), e.organizer_name) AS organizer_name
+           FROM events e
+           LEFT JOIN members m ON e.organizer_id = m.id
+          WHERE ${where}
+            AND (e.status IS NULL OR e.status NOT IN ('proposed', 'rejected'))`,
+        params)).rows;
+    if (events.length === 0) return [];
+    const ids = events.map(e => e.id);
+    const [shifts, regs] = await Promise.all([
+        pool.query('SELECT * FROM shifts WHERE event_id = ANY($1::uuid[]) ORDER BY date, start_time, id', [ids]),
+        pool.query(
+            `SELECT r.*, m.vorname AS member_vorname, m.nachname AS member_nachname,
+                    m.email AS member_email, m.mobile AS member_mobile, m.telefon AS member_telefon
+               FROM registrations r
+               LEFT JOIN members m ON r.member_id = m.id
+              WHERE r.event_id = ANY($1::uuid[])
+              ORDER BY r.created_at, r.id`,
+            [ids])
+    ]);
+    return organisatorAnsicht.anlaesseSortieren(events.map(e => organisatorAnsicht.anlassFuerOrganisator(
+        { ...e, shifts: shifts.rows.filter(s => s.event_id === e.id) },
+        regs.rows.filter(r => r.event_id === e.id),
+        { zugang, zeit })));
+}
+
+app.get('/events/organisator-uebersicht', organisatorUebersichtZugang, async (req, res) => {
+    try {
+        const zeit = appAnsicht.jetzt();
+        const heute = appAnsicht.zuerich(zeit).datum;
+        // Letzter Tag (Ende, sonst Beginn) als Datum — Ortszeit wie gespeichert.
+        const letzterTag = `COALESCE(e.end_date, e.start_date)::date`;
+
+        if (req.organisatorLogin) {
+            const ev = await pool.query('SELECT id, status, start_date, end_date, datum_offen FROM events WHERE id = $1',
+                [req.organisatorLogin.event_id]);
+            const gesperrt = organisatorAnsicht.organisatorLoginGesperrt(ev.rows[0], zeit);
+            if (gesperrt) return res.status(401).json({ error: gesperrt, code: 'anlass_vorbei' });
+            const anlaesse = await anlaesseFuerUebersicht('e.id = $1', [ev.rows[0].id], 'organisator-login');
+            return res.json({ zugang: 'organisator-login', anlaesse });
+        }
+
+        if (istVorstandBenutzer(req.user)) {
+            const anlaesse = await anlaesseFuerUebersicht(
+                `(e.datum_offen IS TRUE OR ${letzterTag} >= $1::date)`, [heute], 'vorstand');
+            return res.json({ zugang: 'vorstand', anlaesse });
+        }
+
+        const identity = await resolveOrganizerIdentity(req);
+        if (identity.emails.length === 0 && !identity.memberId) return res.json({ zugang: 'mitglied', anlaesse: [] });
+        const anlaesse = await anlaesseFuerUebersicht(
+            `( LOWER(e.organizer_email) = ANY($1::text[])
+               OR ($2::uuid IS NOT NULL AND e.organizer_id = $2::uuid) )
+             AND (e.datum_offen IS TRUE OR ${letzterTag} >= $3::date - 7)`,
+            [identity.emails, identity.memberId, heute], 'mitglied');
+        res.json({ zugang: 'mitglied', anlaesse });
+    } catch (error) {
+        console.error('GET /events/organisator-uebersicht error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DEUTSCH: Ein Anlass als .ics-Datei ("Zum Kalender"). Oeffentlich wie
+// GET /events/:id; nicht fuer Anlaesse mit "Datum noch offen" (404).
+app.get('/events/:id/ics', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const r = await pool.query(
+            `SELECT id, title, subtitle, description, location, start_date, end_date, status, datum_offen
+               FROM events WHERE ${uuidRegex.test(id) ? 'id = $1' : 'slug = $1'}
+                AND (status IS NULL OR status NOT IN ('proposed', 'rejected'))`,
+            [id]);
+        if (r.rows.length === 0) return res.status(404).json({ error: 'Anlass nicht gefunden' });
+        const ics = anlassIcs(r.rows[0]);
+        if (!ics) return res.status(404).json({ error: 'Das Datum steht noch nicht fest.' });
+        res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${icsDateiname(r.rows[0])}"`);
+        res.send(ics);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // DEUTSCH: Anmeldungen fuer ein Event, das der eingeloggte User organisiert.
 // Erlaubt Mitgliedern (per E-Mail-Match auf event.organizer_email) Anmeldungen zu sehen,
 // ohne dass sie sich mit dem Event-Token einloggen muessen.
@@ -2915,7 +3101,7 @@ app.put('/events/:id/as-organizer', authenticateAny, async (req, res) => {
         ];
         const filteredUpdates = {};
         for (const [key, value] of Object.entries(req.body || {})) {
-            if (allowedFields.includes(key)) filteredUpdates[key] = value;
+            if (allowedFields.includes(key)) filteredUpdates[key] = jsonbWert(key, value);
         }
         const fields = Object.keys(filteredUpdates);
         const values = Object.values(filteredUpdates);
@@ -4690,6 +4876,16 @@ app.get('/events/:id/pdf/teilnehmerliste', async (req, res) => {
             return res.status(404).json({ error: 'Event not found' });
         }
         const event = eventResult.rows[0];
+
+        // Die Liste enthaelt Kontaktdaten aller Angemeldeten — nur fuer den
+        // Vorstand und den Organisator dieses Anlasses (bis Oktober 2026 frei
+        // abrufbar). Alle Aufrufer (Vorstand-Seite/-Apps, Organisator-Bereich)
+        // schicken ihr Token mit.
+        const wer = await anfragender(req);
+        if (!darfBearbeiten(wer, event)) {
+            return res.status(wer.vorstand || wer.identity || wer.organisatorEventId ? 403 : 401)
+                .json({ error: 'Nur fuer Vorstand und Organisator dieses Anlasses' });
+        }
 
         // Load shifts
         const shiftsResult = await pool.query(
