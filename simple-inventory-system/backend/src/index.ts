@@ -461,6 +461,26 @@ app.post('/api/locations', authenticateToken, async (req: AuthenticatedRequest, 
   }
 });
 
+// Get all locations with item counts.
+// Muss VOR /api/locations/:id stehen — sonst landet "overview" dort als id
+// (Datenbankfehler, 500).
+app.get('/api/locations/overview', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT l.*,
+             COUNT(DISTINCT il.item_id) as item_count,
+             COALESCE(SUM(il.quantity), 0) as total_quantity
+      FROM locations l
+      LEFT JOIN item_locations il ON l.id = il.location_id
+      GROUP BY l.id
+      ORDER BY l.name
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Get location with its contents (items assigned to this box)
 app.get('/api/locations/:id', async (req, res) => {
   try {
@@ -561,24 +581,6 @@ app.delete('/api/locations/:locationId/items/:itemId', authenticateToken, async 
     );
 
     res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-// Get all locations with item counts
-app.get('/api/locations/overview', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT l.*,
-             COUNT(DISTINCT il.item_id) as item_count,
-             COALESCE(SUM(il.quantity), 0) as total_quantity
-      FROM locations l
-      LEFT JOIN item_locations il ON l.id = il.location_id
-      GROUP BY l.id
-      ORDER BY l.name
-    `);
-    res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
@@ -1404,16 +1406,29 @@ app.post('/api/events/:slug/shopping-list/restock', authenticateEventAccess, asy
   const client = await pool.connect();
   try {
     const { slug } = req.params;
+    // Bedarf wie in der Einkaufsliste: Rezept-Zutaten x Portionen plus
+    // Material von Hand (event_manual_items).
     const rows = await client.query(`
+      WITH needs AS (
+        SELECT ri.item_id, SUM(ri.quantity * er.servings)::numeric AS needed
+        FROM event_recipes er
+        JOIN recipes r ON r.id = er.recipe_id AND r.active = true
+        JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
+        WHERE er.event_slug = $1
+        GROUP BY ri.item_id
+        UNION ALL
+        SELECT item_id, SUM(quantity)::numeric AS needed
+        FROM event_manual_items
+        WHERE event_slug = $1
+        GROUP BY item_id
+      )
       SELECT i.id AS item_id, i.name, i.quantity AS in_stock,
-             SUM(ri.quantity * er.servings)::numeric AS needed,
+             SUM(n.needed)::numeric AS needed,
              ess.actual_quantity, ess.id AS ess_id
-      FROM event_recipes er
-      JOIN recipes r ON r.id = er.recipe_id AND r.active = true
-      JOIN recipe_ingredients ri ON ri.recipe_id = er.recipe_id
-      JOIN items i ON i.id = ri.item_id
+      FROM needs n
+      JOIN items i ON i.id = n.item_id AND i.active = true
       JOIN event_shopping_status ess ON ess.event_slug = $1 AND ess.item_id = i.id
-      WHERE er.event_slug = $1 AND i.active = true AND ess.purchased = true AND ess.restocked_at IS NULL
+      WHERE ess.purchased = true AND ess.restocked_at IS NULL
       GROUP BY i.id, i.name, i.quantity, ess.actual_quantity, ess.id
     `, [slug]);
 
@@ -1426,7 +1441,10 @@ app.post('/api/events/:slug/shopping-list/restock', authenticateEventAccess, asy
     for (const row of rows.rows) {
       const needed = parseFloat(row.needed) || 0;
       const inStock = parseFloat(row.in_stock) || 0;
-      const qty = row.actual_quantity != null ? parseFloat(row.actual_quantity) : Math.max(0, needed - inStock);
+      const roh = row.actual_quantity != null ? parseFloat(row.actual_quantity) : Math.max(0, needed - inStock);
+      // Der Bestand ist eine ganze Zahl (items.quantity INTEGER): angebrochene
+      // Mengen aufrunden — gekauft wird in ganzen Packungen.
+      const qty = Math.ceil(roh - 1e-9);
       // Immer als eingebucht markieren (auch qty 0), damit nichts doppelt läuft.
       if (qty > 0) {
         const newStock = inStock + qty;
@@ -1914,7 +1932,15 @@ function authenticateOrderSystem(req: express.Request, res: express.Response, ne
 //  2. jeden eingeloggten Inventar-Nutzer (Authentik-Token) fuer das Inventar-Frontend.
 async function authenticateEventAccess(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   const apiKey = req.headers['x-order-api-key'];
-  if (apiKey && apiKey === ORDER_API_KEY) return next();
+  if (apiKey && apiKey === ORDER_API_KEY) {
+    // Das Events-Backend nennt die Person, fuer die es handelt (nur mit
+    // gueltigem Key vertraut) — fuer "gekauft von", Belege und Buchungen.
+    const email = req.headers['x-fwv-user-email'];
+    if (typeof email === 'string' && email.trim()) {
+      req.user = { id: 'events-proxy', email: email.trim().slice(0, 255), name: email.trim(), groups: [] };
+    }
+    return next();
+  }
 
   // Teilen-Link: gültiger Share-Token für genau dieses Event erlaubt Zugriff ohne Login.
   const shareToken = (req.headers['x-share-token'] as string) || (req.query.share as string);
@@ -2149,7 +2175,17 @@ app.get('/api/items/:id', async (req, res) => {
       return res.status(404).json({ error: 'Item not found' });
     }
 
-    res.json(result.rows[0]);
+    // Bestand je Lagerort/Kiste (item_locations) — fuer die Detailansicht
+    // der Apps, damit sie nicht jede Kiste einzeln abfragen muessen.
+    const orte = await pool.query(`
+      SELECT il.location_id, l.name AS location_name, il.quantity, il.notes
+      FROM item_locations il
+      JOIN locations l ON l.id = il.location_id
+      WHERE il.item_id = $1
+      ORDER BY l.name
+    `, [id]);
+
+    res.json({ ...result.rows[0], locations: orte.rows });
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
@@ -2412,6 +2448,11 @@ app.post('/api/items/:id/stock', authenticateToken, async (req: AuthenticatedReq
     if (!['in', 'out', 'correction', 'inventory'].includes(type)) {
       return res.status(400).json({ error: 'Invalid transaction type' });
     }
+    // Ganze Zahl verlangen: als Text kaeme sonst "5" + "3" = "53" heraus.
+    const menge = Number(quantity);
+    if (!Number.isInteger(menge) || menge < 0 || ((type === 'in' || type === 'out') && menge === 0)) {
+      return res.status(400).json({ error: 'Die Menge muss eine ganze Zahl über 0 sein.' });
+    }
 
     // Get current quantity
     const itemResult = await pool.query('SELECT quantity FROM items WHERE id = $1', [id]);
@@ -2423,15 +2464,15 @@ app.post('/api/items/:id/stock', authenticateToken, async (req: AuthenticatedReq
     let newQuantity: number;
 
     if (type === 'in') {
-      newQuantity = previousQuantity + quantity;
+      newQuantity = previousQuantity + menge;
     } else if (type === 'out') {
-      newQuantity = previousQuantity - quantity;
+      newQuantity = previousQuantity - menge;
       if (newQuantity < 0) {
-        return res.status(400).json({ error: 'Insufficient stock' });
+        return res.status(400).json({ error: `Nicht genug an Lager (Bestand: ${previousQuantity}).` });
       }
     } else {
       // correction or inventory
-      newQuantity = quantity;
+      newQuantity = menge;
     }
 
     // Update item
@@ -2442,7 +2483,7 @@ app.post('/api/items/:id/stock', authenticateToken, async (req: AuthenticatedReq
       INSERT INTO transactions (item_id, type, quantity, previous_quantity, new_quantity, reason, user_email)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
-    `, [id, type, quantity, previousQuantity, newQuantity, reason, req.user?.email]);
+    `, [id, type, menge, previousQuantity, newQuantity, reason, req.user?.email]);
 
     broadcast({ type: 'stock_updated', item_id: id, new_quantity: newQuantity });
 
@@ -2504,7 +2545,8 @@ app.post('/api/stock/scan', authenticateToken, async (req: AuthenticatedRequest,
 // TRANSACTIONS HISTORY
 // ========================================
 
-app.get('/api/transactions', async (req, res) => {
+// Enthaelt, wer gebucht hat (E-Mail) — bis Oktober 2026 ohne Anmeldung lesbar.
+app.get('/api/transactions', authenticateToken, async (req, res) => {
   try {
     const { item_id, limit } = req.query;
 
@@ -2982,7 +3024,7 @@ app.get('/api/public/item/:code', async (req, res) => {
 // REPORTS
 // ========================================
 
-app.get('/api/reports/low-stock', async (req, res) => {
+app.get('/api/reports/low-stock', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT i.*, c.name as category_name, l.name as location_name
@@ -2998,7 +3040,8 @@ app.get('/api/reports/low-stock', async (req, res) => {
   }
 });
 
-app.get('/api/reports/inventory-value', async (req, res) => {
+// Wert- und Verkaufszahlen nur angemeldet (bis Oktober 2026 offen).
+app.get('/api/reports/inventory-value', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT
@@ -3091,7 +3134,7 @@ app.get('/api/reports/inventory-list', async (req, res) => {
 });
 
 // Sales report (items sold from inventory)
-app.get('/api/reports/sales', async (req, res) => {
+app.get('/api/reports/sales', authenticateToken, async (req, res) => {
   try {
     const { from, to } = req.query;
     const fromDate = from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];

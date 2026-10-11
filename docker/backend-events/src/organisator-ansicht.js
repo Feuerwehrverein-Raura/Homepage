@@ -144,6 +144,8 @@ function aktionen(zugang, event, anmeldungen) {
         schichten: voll,
         notizen: voll,
         material: voll,
+        // Einkauf: abhaken, Belege, ins Lager zurueckbuchen (Inventar-Proxy).
+        einkauf: voll,
         arbeitsplan_senden: !voll && hatSchichten,
         pdf_teilnehmerliste: anmeldungen.some(a => a.status !== 'rejected'),
         pdf_arbeitsplan: hatSchichten,

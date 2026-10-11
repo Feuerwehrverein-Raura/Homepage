@@ -292,7 +292,7 @@ Jeder Anlass ist die Zeile aus `events` (ohne Zugangsdaten und ohne
         "bestaetigen": true, "hinzufuegen": true, "bearbeiten": true,
         "loeschen": true, "alternative": false, "mitteilen": true,
         "anlass_bearbeiten": true, "schichten": true, "notizen": true,
-        "material": true, "arbeitsplan_senden": false,
+        "material": true, "einkauf": true, "arbeitsplan_senden": false,
         "pdf_teilnehmerliste": true, "pdf_arbeitsplan": false, "pdf_aushang": false
       },
       "anmeldungen": [{
@@ -344,6 +344,34 @@ normalen Token:
 | `POST /events/:id/shifts-as-organizer`, `PUT/DELETE /events/:id/shifts/:shiftId/as-organizer` | Schichten |
 | `GET/POST /events/:id/organizer-notes`, `DELETE …/:noteId`, `GET/DELETE …/:noteId/attachments/:attId` | Notizen mit Anhängen (Base64) |
 | `GET /events/:id/recipes`, `…/shopping-list`, `POST …/manual-items` usw. | Rezepte und Material (Inventar) |
+
+### Rezepte, Material und Einkauf (Inventar-Proxy)
+
+Das Events-Backend prüft "Vorstand/Admin oder Organisator dieses Anlasses"
+und reicht an die Inventar-API (`INVENTORY_URL`, Standard
+`https://inventar.fwv-raura.ch`) weiter — mit dem internen Key
+(`x-order-api-key`) und der handelnden Person (`x-fwv-user-email`, nur
+zusammen mit dem Key gültig). `:id` darf UUID oder Slug sein; die
+Inventar-API kennt den Anlass über den Slug.
+
+| Route | Zweck |
+|---|---|
+| `GET /events/:id/recipes`, `GET …/shopping-list` | verknüpfte Rezepte, Einkaufsliste (Bedarf gegen Lagerbestand) |
+| `POST/PUT/DELETE /events/:id/recipes[/:recipeId]` | Rezept verknüpfen, Portionen, lösen |
+| `POST /events/:id/manual-items`, `DELETE …/:itemId` | Material von Hand |
+| `GET /events/:id/available-recipes`, `…/available-items` | Auswahllisten |
+| `PATCH /events/:id/shopping-list/:itemId` | Position abhaken: `{ purchased, actual_quantity?, actual_price?, paid_by?, note? }` |
+| `GET /events/:id/receipts` | Belege: `[{ id, image_url, amount, paid_by, note, uploaded_by, created_at }]` |
+| `POST /events/:id/receipts` | Beleg hochladen: `multipart/form-data`, Feld `image` (JPEG/PNG/WebP/GIF, max. 10 MB), optional `amount`, `note`, `paid_by` → 201 mit der neuen Zeile |
+| `GET /events/:id/receipts/:receiptId/image` | Belegbild (nur Dateien unter `/api/uploads/` der Inventar-API) |
+| `DELETE /events/:id/receipts/:receiptId` | Beleg löschen |
+| `POST /events/:id/shopping-list/restock` | Gekauftes ins Lager zurückbuchen → `{ restocked, items: [{ item_id, name, quantity }] }` |
+
+Zurückbuchen bucht jede abgehakte, noch nicht eingebuchte Position einmal
+ein: die Ist-Menge (`actual_quantity`), sonst Bedarf minus Bestand —
+aufgerundet auf ganze Einheiten. Rezept-Zutaten und Material von Hand.
+`aktionen.einkauf` in der Organisator-Übersicht sagt, ob der Einkauf
+angeboten wird (nicht beim Organisator-Login).
 
 ## Schichten
 

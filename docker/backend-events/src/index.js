@@ -996,10 +996,22 @@ async function requireEventRecipeAccess(req, res, next) {
     }
 }
 
+// DEUTSCH: Die Inventar-API vertraut dieser Kopfzeile nur zusammen mit dem
+// internen Key — so stehen bei "gekauft von", Belegen und Lager-Buchungen die
+// handelnde Person statt nichts.
+function inventarKopf(req, extra = {}) {
+    const email = req.user?.email;
+    return {
+        'x-order-api-key': INVENTORY_KEY,
+        ...(typeof email === 'string' && email ? { 'x-fwv-user-email': email } : {}),
+        ...extra
+    };
+}
+
 async function proxyInventory(req, res, path) {
     try {
         const r = await axios.get(`${INVENTORY_URL}/api/events/${encodeURIComponent(req.eventSlug)}/${path}`, {
-            headers: { 'x-order-api-key': INVENTORY_KEY },
+            headers: inventarKopf(req),
             timeout: 8000
         });
         res.json(r.data);
@@ -1017,7 +1029,7 @@ async function proxyInventoryReq(req, res, method, subpath) {
         const r = await axios({
             method,
             url,
-            headers: { 'x-order-api-key': INVENTORY_KEY, 'Content-Type': 'application/json' },
+            headers: inventarKopf(req, { 'Content-Type': 'application/json' }),
             data: (method === 'get' || method === 'delete') ? undefined : (req.body || {}),
             timeout: 8000
         });
@@ -1055,6 +1067,73 @@ app.delete('/events/:id/manual-items/:itemId', authenticateAny, requireEventReci
 // Listen zum Anwaehlen (Rezepte + Materialien aus dem Lager).
 app.get('/events/:id/available-recipes', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryList(req, res, 'recipes'));
 app.get('/events/:id/available-items', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryList(req, res, 'items'));
+
+// DEUTSCH: Einkauf (Organisator-Bereich der Mitglieder-App, frueher die
+// Einkaufs-PWA): Positionen abhaken, Belege (Kassenzettel-Fotos) und das
+// Gekaufte ins Lager zurueckbuchen. Zugriff wie oben: Vorstand/Admin oder
+// Organisator des Anlasses.
+app.patch('/events/:id/shopping-list/:itemId', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'patch', `shopping-list/${encodeURIComponent(req.params.itemId)}`));
+app.post('/events/:id/shopping-list/restock', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'post', 'shopping-list/restock'));
+app.get('/events/:id/receipts', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventory(req, res, 'receipts'));
+app.delete('/events/:id/receipts/:receiptId', authenticateAny, requireEventRecipeAccess, (req, res) => proxyInventoryReq(req, res, 'delete', `receipts/${encodeURIComponent(req.params.receiptId)}`));
+
+// Beleg hochladen: multipart/form-data (Feld "image", optional amount, note,
+// paid_by) wird unveraendert an die Inventar-API weitergestreamt — die prueft
+// Typ (Bild) und Groesse (10 MB) selbst.
+const BELEG_MAX_BYTES = 10 * 1024 * 1024 + 64 * 1024; // Foto + Formular-Rahmen
+app.post('/events/:id/receipts', authenticateAny, requireEventRecipeAccess, async (req, res) => {
+    const typ = req.headers['content-type'] || '';
+    if (!typ.toLowerCase().startsWith('multipart/form-data')) {
+        return res.status(400).json({ error: 'Beleg-Foto bitte als multipart/form-data im Feld "image" senden.' });
+    }
+    const laenge = Number(req.headers['content-length']);
+    if (Number.isFinite(laenge) && laenge > BELEG_MAX_BYTES) {
+        return res.status(413).json({ error: 'Das Foto ist zu gross (höchstens 10 MB).' });
+    }
+    try {
+        const r = await axios.post(
+            `${INVENTORY_URL}/api/events/${encodeURIComponent(req.eventSlug)}/receipts`,
+            req,
+            {
+                headers: inventarKopf(req, {
+                    'Content-Type': typ,
+                    ...(Number.isFinite(laenge) ? { 'Content-Length': String(laenge) } : {})
+                }),
+                maxBodyLength: BELEG_MAX_BYTES,
+                maxContentLength: 1024 * 1024,
+                timeout: 30000
+            }
+        );
+        res.status(r.status).json(r.data);
+    } catch (error) {
+        const st = error.response?.status || 502;
+        res.status(st).json(error.response?.data || { error: 'Inventar-API nicht erreichbar' });
+    }
+});
+
+// Belegbild: die Inventar-API legt es unter /api/uploads/ ab. Die App laedt
+// es hierueber (mit Anmeldung), statt die Inventar-Adresse zu kennen. Nur
+// Pfade unter /api/uploads/ werden geholt.
+app.get('/events/:id/receipts/:receiptId/image', authenticateAny, requireEventRecipeAccess, async (req, res) => {
+    try {
+        const liste = await axios.get(`${INVENTORY_URL}/api/events/${encodeURIComponent(req.eventSlug)}/receipts`, {
+            headers: inventarKopf(req),
+            timeout: 8000
+        });
+        const beleg = (Array.isArray(liste.data) ? liste.data : []).find(b => String(b.id) === String(req.params.receiptId));
+        const pfad = beleg && typeof beleg.image_url === 'string' ? beleg.image_url : '';
+        if (!/^\/api\/uploads\/[A-Za-z0-9._-]+$/.test(pfad)) {
+            return res.status(404).json({ error: 'Beleg nicht gefunden' });
+        }
+        const bild = await axios.get(`${INVENTORY_URL}${pfad}`, { responseType: 'arraybuffer', timeout: 15000 });
+        res.setHeader('Content-Type', bild.headers['content-type'] || 'image/jpeg');
+        res.setHeader('Content-Disposition', `inline; filename="beleg-${String(beleg.id).replace(/[^0-9]/g, '')}${(pfad.match(/\.[A-Za-z0-9]+$/) || ['.jpg'])[0]}"`);
+        res.send(Buffer.from(bild.data));
+    } catch (error) {
+        const st = error.response?.status === 404 ? 404 : 502;
+        res.status(st).json({ error: st === 404 ? 'Beleg nicht gefunden' : 'Inventar-API nicht erreichbar' });
+    }
+});
 
 // DEUTSCH: Einzelnes Event abrufen (per UUID oder Slug), inkl. Schichten und Registrierungen
 // ============================================================

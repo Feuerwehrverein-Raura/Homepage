@@ -81,6 +81,7 @@ test('Aktionen: Organisator-Login nur bestaetigen/hinzufuegen', () => {
     assert.equal(voll.alternative, true);
     assert.equal(voll.arbeitsplan_senden, false);
     assert.equal(voll.pdf_aushang, true);
+    assert.equal(voll.einkauf, true);
     const login = o.aktionen('organisator-login', ev, []);
     assert.deepEqual(Object.entries(login).filter(([, v]) => v).map(([k]) => k),
         ['bestaetigen', 'hinzufuegen', 'arbeitsplan_senden', 'pdf_arbeitsplan', 'pdf_aushang']);

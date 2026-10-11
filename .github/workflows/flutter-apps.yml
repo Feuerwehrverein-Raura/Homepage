@@ -2,9 +2,12 @@ name: Flutter-Apps
 
 # Die Flutter-Apps, die die nativen Apps ersetzen (docs/flutter-entscheidung.md):
 # flutter/fwv_core (gemeinsamer Kern), flutter/fwv_anlass (Anlass-Verwaltung
-# mit Oberflaeche, Organisator + Vorstand), flutter/mitglieder (Mitglieder +
-# Organisatoren), spaeter flutter/vorstand. Laeuft auch, wenn sich der Vertrag
-# des Backends aendert — der Kern testet gegen dieselben Dateien.
+# mit Oberflaeche, Organisator + Vorstand), flutter/fwv_lager (Lager mit
+# Oberflaeche, beide Apps), flutter/mitglieder (Mitglieder + Organisatoren),
+# spaeter flutter/vorstand. Laeuft auch, wenn sich der Vertrag des Backends
+# aendert — der Kern testet gegen dieselben Dateien. Den Vertrag der
+# Inventar-API (flutter/fwv_lager/test/fixtures/inventar-api.json) prueft
+# zusaetzlich der Backend-Test in tests.yml (Inventar-Backend).
 
 on:
   push:
@@ -27,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        paket: [fwv_core, fwv_anlass, mitglieder]
+        paket: [fwv_core, fwv_anlass, fwv_lager, mitglieder]
     defaults:
       run:
         working-directory: flutter/${{ matrix.paket }}

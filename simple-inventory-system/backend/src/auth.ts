@@ -1,38 +1,77 @@
 /**
- * Auth Middleware for Order System
+ * Auth Middleware for the Inventory System
  * Supports both:
- * - Authentik JWT (online mode)
+ * - Authentik JWT (online mode) — Inventar-PWA ohne Gruppenpruefung,
+ *   Mitglieder-App/-Web nur mit Gruppe Lager/Vorstand/admin (zugang.ts)
  * - Simple password auth (local/offline mode)
  */
 
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
+import {
+  anwendungAusIssuer, Entscheid, gruppenAusClaims, issuerFuer, jwksFuer, lagerZugang
+} from './zugang.js';
 
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 const LOCAL_MODE = process.env.LOCAL_MODE === 'true';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fwv2026';
 const JWT_SECRET = process.env.JWT_SECRET || 'local-inventory-system-secret';
 
-// JWKS client to get public keys from Authentik (only used in online mode)
-const client = LOCAL_MODE ? null : jwksClient({
-  jwksUri: `${AUTHENTIK_URL}/application/o/inventory-system/jwks/`,
-  cache: true,
-  cacheMaxAge: 600000,
-  rateLimit: true,
-  jwksRequestsPerMinute: 10
-});
+// JWKS-Clients je Authentik-Anwendung (nur online). Welche Anwendungen
+// angenommen werden und wer davon ins Lager darf, steht in zugang.ts.
+const jwksClients = new Map<string, jwksClient.JwksClient>();
 
-function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) {
-  if (!client) {
-    return callback(new Error('JWKS client not available in local mode'));
+function clientFuer(anwendung: string): jwksClient.JwksClient {
+  let c = jwksClients.get(anwendung);
+  if (!c) {
+    c = jwksClient({
+      jwksUri: jwksFuer(AUTHENTIK_URL, anwendung),
+      cache: true,
+      cacheMaxAge: 600000,
+      rateLimit: true,
+      jwksRequestsPerMinute: 10
+    });
+    jwksClients.set(anwendung, c);
   }
-  client.getSigningKey(header.kid, (err, key) => {
-    if (err) {
-      return callback(err);
-    }
-    const signingKey = key?.getPublicKey();
-    callback(null, signingKey);
+  return c;
+}
+
+type Benutzer = NonNullable<AuthenticatedRequest['user']>;
+type Pruefung = { user: Benutzer; entscheid: Entscheid };
+
+/**
+ * Prueft ein Authentik-Token (RS256): Issuer bestimmt die Anwendung und
+ * damit den JWKS-Endpunkt; danach entscheidet lagerZugang() ueber die
+ * Gruppen. Fehler (Signatur, Ablauf, fremder Issuer) -> Error.
+ */
+function authentikPruefen(token: string): Promise<Pruefung> {
+  return new Promise((resolve, reject) => {
+    const ungeprueft = jwt.decode(token, { json: true });
+    const anwendung = anwendungAusIssuer(AUTHENTIK_URL, ungeprueft?.iss);
+    if (!anwendung) return reject(new Error('unbekannter Issuer'));
+    const client = clientFuer(anwendung);
+    const getKey = (header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) => {
+      client.getSigningKey(header.kid, (err, key) => {
+        if (err) return callback(err);
+        callback(null, key?.getPublicKey());
+      });
+    };
+    jwt.verify(token, getKey, {
+      algorithms: ['RS256'],
+      issuer: issuerFuer(AUTHENTIK_URL, anwendung)
+    }, (err, decoded: any) => {
+      if (err || !decoded) return reject(err || new Error('leeres Token'));
+      resolve({
+        user: {
+          id: decoded.sub,
+          email: decoded.email,
+          name: decoded.name,
+          groups: gruppenAusClaims(decoded)
+        },
+        entscheid: lagerZugang(anwendung, decoded)
+      });
+    });
   });
 }
 
@@ -100,24 +139,16 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
     }
   }
 
-  // Online mode: verify with Authentik JWKS
-  jwt.verify(token, getKey, {
-    algorithms: ['RS256'],
-    issuer: `${AUTHENTIK_URL}/application/o/inventory-system/`
-  }, (err, decoded: any) => {
-    if (err) {
-      console.error('Token verification failed:', err.message);
-      return res.status(403).json({ error: 'Invalid token' });
+  // Online mode: verify with Authentik JWKS (Anwendung aus dem Issuer)
+  authentikPruefen(token).then(({ user, entscheid }) => {
+    if (!entscheid.ok) {
+      return res.status(entscheid.status).json({ error: entscheid.error });
     }
-
-    req.user = {
-      id: decoded.sub,
-      email: decoded.email,
-      name: decoded.name,
-      groups: decoded.groups || []
-    };
-
+    req.user = user;
     next();
+  }, (err: Error) => {
+    console.error('Token verification failed:', err.message);
+    res.status(403).json({ error: 'Invalid token' });
   });
 }
 
@@ -167,20 +198,11 @@ export function optionalAuth(req: AuthenticatedRequest, res: Response, next: Nex
     return next();
   }
 
-  jwt.verify(token, getKey, {
-    algorithms: ['RS256'],
-    issuer: `${AUTHENTIK_URL}/application/o/inventory-system/`
-  }, (err, decoded: any) => {
-    if (!err && decoded) {
-      req.user = {
-        id: decoded.sub,
-        email: decoded.email,
-        name: decoded.name,
-        groups: decoded.groups || []
-      };
-    }
+  // Ohne Lager-Berechtigung zaehlt das Token hier wie keins.
+  authentikPruefen(token).then(({ user, entscheid }) => {
+    if (entscheid.ok) req.user = user;
     next();
-  });
+  }, () => next());
 }
 
 /**

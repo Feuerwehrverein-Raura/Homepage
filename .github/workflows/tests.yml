@@ -1,6 +1,6 @@
 name: Tests
 
-# Backend (inkl. echter Postgres-Datenbank) und Website.
+# Backends (Events, Inventar — je mit echter Postgres-Datenbank) und Website.
 #
 # Laeuft bei Pull Requests selbst; bei Pushes auf main ruft
 # build-containers.yml diesen Workflow auf und baut/deployt erst, wenn er
@@ -51,6 +51,41 @@ jobs:
           TEST_DATABASE_URL: postgres://test:test@localhost:5432/fwvtest
         # nacheinander: mehrere Testdateien bauen die Datenbank neu auf
         run: node --test --test-concurrency=1 test/
+
+  inventory-backend:
+    name: Inventar-Backend
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: inventartest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Abhaengigkeiten
+        working-directory: simple-inventory-system/backend
+        run: npm install --no-audit --no-fund
+
+      - name: TypeScript und Tests (mit Datenbank)
+        working-directory: simple-inventory-system/backend
+        env:
+          TEST_DATABASE_URL: postgres://test:test@localhost:5432/inventartest
+        # npm test = tsc + node --test (Zugangsregeln, API gegen Postgres)
+        run: npm test
 
   website:
     name: Website
