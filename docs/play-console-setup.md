@@ -82,8 +82,8 @@ Erst nach erfolgreicher Identitätsverifizierung:
 - ✅ Privacy Policy als HTML-Seite auf fwv-raura.ch
 - ✅ Data Safety Form mit den richtigen Antworten (Daten die wir sammeln)
 - ✅ App-Beschreibung für den Play Store (kurz + lang)
-- ✅ Build-Pipeline: `bundleRelease` (.aab statt .apk) und Auto-Upload via
-  CI über Gradle Play Publisher
+- ✅ Build-Pipeline: `flutter build appbundle` (.aab statt .apk) und
+  Auto-Upload via CI (`r0adkll/upload-google-play`), siehe Abschnitt 9
 
 ## 5. Was du tun musst (in dieser Reihenfolge)
 
@@ -93,7 +93,7 @@ Erst nach erfolgreicher Identitätsverifizierung:
 | 2 | Play Console Account anlegen, USD 25 zahlen | jetzt |
 | 3 | Identitätsverifizierung abwarten | 1–2 Tage |
 | 4 | Service-Account erstellen, JSON sicher aufbewahren | nach Schritt 3 |
-| 5 | Service-Account-JSON als GitHub-Secret hinterlegen<br>(`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`) | nach Schritt 4 |
+| 5 | Service-Account-JSON als GitHub-Secret hinterlegen<br>(`PLAY_SERVICE_ACCOUNT_JSON`) | nach Schritt 4 |
 | 6 | Tester-Liste sammeln (E-Mails der Mitglieder) | parallel |
 | 7 | Erste manuelle App-Erstellung in Play Console nach Anleitung | wenn Schritt 3 durch |
 
@@ -128,8 +128,8 @@ Daten bleiben auf eigenen Servern (`api.fwv-raura.ch`, `auth.fwv-raura.ch`).
 | Account-Lösch-Möglichkeit (in-App + Web) | ✅ | App: Profil → "Aus dem Verein austreten"<br>Web: <https://www.fwv-raura.ch/account-loeschen.html> |
 | Data Safety Form ausgefüllt | ⏳ | Du in Play Console (siehe 8.2) |
 | Content Rating (IARC) | ⏳ | Du in Play Console |
-| targetSdk ≥ 35 | ✅ | `members-android/app/build.gradle.kts` |
-| Berechtigungen sparsam | ✅ | nur INTERNET + CAMERA |
+| targetSdk ≥ 35 | ✅ | 36 (Flutter-Standard, `flutter/mitglieder/android/app/build.gradle.kts`) |
+| Berechtigungen sparsam | ✅ | INTERNET, CAMERA (QR), Kontakte/Konto (Adressbuch-Abgleich), Benachrichtigungen |
 | Keine Werbung / Tracking | ✅ | – |
 | App-Icon 512×512 | ⏳ | siehe 8.3 |
 | Mind. 2 Screenshots | ⏳ | siehe 8.3 |
@@ -167,9 +167,11 @@ Was du in die Play Console hochlädst:
 | Beschreibung (lang) | max. 4000 Zeichen | aus `play/listings/de-CH/full-description.txt` |
 | App-Titel | max. 30 Zeichen | aus `play/listings/de-CH/title.txt` |
 
-Die `play/listings/de-CH/*` Dateien werden nach dem ersten manuellen
-Hochladen automatisch über das Gradle Play Publisher Plugin synchronisiert
-(siehe `members-android/app/build.gradle.kts`).
+Die Vorlagen liegen in `members-android/app/src/main/play/listings/de-CH/`.
+Der Store-Eintrag wird **nicht** mehr aus dem Repo synchronisiert: Seit der
+Flutter-App lädt das CI nur noch das Bundle und die Versionshinweise hoch
+(Abschnitt 9). Änderungen am Eintrag macht man direkt in der Play Console
+(und trägt sie zur Ablage in die Dateien nach).
 
 ### 8.4 Closed Testing — neue Developer-Account-Regel
 
@@ -207,3 +209,56 @@ bei Promotion zu Production.
 
 Sobald `PLAY_SERVICE_ACCOUNT_JSON` als Secret gesetzt ist, lädt der
 nächste `members-v*` Tag die App automatisch ins Internal Testing Track.
+
+## 9. Release der Mitglieder-App (Flutter)
+
+Seit `members-v1.0.0` ist die Android-App im Play Store die Flutter-App
+(`flutter/mitglieder`). Sie kommt bei den Testern als **Update** der
+bisherigen nativen App an, weil App-ID (`com.fwv.members`) und
+Upload-Schlüssel (Alias `members`) gleich bleiben. Die native App
+(`members-android`) liegt noch im Repo, wird aber nicht mehr gebaut.
+
+Release auslösen:
+
+```sh
+git tag members-v1.0.0
+git push origin members-v1.0.0
+```
+
+Der Workflow `.github/workflows/build-android-members.yml` macht dann:
+
+1. `flutter analyze` + `flutter test` für `fwv_core`, `fwv_anlass`,
+   `fwv_lager` und `mitglieder`.
+2. AAB und APK bauen, signiert mit dem Upload-Schlüssel. Version
+   `X.Y.Z` aus dem Tag, `versionCode` = X·10000 + Y·100 + Z (1.0.0 → 10000;
+   die letzte native Fassung 0.42.0 hatte 4200).
+3. GitHub-Release mit APK und AAB (nie "Latest") und den rollenden Zeiger
+   `members-latest/members-latest.apk` aktualisieren.
+4. Upload in den Track **Interner Test**, Status `completed` (sofort an die
+   internen Tester ausgerollt), mit den Versionshinweisen aus
+   `flutter/mitglieder/play/whatsnew/whatsnew-de-CH` (max. 500 Zeichen) und
+   der R8-`mapping.txt` für lesbare Absturzberichte.
+
+**Upload-Weg:** `r0adkll/upload-google-play` (v1.1.5) statt Gradle Play
+Publisher. Gründe: Die Flutter-App baut mit AGP 9, das Plugin hätte im
+Flutter-Android-Projekt eigens eingebaut und gegen AGP 9 geprüft werden
+müssen; die Action braucht nur das fertige AAB und das Secret als Text
+(keine Datei auf der Platte), und den Store-Eintrag hat das CI schon bisher
+nicht hochgeladen (`publishReleaseBundle` lädt nur Bundle und
+Versionshinweise).
+
+Secrets (Namen): `MEMBERS_KEYSTORE_BASE64`, `MEMBERS_KEYSTORE_PASSWORD`,
+`PLAY_SERVICE_ACCOUNT_JSON`. Fehlt der Keystore bei einem Tag, bricht der
+Lauf ab (ein Debug-signiertes Bundle nimmt Play nicht an). Fehlt das
+Play-Secret, entsteht nur das GitHub-Release. Schlägt der Play-Upload fehl,
+ist der Lauf rot — GitHub-Release und APK gibt es dann trotzdem schon.
+
+Nach dem ersten Flutter-Release in der Play Console prüfen:
+
+- Interner Test → Release 1.0.0 (10000) ist ausgerollt, Versionshinweise
+  sind da.
+- Keine Warnung zu Signatur/Upload-Schlüssel.
+- App-Inhalte → Datensicherheit: passt noch zu Tabelle 8.2 (neu dazu nur
+  Benachrichtigungen; Kontakte-Abgleich gab es schon in der nativen App).
+- Auf einem Testgerät: Update kommt an, Anmeldung bleibt erhalten, Konto
+  "FWV Raura" mit den Kontakten ist noch da.

@@ -19,7 +19,6 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         // Dieselbe ID wie die bisherige Kotlin-App (members-android): so kommt die
         // Flutter-App bei den Mitgliedern als Update an, nicht als neue App.
         applicationId = "com.fwv.members"
@@ -27,10 +26,9 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
-        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
-        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
-        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
-        // flag during build.
+        // Version kommt aus --build-name / --build-number (Workflow:
+        // members-vX.Y.Z -> X.Y.Z, Code X*10000+Y*100+Z wie bei members-android).
+        // Ohne diese Angaben gilt die Version aus pubspec.yaml.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // Anmeldung ueber Authentik: AppAuth faengt die Rueckleitung
@@ -38,11 +36,40 @@ android {
         manifestPlaceholders += mapOf("appAuthRedirectScheme" to "com.fwv.members")
     }
 
+    // Upload-Schluessel: derselbe wie bei members-android, sonst nimmt Google
+    // Play das Bundle nicht als Update von com.fwv.members an. Die Werte
+    // setzt der Workflow build-android-members.yml aus den GitHub-Secrets
+    // MEMBERS_KEYSTORE_BASE64 / MEMBERS_KEYSTORE_PASSWORD.
+    val keystorePath = System.getenv("MEMBERS_KEYSTORE_PATH")
+    val hatKeystore = !keystorePath.isNullOrBlank()
+
+    signingConfigs {
+        create("release") {
+            if (hatKeystore) {
+                storeFile = file(keystorePath!!)
+                storePassword = System.getenv("MEMBERS_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("MEMBERS_KEY_ALIAS") ?: "members"
+                keyPassword = System.getenv("MEMBERS_KEY_PASSWORD")
+                    ?: System.getenv("MEMBERS_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Ohne Keystore (lokale Builds) mit dem Debug-Schluessel signieren —
+            // so laesst sich ein Release-Build ueber die Debug-App installieren.
+            signingConfig = if (hatKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            // R8 bleibt wie im Flutter-Standard aktiv; eigene Regeln stehen in
+            // proguard-rules.pro (Kontakte-Abgleich, Altdaten-Uebernahme).
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }

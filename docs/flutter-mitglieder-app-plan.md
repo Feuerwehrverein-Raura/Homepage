@@ -451,6 +451,7 @@ Offen:
   (CI-Secrets `MEMBERS_KEYSTORE_BASE64`, `MEMBERS_KEYSTORE_PASSWORD`, Alias
   `members`), Version über `members-v*`-Tags; die neue `versionCode` muss
   über 4200 liegen (0.42.0). Play-Upload wie heute in den internen Test.
+  **Umgestellt (11.10.2026)** — siehe Abschnitt "Release".
 - **iOS**: gleiche Bundle-ID `ch.fwvraura.members`. Es gibt noch **keinen
   Apple-Developer-Account, keine Signierung und kein TestFlight** — das
   blockiert iOS im Store unabhängig von Flutter.
@@ -472,6 +473,56 @@ Offen:
 - **Angemeldet bleiben**: Android speichert das Token heute in
   `EncryptedSharedPreferences` (`fwv_members_prefs`), die neue App liest
   anderswo. Ohne Übernahme-Code müssen sich alle einmal neu anmelden.
+
+## Release
+
+Stand 11.10.2026: Der Tag-Workflow baut die **Flutter-App**, nicht mehr
+`members-android`. Erste Flutter-Version: **`members-v1.0.0`**
+(`versionCode` 10000, liegt über 4200 der letzten nativen Fassung 0.42.0).
+
+Release auslösen (vom aktuellen `main`):
+
+```sh
+git tag members-v1.0.0
+git push origin members-v1.0.0
+```
+
+Was dann passiert (`.github/workflows/build-android-members.yml`):
+
+1. `flutter analyze` + `flutter test` für `fwv_core`, `fwv_anlass`,
+   `fwv_lager`, `mitglieder`; bricht etwas, wird nichts gebaut.
+2. `flutter build appbundle` und `flutter build apk` mit
+   `--build-name X.Y.Z --build-number X*10000+Y*100+Z`, signiert mit dem
+   Upload-Schlüssel der alten App (Secrets `MEMBERS_KEYSTORE_BASE64`,
+   `MEMBERS_KEYSTORE_PASSWORD`, Alias `members`;
+   `android/app/build.gradle.kts`). Ohne Keystore (lokal) signiert Gradle
+   mit dem Debug-Schlüssel; bei einem Tag ohne Keystore bricht der Lauf ab.
+   R8 ist an (Flutter-Standard), eigene Regeln in
+   `android/app/proguard-rules.pro`.
+3. GitHub-Release mit APK + AAB (`make_latest: false`) und rollender Zeiger
+   `members-latest/members-latest.apk`.
+4. Upload in den internen Test von Google Play (Status `completed`) mit
+   `r0adkll/upload-google-play@v1.1.5` (Secret `PLAY_SERVICE_ACCOUNT_JSON`),
+   Versionshinweise aus `flutter/mitglieder/play/whatsnew/whatsnew-de-CH`
+   (de-CH, max. 500 Zeichen — vor jedem Release anpassen). Warum diese
+   Action statt Gradle Play Publisher: `docs/play-console-setup.md`,
+   Abschnitt 9. Der Store-Eintrag (Texte, Bilder) bleibt unverändert.
+
+Die native App (`members-android`) bleibt vorerst im Repo, wird aber weder
+bei Tags noch bei Pull Requests gebaut. Ein `workflow_dispatch` des
+Workflows baut eine beliebige Version ohne Play-Upload (optional mit
+GitHub-Release).
+
+Lokal geprüft (11.10.2026): `flutter build appbundle --release
+--build-name 1.0.0 --build-number 10000` und `flutter build apk --release …`
+laufen durch (Debug-signiert); das Release-APK startet im Emulator als
+Update über die installierte App, Anmeldung bleibt, Konto "FWV Raura" und
+Kontakte-Abgleich (61 Mitglieder) funktionieren mit R8, keine
+`ClassNotFound`/`MissingPluginException` im Log.
+
+**iOS** bleibt blockiert: Ohne Apple-Developer-Account gibt es weder
+Signierung noch TestFlight; sobald der Vereins-Account da ist, folgt ein
+eigener Release-Weg.
 
 ## Was ins Backend gehört (heute rechnen die Apps)
 

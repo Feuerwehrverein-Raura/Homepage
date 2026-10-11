@@ -1,199 +1,193 @@
 name: Build Android Members
 
+# Release der Mitglieder-App fuer Android — seit members-v1.0.0 die
+# Flutter-App (flutter/mitglieder). Die native Kotlin-App (members-android)
+# liegt noch im Repo, wird aber nicht mehr gebaut.
+#
+# Tag members-vX.Y.Z  ->  Analyse + Tests, signiertes AAB + APK,
+# Upload in den internen Test-Track von Google Play (als Update von
+# com.fwv.members), GitHub-Release und rollender Zeiger members-latest.
+# Ablauf und Voraussetzungen: docs/flutter-mitglieder-app-plan.md (Release)
+# und docs/play-console-setup.md.
+
 on:
   push:
     tags:
       - 'members-v*'
-  pull_request:
-    paths:
-      - 'members-android/**'
-      # Vertrags-Fixture des Backends: aendert sie sich, muessen die
-      # Unit-Tests der App erneut laufen.
-      - 'docker/backend-events/test/fixtures/**'
   workflow_dispatch:
     inputs:
       create_release:
-        description: 'Create a release'
+        description: 'GitHub-Release erstellen (ohne Play-Upload)'
         required: false
         default: false
         type: boolean
       version:
-        description: 'Version number (e.g. 1.0.0)'
+        description: 'Versionsnummer (z.B. 1.0.0)'
         required: false
         default: '1.0.0'
         type: string
 
 jobs:
+  test:
+    name: Analyse und Tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        paket: [fwv_core, fwv_anlass, fwv_lager, mitglieder]
+    defaults:
+      run:
+        working-directory: flutter/${{ matrix.paket }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Abhaengigkeiten
+        run: flutter pub get
+
+      - name: Analyse
+        run: flutter analyze
+
+      - name: Tests
+        run: flutter test
+
   build:
+    name: Release bauen und verteilen
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: flutter/mitglieder
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
 
-      - name: Install required SDK components
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;36.0.0" "platforms;android-36"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: subosito/flutter-action@v2
         with:
-          gradle-version: '8.13'
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
 
-      - name: Inject version from tag
-        shell: bash
+      # Versionsname aus dem Tag (members-v1.2.3 -> 1.2.3), Versionscode mit
+      # derselben Formel wie frueher bei members-android:
+      # MAJOR*10000 + MINOR*100 + PATCH. Play verlangt, dass er steigt —
+      # die letzte native Fassung war members-v0.42.0 (4200).
+      - name: Version bestimmen
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/members-v* ]]; then
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#members-v}"
+          set -euo pipefail
+          if [[ "$REF" == refs/tags/members-v* ]]; then
+            VERSION="${REF_NAME#members-v}"
           else
-            VERSION="${{ inputs.version || '0.0.0' }}"
+            VERSION="${INPUT_VERSION:-0.0.0}"
           fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          GRADLE_FILE="members-android/app/build.gradle.kts"
-          sed -i "s/versionName = .*/versionName = \"$VERSION\"/" "$GRADLE_FILE"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' ist nicht X.Y.Z"
+            exit 1
+          fi
           IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
-          VCODE=$(( ${MAJOR:-0} * 10000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          VCODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
           [ "$VCODE" -lt 1 ] && VCODE=1
-          sed -i "s/versionCode = .*/versionCode = $VCODE/" "$GRADLE_FILE"
-          echo "Set version: $VERSION (code: $VCODE)"
-          grep -E "version(Code|Name)" "$GRADLE_FILE"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "VCODE=$VCODE" >> "$GITHUB_ENV"
+          echo "Version: $VERSION (Code $VCODE)"
 
-      - name: Unit tests (Arbeitsplan-Vertrag u.a.)
-        working-directory: members-android
-        run: gradle testDebugUnitTest --stacktrace
-
-      - name: Build Debug APK
-        working-directory: members-android
-        run: gradle assembleDebug --stacktrace
-
-      - name: Setup signing keystore
+      # Derselbe Upload-Schluessel wie bei members-android (Alias members),
+      # sonst lehnt Play das Bundle als Update von com.fwv.members ab.
+      # android/app/build.gradle.kts liest die MEMBERS_*-Variablen.
+      - name: Signier-Schluessel bereitstellen
         env:
-          KEYSTORE_PASSWORD: ${{ secrets.MEMBERS_KEYSTORE_PASSWORD }}
           KEYSTORE_BASE64: ${{ secrets.MEMBERS_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MEMBERS_KEYSTORE_PASSWORD }}
+          REF: ${{ github.ref }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/keystore.jks"
-            echo "MEMBERS_KEYSTORE_PATH=$GITHUB_WORKSPACE/keystore.jks" >> $GITHUB_ENV
-            echo "MEMBERS_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
-            echo "MEMBERS_KEY_ALIAS=members" >> $GITHUB_ENV
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            if [[ "$REF" == refs/tags/members-v* ]]; then
+              echo "::error::Secret MEMBERS_KEYSTORE_BASE64 fehlt — ein mit dem Debug-Schluessel signiertes Release taugt nicht fuer Play."
+              exit 1
+            fi
+            echo "::warning::Kein Keystore — Build wird mit dem Debug-Schluessel signiert."
+            exit 0
           fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/members.jks"
+          {
+            echo "MEMBERS_KEYSTORE_PATH=$RUNNER_TEMP/members.jks"
+            echo "MEMBERS_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "MEMBERS_KEY_ALIAS=members"
+          } >> "$GITHUB_ENV"
 
-      - name: Build Release APK
-        working-directory: members-android
-        run: gradle assembleRelease --stacktrace
+      - name: Abhaengigkeiten
+        run: flutter pub get
 
-      - name: Build Release App Bundle (AAB) for Play Store
-        working-directory: members-android
-        run: gradle bundleRelease --stacktrace
+      - name: App-Bundle bauen (Play Store)
+        run: flutter build appbundle --release --build-name "$VERSION" --build-number "$VCODE"
 
-      - name: Setup Play Console Service-Account
-        if: startsWith(github.ref, 'refs/tags/members-v')
-        env:
-          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      - name: APK bauen (GitHub-Release, Direktinstallation)
+        run: flutter build apk --release --build-name "$VERSION" --build-number "$VCODE"
+
+      - name: Dateien umbenennen
         run: |
-          if [ -n "$PLAY_JSON" ]; then
-            echo "$PLAY_JSON" > "$GITHUB_WORKSPACE/play-service-account.json"
-            echo "PLAY_SERVICE_ACCOUNT_JSON_PATH=$GITHUB_WORKSPACE/play-service-account.json" >> $GITHUB_ENV
-          fi
+          set -euo pipefail
+          cp build/app/outputs/bundle/release/app-release.aab "$GITHUB_WORKSPACE/members-${VERSION}-release.aab"
+          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/members-${VERSION}-release.apk"
 
-      - name: Upload App Bundle to Play Store (Internal Testing)
-        if: startsWith(github.ref, 'refs/tags/members-v') && env.PLAY_SERVICE_ACCOUNT_JSON_PATH != ''
-        working-directory: members-android
-        # continue-on-error: ein evtl. Play-Rollout-Fehler (z.B. App noch nie
-        # veroeffentlicht) darf GitHub-Release + APK nicht blockieren.
-        continue-on-error: true
-        run: gradle publishReleaseBundle --stacktrace
-
-      - name: Rename APKs and AAB
-        run: |
-          DEBUG_APK=$(find members-android -name "*debug*.apk" -type f | head -1)
-          RELEASE_APK=$(find members-android -name "*release*.apk" -type f | head -1)
-          RELEASE_AAB=$(find members-android -name "*release*.aab" -type f | head -1)
-          if [ -n "$DEBUG_APK" ]; then
-            cp "$DEBUG_APK" "members-${VERSION}-debug.apk"
-          fi
-          if [ -n "$RELEASE_APK" ]; then
-            cp "$RELEASE_APK" "members-${VERSION}-release.apk"
-          fi
-          if [ -n "$RELEASE_AAB" ]; then
-            cp "$RELEASE_AAB" "members-${VERSION}-release.aab"
-          fi
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: members-debug
-          path: members-*-debug.apk
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Upload Release APK
+      - name: Artefakte sichern
         uses: actions/upload-artifact@v4
         with:
           name: members-release
-          path: members-*-release.apk
+          path: |
+            members-*-release.apk
+            members-*-release.aab
+            flutter/mitglieder/build/app/outputs/mapping/release/mapping.txt
           retention-days: 30
-          if-no-files-found: ignore
+          if-no-files-found: error
 
-      - name: Upload Release AAB (Play Store Bundle)
-        uses: actions/upload-artifact@v4
-        with:
-          name: members-release-aab
-          path: members-*-release.aab
-          retention-days: 30
-          if-no-files-found: ignore
-
-      - name: Create Release
+      - name: GitHub-Release erstellen
         if: startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || format('members-v{0}', inputs.version) }}
-          name: FWV Raura Members ${{ github.ref_name || format('members-v{0}', inputs.version) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('members-v{0}', inputs.version) }}
+          name: FWV Raura Mitglieder ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('members-v{0}', inputs.version) }}
           # NIE als "Latest" markieren: releases/latest gehoert dem Desktop-Auto-
           # Updater (latest.json) — Android-Releases wuerden ihn sonst kapern.
           make_latest: false
           generate_release_notes: true
           files: |
-            members-*-debug.apk
             members-*-release.apk
             members-*-release.aab
           body: |
             ## FWV Raura Mitglieder-App
 
-            Native Android-App für Mitglieder und Veranstaltungs-Organisatoren des
-            Feuerwehrvereins Raura.
+            App für Mitglieder und Veranstaltungs-Organisatoren des
+            Feuerwehrvereins Raura (Flutter-Fassung, ersetzt die bisherige
+            native App als Update).
 
             **Kompatibilität:** Android 8.0+ (API 26)
 
             ### Installation
 
+            Regulär über Google Play (interner Test). Alternativ:
+
             1. APK auf das Android-Gerät übertragen
             2. "Unbekannte Quellen" in den Einstellungen erlauben
             3. APK installieren
-            4. Anmelden mit Mitgliederkonto, als Organisator oder per QR-Code
-
-            ### Phase 1a (dieses Release)
-
-            - Login-Screen mit drei Modi (Mitglied / Organisator / QR-Code)
-            - Organisator-Login funktional
-            - QR-Login (nach Backend-Endpoint)
-            - Mitglieder-OIDC-Login folgt in nächster Version
-
-            ### Hinweis zum Vertrieb
-
-            Diese Version wird zunächst direkt über GitHub Releases verteilt.
-            Eine Veröffentlichung über Google Play Closed Testing folgt sobald
-            der Play-Console-Account verifiziert ist.
+            4. Anmelden mit dem Mitgliederkonto oder per QR-Code
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -210,18 +204,14 @@ jobs:
       #
       # Als Vorabversion markiert, damit GitHub sie nicht zur "Latest
       # release" des Repos macht und dem Desktop-Updater dazwischenfunkt.
-      - name: Update rolling "members-latest" release
+      - name: Rollenden Zeiger "members-latest" aktualisieren
         if: startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true
+        working-directory: ${{ github.workspace }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          APK="members-${VERSION}-release.apk"
-          if [ ! -f "$APK" ]; then
-            echo "Kein Release-APK gefunden — nichts zu tun."
-            exit 0
-          fi
-          cp "$APK" members-latest.apk
+          cp "members-${VERSION}-release.apk" members-latest.apk
 
           NOTES="Dieser Eintrag zeigt immer auf die neuste Fassung der
           Mitglieder-App. Der Dateiname bleibt gleich, damit Links und
@@ -242,3 +232,31 @@ jobs:
               --prerelease \
               --target "$GITHUB_SHA"
           fi
+
+      - name: Play-Zugang pruefen
+        id: play
+        if: startsWith(github.ref, 'refs/tags/members-v')
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$PLAY_JSON" ]; then
+            echo "vorhanden=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Secret PLAY_SERVICE_ACCOUNT_JSON fehlt — kein Play-Upload."
+          fi
+
+      # Absichtlich als letzter Schritt und ohne continue-on-error: Schlaegt
+      # der Upload fehl, ist der Lauf rot, GitHub-Release und APK gibt es
+      # trotzdem schon. Store-Eintrag (Texte, Bilder) wird nicht angefasst.
+      - name: Upload in Google Play (interner Test)
+        if: steps.play.outputs.vorhanden == 'true'
+        uses: r0adkll/upload-google-play@v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.fwv.members
+          releaseFiles: members-${{ env.VERSION }}-release.aab
+          releaseName: ${{ env.VERSION }}
+          track: internal
+          status: completed
+          whatsNewDirectory: flutter/mitglieder/play/whatsnew
+          mappingFile: flutter/mitglieder/build/app/outputs/mapping/release/mapping.txt
