@@ -23,7 +23,9 @@ test('oeffentliche Anlass-Listen ohne Kontaktdaten', { skip: !DB && 'TEST_DATABA
 
     await schemaAufbauen(pool);
     await pool.query(
-        `INSERT INTO events (id, slug, title, start_date) VALUES ($1, 'test-datenschutz', 'Datenschutz-Test', NOW() + INTERVAL '30 days')`,
+        `INSERT INTO events (id, slug, title, start_date, event_email, event_password_hash)
+         VALUES ($1, 'test-datenschutz', 'Datenschutz-Test', NOW() + INTERVAL '30 days',
+                 'login-geheim@example.ch', 'deadbeefhash0123456789')`,
         [EVENT]);
     const shift = (await pool.query(
         `INSERT INTO shifts (event_id, name, date, start_time, end_time, needed, bereich)
@@ -47,7 +49,8 @@ test('oeffentliche Anlass-Listen ohne Kontaktdaten', { skip: !DB && 'TEST_DATABA
         await new Promise(r => setTimeout(r, 200));
     }
 
-    const kontaktdaten = text => /gast@example\.ch|direkt@example\.ch|Nüsse|vegetarisch/.test(text);
+    // Kontaktdaten der Angemeldeten und Zugangsdaten des Organisator-Logins
+    const kontaktdaten = text => /gast@example\.ch|direkt@example\.ch|Nüsse|vegetarisch|login-geheim|deadbeefhash/.test(text);
 
     for (const url of [`${BASE}/events`, `${BASE}/events/${EVENT}`, `${BASE}/events/test-datenschutz`]) {
         const ohne = await (await fetch(url)).text();

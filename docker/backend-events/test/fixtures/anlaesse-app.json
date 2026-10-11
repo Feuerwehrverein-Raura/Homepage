@@ -1,0 +1,214 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-e00000000007",
+    "slug": "laeuft-noch",
+    "title": "Herbstmarkt",
+    "category": "Sonstiges",
+    "status": "planned",
+    "location": null,
+    "start_date": "2026-10-10 18:00:00",
+    "end_date": "2026-10-11 16:00:00",
+    "registration_deadline": null,
+    "max_participants": null,
+    "registration_required": true,
+    "app": {
+      "datum_text": "Sa 10.10. – So 11.10.2026",
+      "zeit_text": "ab 18:00 Uhr",
+      "abgesagt": false,
+      "anmeldung": {
+        "moeglich": true,
+        "grund": null,
+        "art": "teilnahme",
+        "pflicht": true,
+        "anmeldeschluss_text": null,
+        "plaetze_frei": null,
+        "plaetze_text": null
+      },
+      "kann_bearbeiten": false
+    },
+    "shifts": []
+  },
+  {
+    "id": "00000000-0000-0000-0000-e00000000001",
+    "slug": "chilbi-2026",
+    "title": "Chilbi 2026",
+    "category": "Dorffest",
+    "status": "planned",
+    "location": "Roter Schopf",
+    "start_date": "2026-10-17 10:00:00",
+    "end_date": "2026-10-18 20:00:00",
+    "registration_deadline": "2026-10-15 23:59:00",
+    "max_participants": null,
+    "registration_required": false,
+    "app": {
+      "datum_text": "Sa 17.10. – So 18.10.2026",
+      "zeit_text": "ab 10:00 Uhr",
+      "abgesagt": false,
+      "anmeldung": {
+        "moeglich": true,
+        "grund": null,
+        "art": "schicht",
+        "pflicht": true,
+        "anmeldeschluss_text": "Donnerstag, 15. Oktober 2026, 23:59 Uhr",
+        "plaetze_frei": null,
+        "plaetze_text": null
+      },
+      "kann_bearbeiten": false
+    },
+    "shifts": [
+      {
+        "id": "00000000-0000-0000-0000-500000000001",
+        "name": "Aufbau",
+        "bereich": "Allgemein",
+        "date": "2026-10-16",
+        "start_time": "08:00:00",
+        "end_time": null,
+        "needed": 4,
+        "app": {
+          "datum_text": "Freitag, 16. Oktober 2026",
+          "zeit_text": "08:00 Uhr",
+          "bereich_text": "Aufbau",
+          "belegung": {
+            "besetzt": 1,
+            "gebraucht": 4,
+            "offen": 3,
+            "angefragt": 0,
+            "text": "3 Plätze frei"
+          },
+          "waehlbar": true
+        }
+      },
+      {
+        "id": "00000000-0000-0000-0000-500000000002",
+        "name": "Schicht 1",
+        "bereich": "Bar",
+        "date": "2026-10-17",
+        "start_time": "12:00:00",
+        "end_time": "14:00:00",
+        "needed": 2,
+        "app": {
+          "datum_text": "Samstag, 17. Oktober 2026",
+          "zeit_text": "12:00–14:00 Uhr",
+          "bereich_text": "Bar",
+          "belegung": {
+            "besetzt": 2,
+            "gebraucht": 2,
+            "offen": 0,
+            "angefragt": 0,
+            "text": "voll"
+          },
+          "waehlbar": false
+        }
+      },
+      {
+        "id": "00000000-0000-0000-0000-500000000003",
+        "name": "Schicht 2",
+        "bereich": "Kueche",
+        "date": "2026-10-17",
+        "start_time": "17:00:00",
+        "end_time": "20:00:00",
+        "needed": 2,
+        "app": {
+          "datum_text": "Samstag, 17. Oktober 2026",
+          "zeit_text": "17:00–20:00 Uhr",
+          "bereich_text": "Küche",
+          "belegung": {
+            "besetzt": 1,
+            "gebraucht": 2,
+            "offen": 1,
+            "angefragt": 1,
+            "text": "1 Platz frei"
+          },
+          "waehlbar": true
+        }
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-0000-0000-e00000000002",
+    "slug": "ausflug-2026",
+    "title": "Vereinsausflug",
+    "category": "Ausflug mit Anmeldung",
+    "status": "planned",
+    "location": null,
+    "start_date": "2026-10-24 09:00:00",
+    "end_date": "2026-10-24 18:00:00",
+    "registration_deadline": "2026-10-10 18:00:00",
+    "max_participants": 10,
+    "registration_required": false,
+    "app": {
+      "datum_text": "Samstag, 24. Oktober 2026",
+      "zeit_text": "09:00–18:00 Uhr",
+      "abgesagt": false,
+      "anmeldung": {
+        "moeglich": false,
+        "grund": "Anmeldeschluss vorbei",
+        "art": "teilnahme",
+        "pflicht": true,
+        "anmeldeschluss_text": "Samstag, 10. Oktober 2026, 18:00 Uhr",
+        "plaetze_frei": 9,
+        "plaetze_text": "9 Plätze frei"
+      },
+      "kann_bearbeiten": false
+    },
+    "shifts": []
+  },
+  {
+    "id": "00000000-0000-0000-0000-e00000000004",
+    "slug": "helferessen",
+    "title": "Helferessen",
+    "category": "GV",
+    "status": "planned",
+    "location": null,
+    "start_date": "2026-10-31 19:00:00",
+    "end_date": "2026-10-31 23:00:00",
+    "registration_deadline": null,
+    "max_participants": 2,
+    "registration_required": false,
+    "app": {
+      "datum_text": "Samstag, 31. Oktober 2026",
+      "zeit_text": "19:00–23:00 Uhr",
+      "abgesagt": false,
+      "anmeldung": {
+        "moeglich": false,
+        "grund": "Ausgebucht",
+        "art": "teilnahme",
+        "pflicht": true,
+        "anmeldeschluss_text": null,
+        "plaetze_frei": 0,
+        "plaetze_text": "voll"
+      },
+      "kann_bearbeiten": false
+    },
+    "shifts": []
+  },
+  {
+    "id": "00000000-0000-0000-0000-e00000000003",
+    "slug": "grillabend",
+    "title": "Grillabend",
+    "category": "Sonstiges",
+    "status": "planned",
+    "location": "Feuerwehrmagazin",
+    "start_date": "2026-11-07 18:00:00",
+    "end_date": null,
+    "registration_deadline": null,
+    "max_participants": null,
+    "registration_required": false,
+    "app": {
+      "datum_text": "Samstag, 7. November 2026",
+      "zeit_text": "18:00 Uhr",
+      "abgesagt": false,
+      "anmeldung": {
+        "moeglich": false,
+        "grund": "Keine Anmeldung nötig",
+        "art": null,
+        "pflicht": false,
+        "anmeldeschluss_text": null,
+        "plaetze_frei": null,
+        "plaetze_text": null
+      },
+      "kann_bearbeiten": false
+    },
+    "shifts": []
+  }
+]

@@ -13,6 +13,7 @@ const arbeitsplan = require('./arbeitsplan');
 const { formatDateDE, bereichLesbar, renderArbeitsplanPdf } = arbeitsplan;
 const buildArbeitsplan = eventId => arbeitsplan.buildArbeitsplan(pool, eventId);
 const registrationDetailsText = (eventId, shiftIds) => arbeitsplan.registrationDetailsText(pool, eventId, shiftIds);
+const appAnsicht = require('./app-ansicht');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -708,25 +709,85 @@ app.get('/health', (req, res) => {
 // und Zahlen; die Kontaktdaten braucht nur die Verwaltung, und die schickt
 // immer ihr Token mit (vorstand.html, Vorstand-App, Desktop).
 // ---------------------------------------------------------------------------
-function istVorstandAnfrage(req) {
-    if (!req.headers.authorization && !req.headers['x-api-key']) return Promise.resolve(false);
+// Token des Organisator-Logins (POST /events/login, HS256 type
+// 'event-organizer') — oder null.
+function eventOrganisatorToken(req) {
+    const token = (req.headers.authorization || '').split(' ')[1];
+    if (!token) return null;
+    try {
+        const d = jwt.verify(token, process.env.JWT_SECRET);
+        return d && d.type === 'event-organizer' ? d : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+// Angemeldeter Benutzer (req.user) bei oeffentlichen Endpunkten, die mit
+// Token mehr liefern — oder null. Ein ungueltiges Token heisst hier nur
+// "anonym", die Antwort bleibt oeffentlich.
+function optionalerBenutzer(req) {
+    if (!req.headers.authorization && !req.headers['x-api-key']) return Promise.resolve(null);
+    // Organisator-Token kennt authenticateAny nicht; es wuerde sonst noch
+    // gegen Authentik (Netz) geprueft und dort abgelehnt.
+    if (eventOrganisatorToken(req)) return Promise.resolve(null);
     return new Promise(resolve => {
         // authenticateAny antwortet bei ungueltigem Token selbst mit 401 — hier
-        // soll es nur "kein Vorstand" heissen, die Liste bleibt oeffentlich.
+        // soll es nur "anonym" heissen.
         const abgelehnt = {
             status: () => abgelehnt,
-            json: () => resolve(false),
-            send: () => resolve(false),
-            sendStatus: () => resolve(false)
+            json: () => resolve(null),
+            send: () => resolve(null),
+            sendStatus: () => resolve(null)
         };
         try {
-            authenticateAny(req, abgelehnt, () =>
-                resolve((req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g))));
+            authenticateAny(req, abgelehnt, () => resolve(req.user || null));
         } catch (_) {
-            resolve(false);
+            resolve(null);
         }
     });
 }
+
+const istVorstandBenutzer = user => (user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
+
+// Wer fragt an — fuer `app.kann_bearbeiten`: Vorstand darf alles, ein
+// Organisator seinen Anlass (gleiche Regel wie GET /events/organized-by-me),
+// ein Organisator-Login genau sein Event.
+async function anfragender(req) {
+    const orgToken = eventOrganisatorToken(req);
+    if (orgToken) return { vorstand: false, identity: null, organisatorEventId: orgToken.event_id };
+    const user = await optionalerBenutzer(req);
+    if (!user) return { vorstand: false, identity: null, organisatorEventId: null };
+    if (istVorstandBenutzer(user)) return { vorstand: true, identity: null, organisatorEventId: null };
+    return { vorstand: false, identity: await resolveOrganizerIdentity(req), organisatorEventId: null };
+}
+
+function darfBearbeiten(wer, event) {
+    if (wer.vorstand) return true;
+    if (wer.organisatorEventId && String(wer.organisatorEventId) === String(event.id)) return true;
+    return isOrganizerIdentityMatch(wer.identity, event);
+}
+
+// Haengt die app-Bloecke (src/app-ansicht.js) an Anlaesse aus GET /events
+// bzw. /events/:id. Belegte Personen nur bei Teilnehmer-Limit abfragen (wie
+// die Kapazitaetspruefung in POST /registrations/public).
+async function mitAppAnsicht(events, wer) {
+    const zeit = appAnsicht.jetzt();
+    return Promise.all(events.map(async event => {
+        let belegtePersonen = 0;
+        if (event.max_participants) {
+            const r = await pool.query(
+                `SELECT notes FROM registrations WHERE event_id = $1 AND status IN ('approved', 'pending')`,
+                [event.id]);
+            belegtePersonen = sumRegistrationPersons(r.rows);
+        }
+        return appAnsicht.anlassAnsicht(event, { belegtePersonen, kannBearbeiten: darfBearbeiten(wer, event), zeit });
+    }));
+}
+
+// Felder der Anlass-Zeile, die nie oeffentlich sein duerfen: Zugang zum
+// Organisator-Login (der Hash ist ungesalzenes SHA-256 — offline knackbar)
+// und der PDF-Anhang (gross; hat einen eigenen Download /events/:id/pdf).
+const INTERNE_ANLASS_FELDER = ['event_email', 'event_password_hash', 'event_password_encrypted', 'pdf_attachment'];
 
 function ohneKontaktdaten(event) {
     const nurName = ({ id, name }) => ({ id, name });
@@ -735,8 +796,10 @@ function ohneKontaktdaten(event) {
         approved: (r.approved || []).map(nurName),
         pending: (r.pending || []).map(nurName)
     };
+    const oeffentlich = { ...event };
+    for (const feld of INTERNE_ANLASS_FELDER) delete oeffentlich[feld];
     return {
-        ...event,
+        ...oeffentlich,
         shifts: (event.shifts || []).map(shift => ({ ...shift, registrations: regs(shift.registrations) })),
         directRegistrations: regs(event.directRegistrations)
     };
@@ -745,7 +808,7 @@ function ohneKontaktdaten(event) {
 // DEUTSCH: Alle Events auflisten, optional gefiltert nach upcoming/category, inkl. Schichten und Registrierungen
 app.get('/events', async (req, res) => {
     try {
-        const { upcoming, category } = req.query;
+        const { upcoming, category, aktuell } = req.query;
         let query = `
             SELECT e.*,
                    m.vorname as organizer_vorname,
@@ -765,8 +828,15 @@ app.get('/events', async (req, res) => {
             params.push(category);
             query += ` AND e.category = $${params.length}`;
         }
+        // Fuer die Mitglieder-App: nicht abgesagt und noch nicht vorbei
+        // (Ende bzw. Beginn ist heute oder spaeter, Ortszeit Zuerich).
+        if (aktuell === 'true') {
+            params.push(appAnsicht.zuerich(appAnsicht.jetzt()).datum);
+            query += ` AND COALESCE(e.status, '') <> 'cancelled'`
+                + ` AND COALESCE(e.end_date, e.start_date)::date >= $${params.length}::date`;
+        }
 
-        query += ' ORDER BY e.start_date';
+        query += ' ORDER BY e.start_date, e.id';
         const eventsResult = await pool.query(query, params);
 
         // Fetch shifts for all events with registration info
@@ -849,7 +919,9 @@ app.get('/events', async (req, res) => {
             };
         }));
 
-        res.json(await istVorstandAnfrage(req) ? events : events.map(ohneKontaktdaten));
+        const wer = await anfragender(req);
+        const mitApp = await mitAppAnsicht(events, wer);
+        res.json(wer.vorstand ? mitApp : mitApp.map(ohneKontaktdaten));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -1129,7 +1201,9 @@ app.get('/events/:id', async (req, res, next) => {
                 pendingCount: directPending.length
             }
         };
-        res.json(await istVorstandAnfrage(req) ? antwort : ohneKontaktdaten(antwort));
+        const wer = await anfragender(req);
+        const [mitApp] = await mitAppAnsicht([antwort], wer);
+        res.json(wer.vorstand ? mitApp : ohneKontaktdaten(mitApp));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2516,7 +2590,8 @@ app.get('/registrations/mine', authenticateAny, async (req, res) => {
                 .map(id => shiftMap[id])
                 .filter(Boolean);
         }
-        res.json(result.rows);
+        // status_text/-farbe, event_datum_text, shifts[].beschriftung
+        res.json(result.rows.map(appAnsicht.anmeldungAnsicht));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2543,11 +2618,15 @@ async function resolveOrganizerIdentity(req) {
     if (loginEmail) emails.add(loginEmail);
     if (loginEmail || authId) {
         try {
+            // $2::text: ohne Typ scheiterte die Abfrage bei jedem
+            // angemeldeten Benutzer ("could not determine data type of
+            // parameter $2") — der Fehler wurde nur geloggt, erkannt wurde
+            // der Organisator dann bloss ueber organizer_email.
             const m = await pool.query(
                 `SELECT id, LOWER(email) AS email
                    FROM members
                   WHERE ($1 <> '' AND LOWER(email) = $1)
-                     OR ($2 IS NOT NULL AND authentik_user_id = $2)
+                     OR ($2::text IS NOT NULL AND authentik_user_id = $2::text)
                   ORDER BY (LOWER(email) = $1) DESC
                   LIMIT 1`,
                 [loginEmail, authId]
@@ -3442,7 +3521,10 @@ app.delete('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin
 app.get('/calendar/items', authenticateAny, async (req, res) => {
     try {
         const isPrivileged = (req.user?.groups || []).some(g => ['vorstand', 'admin'].includes(g));
-        const today = new Date();
+        // Fertig fuer die Apps: datum_text, sortiert; E-Mails und Briefe nur
+        // fuer den Vorstand (src/app-ansicht.js).
+        const fertig = items => res.json(appAnsicht.kalenderAnsicht(items, { vorstand: isPrivileged }));
+        const today = appAnsicht.jetzt();
         const defaultFrom = new Date(today); defaultFrom.setMonth(defaultFrom.getMonth() - 12);
         const defaultTo   = new Date(today); defaultTo.setMonth(defaultTo.getMonth() + 24);
         const from = req.query.from || defaultFrom.toISOString().substring(0, 10);
@@ -3519,7 +3601,7 @@ app.get('/calendar/items', authenticateAny, async (req, res) => {
             const paidParams = [from, to];
             let paidWhere = `p.paid_date BETWEEN $1::date AND $2::date AND p.status = 'paid'`;
             if (!isPrivileged) {
-                if (!myId) return res.json(items);
+                if (!myId) return fertig(items);
                 paidWhere += ' AND p.member_id = $3';
                 paidParams.push(myId);
             }
@@ -3545,15 +3627,12 @@ app.get('/calendar/items', authenticateAny, async (req, res) => {
             }
         } catch (_) {}
 
-        // 4) Versendete Briefe / E-Mails
-        try {
+        // 4) Versendete Briefe / E-Mails — nur Vorstand. Mitglieder sahen hier
+        // frueher ihre eigenen; die Apps haben sie dann selbst wieder
+        // ausgeblendet.
+        if (isPrivileged) try {
             const dispParams = [from, to];
-            let dispWhere = `d.sent_at::date BETWEEN $1::date AND $2::date AND d.status = 'sent'`;
-            if (!isPrivileged) {
-                if (!myId) return res.json(items);
-                dispWhere += ' AND d.member_id = $3';
-                dispParams.push(myId);
-            }
+            const dispWhere = `d.sent_at::date BETWEEN $1::date AND $2::date AND d.status = 'sent'`;
             const disp = await pool.query(
                 `SELECT d.id, d.type, d.subject, d.sent_at, d.member_id, m.vorname, m.nachname
                  FROM dispatch_log d
@@ -3577,7 +3656,7 @@ app.get('/calendar/items', authenticateAny, async (req, res) => {
             }
         } catch (_) {}
 
-        res.json(items);
+        fertig(items);
     } catch (error) {
         console.error('GET /calendar/items failed:', error);
         res.status(500).json({ error: error.message });
@@ -5301,6 +5380,23 @@ function requireApiKey(req, res, next) {
 // ============================================
 
 // DEUTSCH: Alle Event-Gruppen mit ihren zugehörigen Events auflisten
+// DEUTSCH: Auswahllisten fuer Anlass-Formulare (Organisator in der App).
+// Einzige Quelle fuer "welche Kategorie braucht eine Anmeldung" — stand
+// vorher in jeder App einzeln (src/app-ansicht.js).
+app.get('/event-optionen', (req, res) => {
+    res.json({
+        kategorien: appAnsicht.KATEGORIEN,
+        anmeldepflichtige_kategorien: appAnsicht.ANMELDEPFLICHTIGE_KATEGORIEN,
+        bereiche: appAnsicht.BEREICHE.map(wert => ({ wert, text: bereichLesbar(wert) })),
+        status: [
+            { wert: 'planned', text: 'Geplant' },
+            { wert: 'confirmed', text: 'Bestätigt' },
+            { wert: 'cancelled', text: 'Abgesagt' },
+            { wert: 'completed', text: 'Abgeschlossen' }
+        ]
+    });
+});
+
 app.get('/event-groups', async (req, res) => {
     try {
         const result = await pool.query(`

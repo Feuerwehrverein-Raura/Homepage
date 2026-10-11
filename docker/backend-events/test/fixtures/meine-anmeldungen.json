@@ -1,0 +1,77 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-700000000007",
+    "event_id": "00000000-0000-0000-0000-e00000000004",
+    "event_title": "Helferessen",
+    "event_slug": "helferessen",
+    "event_location": null,
+    "event_start_date": "2026-10-31 19:00:00",
+    "event_end_date": "2026-10-31 23:00:00",
+    "status": "rejected",
+    "status_text": "abgelehnt",
+    "status_farbe": "rot",
+    "event_datum_text": "Samstag, 31. Oktober 2026",
+    "shifts": []
+  },
+  {
+    "id": "00000000-0000-0000-0000-700000000005",
+    "event_id": "00000000-0000-0000-0000-e00000000002",
+    "event_title": "Vereinsausflug",
+    "event_slug": "ausflug-2026",
+    "event_location": null,
+    "event_start_date": "2026-10-24 09:00:00",
+    "event_end_date": "2026-10-24 18:00:00",
+    "status": "pending",
+    "status_text": "offen",
+    "status_farbe": "gelb",
+    "event_datum_text": "Samstag, 24. Oktober 2026",
+    "shifts": []
+  },
+  {
+    "id": "00000000-0000-0000-0000-700000000001",
+    "event_id": "00000000-0000-0000-0000-e00000000001",
+    "event_title": "Chilbi 2026",
+    "event_slug": "chilbi-2026",
+    "event_location": "Roter Schopf",
+    "event_start_date": "2026-10-17 10:00:00",
+    "event_end_date": "2026-10-18 20:00:00",
+    "status": "approved",
+    "status_text": "bestätigt",
+    "status_farbe": "gruen",
+    "event_datum_text": "Sa 17.10. – So 18.10.2026",
+    "shifts": [
+      {
+        "id": "00000000-0000-0000-0000-500000000001",
+        "name": "Aufbau",
+        "bereich": "Allgemein",
+        "date": "2026-10-16",
+        "start_time": "08:00:00",
+        "end_time": null,
+        "beschriftung": "Aufbau · Fr 16.10. · 08:00"
+      },
+      {
+        "id": "00000000-0000-0000-0000-500000000002",
+        "name": "Schicht 1",
+        "bereich": "Bar",
+        "date": "2026-10-17",
+        "start_time": "12:00:00",
+        "end_time": "14:00:00",
+        "beschriftung": "Bar – Schicht 1 · Sa 17.10. · 12:00–14:00"
+      }
+    ]
+  },
+  {
+    "id": "00000000-0000-0000-0000-700000000008",
+    "event_id": "00000000-0000-0000-0000-e00000000006",
+    "event_title": "Vergangener Anlass",
+    "event_slug": "vergangen",
+    "event_location": null,
+    "event_start_date": "2026-10-01 19:00:00",
+    "event_end_date": null,
+    "status": "approved",
+    "status_text": "bestätigt",
+    "status_farbe": "gruen",
+    "event_datum_text": "Donnerstag, 1. Oktober 2026",
+    "shifts": []
+  }
+]
