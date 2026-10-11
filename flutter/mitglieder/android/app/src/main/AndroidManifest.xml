@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Push-Nachrichten anzeigen (ab Android 13 fragt die App danach). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Adressbuch-Abgleich: FWV-Mitglieder als Konto "FWV Raura" im Adressbuch
+         (wie members-android). -->
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <!-- allowBackup="false" wie in members-android: die Anmeldedaten liegen
          verschluesselt mit einem Schluessel aus dem Android-Keystore; eine
          Sicherung liesse sich auf einem anderen Geraet nicht entschluesseln.
@@ -40,6 +48,35 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_benachrichtigung" />
+        <!-- Adressbuch-Abgleich, aus members-android uebernommen. Kontotyp
+             com.fwv.members, Authority com.android.contacts und die XML-Dateien
+             muessen gleich bleiben: fehlt nach dem Update der Authenticator fuer
+             den Kontotyp, entfernt Android das Konto "FWV Raura" samt Kontakten.
+             Kein android:process=":sync" (anders als frueher): der Abgleich
+             liest den Token, den die App im selben Prozess ablegt. -->
+        <service
+            android:name=".kontakte.FwvKontoAuthenticatorService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+        <service
+            android:name=".kontakte.KontakteSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.content.SyncAdapter" />
+            </intent-filter>
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/contacts_syncadapter" />
+            <meta-data
+                android:name="android.provider.CONTACTS_STRUCTURE"
+                android:resource="@xml/contacts" />
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

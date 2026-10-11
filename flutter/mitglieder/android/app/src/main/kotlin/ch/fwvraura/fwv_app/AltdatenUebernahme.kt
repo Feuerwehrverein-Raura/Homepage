@@ -23,6 +23,9 @@ import java.io.File
  *
  * Methoden:
  *  - "lesen":    Map der vorhandenen Werte; null, wenn es keine alte Datei gibt.
+ *                Die Ja/Nein-Werte des Adressbuch-Abgleichs (contacts_sync_enabled,
+ *                contacts_sync_asked) kommen als Text "true"/"false" — nur wenn
+ *                sie in der alten Datei gesetzt waren.
  *  - "loeschen": entfernt beide Dateien.
  */
 class AltdatenUebernahme(private val context: Context) : MethodChannel.MethodCallHandler {
@@ -62,6 +65,11 @@ class AltdatenUebernahme(private val context: Context) : MethodChannel.MethodCal
             val wert = auslesen(verschluesselt, schluessel) ?: auslesen(klartext, schluessel)
             if (!wert.isNullOrBlank()) werte[schluessel] = wert
         }
+        for (schluessel in JA_NEIN_SCHLUESSEL) {
+            val wert = jaNeinAuslesen(verschluesselt, schluessel)
+                ?: jaNeinAuslesen(klartext, schluessel)
+            if (wert != null) werte[schluessel] = wert.toString()
+        }
         return werte
     }
 
@@ -94,6 +102,12 @@ class AltdatenUebernahme(private val context: Context) : MethodChannel.MethodCal
         null
     }
 
+    private fun jaNeinAuslesen(prefs: SharedPreferences?, schluessel: String): Boolean? = try {
+        if (prefs != null && prefs.contains(schluessel)) prefs.getBoolean(schluessel, false) else null
+    } catch (e: Exception) {
+        null
+    }
+
     /** Ohne Datei nichts oeffnen: sonst legt EncryptedSharedPreferences sie an. */
     private fun gibtEs(name: String) =
         File(context.applicationInfo.dataDir, "shared_prefs/$name.xml").exists()
@@ -109,5 +123,13 @@ class AltdatenUebernahme(private val context: Context) : MethodChannel.MethodCal
             "auth_token", "refresh_token", "account_type", "qr_token",
             "event_id", "user_name", "user_email"
         )
+
+        /**
+         * Ja/Nein-Werte aus TokenManager.kt (Adressbuch-Abgleich). Ob der
+         * Abgleich laeuft, steht ohnehin im Konto "FWV Raura" selbst (Kanal
+         * "kontakte", Methode "status"); contacts_sync_asked braucht Dart,
+         * damit die Frage nach dem Abgleich nicht nochmals kommt.
+         */
+        private val JA_NEIN_SCHLUESSEL = listOf("contacts_sync_enabled", "contacts_sync_asked")
     }
 }

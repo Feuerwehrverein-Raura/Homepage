@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Name des Kontos "FWV Raura" in Einstellungen > Konten (authenticator.xml),
+         wie in members-android. -->
+    <string name="app_name">FWV Raura</string>
+</resources>
