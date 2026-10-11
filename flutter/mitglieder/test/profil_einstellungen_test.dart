@@ -140,6 +140,9 @@ class _Backend {
             : json({'success': false, 'message': 'Ungültige E-Mail-Adresse'}, 400);
       case 'GET /events/organized-by-me':
         return json(organisiert);
+      case 'GET /events':
+      case 'GET /registrations/mine':
+        return json([]);
     }
     return json({'error': 'nicht gefunden'}, 404);
   });
@@ -314,7 +317,7 @@ void main() {
       await starten(tester);
       await reiter(tester, 'Profil');
       await tippen(tester, find.text('Meine Anmeldungen'));
-      expect(find.text('Deine Anmeldungen folgen in Kürze.'), findsOneWidget);
+      expect(find.text('Du hast dich noch für keinen Anlass angemeldet.'), findsOneWidget);
     });
   });
 
@@ -533,7 +536,7 @@ void main() {
       await starten(tester);
       expect(backend.gab('GET', '/events/organized-by-me'), isTrue);
       expect(find.text('Organisator'), findsNothing);
-      expect(find.text('Die Anlässe folgen in Kürze.'), findsOneWidget);
+      expect(find.text('Zurzeit sind keine Anlässe geplant.'), findsOneWidget);
     });
   });
 }

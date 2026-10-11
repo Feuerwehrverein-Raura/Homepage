@@ -71,9 +71,8 @@ mit Nachbauten (kein echtes Konto, kein Firebase); `flutter build apk
 - Hauptseite mit Reitern unten: Anlässe · (Organisator) · Profil ·
   Einstellungen. "Organisator" erscheint bei Mitgliedern, wenn
   `events/organized-by-me` etwas liefert; externe Organisatoren starten
-  dort und haben kein Profil. Platzhalter für andere Arbeitsschritte:
-  `AnlaesseTab`, `MeineAnmeldungenScreen` (`lib/anlaesse/`),
-  `OrganisatorTab` (`lib/organisator/`).
+  dort und haben kein Profil. Platzhalter für Phase 2: `OrganisatorTab`,
+  `OrganisatorAnlassScreen` (`lib/organisator/`).
 - `fwv_core` (auch für die Vorstand-App): `MitgliederDienst` (Profil, Foto,
   Austritt, Zugänge, Funktions-Mail-Passwort, Benachrichtigungen,
   Push-Token, Newsletter, organisiert-Abfrage), Modelle `MitgliedProfil`,
@@ -104,6 +103,71 @@ mit Nachbauten (kein echtes Konto, kein Firebase); `flutter build apk
   danach wird das Token auf dem Gerät verworfen; auf Android wird der
   Kontakt-Abgleich ausgeschaltet. Damit ist der Fehler "Abmelden meldet das
   Push-Token nicht ab" behoben (Backend muss dafür ausgerollt sein).
+
+**Anlässe, Kalender, Anmelden, Arbeitsplan, Meine Anmeldungen, Vorschlagen
+— gebaut (11.10.2026).** Getestet mit Nachbauten gegen die Vertragsdateien;
+`flutter build apk --debug` und `flutter build ios --simulator --no-codesign
+--debug` laufen durch. Noch nicht auf einem Gerät ausprobiert.
+
+- Grundsatz eingehalten: Die App zeigt nur die `app`-Blöcke des Backends an
+  (`datum_text`, `zeit_text`, `anmeldung.moeglich/grund/art`,
+  `anmeldeschluss_text`, `plaetze_text`, `kann_bearbeiten`, pro Schicht
+  `bereich_text`, `belegung.text`, `waehlbar`; `status_text`/`status_farbe`/
+  `beschriftung`; `datum_text` im Kalender). Kein Filtern, Zählen oder
+  Datumsformatieren auf dem Gerät.
+- `fwv_core`: Modelle `Anlass` (mit `AnlassApp`, `AnlassAnmeldung`,
+  `Schicht`, `SchichtApp`, `Belegung`, `datum_offen`/`gruppe`),
+  `MeineAnmeldung`, `KalenderEintrag`, `EventOptionen`; `AnlaesseDienst`
+  (Liste, Detail, Kalender, Arbeitsplan + PDF, Anmelden, eigene Anmeldungen,
+  Optionen, Vorschlagen); `ApiClient.datei` (Bytes, z.B. PDF);
+  Kalender-Export `anlassAlsIcs`. Vertrags-Tests lesen
+  `anlaesse-app.json`, `meine-anmeldungen.json`, `kalender-app.json` aus dem
+  Repo.
+- Anlässe-Reiter: oben Liste / Kalender. Liste aus `GET events?aktuell=true`
+  (mit Token), Karten mit Titel, Datum/Zeit, Ort und Hinweis ("Helfer
+  gesucht", "Anmeldung offen" oder der Grund vom Backend); danach der
+  Abschnitt "Ideen – Datum noch offen" (`gruppe = datum_offen`, schlichte
+  Karten). Kalender: Monatsraster (Montag zuerst) mit Punkten, darunter die
+  Einträge des Monats bzw. des gewählten Tags; Anlässe öffnen das Detail.
+  Herunterziehen lädt neu, Fehler- und Leer-Zustände. "+" (nur Mitglieder):
+  Anlass vorschlagen (`POST events/propose`), Kategorien aus
+  `GET event-optionen`.
+- Detail: Titel, Untertitel, Datum, Zeit, Ort, Kosten, Organisation,
+  Anmeldeschluss, Plätze, Beschreibung, Schichten mit Belegung. Unten immer
+  sichtbar: "Helfen"/"Anmelden" nur bei `anmeldung.moeglich`, sonst der
+  Grund; "Arbeitsplan ansehen" bei Schichten. Oben: "Zum Kalender" (nicht bei
+  offenem Datum) und "Bearbeiten" bei `kann_bearbeiten` (führt vorerst auf
+  den Platzhalter `OrganisatorAnlassScreen`).
+- Arbeitsplan: Karten pro Zeitfenster aus `GET events/:id/arbeitsplan`
+  (nur Bereiche mit Schicht, "noch niemand", "N Plätze frei"); PDF über das
+  Teilen-Menü (`share_plus`) zum Öffnen, Sichern oder Weiterschicken.
+- Anmelden (`POST registrations/public`): Name, E-Mail, Telefon aus
+  `members/me` vorbelegt; Helfer wählen nur unter `waehlbar`-Schichten (mit
+  Belegung), Teilnehmer geben Personen (1–20) und Allergien an; Prüfung von
+  Name, E-Mail und Schichtwahl; Meldung des Servers bei Erfolg und bei
+  Absagen (409 usw.).
+- Meine Anmeldungen (aus dem Profil): Anlass, Datum, Status-Chip in der
+  Farbe des Backends, Schicht-Beschriftungen; Antippen öffnet den Anlass.
+
+Beobachtungen am Backend (offen):
+
+- `POST registrations/public` braucht `eventTitle` nicht (Titel kommt aus
+  der Datenbank); die App schickt ihn nicht mehr. `organizerEmail` wird noch
+  gelesen — als Ausweichadresse, wenn der Anlass keine `organizer_email`
+  hat. Ein Client kann so die Benachrichtigung an eine beliebige Adresse
+  umleiten (Punkt 8 unten). Die App schickt es nicht; das Backend sollte es
+  ignorieren.
+- Die Route ist öffentlich: das Mitglied wird nur über die E-Mail im Body
+  erkannt, nicht über das Token. Wer eine andere E-Mail eingibt, wird als
+  Gast behandelt (Bestätigungs-Mail). Besser: mit Token das Mitglied aus
+  dem Token nehmen.
+- `meal_selection` (Menüwahl bei GV) zeigt die App noch nicht; dafür
+  bräuchte es `meal_options` am Anlass im Vertrag.
+- Kalender-Export: Es gibt nur den ganzen Feed `GET calendar/ics`; die App
+  baut die .ics-Datei pro Anlass deshalb selbst aus `start_date`/`end_date`.
+  Kandidat fürs Backend: `GET events/:id/ics`.
+- `POST events/propose` antwortet nur mit der neuen Zeile, ohne Meldung —
+  der Dank-Text steht in der App.
 
 Unterschiede, die beim Bau aufgefallen sind:
 

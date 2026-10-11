@@ -4,6 +4,11 @@
 /// (siehe docs/flutter-entscheidung.md). Keine Oberflaeche.
 library;
 
+export 'src/anlass/anlaesse_dienst.dart';
+export 'src/anlass/anlass.dart';
+export 'src/anlass/kalender.dart';
+export 'src/anlass/kalender_export.dart';
+export 'src/anlass/meine_anmeldung.dart';
 export 'src/api/api_client.dart';
 export 'src/arbeitsplan.dart';
 export 'src/auth/altdaten_uebernahme.dart';

@@ -6,16 +6,27 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart' show Rect;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'anmeldung/authentik_anmeldung.dart';
 import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
 import 'push/push_dienst.dart';
+
+/// Datei teilen: Inhalt, Dateiname, MIME-Typ und (fuer iPad) die Stelle,
+/// an der das Teilen-Menue erscheint.
+typedef DateiTeilen = Future<void> Function(
+  Uint8List bytes,
+  String dateiname,
+  String mimeTyp, {
+  Rect? ursprung,
+});
 
 /// Auf welchem System die App laeuft (in Tests frei waehlbar).
 enum Plattform { android, ios, andere }
@@ -35,11 +46,15 @@ class Dienste {
     Future<Uint8List?> Function(FotoQuelle quelle)? fotoWaehlen,
     Future<String> Function()? appVersion,
     Future<bool> Function(Uri adresse)? linkOeffnen,
+    DateiTeilen? dateiTeilen,
+    DateTime Function()? jetzt,
     Plattform? plattform,
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
        fotoWaehlen = fotoWaehlen ?? _fotoMitImagePicker,
        appVersion = appVersion ?? _appVersionAusPaket,
        linkOeffnen = linkOeffnen ?? _linkExtern,
+       dateiTeilen = dateiTeilen ?? _teilenMitSharePlus,
+       jetzt = jetzt ?? DateTime.now,
        plattform = plattform ?? _aktuellePlattform() {
     pushAnmeldung = PushAnmeldung(push: push, speicher: this.speicher);
     organisator = OrganisatorPruefung(sitzung);
@@ -95,10 +110,23 @@ class Dienste {
   /// Oeffnet eine Adresse im Browser bzw. in der passenden App.
   final Future<bool> Function(Uri adresse) linkOeffnen;
 
+  /// Gibt eine Datei (PDF, .ics) ueber das Teilen-Menue des Systems weiter
+  /// — von dort laesst sie sich oeffnen, speichern oder verschicken.
+  final DateiTeilen dateiTeilen;
+
+  /// "Jetzt" (in Tests fest, z.B. fuer den Monat im Kalender).
+  final DateTime Function() jetzt;
+
   final Plattform plattform;
 
   /// Aufrufe rund ums eigene Mitglied.
   MitgliederDienst get mitglieder => MitgliederDienst(sitzung.api);
+
+  /// Anlaesse, Kalender, Arbeitsplan, Anmeldungen.
+  AnlaesseDienst get anlaesse => AnlaesseDienst(sitzung.api);
+
+  /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.
+  bool get alsMitglied => _alsMitgliedAngemeldet;
 
   bool _warAngemeldet = false;
 
@@ -195,6 +223,21 @@ Future<Uint8List?> _fotoMitImagePicker(FotoQuelle quelle) async {
 Future<String> _appVersionAusPaket() async {
   final info = await PackageInfo.fromPlatform();
   return info.buildNumber.isEmpty ? info.version : '${info.version} (${info.buildNumber})';
+}
+
+Future<void> _teilenMitSharePlus(
+  Uint8List bytes,
+  String dateiname,
+  String mimeTyp, {
+  Rect? ursprung,
+}) async {
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [XFile.fromData(bytes, mimeType: mimeTyp, name: dateiname)],
+      fileNameOverrides: [dateiname],
+      sharePositionOrigin: ursprung,
+    ),
+  );
 }
 
 Future<bool> _linkExtern(Uri adresse) => launchUrl(adresse, mode: LaunchMode.externalApplication);

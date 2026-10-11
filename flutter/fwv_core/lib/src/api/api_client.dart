@@ -9,6 +9,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -96,22 +97,38 @@ class ApiClient {
     required List<int> bytes,
     required String dateiname,
     String inhaltstyp = 'application/octet-stream',
-  }) => _mitErneuern(
-    (token) => _schicken(() {
-      final anfrage = http.MultipartRequest('POST', adresse(pfad))
-        ..headers['Accept'] = 'application/json'
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            feld,
-            bytes,
-            filename: dateiname,
-            contentType: _medientyp(inhaltstyp),
-          ),
-        );
-      if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
-      return anfrage;
-    }),
+  }) async => _auswerten(
+    await _mitErneuern(
+      (token) => _schicken(() {
+        final anfrage = http.MultipartRequest('POST', adresse(pfad))
+          ..headers['Accept'] = 'application/json'
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              feld,
+              bytes,
+              filename: dateiname,
+              contentType: _medientyp(inhaltstyp),
+            ),
+          );
+        if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
+        return anfrage;
+      }),
+    ),
   );
+
+  /// Laedt eine Datei (z.B. ein PDF) als Bytes. Fehler wie bei den
+  /// JSON-Aufrufen ([ApiFehler] mit der Meldung des Backends).
+  Future<Uint8List> datei(String pfad, {Map<String, String>? abfrage}) async {
+    final antwort = await _mitErneuern(
+      (token) => _schicken(() {
+        final anfrage = http.Request('GET', adresse(pfad, abfrage));
+        if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
+        return anfrage;
+      }),
+    );
+    if (antwort.statusCode >= 200 && antwort.statusCode < 300) return antwort.bodyBytes;
+    throw _fehler(antwort, _json(antwort));
+  }
 
   /// Kopfzeilen fuer Abrufe ausserhalb des [ApiClient] (z.B. Bilder ueber
   /// `Image.network`): das aktuelle Token, aber nur fuer Adressen dieses
@@ -133,22 +150,24 @@ class ApiClient {
     String pfad, {
     Map<String, String>? abfrage,
     Object? daten,
-  }) => _mitErneuern(
-    (token) => _schicken(() {
-      final anfrage = http.Request(methode, adresse(pfad, abfrage))
-        ..headers['Accept'] = 'application/json';
-      if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
-      if (daten != null) {
-        anfrage.headers['Content-Type'] = 'application/json; charset=utf-8';
-        anfrage.body = jsonEncode(daten);
-      }
-      return anfrage;
-    }),
+  }) async => _auswerten(
+    await _mitErneuern(
+      (token) => _schicken(() {
+        final anfrage = http.Request(methode, adresse(pfad, abfrage))
+          ..headers['Accept'] = 'application/json';
+        if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
+        if (daten != null) {
+          anfrage.headers['Content-Type'] = 'application/json; charset=utf-8';
+          anfrage.body = jsonEncode(daten);
+        }
+        return anfrage;
+      }),
+    ),
   );
 
   /// Schickt einen Aufruf mit dem aktuellen Token; bei 401/403 einmal
   /// erneuern und mit dem neuen Token wiederholen.
-  Future<dynamic> _mitErneuern(Future<http.Response> Function(String? token) einmal) async {
+  Future<http.Response> _mitErneuern(Future<http.Response> Function(String? token) einmal) async {
     final quelle = tokenQuelle;
     final token = quelle?.accessToken;
     var antwort = await einmal(token);
@@ -165,7 +184,7 @@ class ApiClient {
           throw const ApiFehler.keineVerbindung();
       }
     }
-    return _auswerten(antwort);
+    return antwort;
   }
 
   Future<http.Response> _schicken(http.BaseRequest Function() bauen) async {
@@ -180,23 +199,28 @@ class ApiClient {
   }
 
   dynamic _auswerten(http.Response antwort) {
-    final text = utf8.decode(antwort.bodyBytes, allowMalformed: true);
-    Object? json;
-    if (text.isNotEmpty) {
-      try {
-        json = jsonDecode(text);
-      } on FormatException {
-        json = null;
-      }
-    }
+    final json = _json(antwort);
     if (antwort.statusCode >= 200 && antwort.statusCode < 300) return json;
+    throw _fehler(antwort, json);
+  }
 
+  Object? _json(http.Response antwort) {
+    final text = utf8.decode(antwort.bodyBytes, allowMalformed: true);
+    if (text.isEmpty) return null;
+    try {
+      return jsonDecode(text);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  ApiFehler _fehler(http.Response antwort, Object? json) {
     String? meldung;
     if (json is Map) {
       final e = json['error'] ?? json['message'];
       if (e is String && e.isNotEmpty) meldung = e;
     }
-    throw ApiFehler(
+    return ApiFehler(
       meldung ?? 'Der Server meldet einen Fehler (${antwort.statusCode}).',
       status: antwort.statusCode,
     );
