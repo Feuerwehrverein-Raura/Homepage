@@ -7,8 +7,10 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart' show Rect;
+import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:fwv_core/fwv_core.dart';
+import 'package:fwv_lager/fwv_lager.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -51,7 +53,13 @@ class Dienste {
     DateTime Function()? jetzt,
     Plattform? plattform,
     Future<Uint8List> Function(Uint8List roh)? anhangVerkleinern,
+    Future<Uint8List?> Function({required bool kamera})? dokumentFotoWaehlen,
+    Future<String?> Function(BuildContext context)? barcodeScannen,
+    Uri? inventarBasis,
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
+       dokumentFotoWaehlen = dokumentFotoWaehlen ?? _dokumentFotoMitImagePicker,
+       barcodeScannen = barcodeScannen ?? _barcodeMitKamera,
+       inventarBasis = inventarBasis ?? inventarApiBasis,
        anhangVerkleinern = anhangVerkleinern ?? anhangBildVerkleinern,
        fotoWaehlen = fotoWaehlen ?? _fotoMitImagePicker,
        appVersion = appVersion ?? _appVersionAusPaket,
@@ -127,6 +135,27 @@ class Dienste {
   /// ersetzt — das echte laeuft in einem eigenen Isolate).
   final Future<Uint8List> Function(Uint8List roh) anhangVerkleinern;
 
+  /// Foto fuer Notizen und Belege (Rueckkamera bzw. Galerie); null bei
+  /// Abbruch.
+  final Future<Uint8List?> Function({required bool kamera}) dokumentFotoWaehlen;
+
+  /// Barcode lesen (Kamera-Screen aus fwv_lager; in Tests ersetzt).
+  final Future<String?> Function(BuildContext context) barcodeScannen;
+
+  /// Inventar-API (`https://inventar.fwv-raura.ch/api/`).
+  final Uri inventarBasis;
+
+  /// Darf diese Sitzung ins Lager? Authentik-Gruppe Lager, Vorstand oder
+  /// admin; QR-Login und externe Organisatoren nie.
+  bool get lagerSichtbar => hatLagerZugang(sitzung.sitzung);
+
+  /// Lager (Paket fwv_lager, gemeinsam mit der spaeteren Vorstand-App):
+  /// Inventar-API mit demselben Authentik-Token und demselben Erneuern.
+  Lager get lager => Lager(
+    zugang: ApiLagerZugang(sitzung.apiFuer(inventarBasis)),
+    umgebung: LagerUmgebung(scannen: barcodeScannen),
+  );
+
   /// Aufrufe rund ums eigene Mitglied.
   MitgliederDienst get mitglieder => MitgliederDienst(sitzung.api);
 
@@ -143,8 +172,8 @@ class Dienste {
     ),
     umgebung: VerwaltungsUmgebung(
       dateiTeilen: dateiTeilen,
-      fotoWaehlen: ({required bool kamera}) =>
-          fotoWaehlen(kamera ? FotoQuelle.kamera : FotoQuelle.galerie),
+      // Notizen und Belege: Rueckkamera (das Profilfoto nimmt die vordere).
+      fotoWaehlen: dokumentFotoWaehlen,
       linkOeffnen: linkOeffnen,
       anhangVerkleinern: anhangVerkleinern,
     ),
@@ -278,6 +307,21 @@ Future<Uint8List?> _fotoMitImagePicker(FotoQuelle quelle) async {
   );
   return datei?.readAsBytes();
 }
+
+/// Fuer Kassenzettel und Plaene die Rueckkamera; verkleinert wird danach
+/// auf 1600 px ([anhangBildVerkleinern]).
+Future<Uint8List?> _dokumentFotoMitImagePicker({required bool kamera}) async {
+  final datei = await ImagePicker().pickImage(
+    source: kamera ? ImageSource.camera : ImageSource.gallery,
+    maxWidth: 2400,
+    maxHeight: 2400,
+    imageQuality: 95,
+    preferredCameraDevice: CameraDevice.rear,
+  );
+  return datei?.readAsBytes();
+}
+
+Future<String?> _barcodeMitKamera(BuildContext context) => barcodeScannen(context);
 
 Future<String> _appVersionAusPaket() async {
   final info = await PackageInfo.fromPlatform();

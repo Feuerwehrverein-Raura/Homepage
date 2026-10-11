@@ -156,9 +156,28 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
           zuKaufen: 6,
         ),
         EinkaufsPosten(materialId: 8, name: 'Becher', bedarf: 50, vonHand: 50, zuKaufen: 0),
+        EinkaufsPosten(
+          materialId: 10,
+          name: 'Bier',
+          einheit: 'Harass',
+          bedarf: 10,
+          lager: 4,
+          zuKaufen: 6,
+          gekauft: true,
+          istMenge: 6,
+        ),
+        EinkaufsPosten(
+          materialId: 11,
+          name: 'Kaffee',
+          bedarf: 2,
+          zuKaufen: 2,
+          gekauft: true,
+          eingebucht: true,
+        ),
       ],
-      zuKaufen: 1,
+      zuKaufen: 3,
       geschaetzteKosten: 18.5,
+      gekauft: 2,
     ),
   );
   @override
@@ -184,6 +203,44 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
   @override
   Future<void> materialEntfernen(String a, int m) => _merken('materialEntfernen', [a, m], null);
   @override
+  Future<void> gekauftSetzen(String a, int m, bool g, {double? istMenge}) =>
+      _merken('gekauftSetzen', [a, m, g, istMenge], null);
+  final belegListe = <Beleg>[
+    Beleg(
+      id: 7,
+      betrag: 42.5,
+      hochgeladenVon: 'erika@example.ch',
+      erstellt: DateTime(2026, 10, 10),
+    ),
+  ];
+  @override
+  Future<List<Beleg>> belege(String a) => _merken('belege', [a], List.of(belegListe));
+  @override
+  Future<void> belegHochladen(String a, Uint8List jpeg) {
+    belegListe.add(Beleg(id: 8, erstellt: DateTime(2026, 10, 11)));
+    return _merken('belegHochladen', [a, jpeg], null);
+  }
+
+  @override
+  Future<Uint8List> belegBild(String a, int b) => _merken('belegBild', [a, b], _png);
+  @override
+  Future<void> belegLoeschen(String a, int b) {
+    belegListe.removeWhere((x) => x.id == b);
+    return _merken('belegLoeschen', [a, b], null);
+  }
+
+  @override
+  Future<Zurueckbuchung> insLagerZurueckbuchen(String a) => _merken(
+    'zurueckbuchen',
+    [a],
+    Zurueckbuchung.ausJson({
+      'restocked': 1,
+      'items': [
+        {'item_id': 10, 'name': 'Bier', 'quantity': 6},
+      ],
+    }),
+  );
+  @override
   Future<Uint8List> teilnehmerlistePdf(String a) =>
       _merken('teilnehmerlistePdf', [a], Uint8List.fromList([37, 80, 68, 70]));
   @override
@@ -191,6 +248,13 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
   @override
   Future<Uint8List> arbeitsplanPdf(String a) => _merken('arbeitsplanPdf', [a], Uint8List(0));
 }
+
+// Kleinstes gueltiges PNG (1x1), fuer die Beleg-Ansicht.
+final _png = Uint8List.fromList(
+  base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  ),
+);
 
 const _chilbi = '00000000-0000-0000-0000-e00000000001';
 const _essen = '00000000-0000-0000-0000-e00000000004';
@@ -257,6 +321,28 @@ void main() {
       await tester.ensureVisible(f);
       await tester.pumpAndSettle();
     }
+    await tester.tap(f);
+    await tester.pumpAndSettle();
+  }
+
+  /// Im Reiter Material zu [f] scrollen (runter, sonst hoch) und antippen.
+  /// Meldungen unten werden vorher weggeraeumt, damit sie nichts verdecken.
+  Future<void> imMaterial(WidgetTester tester, Finder f, {bool tippen = true}) async {
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).clearSnackBars();
+    await tester.pumpAndSettle();
+    final liste = find.byKey(const Key('material-liste'));
+    if (f.hitTestable().evaluate().isEmpty) {
+      try {
+        await tester.dragUntilVisible(f, liste, const Offset(0, -150), maxIteration: 30);
+      } on Object {
+        await tester.dragUntilVisible(f, liste, const Offset(0, 150), maxIteration: 60);
+      }
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(f);
+      await tester.pumpAndSettle();
+    }
+    expect(f, findsOneWidget);
+    if (!tippen) return;
     await tester.tap(f);
     await tester.pumpAndSettle();
   }
@@ -418,11 +504,100 @@ void main() {
     expect(find.text('Risotto'), findsOneWidget);
     expect(find.text('40 Portionen · aus Lager möglich: 12'), findsOneWidget);
     expect(find.text('6 kg'), findsOneWidget);
-    expect(find.text('Geschätzte Kosten: CHF 18.50'), findsOneWidget);
     await tippen(tester, find.text('Rezept verknüpfen'));
     await tippen(tester, find.text('Älplermagronen'));
     await tippen(tester, find.text('Übernehmen'));
     expect(zugang.letzter('rezeptVerknuepfen'), [_chilbi, 12, 20]);
+    await imMaterial(tester, find.text('Geschätzte Kosten: CHF 18.50'), tippen: false);
+  });
+
+  testWidgets('Einkauf: abhaken mit Menge, Beleg fotografieren, ins Lager zurueckbuchen', (
+    tester,
+  ) async {
+    await anlass(tester, _chilbi);
+    await tippen(tester, find.widgetWithText(Tab, 'Material'));
+    expect(zugang.gab('belege'), isTrue, reason: 'Vertrag: aktionen.einkauf = true');
+
+    // Reis abhaken: Vorschlag ist die fehlende Menge (6 kg), geaendert auf 5.
+    final reis = find.descendant(
+      of: find.byKey(const Key('posten-7')),
+      matching: find.byType(Checkbox),
+    );
+    await imMaterial(tester, reis);
+    expect(find.text('Gekauft: Reis'), findsOneWidget);
+    expect(find.widgetWithText(TextField, '6'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('material-menge')), '5,5');
+    await tester.pump();
+    await tippen(tester, find.widgetWithText(FilledButton, 'Abhaken'));
+    expect(zugang.letzter('gekauftSetzen'), [_chilbi, 7, true, 5.5]);
+
+    // Bier wieder entfernen: ohne Rueckfrage. Kaffee ist schon im Lager.
+    await imMaterial(
+      tester,
+      find.descendant(of: find.byKey(const Key('posten-10')), matching: find.byType(Checkbox)),
+    );
+    expect(zugang.letzter('gekauftSetzen'), [_chilbi, 10, false, null]);
+    expect(
+      tester
+          .widget<Checkbox>(
+            find.descendant(
+              of: find.byKey(const Key('posten-11')),
+              matching: find.byType(Checkbox),
+            ),
+          )
+          .onChanged,
+      isNull,
+    );
+    await imMaterial(tester, find.text('im Lager'), tippen: false);
+
+    // Beleg fotografieren: verkleinert (Umgebung) und hochgeladen.
+    await imMaterial(tester, find.byKey(const Key('beleg-kamera')));
+    final hoch = zugang.letzter('belegHochladen') as List;
+    expect(hoch[0], _chilbi);
+    expect(hoch[1], [1, 2, 3]);
+    expect(find.byKey(const Key('beleg-8')), findsOneWidget);
+
+    // Beleg ansehen und teilen.
+    await imMaterial(tester, find.text('10.10.2026 · CHF 42.50'));
+    expect(zugang.letzter('belegBild'), [_chilbi, 7]);
+    expect(find.byType(Image), findsOneWidget);
+    await tester.tap(find.byTooltip('Teilen'));
+    await tester.pumpAndSettle();
+    expect(geteilt.last, ('beleg-7.jpg', 'image/jpeg'));
+    await tester.tap(find.byTooltip('Zurück').last);
+    await tester.pumpAndSettle();
+
+    // Beleg loeschen (mit Rueckfrage).
+    await imMaterial(
+      tester,
+      find.descendant(
+        of: find.byKey(const Key('beleg-7')),
+        matching: find.byTooltip('Beleg löschen'),
+      ),
+    );
+    await tippen(tester, find.widgetWithText(FilledButton, 'Löschen'));
+    expect(zugang.letzter('belegLoeschen'), [_chilbi, 7]);
+
+    // Zurueckbuchen: Bier ist abgehakt und noch nicht im Lager -> (1).
+    await imMaterial(tester, find.byKey(const Key('zurueckbuchen')));
+    expect(find.text('Ins Lager zurückbuchen?'), findsOneWidget);
+    await tippen(tester, find.widgetWithText(FilledButton, 'Zurückbuchen'));
+    expect(zugang.gab('zurueckbuchen'), isTrue);
+    expect(find.text('Ins Lager gebucht: Bier +6'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Material ohne Einkaufsrecht: keine Haken, keine Belege', (tester) async {
+    final json = _vertrag();
+    for (final a in json['anlaesse'] as List) {
+      ((a as Map)['organisator']['aktionen'] as Map)['einkauf'] = false;
+    }
+    zugang.json = json;
+    await anlass(tester, _chilbi);
+    await tippen(tester, find.widgetWithText(Tab, 'Material'));
+    expect(find.byType(Checkbox), findsNothing);
+    expect(find.text('Belege'), findsNothing);
+    expect(zugang.gab('belege'), isFalse);
   });
 
   testWidgets('Externer Organisator: nur bestaetigen/ablehnen, keine Reiter', (tester) async {

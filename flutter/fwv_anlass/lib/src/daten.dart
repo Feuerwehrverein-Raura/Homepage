@@ -250,7 +250,12 @@ class AuswahlMaterial {
 /// Einkaufsliste: gerechnet von der Inventar-API (Rezepte + Material von
 /// Hand gegen den Lagerbestand). Die App zeigt nur an.
 class Einkaufsliste {
-  const Einkaufsliste({this.posten = const [], this.zuKaufen, this.geschaetzteKosten});
+  const Einkaufsliste({
+    this.posten = const [],
+    this.zuKaufen,
+    this.geschaetzteKosten,
+    this.gekauft,
+  });
 
   factory Einkaufsliste.ausJson(Object? json) {
     final m = json is Map ? json : const {};
@@ -258,12 +263,19 @@ class Einkaufsliste {
       posten: jsonListe(m['items'], EinkaufsPosten.ausJson),
       zuKaufen: jsonZahl(m['total_to_buy']),
       geschaetzteKosten: _lockereZahl(m['estimated_total_cost']),
+      gekauft: jsonZahl(m['total_purchased']),
     );
   }
 
   final List<EinkaufsPosten> posten;
   final int? zuKaufen;
   final double? geschaetzteKosten;
+
+  /// Abgehakte Positionen (`total_purchased`).
+  final int? gekauft;
+
+  /// Abgehakt, aber noch nicht ins Lager zurueckgebucht.
+  int get zumZurueckbuchen => posten.where((p) => p.gekauft && !p.eingebucht).length;
 
   /// Material von Hand: Posten mit manuellem Bedarf.
   List<EinkaufsPosten> get vonHand => [
@@ -282,6 +294,10 @@ class EinkaufsPosten {
     this.lager,
     this.zuKaufen,
     this.lieferant,
+    this.gekauft = false,
+    this.gekauftVon,
+    this.istMenge,
+    this.eingebucht = false,
   });
 
   factory EinkaufsPosten.ausJson(Map<String, dynamic> m) => EinkaufsPosten(
@@ -293,6 +309,10 @@ class EinkaufsPosten {
     lager: _lockereZahl(m['in_stock']),
     zuKaufen: _lockereZahl(m['to_buy']),
     lieferant: jsonText(m['supplier']),
+    gekauft: jsonWahr(m['purchased']) ?? false,
+    gekauftVon: jsonText(m['purchased_by']),
+    istMenge: _lockereZahl(m['actual_quantity']),
+    eingebucht: jsonWahr(m['restocked']) ?? false,
   );
 
   final int? materialId;
@@ -303,4 +323,74 @@ class EinkaufsPosten {
   final double? lager;
   final double? zuKaufen;
   final String? lieferant;
+
+  /// Abgehakt beim Einkauf (`purchased`), von wem (`purchased_by`).
+  final bool gekauft;
+  final String? gekauftVon;
+
+  /// Tatsaechlich gekaufte Menge (`actual_quantity`); ohne sie bucht das
+  /// Inventar "Bedarf minus Bestand" zurueck.
+  final double? istMenge;
+
+  /// Schon ins Lager zurueckgebucht (`restocked`).
+  final bool eingebucht;
+}
+
+/// Ein Beleg (Kassenzettel-Foto) zum Einkauf eines Anlasses
+/// (`GET events/:id/receipts`).
+class Beleg {
+  const Beleg({
+    required this.id,
+    this.betrag,
+    this.bezahltVon,
+    this.notiz,
+    this.hochgeladenVon,
+    this.erstellt,
+  });
+
+  factory Beleg.ausJson(Map<String, dynamic> m) => Beleg(
+    id: jsonZahl(m['id']) ?? 0,
+    betrag: _lockereZahl(m['amount']),
+    bezahltVon: jsonText(m['paid_by']),
+    notiz: jsonText(m['note']),
+    hochgeladenVon: jsonText(m['uploaded_by']),
+    erstellt: jsonZeitpunkt(m['created_at']),
+  );
+
+  final int id;
+  final double? betrag;
+  final String? bezahltVon;
+  final String? notiz;
+  final String? hochgeladenVon;
+  final DateTime? erstellt;
+
+  /// "10.10.2026" bzw. leer.
+  String? get datumText => erstellt == null ? null : schweizerDatum(erstellt!);
+}
+
+/// Ergebnis von "ins Lager zurueckbuchen"
+/// (`POST events/:id/shopping-list/restock`).
+class Zurueckbuchung {
+  const Zurueckbuchung({this.anzahl = 0, this.posten = const []});
+
+  factory Zurueckbuchung.ausJson(Object? json) {
+    final m = json is Map ? json : const {};
+    return Zurueckbuchung(
+      anzahl: jsonZahl(m['restocked']) ?? 0,
+      posten: [
+        if (m['items'] is List)
+          for (final e in m['items'] as List)
+            if (e is Map)
+              (name: jsonText(e['name']) ?? 'Posten', menge: _lockereZahl(e['quantity']) ?? 0),
+      ],
+    );
+  }
+
+  final int anzahl;
+  final List<({String name, double menge})> posten;
+
+  /// "Reis +6, Becher +50" bzw. "Nichts zurückzubuchen."
+  String get text => posten.isEmpty
+      ? 'Nichts zurückzubuchen — erst Gekauftes abhaken.'
+      : 'Ins Lager gebucht: ${posten.map((p) => '${p.name} +${mengeText(p.menge)}').join(', ')}';
 }

@@ -1,11 +1,13 @@
 // Hauptseite nach der Anmeldung: Reiter unten.
 //
-// Mitglieder:          Anlässe · (Organisator) · Profil · Einstellungen
+// Mitglieder:          Anlässe · (Organisator) · (Lager) · Profil · Einstellungen
 // Externe Organisatoren: Organisator · Anlässe · Einstellungen
 //
 // "Organisator" erscheint bei Mitgliedern nur, wenn sie Anlaesse
-// organisieren ([OrganisatorPruefung]). Die Reiter werden erst beim ersten
-// Oeffnen gebaut und bleiben danach erhalten (Scroll-Stand, geladene Daten).
+// organisieren ([OrganisatorPruefung]); "Lager" nur mit der Authentik-Gruppe
+// Lager, Vorstand oder admin ([Dienste.lagerSichtbar]). Die Reiter werden
+// erst beim ersten Oeffnen gebaut und bleiben danach erhalten (Scroll-Stand,
+// geladene Daten).
 
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
@@ -14,10 +16,11 @@ import 'anlaesse/anlaesse_tab.dart';
 import 'dienste.dart';
 import 'einstellungen/adressbuch.dart';
 import 'einstellungen/einstellungen_tab.dart';
+import 'lager/lager_tab.dart';
 import 'organisator/organisator_tab.dart';
 import 'profil/profil_tab.dart';
 
-enum Reiter { anlaesse, organisator, profil, einstellungen }
+enum Reiter { anlaesse, organisator, lager, profil, einstellungen }
 
 class Hauptseite extends StatefulWidget {
   const Hauptseite({super.key, required this.dienste});
@@ -45,13 +48,20 @@ class _HauptseiteState extends State<Hauptseite> {
     });
   }
 
-  List<Reiter> _reiter(bool organisiert) => _externerOrganisator
+  List<Reiter> _reiter(bool organisiert, bool lager) => _externerOrganisator
       ? const [Reiter.organisator, Reiter.anlaesse, Reiter.einstellungen]
-      : [Reiter.anlaesse, if (organisiert) Reiter.organisator, Reiter.profil, Reiter.einstellungen];
+      : [
+          Reiter.anlaesse,
+          if (organisiert) Reiter.organisator,
+          if (lager) Reiter.lager,
+          Reiter.profil,
+          Reiter.einstellungen,
+        ];
 
   Widget _inhalt(Reiter r) => switch (r) {
     Reiter.anlaesse => AnlaesseTab(dienste: widget.dienste),
     Reiter.organisator => OrganisatorTab(dienste: widget.dienste),
+    Reiter.lager => LagerTab(dienste: widget.dienste),
     Reiter.profil => ProfilTab(dienste: widget.dienste),
     Reiter.einstellungen => EinstellungenTab(dienste: widget.dienste),
   };
@@ -66,6 +76,11 @@ class _HauptseiteState extends State<Hauptseite> {
       icon: Icon(Icons.assignment_outlined),
       selectedIcon: Icon(Icons.assignment),
       label: 'Organisator',
+    ),
+    Reiter.lager => const NavigationDestination(
+      icon: Icon(Icons.inventory_2_outlined),
+      selectedIcon: Icon(Icons.inventory_2),
+      label: 'Lager',
     ),
     Reiter.profil => const NavigationDestination(
       icon: Icon(Icons.person_outline),
@@ -82,9 +97,13 @@ class _HauptseiteState extends State<Hauptseite> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: widget.dienste.organisator,
+      // Sitzung: die Gruppen (Lager) stehen im Token.
+      listenable: Listenable.merge([widget.dienste.organisator, widget.dienste.sitzung]),
       builder: (context, _) {
-        final reiter = _reiter(widget.dienste.organisator.organisiert);
+        final reiter = _reiter(
+          widget.dienste.organisator.organisiert,
+          widget.dienste.lagerSichtbar,
+        );
         // Verschwindet der aktive Reiter (z.B. keine Anlaesse mehr), zurueck
         // zum ersten.
         if (!reiter.contains(_aktiv)) _aktiv = reiter.first;

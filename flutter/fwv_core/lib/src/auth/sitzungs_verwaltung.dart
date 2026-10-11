@@ -16,6 +16,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../api/api_client.dart';
+import 'jwt.dart';
 import 'konfiguration.dart';
 import 'sitzung.dart';
 
@@ -48,6 +49,12 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
 
   /// Angemeldeter Zugriff aufs Backend; erneuert abgelaufene Tokens selbst.
   late final ApiClient api = ApiClient(http: _http, tokenQuelle: this, basis: _basis);
+
+  /// Angemeldeter Zugriff auf ein anderes Backend mit demselben Token und
+  /// demselben Erneuern — z.B. die Inventar-API
+  /// (`https://inventar.fwv-raura.ch/api/`), die Authentik-Tokens der App
+  /// annimmt. [basis] muss mit `/` enden.
+  ApiClient apiFuer(Uri basis) => ApiClient(http: _http, tokenQuelle: this, basis: basis);
 
   /// Zugriff ohne Anmeldung, fuer die Login-Routen selbst.
   late final ApiClient _offen = ApiClient(http: _http, basis: _basis);
@@ -310,19 +317,6 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
       user is Map ? _text(user['name']) : null,
       user is Map ? _text(user['email']) : null,
     );
-  }
-}
-
-/// Liest die Angaben (Claims) eines JWT, ohne die Signatur zu pruefen — nur
-/// fuer die Anzeige. Gibt eine leere Map zurueck, wenn es kein JWT ist.
-Map<String, dynamic> jwtAngaben(String? token) {
-  final teile = token?.split('.');
-  if (teile == null || teile.length != 3) return const {};
-  try {
-    final json = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(teile[1]))));
-    return json is Map<String, dynamic> ? json : const {};
-  } on FormatException {
-    return const {};
   }
 }
 

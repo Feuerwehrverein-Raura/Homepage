@@ -413,6 +413,86 @@ void main() {
     expect(body(anfragen[anfragen.length - 2]), {'item_id': 8, 'quantity': 2.5});
   });
 
+  test('Einkauf: abhaken, Belege, zurueckbuchen (Proxy-Routen)', () async {
+    final d = dienst();
+    antwort = (_) => {
+      'items': [
+        {
+          'item_id': 7,
+          'item_name': 'Reis',
+          'purchased': true,
+          'purchased_by': 'erika@example.ch',
+          'actual_quantity': '5.5',
+          'restocked': false,
+        },
+        {'item_id': 8, 'item_name': 'Kaffee', 'purchased': true, 'restocked': true},
+        {'item_id': 9, 'item_name': 'Becher', 'purchased': false},
+      ],
+      'total_purchased': 2,
+    };
+    final l = await d.einkaufsliste('e1');
+    expect(l.gekauft, 2);
+    expect(l.posten.first.gekauft, isTrue);
+    expect(l.posten.first.gekauftVon, 'erika@example.ch');
+    expect(l.posten.first.istMenge, 5.5);
+    expect(l.zumZurueckbuchen, 1, reason: 'Kaffee ist schon im Lager');
+
+    antwort = (_) => {'success': true};
+    await d.gekauftSetzen('e1', 7, true, istMenge: 5.5);
+    expect(route(anfragen.last), 'PATCH /events/e1/shopping-list/7');
+    expect(body(anfragen.last), {'purchased': true, 'actual_quantity': 5.5});
+    await d.gekauftSetzen('e1', 7, false);
+    expect(body(anfragen.last), {'purchased': false});
+
+    antwort = (_) => [
+      {
+        'id': 7,
+        'image_url': '/api/uploads/item-abc.jpg',
+        'amount': '42.50',
+        'paid_by': 'erika@example.ch',
+        'note': null,
+        'uploaded_by': 'erika@example.ch',
+        'created_at': '2026-10-10T08:00:00.000Z',
+      },
+    ];
+    final b = (await d.belege('e1')).single;
+    expect(route(anfragen.last), 'GET /events/e1/receipts');
+    expect(
+      (b.id, b.betrag, b.bezahltVon, b.datumText),
+      (7, 42.5, 'erika@example.ch', '10.10.2026'),
+    );
+
+    antwort = (_) => {'id': 9};
+    await d.belegHochladen('e1', Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]));
+    final hoch = anfragen.last;
+    expect(route(hoch), 'POST /events/e1/receipts');
+    expect(hoch.headers['content-type'], startsWith('multipart/form-data'));
+    final roh = latin1.decode(hoch.bodyBytes);
+    expect(roh, contains('name="image"; filename="beleg.jpg"'));
+    expect(roh, contains('image/jpeg'));
+
+    antwort = (_) => Uint8List.fromList([1, 2, 3]);
+    expect(await d.belegBild('e1', 7), [1, 2, 3]);
+    expect(route(anfragen.last), 'GET /events/e1/receipts/7/image');
+
+    antwort = (_) => {'success': true};
+    await d.belegLoeschen('e1', 7);
+    expect(route(anfragen.last), 'DELETE /events/e1/receipts/7');
+
+    antwort = (_) => {
+      'restocked': 2,
+      'items': [
+        {'item_id': 7, 'name': 'Reis', 'quantity': 6},
+        {'item_id': 10, 'name': 'Servietten', 'quantity': '3'},
+      ],
+    };
+    final z = await d.insLagerZurueckbuchen('e1');
+    expect(route(anfragen.last), 'POST /events/e1/shopping-list/restock');
+    expect(z.anzahl, 2);
+    expect(z.text, 'Ins Lager gebucht: Reis +6, Servietten +3');
+    expect(Zurueckbuchung.ausJson({'restocked': 0, 'items': []}).text, startsWith('Nichts'));
+  });
+
   test('PDFs und Arbeitsplan senden', () async {
     final d = dienst(extern: true);
     antwort = (_) => Uint8List.fromList([37, 80, 68, 70]);

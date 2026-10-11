@@ -239,6 +239,41 @@ class OrganisatorZugang extends AnlassVerwaltungZugang {
       api.delete('events/${_e(anlassId)}/manual-items/$materialId');
 
   // -------------------------------------------------------------------
+  // Einkauf (Inventar, ueber das Events-Backend)
+
+  @override
+  Future<void> gekauftSetzen(String anlassId, int materialId, bool gekauft, {double? istMenge}) =>
+      api.patch(
+        'events/${_e(anlassId)}/shopping-list/$materialId',
+        daten: {'purchased': gekauft, 'actual_quantity': ?istMenge},
+      );
+
+  @override
+  Future<List<Beleg>> belege(String anlassId) async =>
+      jsonListe(await api.get('events/${_e(anlassId)}/receipts'), Beleg.ausJson);
+
+  @override
+  Future<void> belegHochladen(String anlassId, Uint8List jpeg) => api.hochladen(
+    'events/${_e(anlassId)}/receipts',
+    feld: 'image',
+    bytes: jpeg,
+    dateiname: 'beleg.jpg',
+    inhaltstyp: 'image/jpeg',
+  );
+
+  @override
+  Future<Uint8List> belegBild(String anlassId, int belegId) =>
+      api.datei('events/${_e(anlassId)}/receipts/$belegId/image');
+
+  @override
+  Future<void> belegLoeschen(String anlassId, int belegId) =>
+      api.delete('events/${_e(anlassId)}/receipts/$belegId');
+
+  @override
+  Future<Zurueckbuchung> insLagerZurueckbuchen(String anlassId) async =>
+      Zurueckbuchung.ausJson(await api.post('events/${_e(anlassId)}/shopping-list/restock'));
+
+  // -------------------------------------------------------------------
   // PDFs
 
   @override

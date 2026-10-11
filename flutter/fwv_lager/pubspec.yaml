@@ -1,0 +1,28 @@
+name: fwv_lager
+description: "Lager mit Oberfläche (Artikel, Barcode-Scan, Ein-/Ausbuchen, Lagerorte, Nachbestellen) für Mitglieder- und Vorstand-App"
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  fwv_core:
+    path: ../fwv_core
+  # Gemeinsame Bausteine der Oberflaeche (Laden, Meldungen, Chips, Rueckfrage)
+  fwv_anlass:
+    path: ../fwv_anlass
+  material_ui: ^1.6.0
+  # Gleiche Version wie flutter/mitglieder (QR-Login)
+  mobile_scanner: ^7.4.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  http: ^1.6.0
+
+flutter:

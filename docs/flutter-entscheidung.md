@@ -74,9 +74,10 @@ Bisher eigene PWAs (`simple-inventory-system`, `simple-order-system`).
   Mitglieder-App; die Einkaufs-PWA fällt danach weg.
 - **Kasse, Bar, Küchenanzeige** bleiben vorerst eigenständig: feste Geräte
   am Fest, teils offline über den Raspberry Pi, Bondrucker und SumUp.
-- Voraussetzung: das Inventar-Backend akzeptiert heute nur Anmeldungen
-  seiner eigenen Authentik-Anwendung (`inventory-system`) und muss
-  zusätzlich die der Apps annehmen (wie das Events-Backend).
+- Voraussetzung: das Inventar-Backend akzeptierte nur Anmeldungen seiner
+  eigenen Authentik-Anwendung (`inventory-system`). Erledigt (11.10.2026):
+  es nimmt zusätzlich die der Apps an, aber nur mit der Gruppe Lager,
+  Vorstand oder admin. Stand: `docs/flutter-mitglieder-app-plan.md`.
 
 Reihenfolge: nach dem Organisator-Bereich der Mitglieder-App.
 

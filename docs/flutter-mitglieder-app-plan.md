@@ -245,6 +245,69 @@ prüft "Vorstand oder Organisator dieses Anlasses und nicht vorbei".
 E-Mail-Adressen) — gehört geschützt. Notizen nehmen nur Fotos auf, keine
 anderen Dateien.
 
+### Stand Lager und Einkauf (11.10.2026)
+
+**Gebaut** (Entscheidung "Inventar, Einkauf, Kasse" in
+`docs/flutter-entscheidung.md`). Getestet mit Nachbauten und gegen echte
+Antworten der Inventar-API; noch nicht auf einem Gerät und noch nicht gegen
+das echte Authentik ausprobiert.
+
+- Inventar-Backend (`simple-inventory-system/backend`): nimmt zusätzlich
+  Authentik-Tokens von `fwv-members-app` und `fwv-members` an (Issuer und
+  JWKS je Anwendung, `src/zugang.ts`), aber nur mit der Gruppe Lager,
+  Vorstand oder admin (Gross-/Kleinschreibung egal), sonst 403 mit
+  deutscher Meldung. Tokens der Inventar-PWA (`inventory-system`) und der
+  lokale Modus unverändert. Dazu: `GET items/:id` liefert den Bestand je
+  Lagerort (`locations`); `GET locations/overview` lieferte immer 500 (stand
+  hinter `locations/:id`) — behoben; Buchen verlangt eine ganze Zahl über 0
+  ("5" + "3" ergab vorher "53") und meldet "Nicht genug an Lager" auf
+  Deutsch; Zurückbuchen nimmt auch das Material von Hand mit und rundet auf
+  ganze Einheiten; mit dem internen Key nennt das Events-Backend die
+  handelnde Person (`x-fwv-user-email`). Tests: `npm test` (tsc,
+  Zugangsregeln, API gegen Postgres mit nachgebautem Authentik), neu in der
+  CI (`tests.yml`, Job Inventar-Backend) — vorher lief nur `tsc` im
+  Docker-Build.
+- Neues Paket `flutter/fwv_lager` (mit Oberfläche, für beide Apps):
+  Schnittstelle `LagerZugang`, `ApiLagerZugang` auf
+  `https://inventar.fwv-raura.ch/api/`. Artikel suchen, Barcode/QR scannen
+  (`mobile_scanner`, Etiketten der Inventar-PWA werden erkannt), Artikel mit
+  Bestand je Lagerort, Mindestbestand und letzten Buchungen, Eingang/Ausgang
+  mit Menge und Notiz, Lagerorte mit Inhalt, Nachbestellen, Artikel anlegen
+  (ohne EAN vergibt das Backend `FWV000123`), unbekannten Code einem
+  Artikel zuordnen. Vertrag `fwv_lager/test/fixtures/inventar-api.json`
+  schreibt und prüft der Backend-Test.
+- `fwv_core`: `Sitzung.gruppen`/`hatGruppe` aus dem `groups`-Claim des
+  Authentik-Tokens (QR-Login, Passwort-Reset und externe Organisatoren haben
+  nie Gruppen), `SitzungsVerwaltung.apiFuer` (zweites Backend, gleiches
+  Token und Erneuern), `ApiClient.patch`, `hochladen` mit Text-Feldern.
+- Mitglieder-App: Reiter "Lager" für Lager, Vorstand, admin.
+- Einkauf im Organisator-Bereich (Reiter Material, Recht
+  `aktionen.einkauf`): Positionen abhaken (mit gekaufter Menge), Belege
+  fotografieren oder aus der Galerie (1600 px, Rückkamera), ansehen,
+  teilen, löschen, "Eingekauft → ins Lager zurückbuchen". Neue Proxy-Routen
+  im Events-Backend (`PATCH …/shopping-list/:itemId`,
+  `POST …/shopping-list/restock`, `GET/POST …/receipts`,
+  `GET …/receipts/:id/image`, `DELETE …/receipts/:id`), Test mit
+  nachgebauter Inventar-API (`test/einkauf.test.js`).
+
+**Die Einkaufs-PWA (`simple-inventory-system/shopping-pwa`) kann wegfallen,
+sobald das live ist** (Backends ausgerollt, App im Store). Was sie noch
+zusätzlich kann und die App nicht: Teilen-Links für Nicht-Mitglieder,
+Deadline/Budget pro Anlass, Ist-Preis und Zahler je Position, Web-Push.
+Vor dem Abschalten klären, ob das jemand braucht.
+
+Offen:
+
+- Authentik: Die Tokens müssen die Gruppe wirklich im Claim `groups`
+  tragen (Standard-Mapping "profile"); auf einem Gerät mit einem Konto der
+  Gruppe Lager prüfen.
+- Ein- und Ausbuchen ändert nur den Gesamtbestand, nicht die Menge in den
+  Kisten (`item_locations`) — so ist das Inventar gebaut (auch in der PWA).
+- Belegbilder und Artikelbilder liegen unter `/api/uploads/` der
+  Inventar-API ohne Anmeldung abrufbar (Dateinamen sind zufällig).
+- Die Inventar-Leserouten (`GET items`, `locations`, `reports`, …) sind
+  weiterhin ohne Anmeldung offen.
+
 ## Phase 3 — Ablösung der alten Apps
 
 - **Android**: gleiche App-ID `com.fwv.members`, gleicher Upload-Schlüssel

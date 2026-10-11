@@ -12,6 +12,7 @@ export 'src/anlass/meine_anmeldung.dart';
 export 'src/api/api_client.dart';
 export 'src/arbeitsplan.dart';
 export 'src/auth/altdaten_uebernahme.dart';
+export 'src/auth/jwt.dart';
 export 'src/auth/konfiguration.dart';
 export 'src/auth/qr_login_code.dart';
 export 'src/auth/sitzung.dart';

@@ -146,6 +146,7 @@ class AnlassRechte {
     this.schichten = false,
     this.notizen = false,
     this.material = false,
+    this.einkauf = false,
     this.arbeitsplanSenden = false,
     this.pdfTeilnehmerliste = false,
     this.pdfArbeitsplan = false,
@@ -166,6 +167,7 @@ class AnlassRechte {
       schichten: w('schichten'),
       notizen: w('notizen'),
       material: w('material'),
+      einkauf: w('einkauf'),
       arbeitsplanSenden: w('arbeitsplan_senden'),
       pdfTeilnehmerliste: w('pdf_teilnehmerliste'),
       pdfArbeitsplan: w('pdf_arbeitsplan'),
@@ -183,6 +185,9 @@ class AnlassRechte {
   final bool schichten;
   final bool notizen;
   final bool material;
+
+  /// Einkauf: abhaken, Belege, ins Lager zurueckbuchen (im Reiter Material).
+  final bool einkauf;
   final bool arbeitsplanSenden;
   final bool pdfTeilnehmerliste;
   final bool pdfArbeitsplan;

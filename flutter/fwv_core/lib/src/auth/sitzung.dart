@@ -5,6 +5,8 @@
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'jwt.dart';
+
 /// Wer angemeldet ist. Gespeichert wird der Text aus den alten Apps.
 enum Kontotyp {
   /// Mitglied (Authentik, QR-Code oder Passwort-Reset).
@@ -58,6 +60,19 @@ class Sitzung {
   /// Anzeigename und E-Mail, soweit bekannt (nur fuer die Anzeige).
   final String? name;
   final String? email;
+
+  /// Authentik-Gruppen aus dem Access-Token (z.B. `Lager`, `Vorstand`).
+  /// Leer bei QR-Login, Passwort-Reset und externen Organisatoren — deren
+  /// Tokens haben keine Gruppen. Wird bei jedem Zugriff aus dem aktuellen
+  /// Token gelesen, gilt also auch nach dem Erneuern.
+  List<String> get gruppen => kontotyp == Kontotyp.mitglied ? jwtGruppen(accessToken) : const [];
+
+  /// Ob die Sitzung eine der [namen] als Gruppe hat (Gross-/Kleinschreibung
+  /// egal: Authentik kennt `Lager` und `admin`).
+  bool hatGruppe(Iterable<String> namen) {
+    final gesucht = {for (final n in namen) n.trim().toLowerCase()};
+    return gruppen.any((g) => gesucht.contains(g.toLowerCase()));
+  }
 
   Sitzung kopieMit({String? accessToken, String? refreshToken}) => Sitzung(
     accessToken: accessToken ?? this.accessToken,

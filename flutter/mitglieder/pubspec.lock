@@ -387,6 +387,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  fwv_lager:
+    dependency: "direct main"
+    description:
+      path: "../fwv_lager"
+      relative: true
+    source: path
+    version: "0.1.0"
   hooks:
     dependency: transitive
     description:

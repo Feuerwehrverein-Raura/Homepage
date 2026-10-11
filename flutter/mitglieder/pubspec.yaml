@@ -32,6 +32,8 @@ dependencies:
     path: ../fwv_core
   fwv_anlass:
     path: ../fwv_anlass
+  fwv_lager:
+    path: ../fwv_lager
   flutter:
     sdk: flutter
 

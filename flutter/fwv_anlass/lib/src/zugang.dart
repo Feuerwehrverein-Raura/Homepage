@@ -129,6 +129,22 @@ abstract class AnlassVerwaltungZugang {
   Future<void> materialErfassen(String anlassId, int materialId, double menge);
   Future<void> materialEntfernen(String anlassId, int materialId);
 
+  // Einkauf (nur mit [AnlassRechte.einkauf]): ueber das Events-Backend an
+  // die Inventar-API — ersetzt die Einkaufs-PWA.
+
+  /// Position der Einkaufsliste abhaken; [istMenge] = tatsaechlich gekauft
+  /// (sonst bucht das Inventar "Bedarf minus Bestand" zurueck).
+  Future<void> gekauftSetzen(String anlassId, int materialId, bool gekauft, {double? istMenge});
+  Future<List<Beleg>> belege(String anlassId);
+
+  /// Beleg-Foto (JPEG, schon verkleinert) hochladen.
+  Future<void> belegHochladen(String anlassId, Uint8List jpeg);
+  Future<Uint8List> belegBild(String anlassId, int belegId);
+  Future<void> belegLoeschen(String anlassId, int belegId);
+
+  /// Alles Abgehakte, noch nicht Eingebuchte ins Lager zurueckbuchen.
+  Future<Zurueckbuchung> insLagerZurueckbuchen(String anlassId);
+
   // PDFs
   Future<Uint8List> teilnehmerlistePdf(String anlassId);
   Future<Uint8List> aushangPdf(String anlassId);
@@ -156,7 +172,7 @@ class VerwaltungsUmgebung {
   /// tel:, mailto:, https: oeffnen.
   final Future<bool> Function(Uri adresse) linkOeffnen;
 
-  /// Bild fuer einen Notiz-Anhang verkleinern (1600 px, JPEG).
+  /// Bild fuer einen Notiz-Anhang oder Beleg verkleinern (1600 px, JPEG).
   final Future<Uint8List> Function(Uint8List roh) anhangVerkleinern;
 }
 

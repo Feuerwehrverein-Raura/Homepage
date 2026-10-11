@@ -169,7 +169,10 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
         (const Tab(text: 'Schichten'), SchichtenAnsicht(verwaltung: _v, anlass: a, neuLaden: _neu)),
       if (r.notizen) (const Tab(text: 'Notizen'), NotizenAnsicht(verwaltung: _v, anlass: a.anlass)),
       if (r.material)
-        (const Tab(text: 'Material'), MaterialAnsicht(verwaltung: _v, anlass: a.anlass)),
+        (
+          const Tab(text: 'Material'),
+          MaterialAnsicht(verwaltung: _v, anlass: a.anlass, einkauf: r.einkauf),
+        ),
     ];
   }
 

@@ -88,20 +88,25 @@ class ApiClient {
 
   Future<dynamic> delete(String pfad, {Object? daten}) => _senden('DELETE', pfad, daten: daten);
 
+  Future<dynamic> patch(String pfad, {Object? daten}) => _senden('PATCH', pfad, daten: daten);
+
   /// Laedt eine Datei als `multipart/form-data` hoch (z.B. das Profilfoto
-  /// unter dem Feld `photo`). Erneuern und Wiederholen wie bei den
-  /// JSON-Aufrufen; die Anfrage wird dafuer neu gebaut.
+  /// unter dem Feld `photo`), mit weiteren Text-[felder]n. Erneuern und
+  /// Wiederholen wie bei den JSON-Aufrufen; die Anfrage wird dafuer neu
+  /// gebaut.
   Future<dynamic> hochladen(
     String pfad, {
     required String feld,
     required List<int> bytes,
     required String dateiname,
     String inhaltstyp = 'application/octet-stream',
+    Map<String, String> felder = const {},
   }) async => _auswerten(
     await _mitErneuern(
       (token) => _schicken(() {
         final anfrage = http.MultipartRequest('POST', adresse(pfad))
           ..headers['Accept'] = 'application/json'
+          ..fields.addAll(felder)
           ..files.add(
             http.MultipartFile.fromBytes(
               feld,
