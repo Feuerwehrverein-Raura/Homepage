@@ -14,6 +14,7 @@ const { formatDateDE, bereichLesbar, renderArbeitsplanPdf } = arbeitsplan;
 const buildArbeitsplan = eventId => arbeitsplan.buildArbeitsplan(pool, eventId);
 const registrationDetailsText = (eventId, shiftIds) => arbeitsplan.registrationDetailsText(pool, eventId, shiftIds);
 const appAnsicht = require('./app-ansicht');
+const { schichtKonflikte, eindeutig, konfliktText } = require('./doppelte-schicht');
 const organisatorAnsicht = require('./organisator-ansicht');
 const { anlassIcs, icsDateiname } = require('./ics');
 
@@ -2168,11 +2169,23 @@ app.get('/registrations', authenticateAny, async (req, res) => {
 // DEUTSCH: Neue Registrierung erstellen (authentifiziert, z.B. via Vorstand-App). Vorstand kann Status direkt setzen (z.B. 'approved')
 app.post('/registrations', authenticateAny, async (req, res) => {
     try {
-        const { event_id, member_id, guest_name, guest_email, shift_ids, notes, status } = req.body;
+        const { event_id, member_id, guest_name, guest_email, notes, status } = req.body;
+        const shift_ids = eindeutig(req.body.shift_ids);
 
         // Vorstand/Admin darf Status direkt setzen, sonst immer 'pending'
         const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
         const regStatus = (isPrivileged && status) ? status : 'pending';
+
+        // Niemand zweimal auf derselben Schicht (src/doppelte-schicht.js).
+        const doppelt = await schichtKonflikte(pool, {
+            eventId: event_id, memberId: member_id, email: guest_email, shiftIds: shift_ids
+        });
+        if (doppelt.length > 0) {
+            return res.status(409).json({
+                error: `Bereits auf dieser Schicht eingetragen: ${konfliktText(doppelt)}`,
+                code: 'schicht_doppelt'
+            });
+        }
 
         const result = await pool.query(`
             INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
@@ -2271,7 +2284,7 @@ async function finalizeRegistration(ctx) {
         RETURNING *
     `, [
         eventId, memberId || null, name, email,
-        type === 'shift' ? shiftIds : null,
+        type === 'shift' ? eindeutig(shiftIds) : null,
         JSON.stringify({
             phone,
             participants: requestedPersons,
@@ -2490,6 +2503,19 @@ app.post('/registrations/public', async (req, res) => {
         // Mitglied) hat fuer diesen Anlass schon eine offene/bestaetigte
         // Anmeldung. Nur fuer Teilnehmer-/GV-Anmeldungen: Helfer duerfen
         // spaeter zusaetzliche Schichten nachbuchen.
+        // Helfer: weitere Schichten ja, dieselbe Schicht nein.
+        if (type === 'shift') {
+            const doppelt = await schichtKonflikte(pool, {
+                eventId: ev.id, memberId, email, shiftIds: shiftIds
+            });
+            if (doppelt.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: `Du bist für diese Schicht schon eingetragen: ${konfliktText(doppelt)}.`,
+                    code: 'schicht_doppelt'
+                });
+            }
+        }
         if (type !== 'shift' && (email || memberId)) {
             const dupe = await pool.query(
                 `SELECT id FROM registrations
@@ -3634,6 +3660,23 @@ app.get('/registrations/alternative-response/:token', async (req, res) => {
         }
 
         if (isAccept) {
+            // Steht die Person auf der vorgeschlagenen Schicht schon (ueber eine
+            // andere Anmeldung), nicht ein zweites Mal eintragen.
+            const doppelt = await schichtKonflikte(pool, {
+                eventId: reg.event_id, memberId: reg.member_id, email: reg.guest_email,
+                shiftIds: [suggestion.suggested_shift_id], ausser: reg.id
+            });
+            if (doppelt.length > 0) {
+                return res.send(`
+                    <html>
+                    <head><title>Schon eingetragen</title></head>
+                    <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                        <h1>Schon eingetragen</h1>
+                        <p>Du stehst für diese Schicht bereits auf dem Plan - es ist nichts mehr zu tun.</p>
+                    </body>
+                    </html>
+                `);
+            }
             // Accept: Update registration to new shift
             await pool.query(`
                 UPDATE registrations
@@ -3702,7 +3745,26 @@ app.get('/registrations/alternative-response/:token', async (req, res) => {
 app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { guest_name, guest_email, phone, shift_ids, notes, status, member_id, participants } = req.body;
+        const { guest_name, guest_email, phone, notes, status, member_id, participants } = req.body;
+        const shift_ids = eindeutig(req.body.shift_ids);
+
+        if (Array.isArray(shift_ids) && shift_ids.length > 0) {
+            const bisher = (await pool.query(
+                'SELECT event_id, member_id, guest_email FROM registrations WHERE id = $1', [id])).rows[0];
+            if (!bisher) return res.status(404).json({ error: 'Registration not found' });
+            const doppelt = await schichtKonflikte(pool, {
+                eventId: bisher.event_id,
+                memberId: member_id || bisher.member_id,
+                email: guest_email ?? bisher.guest_email,
+                shiftIds: shift_ids, ausser: id
+            });
+            if (doppelt.length > 0) {
+                return res.status(409).json({
+                    error: `Bereits mit einer anderen Anmeldung auf dieser Schicht: ${konfliktText(doppelt)}`,
+                    code: 'schicht_doppelt'
+                });
+            }
+        }
 
         // DEUTSCH: participants/phone werden ins BESTEHENDE notes-JSON gemerged
         // (dort liegen auch companions/allergies/meal — nicht ueberschreiben!).
