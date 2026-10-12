@@ -137,10 +137,14 @@ class _Backend {
 void main() {
   late _Backend backend;
   late List<(Uint8List, String, String)> geteilt;
+  late List<Uri> geoeffnet;
+  late bool linkGeht;
 
   setUp(() {
     backend = _Backend();
     geteilt = [];
+    geoeffnet = [];
+    linkGeht = true;
   });
 
   /// Angemeldetes Mitglied, Handy-Bildschirm (360 x 800), "jetzt" wie im
@@ -175,6 +179,10 @@ void main() {
       dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((bytes, name, typ)),
       jetzt: () => DateTime(2026, 10, 11, 10),
       plattform: Plattform.android,
+      linkOeffnen: (adresse) async {
+        geoeffnet.add(adresse);
+        return linkGeht;
+      },
     );
     await tester.pumpWidget(FwvApp(dienste: d));
     await tester.pumpAndSettle();
@@ -203,6 +211,35 @@ void main() {
     await tippen(tester, find.text(titel));
     expect(find.byType(AppBar), findsOneWidget);
   }
+
+  group('Kalender-Abo', () {
+    testWidgets('oeffnet webcal-Abo; ohne passende App wird der Link kopiert', (tester) async {
+      String? zwischenablage;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (
+        call,
+      ) async {
+        if (call.method == 'Clipboard.setData') {
+          zwischenablage = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      });
+      await starten(tester);
+      await tester.tap(find.byTooltip('Kalender abonnieren'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('In der Kalender-App abonnieren'));
+      await tester.pumpAndSettle();
+      expect(geoeffnet.single.toString(), 'webcal://api.fwv-raura.ch/calendar/ics');
+      expect(zwischenablage, isNull);
+
+      linkGeht = false;
+      await tester.tap(find.byTooltip('Kalender abonnieren'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('In der Kalender-App abonnieren'));
+      await tester.pumpAndSettle();
+      expect(zwischenablage, 'https://api.fwv-raura.ch/calendar/ics');
+      expect(find.textContaining('Der Link ist kopiert'), findsOneWidget);
+    });
+  });
 
   group('Liste', () {
     testWidgets('zeigt die Anlässe aus dem Vertrag, Ideen in eigenem Abschnitt', (tester) async {

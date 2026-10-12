@@ -13,6 +13,7 @@ import 'anlass_detail_screen.dart';
 import 'anlass_kalender.dart';
 import 'anlass_vorschlagen_screen.dart';
 import 'bausteine.dart';
+import 'kalender_abo.dart';
 
 enum _Ansicht { liste, kalender }
 
@@ -42,6 +43,11 @@ class _AnlaesseTabState extends State<AnlaesseTab> {
       appBar: AppBar(
         title: const Text('Anlässe'),
         actions: [
+          IconButton(
+            onPressed: () => kalenderAboZeigen(context, widget.dienste),
+            icon: const Icon(Icons.event_repeat_outlined),
+            tooltip: 'Kalender abonnieren',
+          ),
           if (widget.dienste.alsMitglied)
             IconButton(
               onPressed: _vorschlagen,
