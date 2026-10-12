@@ -9,6 +9,8 @@
 // erst beim ersten Oeffnen gebaut und bleiben danach erhalten (Scroll-Stand,
 // geladene Daten).
 
+import 'dart:async';
+
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -16,6 +18,7 @@ import 'anlaesse/anlaesse_tab.dart';
 import 'dienste.dart';
 import 'einstellungen/adressbuch.dart';
 import 'einstellungen/einstellungen_tab.dart';
+import 'einstellungen/update_hinweis.dart';
 import 'lager/lager_tab.dart';
 import 'organisator/organisator_tab.dart';
 import 'profil/profil_tab.dart';
@@ -45,6 +48,7 @@ class _HauptseiteState extends State<Hauptseite> {
     // Nach dem (ersten) Login einmal nach dem Adressbuch fragen (Android).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) kontakteFrageStellen(context, widget.dienste);
+      if (mounted) unawaited(updateHinweisZeigen(context, widget.dienste));
     });
   }
 

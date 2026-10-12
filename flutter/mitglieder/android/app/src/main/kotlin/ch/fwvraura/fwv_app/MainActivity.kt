@@ -7,6 +7,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var kontakte: KontakteKanal? = null
+    private var update: AppUpdateKanal? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -15,6 +16,13 @@ class MainActivity : FlutterActivity() {
         val k = KontakteKanal(this).also { kontakte = it }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, KontakteKanal.KANAL)
             .setMethodCallHandler(k)
+        val updateKanal = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, AppUpdateKanal.KANAL)
+        updateKanal.setMethodCallHandler(AppUpdateKanal(this, updateKanal).also { update = it })
+    }
+
+    override fun onDestroy() {
+        update?.beenden()
+        super.onDestroy()
     }
 
     override fun onRequestPermissionsResult(

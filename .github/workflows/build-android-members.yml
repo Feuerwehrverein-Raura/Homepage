@@ -213,6 +213,10 @@ jobs:
         run: |
           set -euo pipefail
           cp "members-${VERSION}-release.apk" members-latest.apk
+          # Daran erkennt eine von GitHub installierte App, dass es eine
+          # neuere APK gibt (flutter/mitglieder/lib/einstellungen/app_update.dart).
+          APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
+          printf '{"version":"%s","versionCode":%s,"apk":"%s"}\n' "$VERSION" "$VCODE" "$APK_URL" > members-latest.json
 
           NOTES="Dieser Eintrag zeigt immer auf die neuste Fassung der
           Mitglieder-App. Der Dateiname bleibt gleich, damit Links und
@@ -224,10 +228,10 @@ jobs:
           https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
 
           if gh release view members-latest >/dev/null 2>&1; then
-            gh release upload members-latest members-latest.apk --clobber
+            gh release upload members-latest members-latest.apk members-latest.json --clobber
             gh release edit members-latest --notes "$NOTES"
           else
-            gh release create members-latest members-latest.apk \
+            gh release create members-latest members-latest.apk members-latest.json \
               --title "Mitglieder-App — neuste Fassung" \
               --notes "$NOTES" \
               --prerelease \

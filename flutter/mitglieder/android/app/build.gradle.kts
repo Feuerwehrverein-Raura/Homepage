@@ -88,5 +88,7 @@ dependencies {
     // Nur fuer die Uebernahme der Anmeldung aus der alten App
     // (EncryptedSharedPreferences "fwv_members_prefs", siehe MainActivity.kt).
     implementation("androidx.security:security-crypto:1.1.0")
+    // Hinweis auf neue Versionen aus Play (lib/einstellungen/app_update.dart).
+    implementation("com.google.android.play:app-update:2.1.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }

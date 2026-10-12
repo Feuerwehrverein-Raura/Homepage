@@ -18,6 +18,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'anmeldung/authentik_anmeldung.dart';
+import 'einstellungen/app_update.dart';
 import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
 import 'push/push_dienst.dart';
@@ -56,6 +57,7 @@ class Dienste {
     Future<Uint8List?> Function({required bool kamera})? dokumentFotoWaehlen,
     Future<String?> Function(BuildContext context)? barcodeScannen,
     Uri? inventarBasis,
+    this.update = const KeinAppUpdate(),
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
        dokumentFotoWaehlen = dokumentFotoWaehlen ?? _dokumentFotoMitImagePicker,
        barcodeScannen = barcodeScannen ?? _barcodeMitKamera,
@@ -94,6 +96,7 @@ class Dienste {
       speicher: geheim,
       push: push,
       kontakte: kontakte,
+      update: Platform.isAndroid ? AndroidAppUpdate(appVersion: _appVersionAusPaket) : const KeinAppUpdate(),
     );
   }
 
@@ -111,6 +114,9 @@ class Dienste {
   final PushDienst push;
   late final PushAnmeldung pushAnmeldung;
   final KontakteAbgleich kontakte;
+
+  /// Hinweis auf neue Versionen (Play bzw. GitHub-APK; in Tests keiner).
+  final AppUpdate update;
   late final OrganisatorPruefung organisator;
 
   /// Foto aufnehmen oder auswaehlen; null bei Abbruch.
