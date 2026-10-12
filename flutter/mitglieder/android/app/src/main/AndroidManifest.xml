@@ -1,4 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Musik aus dem Roten Schopf im Hintergrund (just_audio_background). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <!-- Push-Nachrichten anzeigen (ab Android 13 fragt die App danach). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- Adressbuch-Abgleich: FWV-Mitglieder als Konto "FWV Raura" im Adressbuch
@@ -41,6 +46,20 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Musik im Hintergrund: Dienst und Medientasten (audio_service). -->
+        <service android:name="com.ryanheise.audioservice.AudioService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true" tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+        <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:exported="true" tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
         <!-- Push im Hintergrund: Android zeigt die Nachricht selbst an — im
              selben Kanal wie die alte App und mit dem Vereins-Symbol. -->
         <meta-data

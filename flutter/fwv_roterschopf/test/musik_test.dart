@@ -2,43 +2,132 @@
 // nachgebauten Zugang. Antworten im Format von api-members (/kiosk/...).
 
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:material_ui/material_ui.dart';
 
-class _Abspieler implements Abspieler {
-  final gespielt = <(int, String)>[];
-  var angehalten = 0;
-  final _ende = StreamController<void>.broadcast();
+import 'vertrag.dart';
 
-  void endet() => _ende.add(null);
+class _Wiedergabe implements Wiedergabe {
+  final aufrufe = <String>[];
+  List<WiedergabeEintrag> geladen = const [];
+  final _stand = StreamController<WiedergabeStand>.broadcast();
+  final _fehler = StreamController<int?>.broadcast();
+  int _index = 0;
+  bool _spielt = false;
+
+  void _melden({bool fertig = false}) =>
+      _stand.add(WiedergabeStand(index: _index, spielt: _spielt, fertig: fertig));
+
+  /// Der Titel an [i] laesst sich nicht abspielen.
+  void kaputt(int i) => _fehler.add(i);
+  void ende() {
+    _spielt = false;
+    _melden(fertig: true);
+  }
 
   @override
-  Future<void> abspielen(Uint8List daten, String name) async => gespielt.add((daten.length, name));
+  Future<void> laden(List<WiedergabeEintrag> liste, {int ab = 0}) async {
+    geladen = liste;
+    _index = ab;
+    aufrufe.add('laden ${liste.length} ab $ab');
+  }
 
   @override
-  Future<void> anhalten() async => angehalten++;
+  Future<void> spielen() async {
+    aufrufe.add('spielen');
+    _spielt = true;
+    _melden();
+  }
 
   @override
-  Stream<void> get zuEnde => _ende.stream;
+  Future<void> pause() async {
+    aufrufe.add('pause');
+    _spielt = false;
+    _melden();
+  }
 
   @override
-  Future<void> schliessen() => _ende.close();
+  Future<void> stoppen() async {
+    aufrufe.add('stoppen');
+    _spielt = false;
+    _melden();
+  }
+
+  @override
+  Future<void> weiter() async {
+    aufrufe.add('weiter');
+    if (_index + 1 < geladen.length) _index++;
+    _melden();
+  }
+
+  @override
+  Future<void> zurueck() async {
+    aufrufe.add('zurueck');
+    if (_index > 0) _index--;
+    _melden();
+  }
+
+  @override
+  Future<void> springen(Duration position) async => aufrufe.add('springen ${position.inSeconds}');
+
+  @override
+  Future<void> springeZu(int index) async {
+    aufrufe.add('springeZu $index');
+    _index = index;
+    _melden();
+  }
+
+  @override
+  Future<void> zufall(bool an) async => aufrufe.add('zufall $an');
+
+  @override
+  Stream<WiedergabeStand> get stand => _stand.stream;
+
+  @override
+  Stream<Duration> get position => const Stream.empty();
+
+  @override
+  Stream<Duration?> get dauer => const Stream.empty();
+
+  @override
+  Stream<int?> get fehler => _fehler.stream;
+
+  @override
+  Future<void> schliessen() async {
+    await _stand.close();
+    await _fehler.close();
+  }
 }
 
 class _Zugang extends MusikZugang {
-  final geladen = <String>[];
-  bool ladenKaputt = false;
+  final freigaben = <List<String>>[];
+  bool freigabeKaputt = false;
 
   @override
-  Future<Uint8List> titelLaden(String pfad) async {
-    if (ladenKaputt) throw const ApiFehler('Die Datei liegt nicht auf dem Server', status: 404);
-    geladen.add(pfad);
-    return Uint8List(1234);
+  Future<List<Uri>> hoerAdressen(List<String> pfade) async {
+    if (freigabeKaputt) throw const ApiFehler('Freigabe nicht moeglich', status: 500);
+    freigaben.add(pfade);
+    return [for (final p in pfade) Uri.parse('https://api.test/kiosk/hoeren?pfad=$p&t=x')];
   }
+
+  var laptopZustand = LaptopZustand.ausJson(kioskMusikVertrag()['zustand']);
+  bool laptopWeg = false;
+  final laptopBefehle = <(String, Map<String, Object?>)>[];
+
+  @override
+  Future<LaptopZustand> laptop() async {
+    if (laptopWeg) {
+      throw const ApiFehler('Der Laptop im Roten Schopf antwortet nicht', status: 502);
+    }
+    return laptopZustand;
+  }
+
+  @override
+  Future<void> laptopBefehl(String aktion, [Map<String, Object?> daten = const {}]) async =>
+      laptopBefehle.add((aktion, daten));
 
   final gespeichert = <(String?, String, List<String>)>[];
   final senderNeu = <(String, String)>[];
@@ -143,17 +232,17 @@ void main() {
     expect(Bibliothek.ausJson(null).titel, isEmpty);
   });
 
-  late _Abspieler abspieler;
+  late _Wiedergabe wiedergabe;
 
-  Future<_Zugang> zeigen(WidgetTester tester) async {
+  Future<_Zugang> zeigen(WidgetTester tester, {bool laptop = false}) async {
     final z = _Zugang();
-    abspieler = _Abspieler();
+    wiedergabe = _Wiedergabe();
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
-        home: MusikScreen(zugang: z, abspieler: abspieler),
+        home: MusikScreen(zugang: z, wiedergabe: wiedergabe, laptopSteuern: laptop),
       ),
     );
     await tester.pumpAndSettle();
@@ -270,7 +359,7 @@ void main() {
     expect(const ApiFehler('x').meldung, 'x');
   });
 
-  testWidgets('Vorhoeren: abspielen, anhalten, anderer Titel loest ab, Fehler wird gemeldet', (
+  testWidgets('Vorhoeren: streamt, haelt an, anderer Titel loest ab, Fehler wird gemeldet', (
     tester,
   ) async {
     final z = await zeigen(tester);
@@ -281,35 +370,172 @@ void main() {
     expect(find.byTooltip('Vorhören'), findsOneWidget);
     await tester.tap(find.byTooltip('Vorhören'));
     await tester.pumpAndSettle();
-    expect(z.geladen, ['Queen/Bohemian Rhapsody.mp3']);
-    expect(abspieler.gespielt.single, (1234, 'Bohemian Rhapsody.mp3'));
+    expect(z.freigaben.single, ['Queen/Bohemian Rhapsody.mp3']);
+    expect(
+      wiedergabe.geladen.single.adresse.toString(),
+      'https://api.test/kiosk/hoeren?pfad=Queen/Bohemian%20Rhapsody.mp3&t=x',
+    );
+    expect(wiedergabe.geladen.single.titel, 'Bohemian Rhapsody');
+    expect(wiedergabe.geladen.single.interpret, 'Queen');
     expect(find.byTooltip('Anhalten'), findsOneWidget);
+    // Mini-Player unten zeigt, was laeuft.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('mini-player')),
+        matching: find.text('Bohemian Rhapsody'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('Anhalten'));
     await tester.pumpAndSettle();
+    expect(wiedergabe.aufrufe.last, 'pause');
     expect(find.byTooltip('Vorhören'), findsOneWidget);
 
-    // Zu Ende gespielt: Knopf springt zurueck.
+    // Nochmals: spielt weiter, statt neu zu laden.
     await tester.tap(find.byTooltip('Vorhören'));
     await tester.pumpAndSettle();
-    abspieler.endet();
+    expect(z.freigaben, hasLength(1));
+    expect(wiedergabe.aufrufe.last, 'spielen');
+
+    // Zu Ende gespielt: Knopf springt zurueck.
+    wiedergabe.ende();
     await tester.pumpAndSettle();
     expect(find.byTooltip('Anhalten'), findsNothing);
 
     // In der Suche: anderer Titel loest den laufenden ab.
     await tester.tap(find.text('Titel suchen'));
     await tester.pumpAndSettle();
-    final knoepfe = find.byTooltip('Vorhören');
-    await tester.tap(knoepfe.first);
-    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Vorhören').last);
     await tester.pumpAndSettle();
-    expect(z.geladen.last, 'Baschi/Gib mer e Chance.mp3');
+    expect(z.freigaben.last, ['Baschi/Gib mer e Chance.mp3']);
     expect(find.byTooltip('Anhalten'), findsOneWidget);
 
-    z.ladenKaputt = true;
+    z.freigabeKaputt = true;
     await tester.tap(find.byTooltip('Vorhören').first);
     await tester.pumpAndSettle();
-    expect(find.text('Die Datei liegt nicht auf dem Server'), findsOneWidget);
+    expect(find.text('Freigabe nicht moeglich'), findsOneWidget);
+  });
+
+  testWidgets('Ganze Playlist abspielen: Warteschlange, weiter, kaputter Titel, Player', (
+    tester,
+  ) async {
+    final z = await zeigen(tester);
+    await tester.tap(find.byTooltip('Abspielen'));
+    await tester.pumpAndSettle();
+
+    // Nur der vorhandene Titel kommt in die Warteschlange.
+    expect(z.freigaben.single, ['Queen/Bohemian Rhapsody.mp3']);
+    expect(wiedergabe.aufrufe, ['laden 1 ab 0', 'zufall false', 'spielen']);
+    final mini = find.byKey(const Key('mini-player'));
+    expect(find.descendant(of: mini, matching: find.text('Queen · Chilbi Abend')), findsOneWidget);
+
+    // Im Editor: alle abspielen, inklusive neu gesuchtem Titel.
+    await tester.tap(find.text('Chilbi Abend'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Titel suchen'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Baschi – Gib mer e Chance'));
+    await tester.pump();
+    await tester.tap(find.text('Übernehmen (1)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Alle abspielen'));
+    await tester.pumpAndSettle();
+    expect(z.freigaben.last, ['Queen/Bohemian Rhapsody.mp3', 'Baschi/Gib mer e Chance.mp3']);
+
+    // Ein kaputter erster Titel haelt die Liste nicht an.
+    wiedergabe.kaputt(0);
+    await tester.pumpAndSettle();
+    expect(find.text('„Bohemian Rhapsody“ lässt sich nicht abspielen'), findsOneWidget);
+    expect(wiedergabe.aufrufe.reversed.take(2), ['spielen', 'weiter']);
+
+    // Grosser Player: Warteschlange, zurueck springen.
+    await tester.tap(find.byKey(const Key('mini-player')));
+    await tester.pumpAndSettle();
+    expect(find.text('Gib mer e Chance'), findsWidgets);
+    await tester.tap(find.text('Bohemian Rhapsody').last);
+    await tester.pumpAndSettle();
+    expect(wiedergabe.aufrufe.reversed.take(2), ['spielen', 'springeZu 0']);
+    await tester.tap(find.byTooltip('Zufall ein'));
+    await tester.pumpAndSettle();
+    expect(wiedergabe.aufrufe.last, 'zufall true');
+
+    // Beenden: Mini-Player verschwindet.
+    await tester.tap(find.byTooltip('Beenden'));
+    await tester.pumpAndSettle();
+    expect(wiedergabe.aufrufe.last, 'stoppen');
+    expect(find.byKey(const Key('mini-player')), findsNothing);
+  });
+
+  testWidgets('Radiosender auf dem Handy hoeren', (tester) async {
+    await zeigen(tester);
+    await tester.tap(find.text('Radiosender'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Auf dem Handy hören'));
+    await tester.pumpAndSettle();
+    expect(
+      wiedergabe.geladen.single.adresse.toString(),
+      'https://stream.srg-ssr.ch/srf3/mp3_128.m3u',
+    );
+    expect(find.byTooltip('Anhalten'), findsOneWidget);
+    await tester.tap(find.byTooltip('Anhalten'));
+    await tester.pumpAndSettle();
+    expect(wiedergabe.aufrufe.last, 'pause');
+  });
+
+  test('Laptop-Zustand liest die Vertragsdatei von api-members', () {
+    final z = LaptopZustand.ausJson(kioskMusikVertrag()['zustand']);
+    expect(z.musik.erreichbar, isTrue);
+    expect(z.musik.titel, 'Louenesee');
+    expect(z.musik.interpret, 'Span');
+    expect(z.musik.position, const Duration(milliseconds: 61300));
+    expect(z.musik.dauer, const Duration(seconds: 255));
+    expect(z.musik.lautstaerke, 60);
+    expect(z.musik.naechste, ['Baschi — Gib mer e chance']);
+    expect(z.playlists, ['Alle Titel', 'Chilbi Abend']);
+    expect(z.sender.single.url, 'https://stream.srg-ssr.ch/m/drs3/mp3_128');
+    expect(LaptopMusik.ausJson({'erreichbar': false}).erreichbar, isFalse);
+    expect(LaptopMusik.ausJson({'erreichbar': true, 'lautstaerke': -1}).lautstaerke, isNull);
+  });
+
+  testWidgets('Ohne Berechtigung kein Reiter Im Schopf', (tester) async {
+    await zeigen(tester);
+    expect(find.text('Im Schopf'), findsNothing);
+  });
+
+  testWidgets('Im Schopf: nur mit Berechtigung, steuern, Playlist erst nach Rueckfrage', (
+    tester,
+  ) async {
+    final z = await zeigen(tester, laptop: true);
+    await tester.tap(find.text('Im Schopf'));
+    await tester.pumpAndSettle();
+    expect(find.text('Läuft im Schopf'), findsOneWidget);
+    expect(find.text('Louenesee'), findsOneWidget);
+    expect(find.text('1:01'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Pause im Schopf'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Nächster Titel im Schopf'));
+    await tester.pump();
+    expect(z.laptopBefehle.map((b) => b.$1), ['umschalten', 'weiter']);
+
+    await tester.scrollUntilVisible(
+      find.text('Chilbi Abend'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Chilbi Abend'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('„Chilbi Abend“ im Schopf spielen?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Abspielen'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(z.laptopBefehle.last.$1, 'playlist');
+    expect(z.laptopBefehle.last.$2, {'name': 'Chilbi Abend'});
+
+    z.laptopWeg = true;
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.text('Der Laptop im Roten Schopf antwortet nicht'), findsOneWidget);
+    // Abbauen, damit der Takt stehen bleibt.
+    await tester.pumpWidget(const SizedBox());
   });
 }

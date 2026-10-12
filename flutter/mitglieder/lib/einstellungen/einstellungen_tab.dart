@@ -137,7 +137,13 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
               title: const Text('Musik im Roten Schopf'),
               subtitle: const Text('Playlists und Radiosender für den Laptop'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => _oeffnen(MusikScreen(zugang: _d.musik)),
+              onTap: () => _oeffnen(
+                MusikScreen(
+                  zugang: _d.musik,
+                  player: _d.musikPlayer,
+                  laptopSteuern: _d.roterSchopfSichtbar,
+                ),
+              ),
             ),
             ListTile(
               leading: const Icon(Icons.desktop_windows_outlined),

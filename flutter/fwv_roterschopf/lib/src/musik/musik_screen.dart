@@ -3,7 +3,8 @@
 // (mein.html). Jedes Mitglied darf zusammenstellen; der Laptop holt sich
 // alles alle fuenf Minuten selbst ab.
 //
-// Vorhoeren (Knopf neben jedem Titel) siehe vorhoeren.dart.
+// Hoeren auf dem Handy (Vorhoeren, ganze Playlists, Radio) siehe
+// player.dart; den Laptop im Lokal fernbedienen siehe laptop.dart.
 
 import 'dart:async';
 
@@ -19,27 +20,45 @@ import 'package:fwv_anlass/fwv_anlass.dart'
 import 'package:material_ui/material_ui.dart';
 
 import 'modelle.dart';
-import 'vorhoeren.dart';
+import 'laptop.dart';
+import 'player.dart';
 import 'zugang.dart';
 
 class MusikScreen extends StatefulWidget {
-  const MusikScreen({super.key, required this.zugang, this.abspieler});
+  const MusikScreen({
+    super.key,
+    required this.zugang,
+    this.player,
+    this.wiedergabe,
+    this.laptopSteuern = false,
+  });
 
   final MusikZugang zugang;
 
-  /// Nur fuer Tests; sonst just_audio.
-  final Abspieler? abspieler;
+  /// Der Player der App (lebt laenger als dieser Bildschirm). Ohne ihn
+  /// bringt der Bildschirm einen eigenen mit.
+  final MusikPlayer? player;
+
+  /// Nur fuer Tests, wenn kein [player] kommt; sonst just_audio.
+  final Wiedergabe? wiedergabe;
+
+  /// Reiter "Im Schopf": den Laptop fernbedienen (Gruppe Roter Schopf,
+  /// Vorstand, admin).
+  final bool laptopSteuern;
 
   @override
   State<MusikScreen> createState() => _MusikScreenState();
 }
 
 class _MusikScreenState extends State<MusikScreen> {
-  late final _vorhoerer = Vorhoerer(laden: widget.zugang.titelLaden, abspieler: widget.abspieler);
+  MusikPlayer? _eigener;
+  late final MusikPlayer _player =
+      widget.player ??
+      (_eigener = MusikPlayer(zugang: widget.zugang, wiedergabe: widget.wiedergabe));
 
   @override
   void dispose() {
-    _vorhoerer.dispose();
+    _eigener?.dispose();
     super.dispose();
   }
 
@@ -47,23 +66,26 @@ class _MusikScreenState extends State<MusikScreen> {
   Widget build(BuildContext context) {
     final zugang = widget.zugang;
     return DefaultTabController(
-      length: 2,
+      length: widget.laptopSteuern ? 3 : 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Musik im Roten Schopf'),
           bottom: reiterAufRot(
-            tabs: const [
-              Tab(text: 'Playlists'),
-              Tab(text: 'Radiosender'),
+            tabs: [
+              const Tab(text: 'Playlists'),
+              const Tab(text: 'Radiosender'),
+              if (widget.laptopSteuern) const Tab(text: 'Im Schopf'),
             ],
           ),
         ),
         body: TabBarView(
           children: [
-            _PlaylistsSeite(zugang: zugang, vorhoerer: _vorhoerer),
-            _SenderSeite(zugang: zugang),
+            _PlaylistsSeite(zugang: zugang, player: _player),
+            _SenderSeite(zugang: zugang, player: _player),
+            if (widget.laptopSteuern) LaptopSeite(zugang: zugang),
           ],
         ),
+        bottomNavigationBar: MiniPlayer(player: _player),
       ),
     );
   }
@@ -73,10 +95,10 @@ class _MusikScreenState extends State<MusikScreen> {
 // Playlists
 
 class _PlaylistsSeite extends StatefulWidget {
-  const _PlaylistsSeite({required this.zugang, required this.vorhoerer});
+  const _PlaylistsSeite({required this.zugang, required this.player});
 
   final MusikZugang zugang;
-  final Vorhoerer vorhoerer;
+  final MusikPlayer player;
 
   @override
   State<_PlaylistsSeite> createState() => _PlaylistsSeiteState();
@@ -88,12 +110,21 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
   Future<void> _bearbeiten(String? id) async {
     final geaendert = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => PlaylistEditor(zugang: widget.zugang, vorhoerer: widget.vorhoerer, id: id),
+        builder: (_) => PlaylistEditor(zugang: widget.zugang, player: widget.player, id: id),
       ),
     );
-    // Was im Editor lief, verstummt mit dem Zurueck.
-    await widget.vorhoerer.anhalten();
     if (geaendert == true) unawaited(_ansicht.currentState?.neuLaden());
+  }
+
+  /// Die ganze Playlist auf dem Handy hoeren - zum Pruefen, oder wenn der
+  /// Laptop ausfaellt.
+  Future<void> _abspielen(PlaylistKurz p) async {
+    try {
+      final pl = await widget.zugang.playlist(p.id);
+      await widget.player.spieleListe(pl.name, pl.titel);
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    }
   }
 
   Future<void> _loeschen(PlaylistKurz p) async {
@@ -141,10 +172,20 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
                   ].join(' · '),
                 ),
                 onTap: () => _bearbeiten(p.id),
-                trailing: IconButton(
-                  tooltip: 'Löschen',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _loeschen(p),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Abspielen',
+                      icon: const Icon(Icons.play_arrow),
+                      onPressed: p.anzahl == 0 ? null : () => _abspielen(p),
+                    ),
+                    IconButton(
+                      tooltip: 'Löschen',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _loeschen(p),
+                    ),
+                  ],
                 ),
               ),
           ],
@@ -157,10 +198,10 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
 /// Playlist anlegen ([id] null) oder bearbeiten. Gibt true zurueck, wenn
 /// gespeichert wurde.
 class PlaylistEditor extends StatefulWidget {
-  const PlaylistEditor({super.key, required this.zugang, required this.vorhoerer, this.id});
+  const PlaylistEditor({super.key, required this.zugang, required this.player, this.id});
 
   final MusikZugang zugang;
-  final Vorhoerer vorhoerer;
+  final MusikPlayer player;
   final String? id;
 
   @override
@@ -225,7 +266,7 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
       MaterialPageRoute(
         builder: (_) => TitelSuche(
           zugang: widget.zugang,
-          vorhoerer: widget.vorhoerer,
+          player: widget.player,
           schonDrin: {for (final t in _titel) t.pfad},
         ),
       ),
@@ -236,7 +277,7 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
   Future<void> _abgleichen() async {
     final gewaehlt = await Navigator.of(context).push<List<MusikTitel>>(
       MaterialPageRoute(
-        builder: (_) => ListenAbgleich(zugang: widget.zugang, vorhoerer: widget.vorhoerer),
+        builder: (_) => ListenAbgleich(zugang: widget.zugang, player: widget.player),
       ),
     );
     if (gewaehlt != null && mounted) _hinzufuegen(gewaehlt);
@@ -284,12 +325,27 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
           title: Text(widget.id == null ? 'Neue Playlist' : 'Playlist bearbeiten'),
           actions: [
             IconButton(
+              tooltip: 'Alle abspielen',
+              onPressed: _laedt || !_titel.any((t) => t.vorhanden)
+                  ? null
+                  : () => widget.player
+                        .spieleListe(
+                          _name.text.trim().isEmpty ? 'Playlist' : _name.text.trim(),
+                          _titel,
+                        )
+                        .catchError((Object e) {
+                          if (context.mounted) meldung(context, fehlerText(e));
+                        }),
+              icon: const Icon(Icons.playlist_play),
+            ),
+            IconButton(
               tooltip: 'Speichern',
               onPressed: _speichert || _laedt ? null : _speichern,
               icon: const Icon(Icons.check),
             ),
           ],
         ),
+        bottomNavigationBar: MiniPlayer(player: widget.player),
         body: _laedt
             ? const Center(child: CircularProgressIndicator())
             : _fehler != null
@@ -375,8 +431,8 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
                                   children: [
                                     if (t.vorhanden)
                                       VorhoerKnopf(
-                                        vorhoerer: widget.vorhoerer,
-                                        pfad: t.pfad,
+                                        player: widget.player,
+                                        titel: t,
                                         beiFehler: (e) => meldung(context, fehlerText(e)),
                                       ),
                                     IconButton(
@@ -406,12 +462,12 @@ class TitelSuche extends StatefulWidget {
   const TitelSuche({
     super.key,
     required this.zugang,
-    required this.vorhoerer,
+    required this.player,
     required this.schonDrin,
   });
 
   final MusikZugang zugang;
-  final Vorhoerer vorhoerer;
+  final MusikPlayer player;
   final Set<String> schonDrin;
 
   @override
@@ -464,6 +520,7 @@ class _TitelSucheState extends State<TitelSuche> {
   Widget build(BuildContext context) {
     final b = _ergebnis;
     return Scaffold(
+      bottomNavigationBar: MiniPlayer(player: widget.player),
       appBar: AppBar(
         title: const Text('Titel suchen'),
         actions: [
@@ -530,8 +587,8 @@ class _TitelSucheState extends State<TitelSuche> {
                     // Vorhoeren links, Auswaehlen rechts.
                     controlAffinity: ListTileControlAffinity.trailing,
                     secondary: VorhoerKnopf(
-                      vorhoerer: widget.vorhoerer,
-                      pfad: t.pfad,
+                      player: widget.player,
+                      titel: t,
                       beiFehler: (e) => meldung(context, fehlerText(e)),
                     ),
                   ),
@@ -547,10 +604,10 @@ class _TitelSucheState extends State<TitelSuche> {
 /// Eine kopierte Titelliste gegen die Sammlung halten. Der Abgleich schlaegt
 /// vor, er entscheidet nicht: alle Treffer sind angehakt, knappe markiert.
 class ListenAbgleich extends StatefulWidget {
-  const ListenAbgleich({super.key, required this.zugang, required this.vorhoerer});
+  const ListenAbgleich({super.key, required this.zugang, required this.player});
 
   final MusikZugang zugang;
-  final Vorhoerer vorhoerer;
+  final MusikPlayer player;
 
   @override
   State<ListenAbgleich> createState() => _ListenAbgleichState();
@@ -594,6 +651,7 @@ class _ListenAbgleichState extends State<ListenAbgleich> {
         if (!_aus.contains(t.titel.pfad)) t.titel,
     ];
     return Scaffold(
+      bottomNavigationBar: MiniPlayer(player: widget.player),
       appBar: AppBar(
         title: const Text('Liste abgleichen'),
         actions: [
@@ -660,8 +718,8 @@ class _ListenAbgleichState extends State<ListenAbgleich> {
                   subtitle: Text(t.sicher ? t.zeile : 'knapp – bitte prüfen: ${t.zeile}'),
                   controlAffinity: ListTileControlAffinity.trailing,
                   secondary: VorhoerKnopf(
-                    vorhoerer: widget.vorhoerer,
-                    pfad: t.titel.pfad,
+                    player: widget.player,
+                    titel: t.titel,
                     beiFehler: (e) => meldung(context, fehlerText(e)),
                   ),
                 ),
@@ -692,9 +750,10 @@ class _ListenAbgleichState extends State<ListenAbgleich> {
 // Radiosender
 
 class _SenderSeite extends StatefulWidget {
-  const _SenderSeite({required this.zugang});
+  const _SenderSeite({required this.zugang, required this.player});
 
   final MusikZugang zugang;
+  final MusikPlayer player;
 
   @override
   State<_SenderSeite> createState() => _SenderSeiteState();
@@ -756,10 +815,28 @@ class _SenderSeiteState extends State<_SenderSeite> {
                 leading: const Icon(Icons.radio),
                 title: Text(s.name),
                 subtitle: Text(s.url, maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: IconButton(
-                  tooltip: 'Entfernen',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => _loeschen(s),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListenableBuilder(
+                      listenable: widget.player,
+                      builder: (context, _) {
+                        final laeuft = widget.player.istAktuell(s.url) && widget.player.spielt;
+                        return IconButton(
+                          tooltip: laeuft ? 'Anhalten' : 'Auf dem Handy hören',
+                          icon: Icon(laeuft ? Icons.pause : Icons.play_arrow),
+                          onPressed: () => widget.player.spieleSender(s).catchError((Object e) {
+                            if (context.mounted) meldung(context, fehlerText(e));
+                          }),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Entfernen',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _loeschen(s),
+                    ),
+                  ],
                 ),
               ),
           ],

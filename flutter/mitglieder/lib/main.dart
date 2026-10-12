@@ -8,6 +8,7 @@
 
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben, fwvThema;
+import 'package:just_audio_background/just_audio_background.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'anmeldung/login_screen.dart';
@@ -15,8 +16,17 @@ import 'dienste.dart';
 import 'gemeinsam.dart' show logoMitglieder;
 import 'hauptseite.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Musik aus dem Roten Schopf laeuft im Hintergrund weiter, mit Bedienung
+  // in der Benachrichtigung und auf dem Sperrbildschirm (fwv_roterschopf,
+  // musik/player.dart). Muss vor dem ersten Player stehen.
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'ch.fwvraura.fwv_app.musik',
+    androidNotificationChannelName: 'Musik',
+    androidNotificationOngoing: true,
+    androidNotificationIcon: 'drawable/ic_benachrichtigung',
+  );
   runApp(FwvApp(dienste: Dienste.echt()));
 }
 

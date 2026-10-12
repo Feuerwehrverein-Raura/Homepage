@@ -142,3 +142,80 @@ class Radiosender {
   final String name;
   final String url;
 }
+
+/// Was der Laptop im Lokal gerade spielt (GET /kiosk/t400/musik, aus dem
+/// Kiosk-Dienst roterschopf-kiosk/dienst/kiosk.py).
+class LaptopMusik {
+  const LaptopMusik({
+    required this.erreichbar,
+    this.laeuft = false,
+    this.titel,
+    this.interpret,
+    this.position = Duration.zero,
+    this.dauer = Duration.zero,
+    this.lautstaerke,
+    this.zufall = false,
+    this.naechste = const [],
+  });
+
+  factory LaptopMusik.ausJson(Object? roh) {
+    final j = roh is Map ? Map<String, dynamic>.from(roh) : const <String, dynamic>{};
+    Duration sek(Object? v) => Duration(milliseconds: ((v as num?) ?? 0).toDouble() * 1000 ~/ 1);
+    final vol = (j['lautstaerke'] as num?)?.toInt();
+    final titel = _text(j['titel']);
+    return LaptopMusik(
+      erreichbar: j['erreichbar'] == true,
+      laeuft: j['laeuft'] == true,
+      titel: titel == '—' ? null : titel,
+      interpret: _text(j['interpret']),
+      position: sek(j['position']),
+      dauer: sek(j['dauer']),
+      // MPD meldet -1, wenn es die Lautstaerke nicht kennt.
+      lautstaerke: vol == null || vol < 0 ? null : vol,
+      zufall: j['zufall'] == true,
+      naechste: [
+        for (final n in _liste(j['naechste'], (m) => m))
+          if (_text(n['name']) != null) _text(n['name'])!,
+      ],
+    );
+  }
+
+  /// false: MPD auf dem Laptop antwortet nicht.
+  final bool erreichbar;
+  final bool laeuft;
+  final String? titel;
+  final String? interpret;
+  final Duration position;
+
+  /// Null beim Radio.
+  final Duration dauer;
+  final int? lautstaerke;
+  final bool zufall;
+  final List<String> naechste;
+}
+
+class LaptopZustand {
+  const LaptopZustand({required this.musik, this.playlists = const [], this.sender = const []});
+
+  factory LaptopZustand.ausJson(Object? roh) {
+    final j = roh is Map ? Map<String, dynamic>.from(roh) : const <String, dynamic>{};
+    return LaptopZustand(
+      musik: LaptopMusik.ausJson(j['musik']),
+      playlists: [
+        if (j['playlists'] is List)
+          for (final p in j['playlists'] as List)
+            if (_text(p) != null) _text(p)!,
+      ],
+      sender: _liste(
+        j['sender'],
+        (m) => Radiosender(id: '${m['url']}', name: '${m['name']}', url: '${m['url']}'),
+      ),
+    );
+  }
+
+  final LaptopMusik musik;
+
+  /// Namen, "Alle Titel" zuerst.
+  final List<String> playlists;
+  final List<Radiosender> sender;
+}

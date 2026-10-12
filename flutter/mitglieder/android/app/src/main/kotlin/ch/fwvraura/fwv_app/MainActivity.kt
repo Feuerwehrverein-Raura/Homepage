@@ -1,11 +1,12 @@
 package ch.fwvraura.fwv_app
 
 import ch.fwvraura.fwv_app.kontakte.KontakteKanal
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+// AudioServiceActivity (eine FlutterActivity) fuer die Musik im Hintergrund.
+class MainActivity : AudioServiceActivity() {
     private var kontakte: KontakteKanal? = null
     private var update: AppUpdateKanal? = null
 

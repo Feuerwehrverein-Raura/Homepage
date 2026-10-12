@@ -176,8 +176,15 @@ class Dienste {
   final Duration? roterSchopfTakt;
 
   /// Musik fuer den Laptop im Roten Schopf (Playlists, Radiosender) - fuer
-  /// jedes Mitglied, wie im Mitgliederbereich der Webseite.
-  MusikZugang get musik => ApiMusikZugang(sitzung.api);
+  /// jedes Mitglied, wie im Mitgliederbereich der Webseite. Einer fuer die
+  /// ganze App: er merkt sich die Hoer-Freigabe.
+  late final MusikZugang musik = ApiMusikZugang(sitzung.api);
+
+  MusikPlayer? _musikPlayer;
+
+  /// Der eine Player der App - die Musik laeuft weiter, wenn man den
+  /// Musik-Bereich verlaesst (und im Hintergrund).
+  MusikPlayer get musikPlayer => _musikPlayer ??= MusikPlayer(zugang: musik);
 
   /// Roter Schopf (Paket fwv_roterschopf): api-members mit demselben Token.
   RoterSchopfZugang get roterSchopf => ApiRoterSchopfZugang(sitzung.api);
@@ -310,6 +317,8 @@ class Dienste {
 /// wieder nach dem Adressbuch gefragt — die Kontakte sind ja entfernt. Das
 /// Token erhaelt der Abgleich danach als null ([SitzungsVerwaltung.beiNeuemToken]).
 Future<void> abmeldenAufraeumen(ApiClient api, Dienste dienste) async {
+  // Nach dem Abmelden spielt nichts mehr weiter.
+  await dienste._musikPlayer?.beenden();
   try {
     if (dienste.sitzung.sitzung?.kontotyp == Kontotyp.mitglied) {
       await pushTokenAbmelden(api, dienste.pushAnmeldung);

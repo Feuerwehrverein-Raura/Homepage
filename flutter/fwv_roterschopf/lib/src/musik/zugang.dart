@@ -3,8 +3,6 @@
 // Playlists und Sender anlegen; fremde Playlists loeschen nur Vorstand und
 // admin - das prueft das Backend.
 
-import 'dart:typed_data';
-
 import 'package:fwv_core/fwv_core.dart';
 
 import 'modelle.dart';
@@ -26,16 +24,24 @@ abstract class MusikZugang {
 
   Future<void> loeschen(String id);
 
-  /// Die Datei eines Titels zum Vorhoeren (angemeldet geladen).
-  Future<Uint8List> titelLaden(String pfad);
+  /// Adressen zum Streamen der Titel (mit Hoer-Freigabe, ohne Anmeldung).
+  Future<List<Uri>> hoerAdressen(List<String> pfade);
 
   Future<List<Radiosender>> sender();
   Future<void> senderAnlegen({required String name, required String url});
   Future<void> senderLoeschen(String id);
+
+  /// Was der Laptop im Lokal spielt - nur Gruppe Roter Schopf, Vorstand,
+  /// admin.
+  Future<LaptopZustand> laptop();
+
+  /// umschalten, weiter, zurueck, lautstaerke {wert}, playlist {name},
+  /// radio {url}.
+  Future<void> laptopBefehl(String aktion, [Map<String, Object?> daten = const {}]);
 }
 
 class ApiMusikZugang extends MusikZugang {
-  const ApiMusikZugang(this.api);
+  ApiMusikZugang(this.api);
 
   /// `SitzungsVerwaltung.api` (api-members).
   final ApiClient api;
@@ -87,8 +93,28 @@ class ApiMusikZugang extends MusikZugang {
   @override
   Future<void> loeschen(String id) => api.delete('kiosk/playlists/${_e(id)}');
 
+  String? _freigabe;
+  DateTime? _freigabeBis;
+
   @override
-  Future<Uint8List> titelLaden(String pfad) => api.datei('kiosk/anhoeren', abfrage: {'pfad': pfad});
+  Future<List<Uri>> hoerAdressen(List<String> pfade) async {
+    // Eine Freigabe gilt 12 Stunden; erneuert wird, solange noch mindestens
+    // eine Stunde uebrig waere - lang genug fuer jede Playlist.
+    final bis = _freigabeBis;
+    if (_freigabe == null || bis == null || bis.difference(DateTime.now()).inMinutes < 60) {
+      final json = await api.post('kiosk/hoeren/freigabe');
+      if (json is! Map || json['token'] == null) {
+        throw const FormatException('Der Server hat keine Hoer-Freigabe geliefert.');
+      }
+      _freigabe = '${json['token']}';
+      _freigabeBis =
+          DateTime.tryParse('${json['gueltig_bis']}') ??
+          DateTime.now().add(const Duration(hours: 1, minutes: 30));
+    }
+    return [
+      for (final p in pfade) api.adresse('kiosk/hoeren', {'pfad': p, 't': _freigabe!}),
+    ];
+  }
 
   @override
   Future<List<Radiosender>> sender() async =>
@@ -100,4 +126,11 @@ class ApiMusikZugang extends MusikZugang {
 
   @override
   Future<void> senderLoeschen(String id) => api.delete('kiosk/sender/${_e(id)}');
+
+  @override
+  Future<LaptopZustand> laptop() async => LaptopZustand.ausJson(await api.get('kiosk/t400/musik'));
+
+  @override
+  Future<void> laptopBefehl(String aktion, [Map<String, Object?> daten = const {}]) =>
+      api.post('kiosk/t400/musik/${_e(aktion)}', daten: daten);
 }
