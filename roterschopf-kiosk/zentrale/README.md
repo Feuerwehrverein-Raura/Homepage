@@ -16,20 +16,47 @@ boolean:202 hiess "Girlanden" und ist keine eigene Gruppe: Am Taster ist
 das eine Stimmung und kein zweiter Handgriff. Der Schalter steht noch auf
 dem Geraet, wird aber von niemandem beachtet.
 
-Wer den Schalter umlegt, ist gleich — der BLU-Taster an der Wand oder die
-Lichtseite auf dem Laptop. Das Skript hoert auf die Aenderung und setzt
-alle Lampen der Gruppe nach. Deshalb schalten weder Taster noch Laptop die
-Lampen direkt: Sonst haetten beide ein eigenes Bild davon, was an ist.
+Der BLU-Taster schaltet die Lampen **immer**, auch wenn der Schalter
+schon auf dem Zielwert steht; der Schalter wird nur mitgefuehrt. Die
+Lichtseite auf dem Laptop nimmt denselben Weg ueber den Endpunkt
 
-Der BLU-Taster hat vier Tasten mit fester Absicht statt Umschaltung — zwei
-zum Ein-, zwei zum Ausschalten. Ein versehentlicher zweiter Druck laesst
-das Licht dann an, statt es wieder auszuschalten. Aus demselben Grund gilt
-jeder Druck (einfach, doppelt, lang) als dieselbe Absicht.
+    http://192.168.88.84/script/4/gruppe?id=200&an=true
 
-**Die Aufrufe gehen nacheinander raus, nicht auf einmal.** Die
-Aufrufwarteschlange eines Shelly-Skripts ist kurz: Bei acht gleichzeitigen
-HTTP-Aufrufen kamen die letzten drei nie an - die Girlanden blieben
-dunkel, waehrend die fuenf Spots angingen.
+Wer `boolean:200/201` von aussen umlegt, schaltet die Gruppe ebenfalls -
+aber nur, wenn sich der Wert aendert.
+
+Belegung des Tasters (vor Ort getestet am 12.10.2026): oben
+Arbeitsleuchten ein/aus (idx 0/1, "Licht aus" ist idx 1), unten Spots
+ein/aus (idx 2/3). Kein Umschalten: Ein versehentlicher zweiter Druck
+laesst das Licht an. Jeder Druck (einfach, doppelt, lang) zaehlt gleich.
+
+**Ereignis und Taste stehen in `e.info`**, nicht in `e`. Die erste
+Fassung las `e.event`/`e.idx`, die leer sind, und hat nie auf einen Druck
+reagiert - der Empfang war die ganze Zeit einwandfrei.
+
+**Eine Warteschlange, immer nur eine HTTP-Anfrage.** Bei schnellen
+Druecken liefen frueher mehrere Durchgaenge nebeneinander, und das
+Geraet brach das Skript mit "Too many calls in progress" ab. Je Gruppe
+gilt der letzte Wunsch, der neueste Druck kommt zuerst dran.
+
+**Tote Regler werden uebersprungen.** Jede Lampe bekommt einen Versuch
+(2 s). Antwortet ein Regler nicht, gilt er fuer beide Gruppen bis zum
+naechsten 10-s-Takt als tot. Girlande Raum und Laterne WC stehen vorn,
+weil sie nicht an den Sicherungen der Regler haengen. Frueher wartete
+die Girlande bei ausgeschalteter Sicherung fast eine Minute.
+
+**Nachfassen:** Was nicht erreicht wurde, wird alle 10 s erneut
+geschaltet, hoechstens 30 min - nur die fehlenden Lampen, nie die ganze
+Gruppe. Bewusst kein dauerhaftes Erzwingen: Das wuerde Schalten in der
+App ueberstimmen und die Arbeitsleuchten, die nach der Sicherung mit
+"ein" starten, wieder ausmachen.
+
+**Abgleich alle 2 min:** Brennen alle Lampen einer Gruppe, wird ihr
+Schalter auf ein gestellt, sind alle aus, auf aus.
+
+**Mitlesen:** Das Debug-Log ist per Websocket offen:
+
+    curl -sN ws://192.168.88.84/debug/log
 
 **Nur ASCII in dieser Datei.** Der JSON-Parser des Geraets bricht ab,
 sobald ein mehrbyteiges Zeichen an einer Uebertragungsgrenze landet — ein

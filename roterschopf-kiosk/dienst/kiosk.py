@@ -297,6 +297,10 @@ LICHT_VORGABE = {
     # eigene. boolean:202 heisst auf dem Geraet noch "Girlanden", wird aber
     # von niemandem beachtet.
     "schalter": {"Spots": 200, "Arbeitsleuchten": 201},
+    # Id des Skripts "Lichtgruppen" auf der Zentrale. Es bietet unter
+    # /script/<id>/gruppe einen Endpunkt, der die Gruppe immer schaltet —
+    # auch wenn der Schalter schon auf dem Zielwert steht.
+    "skript": 4,
     # Womit die Gruppe belegt ist — nur fuer die Anzeige. Geschaltet wird
     # ueber den Schalter oben. Gepflegt wird die Zuordnung im Skript
     # "Lichtgruppen" auf der Zentrale.
@@ -360,6 +364,21 @@ def shelly(ziel, methode, **werte):
             return {}
         daten = json.loads(roh)
         return {} if daten is None else daten
+    except Exception:
+        return None
+
+
+def gruppe_erzwingen(zentrale, skript, nummer, an):
+    """Schaltet eine Gruppe ueber den Endpunkt des Skripts "Lichtgruppen".
+
+    Liefert {} bei Erfolg, None wenn die Zentrale oder das Skript nicht
+    antwortet.
+    """
+    url = "http://%s/script/%d/gruppe?id=%d&an=%s" % (
+        zentrale, skript, nummer, "true" if an else "false")
+    try:
+        with urllib.request.urlopen(url, timeout=6) as antwort:
+            return {} if antwort.status == 200 else None
     except Exception:
         return None
 
@@ -505,13 +524,22 @@ def licht_schalten(kennung, an):
     einstellung = licht_einstellung()
     zentrale = einstellung.get("zentrale", "192.168.88.84")
 
-    # Gruppen laufen ueber den Schalter auf der Zentrale, nicht ueber die
-    # einzelnen Lampen. Von dort zieht das Skript "Lichtgruppen" nach.
+    # Gruppen laufen ueber das Skript "Lichtgruppen" auf der Zentrale, nicht
+    # ueber die einzelnen Lampen.
+    #
+    # Nicht mehr ueber Boolean.Set: Das Skript reagiert nur auf eine
+    # Aenderung des Schalters. Stand er schon auf "aus", waehrend Lampen
+    # brannten (nach der Sicherung starten die Arbeitsleuchten mit "ein"),
+    # tat "aus" hier nichts. Der Endpunkt schaltet immer — wie der Taster.
+    # Boolean.Set bleibt als Rueckfall, falls das Skript nicht laeuft.
     if kennung.startswith("gruppe:"):
         nummer = einstellung.get("schalter", {}).get(kennung[7:])
         if nummer is None:
             return {"geschaltet": 0, "von": 0}
-        ergebnis = shelly(zentrale, "Boolean.Set", id=nummer, value=bool(an))
+        ergebnis = gruppe_erzwingen(zentrale, einstellung.get("skript", 4),
+                                    nummer, bool(an))
+        if ergebnis is None:
+            ergebnis = shelly(zentrale, "Boolean.Set", id=nummer, value=bool(an))
         if ergebnis is not None:
             # Die Zentrale schaltet die Lampen nacheinander; bis alle folgen,
             # vergehen ein paar Sekunden. Solange gilt der Befehl.
