@@ -62,6 +62,10 @@ abstract class Wiedergabe {
   Future<void> springeZu(int index);
   Future<void> zufall(bool an);
 
+  /// Die Abspielreihenfolge (Indizes der Warteschlange) - bei Zufall nicht
+  /// die geladene Reihenfolge.
+  List<int> get reihenfolge;
+
   Stream<WiedergabeStand> get stand;
   Stream<Duration> get position;
   Stream<Duration?> get dauer;
@@ -87,6 +91,8 @@ class JustAudioWiedergabe implements Wiedergabe {
 
     _player.playerStateStream.listen((_) => melden());
     _player.currentIndexStream.listen((_) => melden());
+    _player.shuffleIndicesStream.listen((_) => melden());
+    _player.shuffleModeEnabledStream.listen((_) => melden());
   }
 
   final _player = AudioPlayer();
@@ -141,6 +147,11 @@ class JustAudioWiedergabe implements Wiedergabe {
     if (an) await _player.shuffle();
     await _player.setShuffleModeEnabled(an);
   }
+
+  @override
+  List<int> get reihenfolge => _player.shuffleModeEnabled
+      ? List.of(_player.shuffleIndices)
+      : List.generate(_player.sequence.length, (i) => i);
 
   @override
   Stream<WiedergabeStand> get stand => _stand.stream;
@@ -218,6 +229,15 @@ class MusikPlayer extends ChangeNotifier {
 
   Stream<Duration> get position => _w.position;
   Stream<Duration?> get dauer => _w.dauer;
+
+  /// Was nach dem aktuellen Titel kommt, in Abspielreihenfolge (Indizes
+  /// in [liste]), hoechstens [anzahl].
+  List<int> naechste({int anzahl = 100}) {
+    final r = _w.reihenfolge;
+    final hier = r.indexOf(_index);
+    if (hier < 0) return const [];
+    return r.skip(hier + 1).take(anzahl).toList();
+  }
 
   /// true, wenn [id] gerade der aktuelle Eintrag ist (oder geholt wird).
   bool istAktuell(String id) => _holt == id || (_holt == null && aktuell?.id == id);
@@ -577,31 +597,62 @@ class PlayerScreen extends StatelessWidget {
                       ],
                     ),
                     const Divider(),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
-                        itemCount: player.liste.length,
-                        itemBuilder: (context, i) {
-                          final t = player.liste[i];
-                          final jetzt = i == player.index;
-                          return ListTile(
-                            dense: true,
-                            selected: jetzt,
-                            leading: jetzt
-                                ? const Icon(Icons.equalizer)
-                                : SizedBox(
-                                    width: 24,
-                                    child: Text('${i + 1}', textAlign: TextAlign.center),
-                                  ),
-                            title: Text(t.titel, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: t.interpret == null ? null : Text(t.interpret!),
-                            onTap: () => player.springeZu(i),
-                          );
-                        },
+                    if (!player.radio) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                        child: Row(
+                          children: [
+                            Text('Als Nächstes', style: text.titleSmall),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                '${player.index + 1} von ${player.liste.length}'
+                                '${player.zufall ? ' · zufällig' : ''}',
+                                style: text.bodySmall,
+                                textAlign: TextAlign.end,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      Expanded(child: _Naechste(player: player)),
+                    ],
                   ],
                 ),
+        );
+      },
+    );
+  }
+}
+
+/// Die naechsten Titel in Abspielreihenfolge - bei "Alle Titel" sonst eine
+/// alphabetische Liste von ueber tausend Eintraegen, die nichts ueber die
+/// Wiedergabe sagt.
+class _Naechste extends StatelessWidget {
+  const _Naechste({required this.player});
+
+  final MusikPlayer player;
+
+  @override
+  Widget build(BuildContext context) {
+    final naechste = player.naechste();
+    if (naechste.isEmpty) {
+      return const Padding(padding: EdgeInsets.all(16), child: Text('Danach ist Schluss.'));
+    }
+    return ListView.builder(
+      padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+      itemCount: naechste.length,
+      itemBuilder: (context, n) {
+        final i = naechste[n];
+        final t = player.liste[i];
+        return ListTile(
+          dense: true,
+          leading: SizedBox(width: 24, child: Text('${n + 1}', textAlign: TextAlign.center)),
+          title: Text(t.titel, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: t.interpret == null ? null : Text(t.interpret!),
+          onTap: () => player.springeZu(i),
         );
       },
     );

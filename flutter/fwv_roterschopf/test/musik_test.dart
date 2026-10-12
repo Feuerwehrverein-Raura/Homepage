@@ -80,8 +80,20 @@ class _Wiedergabe implements Wiedergabe {
     _melden();
   }
 
+  bool _zufall = false;
+
   @override
-  Future<void> zufall(bool an) async => aufrufe.add('zufall $an');
+  Future<void> zufall(bool an) async {
+    aufrufe.add('zufall $an');
+    _zufall = an;
+  }
+
+  /// Bei Zufall rueckwaerts - vorhersehbar genug fuer den Test.
+  @override
+  List<int> get reihenfolge {
+    final r = List.generate(geladen.length, (i) => i);
+    return _zufall ? r.reversed.toList() : r;
+  }
 
   @override
   Stream<WiedergabeStand> get stand => _stand.stream;
@@ -455,16 +467,26 @@ void main() {
     expect(find.text('„Bohemian Rhapsody“ lässt sich nicht abspielen'), findsOneWidget);
     expect(wiedergabe.aufrufe.reversed.take(2), ['spielen', 'weiter']);
 
-    // Grosser Player: Warteschlange, zurueck springen.
+    // Grosser Player: der letzte Titel laeuft, danach kommt nichts.
     await tester.tap(find.byKey(const Key('mini-player')));
     await tester.pumpAndSettle();
-    expect(find.text('Gib mer e Chance'), findsWidgets);
-    await tester.tap(find.text('Bohemian Rhapsody').last);
+    expect(find.text('2 von 2'), findsOneWidget);
+    expect(find.text('Danach ist Schluss.'), findsOneWidget);
+
+    // Zurueck: "Als Nächstes" zeigt den Titel danach, antippen springt hin.
+    await tester.tap(find.byTooltip('Zurück'));
     await tester.pumpAndSettle();
-    expect(wiedergabe.aufrufe.reversed.take(2), ['spielen', 'springeZu 0']);
+    expect(find.text('1 von 2'), findsOneWidget);
+    await tester.tap(find.text('Gib mer e Chance'));
+    await tester.pumpAndSettle();
+    expect(wiedergabe.aufrufe.reversed.take(2), ['spielen', 'springeZu 1']);
+
+    // Zufall: die Liste folgt der Abspielreihenfolge, nicht der geladenen.
     await tester.tap(find.byTooltip('Zufall ein'));
     await tester.pumpAndSettle();
     expect(wiedergabe.aufrufe.last, 'zufall true');
+    expect(find.text('2 von 2 · zufällig'), findsOneWidget);
+    expect(find.text('Bohemian Rhapsody'), findsOneWidget);
 
     // Beenden: Mini-Player verschwindet.
     await tester.tap(find.byTooltip('Beenden'));
