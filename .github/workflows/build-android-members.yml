@@ -253,6 +253,13 @@ jobs:
       # Absichtlich als letzter Schritt und ohne continue-on-error: Schlaegt
       # der Upload fehl, ist der Lauf rot, GitHub-Release und APK gibt es
       # trotzdem schon. Store-Eintrag (Texte, Bilder) wird nicht angefasst.
+      # Play zeigt Versionshinweise in der Sprache des Handys oder in der
+      # Standardsprache der App - und die ist de-DE, nicht de-CH. Nur mit
+      # de-CH blieb "Was ist neu" deshalb leer. Gepflegt wird nur die
+      # de-CH-Datei; de-DE ist eine Kopie.
+      - name: Versionshinweise auch fuer de-DE
+        run: cp flutter/mitglieder/play/whatsnew/whatsnew-de-CH flutter/mitglieder/play/whatsnew/whatsnew-de-DE
+
       - name: Upload in Google Play (interner Test)
         if: steps.play.outputs.vorhanden == 'true'
         uses: r0adkll/upload-google-play@v1.1.5

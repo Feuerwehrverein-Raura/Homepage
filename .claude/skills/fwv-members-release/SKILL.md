@@ -20,6 +20,9 @@ verlinken Website und Anleitung).
    ersetzen (nicht anhaengen): nur was seit dem letzten Tag neu ist,
    Aufzaehlung mit `• `, fuer Mitglieder verstaendlich, max. 500 Zeichen.
    Was neu ist: `git log --oneline members-vLETZTE..HEAD -- flutter/`.
+   Nur diese Datei pflegen: der Workflow kopiert sie als `whatsnew-de-DE`
+   (Standardsprache der App in Play ist de-DE). Was Play gespeichert hat,
+   zeigt der Workflow `play-zeigen.yml`.
 3. Commit `chore(members): Versionshinweise X.Y.Z`, dann
    ```sh
    git pull --rebase -q && git push
