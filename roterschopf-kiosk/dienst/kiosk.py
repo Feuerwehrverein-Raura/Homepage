@@ -16,6 +16,7 @@ zuletzt geholten Daten bleiben stehen.
 """
 
 import datetime
+import hmac
 import json
 import os
 import socket
@@ -743,26 +744,9 @@ class Handler(BaseHTTPRequestHandler):
 
         p = self.path.split("?")[0]
 
-        if p == "/api/musik/umschalten":
-            mpd("pause")
-        elif p == "/api/musik/weiter":
-            mpd("next")
-        elif p == "/api/musik/lautstaerke":
-            wert = max(0, min(100, int(daten.get("wert", 60))))
-            mpd("setvol %d" % wert)
-        elif p == "/api/musik/playlist":
-            name = str(daten.get("name", ""))
-            if name == "Alle Titel":
-                mpd("clear", 'add ""', "random 1", "play")
-            elif name:
-                # clear + load + play: die Playlist ersetzt die Warteschlange,
-                # statt sich anzuhaengen. Sonst waechst sie ueber einen Abend
-                # ins Unendliche.
-                mpd("clear", 'load "%s"' % name.replace('"', ""), "random 1", "play")
-        elif p == "/api/musik/radio":
-            url = str(daten.get("url", ""))
-            if url.startswith("http"):
-                mpd("clear", 'add "%s"' % url.replace('"', ""), "random 0", "play")
+        if p.startswith("/api/musik/"):
+            if not musik_befehl(p[len("/api/musik/"):], daten):
+                return self.sende(404, {"fehler": "unbekannt"})
         elif p == "/api/licht":
             return self.sende(200, licht_schalten(
                 str(daten.get("kennung", "")), bool(daten.get("an"))))
@@ -781,6 +765,102 @@ class Handler(BaseHTTPRequestHandler):
             return self.sende(404, {"fehler": "unbekannt"})
 
         return self.sende(200, {"ok": True})
+
+
+def musik_befehl(aktion, daten):
+    """Ein Musikbefehl - von der Oberflaeche wie von der Fernbedienung.
+    Liefert False bei unbekannter Aktion."""
+    if aktion == "umschalten":
+        # Nicht einfach "pause": Die bereitgelegte Warteschlange steht auf
+        # "stop", und dort bewirkt "pause" nichts.
+        if mpd("status").get("state") == "play":
+            mpd("pause 1")
+        else:
+            mpd("play")
+    elif aktion == "weiter":
+        mpd("next")
+    elif aktion == "zurueck":
+        mpd("previous")
+    elif aktion == "lautstaerke":
+        wert = max(0, min(100, int(daten.get("wert", 60))))
+        mpd("setvol %d" % wert)
+    elif aktion == "playlist":
+        name = str(daten.get("name", ""))
+        if name == "Alle Titel":
+            mpd("clear", 'add ""', "random 1", "play")
+        elif name:
+            # clear + load + play: die Playlist ersetzt die Warteschlange,
+            # statt sich anzuhaengen. Sonst waechst sie ueber einen Abend
+            # ins Unendliche.
+            mpd("clear", 'load "%s"' % name.replace('"', ""), "random 1", "play")
+    elif aktion == "radio":
+        url = str(daten.get("url", ""))
+        if url.startswith("http"):
+            mpd("clear", 'add "%s"' % url.replace('"', ""), "random 0", "play")
+    else:
+        return False
+    return True
+
+
+# --------------------------------------------------------------------------
+# Fernbedienung fuer die Mitglieder-App
+# --------------------------------------------------------------------------
+#
+# Die App spricht nie direkt mit dem Laptop, sondern mit dem Vereinsserver;
+# der prueft die Anmeldung und reicht nur Musikbefehle weiter. Dieser
+# Anschluss nimmt deshalb nur zwei Dinge an:
+#
+#   * Anfragen von FERN_ERLAUBT (der Server ueber den WireGuard-Tunnel)
+#   * mit dem KIOSK_KEY, den der Laptop ohnehin fuer den Abgleich kennt
+#
+# Beides, weil ueber den Server auch VPN-Mitglieder mit dessen Adresse
+# ankommen. Licht, Abmelden und Bestellsystem gibt es hier nicht.
+
+FERN_PORT = int(os.environ.get("FERN_PORT", "8081"))
+FERN_ERLAUBT = set(os.environ.get("FERN_ERLAUBT", "10.10.0.1").split())
+
+
+class Fernbedienung(Handler):
+
+    def zugelassen(self):
+        schluessel = os.environ.get("KIOSK_KEY", "")
+        return (self.client_address[0] in FERN_ERLAUBT and schluessel and
+                hmac.compare_digest(self.headers.get("X-Kiosk-Key", ""), schluessel))
+
+    def do_GET(self):
+        if not self.zugelassen():
+            return self.sende(401, {"fehler": "nicht zugelassen"})
+        if self.path.split("?")[0] != "/musik":
+            return self.sende(404, {"fehler": "unbekannt"})
+        pl = lies("playlists.json", [])["daten"]
+        return self.sende(200, {
+            "musik": musikzustand(),
+            "playlists": ["Alle Titel"] + [
+                p["name"] for p in pl if isinstance(p, dict) and p.get("name")],
+            "sender": [s for s in lies("sender.json", [])["daten"]
+                       if isinstance(s, dict) and s.get("url")],
+        })
+
+    def do_POST(self):
+        if not self.zugelassen():
+            return self.sende(401, {"fehler": "nicht zugelassen"})
+        laenge = int(self.headers.get("Content-Length") or 0)
+        try:
+            daten = json.loads(self.rfile.read(laenge) or b"{}")
+        except ValueError:
+            daten = {}
+        p = self.path.split("?")[0]
+        if not p.startswith("/musik/") or not musik_befehl(p[len("/musik/"):], daten):
+            return self.sende(404, {"fehler": "unbekannt"})
+        return self.sende(200, {"ok": True, "musik": musikzustand()})
+
+
+def fernbedienung():
+    while True:
+        try:
+            ThreadingHTTPServer(("0.0.0.0", FERN_PORT), Fernbedienung).serve_forever()
+        except OSError:
+            time.sleep(30)  # Port belegt (Neustart) - spaeter nochmals
 
 
 def musik_bereitlegen():
@@ -807,6 +887,7 @@ if __name__ == "__main__":
     threading.Thread(target=musik_bereitlegen, daemon=True).start()
     threading.Thread(target=ampelschleife, daemon=True).start()
     threading.Thread(target=lichtschleife, daemon=True).start()
+    threading.Thread(target=fernbedienung, daemon=True).start()
     # Nur auf 127.0.0.1: Die Oberflaeche wird ausschliesslich vom Browser
-    # dieses Rechners aufgerufen. Nach aussen gibt es nichts zu sehen.
+    # dieses Rechners aufgerufen. Nach aussen geht nur die Fernbedienung.
     ThreadingHTTPServer(("127.0.0.1", 8080), Handler).serve_forever()

@@ -19,6 +19,7 @@ const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } 
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
 const { roterSchopf, hatRoterSchopfZugang } = require('./roter-schopf');
+const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
@@ -6354,7 +6355,7 @@ app.post('/kiosk/abgleich', authenticateToken, async (req, res) => {
 //   2. Der aufgeloeste Pfad muss unterhalb des Musikordners liegen.
 // Die erste allein genuegte; die zweite faengt ab, was passiert, wenn jemand
 // spaeter die erste lockert.
-app.get('/kiosk/anhoeren', authenticateToken, async (req, res) => {
+async function titelSenden(req, res) {
     const WURZEL = process.env.KIOSK_MUSIK_PFAD || '/app/musik';
     try {
         await kioskTabellen();
@@ -6376,17 +6377,42 @@ app.get('/kiosk/anhoeren', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Die Datei liegt nicht auf dem Server' });
         }
 
-        // sendFile beherrscht Range von sich aus — noetig, damit im Browser
-        // gesprungen werden kann, statt jedes Mal von vorn zu laden.
+        // sendFile beherrscht Range von sich aus — noetig, damit gesprungen
+        // und gestreamt werden kann, statt jedes Mal von vorn zu laden.
+        const TYPEN = { '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.aac': 'audio/aac',
+            '.flac': 'audio/flac', '.ogg': 'audio/ogg', '.opus': 'audio/ogg', '.wav': 'audio/wav' };
         res.sendFile(ziel, {
-            headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'private, max-age=300' }
+            headers: {
+                'Content-Type': TYPEN[path.extname(ziel).toLowerCase()] || 'audio/mpeg',
+                'Cache-Control': 'private, max-age=300'
+            }
         }, (err) => {
             if (err && !res.headersSent) res.status(500).end();
         });
     } catch (error) {
-        console.error('GET /kiosk/anhoeren:', error.message);
+        console.error('Titel senden:', error.message);
         if (!res.headersSent) res.status(500).json({ error: 'Titel konnte nicht geladen werden' });
     }
+}
+
+app.get('/kiosk/anhoeren', authenticateToken, titelSenden);
+
+// Der Player der App streamt ohne Anmelde-Kopfzeile - mit einer Freigabe in
+// der Adresse, die nur zum Hoeren taugt (src/kiosk-musik.js).
+app.post('/kiosk/hoeren/freigabe', authenticateToken, (req, res) => {
+    try {
+        res.json(hoerFreigabe(process.env.JWT_SECRET, req.user?.email || req.user?.sub));
+    } catch (error) {
+        console.error('POST /kiosk/hoeren/freigabe:', error.message);
+        res.status(500).json({ error: 'Freigabe nicht moeglich' });
+    }
+});
+
+app.get('/kiosk/hoeren', (req, res) => {
+    if (!hoerFreigabeGueltig(process.env.JWT_SECRET, String(req.query.t || ''))) {
+        return res.status(401).json({ error: 'Hoer-Freigabe ungueltig oder abgelaufen' });
+    }
+    return titelSenden(req, res);
 });
 
 app.get('/kiosk/playlists', authenticateToken, async (req, res) => {
@@ -6641,6 +6667,29 @@ app.post('/kiosk/roter-schopf/licht', authenticateToken, roterSchopfZugang, asyn
         console.error('POST /kiosk/roter-schopf/licht:', error.message);
         res.status(500).json({ error: 'Licht konnte nicht geschaltet werden' });
     }
+});
+
+// --- Roter Schopf: Musik am Laptop fernbedienen ---------------------------
+//
+// Gleiche Berechtigung wie das Licht. Der Laptop nimmt nur Musikbefehle an
+// (src/kiosk-musik.js, roterschopf-kiosk/dienst/kiosk.py).
+
+const kioskMusik = kioskFernbedienung({
+    adresse: process.env.KIOSK_FERN_URL || 'http://192.168.88.10:8081',
+    schluessel: process.env.KIOSK_KEY
+});
+
+app.get('/kiosk/t400/musik', authenticateToken, roterSchopfZugang, async (req, res) => {
+    const r = await kioskMusik.zustand();
+    if (!r.ok) return res.status(502).json({ error: r.grund });
+    res.json(r.daten);
+});
+
+app.post('/kiosk/t400/musik/:aktion', authenticateToken, roterSchopfZugang, async (req, res) => {
+    const r = await kioskMusik.befehl(req.params.aktion, req.body || {});
+    console.log(`Roter Schopf Musik: ${req.user?.email || req.user?.sub} ${req.params.aktion} ${JSON.stringify(req.body || {})} -> ${r.ok ? 'ok' : r.grund}`);
+    if (!r.ok) return res.status(r.ungueltig ? 400 : 502).json({ error: r.grund });
+    res.json(r.daten);
 });
 
 // --- Authentik-Gruppen verwalten (Vorstand in der Mitglieder-App) ----------

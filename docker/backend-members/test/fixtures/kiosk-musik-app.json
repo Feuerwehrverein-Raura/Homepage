@@ -1,0 +1,30 @@
+{
+  "zustand": {
+    "musik": {
+      "erreichbar": true,
+      "naechste": [
+        {
+          "name": "Baschi — Gib mer e chance",
+          "dauer": "206"
+        }
+      ],
+      "laeuft": true,
+      "titel": "Louenesee",
+      "interpret": "Span",
+      "position": 61.3,
+      "dauer": 255,
+      "lautstaerke": 60,
+      "zufall": true
+    },
+    "playlists": [
+      "Alle Titel",
+      "Chilbi Abend"
+    ],
+    "sender": [
+      {
+        "name": "SRF 3",
+        "url": "https://stream.srg-ssr.ch/m/drs3/mp3_128"
+      }
+    ]
+  }
+}
