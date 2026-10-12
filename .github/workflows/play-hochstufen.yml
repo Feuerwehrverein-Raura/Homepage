@@ -1,0 +1,39 @@
+name: Play hochstufen
+
+# Stuft ein bereits hochgeladenes Release der Mitglieder-App von Hand in einen
+# anderen Track hoch, ohne neu zu bauen — z.B. wenn der automatische Schritt
+# in build-android-members.yml fehlgeschlagen ist.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'versionCode (z.B. 10001 fuer 1.0.1)'
+        required: true
+        type: string
+      von:
+        description: 'Quell-Track'
+        required: true
+        default: internal
+        type: string
+      nach:
+        description: 'Ziel-Track'
+        required: true
+        default: alpha
+        type: string
+
+jobs:
+  hochstufen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hochstufen
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          CODE: ${{ inputs.version_code }}
+          VON: ${{ inputs.von }}
+          NACH: ${{ inputs.nach }}
+        run: |
+          set -euo pipefail
+          pip install --quiet google-auth requests
+          python3 .github/scripts/play-hochstufen.py com.fwv.members "$CODE" "$VON" "$NACH"

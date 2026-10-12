@@ -272,4 +272,4 @@ jobs:
         run: |
           set -euo pipefail
           pip install --quiet google-auth requests
-          python3 .github/scripts/play-hochstufen.py com.fwv.members "$VCODE" internal alpha
+          python3 "$GITHUB_WORKSPACE/.github/scripts/play-hochstufen.py" com.fwv.members "$VCODE" internal alpha
