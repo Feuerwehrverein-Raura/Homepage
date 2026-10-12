@@ -534,6 +534,40 @@ body {
   background: linear-gradient(90deg, var(--warnung) 50%, transparent 50%);
 }
 
+/* Tiefkuehler: nur Anzeige, kein Knopf. Die Temperatur steht gross, weil
+   sie das Einzige ist, was man von weitem wissen will. */
+.unterkopf {
+  margin: 22px 0 10px;
+  font-family: "Barlow Condensed", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--schrift-leise);
+}
+.unterkopf[hidden] { display: none; }
+#kuehlliste { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.kuehler { cursor: default; border-left-color: var(--linie); }
+.kuehler .lampentext b,
+.kuehler .lampentext span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kuehler .grad {
+  flex: none;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 30px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.4em;
+  text-align: right;
+}
+/* Zu warm ist ein Fehler, keine Stimmung: dieselbe Farbe wie die Ampel. */
+.kuehler.warm { border-left-color: var(--feuer); }
+.kuehler.warm .grad { color: var(--feuer); }
+.kuehler.weg { opacity: .5; }
+
 .bereich {
   margin-left: 10px;
   font-size: 14px;
@@ -911,6 +945,8 @@ body {
       </div>
       <div class="lampen" id="gruppenliste"></div>
       <div class="lampen" id="lampenliste"></div>
+      <h3 class="unterkopf" id="kuehlkopf" hidden>Tiefkühler</h3>
+      <div class="lampen" id="kuehlliste"></div>
     </section>
 
     <!-- ---------------- Kasse ----------------
@@ -1113,6 +1149,8 @@ function zeichneLicht() {
     gruppen.appendChild(knopf);
   });
 
+  zeichneKuehlung();
+
   if (!lichtDaten.lampen.length) {
     lampen.appendChild(hinweis("Keine Lampen eingerichtet."));
     return;
@@ -1124,6 +1162,50 @@ function zeichneLicht() {
                 : "aus";
     lampen.appendChild(lampenknopf(l.name, unten, l.an, l.erreichbar,
       function () { schalteLicht(l.kennung, !l.an); }));
+  });
+}
+
+// Tiefkuehler: eine Kachel je Geraet, ohne Knopf. Rot, sobald die
+// Temperatur ueber der Grenze liegt oder der Fuehler nichts liefert — das
+// Skript auf dem Geraet schaltet dann schon den Strom ein, aber jemand soll
+// nachsehen, ob die Tuer offen steht.
+function zeichneKuehlung() {
+  const liste = $("#kuehlliste");
+  const geraete = lichtDaten.kuehlung || [];
+  liste.textContent = "";
+  $("#kuehlkopf").hidden = !geraete.length;
+
+  geraete.forEach(function (g) {
+    const t = g.temperatur;
+    const ohneWert = t === null || t === undefined;
+    const warm = g.erreichbar && (ohneWert || (g.grenze !== null && t > g.grenze));
+
+    const kachel = document.createElement("div");
+    kachel.className = "lampe kuehler" + (warm ? " warm" : "") +
+                       (g.erreichbar ? "" : " weg");
+
+    const text = document.createElement("span");
+    text.className = "lampentext";
+    const name = document.createElement("b");
+    name.textContent = g.name;
+    const unten = document.createElement("span");
+    let zeile;
+    if (!g.erreichbar) zeile = "nicht erreichbar";
+    else if (ohneWert) zeile = "Fühler liefert keinen Wert";
+    else if (!g.relais_zeigen) zeile = "nur Temperatur";
+    else if (g.an) zeile = "Strom an · " + (g.watt || 0) + " W";
+    else zeile = "Strom aus";
+    if (g.erreichbar && warm && !ohneWert) zeile = "zu warm · " + zeile;
+    unten.textContent = zeile;
+    text.append(name, unten);
+
+    const grad = document.createElement("span");
+    grad.className = "grad";
+    grad.textContent = !g.erreichbar || ohneWert ? "—"
+                     : t.toFixed(1).replace(".", ",") + " °";
+
+    kachel.append(text, grad);
+    liste.appendChild(kachel);
   });
 }
 

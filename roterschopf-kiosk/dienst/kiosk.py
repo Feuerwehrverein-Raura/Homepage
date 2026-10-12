@@ -301,6 +301,20 @@ LICHT_VORGABE = {
     # /script/<id>/gruppe einen Endpunkt, der die Gruppe immer schaltet —
     # auch wenn der Schalter schon auf dem Zielwert steht.
     "skript": 4,
+    # Tiefkuehler: je ein Shelly 1PM Gen4 im Hausnetz (nicht hinter der
+    # Zentrale) mit DS18B20 am Addon. Nur Anzeige — einen Tiefkuehler
+    # schaltet man nicht versehentlich vom Kiosk aus.
+    #
+    # "grenze" ist dieselbe wie im Skript "Tiefkuehl-Waechter" auf dem
+    # Geraet: Darueber wird die Kachel rot. Mit "relais": False liesse sich
+    # die Relaiszeile ausblenden; der Landi haengt noch nicht am Relais,
+    # zeigt sie aber trotzdem (dann eben 0 W).
+    "kuehlung": [
+        {"name": "Tiefkühlschrank Eis", "adresse": "192.168.88.76",
+         "grenze": -12},
+        {"name": "Tiefkühlschrank Landi", "adresse": "192.168.88.71",
+         "grenze": -12},
+    ],
     # Womit die Gruppe belegt ist — nur fuer die Anzeige. Geschaltet wird
     # ueber den Schalter oben. Gepflegt wird die Zuordnung im Skript
     # "Lichtgruppen" auf der Zentrale.
@@ -315,7 +329,8 @@ LICHT_VORGABE = {
     },
 }
 
-lichtzustand = {"lampen": [], "geprueft": 0, "zentrale": False, "schalter": {}}
+lichtzustand = {"lampen": [], "geprueft": 0, "zentrale": False, "schalter": {},
+                "kuehlung": []}
 lichtports = {}
 # Was zuletzt befohlen wurde, je Kanal: (Wert, Zeitpunkt).
 #
@@ -472,6 +487,28 @@ def licht_auffrischen(adressen, verzoegerung=0.0):
     threading.Thread(target=lauf, daemon=True).start()
 
 
+def kuehlung_abfragen():
+    """Liest Temperatur und Relais der Tiefkuehler.
+
+    Direkt im Hausnetz, nicht durch den Range Extender der Zentrale — die
+    zwei Anfragen kosten das Schalten der Lampen nichts.
+    """
+    ergebnis = []
+    for g in licht_einstellung().get("kuehlung", []):
+        st = shelly(g["adresse"], "Shelly.GetStatus")
+        eintrag = {"name": g["name"], "grenze": g.get("grenze"),
+                   "relais_zeigen": g.get("relais", True),
+                   "erreichbar": st is not None,
+                   "temperatur": None, "an": None, "watt": None}
+        if st:
+            eintrag["temperatur"] = (st.get("temperature:100") or {}).get("tC")
+            sw = st.get("switch:0") or {}
+            eintrag["an"] = sw.get("output")
+            eintrag["watt"] = round(sw.get("apower") or 0)
+        ergebnis.append(eintrag)
+    return ergebnis
+
+
 def lichtschleife():
     """Fragt die Lampen im Hintergrund ab.
 
@@ -506,8 +543,11 @@ def lichtschleife():
                 if st is not None:
                     schalter[name] = bool(st.get("value"))
 
+        kuehlung = kuehlung_abfragen()
+
         with sperre:
             lichtzustand["lampen"] = lampen
+            lichtzustand["kuehlung"] = kuehlung
             lichtzustand["zentrale"] = klienten is not None
             lichtzustand["schalter"] = schalter
             lichtzustand["geprueft"] = time.time()
@@ -647,6 +687,7 @@ class Handler(BaseHTTPRequestHandler):
                 ampel = dict(zustand["ampel"])
                 zentrale_da = lichtzustand["zentrale"]
                 schalter_jetzt = dict(lichtzustand["schalter"])
+                kuehlung = [dict(k) for k in lichtzustand["kuehlung"]]
             lampen = lampen_jetzt()
             # "Alle Titel" steht immer vorn: Sie braucht keinen Server und
             # keine Pflege. Ohne sie stuende der Rechner beim allerersten
@@ -665,6 +706,7 @@ class Handler(BaseHTTPRequestHandler):
                 "licht": {"lampen": lampen,
                           "gruppen": licht_einstellung().get("gruppen", {}),
                           "schalter": schalter_jetzt,
+                          "kuehlung": kuehlung,
                           "zentrale": zentrale_da},
             })
 
