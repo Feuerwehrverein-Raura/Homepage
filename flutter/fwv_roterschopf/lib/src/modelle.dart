@@ -11,6 +11,7 @@ class RoterSchopfZustand {
     required this.gruppen,
     required this.lampen,
     required this.kuehlung,
+    this.thermostate = const [],
   });
 
   factory RoterSchopfZustand.ausJson(Map<String, dynamic> j) => RoterSchopfZustand(
@@ -19,6 +20,7 @@ class RoterSchopfZustand {
     gruppen: _liste(j['gruppen'], LichtGruppe.ausJson),
     lampen: _liste(j['lampen'], Lampe.ausJson),
     kuehlung: _liste(j['kuehlung'], Kuehler.ausJson),
+    thermostate: _liste(j['thermostate'], Thermostat.ausJson),
   );
 
   /// Wann gemessen (das Backend teilt eine Messung bis zu 10 s).
@@ -30,6 +32,7 @@ class RoterSchopfZustand {
   final List<LichtGruppe> gruppen;
   final List<Lampe> lampen;
   final List<Kuehler> kuehlung;
+  final List<Thermostat> thermostate;
 }
 
 List<T> _liste<T>(Object? roh, T Function(Map<String, dynamic>) bauen) => roh is List
@@ -136,4 +139,45 @@ class Kuehler {
   final bool zuWarm;
   final bool? stromAn;
   final int? watt;
+}
+
+/// Heizkoerper-Thermostat (Shelly BLU TRV am BLU Gateway). Nur Anzeige.
+class Thermostat {
+  const Thermostat({
+    required this.name,
+    required this.erreichbar,
+    required this.temperatur,
+    required this.soll,
+    required this.ventil,
+    required this.batterie,
+    required this.fehler,
+  });
+
+  factory Thermostat.ausJson(Map<String, dynamic> j) => Thermostat(
+    name: '${j['name']}',
+    erreichbar: j['erreichbar'] == true,
+    temperatur: (j['temperatur'] as num?)?.toDouble(),
+    soll: (j['soll'] as num?)?.toDouble(),
+    ventil: _ganz(j['ventil']),
+    batterie: _ganz(j['batterie']),
+    fehler: j['fehler'] is List ? [for (final f in j['fehler'] as List) '$f'] : const [],
+  );
+
+  final String name;
+  final bool erreichbar;
+
+  /// Gemessene Raumtemperatur am Heizkoerper (Grad Celsius).
+  final double? temperatur;
+
+  /// Eingestellte Solltemperatur.
+  final double? soll;
+
+  /// Ventiloeffnung in Prozent.
+  final int? ventil;
+
+  /// Batterie in Prozent.
+  final int? batterie;
+
+  /// Fehler des Geraets, z.B. "not_calibrated".
+  final List<String> fehler;
 }

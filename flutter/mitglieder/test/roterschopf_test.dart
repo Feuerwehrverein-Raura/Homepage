@@ -116,7 +116,14 @@ void main() {
     await tester.tap(reiter('Schopf'));
     await tester.pumpAndSettle();
     expect(find.text('Spots'), findsOneWidget);
+    await tester.tap(find.text('Temperaturen'));
+    await tester.pumpAndSettle();
     expect(find.text('Tiefkühlschrank Eis'), findsOneWidget);
+    await tester.drag(find.text('Tiefkühlschrank Eis'), const Offset(0, -250));
+    await tester.pumpAndSettle();
+    expect(find.text('Heizkörper'), findsOneWidget);
+    await tester.tap(find.text('Lampen'));
+    await tester.pumpAndSettle();
     final a = anfragen.firstWhere((a) => a.url.path == '/kiosk/roter-schopf');
     expect(a.url.toString(), 'https://api.fwv-raura.ch/kiosk/roter-schopf');
     expect(a.headers['Authorization'], 'Bearer ${s.accessToken}');

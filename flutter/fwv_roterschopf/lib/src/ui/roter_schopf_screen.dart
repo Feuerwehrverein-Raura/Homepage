@@ -1,14 +1,20 @@
-// Reiter "Roter Schopf": oben die zwei Lichtgruppen, darunter die
-// Tiefkuehler, ganz unten die einzelnen Lampen (zugeklappt). Vorbild: die
-// Lichtseite des Kiosk-Laptops im Lokal (roterschopf-kiosk/dienst).
+// Reiter "Roter Schopf" mit zwei Unter-Reitern:
 //
-// Die Tiefkuehler sind nur Anzeige — einen Tiefkuehler schaltet man nicht
-// versehentlich vom Handy aus. Ihr Skript auf dem Geraet schaltet den Strom
+//   Lampen       die zwei Lichtgruppen, darunter jede Lampe einzeln
+//   Temperaturen Tiefkuehler und Heizkoerper-Thermostat
+//
+// Vorbild: die Lichtseite des Kiosk-Laptops im Lokal (roterschopf-kiosk).
+// Jeder Unter-Reiter laedt selbst (eigene LadeAnsicht), damit Herunterziehen
+// zum Aktualisieren in beiden geht; das Backend teilt eine Messung 10 s.
+//
+// Temperaturen sind nur Anzeige — einen Tiefkuehler schaltet man nicht
+// versehentlich vom Handy aus. Sein Skript auf dem Geraet schaltet den Strom
 // ohnehin wieder ein, wenn es zu warm wird.
 
 import 'dart:async';
 
-import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, fehlerText, meldung;
+import 'package:fwv_anlass/fwv_anlass.dart'
+    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, reiterAufRot;
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
@@ -28,7 +34,12 @@ class RoterSchopfScreen extends StatefulWidget {
 }
 
 class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
-  final _ansicht = GlobalKey<LadeAnsichtState<RoterSchopfZustand>>();
+  final _lampen = GlobalKey<LadeAnsichtState<RoterSchopfZustand>>();
+  final _temperaturen = GlobalKey<LadeAnsichtState<RoterSchopfZustand>>();
+
+  Future<void> _neuLaden() async {
+    await Future.wait([?_lampen.currentState?.neuLaden(), ?_temperaturen.currentState?.neuLaden()]);
+  }
 
   /// Kennungen, die gerade geschaltet werden (Knopf zeigt "laeuft").
   final _laeuft = <String>{};
@@ -43,7 +54,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
         // Nur nachlesen, wenn der Reiter sichtbar ist: Die Hauptseite haelt
         // unsichtbare Reiter am Leben, schaltet ihnen aber die Ticker ab.
         if (mounted && TickerMode.valuesOf(context).enabled) {
-          unawaited(_ansicht.currentState?.neuLaden());
+          unawaited(_neuLaden());
         }
       });
     }
@@ -62,9 +73,9 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
       // Das Backend merkt sich den Befehl und zeigt ihn sofort; die Zentrale
       // schaltet eine Gruppe aber nacheinander durch. Gleich und nach ein
       // paar Sekunden nachlesen.
-      await _ansicht.currentState?.neuLaden();
+      await _lampen.currentState?.neuLaden();
       Timer(const Duration(seconds: 4), () {
-        if (mounted) unawaited(_ansicht.currentState?.neuLaden());
+        if (mounted) unawaited(_lampen.currentState?.neuLaden());
       });
     } on Object catch (e) {
       if (mounted) meldung(context, fehlerText(e));
@@ -75,17 +86,37 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Roter Schopf')),
-      body: LadeAnsicht<RoterSchopfZustand>(
-        key: _ansicht,
-        laden: widget.zugang.zustand,
-        bauen: (context, z, _) => _inhalt(context, z),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Roter Schopf'),
+          bottom: reiterAufRot(
+            tabs: const [
+              Tab(text: 'Lampen'),
+              Tab(text: 'Temperaturen'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            LadeAnsicht<RoterSchopfZustand>(
+              key: _lampen,
+              laden: widget.zugang.zustand,
+              bauen: (context, z, _) => _lampenSeite(context, z),
+            ),
+            LadeAnsicht<RoterSchopfZustand>(
+              key: _temperaturen,
+              laden: widget.zugang.zustand,
+              bauen: (context, z, _) => _temperaturSeite(context, z),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _inhalt(BuildContext context, RoterSchopfZustand z) {
+  Widget _lampenSeite(BuildContext context, RoterSchopfZustand z) {
     final farben = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
@@ -106,30 +137,39 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
               ),
             ),
           ),
-        const _Kopf('Licht'),
+        const _Kopf('Gruppen'),
         for (final g in z.gruppen) _gruppe(g),
+        if (z.lampen.isNotEmpty) ...[
+          _Kopf(
+            'Einzelne Lampen',
+            zusatz:
+                '${z.lampen.where((l) => l.erreichbar).length} von ${z.lampen.length} erreichbar',
+          ),
+          for (final l in z.lampen) _lampe(l),
+        ],
+        _Stand(z.stand),
+      ],
+    );
+  }
+
+  Widget _temperaturSeite(BuildContext context, RoterSchopfZustand z) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
+      children: [
         if (z.kuehlung.isNotEmpty) ...[
           const _Kopf('Tiefkühler'),
           for (final k in z.kuehlung) _KuehlerKarte(k),
         ],
-        if (z.lampen.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          ExpansionTile(
-            title: const Text('Einzelne Lampen'),
-            subtitle: Text(
-              '${z.lampen.where((l) => l.erreichbar).length} von ${z.lampen.length} erreichbar',
-            ),
-            children: [for (final l in z.lampen) _lampe(l)],
-          ),
+        if (z.thermostate.isNotEmpty) ...[
+          const _Kopf('Heizung'),
+          for (final t in z.thermostate) _ThermostatKarte(t),
         ],
-        if (z.stand != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Text(
-              'Stand ${_uhrzeit(z.stand!)} · zum Aktualisieren herunterziehen',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: farben.outline),
-            ),
+        if (z.kuehlung.isEmpty && z.thermostate.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('Keine Temperaturfühler eingerichtet.', textAlign: TextAlign.center),
           ),
+        _Stand(z.stand),
       ],
     );
   }
@@ -191,15 +231,83 @@ String _uhrzeit(DateTime t) =>
     '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
 class _Kopf extends StatelessWidget {
-  const _Kopf(this.text);
+  const _Kopf(this.text, {this.zusatz});
 
   final String text;
+  final String? zusatz;
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-    child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Expanded(child: Text(text, style: Theme.of(context).textTheme.titleMedium)),
+        if (zusatz != null)
+          Text(
+            zusatz!,
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: Theme.of(context).colorScheme.outline),
+          ),
+      ],
+    ),
   );
+}
+
+class _Stand extends StatelessWidget {
+  const _Stand(this.stand);
+
+  final DateTime? stand;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stand == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Text(
+        'Stand ${_uhrzeit(stand!)} · zum Aktualisieren herunterziehen',
+        style: Theme.of(context).textTheme.bodySmall
+            ?.copyWith(color: Theme.of(context).colorScheme.outline),
+      ),
+    );
+  }
+}
+
+String _grad(double t) => '${t.toStringAsFixed(1).replaceAll('.', ',')} °C';
+
+class _ThermostatKarte extends StatelessWidget {
+  const _ThermostatKarte(this.t);
+
+  final Thermostat t;
+
+  @override
+  Widget build(BuildContext context) {
+    final teile = <String>[
+      if (!t.erreichbar) 'nicht erreichbar',
+      if (t.erreichbar && t.soll != null) 'Soll ${_grad(t.soll!)}',
+      if (t.erreichbar && t.ventil != null) 'Ventil ${t.ventil} %',
+      if (t.erreichbar && t.batterie != null) 'Batterie ${t.batterie} %',
+      // Uebersetzt, was das Thermostat meldet; Unbekanntes so, wie es kommt.
+      for (final f in t.fehler) f == 'not_calibrated' ? 'nicht kalibriert' : f,
+    ];
+    final temp = t.temperatur;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: ListTile(
+        leading: const Icon(Icons.thermostat),
+        title: Text(t.name),
+        subtitle: Text(teile.join(' · ')),
+        trailing: Text(
+          !t.erreichbar || temp == null ? '—' : _grad(temp),
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Laeuft extends StatelessWidget {

@@ -19,6 +19,9 @@
 // Nur Anzeige. Die Grenze ist dieselbe wie im Skript "Tiefkuehl-Waechter"
 // auf dem Geraet.
 //
+// Thermostate: Shelly BLU TRV am Heizkoerper, per Bluetooth am BLU Gateway
+// (hinter der Zentrale, wie die Lampen). Nur Anzeige.
+//
 // Quelle der Zuordnungen: roterschopf-kiosk/zentrale/ (lichtgruppen.js,
 // README.md). Aendert sich dort etwas, muss es hier nachgezogen werden.
 //
@@ -55,6 +58,9 @@ const VORGABE = {
     kuehlung: [
         { name: 'Tiefkühlschrank Eis', adresse: '192.168.88.76', grenze: -12 },
         { name: 'Tiefkühlschrank Landi', adresse: '192.168.88.71', grenze: -12 }
+    ],
+    thermostate: [
+        { name: 'Heizkörper', geraet: '192.168.33.31', id: 200 }
     ]
 };
 
@@ -175,6 +181,22 @@ function roterSchopf({
         };
     }
 
+    async function thermostatMessen(t, karte) {
+        const port = karte ? karte.get(t.geraet) : null;
+        const st = port ? await rpc(`${zentrale}:${port}`, 'BluTrv.GetStatus', { id: t.id }) : null;
+        const zahl = v => (typeof v === 'number' ? v : null);
+        return {
+            name: t.name,
+            // Gateway antwortet UND das Thermostat ist per Bluetooth verbunden.
+            erreichbar: !!st && st.connected !== false,
+            temperatur: st ? zahl(st.current_C) : null,
+            soll: st ? zahl(st.target_C) : null,
+            ventil: st ? zahl(st.pos) : null,
+            batterie: st ? zahl(st.battery) : null,
+            fehler: st && Array.isArray(st.errors) ? st.errors.map(String) : []
+        };
+    }
+
     async function messen() {
         const karte = await ports();
         const lampen = karte
@@ -182,7 +204,9 @@ function roterSchopf({
             : alleLampen.map(l => ({ kennung: l.kennung, gruppe: l.gruppe, name: null,
                 erreichbar: false, an: false, watt: null }));
         const kuehlung = await Promise.all(einstellung.kuehlung.map(kuehlerMessen));
-        return { zentrale: !!karte, lampen, kuehlung, zeit: jetzt() };
+        const thermostate = [];
+        for (const t of einstellung.thermostate || []) thermostate.push(await thermostatMessen(t, karte));
+        return { zentrale: !!karte, lampen, kuehlung, thermostate, zeit: jetzt() };
     }
 
     function befehleAnwenden(lampen) {
@@ -216,7 +240,8 @@ function roterSchopf({
             gruppen,
             lampen: lampen.map(({ kennung, gruppe, name, erreichbar, an, watt }) =>
                 ({ kennung, gruppe, name, erreichbar, an, watt })),
-            kuehlung: messung.kuehlung
+            kuehlung: messung.kuehlung,
+            thermostate: messung.thermostate
         };
     }
 

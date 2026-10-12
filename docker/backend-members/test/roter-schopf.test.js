@@ -47,6 +47,10 @@ function fakeLokal({ zentraleWeg = false, eisWarm = false } = {}) {
             if (u.pathname === '/rpc/Switch.GetConfig') {
                 return antwort({ id: Number(kanal), name: `Lampe ${ip.split('.').pop()}/${kanal}` });
             }
+            if (u.pathname === '/rpc/BluTrv.GetStatus' && ip === '192.168.33.31') {
+                return antwort({ id: 200, target_C: 21, current_C: 21.3, pos: 0,
+                    errors: ['not_calibrated'], connected: true, battery: 100 });
+            }
             if (u.pathname === '/rpc/Switch.Set') {
                 ausgang[k] = u.searchParams.get('on') === 'true';
                 return antwort({ was_on: false });
@@ -95,6 +99,9 @@ test('Zustand: Gruppen aus den Lampen, stromlose Regler, Tiefkuehler', async () 
     const landi = z.kuehlung.find(k => k.name === 'Tiefkühlschrank Landi');
     assert.equal(landi.zu_warm, true, 'Fuehler ohne Wert gilt als zu warm');
 
+    assert.deepEqual(z.thermostate, [{ name: 'Heizkörper', erreichbar: true, temperatur: 21.3,
+        soll: 21, ventil: 0, batterie: 100, fehler: ['not_calibrated'] }]);
+
     if (process.env.FIXTURES_SCHREIBEN) {
         const ziel = path.join(__dirname, 'fixtures', 'roter-schopf-app.json');
         fs.mkdirSync(path.dirname(ziel), { recursive: true });
@@ -126,6 +133,7 @@ test('Zentrale weg: alle Lampen nicht erreichbar, Tiefkuehler trotzdem da', asyn
     assert.ok(z.lampen.every(l => !l.erreichbar));
     assert.ok(z.gruppen.every(g => !g.erreichbar));
     assert.equal(z.kuehlung[0].erreichbar, true);
+    assert.equal(z.thermostate[0].erreichbar, false, 'Gateway haengt hinter der Zentrale');
 });
 
 test('Gruppe schalten geht ueber das Skript der Zentrale und wird vorgemerkt', async () => {

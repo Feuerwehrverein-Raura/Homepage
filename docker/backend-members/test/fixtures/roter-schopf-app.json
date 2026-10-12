@@ -138,5 +138,18 @@
       "strom_an": false,
       "watt": 0
     }
+  ],
+  "thermostate": [
+    {
+      "name": "Heizkörper",
+      "erreichbar": true,
+      "temperatur": 21.3,
+      "soll": 21,
+      "ventil": 0,
+      "batterie": 100,
+      "fehler": [
+        "not_calibrated"
+      ]
+    }
   ]
 }

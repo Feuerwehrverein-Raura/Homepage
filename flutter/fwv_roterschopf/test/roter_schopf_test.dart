@@ -46,6 +46,12 @@ void main() {
     );
     final landi = z.kuehlung.last;
     expect([landi.temperatur, landi.zuWarm], [null, true]);
+    final trv = z.thermostate.single;
+    expect(
+      [trv.name, trv.erreichbar, trv.temperatur, trv.soll, trv.ventil, trv.batterie],
+      ['Heizkörper', true, 21.3, 21.0, 0, 100],
+    );
+    expect(trv.fehler, ['not_calibrated']);
   });
 
   Future<_Zugang> zeigen(WidgetTester tester) async {
@@ -58,15 +64,29 @@ void main() {
     return zugang;
   }
 
-  testWidgets('Zeigt Gruppen und Tiefkuehler; Gruppe teilweise an -> einschalten', (tester) async {
+  testWidgets('Zwei Unter-Reiter: Lampen und Temperaturen; Gruppe teilweise an -> einschalten', (
+    tester,
+  ) async {
     final zugang = await zeigen(tester);
     expect(find.text('Spots'), findsOneWidget);
     expect(find.text('2 von 8 an'), findsOneWidget);
     expect(find.text('4 Lampen · aus'), findsOneWidget);
+    expect(find.text('-18,2 °C'), findsNothing, reason: 'Temperaturen im zweiten Reiter');
+
+    await tester.tap(find.text('Temperaturen'));
+    await tester.pumpAndSettle();
     expect(find.text('-18,2 °C'), findsOneWidget);
     expect(find.text('Strom an · 90 W'), findsOneWidget);
     expect(find.text('Fühler liefert keinen Wert'), findsOneWidget);
+    expect(find.text('Heizkörper'), findsOneWidget);
+    expect(find.text('21,3 °C'), findsOneWidget);
+    expect(
+      find.text('Soll 21,0 °C · Ventil 0 % · Batterie 100 % · nicht kalibriert'),
+      findsOneWidget,
+    );
 
+    await tester.tap(find.text('Lampen'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Spots'));
     await tester.pump();
     expect(zugang.geschaltet, [('gruppe:spots', true)]);
@@ -75,9 +95,7 @@ void main() {
 
   testWidgets('Einzelne Lampe schalten, stromlose Lampe gesperrt', (tester) async {
     final zugang = await zeigen(tester);
-    await tester.scrollUntilVisible(find.text('Einzelne Lampen'), 200);
-    await tester.tap(find.text('Einzelne Lampen'));
-    await tester.pumpAndSettle();
+    expect(find.text('Einzelne Lampen'), findsOneWidget);
     expect(find.text('10 von 12 erreichbar'), findsOneWidget);
 
     final ersteLampe = find.ancestor(of: find.text('Lampe 12/0'), matching: find.byType(ListTile));
