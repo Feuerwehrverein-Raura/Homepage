@@ -34,6 +34,8 @@ dependencies:
     path: ../fwv_anlass
   fwv_lager:
     path: ../fwv_lager
+  fwv_roterschopf:
+    path: ../fwv_roterschopf
   flutter:
     sdk: flutter
 

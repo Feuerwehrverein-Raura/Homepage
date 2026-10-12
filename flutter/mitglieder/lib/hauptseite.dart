@@ -1,11 +1,13 @@
 // Hauptseite nach der Anmeldung: Reiter unten.
 //
-// Mitglieder:          Anlässe · (Organisator) · (Lager) · Profil · Einstellungen
+// Mitglieder:          Anlässe · (Organisator) · (Lager) · (Schopf) · Profil · Einstellungen
 // Externe Organisatoren: Organisator · Anlässe · Einstellungen
 //
 // "Organisator" erscheint bei Mitgliedern nur, wenn sie Anlaesse
 // organisieren ([OrganisatorPruefung]); "Lager" nur mit der Authentik-Gruppe
-// Lager, Vorstand oder admin ([Dienste.lagerSichtbar]). Die Reiter werden
+// Lager, Vorstand oder admin ([Dienste.lagerSichtbar]); "Schopf" (Licht und
+// Tiefkuehler im Roten Schopf) nur mit Roter Schopf, Vorstand oder admin
+// ([Dienste.roterSchopfSichtbar]). Die Reiter werden
 // erst beim ersten Oeffnen gebaut und bleiben danach erhalten (Scroll-Stand,
 // geladene Daten).
 
@@ -22,8 +24,9 @@ import 'einstellungen/update_hinweis.dart';
 import 'lager/lager_tab.dart';
 import 'organisator/organisator_tab.dart';
 import 'profil/profil_tab.dart';
+import 'roterschopf/roterschopf_tab.dart';
 
-enum Reiter { anlaesse, organisator, lager, profil, einstellungen }
+enum Reiter { anlaesse, organisator, lager, roterSchopf, profil, einstellungen }
 
 class Hauptseite extends StatefulWidget {
   const Hauptseite({super.key, required this.dienste});
@@ -52,12 +55,13 @@ class _HauptseiteState extends State<Hauptseite> {
     });
   }
 
-  List<Reiter> _reiter(bool organisiert, bool lager) => _externerOrganisator
+  List<Reiter> _reiter(bool organisiert, bool lager, bool roterSchopf) => _externerOrganisator
       ? const [Reiter.organisator, Reiter.anlaesse, Reiter.einstellungen]
       : [
           Reiter.anlaesse,
           if (organisiert) Reiter.organisator,
           if (lager) Reiter.lager,
+          if (roterSchopf) Reiter.roterSchopf,
           Reiter.profil,
           Reiter.einstellungen,
         ];
@@ -66,6 +70,7 @@ class _HauptseiteState extends State<Hauptseite> {
     Reiter.anlaesse => AnlaesseTab(dienste: widget.dienste),
     Reiter.organisator => OrganisatorTab(dienste: widget.dienste),
     Reiter.lager => LagerTab(dienste: widget.dienste),
+    Reiter.roterSchopf => RoterSchopfTab(dienste: widget.dienste),
     Reiter.profil => ProfilTab(dienste: widget.dienste),
     Reiter.einstellungen => EinstellungenTab(dienste: widget.dienste),
   };
@@ -85,6 +90,11 @@ class _HauptseiteState extends State<Hauptseite> {
       icon: Icon(Icons.inventory_2_outlined),
       selectedIcon: Icon(Icons.inventory_2),
       label: 'Lager',
+    ),
+    Reiter.roterSchopf => const NavigationDestination(
+      icon: Icon(Icons.lightbulb_outline),
+      selectedIcon: Icon(Icons.lightbulb),
+      label: 'Schopf',
     ),
     Reiter.profil => const NavigationDestination(
       icon: Icon(Icons.person_outline),
@@ -107,6 +117,7 @@ class _HauptseiteState extends State<Hauptseite> {
         final reiter = _reiter(
           widget.dienste.organisator.organisiert,
           widget.dienste.lagerSichtbar,
+          widget.dienste.roterSchopfSichtbar,
         );
         // Verschwindet der aktive Reiter (z.B. keine Anlaesse mehr), zurueck
         // zum ersten.

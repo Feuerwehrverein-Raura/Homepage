@@ -18,6 +18,7 @@ const admin = require('firebase-admin');
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
+const { roterSchopf, hatRoterSchopfZugang } = require('./roter-schopf');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -6540,6 +6541,54 @@ app.delete('/kiosk/sender/:id', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('DELETE /kiosk/sender/:id:', error.message);
         res.status(500).json({ error: 'Sender konnte nicht geloescht werden' });
+    }
+});
+
+// --- Roter Schopf: Licht und Tiefkuehler (Mitglieder-App) ------------------
+//
+// Fuer die Gruppe "Roter Schopf" sowie Vorstand und admin. Der Server
+// erreicht die Geraete ueber den WireGuard-Tunnel; Einzelheiten in
+// src/roter-schopf.js.
+
+const roterSchopfDienst = roterSchopf();
+
+function roterSchopfZugang(req, res, next) {
+    if (!hatRoterSchopfZugang(req.user?.groups)) {
+        return res.status(403).json({ error: 'Nur fuer die Gruppe Roter Schopf' });
+    }
+    next();
+}
+
+app.get('/kiosk/roter-schopf', authenticateToken, roterSchopfZugang, async (req, res) => {
+    try {
+        res.json(await roterSchopfDienst.zustand());
+    } catch (error) {
+        console.error('GET /kiosk/roter-schopf:', error.message);
+        res.status(500).json({ error: 'Zustand konnte nicht gelesen werden' });
+    }
+});
+
+// { kennung: "gruppe:spots" | "192.168.33.4:1", an: true|false }
+app.post('/kiosk/roter-schopf/licht', authenticateToken, roterSchopfZugang, async (req, res) => {
+    try {
+        const kennung = String(req.body?.kennung || '');
+        const an = req.body?.an === true;
+        if (typeof req.body?.an !== 'boolean' || !kennung) {
+            return res.status(400).json({ error: 'kennung und an (true/false) noetig' });
+        }
+        const ergebnis = kennung.startsWith('gruppe:')
+            ? await roterSchopfDienst.schalteGruppe(kennung.slice(7), an)
+            : await roterSchopfDienst.schalteLampe(kennung, an);
+        // Wer im Lokal Licht schaltet, soll sich nachvollziehen lassen.
+        console.log(`Roter Schopf: ${req.user?.email || req.user?.sub} schaltet ${kennung} ${an ? 'ein' : 'aus'} -> ${ergebnis.ok ? 'ok' : ergebnis.grund}`);
+        if (!ergebnis.ok) {
+            const status = ergebnis.grund.startsWith('unbekannte') ? 404 : 502;
+            return res.status(status).json({ error: ergebnis.grund });
+        }
+        res.json(ergebnis);
+    } catch (error) {
+        console.error('POST /kiosk/roter-schopf/licht:', error.message);
+        res.status(500).json({ error: 'Licht konnte nicht geschaltet werden' });
     }
 });
 

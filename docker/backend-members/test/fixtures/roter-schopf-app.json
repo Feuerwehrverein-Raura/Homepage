@@ -1,0 +1,142 @@
+{
+  "stand": "2026-10-12T18:30:00.000Z",
+  "zentrale": true,
+  "gruppen": [
+    {
+      "kennung": "spots",
+      "name": "Spots",
+      "anzahl": 8,
+      "anzahl_an": 2,
+      "an": false,
+      "teilweise": true,
+      "erreichbar": true
+    },
+    {
+      "kennung": "arbeitsleuchten",
+      "name": "Arbeitsleuchten",
+      "anzahl": 4,
+      "anzahl_an": 0,
+      "an": false,
+      "teilweise": false,
+      "erreichbar": true
+    }
+  ],
+  "lampen": [
+    {
+      "kennung": "192.168.33.12:0",
+      "gruppe": "spots",
+      "name": "Lampe 12/0",
+      "erreichbar": true,
+      "an": true,
+      "watt": 42
+    },
+    {
+      "kennung": "192.168.33.13:0",
+      "gruppe": "spots",
+      "name": "Lampe 13/0",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    },
+    {
+      "kennung": "192.168.33.4:1",
+      "gruppe": "spots",
+      "name": "Lampe 4/1",
+      "erreichbar": true,
+      "an": true,
+      "watt": 42
+    },
+    {
+      "kennung": "192.168.33.5:0",
+      "gruppe": "spots",
+      "name": "Lampe 5/0",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    },
+    {
+      "kennung": "192.168.33.5:1",
+      "gruppe": "spots",
+      "name": "Lampe 5/1",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    },
+    {
+      "kennung": "192.168.33.6:0",
+      "gruppe": "spots",
+      "name": "Lampe 6/0",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    },
+    {
+      "kennung": "192.168.33.7:0",
+      "gruppe": "spots",
+      "name": null,
+      "erreichbar": false,
+      "an": false,
+      "watt": null
+    },
+    {
+      "kennung": "192.168.33.8:1",
+      "gruppe": "spots",
+      "name": "Lampe 8/1",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    },
+    {
+      "kennung": "192.168.33.4:0",
+      "gruppe": "arbeitsleuchten",
+      "name": "Lampe 4/0",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    },
+    {
+      "kennung": "192.168.33.6:1",
+      "gruppe": "arbeitsleuchten",
+      "name": "Lampe 6/1",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    },
+    {
+      "kennung": "192.168.33.7:1",
+      "gruppe": "arbeitsleuchten",
+      "name": null,
+      "erreichbar": false,
+      "an": false,
+      "watt": null
+    },
+    {
+      "kennung": "192.168.33.8:0",
+      "gruppe": "arbeitsleuchten",
+      "name": "Lampe 8/0",
+      "erreichbar": true,
+      "an": false,
+      "watt": 0
+    }
+  ],
+  "kuehlung": [
+    {
+      "name": "Tiefkühlschrank Eis",
+      "erreichbar": true,
+      "temperatur": -18.2,
+      "grenze": -12,
+      "zu_warm": false,
+      "strom_an": true,
+      "watt": 90
+    },
+    {
+      "name": "Tiefkühlschrank Landi",
+      "erreichbar": true,
+      "temperatur": null,
+      "grenze": -12,
+      "zu_warm": true,
+      "strom_an": false,
+      "watt": 0
+    }
+  ]
+}

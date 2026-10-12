@@ -11,6 +11,7 @@ import 'package:flutter/widgets.dart' show BuildContext;
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_lager/fwv_lager.dart';
+import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -58,6 +59,7 @@ class Dienste {
     Future<String?> Function(BuildContext context)? barcodeScannen,
     Uri? inventarBasis,
     this.update = const KeinAppUpdate(),
+    this.roterSchopfTakt = const Duration(seconds: 20),
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
        dokumentFotoWaehlen = dokumentFotoWaehlen ?? _dokumentFotoMitImagePicker,
        barcodeScannen = barcodeScannen ?? _barcodeMitKamera,
@@ -163,6 +165,18 @@ class Dienste {
     umgebung: LagerUmgebung(scannen: barcodeScannen),
     ausleihen: ausleihen,
   );
+
+  /// Darf diese Sitzung in den Roten Schopf (Licht, Tiefkuehler)?
+  /// Authentik-Gruppe Roter Schopf, Vorstand oder admin — auch mit QR-Code
+  /// angemeldet; externe Organisatoren nie.
+  bool get roterSchopfSichtbar => hatRoterSchopfZugang(sitzung.sitzung);
+
+  /// Wie oft der Reiter "Schopf" von selbst nachliest, solange er offen ist
+  /// (null in Tests: kein Takt).
+  final Duration? roterSchopfTakt;
+
+  /// Roter Schopf (Paket fwv_roterschopf): api-members mit demselben Token.
+  RoterSchopfZugang get roterSchopf => ApiRoterSchopfZugang(sitzung.api);
 
   /// Darf diese Sitzung ausleihen? Jedes angemeldete Mitglied, ob ueber
   /// Authentik oder per QR-Code (die Inventar-API prueft Mitglieder-Tokens

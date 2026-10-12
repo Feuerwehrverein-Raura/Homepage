@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        paket: [fwv_core, fwv_anlass, fwv_lager, mitglieder]
+        paket: [fwv_core, fwv_anlass, fwv_lager, fwv_roterschopf, mitglieder]
     defaults:
       run:
         working-directory: flutter/${{ matrix.paket }}

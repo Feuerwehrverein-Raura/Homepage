@@ -3,7 +3,9 @@ name: Flutter-Apps
 # Die Flutter-Apps, die die nativen Apps ersetzen (docs/flutter-entscheidung.md):
 # flutter/fwv_core (gemeinsamer Kern), flutter/fwv_anlass (Anlass-Verwaltung
 # mit Oberflaeche, Organisator + Vorstand), flutter/fwv_lager (Lager mit
-# Oberflaeche, beide Apps), flutter/mitglieder (Mitglieder + Organisatoren),
+# Oberflaeche, beide Apps), flutter/fwv_roterschopf (Licht und Tiefkuehler
+# im Roten Schopf, Vertrag aus docker/backend-members/test/fixtures),
+# flutter/mitglieder (Mitglieder + Organisatoren),
 # spaeter flutter/vorstand. Laeuft auch, wenn sich der Vertrag des Backends
 # aendert — der Kern testet gegen dieselben Dateien. Die Vertraege der
 # Inventar-API (flutter/fwv_lager/test/fixtures/inventar-api.json und
@@ -16,11 +18,13 @@ on:
     paths:
       - 'flutter/**'
       - 'docker/backend-events/test/fixtures/**'
+      - 'docker/backend-members/test/fixtures/**'
       - '.github/workflows/flutter-apps.yml'
   pull_request:
     paths:
       - 'flutter/**'
       - 'docker/backend-events/test/fixtures/**'
+      - 'docker/backend-members/test/fixtures/**'
       - '.github/workflows/flutter-apps.yml'
   workflow_dispatch:
 
@@ -31,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        paket: [fwv_core, fwv_anlass, fwv_lager, mitglieder]
+        paket: [fwv_core, fwv_anlass, fwv_lager, fwv_roterschopf, mitglieder]
     defaults:
       run:
         working-directory: flutter/${{ matrix.paket }}
