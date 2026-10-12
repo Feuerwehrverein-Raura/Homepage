@@ -105,6 +105,10 @@ class _Backend {
         });
       case 'GET /members/me/notifications':
         return json(prefs);
+      case 'GET /kiosk/playlists':
+        return json([
+          {'id': 'p1', 'name': 'Chilbi Abend', 'anzahl': 12, 'erstellt_von_name': 'Erika Muster'},
+        ]);
       case 'PUT /members/me/notifications':
         prefs = ((body as Map)['preferences'] as List).cast<Map<String, Object?>>();
         return json(prefs);
@@ -321,7 +325,7 @@ void main() {
         await tippen(tester, find.byTooltip('Profil bearbeiten'));
         final feld = find.widgetWithText(TextFormField, 'IBAN (für Rückerstattungen)');
         await tester.ensureVisible(feld);
-      await tester.pumpAndSettle();
+        await tester.pumpAndSettle();
         await tester.enterText(feld, 'CH93 0076 2011 6238 5295 8');
         await tester.tap(find.byKey(const Key('profil-speichern')));
         await tester.pumpAndSettle();
@@ -389,6 +393,16 @@ void main() {
   });
 
   group('Einstellungen', () {
+    testWidgets('Musik im Roten Schopf: Playlists von api-members', (tester) async {
+      await starten(tester);
+      await reiter(tester, 'Mehr');
+      await tester.ensureVisible(find.text('Musik im Roten Schopf'));
+      await tippen(tester, find.text('Musik im Roten Schopf'));
+      expect(find.text('Chilbi Abend'), findsOneWidget);
+      expect(find.text('12 Titel · von Erika Muster'), findsOneWidget);
+      expect(backend.gab('GET', '/kiosk/playlists'), isTrue);
+    });
+
     testWidgets('Version, Newsletter an (lokal gemerkt)', (tester) async {
       await starten(tester);
       await reiter(tester, 'Mehr');

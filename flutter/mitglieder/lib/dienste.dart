@@ -175,6 +175,10 @@ class Dienste {
   /// (null in Tests: kein Takt).
   final Duration? roterSchopfTakt;
 
+  /// Musik fuer den Laptop im Roten Schopf (Playlists, Radiosender) - fuer
+  /// jedes Mitglied, wie im Mitgliederbereich der Webseite.
+  MusikZugang get musik => ApiMusikZugang(sitzung.api);
+
   /// Roter Schopf (Paket fwv_roterschopf): api-members mit demselben Token.
   RoterSchopfZugang get roterSchopf => ApiRoterSchopfZugang(sitzung.api);
 

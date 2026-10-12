@@ -2,11 +2,14 @@
 // Adressbuch, App-Version und Abmelden. Aufbau wie members-ios SettingsView
 // (die Android-App hat ihn uebernommen).
 //
+// "Musik im Roten Schopf" (Playlists, Radiosender) fuer jedes Mitglied.
+//
 // Externe Organisatoren haben kein Mitgliederkonto; sie sehen nur, wer
 // angemeldet ist, die Version und Abmelden. Vorstand und admin sehen
 // zusaetzlich "Gruppen verwalten" (Authentik-Gruppen, gruppen_screen.dart).
 
 import 'package:fwv_core/fwv_core.dart';
+import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
@@ -117,6 +120,14 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
               subtitle: const Text('Funktions-Mails, Cloud, geteilte Konten'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _oeffnen(ZugaengeScreen(dienste: _d)),
+            ),
+            const Abschnitt('Roter Schopf'),
+            ListTile(
+              leading: const Icon(Icons.queue_music),
+              title: const Text('Musik im Roten Schopf'),
+              subtitle: const Text('Playlists und Radiosender für den Laptop'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _oeffnen(MusikScreen(zugang: _d.musik)),
             ),
             if (darfGruppenVerwalten(sitzung)) ...[
               const Abschnitt('Vorstand'),
