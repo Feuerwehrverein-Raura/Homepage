@@ -6,6 +6,7 @@
 
 import 'dart:convert';
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -133,7 +134,7 @@ class _Inhalt extends StatelessWidget {
     final anm = app.anmeldung;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 16, 16, 24)),
       children: [
         if (app.abgesagt)
           const Padding(

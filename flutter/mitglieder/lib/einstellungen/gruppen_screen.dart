@@ -14,7 +14,15 @@
 import 'dart:async';
 
 import 'package:fwv_anlass/fwv_anlass.dart'
-    show HinweisArt, HinweisChip, LadeAnsicht, LadeAnsichtState, fehlerText, meldung, nachfragen;
+    show
+        HinweisArt,
+        HinweisChip,
+        LadeAnsicht,
+        LadeAnsichtState,
+        fehlerText,
+        meldung,
+        nachfragen,
+        mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -280,7 +288,7 @@ class _GruppeScreenState extends State<GruppeScreen> {
         label: const Text('Aufnehmen'),
       ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 96),
+        padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 96)),
         children: [
           if (_laeuft) const LinearProgressIndicator(),
           if (g.automatisch)

@@ -2,6 +2,7 @@
 // die der Vorstand fuer den Anlass vergeben hat (POST events/login).
 // Organisatoren, die Mitglied sind, melden sich mit ihrem Mitgliederkonto an.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -57,7 +58,7 @@ class _OrganisatorLoginScreenState extends State<OrganisatorLoginScreen> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(24),
+                padding: mitSystemleiste(context, const EdgeInsets.all(24)),
                 children: [
                   const Text(
                     'Für Organisatoren, die nicht Mitglied sind: Melde dich mit der '

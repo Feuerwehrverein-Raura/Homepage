@@ -16,6 +16,9 @@ dependencies:
   fwv_anlass:
     path: ../fwv_anlass
   material_ui: ^1.6.0
+  # Vorhoeren der Musik (lokale Datei, kein Stream - siehe musik/vorhoeren.dart)
+  just_audio: ^0.10.6
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

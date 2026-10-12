@@ -14,7 +14,7 @@
 import 'dart:async';
 
 import 'package:fwv_anlass/fwv_anlass.dart'
-    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, reiterAufRot;
+    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, reiterAufRot, mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
@@ -119,7 +119,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
   Widget _lampenSeite(BuildContext context, RoterSchopfZustand z) {
     final farben = Theme.of(context).colorScheme;
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
       children: [
         if (!z.zentrale)
           Card(
@@ -154,7 +154,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
 
   Widget _temperaturSeite(BuildContext context, RoterSchopfZustand z) {
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
       children: [
         if (z.kuehlung.isNotEmpty) ...[
           const _Kopf('Tiefkühler'),

@@ -194,7 +194,7 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           // Unten Platz fuer den "Person"-Knopf.
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 8, 12, 96)),
           children: [
             _Kopf(anlass: a),
             const SizedBox(height: 8),

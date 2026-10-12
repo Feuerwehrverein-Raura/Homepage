@@ -1,7 +1,8 @@
 // Ein Lagerort (Kiste, Regal): was drin ist und wie viel. Antippen oeffnet
 // den Artikel.
 
-import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, fehlerText, meldung;
+import 'package:fwv_anlass/fwv_anlass.dart'
+    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
@@ -61,7 +62,7 @@ class _LagerortScreenState extends State<LagerortScreen> {
           laden: () => widget.lager.zugang.lagerort(widget.lagerort.id),
           bauen: (context, inhalt, _) => ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
             children: [
               SwitchListTile(
                 key: const Key('kiste-ausleihbar'),

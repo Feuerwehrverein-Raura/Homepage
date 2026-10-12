@@ -3,6 +3,8 @@
 // Playlists und Sender anlegen; fremde Playlists loeschen nur Vorstand und
 // admin - das prueft das Backend.
 
+import 'dart:typed_data';
+
 import 'package:fwv_core/fwv_core.dart';
 
 import 'modelle.dart';
@@ -23,6 +25,9 @@ abstract class MusikZugang {
   Future<String> speichern({String? id, required String name, required List<String> pfade});
 
   Future<void> loeschen(String id);
+
+  /// Die Datei eines Titels zum Vorhoeren (angemeldet geladen).
+  Future<Uint8List> titelLaden(String pfad);
 
   Future<List<Radiosender>> sender();
   Future<void> senderAnlegen({required String name, required String url});
@@ -81,6 +86,9 @@ class ApiMusikZugang extends MusikZugang {
 
   @override
   Future<void> loeschen(String id) => api.delete('kiosk/playlists/${_e(id)}');
+
+  @override
+  Future<Uint8List> titelLaden(String pfad) => api.datei('kiosk/anhoeren', abfrage: {'pfad': pfad});
 
   @override
   Future<List<Radiosender>> sender() async =>

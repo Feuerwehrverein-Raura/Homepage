@@ -12,7 +12,8 @@ import 'package:fwv_anlass/fwv_anlass.dart'
         LadeAnsichtState,
         UntenLeiste,
         fehlerText,
-        meldung;
+        meldung,
+        mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -163,7 +164,7 @@ class _ArtikelScreenState extends State<ArtikelScreen> {
     final bild = _zugang.bildAdresse(a.bild);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 12, 16, 24)),
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,

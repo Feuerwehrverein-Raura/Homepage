@@ -8,6 +8,7 @@
 //    in kontakte_abgleich.dart.
 
 import 'package:flutter/services.dart';
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
@@ -39,7 +40,7 @@ class CardDavScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Adressbuch')),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
         children: [
           const Abschnitt('Empfohlen'),
           Padding(

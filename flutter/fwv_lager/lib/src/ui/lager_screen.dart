@@ -4,7 +4,8 @@
 
 import 'dart:async';
 
-import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, reiterAufRot;
+import 'package:fwv_anlass/fwv_anlass.dart'
+    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, reiterAufRot, mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import '../ausleihe/ui/listen_screens.dart';
@@ -125,7 +126,7 @@ class _LagerScreenState extends State<LagerScreen> {
               leer: 'Noch keine Lagerorte erfasst.',
               bauen: (context, orte, _) => ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 96),
+                padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 96)),
                 children: [
                   for (final o in orte)
                     ListTile(
@@ -152,7 +153,7 @@ class _LagerScreenState extends State<LagerScreen> {
               leer: 'Alles genug an Lager.',
               bauen: (context, liste, _) => ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 96),
+                padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 96)),
                 children: [
                   for (final a in liste)
                     ListTile(
@@ -266,7 +267,7 @@ class _ArtikelListeState extends State<_ArtikelListe> with AutomaticKeepAliveCli
             leer: 'Keine Artikel gefunden.',
             bauen: (context, liste, _) => ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 96),
+              padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 96)),
               children: [
                 for (final a in liste)
                   ListTile(

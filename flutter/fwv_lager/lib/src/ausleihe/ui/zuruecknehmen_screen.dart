@@ -7,7 +7,7 @@
 import 'dart:typed_data';
 
 import 'package:fwv_anlass/fwv_anlass.dart'
-    show Abschnitt, UntenLeiste, fehlerText, meldung, nachfragen;
+    show Abschnitt, UntenLeiste, fehlerText, meldung, nachfragen, mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
@@ -187,7 +187,7 @@ class _ZuruecknehmenScreenState extends State<ZuruecknehmenScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('Rückgabe #${_a.id}')),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 8, 16, 24)),
         children: [
           Text(
             [?_a.app.ausleiherText, ?_a.app.zeitraumText].join(' · '),

@@ -5,6 +5,7 @@
 // Speichern sitzt oben in der Titelleiste und ist damit auch bei offener
 // Tastatur sichtbar.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -179,7 +180,7 @@ class _ProfilBearbeitenScreenState extends State<ProfilBearbeitenScreen> {
           // Kein ListView: dessen Felder ausserhalb des Bildschirms gibt es nicht,
           // und das Formular koennte sie dann nicht pruefen.
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 16, 16, 32)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

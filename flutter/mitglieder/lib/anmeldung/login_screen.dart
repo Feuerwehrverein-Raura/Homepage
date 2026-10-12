@@ -7,7 +7,7 @@
 // sich normal als Mitglied an.
 
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
-import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben;
+import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben, mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -138,11 +138,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         backgroundColor: FwvFarben.loginHintergrund,
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 16)),
             child: Column(
               children: [
                 const SizedBox(height: 32),
-                const Image(image: logoMitglieder, width: 180, height: 180, semanticLabel: 'FWV Logo'),
+                const Image(
+                  image: logoMitglieder,
+                  width: 180,
+                  height: 180,
+                  semanticLabel: 'FWV Logo',
+                ),
                 const SizedBox(height: 12),
                 Text(
                   'Feuerwehrverein Raura',

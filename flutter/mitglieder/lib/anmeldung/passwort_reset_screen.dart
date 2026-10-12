@@ -3,6 +3,7 @@
 //  Schritt 2: Code aus der E-Mail und neues Passwort (POST auth/member/reset).
 // Das Backend setzt das Passwort auch fuer die Website und meldet direkt an.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -103,7 +104,7 @@ class _PasswortResetScreenState extends State<PasswortResetScreen> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(24),
+                padding: mitSystemleiste(context, const EdgeInsets.all(24)),
                 children: [
                   Text('Schritt 1', style: text.titleMedium),
                   const Text('Du bekommst einen Code per E-Mail.'),

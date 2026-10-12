@@ -8,6 +8,7 @@
 // angemeldet ist, die Version und Abmelden. Vorstand und admin sehen
 // zusaetzlich "Gruppen verwalten" (Authentik-Gruppen, gruppen_screen.dart).
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:material_ui/material_ui.dart';
@@ -101,7 +102,7 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
     return Scaffold(
       appBar: AppBar(title: const Text('Einstellungen')),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
         children: [
           ListTile(
             leading: const Icon(Icons.account_circle_outlined),

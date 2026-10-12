@@ -106,7 +106,7 @@ class _AnmeldungBearbeitenScreenState extends State<AnmeldungBearbeitenScreen> {
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: mitSystemleiste(context, const EdgeInsets.all(16)),
           children: [
             if (gast) ...[
               TextFormField(
@@ -324,7 +324,7 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: mitSystemleiste(context, const EdgeInsets.all(16)),
           children: [
             SegmentedButton<bool>(
               segments: const [
@@ -461,7 +461,7 @@ class _AlternativeScreenState extends State<AlternativeScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Andere Schicht')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: mitSystemleiste(context, const EdgeInsets.symmetric(vertical: 8)),
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -566,7 +566,7 @@ class _MitteilenScreenState extends State<MitteilenScreen> {
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: mitSystemleiste(context, const EdgeInsets.all(16)),
           children: [
             if (e == null) ...[
               Text(

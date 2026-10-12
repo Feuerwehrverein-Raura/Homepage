@@ -12,7 +12,8 @@ import 'package:fwv_anlass/fwv_anlass.dart'
         UntenLeiste,
         fehlerText,
         meldung,
-        nachfragen;
+        nachfragen,
+        mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
@@ -153,7 +154,7 @@ class _AusleiheScreenState extends State<AusleiheScreen> {
     final klein = t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 12, 16, 24)),
       children: [
         Row(
           children: [

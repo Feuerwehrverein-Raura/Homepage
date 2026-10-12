@@ -5,7 +5,14 @@
 // kommt dessen Meldung (409) und das Angebot wird neu geladen.
 
 import 'package:fwv_anlass/fwv_anlass.dart'
-    show Abschnitt, LadeAnsicht, LadeAnsichtState, UntenLeiste, fehlerText, meldung;
+    show
+        Abschnitt,
+        LadeAnsicht,
+        LadeAnsichtState,
+        UntenLeiste,
+        fehlerText,
+        meldung,
+        mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -189,7 +196,7 @@ class _AusleiheNeuScreenState extends State<AusleiheNeuScreen> {
     final klein = t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline);
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
       children: [
         if (a.artikel.isNotEmpty) const Abschnitt('Artikel'),
         for (final art in a.artikel)
@@ -332,7 +339,7 @@ class _BestaetigenScreenState extends State<_BestaetigenScreen> {
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 8, 16, 24)),
           children: [
             ListTile(
               contentPadding: EdgeInsets.zero,

@@ -2,6 +2,7 @@
 // Status-Text, Farbe, Anlass-Datum und Schicht-Beschriftung kommen fertig
 // vom Backend. Antippen oeffnet den Anlass.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -24,7 +25,7 @@ class MeineAnmeldungenScreen extends StatelessWidget {
         leer: 'Du hast dich noch für keinen Anlass angemeldet.',
         bauen: (context, liste, neuLaden) => ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 8, 12, 16)),
           itemCount: liste.length,
           itemBuilder: (context, i) => _AnmeldungKarte(
             anmeldung: liste[i],

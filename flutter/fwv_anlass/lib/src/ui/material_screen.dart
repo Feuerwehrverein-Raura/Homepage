@@ -307,7 +307,7 @@ class _MaterialAnsichtState extends State<MaterialAnsicht> {
         bauen: (context, d, _) => ListView(
           key: const Key('material-liste'),
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 24),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(4, 0, 4, 24)),
           children: [
             const Abschnitt('Rezepte'),
             if (d.rezepte.isEmpty) const ListTile(title: Text('Keine Rezepte verknüpft.')),

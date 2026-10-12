@@ -7,7 +7,7 @@
 // Inventar-PWA, damit keine Doppel entstehen.
 
 import 'package:fwv_anlass/fwv_anlass.dart'
-    show InfoZeile, LadeAnsicht, UntenLeiste, fehlerText, meldung;
+    show InfoZeile, LadeAnsicht, UntenLeiste, fehlerText, meldung, mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
@@ -108,7 +108,7 @@ class _ArtikelAnlegenScreenState extends State<ArtikelAnlegenScreen> {
           key: _form,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 12, 16, 24)),
             children: [
               TextFormField(
                 key: const Key('anlegen-name'),
@@ -280,7 +280,7 @@ class UnbekannterCodeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Unbekannter Code')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: mitSystemleiste(context, const EdgeInsets.all(16)),
         children: [
           Text(treffer.code, style: t.textTheme.headlineSmall),
           const SizedBox(height: 8),

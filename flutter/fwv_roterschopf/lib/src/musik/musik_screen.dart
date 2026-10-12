@@ -3,25 +3,49 @@
 // (mein.html). Jedes Mitglied darf zusammenstellen; der Laptop holt sich
 // alles alle fuenf Minuten selbst ab.
 //
-// Nicht hier: Vorhoeren (/kiosk/anhoeren) - dafuer braeuchte die App einen
-// Audio-Player als eigene Abhaengigkeit.
+// Vorhoeren (Knopf neben jedem Titel) siehe vorhoeren.dart.
 
 import 'dart:async';
 
 import 'package:fwv_anlass/fwv_anlass.dart'
-    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, nachfragen, reiterAufRot;
+    show
+        LadeAnsicht,
+        LadeAnsichtState,
+        fehlerText,
+        meldung,
+        nachfragen,
+        reiterAufRot,
+        mitSystemleiste;
 import 'package:material_ui/material_ui.dart';
 
 import 'modelle.dart';
+import 'vorhoeren.dart';
 import 'zugang.dart';
 
-class MusikScreen extends StatelessWidget {
-  const MusikScreen({super.key, required this.zugang});
+class MusikScreen extends StatefulWidget {
+  const MusikScreen({super.key, required this.zugang, this.abspieler});
 
   final MusikZugang zugang;
 
+  /// Nur fuer Tests; sonst just_audio.
+  final Abspieler? abspieler;
+
+  @override
+  State<MusikScreen> createState() => _MusikScreenState();
+}
+
+class _MusikScreenState extends State<MusikScreen> {
+  late final _vorhoerer = Vorhoerer(laden: widget.zugang.titelLaden, abspieler: widget.abspieler);
+
+  @override
+  void dispose() {
+    _vorhoerer.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final zugang = widget.zugang;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -36,7 +60,7 @@ class MusikScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _PlaylistsSeite(zugang: zugang),
+            _PlaylistsSeite(zugang: zugang, vorhoerer: _vorhoerer),
             _SenderSeite(zugang: zugang),
           ],
         ),
@@ -49,9 +73,10 @@ class MusikScreen extends StatelessWidget {
 // Playlists
 
 class _PlaylistsSeite extends StatefulWidget {
-  const _PlaylistsSeite({required this.zugang});
+  const _PlaylistsSeite({required this.zugang, required this.vorhoerer});
 
   final MusikZugang zugang;
+  final Vorhoerer vorhoerer;
 
   @override
   State<_PlaylistsSeite> createState() => _PlaylistsSeiteState();
@@ -63,9 +88,11 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
   Future<void> _bearbeiten(String? id) async {
     final geaendert = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => PlaylistEditor(zugang: widget.zugang, id: id),
+        builder: (_) => PlaylistEditor(zugang: widget.zugang, vorhoerer: widget.vorhoerer, id: id),
       ),
     );
+    // Was im Editor lief, verstummt mit dem Zurueck.
+    await widget.vorhoerer.anhalten();
     if (geaendert == true) unawaited(_ansicht.currentState?.neuLaden());
   }
 
@@ -101,7 +128,7 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
         istLeer: (l) => l.isEmpty,
         leer: 'Noch keine Playlists. „Alle Titel“ gibt es auf dem Laptop immer.',
         bauen: (context, liste, _) => ListView(
-          padding: const EdgeInsets.only(bottom: 96),
+          padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 96)),
           children: [
             for (final p in liste)
               ListTile(
@@ -130,9 +157,10 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
 /// Playlist anlegen ([id] null) oder bearbeiten. Gibt true zurueck, wenn
 /// gespeichert wurde.
 class PlaylistEditor extends StatefulWidget {
-  const PlaylistEditor({super.key, required this.zugang, this.id});
+  const PlaylistEditor({super.key, required this.zugang, required this.vorhoerer, this.id});
 
   final MusikZugang zugang;
+  final Vorhoerer vorhoerer;
   final String? id;
 
   @override
@@ -195,8 +223,11 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
   Future<void> _suchen() async {
     final gewaehlt = await Navigator.of(context).push<List<MusikTitel>>(
       MaterialPageRoute(
-        builder: (_) =>
-            TitelSuche(zugang: widget.zugang, schonDrin: {for (final t in _titel) t.pfad}),
+        builder: (_) => TitelSuche(
+          zugang: widget.zugang,
+          vorhoerer: widget.vorhoerer,
+          schonDrin: {for (final t in _titel) t.pfad},
+        ),
       ),
     );
     if (gewaehlt != null && mounted) _hinzufuegen(gewaehlt);
@@ -204,7 +235,9 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
 
   Future<void> _abgleichen() async {
     final gewaehlt = await Navigator.of(context).push<List<MusikTitel>>(
-      MaterialPageRoute(builder: (_) => ListenAbgleich(zugang: widget.zugang)),
+      MaterialPageRoute(
+        builder: (_) => ListenAbgleich(zugang: widget.zugang, vorhoerer: widget.vorhoerer),
+      ),
     );
     if (gewaehlt != null && mounted) _hinzufuegen(gewaehlt);
   }
@@ -321,7 +354,7 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
                             ),
                           )
                         : ReorderableListView.builder(
-                            padding: const EdgeInsets.only(bottom: 24),
+                            padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
                             itemCount: _titel.length,
                             onReorderItem: (alt, neu) => setState(() {
                               _titel.insert(neu, _titel.removeAt(alt));
@@ -337,13 +370,24 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
                                     ? null
                                     : const Text('nicht mehr auf dem Laptop'),
                                 enabled: t.vorhanden,
-                                trailing: IconButton(
-                                  tooltip: 'Entfernen',
-                                  icon: const Icon(Icons.remove_circle_outline),
-                                  onPressed: () => setState(() {
-                                    _titel.removeAt(i);
-                                    _geaendert = true;
-                                  }),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (t.vorhanden)
+                                      VorhoerKnopf(
+                                        vorhoerer: widget.vorhoerer,
+                                        pfad: t.pfad,
+                                        beiFehler: (e) => meldung(context, fehlerText(e)),
+                                      ),
+                                    IconButton(
+                                      tooltip: 'Entfernen',
+                                      icon: const Icon(Icons.remove_circle_outline),
+                                      onPressed: () => setState(() {
+                                        _titel.removeAt(i);
+                                        _geaendert = true;
+                                      }),
+                                    ),
+                                  ],
                                 ),
                               );
                             },
@@ -359,9 +403,15 @@ class _PlaylistEditorState extends State<PlaylistEditor> {
 /// Titel aus der Sammlung suchen; mehrere antippen, "Übernehmen" gibt sie
 /// zurueck.
 class TitelSuche extends StatefulWidget {
-  const TitelSuche({super.key, required this.zugang, required this.schonDrin});
+  const TitelSuche({
+    super.key,
+    required this.zugang,
+    required this.vorhoerer,
+    required this.schonDrin,
+  });
 
   final MusikZugang zugang;
+  final Vorhoerer vorhoerer;
   final Set<String> schonDrin;
 
   @override
@@ -421,7 +471,12 @@ class _TitelSucheState extends State<TitelSuche> {
             onPressed: _gewaehlt.isEmpty
                 ? null
                 : () => Navigator.of(context).pop(_gewaehlt.values.toList()),
-            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.onPrimary),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              // Ausgegraut sonst dunkelrot auf Rot - kaum zu sehen.
+              disabledForegroundColor: Theme.of(context).colorScheme.onPrimary
+                  .withValues(alpha: 0.5),
+            ),
             child: Text(_gewaehlt.isEmpty ? 'Übernehmen' : 'Übernehmen (${_gewaehlt.length})'),
           ),
         ],
@@ -454,7 +509,7 @@ class _TitelSucheState extends State<TitelSuche> {
             ),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 24),
+              padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
               children: [
                 for (final t in b?.titel ?? const <MusikTitel>[])
                   CheckboxListTile(
@@ -472,6 +527,13 @@ class _TitelSucheState extends State<TitelSuche> {
                     subtitle: widget.schonDrin.contains(t.pfad)
                         ? const Text('schon in der Playlist')
                         : null,
+                    // Vorhoeren links, Auswaehlen rechts.
+                    controlAffinity: ListTileControlAffinity.trailing,
+                    secondary: VorhoerKnopf(
+                      vorhoerer: widget.vorhoerer,
+                      pfad: t.pfad,
+                      beiFehler: (e) => meldung(context, fehlerText(e)),
+                    ),
                   ),
               ],
             ),
@@ -485,9 +547,10 @@ class _TitelSucheState extends State<TitelSuche> {
 /// Eine kopierte Titelliste gegen die Sammlung halten. Der Abgleich schlaegt
 /// vor, er entscheidet nicht: alle Treffer sind angehakt, knappe markiert.
 class ListenAbgleich extends StatefulWidget {
-  const ListenAbgleich({super.key, required this.zugang});
+  const ListenAbgleich({super.key, required this.zugang, required this.vorhoerer});
 
   final MusikZugang zugang;
+  final Vorhoerer vorhoerer;
 
   @override
   State<ListenAbgleich> createState() => _ListenAbgleichState();
@@ -537,13 +600,18 @@ class _ListenAbgleichState extends State<ListenAbgleich> {
           if (a != null)
             TextButton(
               onPressed: gewaehlt.isEmpty ? null : () => Navigator.of(context).pop(gewaehlt),
-              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.onPrimary),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                // Ausgegraut sonst dunkelrot auf Rot - kaum zu sehen.
+                disabledForegroundColor: Theme.of(context).colorScheme.onPrimary
+                    .withValues(alpha: 0.5),
+              ),
               child: Text('Übernehmen (${gewaehlt.length})'),
             ),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 16, 16, 24)),
         children: [
           if (a == null) ...[
             const Text(
@@ -590,6 +658,12 @@ class _ListenAbgleichState extends State<ListenAbgleich> {
                   }),
                   title: Text(t.titel.anzeige),
                   subtitle: Text(t.sicher ? t.zeile : 'knapp – bitte prüfen: ${t.zeile}'),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                  secondary: VorhoerKnopf(
+                    vorhoerer: widget.vorhoerer,
+                    pfad: t.titel.pfad,
+                    beiFehler: (e) => meldung(context, fehlerText(e)),
+                  ),
                 ),
             ],
             if (a.fehlend.isNotEmpty) ...[
@@ -675,7 +749,7 @@ class _SenderSeiteState extends State<_SenderSeite> {
         istLeer: (l) => l.isEmpty,
         leer: 'Noch keine Radiosender.',
         bauen: (context, liste, _) => ListView(
-          padding: const EdgeInsets.only(bottom: 96),
+          padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 96)),
           children: [
             for (final s in liste)
               ListTile(

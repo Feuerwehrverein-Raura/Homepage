@@ -4,6 +4,7 @@
 // lautet (`datum_text`), bestimmt das Backend; die App ordnet sie nur nach
 // `date` ins Raster ein.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -55,7 +56,7 @@ class _AnlassKalenderState extends State<AnlassKalender> {
         final lokal = MaterialLocalizations.of(context);
         return ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 16)),
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),

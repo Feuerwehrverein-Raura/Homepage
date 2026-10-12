@@ -51,7 +51,7 @@ class SchichtenAnsicht extends StatelessWidget {
         onRefresh: neuLaden,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 8, 12, 96)),
           children: [
             if (schichten.isEmpty)
               const Padding(
@@ -204,7 +204,7 @@ class _SchichtFormularState extends State<SchichtFormular> {
           return Form(
             key: _form,
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: mitSystemleiste(context, const EdgeInsets.all(16)),
               children: [
                 TextFormField(
                   key: const Key('schicht-name'),

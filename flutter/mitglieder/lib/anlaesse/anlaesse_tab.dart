@@ -4,6 +4,7 @@
 // Alles, was angezeigt wird, kommt fertig vom Backend (`app`-Bloecke,
 // `datum_text`): die App filtert, zaehlt und formatiert nichts selbst.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -129,7 +130,7 @@ class AnlassListe extends StatelessWidget {
         );
         return ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 4, 12, 16)),
           children: [
             ...kommend.map(karte),
             if (ideen.isNotEmpty) ...[

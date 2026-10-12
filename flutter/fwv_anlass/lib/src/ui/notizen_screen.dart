@@ -133,7 +133,7 @@ class _NotizenAnsichtState extends State<NotizenAnsicht> {
         leer: 'Noch keine Notizen. Was sich das Team merken soll, kommt hierher.',
         bauen: (context, notizen, _) => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 8, 12, 16)),
           children: [
             for (final n in notizen)
               Card(

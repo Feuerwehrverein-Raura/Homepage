@@ -1,12 +1,45 @@
 // Musik im Roten Schopf: Playlists und Radiosender gegen einen
 // nachgebauten Zugang. Antworten im Format von api-members (/kiosk/...).
 
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:material_ui/material_ui.dart';
 
+class _Abspieler implements Abspieler {
+  final gespielt = <(int, String)>[];
+  var angehalten = 0;
+  final _ende = StreamController<void>.broadcast();
+
+  void endet() => _ende.add(null);
+
+  @override
+  Future<void> abspielen(Uint8List daten, String name) async => gespielt.add((daten.length, name));
+
+  @override
+  Future<void> anhalten() async => angehalten++;
+
+  @override
+  Stream<void> get zuEnde => _ende.stream;
+
+  @override
+  Future<void> schliessen() => _ende.close();
+}
+
 class _Zugang extends MusikZugang {
+  final geladen = <String>[];
+  bool ladenKaputt = false;
+
+  @override
+  Future<Uint8List> titelLaden(String pfad) async {
+    if (ladenKaputt) throw const ApiFehler('Die Datei liegt nicht auf dem Server', status: 404);
+    geladen.add(pfad);
+    return Uint8List(1234);
+  }
+
   final gespeichert = <(String?, String, List<String>)>[];
   final senderNeu = <(String, String)>[];
   final geloescht = <String>[];
@@ -110,12 +143,19 @@ void main() {
     expect(Bibliothek.ausJson(null).titel, isEmpty);
   });
 
+  late _Abspieler abspieler;
+
   Future<_Zugang> zeigen(WidgetTester tester) async {
     final z = _Zugang();
+    abspieler = _Abspieler();
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(home: MusikScreen(zugang: z)));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MusikScreen(zugang: z, abspieler: abspieler),
+      ),
+    );
     await tester.pumpAndSettle();
     return z;
   }
@@ -228,5 +268,48 @@ void main() {
 
   test('ApiFehler ist erreichbar (fuer fehlerText)', () {
     expect(const ApiFehler('x').meldung, 'x');
+  });
+
+  testWidgets('Vorhoeren: abspielen, anhalten, anderer Titel loest ab, Fehler wird gemeldet', (
+    tester,
+  ) async {
+    final z = await zeigen(tester);
+    await tester.tap(find.text('Chilbi Abend'));
+    await tester.pumpAndSettle();
+
+    // Nur der vorhandene Titel hat einen Vorhoer-Knopf.
+    expect(find.byTooltip('Vorhören'), findsOneWidget);
+    await tester.tap(find.byTooltip('Vorhören'));
+    await tester.pumpAndSettle();
+    expect(z.geladen, ['Queen/Bohemian Rhapsody.mp3']);
+    expect(abspieler.gespielt.single, (1234, 'Bohemian Rhapsody.mp3'));
+    expect(find.byTooltip('Anhalten'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Anhalten'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Vorhören'), findsOneWidget);
+
+    // Zu Ende gespielt: Knopf springt zurueck.
+    await tester.tap(find.byTooltip('Vorhören'));
+    await tester.pumpAndSettle();
+    abspieler.endet();
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Anhalten'), findsNothing);
+
+    // In der Suche: anderer Titel loest den laufenden ab.
+    await tester.tap(find.text('Titel suchen'));
+    await tester.pumpAndSettle();
+    final knoepfe = find.byTooltip('Vorhören');
+    await tester.tap(knoepfe.first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Vorhören').last);
+    await tester.pumpAndSettle();
+    expect(z.geladen.last, 'Baschi/Gib mer e Chance.mp3');
+    expect(find.byTooltip('Anhalten'), findsOneWidget);
+
+    z.ladenKaputt = true;
+    await tester.tap(find.byTooltip('Vorhören').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Die Datei liegt nicht auf dem Server'), findsOneWidget);
   });
 }

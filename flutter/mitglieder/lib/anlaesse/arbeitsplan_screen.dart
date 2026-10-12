@@ -4,6 +4,7 @@
 // Oben rechts das PDF (`GET events/:id/pdf/arbeitsplan`) zum Oeffnen,
 // Speichern oder Weiterschicken ueber das Teilen-Menue.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -75,7 +76,7 @@ class _ArbeitsplanScreenState extends State<ArbeitsplanScreen> {
         leer: 'Für diesen Anlass gibt es noch keine Schichten.',
         bauen: (context, plan, _) => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 0, 12, 24)),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),

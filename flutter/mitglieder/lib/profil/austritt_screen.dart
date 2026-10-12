@@ -4,6 +4,7 @@
 // steht auch so da, damit niemand glaubt, mit dem Tippen sei die
 // Mitgliedschaft beendet. Danach wird abgemeldet (wie die alte Android-App).
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -95,7 +96,7 @@ class _AustrittScreenState extends State<AustrittScreen> {
           children: [
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: mitSystemleiste(context, const EdgeInsets.all(16)),
                 children: [
                   const Text(
                     'Möchtest du aus dem Feuerwehrverein Raura austreten? Der Antrag '

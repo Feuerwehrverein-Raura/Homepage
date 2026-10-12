@@ -2,6 +2,7 @@
 // Anmeldungen und Austritt. Wie members-android ProfileFragment und
 // members-ios ProfileView.
 
+import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_lager/fwv_lager.dart' show MeineAusleihenScreen, ausleiheNeuOeffnen;
 import 'package:material_ui/material_ui.dart';
@@ -88,7 +89,7 @@ class _ProfilTabState extends State<ProfilTab> {
     final api = widget.dienste.sitzung.api;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
       children: [
         const SizedBox(height: 24),
         Center(

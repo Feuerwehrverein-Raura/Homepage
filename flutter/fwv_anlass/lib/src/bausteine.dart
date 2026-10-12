@@ -11,6 +11,17 @@ import 'package:material_ui/material_ui.dart';
 import 'thema.dart';
 import 'zugang.dart';
 
+/// Innenabstand einer scrollbaren Liste plus der Platz, den die
+/// Bedienleiste des Systems unten belegt (Android-Gestenleiste,
+/// iPhone-Home-Balken).
+///
+/// Gibt man einer Liste einen eigenen `padding`, rechnet Flutter diesen Platz
+/// NICHT mehr selbst dazu - der letzte Eintrag rutschte dann unter die
+/// Gestenleiste. Auf Seiten mit Reiterleiste ist der Wert 0 (die Leiste
+/// belegt den Platz schon), dort aendert sich nichts.
+EdgeInsets mitSystemleiste(BuildContext context, EdgeInsets abstand) =>
+    abstand.copyWith(bottom: abstand.bottom + MediaQuery.paddingOf(context).bottom);
+
 /// Kurze Meldung unten am Bildschirm.
 void meldung(BuildContext context, String text) {
   ScaffoldMessenger.of(context)

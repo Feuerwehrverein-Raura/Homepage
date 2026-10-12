@@ -11,7 +11,7 @@
 import 'dart:convert';
 
 import 'package:fwv_anlass/fwv_anlass.dart'
-    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, nachfragen;
+    show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, nachfragen, mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -157,7 +157,7 @@ class _VpnScreenState extends State<VpnScreen> {
         key: _ansicht,
         laden: _vpn.liste,
         bauen: (context, liste, _) => ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 16, 16, 24)),
           children: [
             const Text(
               'Verbindet dein Gerät mit dem Vereinsnetz – für die Dateiablage und das Netz '
