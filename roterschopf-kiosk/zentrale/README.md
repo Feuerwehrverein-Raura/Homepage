@@ -77,3 +77,17 @@ Die Skripte `Spots` (id 1) und `Taster Eingang` (id 3) sind abgeschaltet.
 Sie reagierten ebenfalls auf den BLU-Taster und haetten sich mit dem neuen
 gestritten. Ihr Code bleibt als Beleg dafuer, wie die Anlage gedacht war —
 aus `Taster Eingang` stammt die Gruppenzuordnung.
+
+## tiefkuehl-waechter.js
+
+Laeuft nicht auf der Zentrale, sondern auf den beiden Shelly 1PM Gen4 der
+Tiefkuehler im Hausnetz: `192.168.88.76` (Tiefkuehlschrank Eis) und
+`192.168.88.71` (Tiefkuehlschrank Landi). Name auf dem Geraet:
+`Tiefkuehl-Waechter`.
+
+Ist das Relais aus und es wird waermer als -12 degC, schaltet das Skript
+es wieder ein - ebenso, wenn der Fuehler keinen Wert mehr liefert. Es
+schaltet nie aus. Auf .76 stehen zusaetzlich `initial_state: on` und
+`auto_on` nach 60 s.
+
+Einspielen wie `lichtgruppen.js`, nur mit der Adresse des Tiefkuehlers.
