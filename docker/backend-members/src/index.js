@@ -5112,11 +5112,18 @@ app.get('/members/:id/social-media-group', authenticateAny, requireRole('vorstan
 
 // DEUTSCH: Namen vergleichbar machen — Umlaute, Gross-/Kleinschreibung und
 // doppelte Leerzeichen sollen keinen Unterschied machen.
+//
+// Deutsche Umlaute werden ausgeschrieben (ü -> ue), alle anderen Akzente
+// nur entfernt (ç -> c, à -> a). Frueher fiel alles ausser é/è/ê einfach
+// weg - aus "François Bach" wurde der Benutzername "fran.ois.bach".
 function normName(wert) {
     return (wert || '')
         .toLowerCase()
         .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
-        .replace(/[éèê]/g, 'e').replace(/ß/g, 'ss')
+        .replace(/ß/g, 'ss')
+        // Buchstaben, die sich nicht in Grundbuchstabe + Akzent zerlegen
+        .replace(/ı/g, 'i').replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/œ/g, 'oe').replace(/ł/g, 'l')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         .replace(/[^a-z0-9]+/g, ' ')
         .trim();
 }
