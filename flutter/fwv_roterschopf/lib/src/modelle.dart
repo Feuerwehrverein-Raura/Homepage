@@ -181,3 +181,40 @@ class Thermostat {
   /// Fehler des Geraets, z.B. "not_calibrated".
   final List<String> fehler;
 }
+
+/// Antwort von GET /kiosk/roter-schopf/zugang: Darf diese Anmeldung in den
+/// Roten Schopf - ueber die Gruppe oder, ohne Gruppe, waehrend einer Schicht
+/// (1 h vorher bis 1 h nachher, api-members src/schicht-zugang.js)?
+class SchopfFreigabe {
+  const SchopfFreigabe({
+    required this.zugang,
+    this.ueberSchicht = false,
+    this.schicht,
+    this.anlass,
+    this.bis,
+  });
+
+  factory SchopfFreigabe.ausJson(Object? roh) {
+    final j = roh is Map ? Map<String, dynamic>.from(roh) : const <String, dynamic>{};
+    final s = j['schicht'] is Map ? Map<String, dynamic>.from(j['schicht'] as Map) : null;
+    return SchopfFreigabe(
+      zugang: j['zugang'] == true,
+      ueberSchicht: j['grund'] == 'schicht',
+      schicht: s?['name']?.toString(),
+      anlass: s?['anlass']?.toString(),
+      bis: DateTime.tryParse('${s?['bis']}')?.toLocal(),
+    );
+  }
+
+  static const keine = SchopfFreigabe(zugang: false);
+
+  final bool zugang;
+
+  /// true: nur wegen einer Schicht, nicht ueber die Gruppe.
+  final bool ueberSchicht;
+  final String? schicht;
+  final String? anlass;
+
+  /// Ende des Zugangs (Schichtende + 1 h); null ueber die Gruppe.
+  final DateTime? bis;
+}

@@ -6,8 +6,8 @@
 // "Organisator" erscheint bei Mitgliedern nur, wenn sie Anlaesse
 // organisieren ([OrganisatorPruefung]); "Lager" nur mit der Authentik-Gruppe
 // Lager, Vorstand oder admin ([Dienste.lagerSichtbar]); "Schopf" (Licht und
-// Tiefkuehler im Roten Schopf) nur mit Roter Schopf, Vorstand oder admin
-// ([Dienste.roterSchopfSichtbar]). Die Reiter werden
+// Tiefkuehler im Roten Schopf) nur mit Roter Schopf, Vorstand oder admin -
+// oder waehrend der eigenen Schicht ([Dienste.roterSchopfSichtbar]). Die Reiter werden
 // erst beim ersten Oeffnen gebaut und bleiben danach erhalten (Scroll-Stand,
 // geladene Daten).
 
@@ -48,6 +48,7 @@ class _HauptseiteState extends State<Hauptseite> {
     super.initState();
     _aktiv = _externerOrganisator ? Reiter.organisator : Reiter.anlaesse;
     widget.dienste.organisator.pruefen();
+    widget.dienste.schopfPruefung.pruefen();
     // Nach dem (ersten) Login einmal nach dem Adressbuch fragen (Android).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) kontakteFrageStellen(context, widget.dienste);
@@ -115,7 +116,11 @@ class _HauptseiteState extends State<Hauptseite> {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       // Sitzung: die Gruppen (Lager) stehen im Token.
-      listenable: Listenable.merge([widget.dienste.organisator, widget.dienste.sitzung]),
+      listenable: Listenable.merge([
+        widget.dienste.organisator,
+        widget.dienste.sitzung,
+        widget.dienste.schopfPruefung,
+      ]),
       builder: (context, _) {
         final reiter = _reiter(
           widget.dienste.organisator.organisiert,

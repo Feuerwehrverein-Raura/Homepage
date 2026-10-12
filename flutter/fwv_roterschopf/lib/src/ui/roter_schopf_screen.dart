@@ -21,9 +21,13 @@ import '../modelle.dart';
 import '../zugang.dart';
 
 class RoterSchopfScreen extends StatefulWidget {
-  const RoterSchopfScreen({super.key, required this.zugang, this.auffrischen});
+  const RoterSchopfScreen({super.key, required this.zugang, this.auffrischen, this.hinweis});
 
   final RoterSchopfZugang zugang;
+
+  /// Zeile oben, z.B. "Fuer deine Schicht Bar bis 01:00" (Zugang nur wegen
+  /// der Schicht).
+  final String? hinweis;
 
   /// Wie oft die Anzeige von selbst nachliest, solange der Reiter offen
   /// ist; null = nie (Tests).
@@ -98,23 +102,38 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
             ],
           ),
         ),
-        body: TabBarView(
+        body: Column(
           children: [
-            LadeAnsicht<RoterSchopfZustand>(
-              key: _lampen,
-              laden: widget.zugang.zustand,
-              bauen: (context, z, _) => _lampenSeite(context, z),
-            ),
-            LadeAnsicht<RoterSchopfZustand>(
-              key: _temperaturen,
-              laden: widget.zugang.zustand,
-              bauen: (context, z, _) => _temperaturSeite(context, z),
-            ),
+            if (widget.hinweis != null)
+              Material(
+                color: Theme.of(context).colorScheme.tertiaryContainer,
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.schedule),
+                  title: Text(widget.hinweis!),
+                ),
+              ),
+            Expanded(child: _reiterInhalt()),
           ],
         ),
       ),
     );
   }
+
+  Widget _reiterInhalt() => TabBarView(
+    children: [
+      LadeAnsicht<RoterSchopfZustand>(
+        key: _lampen,
+        laden: widget.zugang.zustand,
+        bauen: (context, z, _) => _lampenSeite(context, z),
+      ),
+      LadeAnsicht<RoterSchopfZustand>(
+        key: _temperaturen,
+        laden: widget.zugang.zustand,
+        bauen: (context, z, _) => _temperaturSeite(context, z),
+      ),
+    ],
+  );
 
   Widget _lampenSeite(BuildContext context, RoterSchopfZustand z) {
     final farben = Theme.of(context).colorScheme;

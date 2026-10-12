@@ -22,6 +22,7 @@ import 'anmeldung/authentik_anmeldung.dart';
 import 'einstellungen/app_update.dart';
 import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
+import 'roterschopf/schopf_pruefung.dart';
 import 'push/push_dienst.dart';
 
 /// Datei teilen: Inhalt, Dateiname, MIME-Typ und (fuer iPad) die Stelle,
@@ -60,6 +61,8 @@ class Dienste {
     Uri? inventarBasis,
     this.update = const KeinAppUpdate(),
     this.roterSchopfTakt = const Duration(seconds: 20),
+    // Nur die echte App fragt von selbst nach (Tests: kein Wecker).
+    Duration? schopfPruefTakt,
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
        dokumentFotoWaehlen = dokumentFotoWaehlen ?? _dokumentFotoMitImagePicker,
        barcodeScannen = barcodeScannen ?? _barcodeMitKamera,
@@ -73,6 +76,12 @@ class Dienste {
        plattform = plattform ?? _aktuellePlattform() {
     pushAnmeldung = PushAnmeldung(push: push, speicher: this.speicher);
     organisator = OrganisatorPruefung(sitzung);
+    schopfPruefung = SchopfPruefung(
+      sitzung,
+      () => roterSchopf,
+      jetzt: this.jetzt,
+      takt: schopfPruefTakt,
+    );
     sitzung.beiNeuemToken = _tokenAnKontakteGeben;
   }
 
@@ -98,7 +107,10 @@ class Dienste {
       speicher: geheim,
       push: push,
       kontakte: kontakte,
-      update: Platform.isAndroid ? AndroidAppUpdate(appVersion: _appVersionAusPaket) : const KeinAppUpdate(),
+      update: Platform.isAndroid
+          ? AndroidAppUpdate(appVersion: _appVersionAusPaket)
+          : const KeinAppUpdate(),
+      schopfPruefTakt: const Duration(minutes: 10),
     );
   }
 
@@ -120,6 +132,9 @@ class Dienste {
   /// Hinweis auf neue Versionen (Play bzw. GitHub-APK; in Tests keiner).
   final AppUpdate update;
   late final OrganisatorPruefung organisator;
+
+  /// Reiter "Schopf" waehrend einer Schicht, auch ohne Gruppe.
+  late final SchopfPruefung schopfPruefung;
 
   /// Foto aufnehmen oder auswaehlen; null bei Abbruch.
   final Future<Uint8List?> Function(FotoQuelle quelle) fotoWaehlen;
@@ -166,10 +181,12 @@ class Dienste {
     ausleihen: ausleihen,
   );
 
-  /// Darf diese Sitzung in den Roten Schopf (Licht, Tiefkuehler)?
+  /// Darf diese Sitzung in den Roten Schopf (Licht, Tiefkuehler, Musik)?
   /// Authentik-Gruppe Roter Schopf, Vorstand oder admin — auch mit QR-Code
-  /// angemeldet; externe Organisatoren nie.
-  bool get roterSchopfSichtbar => hatRoterSchopfZugang(sitzung.sitzung);
+  /// angemeldet; externe Organisatoren nie. Ohne Gruppe waehrend einer
+  /// eigenen Schicht ([schopfPruefung]).
+  bool get roterSchopfSichtbar =>
+      hatRoterSchopfZugang(sitzung.sitzung) || schopfPruefung.schicht != null;
 
   /// Wie oft der Reiter "Schopf" von selbst nachliest, solange er offen ist
   /// (null in Tests: kein Takt).

@@ -20,6 +20,7 @@ const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
 const { roterSchopf, hatRoterSchopfZugang } = require('./roter-schopf');
 const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
+const { schichtZugang } = require('./schicht-zugang');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
@@ -6644,12 +6645,38 @@ app.delete('/kiosk/sender/:id', authenticateToken, async (req, res) => {
 
 const roterSchopfDienst = roterSchopf();
 
-function roterSchopfZugang(req, res, next) {
-    if (!hatRoterSchopfZugang(req.user?.groups)) {
-        return res.status(403).json({ error: 'Nur fuer die Gruppe Roter Schopf' });
+// Wer gerade Schicht hat (1 h vorher bis 1 h nachher), darf auch ohne die
+// Gruppe - geprueft bei jedem Zugriff, siehe src/schicht-zugang.js.
+const schichtPruefung = schichtZugang(pool);
+
+async function roterSchopfZugang(req, res, next) {
+    if (hatRoterSchopfZugang(req.user?.groups)) return next();
+    try {
+        const schicht = await schichtPruefung.pruefen(req.user);
+        if (schicht) return next();
+    } catch (error) {
+        console.error('Schicht-Zugang:', error.message);
     }
-    next();
+    return res.status(403).json({ error: 'Nur fuer die Gruppe Roter Schopf oder waehrend deiner Schicht' });
 }
+
+// Fuer die App: Reiter "Schopf" zeigen? Mit Grund und - bei einer Schicht -
+// bis wann.
+app.get('/kiosk/roter-schopf/zugang', authenticateToken, async (req, res) => {
+    if (hatRoterSchopfZugang(req.user?.groups)) {
+        return res.json({ zugang: true, grund: 'gruppe', schicht: null });
+    }
+    try {
+        const s = await schichtPruefung.pruefen(req.user);
+        res.json(s
+            ? { zugang: true, grund: 'schicht',
+                schicht: { name: s.schicht, anlass: s.anlass, beginn: s.beginn, ende: s.ende, bis: s.bis } }
+            : { zugang: false, grund: null, schicht: null });
+    } catch (error) {
+        console.error('GET /kiosk/roter-schopf/zugang:', error.message);
+        res.status(500).json({ error: 'Zugang konnte nicht geprueft werden' });
+    }
+});
 
 app.get('/kiosk/roter-schopf', authenticateToken, roterSchopfZugang, async (req, res) => {
     try {

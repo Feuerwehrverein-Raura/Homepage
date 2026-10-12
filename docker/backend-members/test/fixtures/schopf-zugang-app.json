@@ -1,0 +1,23 @@
+{
+  "gruppe": {
+    "zugang": true,
+    "grund": "gruppe",
+    "schicht": null
+  },
+  "schicht": {
+    "zugang": true,
+    "grund": "schicht",
+    "schicht": {
+      "name": "Nachtschicht",
+      "anlass": "Chilbi 2026",
+      "beginn": "2026-10-14T20:00:00.000Z",
+      "ende": "2026-10-15T00:00:00.000Z",
+      "bis": "2026-10-15T01:00:00.000Z"
+    }
+  },
+  "kein": {
+    "zugang": false,
+    "grund": null,
+    "schicht": null
+  }
+}

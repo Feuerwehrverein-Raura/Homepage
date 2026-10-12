@@ -19,3 +19,5 @@ Map<String, dynamic> _lesen(String name) {
 Map<String, dynamic> roterSchopfVertrag() => _lesen('roter-schopf-app.json');
 
 Map<String, dynamic> kioskMusikVertrag() => _lesen('kiosk-musik-app.json');
+
+Map<String, dynamic> schopfZugangVertrag() => _lesen('schopf-zugang-app.json');

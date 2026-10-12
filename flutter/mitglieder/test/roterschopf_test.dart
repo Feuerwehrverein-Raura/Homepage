@@ -16,8 +16,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
 
-Map<String, dynamic> _vertrag() {
-  const name = 'roter-schopf-app.json';
+Map<String, dynamic> _vertrag([String name = 'roter-schopf-app.json']) {
   var dir = Directory.current;
   while (true) {
     final f = File('${dir.path}/docker/backend-members/test/fixtures/$name');
@@ -50,7 +49,12 @@ class _KeineAltdaten implements AltdatenQuelle {
 
 void main() {
   final vertrag = _vertrag();
+  final zugangVertrag = _vertrag('schopf-zugang-app.json');
   late List<http.Request> anfragen;
+  // Was GET /kiosk/roter-schopf/zugang antwortet: gruppe, schicht oder kein.
+  var zugangFall = 'kein';
+  // Nachtschicht der Vertragsdatei: Zugang bis 15.10.2026 01:00 UTC.
+  var jetzt = DateTime.utc(2026, 10, 14, 21, 30);
 
   late final client = MockClient((a) async {
     anfragen.add(a);
@@ -58,6 +62,7 @@ void main() {
         http.Response.bytes(utf8.encode(jsonEncode(o)), status);
     return switch ('${a.method} ${a.url.path}') {
       'GET /kiosk/roter-schopf' => json(vertrag),
+      'GET /kiosk/roter-schopf/zugang' => json(zugangVertrag[zugangFall]),
       'POST /kiosk/roter-schopf/licht' => json({'ok': true}),
       'GET /events' || 'GET /events/organized-by-me' => json([]),
       'GET /members/me' => json({'id': 'a1', 'vorname': 'Erika', 'nachname': 'Muster'}),
@@ -65,7 +70,13 @@ void main() {
     };
   });
 
-  setUp(() => anfragen = []);
+  setUp(() {
+    anfragen = [];
+    zugangFall = 'kein';
+    jetzt = DateTime.utc(2026, 10, 14, 21, 30);
+  });
+
+  late Dienste dienste;
 
   Future<void> starten(WidgetTester tester, Sitzung sitzung) async {
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -86,7 +97,10 @@ void main() {
       appVersion: () async => '1.0.0 (1)',
       plattform: Plattform.ios,
       roterSchopfTakt: null,
+      schopfPruefTakt: null,
+      jetzt: () => jetzt,
     );
+    dienste = d;
     await tester.pumpWidget(FwvApp(dienste: d));
     await tester.pumpAndSettle();
   }
@@ -183,5 +197,41 @@ void main() {
       ),
     );
     expect(reiter('Schopf'), findsNothing);
+  });
+
+  testWidgets('Ohne Gruppe, aber mit Schicht: Reiter mit Hinweis, nach dem Ende wieder weg', (
+    tester,
+  ) async {
+    zugangFall = 'schicht';
+    await starten(tester, mitGruppen(['Mitglieder']));
+    expect(reiter('Schopf'), findsOneWidget);
+    expect(anfragen.where((a) => a.url.path == '/kiosk/roter-schopf/zugang'), hasLength(1));
+
+    await tester.tap(reiter('Schopf'));
+    await tester.pumpAndSettle();
+    final bis = DateTime.utc(2026, 10, 15, 1).toLocal();
+    final uhr = '${bis.hour.toString().padLeft(2, '0')}:${bis.minute.toString().padLeft(2, '0')}';
+    expect(find.text('Für deine Schicht «Nachtschicht» (Chilbi 2026) bis $uhr'), findsOneWidget);
+    expect(find.text('Spots'), findsOneWidget);
+
+    // Nach dem Ende: der Server sagt nein, der Reiter verschwindet.
+    jetzt = DateTime.utc(2026, 10, 15, 1, 1);
+    zugangFall = 'kein';
+    await dienste.schopfPruefung.pruefen();
+    await tester.pumpAndSettle();
+    expect(reiter('Schopf'), findsNothing);
+  });
+
+  testWidgets('Ohne Gruppe und ohne Schicht: kein Reiter; mit Gruppe keine Nachfrage', (
+    tester,
+  ) async {
+    await starten(tester, mitGruppen(['Mitglieder']));
+    expect(reiter('Schopf'), findsNothing);
+    expect(anfragen.where((a) => a.url.path == '/kiosk/roter-schopf/zugang'), hasLength(1));
+  });
+
+  testWidgets('Mit Gruppe fragt die App nicht nach der Schicht', (tester) async {
+    await starten(tester, mitGruppen(['Roter Schopf']));
+    expect(anfragen.where((a) => a.url.path == '/kiosk/roter-schopf/zugang'), isEmpty);
   });
 }

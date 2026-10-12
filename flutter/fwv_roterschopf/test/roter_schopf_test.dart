@@ -19,6 +19,9 @@ class _Zugang extends RoterSchopfZugang {
   Future<RoterSchopfZustand> zustand() async => RoterSchopfZustand.ausJson(daten);
 
   @override
+  Future<SchopfFreigabe> freigabe() async => const SchopfFreigabe(zugang: true);
+
+  @override
   Future<void> schalten(String kennung, {required bool an}) async {
     if (kaputt) throw const ApiFehler('Zentrale nicht erreichbar', status: 502);
     geschaltet.add((kennung, an));
@@ -120,5 +123,19 @@ void main() {
     await tester.tap(find.text('Arbeitsleuchten'));
     await tester.pumpAndSettle();
     expect(find.text('Zentrale nicht erreichbar'), findsOneWidget);
+  });
+
+  test('Schopf-Freigabe liest die Vertragsdatei (Gruppe, Schicht, keine)', () {
+    final v = schopfZugangVertrag();
+    final g = SchopfFreigabe.ausJson(v['gruppe']);
+    expect((g.zugang, g.ueberSchicht, g.bis), (true, false, null));
+    final s = SchopfFreigabe.ausJson(v['schicht']);
+    expect(
+      (s.zugang, s.ueberSchicht, s.schicht, s.anlass),
+      (true, true, 'Nachtschicht', 'Chilbi 2026'),
+    );
+    expect(s.bis!.toUtc(), DateTime.utc(2026, 10, 15, 1));
+    expect(SchopfFreigabe.ausJson(v['kein']).zugang, isFalse);
+    expect(SchopfFreigabe.ausJson(null).zugang, isFalse);
   });
 }

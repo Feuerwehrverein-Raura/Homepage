@@ -16,9 +16,10 @@ import 'modelle.dart';
 /// Reiter zeigt.
 const roterSchopfGruppen = ['Roter Schopf', 'Vorstand', 'admin'];
 
-/// Darf diese Sitzung in den Roten Schopf? Ueber Authentik oder per
-/// QR-Code angemeldet gleich (die Gruppen stehen in beiden Tokens);
-/// externe Organisatoren nie.
+/// Darf diese Sitzung ueber ihre Gruppen in den Roten Schopf? Ueber
+/// Authentik oder per QR-Code angemeldet gleich (die Gruppen stehen in
+/// beiden Tokens); externe Organisatoren nie. Wer gerade Schicht hat, darf
+/// auch ohne Gruppe - das sagt erst der Server ([RoterSchopfZugang.freigabe]).
 bool hatRoterSchopfZugang(Sitzung? sitzung) => sitzung?.hatGruppe(roterSchopfGruppen) ?? false;
 
 abstract class RoterSchopfZugang {
@@ -30,6 +31,9 @@ abstract class RoterSchopfZugang {
   /// Schaltet eine Gruppe ("gruppe:spots") oder eine Lampe
   /// ("192.168.33.4:1"). Wirft [ApiFehler], wenn es nicht ging.
   Future<void> schalten(String kennung, {required bool an});
+
+  /// Darf ich gerade in den Roten Schopf (Gruppe oder Schicht)?
+  Future<SchopfFreigabe> freigabe();
 }
 
 class ApiRoterSchopfZugang extends RoterSchopfZugang {
@@ -49,4 +53,8 @@ class ApiRoterSchopfZugang extends RoterSchopfZugang {
   Future<void> schalten(String kennung, {required bool an}) async {
     await api.post('kiosk/roter-schopf/licht', daten: {'kennung': kennung, 'an': an});
   }
+
+  @override
+  Future<SchopfFreigabe> freigabe() async =>
+      SchopfFreigabe.ausJson(await api.get('kiosk/roter-schopf/zugang'));
 }
