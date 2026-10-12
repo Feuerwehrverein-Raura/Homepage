@@ -1174,24 +1174,41 @@ app.post('/auth/member/request-reset', async (req, res) => {
     try {
         const { email } = req.body || {};
         if (!email) return res.status(400).json({ error: 'E-Mail erforderlich' });
-        const r = await pool.query('SELECT id, email, vorname FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
-        const m = r.rows[0];
-        if (m) {
-            const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
-            const codeHash = await bcrypt.hash(code, 10);
+        // ALLE Mitglieder mit dieser Adresse: Ehepaare teilen sich hier
+        // Adressen. Frueher traf LIMIT 1 immer dieselbe Person - forderte
+        // Margrit einen Code an, bekam sie einen fuer Franz' Konto, und ihr
+        // eigenes Passwort liess sich ueber die App nie zuruecksetzen.
+        // Jetzt bekommt jede Person einen eigenen Code, alle in EINER Mail,
+        // jeder mit Name und Benutzername. Der Code bestimmt beim Einloesen,
+        // wessen Passwort gesetzt wird.
+        const r = await pool.query(
+            `SELECT id, email, vorname, nachname, benutzername FROM members
+             WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) ORDER BY vorname`, [email]);
+        if (r.rows.length > 0) {
             const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-            await pool.query(
-                `INSERT INTO member_password_resets (member_id, code_hash, attempts, expires_at)
-                 VALUES ($1, $2, 0, $3)
-                 ON CONFLICT (member_id) DO UPDATE SET code_hash = EXCLUDED.code_hash, attempts = 0, expires_at = EXCLUDED.expires_at, created_at = NOW()`,
-                [m.id, codeHash, expiresAt]
-            );
+            const codes = [];
+            for (const m of r.rows) {
+                const code = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+                await pool.query(
+                    `INSERT INTO member_password_resets (member_id, code_hash, attempts, expires_at)
+                     VALUES ($1, $2, 0, $3)
+                     ON CONFLICT (member_id) DO UPDATE SET code_hash = EXCLUDED.code_hash, attempts = 0, expires_at = EXCLUDED.expires_at, created_at = NOW()`,
+                    [m.id, await bcrypt.hash(code, 10), expiresAt]
+                );
+                codes.push({ m, code });
+            }
             const DISPATCH_API = process.env.DISPATCH_API_URL || 'http://api-dispatch:3000';
-            const body = `Guten Tag ${m.vorname || ''},\n\ndein Code zum Setzen eines neuen Passworts für die FWV-App:\n\n    ${code}\n\nGültig für 15 Minuten. Falls du das nicht angefordert hast, ignoriere diese E-Mail.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`.trim();
+            const wer = ({ m }) => `${m.vorname || ''} ${m.nachname || ''}`.trim() + (m.benutzername ? ` (Benutzer ${m.benutzername})` : '');
+            const body = codes.length === 1
+                ? `Guten Tag ${codes[0].m.vorname || ''},\n\ndein Code zum Setzen eines neuen Passworts für die FWV-App:\n\n    ${codes[0].code}\n\nDer Code gilt für das Konto von ${wer(codes[0])}.\n\nGültig für 15 Minuten. Falls du das nicht angefordert hast, ignoriere diese E-Mail.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`.trim()
+                : `Guten Tag,\n\nan diese E-Mail-Adresse sind mehrere Mitglieder gebunden. Darum steht hier für jede Person ein eigener Code zum Setzen eines neuen Passworts für die FWV-App. Bitte nur den eigenen Code verwenden - er setzt genau dieses Konto zurück:\n\n${codes.map(c => `    ${wer(c)}:  ${c.code}`).join('\n')}\n\nGültig für 15 Minuten. Falls das niemand angefordert hat, ignoriere diese E-Mail.\n\nMit freundlichen Grüssen\nFeuerwehrverein Raura`.trim();
+            const subject = codes.length === 1
+                ? `Dein Code für die FWV-App – ${`${codes[0].m.vorname || ''} ${codes[0].m.nachname || ''}`.trim()}`
+                : 'Codes für die FWV-App';
             try {
-                await axios.post(`${DISPATCH_API}/email/send`, { to: m.email, subject: 'Dein Code für die FWV-App', body });
+                await axios.post(`${DISPATCH_API}/email/send`, { to: codes[0].m.email, subject, body });
             } catch (e) { console.error('Reset-Code-Mail fehlgeschlagen:', e.message); }
-            await logAudit(pool, 'MEMBER_RESET_REQUESTED', m.id, m.email, clientIp, {});
+            for (const { m } of codes) await logAudit(pool, 'MEMBER_RESET_REQUESTED', m.id, m.email, clientIp, {});
         }
         res.json({ success: true, message: 'Falls die E-Mail bei uns registriert ist, wurde ein Code verschickt.' });
     } catch (err) {
@@ -1207,21 +1224,36 @@ app.post('/auth/member/reset', async (req, res) => {
         const { email, code, new_password } = req.body || {};
         if (!email || !code || !new_password) return res.status(400).json({ error: 'E-Mail, Code und neues Passwort erforderlich' });
         if (String(new_password).length < 8) return res.status(400).json({ error: 'Das Passwort muss mindestens 8 Zeichen haben.' });
-        const r = await pool.query('SELECT id, email, benutzername, vorname, nachname, authentik_user_id FROM members WHERE LOWER(email) = LOWER($1) LIMIT 1', [email]);
-        const m = r.rows[0];
-        const rr = m ? (await pool.query('SELECT code_hash, attempts, expires_at FROM member_password_resets WHERE member_id = $1', [m.id])).rows[0] : null;
-        if (!m || !rr) return res.status(400).json({ error: 'Kein gültiger Reset angefordert. Bitte „Passwort vergessen" erneut nutzen.' });
-        if (new Date(rr.expires_at) < new Date()) {
-            await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
-            return res.status(400).json({ error: 'Der Code ist abgelaufen. Bitte fordere einen neuen an.' });
+        // Alle Mitglieder mit dieser Adresse, die einen offenen Code haben;
+        // der Code entscheidet, welches Konto gemeint ist (siehe request-reset).
+        const kandidaten = (await pool.query(`
+            SELECT m.id, m.email, m.benutzername, m.vorname, m.nachname, m.authentik_user_id,
+                   r.code_hash, r.attempts, r.expires_at
+            FROM members m JOIN member_password_resets r ON r.member_id = m.id
+            WHERE LOWER(TRIM(m.email)) = LOWER(TRIM($1))`, [email])).rows;
+        if (kandidaten.length === 0) return res.status(400).json({ error: 'Kein gültiger Reset angefordert. Bitte „Passwort vergessen" erneut nutzen.' });
+        const jetzt = new Date();
+        const gueltig = [];
+        for (const k of kandidaten) {
+            if (new Date(k.expires_at) < jetzt || k.attempts >= 5) {
+                await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [k.id]);
+            } else {
+                gueltig.push(k);
+            }
         }
-        if (rr.attempts >= 5) {
-            await pool.query('DELETE FROM member_password_resets WHERE member_id = $1', [m.id]);
-            return res.status(429).json({ error: 'Zu viele Fehlversuche. Bitte fordere einen neuen Code an.' });
+        if (gueltig.length === 0) {
+            const zuOft = kandidaten.some(k => k.attempts >= 5);
+            return res.status(zuOft ? 429 : 400).json({ error: zuOft
+                ? 'Zu viele Fehlversuche. Bitte fordere einen neuen Code an.'
+                : 'Der Code ist abgelaufen. Bitte fordere einen neuen an.' });
         }
-        const codeOk = await bcrypt.compare(String(code), rr.code_hash);
-        if (!codeOk) {
-            await pool.query('UPDATE member_password_resets SET attempts = attempts + 1 WHERE member_id = $1', [m.id]);
+        let m = null;
+        for (const k of gueltig) {
+            if (await bcrypt.compare(String(code), k.code_hash)) { m = k; break; }
+        }
+        if (!m) {
+            // Fehlversuch zaehlt fuer alle Konten dieser Adresse.
+            await pool.query('UPDATE member_password_resets SET attempts = attempts + 1 WHERE member_id = ANY($1::uuid[])', [gueltig.map(k => k.id)]);
             return res.status(400).json({ error: 'Der Code ist falsch.' });
         }
         // Passwort im Authentik setzen (Web-Login) — bei vorhandenem Authentik-Konto Pflicht.

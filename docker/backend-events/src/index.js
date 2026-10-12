@@ -2337,7 +2337,9 @@ async function finalizeRegistration(ctx) {
         console.error('Anmelde-Details fuer E-Mail nicht ladbar:', e.message);
     }
 
-    const confirmSubject = `Bestätigung Ihrer Anmeldung - ${eventTitle}`;
+    // Name im Betreff: Ehepaare teilen sich hier oft eine Adresse - so sieht
+    // man im gemeinsamen Postfach sofort, fuer wen die Bestaetigung ist.
+    const confirmSubject = `Bestätigung Ihrer Anmeldung - ${eventTitle}${name ? ` (${name})` : ''}`;
     const confirmBody = `
 Guten Tag ${name},
 
@@ -2623,7 +2625,7 @@ Feuerwehrverein Raura
             try {
                 await axios.post(`${DISPATCH_API}/email/send`, {
                     to: email,
-                    subject: `Bitte bestätige deine Anmeldung – ${ev.title}`,
+                    subject: `Bitte bestätige deine Anmeldung – ${ev.title}${name ? ` (${name})` : ''}`,
                     body: optinBody
                 });
             } catch (emailError) {
