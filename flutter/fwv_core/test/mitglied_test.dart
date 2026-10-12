@@ -143,6 +143,33 @@ void main() {
       expect(z.leer, isFalse);
     });
 
+    test('Netzlaufwerk (smbCredentials): Freigaben als Namen oder Objekte, Wechsel am Ersten', () {
+      final z = Zugaenge.ausJson({
+        'smbCredentials': {
+          'server': 'smb.fwv-raura.ch',
+          'user': 'mitglied',
+          'password': 'geheim-fake',
+          'shares': [
+            'Fotos',
+            {'name': 'Vorlagen'},
+            '',
+            3,
+          ],
+          'updatedAt': '2026-10-01T03:00:00.000Z',
+          'connectUrl': 'smb://smb.fwv-raura.ch/',
+        },
+      });
+      final n = z.netzlaufwerk!;
+      expect(
+        [n.server, n.benutzer, n.passwort, n.adresse],
+        ['smb.fwv-raura.ch', 'mitglied', 'geheim-fake', 'smb://smb.fwv-raura.ch/'],
+      );
+      expect(n.freigaben, ['Fotos', 'Vorlagen']);
+      expect(n.naechsterWechsel, DateTime(2026, 11, 1));
+      expect(z.leer, isFalse);
+      expect(Zugaenge.ausJson({'smbCredentials': null}).netzlaufwerk, isNull);
+    });
+
     test('leere oder kaputte Antwort', () {
       expect(Zugaenge.ausJson({}).leer, isTrue);
       expect(Zugaenge.ausJson(null).leer, isTrue);

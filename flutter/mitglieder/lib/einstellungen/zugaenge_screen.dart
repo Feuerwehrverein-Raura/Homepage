@@ -125,6 +125,28 @@ class _ZugaengeScreenState extends State<ZugaengeScreen> {
                         subtitle: o.gruppen.isEmpty ? null : Text(o.gruppen.join(', ')),
                       ),
                   ],
+                  if (z.netzlaufwerk != null) ...[
+                    const Abschnitt('Netzlaufwerk'),
+                    _Karte(
+                      titel: z.netzlaufwerk!.server ?? 'Netzlaufwerk',
+                      untertitel: z.netzlaufwerk!.freigaben.isEmpty
+                          ? null
+                          : 'Freigaben: ${z.netzlaufwerk!.freigaben.join(', ')}',
+                      zeilen: [
+                        if (z.netzlaufwerk!.adresse != null)
+                          KopierZeile(titel: 'Adresse', wert: z.netzlaufwerk!.adresse!),
+                        if (z.netzlaufwerk!.benutzer != null)
+                          KopierZeile(titel: 'Benutzer', wert: z.netzlaufwerk!.benutzer!),
+                        if (z.netzlaufwerk!.passwort != null)
+                          GeheimZeile(titel: 'Passwort', wert: z.netzlaufwerk!.passwort!),
+                        if (z.netzlaufwerk!.naechsterWechsel != null)
+                          _Zeile(
+                            'Nächster Wechsel',
+                            schweizerDatum(z.netzlaufwerk!.naechsterWechsel!),
+                          ),
+                      ],
+                    ),
+                  ],
                   if (z.geteilteKonten.isNotEmpty) ...[
                     const Abschnitt('Geteilte Konten'),
                     for (final k in z.geteilteKonten)

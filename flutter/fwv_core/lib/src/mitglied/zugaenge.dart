@@ -1,9 +1,9 @@
 // Die Zugaenge eines Mitglieds: `GET members/me/accesses`
 // (backend-members, Schluessel in camelCase).
 //
-// Das Backend liefert ausserdem `organizerEvents` und `smbCredentials`; beide
-// zeigten die alten Apps nicht an, deshalb werden sie hier (noch) nicht
-// gelesen.
+// Das Backend liefert ausserdem `organizerEvents`; das deckt in der App der
+// Reiter Organisator ab. `smbCredentials` (Netzlaufwerk) wird gelesen wie im
+// Mitgliederbereich der Webseite.
 
 import 'json_lesen.dart';
 
@@ -13,6 +13,7 @@ class Zugaenge {
     this.cloudOrdner = const [],
     this.systeme = const [],
     this.geteilteKonten = const [],
+    this.netzlaufwerk,
   });
 
   factory Zugaenge.ausJson(Object? json) {
@@ -22,6 +23,9 @@ class Zugaenge {
       cloudOrdner: jsonListe(m['nextcloudFolders'], CloudOrdner.ausJson),
       systeme: jsonListe(m['systemAccesses'], SystemZugang.ausJson),
       geteilteKonten: jsonListe(m['serviceAccounts'], GeteiltesKonto.ausJson),
+      netzlaufwerk: m['smbCredentials'] is Map
+          ? Netzlaufwerk.ausJson(Map<String, dynamic>.from(m['smbCredentials'] as Map))
+          : null,
     );
   }
 
@@ -30,8 +34,64 @@ class Zugaenge {
   final List<SystemZugang> systeme;
   final List<GeteiltesKonto> geteilteKonten;
 
+  /// Zugang zum Vereins-Netzlaufwerk (SMB) - je nach Rolle Vorstand,
+  /// Social Media oder Mitglied; null, wenn das Backend keinen liefert.
+  final Netzlaufwerk? netzlaufwerk;
+
   bool get leer =>
-      funktionsMails.isEmpty && cloudOrdner.isEmpty && systeme.isEmpty && geteilteKonten.isEmpty;
+      funktionsMails.isEmpty &&
+      cloudOrdner.isEmpty &&
+      systeme.isEmpty &&
+      geteilteKonten.isEmpty &&
+      netzlaufwerk == null;
+}
+
+/// `smbCredentials`: Server, Benutzer, Passwort, Freigaben. Das Passwort
+/// wechselt monatlich (am Ersten, nach `updatedAt`).
+class Netzlaufwerk {
+  const Netzlaufwerk({
+    this.server,
+    this.benutzer,
+    this.passwort,
+    this.freigaben = const [],
+    this.geaendert,
+    this.adresse,
+  });
+
+  factory Netzlaufwerk.ausJson(Map<String, dynamic> m) => Netzlaufwerk(
+    server: jsonText(m['server']),
+    benutzer: jsonText(m['user']),
+    passwort: jsonText(m['password']),
+    // Freigaben als Namen oder als Objekte mit `name` - beides lesen.
+    freigaben: m['shares'] is List
+        ? [
+            for (final f in m['shares'] as List)
+              if (f is String && f.trim().isNotEmpty)
+                f.trim()
+              else if (f is Map && jsonText(f['name']) != null)
+                jsonText(f['name'])!,
+          ]
+        : const [],
+    geaendert: jsonZeitpunkt(m['updatedAt']),
+    adresse: jsonText(m['connectUrl']),
+  );
+
+  final String? server;
+  final String? benutzer;
+  final String? passwort;
+  final List<String> freigaben;
+  final DateTime? geaendert;
+
+  /// `smb://smb.fwv-raura.ch/` - zum Verbinden im Dateimanager.
+  final String? adresse;
+
+  /// Erster des Folgemonats nach der letzten Aenderung.
+  DateTime? get naechsterWechsel {
+    final g = geaendert;
+    if (g == null) return null;
+    final l = g.toLocal();
+    return DateTime(l.year, l.month + 1, 1);
+  }
 }
 
 /// Postfach einer Vereinsfunktion (z.B. kassier@fwv-raura.ch).
