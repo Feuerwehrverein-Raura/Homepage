@@ -89,7 +89,7 @@ void main() {
 
   /// Nach der Anmeldung steht der Name in den Einstellungen.
   Future<void> zuDenEinstellungen(WidgetTester tester) async {
-    await tester.tap(find.text('Einstellungen'));
+    await tester.tap(find.text('Mehr'));
     await tester.pumpAndSettle();
   }
 

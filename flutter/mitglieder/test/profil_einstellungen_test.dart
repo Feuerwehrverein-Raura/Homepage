@@ -346,7 +346,7 @@ void main() {
       expect(an['device_id'], roh.werte['geraete_id']);
       expect(an['device_id'], isNotEmpty);
 
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await tippen(tester, find.text('Abmelden'));
 
       expect(backend.letzter('DELETE', '/members/me/fcm-token'), {'token': 'fcm-1'});
@@ -360,7 +360,7 @@ void main() {
   group('Einstellungen', () {
     testWidgets('Version, Newsletter an (lokal gemerkt)', (tester) async {
       await starten(tester);
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await sichtbar(tester, find.text('1.2.3 (45)'));
 
       await tippen(tester, find.byKey(const Key('newsletter')));
@@ -372,7 +372,7 @@ void main() {
     testWidgets('Newsletter: Fehler setzt den Schalter zurueck', (tester) async {
       backend.newsletterOk = false;
       await starten(tester);
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await tippen(tester, find.byKey(const Key('newsletter')));
       expect(tester.widget<SwitchListTile>(find.byKey(const Key('newsletter'))).value, isFalse);
       expect(find.textContaining('Ungültige E-Mail-Adresse'), findsOneWidget);
@@ -381,7 +381,7 @@ void main() {
 
     testWidgets('Android: Kontakt-Abgleich ohne nativen Teil', (tester) async {
       await starten(tester);
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await sichtbar(tester, find.byKey(const Key('kontakte-nicht-verfuegbar')));
       expect(find.text('In dieser Version noch nicht verfügbar.'), findsOneWidget);
     });
@@ -402,7 +402,7 @@ void main() {
       );
 
       await starten(tester, kontakte: const KontakteAbgleich(kanal));
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await tippen(tester, find.text('Jetzt abgleichen'));
       await tippen(tester, find.text('Gelöschte wiederherstellen'));
       expect(find.text('3 gelöschte Mitglieder werden wiederhergestellt.'), findsOneWidget);
@@ -422,7 +422,7 @@ void main() {
 
     testWidgets('iOS: CardDAV-Profil oeffnen', (tester) async {
       await starten(tester, plattform: Plattform.ios);
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       expect(find.text('Kontakte abgleichen'), findsNothing);
       await tippen(tester, find.text('Mitglieder-Adressbuch einrichten'));
       await tippen(tester, find.text('Profil installieren'));
@@ -434,7 +434,7 @@ void main() {
         {'notification_type': 'general', 'enabled': false},
       ];
       await starten(tester);
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await tippen(tester, find.text('Benachrichtigungen'));
 
       SwitchListTile schalter(String art) =>
@@ -474,7 +474,7 @@ void main() {
       );
 
       await starten(tester);
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await tippen(tester, find.text('Zugänge'));
 
       expect(find.text('kassier@fwv-raura.ch'), findsOneWidget);
@@ -562,7 +562,7 @@ void main() {
       expect(tokens(), ['jwt']);
       expect(find.text('Mitglieder ins Adressbuch übernehmen?'), findsNothing);
 
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await tippen(tester, find.text('Abmelden'));
       expect(tokens(), ['jwt', null]);
       final namen = aufrufe.map((c) => c.method).toList();
@@ -581,7 +581,7 @@ void main() {
       expect(find.text('Mitglieder werden ins Adressbuch übernommen.'), findsOneWidget);
 
       // Einstellungen zeigen den Abgleich als eingeschaltet.
-      await reiter(tester, 'Einstellungen');
+      await reiter(tester, 'Mehr');
       await sichtbar(tester, find.byKey(const Key('kontakte')));
       expect(tester.widget<SwitchListTile>(find.byKey(const Key('kontakte'))).value, isTrue);
     });
@@ -618,7 +618,7 @@ void main() {
     await tippen(tester, find.byTooltip('Profil bearbeiten'));
     await tester.tap(find.byTooltip('Zurück'));
     await tester.pumpAndSettle();
-    await reiter(tester, 'Einstellungen');
+    await reiter(tester, 'Mehr');
     await tippen(tester, find.text('Zugänge'));
     await tippen(tester, find.text('Passwort ändern'));
     expect(tester.takeException(), isNull);

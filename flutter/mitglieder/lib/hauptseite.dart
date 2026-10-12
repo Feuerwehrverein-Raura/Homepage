@@ -1,7 +1,7 @@
 // Hauptseite nach der Anmeldung: Reiter unten.
 //
-// Mitglieder:          Anlässe · (Organisator) · (Lager) · (Schopf) · Profil · Einstellungen
-// Externe Organisatoren: Organisator · Anlässe · Einstellungen
+// Mitglieder:          Anlässe · (Organisator) · (Lager) · (Schopf) · Profil · Mehr
+// Externe Organisatoren: Organisator · Anlässe · Mehr
 //
 // "Organisator" erscheint bei Mitgliedern nur, wenn sie Anlaesse
 // organisieren ([OrganisatorPruefung]); "Lager" nur mit der Authentik-Gruppe
@@ -101,10 +101,13 @@ class _HauptseiteState extends State<Hauptseite> {
       selectedIcon: Icon(Icons.person),
       label: 'Profil',
     ),
+    // "Mehr" statt "Einstellungen": Mit Lager und Schopf hat der Vorstand
+    // fuenf oder sechs Reiter, dann bricht "Einstellungen" mitten im Wort um
+    // ("Einstellung/en"). Die Seite selbst heisst weiter Einstellungen.
     Reiter.einstellungen => const NavigationDestination(
       icon: Icon(Icons.settings_outlined),
       selectedIcon: Icon(Icons.settings),
-      label: 'Einstellungen',
+      label: 'Mehr',
     ),
   };
 
@@ -134,10 +137,25 @@ class _HauptseiteState extends State<Hauptseite> {
                     : SizedBox.shrink(key: ValueKey(r)),
             ],
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: index,
-            onDestinationSelected: (i) => setState(() => _aktiv = reiter[i]),
-            destinations: [for (final r in reiter) _ziel(r)],
+          // Ab sechs Reitern (Vorstand, der organisiert) eine Stufe kleiner:
+          // Auf 360 Punkte breiten Handys brach sonst "Organisator" mitten im
+          // Wort um. Mit weniger Reitern bleibt alles wie gewohnt.
+          bottomNavigationBar: NavigationBarTheme(
+            data: reiter.length >= 6
+                ? NavigationBarTheme.of(context).copyWith(
+                    labelTextStyle: WidgetStateProperty.resolveWith(
+                      (zustand) =>
+                          NavigationBarTheme.of(context).labelTextStyle
+                              ?.resolve(zustand)
+                              ?.copyWith(fontSize: 11),
+                    ),
+                  )
+                : NavigationBarTheme.of(context),
+            child: NavigationBar(
+              selectedIndex: index,
+              onDestinationSelected: (i) => setState(() => _aktiv = reiter[i]),
+              destinations: [for (final r in reiter) _ziel(r)],
+            ),
           ),
         );
       },
