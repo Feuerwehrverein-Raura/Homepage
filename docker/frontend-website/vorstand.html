@@ -5180,6 +5180,7 @@
             document.getElementById('event-form').reset();
             document.getElementById('event-id').value = '';
             document.getElementById('event-shifts-container').innerHTML = '';
+            geladeneSchichten = new Map();
             document.getElementById('meal-options-container').innerHTML = '';
             // Organisator-Notizen: bei neuen Events ausblenden (noch keine Event-ID vorhanden)
             document.getElementById('organizer-notes-section').classList.add('hidden');
@@ -5490,9 +5491,22 @@
             document.body.appendChild(overlay);
         }
 
+        // Welche Schichten beim Oeffnen im Formular standen (id -> Name, Belegung).
+        // Geloescht wird beim Speichern NUR, was hier steht und im Formular
+        // entfernt wurde. Frueher wurde mit einer frischen Abfrage verglichen -
+        // so wurde auch eine Schicht geloescht, die ein Organisator inzwischen
+        // angelegt hatte, und alle Eingeteilten bekamen "Schicht abgesagt".
+        let geladeneSchichten = new Map();
+
+        function schichtBelegung(shift) {
+            const r = shift?.registrations || {};
+            return (r.approvedCount || 0) + (r.pendingCount || 0);
+        }
+
         function loadEventShifts(shifts) {
             const container = document.getElementById('event-shifts-container');
             container.innerHTML = '';
+            geladeneSchichten = new Map((shifts || []).map(s => [s.id, { name: s.name, belegt: schichtBelegung(s) }]));
             shifts.forEach(shift => {
                 addShiftRow(shift);
             });
@@ -5525,6 +5539,7 @@
             const row = document.createElement('div');
             row.className = 'shift-row border rounded-lg p-3 bg-gray-50';
             row.dataset.shiftId = shiftId;
+            row.dataset.belegt = String(schichtBelegung(shift));
 
             const bereichValue = shift?.bereich || 'Allgemein';
             const dateValue = formatDateForInput(shift?.date);
@@ -5539,7 +5554,7 @@
                         </select>
                     </div>
                     <div>
-                        <input type="text" placeholder="Name (z.B. Schicht 1)" value="${shift?.name || ''}"
+                        <input type="text" placeholder="Name (z.B. Schicht 1)" value="${escapeHtml(shift?.name || '')}"
                             class="shift-name w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
                     </div>
                     <div>
@@ -5561,7 +5576,7 @@
                     </div>
                 </div>
                 <div class="mt-2">
-                    <input type="text" placeholder="Beschreibung (optional)" value="${shift?.description || ''}"
+                    <input type="text" placeholder="Beschreibung (optional)" value="${escapeHtml(shift?.description || '')}"
                         class="shift-description w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-fire-500">
                 </div>
             `;
@@ -5570,6 +5585,14 @@
 
         function removeShiftRow(button) {
             const row = button.closest('.shift-row');
+            const belegt = parseInt(row.dataset.belegt, 10) || 0;
+            if (belegt > 0) {
+                const name = row.querySelector('.shift-name').value || 'Diese Schicht';
+                const ok = confirm(`${name}: ${belegt} ${belegt === 1 ? 'Person ist' : 'Personen sind'} eingeteilt.\n\n` +
+                    'Wird die Zeile entfernt, wird die Schicht beim Speichern geloescht und alle Eingeteilten bekommen eine Absage-Mail.\n\n' +
+                    'Um die Schicht nur zu aendern, die Felder anpassen statt die Zeile zu entfernen.\n\nTrotzdem entfernen?');
+                if (!ok) return;
+            }
             row.remove();
         }
 
@@ -5633,10 +5656,23 @@
             }
         }
 
+        // Wirft, wenn eine Zeile unvollstaendig ist. Frueher fielen Zeilen ohne
+        // Name oder Datum stillschweigend weg - bei einer bestehenden Schicht
+        // hiess das: geloescht, und alle Eingeteilten bekamen eine Absage.
+        // Ganz leere NEUE Zeilen werden einfach ignoriert.
         function collectShiftsData() {
             const shifts = [];
+            const unvollstaendig = [];
             document.querySelectorAll('.shift-row').forEach(row => {
                 const shiftId = row.dataset.shiftId || '';
+                const istNeu = !shiftId || shiftId.startsWith('new-');
+                const name = row.querySelector('.shift-name').value.trim();
+                const date = row.querySelector('.shift-date').value;
+                if (istNeu && !name && !date) return;
+                if (!name || !date) {
+                    unvollstaendig.push(name || (geladeneSchichten.get(shiftId)?.name) || 'eine Schicht ohne Namen');
+                    return;
+                }
                 shifts.push({
                     id: (shiftId && !shiftId.startsWith('new-')) ? shiftId : null,
                     bereich: row.querySelector('.shift-bereich').value,
@@ -5648,7 +5684,27 @@
                     description: row.querySelector('.shift-description').value
                 });
             });
-            return shifts.filter(s => s.name && s.date);
+            if (unvollstaendig.length > 0) {
+                throw new Error(`Bei ${unvollstaendig.join(', ')} fehlt Name oder Datum. Bitte ergaenzen - nichts wurde gespeichert.`);
+            }
+            return shifts;
+        }
+
+        // Schichten vor dem Speichern pruefen und Loeschungen bestaetigen lassen.
+        // Gibt null zurueck, wenn abgebrochen wurde.
+        function schichtenVorbereiten() {
+            const shifts = collectShiftsData();
+            const behalten = new Set(shifts.filter(s => s.id).map(s => s.id));
+            const loeschen = [...geladeneSchichten].filter(([id]) => !behalten.has(id))
+                .map(([id, info]) => ({ id, ...info }));
+            const belegte = loeschen.filter(s => s.belegt > 0);
+            if (belegte.length > 0) {
+                const liste = belegte.map(s => `- ${s.name}: ${s.belegt} ${s.belegt === 1 ? 'Person' : 'Personen'}`).join('\n');
+                const ok = confirm(`Diese Schichten werden geloescht:\n${liste}\n\n` +
+                    'Alle Eingeteilten bekommen eine Absage-Mail. Fortfahren?');
+                if (!ok) return null;
+            }
+            return { shifts, loeschen: loeschen.map(s => s.id) };
         }
 
         function formatDateTimeLocal(dateString) {
@@ -5748,6 +5804,20 @@
 
             console.log('Saving event data:', { ...data, pdf_attachment: data.pdf_attachment ? '(base64)' : null });
 
+            // Schichten ZUERST pruefen: Unvollstaendige Zeilen oder eine
+            // abgebrochene Loesch-Rueckfrage sollen gar nichts speichern.
+            const schichtKategorie = document.getElementById('event-category').value;
+            let schichtPlan = null;
+            if (['Dorffest', 'Sonstiges'].includes(schichtKategorie)) {
+                try {
+                    schichtPlan = schichtenVorbereiten();
+                } catch (pruefFehler) {
+                    alert(pruefFehler.message);
+                    return;
+                }
+                if (!schichtPlan) return;
+            }
+
             try {
                 const url = id ? `${API_BASE}/events/${id}` : `${API_BASE}/events`;
                 const method = id ? 'PUT' : 'POST';
@@ -5771,12 +5841,9 @@
                 const eventId = savedEvent.id;
 
                 // Schichten nur speichern wenn Kategorie welche unterstuetzt (sonst skippen)
-                const category = document.getElementById('event-category').value;
-                const supportsShifts = ['Dorffest', 'Sonstiges'].includes(category);
-                if (supportsShifts) {
+                if (schichtPlan) {
                     try {
-                        const shiftsData = collectShiftsData();
-                        await saveEventShifts(eventId, shiftsData);
+                        await saveEventShifts(eventId, schichtPlan);
                     } catch (shiftError) {
                         console.error('Shifts save failed (event saved):', shiftError);
                         alert('Event gespeichert, aber Schichten konnten nicht aktualisiert werden: ' + shiftError.message);
@@ -5792,68 +5859,41 @@
         }
 
         // Speichert die Schichten eines Events separat über die API.
-        async function saveEventShifts(eventId, shifts) {
-            // Get existing shifts to compare
-            const existingResponse = await fetch(`${API_BASE}/events/${eventId}`, {
-                headers: { 'Authorization': `Bearer ${authToken}` }
-            });
-            const existingEvent = await existingResponse.json();
-            const existingShiftIds = (existingEvent.shifts || []).map(s => s.id);
-
-            // Collect shift IDs that are still present
-            const currentShiftIds = shifts.filter(s => s.id).map(s => s.id);
-
-            // Delete removed shifts
-            for (const oldId of existingShiftIds) {
-                if (!currentShiftIds.includes(oldId)) {
-                    await fetch(`${API_BASE}/shifts/${oldId}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${authToken}` }
-                    });
+        async function saveEventShifts(eventId, plan) {
+            const { shifts, loeschen } = plan;
+            const fehler = [];
+            const pruefen = async (antwort, was) => {
+                if (!antwort.ok) {
+                    const d = await antwort.json().catch(() => ({}));
+                    fehler.push(`${was}: ${d.error || 'HTTP ' + antwort.status}`);
                 }
+            };
+            const kopf = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` };
+
+            // Nur Schichten loeschen, die beim Oeffnen da waren und entfernt wurden.
+            for (const oldId of loeschen) {
+                await pruefen(await fetch(`${API_BASE}/shifts/${oldId}`, { method: 'DELETE', headers: kopf }),
+                    `Loeschen ${geladeneSchichten.get(oldId)?.name || oldId}`);
             }
 
-            // Create or update shifts
             for (const shift of shifts) {
-                if (shift.id) {
-                    // Update existing shift
-                    await fetch(`${API_BASE}/shifts/${shift.id}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${authToken}`
-                        },
-                        body: JSON.stringify({
-                            name: shift.name,
-                            description: shift.description,
-                            date: shift.date,
-                            start_time: shift.start_time,
-                            end_time: shift.end_time,
-                            needed: shift.needed,
-                            bereich: shift.bereich
-                        })
-                    });
-                } else {
-                    // Create new shift
-                    await fetch(`${API_BASE}/shifts`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${authToken}`
-                        },
-                        body: JSON.stringify({
-                            event_id: eventId,
-                            name: shift.name,
-                            description: shift.description,
-                            date: shift.date,
-                            start_time: shift.start_time,
-                            end_time: shift.end_time,
-                            needed: shift.needed,
-                            bereich: shift.bereich
-                        })
-                    });
-                }
+                const inhalt = JSON.stringify({
+                    name: shift.name,
+                    description: shift.description,
+                    date: shift.date,
+                    start_time: shift.start_time,
+                    end_time: shift.end_time,
+                    needed: shift.needed,
+                    bereich: shift.bereich,
+                    ...(shift.id ? {} : { event_id: eventId })
+                });
+                const antwort = shift.id
+                    ? await fetch(`${API_BASE}/shifts/${shift.id}`, { method: 'PUT', headers: kopf, body: inhalt })
+                    : await fetch(`${API_BASE}/shifts`, { method: 'POST', headers: kopf, body: inhalt });
+                await pruefen(antwort, shift.name);
             }
+
+            if (fehler.length > 0) throw new Error(fehler.join('; '));
         }
 
         async function deleteEvent() {
