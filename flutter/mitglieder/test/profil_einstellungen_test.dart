@@ -304,11 +304,42 @@ void main() {
       expect(b['telefon'], '061 811 00 00');
       expect(b['mobile'], isNull, reason: 'leeres Feld loescht den Eintrag');
       expect(b['anrede'], 'Frau');
-      expect(b.keys, containsAll(['vorname', 'nachname', 'email', 'strasse', 'plz', 'ort']));
+      expect(
+        b.keys,
+        containsAll(['vorname', 'nachname', 'email', 'strasse', 'plz', 'ort', 'iban']),
+      );
       // Zurueck im Profil, neu geladen.
       expect(find.text('Profil gespeichert'), findsOneWidget);
       expect(find.text('15.05.1990'), findsOneWidget);
     });
+
+    testWidgets(
+      'IBAN: falsche Pruefziffer abgewiesen, richtige in Vierergruppen gespeichert und gezeigt',
+      (tester) async {
+        await starten(tester);
+        await reiter(tester, 'Profil');
+        await tippen(tester, find.byTooltip('Profil bearbeiten'));
+        final feld = find.widgetWithText(TextFormField, 'IBAN (für Rückerstattungen)');
+        await tester.ensureVisible(feld);
+      await tester.pumpAndSettle();
+        await tester.enterText(feld, 'CH93 0076 2011 6238 5295 8');
+        await tester.tap(find.byKey(const Key('profil-speichern')));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Diese IBAN stimmt nicht – bitte Zeichen und Prüfziffer kontrollieren.'),
+          findsOneWidget,
+        );
+        expect(backend.gab('PUT', '/members/me'), isFalse);
+
+        await tester.enterText(feld, 'ch9300762011623852957');
+        await tester.tap(find.byKey(const Key('profil-speichern')));
+        await tester.pumpAndSettle();
+        final b = backend.letzter('PUT', '/members/me') as Map;
+        expect(b['iban'], 'CH93 0076 2011 6238 5295 7');
+        await tester.ensureVisible(find.text('CH93 0076 2011 6238 5295 7'));
+        expect(find.text('CH93 0076 2011 6238 5295 7'), findsOneWidget);
+      },
+    );
 
     testWidgets('Austritt: Bestaetigung, Antrag, danach abgemeldet', (tester) async {
       await starten(tester);
@@ -553,9 +584,7 @@ void main() {
         if (c.method == 'token') (c.arguments as Map)['token'],
     ];
 
-    testWidgets('Token beim Start, null beim Abmelden; Frage danach wieder offen', (
-      tester,
-    ) async {
+    testWidgets('Token beim Start, null beim Abmelden; Frage danach wieder offen', (tester) async {
       kanalNachbauen(tester);
       await roh.schreiben('contacts_sync_asked', 'true');
       await starten(tester, kontakte: const KontakteAbgleich(kanal));

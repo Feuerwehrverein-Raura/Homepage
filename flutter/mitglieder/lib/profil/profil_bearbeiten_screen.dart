@@ -34,6 +34,9 @@ class _ProfilBearbeitenScreenState extends State<ProfilBearbeitenScreen> {
   late final _strasse = TextEditingController(text: widget.profil.strasse);
   late final _plz = TextEditingController(text: widget.profil.plz);
   late final _ort = TextEditingController(text: widget.profil.ort);
+  late final _iban = TextEditingController(
+    text: widget.profil.iban == null ? null : ibanFormatieren(widget.profil.iban!),
+  );
   late String? _anrede = widget.profil.anrede;
   late DateTime? _geburtstag = widget.profil.geburtstag;
   late String? _foto = widget.profil.foto;
@@ -43,7 +46,7 @@ class _ProfilBearbeitenScreenState extends State<ProfilBearbeitenScreen> {
 
   @override
   void dispose() {
-    for (final c in [_vorname, _nachname, _email, _mobile, _telefon, _strasse, _plz, _ort]) {
+    for (final c in [_vorname, _nachname, _email, _mobile, _telefon, _strasse, _plz, _ort, _iban]) {
       c.dispose();
     }
     super.dispose();
@@ -68,6 +71,7 @@ class _ProfilBearbeitenScreenState extends State<ProfilBearbeitenScreen> {
           strasse: _strasse.text,
           plz: _plz.text,
           ort: _ort.text,
+          iban: _iban.text,
         ),
       );
       if (!mounted) return;
@@ -265,6 +269,9 @@ class _ProfilBearbeitenScreenState extends State<ProfilBearbeitenScreen> {
                     Expanded(child: _feld(_ort, 'Ort', autofill: AutofillHints.addressCity)),
                   ],
                 ),
+                const SizedBox(height: 8),
+                // Wie im Mitgliederbereich der Webseite: fuer Rueckerstattungen.
+                _feld(_iban, 'IBAN (für Rückerstattungen)', pruefen: ibanPruefen),
               ],
             ),
           ),
@@ -344,3 +351,6 @@ class _GeburtstagFeld extends StatelessWidget {
     );
   }
 }
+
+String? ibanPruefen(String t) =>
+    ibanGueltig(t) ? null : 'Diese IBAN stimmt nicht – bitte Zeichen und Prüfziffer kontrollieren.';

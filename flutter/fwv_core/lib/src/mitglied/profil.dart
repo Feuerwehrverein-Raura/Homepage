@@ -20,6 +20,7 @@ class MitgliedProfil {
     this.status,
     this.geburtstag,
     this.foto,
+    this.iban,
   });
 
   factory MitgliedProfil.ausJson(Object? json) {
@@ -39,6 +40,7 @@ class MitgliedProfil {
       status: jsonText(m['status']),
       geburtstag: jsonDatum(m['geburtstag']),
       foto: jsonText(m['foto']),
+      iban: jsonText(m['iban']),
     );
   }
 
@@ -60,6 +62,9 @@ class MitgliedProfil {
 
   /// Wie gespeichert: meist relativ (`/uploads/photo-123.jpg`).
   final String? foto;
+
+  /// Bankverbindung fuer Rueckerstattungen, wie gespeichert.
+  final String? iban;
 
   /// "Vorname Nachname", sonst die E-Mail, sonst null.
   String? get name {
@@ -103,6 +108,7 @@ class ProfilAenderung {
     this.strasse,
     this.plz,
     this.ort,
+    this.iban,
   });
 
   final String? anrede;
@@ -116,6 +122,10 @@ class ProfilAenderung {
   final String? plz;
   final String? ort;
 
+  /// Wird in Vierergruppen gespeichert ("CH93 0076 2011 6238 5295 7"),
+  /// wie man sie von der Bankkarte abliest.
+  final String? iban;
+
   Map<String, Object?> alsJson() => {
     'anrede': _leerAlsNull(anrede),
     'vorname': _leerAlsNull(vorname),
@@ -127,7 +137,38 @@ class ProfilAenderung {
     'strasse': _leerAlsNull(strasse),
     'plz': _leerAlsNull(plz),
     'ort': _leerAlsNull(ort),
+    'iban': _leerAlsNull(iban) == null ? null : ibanFormatieren(iban!),
   };
+}
+
+/// IBAN ohne Leerzeichen, gross geschrieben.
+String ibanKompakt(String iban) => iban.replaceAll(RegExp(r'\s'), '').toUpperCase();
+
+/// IBAN in Vierergruppen: "CH93 0076 2011 6238 5295 7".
+String ibanFormatieren(String iban) {
+  final k = ibanKompakt(iban);
+  final teile = <String>[];
+  for (var i = 0; i < k.length; i += 4) {
+    teile.add(k.substring(i, i + 4 > k.length ? k.length : i + 4));
+  }
+  return teile.join(' ');
+}
+
+/// Prueft Laenge, Aufbau und Pruefziffer (ISO 13616, mod 97). Fuer CH/LI
+/// zusaetzlich die feste Laenge von 21 Zeichen.
+bool ibanGueltig(String iban) {
+  final k = ibanKompakt(iban);
+  if (!RegExp(r'^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$').hasMatch(k)) return false;
+  if ((k.startsWith('CH') || k.startsWith('LI')) && k.length != 21) return false;
+  final umgestellt = k.substring(4) + k.substring(0, 4);
+  var rest = 0;
+  for (final c in umgestellt.codeUnits) {
+    final ziffern = c >= 65 ? '${c - 55}' : String.fromCharCode(c);
+    for (final z in ziffern.codeUnits) {
+      rest = (rest * 10 + (z - 48)) % 97;
+    }
+  }
+  return rest == 1;
 }
 
 String? _leerAlsNull(String? s) {

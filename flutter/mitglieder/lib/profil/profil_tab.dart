@@ -130,6 +130,8 @@ class _ProfilTabState extends State<ProfilTab> {
         if (p.geburtstag != null)
           _zeile(Icons.cake_outlined, 'Geburtstag', schweizerDatum(p.geburtstag!)),
         if (p.status != null) _zeile(Icons.badge_outlined, 'Status', p.status),
+        if (p.iban != null && p.iban!.trim().isNotEmpty)
+          _zeile(Icons.account_balance_outlined, 'IBAN', ibanFormatieren(p.iban!)),
         const Divider(height: 32),
         ListTile(
           leading: const Icon(Icons.edit_outlined),

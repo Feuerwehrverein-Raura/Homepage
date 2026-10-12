@@ -351,4 +351,28 @@ void main() {
     expect(api.kopfzeilenFuer(Uri.parse('https://example.com/a.jpg')), isEmpty);
     expect(api.kopfzeilenFuer(Uri.parse('http://api.fwv-raura.ch/a.jpg')), isEmpty);
   });
+
+  group('IBAN', () {
+    test('Pruefziffer, Laenge, Format', () {
+      expect(ibanGueltig('CH93 0076 2011 6238 5295 7'), isTrue);
+      expect(ibanGueltig('ch9300762011623852957'), isTrue);
+      expect(ibanGueltig('CH93 0076 2011 6238 5295 8'), isFalse, reason: 'Pruefziffer');
+      expect(ibanGueltig('CH93 0076 2011 6238 5295'), isFalse, reason: 'CH hat 21 Zeichen');
+      expect(ibanGueltig('DE89 3704 0044 0532 0130 00'), isTrue);
+      expect(ibanGueltig('kein iban'), isFalse);
+      expect(ibanFormatieren('ch9300762011623852957'), 'CH93 0076 2011 6238 5295 7');
+    });
+
+    test('Profil liest und ProfilAenderung schickt sie formatiert; leer loescht', () {
+      expect(
+        MitgliedProfil.ausJson({'iban': 'CH9300762011623852957'}).iban,
+        'CH9300762011623852957',
+      );
+      expect(
+        const ProfilAenderung(iban: 'ch9300762011623852957').alsJson()['iban'],
+        'CH93 0076 2011 6238 5295 7',
+      );
+      expect(const ProfilAenderung(iban: '  ').alsJson()['iban'], isNull);
+    });
+  });
 }
