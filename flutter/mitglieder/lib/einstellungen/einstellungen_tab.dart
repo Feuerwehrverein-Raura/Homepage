@@ -135,7 +135,7 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
             ListTile(
               leading: const Icon(Icons.queue_music),
               title: const Text('Musik im Roten Schopf'),
-              subtitle: const Text('Playlists und Radiosender für den Laptop'),
+              subtitle: const Text('Hören, Playlists, Radio – und den Laptop steuern'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _oeffnen(
                 MusikScreen(

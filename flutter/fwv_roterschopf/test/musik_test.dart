@@ -175,6 +175,12 @@ class _Zugang extends MusikZugang {
   });
 
   @override
+  Future<List<MusikTitel>> alleTitel() async => [
+    for (var i = 0; i < 1153; i++)
+      MusikTitel(pfad: 'Sammlung/Titel $i.mp3', interpret: 'Interpret $i', titel: 'Titel $i'),
+  ];
+
+  @override
   Future<Abgleich> abgleichen(String text) async => Abgleich.ausJson({
     'gelesen': 3,
     'gefunden': [
@@ -465,6 +471,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(wiedergabe.aufrufe.last, 'stoppen');
     expect(find.byKey(const Key('mini-player')), findsNothing);
+  });
+
+  testWidgets('Alle Titel: ganze Sammlung zufaellig auf dem Handy', (tester) async {
+    final z = await zeigen(tester);
+    expect(find.text('Alle Titel'), findsOneWidget);
+    await tester.tap(find.byTooltip('Alle Titel abspielen'));
+    await tester.pumpAndSettle();
+    expect(z.freigaben.single, hasLength(1153));
+    expect(wiedergabe.geladen, hasLength(1153));
+    expect(wiedergabe.aufrufe.skip(1), ['zufall true', 'spielen']);
+    final mini = find.byKey(const Key('mini-player'));
+    expect(find.descendant(of: mini, matching: find.textContaining('Alle Titel')), findsOneWidget);
   });
 
   testWidgets('Radiosender auf dem Handy hoeren', (tester) async {

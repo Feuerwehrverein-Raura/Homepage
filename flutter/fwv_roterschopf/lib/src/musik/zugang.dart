@@ -16,6 +16,9 @@ abstract class MusikZugang {
   /// Ohne [suche] die ersten Titel alphabetisch, sonst die Treffer.
   Future<Bibliothek> bibliothek({String? suche});
 
+  /// Die ganze Sammlung (fuer "Alle Titel" im Player).
+  Future<List<MusikTitel>> alleTitel();
+
   Future<Abgleich> abgleichen(String text);
 
   /// Legt an ([id] null) oder ersetzt Name und ganze Titelliste. Gibt die Id
@@ -76,6 +79,10 @@ class ApiMusikZugang extends MusikZugang {
       ),
     );
   }
+
+  @override
+  Future<List<MusikTitel>> alleTitel() async =>
+      _maps(await api.get('kiosk/bibliothek/alle')).map(MusikTitel.ausJson).toList();
 
   @override
   Future<Abgleich> abgleichen(String text) async =>

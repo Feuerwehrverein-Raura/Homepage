@@ -12,6 +12,7 @@
 // die Musik beim Verlassen des Musik-Bereichs weiterlaeuft.
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -221,8 +222,14 @@ class MusikPlayer extends ChangeNotifier {
   /// true, wenn [id] gerade der aktuelle Eintrag ist (oder geholt wird).
   bool istAktuell(String id) => _holt == id || (_holt == null && aktuell?.id == id);
 
-  /// Spielt die vorhandenen [titel] der Reihe nach, ab Nummer [ab].
-  Future<void> spieleListe(String quelle, List<MusikTitel> titel, {int ab = 0}) async {
+  /// Spielt die vorhandenen [titel] der Reihe nach, ab Nummer [ab] - oder
+  /// mit [zufall] durcheinander, wie "Alle Titel" auf dem Laptop.
+  Future<void> spieleListe(
+    String quelle,
+    List<MusikTitel> titel, {
+    int ab = 0,
+    bool zufall = false,
+  }) async {
     final da = [
       for (final (i, t) in titel.indexed)
         if (t.vorhanden) (i, t),
@@ -248,8 +255,9 @@ class MusikPlayer extends ChangeNotifier {
               album: quelle,
             ),
         ],
-        ab: start < 0 ? 0 : start,
+        ab: zufall ? Random().nextInt(da.length) : (start < 0 ? 0 : start),
         radio: false,
+        zufall: zufall,
       );
     } finally {
       if (nr == _nr) {
@@ -274,6 +282,7 @@ class MusikPlayer extends ChangeNotifier {
       [WiedergabeEintrag(id: s.url, adresse: Uri.parse(s.url), titel: s.name, album: 'Radio')],
       ab: 0,
       radio: true,
+      zufall: false,
     );
   }
 
@@ -282,15 +291,16 @@ class MusikPlayer extends ChangeNotifier {
     List<WiedergabeEintrag> liste, {
     required int ab,
     required bool radio,
+    required bool zufall,
   }) async {
     _liste = liste;
     _quelle = quelle;
     _radio = radio;
     _index = ab;
-    _zufall = false;
+    _zufall = zufall;
     notifyListeners();
     await _w.laden(liste, ab: ab);
-    await _w.zufall(false);
+    await _w.zufall(zufall);
     await _w.spielen();
   }
 

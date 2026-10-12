@@ -6158,6 +6158,21 @@ app.get('/kiosk/bestellsystem', kioskSchluessel, async (req, res) => {
 // Die Bibliothek zum Durchsuchen. Ohne Suchbegriff kommen nicht alle 1153
 // Titel: Diese Liste wandert sonst bei jedem Oeffnen der Seite ueber die
 // Leitung, und niemand scrollt durch 1153 Zeilen.
+// Die ganze Sammlung - fuer "Alle Titel" im Player der App (das Handy als
+// Ersatz fuer den Laptop). Nur Pfad und Tags, rund 100 Bytes pro Titel.
+app.get('/kiosk/bibliothek/alle', authenticateToken, async (req, res) => {
+    try {
+        await kioskTabellen();
+        const alle = await pool.query(
+            'SELECT pfad, interpret, titel FROM kiosk_titel ORDER BY lower(interpret), lower(titel)'
+        );
+        res.json(alle.rows);
+    } catch (error) {
+        console.error('GET /kiosk/bibliothek/alle:', error.message);
+        res.status(500).json({ error: 'Sammlung konnte nicht geladen werden' });
+    }
+});
+
 app.get('/kiosk/bibliothek', authenticateToken, async (req, res) => {
     try {
         await kioskTabellen();

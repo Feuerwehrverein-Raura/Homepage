@@ -127,6 +127,15 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
     }
   }
 
+  /// Die ganze Sammlung durcheinander - wie "Alle Titel" auf dem Laptop.
+  Future<void> _alleAbspielen() async {
+    try {
+      await widget.player.spieleListe('Alle Titel', await widget.zugang.alleTitel(), zufall: true);
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    }
+  }
+
   Future<void> _loeschen(PlaylistKurz p) async {
     final ja = await nachfragen(
       context,
@@ -156,11 +165,26 @@ class _PlaylistsSeiteState extends State<_PlaylistsSeite> {
       body: LadeAnsicht<List<PlaylistKurz>>(
         key: _ansicht,
         laden: widget.zugang.playlists,
-        istLeer: (l) => l.isEmpty,
-        leer: 'Noch keine Playlists. „Alle Titel“ gibt es auf dem Laptop immer.',
         bauen: (context, liste, _) => ListView(
           padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 96)),
           children: [
+            // Wie auf dem Laptop immer da: die ganze Sammlung, zufaellig.
+            ListTile(
+              leading: const Icon(Icons.library_music),
+              title: const Text('Alle Titel'),
+              subtitle: const Text('Die ganze Sammlung, zufällig'),
+              onTap: _alleAbspielen,
+              trailing: IconButton(
+                tooltip: 'Alle Titel abspielen',
+                icon: const Icon(Icons.shuffle),
+                onPressed: _alleAbspielen,
+              ),
+            ),
+            if (liste.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('Noch keine eigenen Playlists.'),
+              ),
             for (final p in liste)
               ListTile(
                 leading: const Icon(Icons.queue_music),

@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Das Push-Symbol wird nur ueber seinen Namen gefunden
-     (flutter_local_notifications, Firebase-Meta-Daten) — nicht wegkuerzen. -->
+<!-- Nur ueber ihren Namen gefunden, deshalb nicht wegkuerzen:
+     - das Push-Symbol (flutter_local_notifications, Firebase-Meta-Daten)
+     - die Knoepfe der Musik-Benachrichtigung (audio_service). Fehlen sie,
+       wirft audio_service bei jedem Zustand und die Bedienung auf dem
+       Sperrbildschirm bleibt tot. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_benachrichtigung" />
+    tools:keep="@drawable/ic_benachrichtigung,@drawable/audio_service_*" />
