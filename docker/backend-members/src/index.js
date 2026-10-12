@@ -5180,10 +5180,17 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
                 let authentikUser = null;
                 let verknuepft = false;
 
-                const suche = await axios.get(
-                    `${AUTHENTIK_API_URL}/api/v3/core/users/`,
-                    { params: { search: member.email }, headers: authHeaders }
-                );
+                // Ohne E-Mail gibt es nichts zu suchen. Frueher ging die Suche
+                // trotzdem raus - mit leerem Begriff lieferte Authentik ALLE
+                // Konten, und member.email.toLowerCase() warf auf null. So
+                // landeten genau die sieben Mitglieder ohne Adresse bei jedem
+                // Lauf in der Fehlerliste und bekamen nie ein Konto.
+                const suche = member.email
+                    ? await axios.get(
+                        `${AUTHENTIK_API_URL}/api/v3/core/users/`,
+                        { params: { search: member.email }, headers: authHeaders }
+                    )
+                    : { data: { results: [] } };
                 // E-Mail allein genuegt NICHT: Ehepaare teilen sich hier Adressen,
                 // und die Benutzernamen sind irrefuehrend — hinter "franz.kaeslin"
                 // steckt Margrits Konto, hinter "reinerberg47" das von Helen.
@@ -5225,9 +5232,13 @@ app.post('/members/sync-authentik', authenticateAny, requireRole('vorstand', 'ad
                     {
                         username: benutzername,
                         name: `${member.vorname} ${member.nachname}`,
-                        email: member.email,
+                        // Leer statt null, wie in createAuthentikUser.
+                        email: member.email || '',
                         is_active: true,
-                        groups: [], // Will be assigned via Authentik UI or later
+                        // Gleich in "Mitglieder" - wie createAuthentikUser.
+                        // Frueher leer: Das Konto existierte, fehlte aber in
+                        // der Gruppe, an der Nextcloud, Kasse & Co. haengen.
+                        groups: [MITGLIEDER_GROUP],
                         type: 'internal' // Regular user (not service account)
                     },
                     { headers: authHeaders }
