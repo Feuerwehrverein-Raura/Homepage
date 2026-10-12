@@ -17,7 +17,9 @@ import '../gemeinsam.dart';
 import '../hauptseite.dart';
 import 'adressbuch.dart';
 import 'benachrichtigungen_screen.dart';
+import 'bildschirm.dart';
 import 'gruppen_screen.dart';
+import 'vpn_screen.dart';
 import 'zugaenge_screen.dart';
 
 class EinstellungenTab extends StatefulWidget {
@@ -121,6 +123,13 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _oeffnen(ZugaengeScreen(dienste: _d)),
             ),
+            ListTile(
+              leading: const Icon(Icons.vpn_key_outlined),
+              title: const Text('VPN-Zugang'),
+              subtitle: const Text('Gerät mit dem Vereinsnetz verbinden'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _oeffnen(VpnScreen(dienste: _d)),
+            ),
             const Abschnitt('Roter Schopf'),
             ListTile(
               leading: const Icon(Icons.queue_music),
@@ -128,6 +137,13 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
               subtitle: const Text('Playlists und Radiosender für den Laptop'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _oeffnen(MusikScreen(zugang: _d.musik)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.desktop_windows_outlined),
+              title: const Text('Bildschirm Roter Schopf'),
+              subtitle: const Text('Live sehen, ob die Musik läuft'),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => bildschirmOeffnen(context, _d),
             ),
             if (darfGruppenVerwalten(sitzung)) ...[
               const Abschnitt('Vorstand'),

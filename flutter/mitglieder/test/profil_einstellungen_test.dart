@@ -80,6 +80,10 @@ class _Backend {
   List<Map<String, Object?>> prefs = [];
   List<Object> organisiert = [];
   bool newsletterOk = true;
+  bool darfSteuern = false;
+  List<Map<String, Object?>> vpn = [
+    {'name': 'ma1b2c3d4-laptop', 'geraet': 'laptop', 'adresse': '10.20.0.7', 'zuletzt': null},
+  ];
   final anfragen = <(String, String, Object?)>[];
 
   Object? letzter(String methode, String pfad) =>
@@ -105,6 +109,25 @@ class _Backend {
         });
       case 'GET /members/me/notifications':
         return json(prefs);
+      case 'GET /members/me/vpn':
+        return json(vpn);
+      case 'POST /members/me/vpn':
+        return json({
+          'name': 'ma1b2c3d4-handy',
+          'geraet': (body as Map)['geraet'],
+          'adresse': '10.20.0.8',
+          'konfiguration': '[Interface]\nPrivateKey = fake\n',
+        }, 201);
+      case 'DELETE /members/me/vpn/ma1b2c3d4-laptop':
+        vpn = [];
+        return json({'success': true});
+      case 'GET /members/me/bildschirm':
+        return json({
+          'schauen': {'url': '/bildschirm/vnc.html?autoconnect=true&password=s'},
+          'steuern': darfSteuern
+              ? {'url': '/bildschirm-steuern/vnc.html?autoconnect=true&password=t'}
+              : null,
+        });
       case 'GET /kiosk/playlists':
         return json([
           {'id': 'p1', 'name': 'Chilbi Abend', 'anzahl': 12, 'erstellt_von_name': 'Erika Muster'},
@@ -172,12 +195,14 @@ void main() {
   late SpeicherImArbeitsspeicher roh;
   late _FalschePush push;
   late List<Uri> geoeffnet;
+  late List<(String, String)> geteilt;
 
   setUp(() {
     backend = _Backend();
     roh = SpeicherImArbeitsspeicher();
     push = _FalschePush();
     geoeffnet = [];
+    geteilt = [];
   });
 
   /// Angemeldetes Mitglied, Handy-Bildschirm (360 x 800).
@@ -222,6 +247,7 @@ void main() {
         geoeffnet.add(u);
         return true;
       },
+      dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, utf8.decode(bytes))),
       plattform: plattform,
     );
     await tester.pumpWidget(FwvApp(dienste: d));
@@ -393,6 +419,53 @@ void main() {
   });
 
   group('Einstellungen', () {
+    testWidgets('VPN: Geraete sehen, Zugang anlegen und an WireGuard geben, entfernen', (
+      tester,
+    ) async {
+      await starten(tester);
+      await reiter(tester, 'Mehr');
+      await tippen(tester, find.text('VPN-Zugang'));
+      expect(find.text('laptop'), findsOneWidget);
+      expect(find.text('10.20.0.7 · noch nie verbunden'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Gerätename, z.B. handy'),
+        'Mein Handy!',
+      );
+      await tippen(tester, find.text('Zugang erstellen'));
+      expect(backend.letzter('POST', '/members/me/vpn'), {'geraet': 'mein-handy'});
+      expect(find.text('Jetzt einrichten: „mein-handy“'), findsOneWidget);
+      await tippen(tester, find.text('In WireGuard öffnen'));
+      expect(geteilt.single.$1, 'fwv-mein-handy.conf');
+      expect(geteilt.single.$2, contains('PrivateKey'));
+
+      await tippen(tester, find.byTooltip('Entfernen'));
+      await tippen(tester, find.widgetWithText(FilledButton, 'Entfernen'));
+      expect(backend.gab('DELETE', '/members/me/vpn/ma1b2c3d4-laptop'), isTrue);
+      expect(find.text('Noch kein Gerät verbunden.'), findsOneWidget);
+    });
+
+    testWidgets('Bildschirm: Mitglied schaut direkt, Vorstand waehlt Ansehen oder Steuern', (
+      tester,
+    ) async {
+      await starten(tester);
+      await reiter(tester, 'Mehr');
+      await tester.ensureVisible(find.text('Bildschirm Roter Schopf'));
+      await tippen(tester, find.text('Bildschirm Roter Schopf'));
+      expect(
+        geoeffnet.single.toString(),
+        'https://www.fwv-raura.ch/bildschirm/vnc.html?autoconnect=true&password=s',
+      );
+
+      backend.darfSteuern = true;
+      await tippen(tester, find.text('Bildschirm Roter Schopf'));
+      await tippen(tester, find.text('Steuern'));
+      expect(
+        geoeffnet.last.toString(),
+        'https://www.fwv-raura.ch/bildschirm-steuern/vnc.html?autoconnect=true&password=t',
+      );
+    });
+
     testWidgets('Musik im Roten Schopf: Playlists von api-members', (tester) async {
       await starten(tester);
       await reiter(tester, 'Mehr');

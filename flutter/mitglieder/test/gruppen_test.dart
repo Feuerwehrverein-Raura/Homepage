@@ -106,11 +106,23 @@ void main() {
 
   testWidgets('Ohne Vorstand kein Eintrag', (tester) async {
     await starten(tester, ['Mitglieder', 'Roter Schopf']);
+    // Bis ganz nach unten: Sonst bestuende der Test auch, wenn der Eintrag
+    // nur ausserhalb des Bildschirms laege.
+    await tester.scrollUntilVisible(
+      find.text('Abmelden'),
+      200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
     expect(find.text('Gruppen verwalten'), findsNothing);
   });
 
   testWidgets('Vorstand: Gruppen sehen, aufnehmen und entfernen', (tester) async {
     await starten(tester, ['Mitglieder', 'vorstand']);
+    await tester.scrollUntilVisible(
+      find.text('Gruppen verwalten'),
+      200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
     await tester.tap(find.text('Gruppen verwalten'));
     await tester.pumpAndSettle();
     expect(find.text('Roter Schopf'), findsOneWidget);
