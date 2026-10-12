@@ -30,6 +30,16 @@ abstract class MusikZugang {
   /// Adressen zum Streamen der Titel (mit Hoer-Freigabe, ohne Anmeldung).
   Future<List<Uri>> hoerAdressen(List<String> pfade);
 
+  /// Meldet dem Server, dass ein Titel auf dem Handy nicht spielt.
+  Future<void> fehlerMelden({
+    String? pfad,
+    String? quelle,
+    String? code,
+    String? meldung,
+    int versuch = 1,
+    Duration position = Duration.zero,
+  });
+
   Future<List<Radiosender>> sender();
   Future<void> senderAnlegen({required String name, required String url});
   Future<void> senderLoeschen(String id);
@@ -79,6 +89,26 @@ class ApiMusikZugang extends MusikZugang {
       ),
     );
   }
+
+  @override
+  Future<void> fehlerMelden({
+    String? pfad,
+    String? quelle,
+    String? code,
+    String? meldung,
+    int versuch = 1,
+    Duration position = Duration.zero,
+  }) => api.post(
+    'kiosk/hoeren/fehler',
+    daten: {
+      'pfad': pfad,
+      'quelle': quelle,
+      'code': code,
+      'meldung': meldung,
+      'versuch': versuch,
+      'position': position.inMilliseconds / 1000,
+    },
+  );
 
   @override
   Future<List<MusikTitel>> alleTitel() async =>

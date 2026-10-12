@@ -366,7 +366,10 @@ app.use((req, res, next) => {
         requestId,
         method: req.method,
         path: req.path,
-        query: Object.keys(req.query).length > 0 ? req.query : undefined,
+        // Die Hoer-Freigabe (?t=) gehoert nicht ins Log.
+        query: Object.keys(req.query).length > 0
+            ? (req.query.t ? { ...req.query, t: '[Freigabe]' } : req.query)
+            : undefined,
         ip: getClientIp(req),
         userAgent: req.headers['user-agent']?.substring(0, 100)
     });
@@ -6422,6 +6425,35 @@ app.post('/kiosk/hoeren/freigabe', authenticateToken, (req, res) => {
         console.error('POST /kiosk/hoeren/freigabe:', error.message);
         res.status(500).json({ error: 'Freigabe nicht moeglich' });
     }
+});
+
+// Der Player der App meldet, wenn ein Titel nicht abspielt - der Server
+// sieht davon nichts (er liefert mit 200 aus, der Fehler entsteht danach auf
+// dem Handy). Nur ins Log, hoechstens 60 Meldungen pro Person und 10 min.
+const hoerFehlerZaehler = new Map();
+app.post('/kiosk/hoeren/fehler', authenticateToken, (req, res) => {
+    const wer = String(req.user?.email || req.user?.preferred_username || req.user?.id || '?');
+    const jetzt = Date.now();
+    const z = hoerFehlerZaehler.get(wer);
+    const zaehler = z && jetzt - z.ab < 10 * 60e3 ? z : { ab: jetzt, n: 0 };
+    zaehler.n++;
+    hoerFehlerZaehler.set(wer, zaehler);
+    if (hoerFehlerZaehler.size > 1000) hoerFehlerZaehler.clear();
+    if (zaehler.n > 60) return res.status(429).json({ error: 'Zu viele Meldungen' });
+
+    const b = req.body || {};
+    const text = (v, n = 300) => (v === undefined || v === null ? null : String(v).slice(0, n));
+    logWarn('PLAYER-FEHLER', {
+        wer,
+        pfad: text(b.pfad),
+        quelle: text(b.quelle, 100),
+        code: text(b.code, 50),
+        meldung: text(b.meldung, 500),
+        versuch: Number.isFinite(Number(b.versuch)) ? Number(b.versuch) : null,
+        position: Number.isFinite(Number(b.position)) ? Number(b.position) : null,
+        geraet: text(req.headers['user-agent'], 100)
+    });
+    res.json({ ok: true });
 });
 
 app.get('/kiosk/hoeren', (req, res) => {

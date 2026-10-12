@@ -50,6 +50,16 @@ class WiedergabeStand {
   final bool fertig;
 }
 
+/// Ein Titel spielt nicht: Index in der Warteschlange und was Android
+/// meldet (ExoPlayer-Typ und Text).
+class WiedergabeFehler {
+  const WiedergabeFehler({this.index, this.code, this.meldung});
+
+  final int? index;
+  final String? code;
+  final String? meldung;
+}
+
 /// Was tatsaechlich abspielt - in Tests ersetzt.
 abstract class Wiedergabe {
   Future<void> laden(List<WiedergabeEintrag> liste, {int ab = 0});
@@ -70,8 +80,11 @@ abstract class Wiedergabe {
   Stream<Duration> get position;
   Stream<Duration?> get dauer;
 
-  /// Ein Titel liess sich nicht abspielen (Index in der Warteschlange).
-  Stream<int?> get fehler;
+  /// Ein Titel liess sich nicht abspielen.
+  Stream<WiedergabeFehler> get fehler;
+
+  /// Nach einem Fehler: Titel [index] neu laden, ab [position] weiter.
+  Future<void> nochmals(int index, Duration position);
   Future<void> schliessen();
 }
 
@@ -163,7 +176,16 @@ class JustAudioWiedergabe implements Wiedergabe {
   Stream<Duration?> get dauer => _player.durationStream;
 
   @override
-  Stream<int?> get fehler => _player.errorStream.map((e) => e.index);
+  Stream<WiedergabeFehler> get fehler => _player.errorStream.map(
+    (e) => WiedergabeFehler(index: e.index, code: '${e.code}', meldung: e.message),
+  );
+
+  @override
+  Future<void> nochmals(int index, Duration position) async {
+    await _player.seek(position, index: index);
+    await _player.load();
+    unawaited(_player.play());
+  }
 
   @override
   Future<void> schliessen() async {
@@ -183,19 +205,58 @@ class MusikPlayer extends ChangeNotifier {
         _puffert = s.laedt;
         notifyListeners();
       }),
-      _w.fehler.listen((i) {
-        final e = (i != null && i >= 0 && i < _liste.length) ? _liste[i] : aktuell;
-        _fehler = e == null
-            ? 'Titel lässt sich nicht abspielen'
-            : '„${e.titel}“ lässt sich nicht abspielen';
-        notifyListeners();
-        // Ein kaputter Titel haelt eine Playlist nicht an.
-        if (i != null && i + 1 < _liste.length) unawaited(_w.weiter().then((_) => _w.spielen()));
-      }),
+      _w.position.listen((p) => _stelle = p),
+      _w.fehler.listen(_beiFehler),
     ];
   }
 
   static const vorhoerQuelle = 'Vorhören';
+
+  /// So oft wird ein Titel nach einem Fehler neu geladen, bevor der Player
+  /// ihn ueberspringt.
+  static const versuche = 2;
+
+  /// Wartezeit vor dem Neuladen (in Tests null).
+  Duration nochmalsNach = const Duration(seconds: 1);
+
+  Duration _stelle = Duration.zero;
+  final _fehlversuche = <int, int>{};
+
+  Future<void> _beiFehler(WiedergabeFehler f) async {
+    final i = f.index ?? _index;
+    final e = (i >= 0 && i < _liste.length) ? _liste[i] : null;
+    final versuch = (_fehlversuche[i] ?? 0) + 1;
+    _fehlversuche[i] = versuch;
+    // Der Server sieht den Fehler nicht (er hat mit 200 ausgeliefert) -
+    // deshalb melden. Scheitert das Melden, ist das egal.
+    unawaited(
+      zugang
+          .fehlerMelden(
+            pfad: _radio ? null : e?.id,
+            quelle: _radio ? 'Radio ${e?.titel}' : _quelle,
+            code: f.code,
+            meldung: f.meldung,
+            versuch: versuch,
+            position: _stelle,
+          )
+          .catchError((Object _) {}),
+    );
+    if (versuch <= versuche && e != null) {
+      // Abgerissene Verbindung o.ae.: an derselben Stelle neu laden.
+      await Future<void>.delayed(nochmalsNach);
+      await _w.nochmals(i, _stelle);
+      return;
+    }
+    _fehler = e == null
+        ? 'Titel lässt sich nicht abspielen'
+        : '„${e.titel}“ lässt sich nicht abspielen';
+    notifyListeners();
+    // Ein kaputter Titel haelt eine Playlist nicht an.
+    if (naechste(anzahl: 1).isNotEmpty) {
+      await _w.weiter();
+      await _w.spielen();
+    }
+  }
 
   final MusikZugang zugang;
   final Wiedergabe _w;
@@ -314,6 +375,7 @@ class MusikPlayer extends ChangeNotifier {
     required bool zufall,
   }) async {
     _liste = liste;
+    _fehlversuche.clear();
     _quelle = quelle;
     _radio = radio;
     _index = ab;

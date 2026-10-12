@@ -14,7 +14,7 @@ class _Wiedergabe implements Wiedergabe {
   final aufrufe = <String>[];
   List<WiedergabeEintrag> geladen = const [];
   final _stand = StreamController<WiedergabeStand>.broadcast();
-  final _fehler = StreamController<int?>.broadcast();
+  final _fehler = StreamController<WiedergabeFehler>.broadcast();
   int _index = 0;
   bool _spielt = false;
 
@@ -22,7 +22,13 @@ class _Wiedergabe implements Wiedergabe {
       _stand.add(WiedergabeStand(index: _index, spielt: _spielt, fertig: fertig));
 
   /// Der Titel an [i] laesst sich nicht abspielen.
-  void kaputt(int i) => _fehler.add(i);
+  void kaputt(int i) => _fehler.add(
+    WiedergabeFehler(
+      index: i,
+      code: '0',
+      meldung: 'Source error: UnrecognizedInputFormatException',
+    ),
+  );
   void ende() {
     _spielt = false;
     _melden(fertig: true);
@@ -105,7 +111,15 @@ class _Wiedergabe implements Wiedergabe {
   Stream<Duration?> get dauer => const Stream.empty();
 
   @override
-  Stream<int?> get fehler => _fehler.stream;
+  Stream<WiedergabeFehler> get fehler => _fehler.stream;
+
+  @override
+  Future<void> nochmals(int index, Duration position) async {
+    aufrufe.add('nochmals $index');
+    _index = index;
+    _spielt = true;
+    _melden();
+  }
 
   @override
   Future<void> schliessen() async {
@@ -115,6 +129,18 @@ class _Wiedergabe implements Wiedergabe {
 }
 
 class _Zugang extends MusikZugang {
+  final gemeldet = <(String?, String?, String?, int)>[];
+
+  @override
+  Future<void> fehlerMelden({
+    String? pfad,
+    String? quelle,
+    String? code,
+    String? meldung,
+    int versuch = 1,
+    Duration position = Duration.zero,
+  }) async => gemeldet.add((pfad, quelle, meldung, versuch));
+
   final freigaben = <List<String>>[];
   bool freigabeKaputt = false;
 
@@ -461,11 +487,29 @@ void main() {
     await tester.pumpAndSettle();
     expect(z.freigaben.last, ['Queen/Bohemian Rhapsody.mp3', 'Baschi/Gib mer e Chance.mp3']);
 
-    // Ein kaputter erster Titel haelt die Liste nicht an.
+    // Fehler: zweimal an derselben Stelle neu laden, jedes Mal an den
+    // Server melden ...
+    for (var v = 1; v <= 2; v++) {
+      wiedergabe.kaputt(0);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(wiedergabe.aufrufe.last, 'nochmals 0');
+      expect(find.text('„Bohemian Rhapsody“ lässt sich nicht abspielen'), findsNothing);
+    }
+    // ... erst beim dritten Mal ueberspringen.
     wiedergabe.kaputt(0);
     await tester.pumpAndSettle();
     expect(find.text('„Bohemian Rhapsody“ lässt sich nicht abspielen'), findsOneWidget);
     expect(wiedergabe.aufrufe.reversed.take(2), ['spielen', 'weiter']);
+    expect(z.gemeldet, [
+      for (var v = 1; v <= 3; v++)
+        (
+          'Queen/Bohemian Rhapsody.mp3',
+          'Chilbi Abend',
+          'Source error: UnrecognizedInputFormatException',
+          v,
+        ),
+    ]);
 
     // Grosser Player: der letzte Titel laeuft, danach kommt nichts.
     await tester.tap(find.byKey(const Key('mini-player')));
