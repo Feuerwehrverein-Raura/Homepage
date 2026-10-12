@@ -258,6 +258,7 @@ jobs:
       # de-CH blieb "Was ist neu" deshalb leer. Gepflegt wird nur die
       # de-CH-Datei; de-DE ist eine Kopie.
       - name: Versionshinweise auch fuer de-DE
+        working-directory: ${{ github.workspace }}
         run: cp flutter/mitglieder/play/whatsnew/whatsnew-de-CH flutter/mitglieder/play/whatsnew/whatsnew-de-DE
 
       - name: Upload in Google Play (interner Test)
