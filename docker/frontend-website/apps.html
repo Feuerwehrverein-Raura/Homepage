@@ -130,7 +130,7 @@
 
                 <!-- DEUTSCH: Mitglieder-App Karte - die einzige App fuer alle Mitglieder,
                      deshalb steht sie zuoberst. Besonderheit: Der Play-Store-Eintrag ist
-                     ein geschlossener Test, man muss vorher freigeschaltet werden. Der
+                     ein geschlossener Test, Freischaltung per Google-Gruppe (selbst). Der
                      APK-Weg daneben braucht das nicht. -->
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 md:col-span-2">
                     <div class="bg-gradient-to-r from-fire-50 to-fire-100 p-6 flex items-center space-x-5">
@@ -160,11 +160,22 @@
                                     </span>
                                 </div>
                                 <h4 class="font-semibold text-gray-800 mb-2">Über den Play Store</h4>
-                                <p class="text-sm text-gray-600 mb-3">Die App ist im Play Store noch nicht öffentlich. Laden kann sie nur, wer freigeschaltet ist.</p>
-                                <p class="text-sm text-gray-600 mb-3">Schreib eine E-Mail an
-                                    <a href="mailto:aktuar@fwv-raura.ch?subject=Zugang%20zur%20Mitglieder-App" class="text-fire-600 hover:underline font-semibold">aktuar@fwv-raura.ch</a>
-                                    und gib darin die <strong>E-Mail-Adresse deines Google-Kontos</strong> an — also die, mit der du am Telefon im Play Store angemeldet bist. Sobald du freigeschaltet bist, bekommst du Bescheid.</p>
-                                <p class="text-xs text-gray-500">Nicht die Adresse, die der Verein von dir hat — nur die Google-Adresse kennt der Play Store.</p>
+                                <p class="text-sm text-gray-600 mb-3">Die App ist im Play Store noch nicht öffentlich. Freischalten kannst du dich selbst — zwei Schritte, in dieser Reihenfolge:</p>
+                                <!-- DEUTSCH: Wer der Google-Gruppe beitritt, ist automatisch Tester
+                                     des geschlossenen Tests (Play Console -> Tester -> Google Groups). -->
+                                <div class="space-y-2 mb-3">
+                                    <a href="https://groups.google.com/g/fwv-raura-app"
+                                       class="flex items-center gap-3 border border-fire-200 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-fire-50 transition-colors">
+                                        <span class="w-6 h-6 rounded-full bg-fire-600 text-white text-xs font-semibold grid place-items-center flex-shrink-0">1</span>
+                                        <span><strong>Testgruppe beitreten</strong> — «Gruppe beitreten» tippen</span>
+                                    </a>
+                                    <a href="https://play.google.com/apps/testing/com.fwv.members"
+                                       class="flex items-center gap-3 border border-fire-200 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-fire-50 transition-colors">
+                                        <span class="w-6 h-6 rounded-full bg-fire-600 text-white text-xs font-semibold grid place-items-center flex-shrink-0">2</span>
+                                        <span><strong>Tester werden</strong> — danach im Play Store installieren</span>
+                                    </a>
+                                </div>
+                                <p class="text-xs text-gray-500">Beides mit dem Google-Konto, mit dem du am Telefon im Play Store angemeldet bist. Nach dem Beitritt kann es bis zu einer Stunde dauern, bis Schritt 2 klappt.</p>
                             </div>
 
                             <!-- DEUTSCH: Weg 2 - APK direkt. Der Link zeigt auf den rollenden Tag
