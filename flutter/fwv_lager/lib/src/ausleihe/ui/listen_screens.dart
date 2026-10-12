@@ -4,7 +4,7 @@
 //  - AusleihenVerwaltenScreen (Lager): Kommend · Ausgegeben · Ueberfaellig ·
 //    Erledigt, unten "Fuer Externe"
 
-import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, meldung;
+import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, meldung, reiterAufRot;
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
@@ -108,7 +108,7 @@ class _AusleihenVerwaltenScreenState extends State<AusleihenVerwaltenScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Ausleihen'),
-          bottom: TabBar(
+          bottom: reiterAufRot(
             labelPadding: const EdgeInsets.symmetric(horizontal: 4),
             tabs: [for (final f in AusleiheFilter.values) Tab(text: f.text)],
           ),

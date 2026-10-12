@@ -194,3 +194,15 @@ ThemeData fwvThema() {
     progressIndicatorTheme: const ProgressIndicatorThemeData(color: FwvFarben.rot),
   );
 }
+
+/// Reiter für die rote Titelleiste: weiss statt rot. Das Thema färbt Reiter
+/// rot für weissen Grund (z.B. Anmeldekarte) — in der AppBar wären sie
+/// unsichtbar.
+TabBar reiterAufRot({required List<Widget> tabs, EdgeInsetsGeometry? labelPadding}) => TabBar(
+      tabs: tabs,
+      labelPadding: labelPadding,
+      labelColor: FwvFarben.aufRot,
+      unselectedLabelColor: const Color(0xCCFFFFFF),
+      indicatorColor: FwvFarben.aufRot,
+      dividerColor: const Color(0x00000000),
+    );

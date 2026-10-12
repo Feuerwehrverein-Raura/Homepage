@@ -13,6 +13,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../bausteine.dart';
 import '../modelle.dart';
+import '../thema.dart';
 import '../zugang.dart';
 import 'anlass_bearbeiten_screen.dart';
 import 'anmeldung_screens.dart';
@@ -253,7 +254,7 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
               tooltip: 'Anlass bearbeiten',
             ),
         ],
-        bottom: mitReitern ? TabBar(tabs: [for (final x in reiter) x.$1]) : null,
+        bottom: mitReitern ? reiterAufRot(tabs: [for (final x in reiter) x.$1]) : null,
       ),
       body: inhalt,
     );

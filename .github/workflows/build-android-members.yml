@@ -6,7 +6,8 @@ name: Build Android Members
 #
 # Tag members-vX.Y.Z  ->  Analyse + Tests, signiertes AAB + APK,
 # Upload in den internen Test-Track von Google Play (als Update von
-# com.fwv.members), GitHub-Release und rollender Zeiger members-latest.
+# com.fwv.members), danach Hochstufen in den geschlossenen Test (alpha),
+# GitHub-Release und rollender Zeiger members-latest.
 # Ablauf und Voraussetzungen: docs/flutter-mitglieder-app-plan.md (Release)
 # und docs/play-console-setup.md.
 
@@ -260,3 +261,15 @@ jobs:
           status: completed
           whatsNewDirectory: flutter/mitglieder/play/whatsnew
           mappingFile: flutter/mitglieder/build/app/outputs/mapping/release/mapping.txt
+
+      # Gleiches Bundle zusaetzlich in den geschlossenen Test (alpha), damit
+      # die Tester-Liste dort jedes Release ohne Klick in der Play Console
+      # bekommt. Produktion bleibt bewusst Handarbeit.
+      - name: Hochstufen in den geschlossenen Test (alpha)
+        if: steps.play.outputs.vorhanden == 'true'
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          set -euo pipefail
+          pip install --quiet google-auth requests
+          python3 .github/scripts/play-hochstufen.py com.fwv.members "$VCODE" internal alpha

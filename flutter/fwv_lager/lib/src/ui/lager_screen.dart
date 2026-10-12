@@ -4,7 +4,7 @@
 
 import 'dart:async';
 
-import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, fehlerText, meldung;
+import 'package:fwv_anlass/fwv_anlass.dart' show LadeAnsicht, LadeAnsichtState, fehlerText, meldung, reiterAufRot;
 import 'package:material_ui/material_ui.dart';
 
 import '../ausleihe/ui/listen_screens.dart';
@@ -107,8 +107,8 @@ class _LagerScreenState extends State<LagerScreen> {
               tooltip: 'Artikel anlegen',
             ),
           ],
-          bottom: const TabBar(
-            tabs: [
+          bottom: reiterAufRot(
+            tabs: const [
               Tab(text: 'Artikel'),
               Tab(text: 'Lagerorte'),
               Tab(text: 'Nachbestellen'),
