@@ -59,3 +59,4 @@ members-*.aab
 members-*.apk
 vorstand-*.aab
 vorstand-*.apk
+__pycache__/
