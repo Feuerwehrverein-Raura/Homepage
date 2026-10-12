@@ -33,6 +33,14 @@ verlinken Website und Anleitung).
 4. **Beobachten:** `gh run list --workflow build-android-members.yml --limit 1`,
    dann `gh run watch <id> --exit-status`. Schlaegt nur das Hochstufen fehl:
    Workflow `play-hochstufen.yml` von Hand (versionCode, internal → alpha).
+   Schlaegt etwas anderes fehl: Log lesen (`gh run view <id> --log-failed`),
+   Ursache beheben (nie nur neu starten), dann Tag verschieben:
+   `git push origin :refs/tags/members-vX.Y.Z && git tag -f members-vX.Y.Z
+   && git push origin members-vX.Y.Z` und wieder beobachten.
+5. **Workflow geaendert?** Der Release-Job setzt
+   `defaults.run.working-directory: flutter/mitglieder` - Pfade in neuen
+   `run:`-Schritten sind relativ dazu (oder `working-directory:
+   ${{ github.workspace }}` setzen). Release 1.0.7 scheiterte genau daran.
 
 ## Tester-Zugang (geschlossener Test)
 
