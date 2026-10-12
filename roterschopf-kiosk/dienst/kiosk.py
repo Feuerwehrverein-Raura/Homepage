@@ -777,10 +777,16 @@ def musik_befehl(aktion, daten):
             mpd("pause 1")
         else:
             mpd("play")
-    elif aktion == "weiter":
-        mpd("next")
-    elif aktion == "zurueck":
-        mpd("previous")
+    elif aktion in ("weiter", "zurueck"):
+        # MPD faengt bei next/previous immer an zu spielen. Wer pausiert
+        # weiterschaltet (z.B. aus der Benachrichtigung auf dem Handy), will
+        # den naechsten Titel sehen - nicht nachts den Raum beschallen.
+        vorher = mpd("status").get("state")
+        mpd("next" if aktion == "weiter" else "previous")
+        if vorher == "pause":
+            mpd("pause 1")
+        elif vorher == "stop":
+            mpd("stop")
     elif aktion == "lautstaerke":
         wert = max(0, min(100, int(daten.get("wert", 60))))
         mpd("setvol %d" % wert)

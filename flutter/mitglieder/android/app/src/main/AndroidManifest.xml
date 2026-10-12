@@ -46,6 +46,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Knoepfe in Benachrichtigungen ("Im Schopf laeuft": Pause/Weiter) -
+             ohne diesen Empfaenger kommen sie nie in der App an. -->
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <!-- Musik im Hintergrund: Dienst und Medientasten (audio_service). -->
         <service android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
