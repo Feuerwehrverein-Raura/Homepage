@@ -507,6 +507,18 @@ Was dann passiert (`.github/workflows/build-android-members.yml`):
    (de-CH, max. 500 Zeichen — vor jedem Release anpassen). Warum diese
    Action statt Gradle Play Publisher: `docs/play-console-setup.md`,
    Abschnitt 9. Der Store-Eintrag (Texte, Bilder) bleibt unverändert.
+5. Dasselbe Release wird in den geschlossenen Test (`alpha`) hochgestuft
+   (`.github/scripts/play-hochstufen.py`). Schlägt das fehl: Workflow
+   "Play hochstufen" von Hand mit dem `versionCode`, ohne neu zu bauen.
+   Produktion bleibt Handarbeit in der Play Console.
+
+**Update-Hinweis in der App** (seit 1.0.2,
+`lib/einstellungen/update_hinweis.dart`): Beim Start prüft die App, ob es
+eine neuere Version gibt. Aus Play installiert: Play In-App-Update,
+flexibel ("Laden", danach "Neu starten"), auch für Tester. Sonst
+(GitHub-APK): `members-latest.json` am Release `members-latest`, der
+Hinweis führt zum APK-Download. Beide Wege am 12.10.2026 geprüft (Play mit
+1.0.2 → 1.0.3 auf einem Handy, GitHub im Emulator).
 
 Die native App (`members-android`) bleibt vorerst im Repo, wird aber weder
 bei Tags noch bei Pull Requests gebaut. Ein `workflow_dispatch` des
