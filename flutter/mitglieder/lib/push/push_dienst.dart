@@ -34,6 +34,8 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:fwv_core/fwv_core.dart';
 
+import 'schopf_benachrichtigung.dart';
+
 /// Ob dieses Geraet Mitteilungen anzeigen darf.
 enum PushErlaubnis { erlaubt, abgelehnt, nichtGefragt, nichtVerfuegbar }
 
@@ -132,7 +134,12 @@ class FirebasePush implements PushDienst {
       // Android liest die Einstellungen aus google-services.json (Gradle-
       // Plugin), iOS spaeter aus GoogleService-Info.plist.
       await Firebase.initializeApp();
+      // Stille Nachrichten bei geschlossener App: "Im Schopf laeuft ..."
+      // (schopf_benachrichtigung.dart).
+      FirebaseMessaging.onBackgroundMessage(pushImHintergrund);
       await _anzeige.initialize(
+        onDidReceiveNotificationResponse: (r) => schopfKnopf(_anzeige, r),
+        onDidReceiveBackgroundNotificationResponse: schopfKnopfImHintergrund,
         settings: const InitializationSettings(
           android: AndroidInitializationSettings('ic_benachrichtigung'),
           iOS: DarwinInitializationSettings(
@@ -145,6 +152,9 @@ class FirebasePush implements PushDienst {
       await _anzeige
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(kanal);
+      await _anzeige
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(schopfKanal);
       // iOS zeigt Nachrichten im Vordergrund selbst an, wenn man es sagt.
       await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
         alert: true,
@@ -174,6 +184,10 @@ class FirebasePush implements PushDienst {
   /// an. Beide Formate wie in der alten App: `notification` oder nur `data`.
   void _imVordergrund(RemoteMessage n) {
     if (!Platform.isAndroid) return;
+    if (n.data['notificationType'] == schopfMusikTyp) {
+      unawaited(schopfAnzeigen(_anzeige, n.data));
+      return;
+    }
     final titel = n.notification?.title ?? n.data['title'] ?? 'FWV Raura';
     final text = n.notification?.body ?? n.data['body'] ?? '';
     _anzeige.show(

@@ -20,7 +20,8 @@ const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
 const { roterSchopf, hatRoterSchopfZugang } = require('./roter-schopf');
 const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
-const { schichtZugang } = require('./schicht-zugang');
+const { schichtZugang, alleAktiven } = require('./schicht-zugang');
+const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
@@ -6763,6 +6764,58 @@ app.post('/kiosk/t400/musik/:aktion', authenticateToken, roterSchopfZugang, asyn
     const r = await kioskMusik.befehl(req.params.aktion, req.body || {});
     console.log(`Roter Schopf Musik: ${req.user?.email || req.user?.sub} ${req.params.aktion} ${JSON.stringify(req.body || {})} -> ${r.ok ? 'ok' : r.grund}`);
     if (!r.ok) return res.status(r.ungueltig ? 400 : 502).json({ error: r.grund });
+    // Die Benachrichtigungen der Schichtleute gleich nachziehen.
+    setTimeout(() => schopfMusikMelder.takt(), 800);
+    res.json(r.daten);
+});
+
+// --- Schopf-Musik als Benachrichtigung bei den Schichtleuten ----------------
+//
+// Siehe src/schopf-melder.js. Stille Push-Nachrichten (nur data, hohe
+// Prioritaet); wer den Typ "schopf_musik" abgeschaltet hat, bekommt nichts.
+
+async function schopfPushSenden(memberIds, daten) {
+    if (!fcmInitialized || !memberIds.length) return;
+    const tokens = await pool.query(`
+        SELECT t.member_id, t.token FROM fcm_tokens t
+        WHERE t.member_id = ANY($1::uuid[])
+          AND NOT EXISTS (SELECT 1 FROM notification_preferences p
+                          WHERE p.member_id = t.member_id
+                            AND p.notification_type = 'schopf_musik' AND p.enabled = false)
+    `, [memberIds]);
+    if (!tokens.rows.length) return;
+    const data = Object.fromEntries(Object.entries({ notificationType: 'schopf_musik', ...daten })
+        .map(([k, v]) => [k, String(v ?? '')]));
+    const antwort = await admin.messaging().sendEachForMulticast({
+        data, tokens: tokens.rows.map(r => r.token), android: { priority: 'high' }
+    });
+    const kaputt = antwort.responses
+        .map((r, i) => (!r.success && ['messaging/registration-token-not-registered',
+            'messaging/invalid-registration-token'].includes(r.error?.code)) ? tokens.rows[i].token : null)
+        .filter(Boolean);
+    if (kaputt.length) await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [kaputt]);
+}
+
+const schopfMusikMelder = schopfMelder({
+    aktive: (jetzt) => alleAktiven(pool, jetzt),
+    zustand: () => kioskMusik.zustand(),
+    senden: schopfPushSenden,
+    geheimnis: process.env.JWT_SECRET
+});
+if (process.env.NODE_ENV !== 'test') {
+    setInterval(() => schopfMusikMelder.takt(), 10e3).unref();
+}
+
+// Knoepfe der Benachrichtigung: ohne Anmeldung, mit der Freigabe aus der
+// Push-Nachricht (nur Musikbefehle, gilt bis Schichtende).
+app.post('/kiosk/t400/musik-push/:aktion', async (req, res) => {
+    const wer = fernFreigabePruefen(process.env.JWT_SECRET, String(req.body?.t || ''));
+    if (!wer) return res.status(401).json({ error: 'Freigabe ungueltig oder abgelaufen' });
+    const r = await kioskMusik.befehl(req.params.aktion, req.body || {});
+    console.log(`Roter Schopf Musik (Benachrichtigung): Mitglied ${wer} ${req.params.aktion} -> ${r.ok ? 'ok' : r.grund}`);
+    if (!r.ok) return res.status(r.ungueltig ? 400 : 502).json({ error: r.grund });
+    // Allen anderen gleich den neuen Stand schicken.
+    setTimeout(() => schopfMusikMelder.takt(), 800);
     res.json(r.daten);
 });
 

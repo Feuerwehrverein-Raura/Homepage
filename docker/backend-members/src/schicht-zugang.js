@@ -130,4 +130,39 @@ function schichtZugang(db, { jetzt = () => new Date(), cacheMs = 30e3 } = {}) {
     return { pruefen };
 }
 
-module.exports = { schichtZugang, aktiveSchicht, ortszeit, wer, VORLAUF_MIN, NACHLAUF_MIN };
+/**
+ * Alle Mitglieder, die gerade Schicht haben: [{ memberId, schicht }].
+ * Gast-Anmeldungen zaehlen, wenn ihre E-Mail genau einem Mitglied gehoert.
+ */
+async function alleAktiven(db, jetzt = new Date()) {
+    const heute = new Intl.DateTimeFormat('en-CA', { timeZone: ZONE }).format(jetzt);
+    const r = await db.query(`
+        SELECT COALESCE(r.member_id, (
+                   SELECT m.id FROM members m
+                   WHERE LOWER(m.email) = LOWER(r.guest_email)
+                     AND (SELECT COUNT(*) FROM members m2 WHERE LOWER(m2.email) = LOWER(r.guest_email)) = 1
+               )) AS member_id,
+               to_char(s.date, 'YYYY-MM-DD') AS datum,
+               s.start_time::text AS beginn, s.end_time::text AS ende,
+               s.name AS schicht, e.title AS anlass
+        FROM registrations r
+        JOIN shifts s ON s.id = ANY(r.shift_ids)
+        LEFT JOIN events e ON e.id = s.event_id
+        WHERE r.status = 'approved'
+          AND s.date BETWEEN ($1::date - 1) AND ($1::date + 1)
+    `, [heute]);
+    const jeMitglied = new Map();
+    for (const z of r.rows) {
+        if (!z.member_id) continue;
+        if (!jeMitglied.has(z.member_id)) jeMitglied.set(z.member_id, []);
+        jeMitglied.get(z.member_id).push(z);
+    }
+    const aktiv = [];
+    for (const [memberId, zeilen] of jeMitglied) {
+        const schicht = aktiveSchicht(zeilen, jetzt);
+        if (schicht) aktiv.push({ memberId, schicht });
+    }
+    return aktiv;
+}
+
+module.exports = { schichtZugang, aktiveSchicht, alleAktiven, ortszeit, wer, VORLAUF_MIN, NACHLAUF_MIN };
