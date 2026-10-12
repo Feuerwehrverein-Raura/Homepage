@@ -3,7 +3,8 @@
 // (die Android-App hat ihn uebernommen).
 //
 // Externe Organisatoren haben kein Mitgliederkonto; sie sehen nur, wer
-// angemeldet ist, die Version und Abmelden.
+// angemeldet ist, die Version und Abmelden. Vorstand und admin sehen
+// zusaetzlich "Gruppen verwalten" (Authentik-Gruppen, gruppen_screen.dart).
 
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
@@ -13,6 +14,7 @@ import '../gemeinsam.dart';
 import '../hauptseite.dart';
 import 'adressbuch.dart';
 import 'benachrichtigungen_screen.dart';
+import 'gruppen_screen.dart';
 import 'zugaenge_screen.dart';
 
 class EinstellungenTab extends StatefulWidget {
@@ -116,6 +118,16 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _oeffnen(ZugaengeScreen(dienste: _d)),
             ),
+            if (darfGruppenVerwalten(sitzung)) ...[
+              const Abschnitt('Vorstand'),
+              ListTile(
+                leading: const Icon(Icons.group_outlined),
+                title: const Text('Gruppen verwalten'),
+                subtitle: const Text('Wer Roter Schopf, Lager & Co. sieht'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _oeffnen(GruppenScreen(zugang: GruppenZugang(_d.sitzung.api))),
+              ),
+            ],
             const Abschnitt('Newsletter'),
             SwitchListTile(
               key: const Key('newsletter'),

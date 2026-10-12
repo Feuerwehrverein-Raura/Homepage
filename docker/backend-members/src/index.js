@@ -19,6 +19,7 @@ const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } 
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
 const { roterSchopf, hatRoterSchopfZugang } = require('./roter-schopf');
+const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -6591,6 +6592,94 @@ app.post('/kiosk/roter-schopf/licht', authenticateToken, roterSchopfZugang, asyn
         res.status(500).json({ error: 'Licht konnte nicht geschaltet werden' });
     }
 });
+
+// --- Authentik-Gruppen verwalten (Vorstand in der Mitglieder-App) ----------
+//
+// Vorstand und admin nehmen Mitglieder in Gruppen auf oder entfernen sie.
+// Nie verwaltbar: admin, Superuser- und technische Gruppen - das prueft
+// src/authentik-gruppen.js bei jeder Aenderung neu. Jede Aenderung landet im
+// Audit-Log.
+//
+// Gruppen-Pruefung ohne Gross/klein: Authentik schreibt "Vorstand", das
+// Vorstand-Login "vorstand" (requireRole vergleicht exakt).
+
+const gruppenDienst = gruppenVerwaltung({
+    authentikUrl: process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch',
+    apiToken: process.env.AUTHENTIK_API_TOKEN
+});
+
+function gruppenVerwalter(req, res, next) {
+    if (!darfGruppenVerwalten(req.user?.groups)) {
+        return res.status(403).json({ error: 'Nur für den Vorstand' });
+    }
+    next();
+}
+
+app.get('/vorstand/gruppen', authenticateAny, gruppenVerwalter, async (req, res) => {
+    try {
+        const liste = await gruppenDienst.liste();
+        const konten = [...new Set(liste.flatMap(g => g.benutzer.map(String)))];
+        const mitglieder = konten.length
+            ? (await pool.query(
+                'SELECT id, vorname, nachname, authentik_user_id FROM members WHERE authentik_user_id::text = ANY($1::text[])',
+                [konten])).rows
+            : [];
+        res.json(gruppenAnsicht(liste, mitglieder));
+    } catch (error) {
+        console.error('GET /vorstand/gruppen:', error.message);
+        res.status(502).json({ error: 'Gruppen konnten nicht gelesen werden' });
+    }
+});
+
+// Wen man aufnehmen kann: nur Name und ob ein Login-Konto besteht - nicht
+// die ganzen Mitgliederdaten.
+app.get('/vorstand/gruppen/kandidaten', authenticateAny, gruppenVerwalter, async (req, res) => {
+    try {
+        const suche = String(req.query.suche || '').trim();
+        if (suche.length < 2) return res.json([]);
+        const ergebnis = await pool.query(`
+            SELECT id, vorname, nachname, (authentik_user_id IS NOT NULL) AS hat_konto
+            FROM members
+            WHERE vorname ILIKE $1 OR nachname ILIKE $1 OR (vorname || ' ' || nachname) ILIKE $1
+            ORDER BY nachname, vorname
+            LIMIT 20`, [`%${suche}%`]);
+        res.json(ergebnis.rows);
+    } catch (error) {
+        console.error('GET /vorstand/gruppen/kandidaten:', error.message);
+        res.status(500).json({ error: 'Suche fehlgeschlagen' });
+    }
+});
+
+async function gruppeAendern(req, res, aufnehmen) {
+    const memberId = aufnehmen ? req.body?.member_id : req.params.memberId;
+    try {
+        if (!memberId) return res.status(400).json({ error: 'member_id fehlt' });
+        const m = (await pool.query(
+            'SELECT id, vorname, nachname, authentik_user_id FROM members WHERE id = $1', [memberId])).rows[0];
+        if (!m) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+        if (!m.authentik_user_id) {
+            return res.status(400).json({ error: `${m.vorname} ${m.nachname} hat kein Login-Konto` });
+        }
+        const g = aufnehmen
+            ? await gruppenDienst.hinzufuegen(req.params.pk, m.authentik_user_id)
+            : await gruppenDienst.entfernen(req.params.pk, m.authentik_user_id);
+        // Die App soll die neue Gruppe beim naechsten Token gleich sehen.
+        authentikGruppenFuer.vergessen(m.authentik_user_id);
+        await logAudit(pool, aufnehmen ? 'MEMBER_GRUPPE_AUFGENOMMEN' : 'MEMBER_GRUPPE_ENTFERNT',
+            null, req.user?.email, getClientIp(req),
+            { member_id: m.id, member_name: `${m.vorname} ${m.nachname}`, gruppe: g.name });
+        res.json({ ok: true, gruppe: g.name });
+    } catch (error) {
+        console.error(`${req.method} ${req.path}:`, error.message);
+        const status = error.status === 403 || error.status === 404 ? error.status : 502;
+        res.status(status).json({ error: status === 502 ? 'Authentik hat die Änderung nicht angenommen' : error.message });
+    }
+}
+
+app.post('/vorstand/gruppen/:pk/mitglieder', authenticateAny, gruppenVerwalter,
+    (req, res) => gruppeAendern(req, res, true));
+app.delete('/vorstand/gruppen/:pk/mitglieder/:memberId', authenticateAny, gruppenVerwalter,
+    (req, res) => gruppeAendern(req, res, false));
 
 app.get('/members/me/accesses', authenticateToken, async (req, res) => {
     try {

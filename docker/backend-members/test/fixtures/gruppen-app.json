@@ -1,0 +1,78 @@
+{
+  "gruppen": {
+    "gruppen": [
+      {
+        "pk": "g-lager",
+        "name": "Lager",
+        "automatisch": false,
+        "mitglieder": [],
+        "weitere_konten": 0
+      },
+      {
+        "pk": "g-mitgl",
+        "name": "Mitglieder",
+        "automatisch": true,
+        "mitglieder": [
+          {
+            "id": "m-8",
+            "vorname": "Hans",
+            "nachname": "Beispiel"
+          },
+          {
+            "id": "m-7",
+            "vorname": "Erika",
+            "nachname": "Muster"
+          }
+        ],
+        "weitere_konten": 1
+      },
+      {
+        "pk": "g-rs",
+        "name": "Roter Schopf",
+        "automatisch": false,
+        "mitglieder": [
+          {
+            "id": "m-8",
+            "vorname": "Hans",
+            "nachname": "Beispiel"
+          }
+        ],
+        "weitere_konten": 0
+      },
+      {
+        "pk": "g-sm",
+        "name": "social-media",
+        "automatisch": true,
+        "mitglieder": [],
+        "weitere_konten": 1
+      },
+      {
+        "pk": "g-vor",
+        "name": "Vorstand",
+        "automatisch": true,
+        "mitglieder": [
+          {
+            "id": "m-7",
+            "vorname": "Erika",
+            "nachname": "Muster"
+          }
+        ],
+        "weitere_konten": 0
+      }
+    ]
+  },
+  "kandidaten": [
+    {
+      "id": "m-7",
+      "vorname": "Erika",
+      "nachname": "Muster",
+      "hat_konto": true
+    },
+    {
+      "id": "m-x",
+      "vorname": "Ohne",
+      "nachname": "Konto",
+      "hat_konto": false
+    }
+  ]
+}
