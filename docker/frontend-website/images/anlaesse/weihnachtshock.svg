@@ -1,10 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-<!-- Platzhalter-Logo (13.10.2026), Vereinsrot #B91C1C. Durch ein echtes Logo ersetzen: gleiche Datei, 512x512. -->
-<circle cx="256" cy="256" r="248" fill="#B91C1C"/><circle cx="256" cy="256" r="226" fill="none" stroke="#fff" stroke-width="8"/>
-<g fill="#fff">
-<path d="M256 112 L196 196 H226 L178 262 H214 L160 330 H352 L298 262 H334 L286 196 H316 Z"/>
-<rect x="240" y="330" width="32" height="26" rx="4"/>
-<path d="M256 70 L264 92 L288 92 L269 106 L276 129 L256 115 L236 129 L243 106 L224 92 L248 92 Z"/>
-</g>
-<g fill="#B91C1C"><circle cx="232" cy="236" r="8"/><circle cx="282" cy="276" r="8"/><circle cx="222" cy="304" r="8"/><circle cx="292" cy="214" r="7"/></g>
-<text x="256" y="412" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="30" letter-spacing="1" fill="#fff">WEIHNACHTSHOCK</text></svg>
+<!-- Platzhalter-Logo Weihnachtshock (13.10.2026), bunter Stil: Ring in Vereinsrot #B91C1C,
+     heller Grund. Durch ein echtes Logo ersetzen: gleiche Datei, 512x512. -->
+<circle cx="256" cy="256" r="248" fill="#B91C1C"/>
+<circle cx="256" cy="256" r="222" fill="#FFF8EC"/>
+<path d="M256 112 L196 196 H226 L178 262 H214 L160 330 H352 L298 262 H334 L286 196 H316 Z" fill="#15803D"/>
+<rect x="240" y="330" width="32" height="26" rx="4" fill="#92400E"/>
+<path d="M256 68 L265 92 L290 92 L270 107 L277 131 L256 117 L235 131 L242 107 L222 92 L247 92 Z" fill="#FACC15" stroke="#D97706" stroke-width="3"/>
+<g><circle cx="232" cy="236" r="9" fill="#DC2626"/><circle cx="282" cy="276" r="9" fill="#2563EB"/><circle cx="222" cy="304" r="9" fill="#FACC15"/>
+<circle cx="292" cy="214" r="8" fill="#EC4899"/><circle cx="256" cy="168" r="7" fill="#FACC15"/><circle cx="300" cy="312" r="8" fill="#DC2626"/>
+<circle cx="250" cy="270" r="7" fill="#F8FAFC"/></g>
+<g fill="#CBD5E1"><circle cx="130" cy="150" r="5"/><circle cx="380" cy="140" r="5"/><circle cx="112" cy="240" r="4"/><circle cx="398" cy="250" r="4"/><circle cx="160" cy="96" r="4"/><circle cx="350" cy="92" r="4"/></g>
+<text x="256" y="412" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="30" letter-spacing="1" fill="#B91C1C">WEIHNACHTSHOCK</text></svg>
