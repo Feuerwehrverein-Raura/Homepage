@@ -25,6 +25,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -78,6 +80,11 @@ object SchopfPlayer {
         val dienst = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) SchopfRoutenDienst.laufend else null
         dienst?.sitzungStarten()
         val gekoppelt = dienst != null
+        // Kommt die Nachricht, waehrend die App offen ist: gleich koppeln
+        // (Suchen geht nur im Vordergrund). Der Dienst zeichnet danach neu.
+        if (!gekoppelt && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && MainActivity.sichtbar) {
+            Handler(Looper.getMainLooper()).post { SchopfRoutenDienst.suchen(c.applicationContext) }
+        }
         // Feste Lautstaerke: Die Tasten des Handys sollen nicht aus Versehen
         // den Raum lauter drehen.
         s.setPlaybackToRemote(

@@ -10,6 +10,13 @@ import io.flutter.plugin.common.MethodChannel
 
 // AudioServiceActivity (eine FlutterActivity) fuer die Musik im Hintergrund.
 class MainActivity : AudioServiceActivity() {
+    companion object {
+        /** Ist die App gerade im Vordergrund? (Fuer schopf/SchopfPlayer.kt) */
+        @Volatile
+        var sichtbar = false
+            private set
+    }
+
     private var kontakte: KontakteKanal? = null
     private var update: AppUpdateKanal? = null
 
@@ -35,12 +42,14 @@ class MainActivity : AudioServiceActivity() {
     // Im Hintergrund darf eine App nicht suchen.
     override fun onResume() {
         super.onResume()
+        sichtbar = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SchopfPlayer.aktiv(this)) {
             SchopfRoutenDienst.suchen(applicationContext)
         }
     }
 
     override fun onPause() {
+        sichtbar = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             SchopfRoutenDienst.sucheBeenden(applicationContext)
         }
