@@ -159,7 +159,7 @@
     <!-- DEUTSCH: Zeigt vollstaendige Event-Infos: Titel, Beschreibung, Termin, Kontakt, Tags, -->
     <!-- DEUTSCH: sowie Aktions-Buttons (Anmelden, Arbeitsplan, ICS-Export) -->
     <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-lg max-w-4xl w-full min-w-0 max-h-[90vh] overflow-y-auto overflow-x-hidden">
             <div id="modal-content">
                 <!-- DEUTSCH: Inhalt wird dynamisch per showEventModal() generiert -->
             </div>
@@ -996,7 +996,7 @@
                 // DEUTSCH: Abgesagte Events - keine Anmelde-Buttons, stattdessen Hinweis.
                 if (event.status === 'cancelled') {
                     return `
-                        <div class="flex-1 min-w-[200px] bg-red-50 border border-red-200 text-red-800 px-6 py-3 rounded-lg text-center font-medium">
+                        <div class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-red-50 border border-red-200 text-red-800 px-6 py-3 rounded-lg text-center font-medium">
                             ❌ Dieses Event wurde abgesagt – eine Anmeldung ist nicht möglich.
                         </div>
                     `;
@@ -1008,14 +1008,14 @@
                     if (event.shifts && event.shifts.length > 0) {
                         buttons += `
                             <button onclick="eventsManager.showShiftRegistration()"
-                                    class="flex-1 min-w-[200px] bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                                    class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
                                 👷 Für Schicht anmelden
                             </button>
                         `;
                         if (event.dbId) {
                             buttons += `
                                 <button onclick="eventsManager.showArbeitsplan()"
-                                        class="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
+                                        class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
                                     📋 Arbeitsplan ansehen
                                 </button>
                             `;
@@ -1025,7 +1025,7 @@
                     // GV: Teilnehmer-Anmeldung mit Essensauswahl
                     buttons += `
                         <button onclick="eventsManager.showGVRegistration()"
-                                class="flex-1 min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
+                                class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
                             📧 Jetzt anmelden
                         </button>
                     `;
@@ -1035,7 +1035,7 @@
                     // Ausflug mit Anmeldung / Aufbau / Abbau: Teilnehmer-Anmeldung
                     buttons += `
                         <button onclick="eventsManager.showParticipantRegistration()"
-                                class="flex-1 min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
+                                class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
                             📧 Jetzt anmelden
                         </button>
                     `;
@@ -1044,14 +1044,14 @@
                     if (event.registrationRequired && event.shifts && event.shifts.length > 0) {
                         buttons += `
                             <button onclick="eventsManager.showShiftRegistration()"
-                                    class="flex-1 min-w-[200px] bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
+                                    class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors">
                                 👷 Für Schicht anmelden
                             </button>
                         `;
                         if (event.dbId) {
                             buttons += `
                                 <button onclick="eventsManager.showArbeitsplan()"
-                                        class="flex-1 min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
+                                        class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors">
                                     📋 Arbeitsplan ansehen
                                 </button>
                             `;
@@ -1059,7 +1059,7 @@
                     } else if (event.registrationRequired && event.participantRegistration) {
                         buttons += `
                             <button onclick="eventsManager.showParticipantRegistration()"
-                                    class="flex-1 min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
+                                    class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition-colors">
                                 📧 Jetzt anmelden
                             </button>
                         `;
@@ -1083,17 +1083,20 @@
                 const directLink = window.location.origin + window.location.pathname + '?event=' + encodeURIComponent(event.slug || event.id);
 
                 content.innerHTML = `
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div class="flex items-center gap-4">
+                    <!-- DEUTSCH: Auf dem Handy (unter sm) steht das Logo ueber dem Titel,
+                         der Titel ist etwas kleiner und darf umbrechen; min-w-0 verhindert,
+                         dass lange Woerter das Fenster rechts ueber den Bildschirm schieben. -->
+                    <div class="p-4 sm:p-6">
+                        <div class="flex items-start sm:items-center justify-between gap-3 mb-4">
+                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 min-w-0">
                                 ${anlassLogoHtml(event.logo, 96)}
-                                <div>
-                                    <h2 class="text-3xl font-bold text-gray-800">${escapeHtml(event.title)}</h2>
+                                <div class="min-w-0">
+                                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 break-words">${escapeHtml(event.title)}</h2>
                                     ${event.subtitle ? `<p class="text-lg text-fire-600 font-medium mt-1">${escapeHtml(event.subtitle)}</p>` : ''}
                                 </div>
                             </div>
                             <button onclick="document.getElementById('event-modal').classList.add('hidden')" 
-                                    class="text-gray-500 hover:text-gray-700 text-3xl leading-none">
+                                    class="shrink-0 text-gray-500 hover:text-gray-700 text-3xl leading-none" aria-label="Schliessen">
                                 ×
                             </button>
                         </div>
@@ -1260,12 +1263,12 @@
                             ${this.getRegistrationButtons(event)}
                             
                             <button onclick="eventsManager.downloadICS()" 
-                                    class="flex-1 min-w-[200px] border border-fire-500 text-fire-500 px-6 py-3 rounded-lg hover:bg-fire-50 transition-colors">
+                                    class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] border border-fire-500 text-fire-500 px-6 py-3 rounded-lg hover:bg-fire-50 transition-colors">
                                 📅 Zu Kalender hinzufügen
                             </button>
                             
                             <button onclick="document.getElementById('event-modal').classList.add('hidden')" 
-                                    class="flex-1 min-w-[200px] border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
+                                    class="w-full sm:w-auto sm:flex-1 sm:min-w-[200px] border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors">
                                 Schließen
                             </button>
                         </div>
