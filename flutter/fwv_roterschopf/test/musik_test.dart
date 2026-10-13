@@ -14,6 +14,13 @@ class _Wiedergabe implements Wiedergabe {
   final aufrufe = <String>[];
   List<WiedergabeEintrag> geladen = const [];
   final _stand = StreamController<WiedergabeStand>.broadcast();
+  final _live = StreamController<String?>.broadcast();
+
+  /// Der Sender meldet einen neuen Titel.
+  void senderMeldet(String? t) => _live.add(t);
+
+  @override
+  Stream<String?> get liveTitel => _live.stream;
   final _fehler = StreamController<WiedergabeFehler>.broadcast();
   int _index = 0;
   bool _spielt = false;
@@ -554,6 +561,31 @@ void main() {
     expect(wiedergabe.aufrufe.skip(1), ['zufall true', 'spielen']);
     final mini = find.byKey(const Key('mini-player'));
     expect(find.descendant(of: mini, matching: find.textContaining('Alle Titel')), findsOneWidget);
+  });
+
+  testWidgets('Radio im grossen Player: laufender Titel und andere Sender', (tester) async {
+    await zeigen(tester);
+    await tester.tap(find.text('Radiosender'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Auf dem Handy hören'));
+    await tester.pumpAndSettle();
+    wiedergabe.senderMeldet("MC HAMMER - U CAN'T TOUCH THIS");
+    await tester.pumpAndSettle();
+    // Mini-Player zeigt den laufenden Titel.
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('mini-player')),
+        matching: find.text("MC HAMMER - U CAN'T TOUCH THIS"),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('mini-player')));
+    await tester.pumpAndSettle();
+    expect(find.text('Radio SRF 3'), findsOneWidget);
+    expect(find.text('LIVE'), findsOneWidget);
+    expect(find.text("U CAN'T TOUCH THIS"), findsOneWidget);
+    expect(find.text('MC HAMMER'), findsOneWidget);
+    expect(find.text('Andere Sender'), findsOneWidget);
   });
 
   testWidgets('Radiosender auf dem Handy hoeren', (tester) async {

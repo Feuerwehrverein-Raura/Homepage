@@ -84,6 +84,9 @@ abstract class Wiedergabe {
   /// Ein Titel liess sich nicht abspielen.
   Stream<WiedergabeFehler> get fehler;
 
+  /// Beim Radio: was der Sender gerade spielt (ICY "StreamTitle").
+  Stream<String?> get liveTitel;
+
   /// Nach einem Fehler: Titel [index] neu laden, ab [position] weiter.
   Future<void> nochmals(int index, Duration position);
   Future<void> schliessen();
@@ -177,6 +180,12 @@ class JustAudioWiedergabe implements Wiedergabe {
   Stream<Duration?> get dauer => _player.durationStream;
 
   @override
+  Stream<String?> get liveTitel => _player.icyMetadataStream.map((m) {
+    final t = m?.info?.title?.trim();
+    return t == null || t.isEmpty ? null : t;
+  });
+
+  @override
   Stream<WiedergabeFehler> get fehler => _player.errorStream.map(
     (e) => WiedergabeFehler(index: e.index, code: '${e.code}', meldung: e.message),
   );
@@ -211,6 +220,11 @@ class MusikPlayer extends ChangeNotifier {
         notifyListeners();
       }),
       _w.position.listen((p) => _stelle = p),
+      _w.liveTitel.listen((t) {
+        if (t == _liveTitel) return;
+        _liveTitel = t;
+        notifyListeners();
+      }),
       _w.fehler.listen(_beiFehler),
     ];
   }
@@ -225,6 +239,11 @@ class MusikPlayer extends ChangeNotifier {
   Duration nochmalsNach = const Duration(seconds: 1);
 
   Duration _stelle = Duration.zero;
+  String? _liveTitel;
+
+  /// Beim Radio: was gerade laeuft, z.B. "Span - Louenesee" (nicht jeder
+  /// Sender schickt das mit).
+  String? get liveTitel => _radio ? _liveTitel : null;
   final _fehlversuche = <int, int>{};
 
   Future<void> _beiFehler(WiedergabeFehler f) async {
@@ -395,6 +414,7 @@ class MusikPlayer extends ChangeNotifier {
   }) async {
     _liste = liste;
     _fehlversuche.clear();
+    _liveTitel = null;
     _quelle = quelle;
     _radio = radio;
     _index = ab;
@@ -530,7 +550,10 @@ class MiniPlayer extends StatelessWidget {
                   leading: Icon(player.radio ? Icons.radio : Icons.music_note),
                   title: Text(e.titel, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(
-                    player.fehler ?? [?e.interpret, ?player.quelle].join(' · '),
+                    player.fehler ??
+                        (player.radio
+                            ? (player.liveTitel ?? 'Live-Radio')
+                            : [?e.interpret, ?player.quelle].join(' · ')),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: player.fehler == null ? null : TextStyle(color: farben.error),
@@ -610,6 +633,12 @@ class PlayerScreen extends StatelessWidget {
       builder: (context, _) {
         final e = player.aktuell;
         final text = Theme.of(context).textTheme;
+        if (e != null && player.radio) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Radio')),
+            body: _RadioAnsicht(player: player, sender: e),
+          );
+        }
         return Scaffold(
           appBar: AppBar(title: Text(player.quelle ?? 'Player')),
           body: e == null
@@ -736,6 +765,125 @@ class _Naechste extends StatelessWidget {
           onTap: () => player.springeZu(i),
         );
       },
+    );
+  }
+}
+
+/// Radio im grossen Player: Sender, was gerade laeuft, andere Sender.
+class _RadioAnsicht extends StatefulWidget {
+  const _RadioAnsicht({required this.player, required this.sender});
+
+  final MusikPlayer player;
+  final WiedergabeEintrag sender;
+
+  @override
+  State<_RadioAnsicht> createState() => _RadioAnsichtState();
+}
+
+class _RadioAnsichtState extends State<_RadioAnsicht> {
+  // Einmal laden, nicht bei jedem neuen Titel.
+  late final Future<List<Radiosender>> _sender = widget.player.zugang.sender();
+
+  @override
+  Widget build(BuildContext context) {
+    final player = widget.player;
+    final sender = widget.sender;
+    final text = Theme.of(context).textTheme;
+    final farben = Theme.of(context).colorScheme;
+    final live = player.liveTitel;
+    // "Interpret - Titel" (so schicken es die meisten Sender) in zwei Zeilen.
+    final teile = live?.split(' - ');
+    final titel = teile != null && teile.length >= 2 ? teile.sublist(1).join(' - ') : live;
+    final interpret = teile != null && teile.length >= 2 ? teile.first : null;
+    return ListView(
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.paddingOf(context).bottom),
+      children: [
+        Center(
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(color: farben.primaryContainer, shape: BoxShape.circle),
+            child: Icon(Icons.radio, size: 60, color: farben.onPrimaryContainer),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(sender.titel, style: text.headlineSmall, textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+        Center(
+          child: Chip(
+            avatar: Icon(
+              Icons.circle,
+              size: 10,
+              color: player.spielt ? farben.error : farben.outline,
+            ),
+            label: Text(player.spielt ? 'LIVE' : 'Pausiert'),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('Läuft gerade', style: text.labelLarge, textAlign: TextAlign.center),
+        const SizedBox(height: 4),
+        Text(
+          titel ?? 'Der Sender meldet keinen Titel',
+          key: const Key('radio-titel'),
+          style: text.titleLarge,
+          textAlign: TextAlign.center,
+        ),
+        if (interpret != null)
+          Text(interpret, style: text.titleMedium, textAlign: TextAlign.center),
+        if (player.fehler != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              player.fehler!,
+              style: TextStyle(color: farben.error),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _SpielKnopf(player: player, gross: true),
+            const SizedBox(width: 16),
+            IconButton(
+              tooltip: 'Beenden',
+              icon: const Icon(Icons.stop),
+              onPressed: () {
+                player.beenden();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        ),
+        const Divider(height: 32),
+        Text('Andere Sender', style: text.titleSmall),
+        FutureBuilder<List<Radiosender>>(
+          future: _sender,
+          builder: (context, s) {
+            final liste = (s.data ?? const <Radiosender>[])
+                .where((x) => x.url != sender.id)
+                .toList();
+            if (s.connectionState != ConnectionState.done) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return Column(
+              children: [
+                for (final x in liste)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.radio),
+                    title: Text(x.name),
+                    trailing: const Icon(Icons.play_arrow),
+                    onTap: () => player.spieleSender(x),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 }
