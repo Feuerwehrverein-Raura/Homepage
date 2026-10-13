@@ -141,14 +141,7 @@ class _Inhalt extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 8),
             child: HinweisChip('Abgesagt', art: HinweisArt.schlecht),
           ),
-        Text(anlass.titel, style: t.textTheme.headlineSmall),
-        if (anlass.untertitel != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            anlass.untertitel!,
-            style: t.textTheme.titleSmall?.copyWith(color: t.colorScheme.outline),
-          ),
-        ],
+        _Titel(anlass: anlass),
         const SizedBox(height: 12),
         if (app.datumText != null)
           InfoZeile(symbol: Icons.calendar_today_outlined, text: app.datumText!),
@@ -175,6 +168,43 @@ class _Inhalt extends StatelessWidget {
           const Abschnitt('Schichten'),
           for (final s in anlass.schichten) SchichtZeile(schicht: s),
         ],
+      ],
+    );
+  }
+}
+
+/// Titel und Untertitel, mit Logo rechts daneben, wenn der Anlass eines hat.
+class _Titel extends StatelessWidget {
+  const _Titel({required this.anlass});
+
+  final Anlass anlass;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(anlass.titel, style: t.textTheme.headlineSmall),
+        if (anlass.untertitel != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            anlass.untertitel!,
+            style: t.textTheme.titleSmall?.copyWith(color: t.colorScheme.outline),
+          ),
+        ],
+      ],
+    );
+    if (anlass.app.logo == null) return text;
+    return Row(
+      children: [
+        Expanded(child: text),
+        AnlassLogo(
+          key: const Key('anlass-logo'),
+          logo: anlass.app.logo,
+          groesse: 80,
+          abstand: const EdgeInsets.only(left: 12),
+        ),
       ],
     );
   }

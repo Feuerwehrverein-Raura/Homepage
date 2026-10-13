@@ -174,6 +174,45 @@ class HinweisChip extends StatelessWidget {
   }
 }
 
+/// Rundes Logo eines Anlasses (`app.logo`), z.B. 48 px an der Karte und
+/// groesser im Kopf der Detailansicht. Ohne Logo nichts; laesst sich das Bild
+/// nicht laden, verschwindet es samt [abstand] — die Karte bleibt heil.
+class AnlassLogo extends StatelessWidget {
+  const AnlassLogo({
+    super.key,
+    required this.logo,
+    this.groesse = 48,
+    this.abstand = EdgeInsets.zero,
+  });
+
+  final Uri? logo;
+  final double groesse;
+
+  /// Abstand zum Nachbarn; faellt mit dem Bild weg, wenn es nicht laedt.
+  final EdgeInsets abstand;
+
+  @override
+  Widget build(BuildContext context) {
+    final adresse = logo;
+    if (adresse == null) return const SizedBox.shrink();
+    // Das Bild ist rein schmueckend (der Titel steht daneben).
+    return Image.network(
+      adresse.toString(),
+      width: groesse,
+      height: groesse,
+      fit: BoxFit.contain,
+      excludeFromSemantics: true,
+      frameBuilder: (context, bild, frame, synchron) => Padding(
+        padding: abstand,
+        child: ClipOval(
+          child: SizedBox.square(dimension: groesse, child: bild),
+        ),
+      ),
+      errorBuilder: (context, fehler, stack) => const SizedBox.shrink(),
+    );
+  }
+}
+
 enum HinweisArt { gut, warnung, schlecht, neutral }
 
 HinweisArt hinweisArtFuer(StatusFarbe f) => switch (f) {

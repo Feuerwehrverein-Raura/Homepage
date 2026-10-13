@@ -104,6 +104,8 @@ class AnlassApp {
     this.abgesagt = false,
     this.anmeldung = const AnlassAnmeldung(),
     this.kannBearbeiten = false,
+    this.logo,
+    this.reihe,
   });
 
   factory AnlassApp.ausJson(Object? json) {
@@ -121,7 +123,18 @@ class AnlassApp {
       abgesagt: jsonWahr(m['abgesagt']) ?? false,
       anmeldung: AnlassAnmeldung.ausJson(m['anmeldung']),
       kannBearbeiten: jsonWahr(m['kann_bearbeiten']) ?? false,
+      logo: _httpsUrl(m['logo']),
+      reihe: jsonText(m['reihe']),
     );
+  }
+
+  /// Nur vollstaendige https-Adressen; alles andere gilt als "kein Logo".
+  static Uri? _httpsUrl(Object? wert) {
+    final text = jsonText(wert);
+    if (text == null) return null;
+    final uri = Uri.tryParse(text);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return null;
+    return uri;
   }
 
   /// "Samstag, 17. Oktober 2026" bzw. "Sa 17.10. – So 18.10.2026".
@@ -141,6 +154,14 @@ class AnlassApp {
 
   /// Ob der Anfragende den Anlass bearbeiten darf (Vorstand, Organisator).
   final bool kannBearbeiten;
+
+  /// Logo des Anlasses (eigenes Bild oder Logo der Reihe, 512x512 PNG,
+  /// rund mit transparentem Rand) oder null.
+  final Uri? logo;
+
+  /// Wiederkehrende Reihe: `fasnacht`, `chilbi`, `preisjassen`,
+  /// `weihnachtshock` oder null.
+  final String? reihe;
 }
 
 /// Abschnitt der Anlass-Liste. Das Backend liefert die Ideen ohne Datum

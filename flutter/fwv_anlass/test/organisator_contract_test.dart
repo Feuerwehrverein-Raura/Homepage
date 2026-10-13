@@ -39,6 +39,9 @@ void main() {
     expect(c.anlass.app.datumText, 'Sa 17.10. – So 18.10.2026');
     expect(c.anlass.app.kannBearbeiten, isTrue);
     expect(c.anlass.organisator, 'Erika Muster');
+    expect(c.anlass.app.logo, Uri.parse('https://www.fwv-raura.ch/images/anlaesse/chilbi.png'));
+    expect(c.anlass.app.reihe, 'chilbi');
+    expect(anlass('helferessen').anlass.app.logo, isNull);
     expect(c.zahlen.text, '3 bestätigt · 1 offen · 4 Personen');
     expect((c.zahlen.offen, c.zahlen.bestaetigt, c.zahlen.personenTotal), (1, 3, 4));
     expect(c.rechte.anlassBearbeiten, isTrue);

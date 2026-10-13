@@ -276,35 +276,54 @@ class _Kopf extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (a.app.abgesagt || !anlass.aktuell)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Wrap(
-                  spacing: 6,
-                  children: [
-                    if (a.app.abgesagt) const HinweisChip('Abgesagt', art: HinweisArt.schlecht),
-                    if (!anlass.aktuell) const HinweisChip('Vorbei'),
-                  ],
+        child: _mitLogo(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (a.app.abgesagt || !anlass.aktuell)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Wrap(
+                    spacing: 6,
+                    children: [
+                      if (a.app.abgesagt) const HinweisChip('Abgesagt', art: HinweisArt.schlecht),
+                      if (!anlass.aktuell) const HinweisChip('Vorbei'),
+                    ],
+                  ),
                 ),
-              ),
-            if (a.app.datumText != null)
-              InfoZeile(symbol: Icons.calendar_today_outlined, text: a.app.datumText!),
-            if (a.app.zeitText != null) InfoZeile(symbol: Icons.schedule, text: a.app.zeitText!),
-            if (a.ort != null) InfoZeile(symbol: Icons.place_outlined, text: a.ort!),
-            if (anlass.zahlen.text != null)
-              InfoZeile(symbol: Icons.group_outlined, text: anlass.zahlen.text!),
-            if (a.app.anmeldung.anmeldeschlussText != null)
-              InfoZeile(
-                symbol: Icons.event_busy_outlined,
-                titel: 'Anmeldeschluss',
-                text: a.app.anmeldung.anmeldeschlussText!,
-              ),
-          ],
+              if (a.app.datumText != null)
+                InfoZeile(symbol: Icons.calendar_today_outlined, text: a.app.datumText!),
+              if (a.app.zeitText != null) InfoZeile(symbol: Icons.schedule, text: a.app.zeitText!),
+              if (a.ort != null) InfoZeile(symbol: Icons.place_outlined, text: a.ort!),
+              if (anlass.zahlen.text != null)
+                InfoZeile(symbol: Icons.group_outlined, text: anlass.zahlen.text!),
+              if (a.app.anmeldung.anmeldeschlussText != null)
+                InfoZeile(
+                  symbol: Icons.event_busy_outlined,
+                  titel: 'Anmeldeschluss',
+                  text: a.app.anmeldung.anmeldeschlussText!,
+                ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  /// Logo (falls vorhanden) rechts neben den Angaben; ohne Logo unveraendert.
+  Widget _mitLogo(Widget inhalt) {
+    final logo = anlass.anlass.app.logo;
+    if (logo == null) return inhalt;
+    return Row(
+      children: [
+        Expanded(child: inhalt),
+        AnlassLogo(
+          key: const Key('anlass-logo'),
+          logo: logo,
+          groesse: 64,
+          abstand: const EdgeInsets.only(left: 12),
+        ),
+      ],
     );
   }
 }

@@ -283,6 +283,28 @@ void main() {
       expect(find.text('Chilbi 2026'), findsOneWidget, reason: 'Pull-to-refresh lädt neu');
     });
 
+    testWidgets('Logo nur an der Chilbi; Ladefehler (kein Netz im Test) macht nichts kaputt', (
+      tester,
+    ) async {
+      await starten(tester);
+      final logo = find.byKey(const Key('anlass-logo'));
+      expect(logo, findsOneWidget);
+      expect(
+        find.descendant(of: find.widgetWithText(Card, 'Chilbi 2026'), matching: logo),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.widgetWithText(Card, 'Herbstmarkt'), matching: logo),
+        findsNothing,
+      );
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(logo), Size.zero, reason: 'kaputtes Bild verschwindet');
+      expect(find.text('Chilbi 2026'), findsOneWidget);
+      expect(find.text('Helfer gesucht'), findsOneWidget);
+    });
+
     testWidgets('dunkler Modus ohne Überlauf', (tester) async {
       await starten(tester, hell: Brightness.dark);
       expect(find.text('Chilbi 2026'), findsOneWidget);
@@ -315,6 +337,23 @@ void main() {
       expect(name, 'Chilbi_2026.ics');
       expect(typ, 'text/calendar');
       expect(utf8.decode(bytes), contains('DTSTART;TZID=Europe/Zurich:20261017T100000'));
+    });
+
+    testWidgets('Logo im Kopf nur, wenn der Anlass eines hat', (tester) async {
+      await detailOeffnen(tester, 'Chilbi 2026');
+      final logo = find.byKey(const Key('anlass-logo'));
+      expect(logo, findsOneWidget);
+      expect(tester.widget<AnlassLogo>(logo).groesse, greaterThan(48));
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.text('Das Dorffest'), findsOneWidget);
+    });
+
+    testWidgets('Ohne Logo bleibt der Kopf wie er war', (tester) async {
+      await detailOeffnen(tester, 'Vereinsausflug');
+      expect(find.byKey(const Key('anlass-logo')), findsNothing);
+      expect(find.byType(AnlassLogo), findsNothing);
     });
 
     testWidgets('Ausflug: keine Anmeldung, Grund sichtbar; Bearbeiten wenn erlaubt', (

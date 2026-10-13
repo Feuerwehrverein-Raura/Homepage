@@ -189,48 +189,67 @@ class AnlassKarte extends StatelessWidget {
         onTap: oeffnen,
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(anlass.titel, style: t.textTheme.titleMedium),
-              if (wann.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.schedule, size: 16, color: t.colorScheme.outline),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(wann, style: t.textTheme.bodyMedium)),
-                  ],
-                ),
+          child: _mitLogo(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(anlass.titel, style: t.textTheme.titleMedium),
+                if (wann.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 16, color: t.colorScheme.outline),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(wann, style: t.textTheme.bodyMedium)),
+                    ],
+                  ),
+                ],
+                if (anlass.ort != null) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(Icons.place_outlined, size: 16, color: t.colorScheme.outline),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(anlass.ort!, style: t.textTheme.bodyMedium)),
+                    ],
+                  ),
+                ],
+                if (hinweis != null || app.abgesagt) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (app.abgesagt) const HinweisChip('Abgesagt', art: HinweisArt.schlecht),
+                      if (hinweis != null) HinweisChip(hinweis.$1, art: hinweis.$2),
+                      if (app.anmeldung.plaetzeText case final p?
+                          when app.anmeldung.moeglich && !app.datumOffen)
+                        HinweisChip(p),
+                    ],
+                  ),
+                ],
               ],
-              if (anlass.ort != null) ...[
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(Icons.place_outlined, size: 16, color: t.colorScheme.outline),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text(anlass.ort!, style: t.textTheme.bodyMedium)),
-                  ],
-                ),
-              ],
-              if (hinweis != null || app.abgesagt) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    if (app.abgesagt) const HinweisChip('Abgesagt', art: HinweisArt.schlecht),
-                    if (hinweis != null) HinweisChip(hinweis.$1, art: hinweis.$2),
-                    if (app.anmeldung.plaetzeText case final p?
-                        when app.anmeldung.moeglich && !app.datumOffen)
-                      HinweisChip(p),
-                  ],
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  /// Logo (falls vorhanden) rechts neben dem Inhalt; ohne Logo bleibt die
+  /// Karte wie sie war.
+  Widget _mitLogo(Widget inhalt) {
+    if (anlass.app.logo == null) return inhalt;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: inhalt),
+        AnlassLogo(
+          key: const Key('anlass-logo'),
+          logo: anlass.app.logo,
+          abstand: const EdgeInsets.only(left: 12),
+        ),
+      ],
     );
   }
 }

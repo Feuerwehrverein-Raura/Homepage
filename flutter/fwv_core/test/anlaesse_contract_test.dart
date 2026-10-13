@@ -124,6 +124,16 @@ void main() {
       expect(markt.app.anmeldung.art, AnmeldeArt.teilnahme);
       expect(markt.hatSchichten, isFalse);
     });
+
+    test('Logo und Reihe: nur die Chilbi hat ein Logo', () {
+      final chilbi = titel('Chilbi 2026');
+      expect(chilbi.app.logo, Uri.parse('https://www.fwv-raura.ch/images/anlaesse/chilbi.png'));
+      expect(chilbi.app.reihe, 'chilbi');
+      for (final a in anlaesse.where((a) => a.titel != 'Chilbi 2026')) {
+        expect(a.app.logo, isNull, reason: a.titel);
+        expect(a.app.reihe, isNull, reason: a.titel);
+      }
+    });
   });
 
   group('meine-anmeldungen.json (GET registrations/mine)', () {
@@ -203,6 +213,11 @@ void main() {
       expect(a.app.gruppe, AnlassGruppe.kommend);
       expect(AnlassApp.ausJson({'datum_offen': true}).gruppe, AnlassGruppe.datumOffen);
       expect(a.schichten, isEmpty);
+      expect(a.app.logo, isNull);
+      expect(a.app.reihe, isNull);
+      expect(AnlassApp.ausJson({'logo': 'http://example.ch/a.png'}).logo, isNull);
+      expect(AnlassApp.ausJson({'logo': '/images/a.png'}).logo, isNull);
+      expect(AnlassApp.ausJson({'logo': 42}).logo, isNull);
       expect(Anlass.ausJson(null).id, '');
       final s = Schicht.ausJson({'id': 's', 'app': 'kaputt'});
       expect(s.app.waehlbar, isFalse);

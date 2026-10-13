@@ -365,6 +365,71 @@ void main() {
     expect(find.text('Küche – Schicht 2 · Sa 17.10. · 17:00–20:00'), findsWidgets);
   });
 
+  // In Tests gibt es kein Netz: Image.network schlaegt fehl. Das Logo muss
+  // dann still verschwinden, die Karte bleibt heil.
+  Future<void> bildFehlerAbwarten(WidgetTester tester) async {
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('Logo: nur an der Chilbi (Karte und Kopf), Ladefehler macht nichts kaputt', (
+    tester,
+  ) async {
+    await zeigen(tester, VerwaltungsUebersichtScreen(verwaltung: verwaltung()));
+    final logo = find.byKey(const Key('anlass-logo'));
+    expect(logo, findsOneWidget, reason: 'Helferessen hat kein Logo');
+    expect(
+      find.descendant(of: find.widgetWithText(Card, 'Chilbi 2026'), matching: logo),
+      findsOneWidget,
+    );
+    expect(tester.widget<AnlassLogo>(logo).logo.toString(), endsWith('/anlaesse/chilbi.png'));
+    expect(find.byIcon(Icons.chevron_right), findsNWidgets(2), reason: 'Pfeil bleibt');
+
+    await bildFehlerAbwarten(tester);
+    expect(tester.takeException(), isNull);
+    expect(find.descendant(of: logo, matching: find.byType(ClipOval)), findsNothing);
+    expect(find.text('Chilbi 2026'), findsOneWidget);
+
+    await tippen(tester, find.text('Chilbi 2026'));
+    expect(logo, findsOneWidget, reason: 'Kopf des Anlasses');
+    await bildFehlerAbwarten(tester);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Logo: ohne Logo kein Bild, mit Logo Bild in der gewuenschten Groesse', (
+    tester,
+  ) async {
+    await zeigen(
+      tester,
+      Scaffold(
+        body: Column(
+          children: [
+            const AnlassLogo(key: Key('ohne'), logo: null),
+            AnlassLogo(
+              key: const Key('mit'),
+              logo: Uri.parse('https://www.fwv-raura.ch/images/anlaesse/chilbi.png'),
+              groesse: 80,
+            ),
+          ],
+        ),
+      ),
+    );
+    expect(
+      find.descendant(of: find.byKey(const Key('ohne')), matching: find.byType(Image)),
+      findsNothing,
+    );
+    expect(tester.getSize(find.byKey(const Key('ohne'))), Size.zero);
+    final mit = find.byKey(const Key('mit'));
+    final bild = tester.widget<Image>(find.descendant(of: mit, matching: find.byType(Image)));
+    expect((bild.width, bild.height), (80, 80));
+    expect((bild.image as NetworkImage).url, 'https://www.fwv-raura.ch/images/anlaesse/chilbi.png');
+    expect(bild.excludeFromSemantics, isTrue);
+
+    await bildFehlerAbwarten(tester);
+    expect(tester.takeException(), isNull);
+    expect(tester.getSize(mit), Size.zero, reason: 'kaputtes Bild verschwindet');
+  });
+
   testWidgets('Bestaetigen und Ablehnen (mit Rueckfrage)', (tester) async {
     await anlass(tester, _chilbi);
     await tippen(tester, find.text('Bestätigen'));

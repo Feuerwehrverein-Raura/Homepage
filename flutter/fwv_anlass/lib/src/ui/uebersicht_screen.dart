@@ -87,37 +87,61 @@ class AnlassKarte extends StatelessWidget {
         onTap: oeffnen,
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: Text(a.titel, style: t.textTheme.titleMedium)),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-              if (wann.isNotEmpty) Text(wann, style: t.textTheme.bodySmall),
-              if (anlass.zahlen.text != null) ...[
-                const SizedBox(height: 6),
-                Text(anlass.zahlen.text!, style: t.textTheme.bodyMedium),
-              ],
-              if (offen > 0 || a.app.abgesagt) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
+          child: _mitLogo(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (a.app.abgesagt) const HinweisChip('Abgesagt', art: HinweisArt.schlecht),
-                    if (offen > 0)
-                      HinweisChip(offen == 1 ? '1 offen' : '$offen offen', art: HinweisArt.warnung),
+                    Expanded(child: Text(a.titel, style: t.textTheme.titleMedium)),
+                    if (a.app.logo == null) const Icon(Icons.chevron_right),
                   ],
                 ),
+                if (wann.isNotEmpty) Text(wann, style: t.textTheme.bodySmall),
+                if (anlass.zahlen.text != null) ...[
+                  const SizedBox(height: 6),
+                  Text(anlass.zahlen.text!, style: t.textTheme.bodyMedium),
+                ],
+                if (offen > 0 || a.app.abgesagt) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (a.app.abgesagt) const HinweisChip('Abgesagt', art: HinweisArt.schlecht),
+                      if (offen > 0)
+                        HinweisChip(
+                          offen == 1 ? '1 offen' : '$offen offen',
+                          art: HinweisArt.warnung,
+                        ),
+                    ],
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  /// Mit Logo: Logo und Pfeil rechts neben dem Inhalt. Ohne Logo bleibt die
+  /// Karte wie sie war (Pfeil in der Titelzeile).
+  Widget _mitLogo(Widget inhalt) {
+    final logo = anlass.anlass.app.logo;
+    if (logo == null) return inhalt;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: inhalt),
+        AnlassLogo(
+          key: const Key('anlass-logo'),
+          logo: logo,
+          abstand: const EdgeInsets.only(left: 12),
+        ),
+        const Icon(Icons.chevron_right),
+      ],
     );
   }
 }
