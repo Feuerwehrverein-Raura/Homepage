@@ -130,11 +130,14 @@ void main() {
     await tester.tap(reiter('Schopf'));
     await tester.pumpAndSettle();
     expect(find.text('Spots'), findsOneWidget);
-    await tester.tap(find.text('Temperaturen'));
+    await tester.tap(find.text('Messwerte'));
     await tester.pumpAndSettle();
     expect(find.text('Tiefkühlschrank Eis'), findsOneWidget);
-    await tester.drag(find.text('Tiefkühlschrank Eis'), const Offset(0, -250));
-    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Heizkörper'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('Heizkörper'), findsOneWidget);
     await tester.tap(find.text('Lampen'));
     await tester.pumpAndSettle();

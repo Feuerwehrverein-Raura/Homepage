@@ -12,6 +12,7 @@ class RoterSchopfZustand {
     required this.lampen,
     required this.kuehlung,
     this.thermostate = const [],
+    this.hauptmessung,
   });
 
   factory RoterSchopfZustand.ausJson(Map<String, dynamic> j) => RoterSchopfZustand(
@@ -21,6 +22,9 @@ class RoterSchopfZustand {
     lampen: _liste(j['lampen'], Lampe.ausJson),
     kuehlung: _liste(j['kuehlung'], Kuehler.ausJson),
     thermostate: _liste(j['thermostate'], Thermostat.ausJson),
+    hauptmessung: j['hauptmessung'] is Map
+        ? Hauptmessung.ausJson(Map<String, dynamic>.from(j['hauptmessung'] as Map))
+        : null,
   );
 
   /// Wann gemessen (das Backend teilt eine Messung bis zu 10 s).
@@ -33,6 +37,48 @@ class RoterSchopfZustand {
   final List<Lampe> lampen;
   final List<Kuehler> kuehlung;
   final List<Thermostat> thermostate;
+
+  /// Stromzaehler des Lokals (die Zentrale, Pro 3EM); null bei aelteren
+  /// Backends.
+  final Hauptmessung? hauptmessung;
+}
+
+/// Strom im Lokal: Leistung jetzt (gesamt und je Phase) und Zaehlerstand.
+class Hauptmessung {
+  const Hauptmessung({
+    required this.erreichbar,
+    this.leistungW,
+    this.phasen = const [],
+    this.zaehlerKwh,
+  });
+
+  factory Hauptmessung.ausJson(Map<String, dynamic> j) => Hauptmessung(
+    erreichbar: j['erreichbar'] == true,
+    leistungW: _ganz(j['leistung_w']),
+    phasen: _liste(j['phasen'], Phase.ausJson),
+    zaehlerKwh: (j['zaehler_kwh'] as num?)?.toDouble(),
+  );
+
+  final bool erreichbar;
+  final int? leistungW;
+  final List<Phase> phasen;
+  final double? zaehlerKwh;
+}
+
+class Phase {
+  const Phase({required this.name, this.spannungV, this.stromA, this.leistungW});
+
+  factory Phase.ausJson(Map<String, dynamic> j) => Phase(
+    name: '${j['name']}',
+    spannungV: (j['spannung_v'] as num?)?.toDouble(),
+    stromA: (j['strom_a'] as num?)?.toDouble(),
+    leistungW: _ganz(j['leistung_w']),
+  );
+
+  final String name;
+  final double? spannungV;
+  final double? stromA;
+  final int? leistungW;
 }
 
 List<T> _liste<T>(Object? roh, T Function(Map<String, dynamic>) bauen) => roh is List

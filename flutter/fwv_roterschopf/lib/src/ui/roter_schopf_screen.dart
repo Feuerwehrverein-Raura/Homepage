@@ -1,7 +1,7 @@
 // Reiter "Roter Schopf" - alles, was das Lokal betrifft:
 //
 //   Lampen       die zwei Lichtgruppen, darunter jede Lampe einzeln
-//   Temperaturen Tiefkuehler und Heizkoerper-Thermostat
+//   Messwerte    Strom im Lokal (Zentrale), Tiefkuehler, Heizkoerper
 //   Musik        den Laptop im Lokal fernbedienen (mit [musik])
 //
 // Oben rechts der Bildschirm des Laptops (mit [bildschirm]). Hoeren auf dem
@@ -127,7 +127,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
           bottom: reiterAufRot(
             tabs: [
               const Tab(text: 'Lampen'),
-              const Tab(text: 'Temperaturen'),
+              const Tab(text: 'Messwerte'),
               if (musik != null) const Tab(text: 'Musik'),
             ],
           ),
@@ -206,6 +206,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
     return ListView(
       padding: mitSystemleiste(context, const EdgeInsets.only(bottom: 24)),
       children: [
+        if (z.hauptmessung != null) ...[const _Kopf('Strom'), _StromKarte(z.hauptmessung!)],
         if (z.kuehlung.isNotEmpty) ...[
           const _Kopf('Tiefkühler'),
           for (final k in z.kuehlung) _KuehlerKarte(k),
@@ -368,6 +369,87 @@ class _Laeuft extends StatelessWidget {
     padding: EdgeInsets.all(12),
     child: SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2.5)),
   );
+}
+
+String _zahl(double v, int stellen) => v.toStringAsFixed(stellen).replaceAll('.', ',');
+
+/// Hauptmessung: Leistung gross, darunter je Phase und der Zaehlerstand.
+class _StromKarte extends StatelessWidget {
+  const _StromKarte(this.m);
+
+  final Hauptmessung m;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final ziffern = const [FontFeature.tabularFigures()];
+    if (!m.erreichbar) {
+      return const Card(
+        margin: EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: ListTile(leading: Icon(Icons.bolt), title: Text('Zentrale antwortet nicht')),
+      );
+    }
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.bolt),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('Leistung jetzt')),
+                Text(
+                  m.leistungW == null ? '—' : '${m.leistungW} W',
+                  style: text.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: ziffern,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            for (final p in m.phasen)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    SizedBox(width: 36, child: Text(p.name, style: text.labelLarge)),
+                    Expanded(
+                      child: Text(
+                        [
+                          if (p.spannungV != null) '${_zahl(p.spannungV!, 0)} V',
+                          if (p.stromA != null) '${_zahl(p.stromA!, 2)} A',
+                        ].join(' · '),
+                        style: text.bodySmall?.copyWith(fontFeatures: ziffern),
+                      ),
+                    ),
+                    Text(
+                      p.leistungW == null ? '—' : '${p.leistungW} W',
+                      style: text.bodyMedium?.copyWith(fontFeatures: ziffern),
+                    ),
+                  ],
+                ),
+              ),
+            if (m.zaehlerKwh != null) ...[
+              const Divider(height: 20),
+              Row(
+                children: [
+                  const Expanded(child: Text('Zählerstand')),
+                  Text(
+                    '${_zahl(m.zaehlerKwh!, 1)} kWh',
+                    style: text.bodyMedium?.copyWith(fontFeatures: ziffern),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _KuehlerKarte extends StatelessWidget {

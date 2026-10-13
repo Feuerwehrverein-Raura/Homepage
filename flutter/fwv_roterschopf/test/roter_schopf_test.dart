@@ -76,8 +76,18 @@ void main() {
     expect(find.text('4 Lampen · aus'), findsOneWidget);
     expect(find.text('-18,2 °C'), findsNothing, reason: 'Temperaturen im zweiten Reiter');
 
-    await tester.tap(find.text('Temperaturen'));
+    await tester.tap(find.text('Messwerte'));
     await tester.pumpAndSettle();
+    // Hauptmessung der Zentrale zuoberst.
+    expect(find.text('227 W'), findsOneWidget);
+    expect(find.text('134 W'), findsOneWidget);
+    expect(find.text('239 V · 0,41 A'), findsOneWidget);
+    expect(find.text('2118,9 kWh'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Heizkörper'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     expect(find.text('-18,2 °C'), findsOneWidget);
     expect(find.text('Strom an · 90 W'), findsOneWidget);
     expect(find.text('Fühler liefert keinen Wert'), findsOneWidget);

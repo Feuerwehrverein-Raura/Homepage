@@ -151,5 +151,31 @@
         "not_calibrated"
       ]
     }
-  ]
+  ],
+  "hauptmessung": {
+    "erreichbar": true,
+    "leistung_w": 227,
+    "strom_a": 1.38,
+    "phasen": [
+      {
+        "name": "L1",
+        "spannung_v": 238.5,
+        "strom_a": 0.03,
+        "leistung_w": 0
+      },
+      {
+        "name": "L2",
+        "spannung_v": 238.9,
+        "strom_a": 0.94,
+        "leistung_w": 134
+      },
+      {
+        "name": "L3",
+        "spannung_v": 239.2,
+        "strom_a": 0.41,
+        "leistung_w": 93
+      }
+    ],
+    "zaehler_kwh": 2118.9
+  }
 }

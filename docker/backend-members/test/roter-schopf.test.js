@@ -36,6 +36,15 @@ function fakeLokal({ zentraleWeg = false, eisWarm = false } = {}) {
                 return antwort({ ap_clients: Object.entries(ports).map(([ip, mport]) => ({ ip, mport })) });
             }
             if (u.pathname === '/script/4/gruppe') return antwort('ok');
+            if (u.pathname === '/rpc/EM.GetStatus') {
+                return antwort({ id: 0, a_current: 0.027, a_voltage: 238.5, a_act_power: 0.0,
+                    b_current: 0.935, b_voltage: 238.9, b_act_power: 134.0,
+                    c_current: 0.414, c_voltage: 239.2, c_act_power: 93.2,
+                    total_current: 1.376, total_act_power: 227.257 });
+            }
+            if (u.pathname === '/rpc/EMData.GetStatus') {
+                return antwort({ id: 0, total_act: 2118948.42 });
+            }
         }
         if (u.hostname === '192.168.88.84' && u.port) {
             const ip = geraetZuPort[Number(u.port)];

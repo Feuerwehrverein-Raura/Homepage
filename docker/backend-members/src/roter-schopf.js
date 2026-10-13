@@ -15,6 +15,9 @@
 // der Taster an der Wand und der Kiosk. So gibt es nur eine Stelle, die
 // weiss, was zur Gruppe gehoert, und nur eine, die schaltet.
 //
+// Hauptmessung: Die Zentrale (Pro 3EM) misst den Strom des Lokals auf drei
+// Phasen. Nur Anzeige.
+//
 // Tiefkuehler: je ein Shelly 1PM Gen4 im Hausnetz mit DS18B20 am Addon.
 // Nur Anzeige. Die Grenze ist dieselbe wie im Skript "Tiefkuehl-Waechter"
 // auf dem Geraet.
@@ -181,6 +184,27 @@ function roterSchopf({
         };
     }
 
+    // Hauptmessung: der Pro 3EM ist zugleich der Stromzaehler des Lokals
+    // (drei Phasen). Leistung jetzt und Zaehlerstand, nur Anzeige.
+    async function hauptmessungMessen() {
+        const em = await rpc(zentrale, 'EM.GetStatus', { id: 0 });
+        const daten = em ? await rpc(zentrale, 'EMData.GetStatus', { id: 0 }) : null;
+        const zahl = (v, stellen = 0) => (typeof v === 'number' ? Number(v.toFixed(stellen)) : null);
+        if (!em) return { erreichbar: false, leistung_w: null, phasen: [], zaehler_kwh: null };
+        return {
+            erreichbar: true,
+            leistung_w: zahl(em.total_act_power),
+            strom_a: zahl(em.total_current, 2),
+            phasen: ['a', 'b', 'c'].map((p, i) => ({
+                name: `L${i + 1}`,
+                spannung_v: zahl(em[`${p}_voltage`], 1),
+                strom_a: zahl(em[`${p}_current`], 2),
+                leistung_w: zahl(em[`${p}_act_power`])
+            })),
+            zaehler_kwh: daten && typeof daten.total_act === 'number' ? zahl(daten.total_act / 1000, 1) : null
+        };
+    }
+
     async function thermostatMessen(t, karte) {
         const port = karte ? karte.get(t.geraet) : null;
         const st = port ? await rpc(`${zentrale}:${port}`, 'BluTrv.GetStatus', { id: t.id }) : null;
@@ -206,7 +230,8 @@ function roterSchopf({
         const kuehlung = await Promise.all(einstellung.kuehlung.map(kuehlerMessen));
         const thermostate = [];
         for (const t of einstellung.thermostate || []) thermostate.push(await thermostatMessen(t, karte));
-        return { zentrale: !!karte, lampen, kuehlung, thermostate, zeit: jetzt() };
+        const hauptmessung = await hauptmessungMessen();
+        return { zentrale: !!karte, lampen, kuehlung, thermostate, hauptmessung, zeit: jetzt() };
     }
 
     function befehleAnwenden(lampen) {
@@ -241,7 +266,8 @@ function roterSchopf({
             lampen: lampen.map(({ kennung, gruppe, name, erreichbar, an, watt }) =>
                 ({ kennung, gruppe, name, erreichbar, an, watt })),
             kuehlung: messung.kuehlung,
-            thermostate: messung.thermostate
+            thermostate: messung.thermostate,
+            hauptmessung: messung.hauptmessung
         };
     }
 
