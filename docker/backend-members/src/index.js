@@ -6843,6 +6843,38 @@ app.post('/kiosk/t400/musik-push/:aktion', async (req, res) => {
     res.json(r.daten);
 });
 
+// Diagnose des Schopf-Players auf den Handys (android/.../schopf/): Die App
+// meldet jeden Schritt (Nachricht empfangen, Kopplung, Anzeige, Fehler), damit
+// sich Geraeteeigenheiten (z.B. Samsung One UI) ohne Kabel nachvollziehen
+// lassen. Nur mit der Freigabe aus der Push-Nachricht; nur ins Log, hoechstens
+// 200 Meldungen pro Person und 10 min.
+const schopfDiagnoseZaehler = new Map();
+app.post('/kiosk/schopf/diagnose', (req, res) => {
+    const wer = fernFreigabePruefen(process.env.JWT_SECRET, String(req.body?.t || ''));
+    if (!wer) return res.status(401).json({ error: 'Freigabe ungueltig oder abgelaufen' });
+    const jetzt = Date.now();
+    const z = schopfDiagnoseZaehler.get(wer);
+    const zaehler = z && jetzt - z.ab < 10 * 60e3 ? z : { ab: jetzt, n: 0 };
+    zaehler.n++;
+    schopfDiagnoseZaehler.set(wer, zaehler);
+    if (schopfDiagnoseZaehler.size > 1000) schopfDiagnoseZaehler.clear();
+    if (zaehler.n > 200) return res.status(429).json({ error: 'Zu viele Meldungen' });
+    const b = req.body || {};
+    const text = (v, n = 200) => (v === undefined || v === null ? null : String(v).slice(0, n));
+    logInfo('SCHOPF-DIAGNOSE', {
+        wer,
+        schritt: text(b.schritt, 60),
+        geraet: text(b.geraet, 80),
+        android: text(b.android, 20),
+        app: text(b.app, 20),
+        sichtbar: b.sichtbar === true,
+        gekoppelt: b.gekoppelt === true,
+        stil: text(b.stil, 20),
+        fehler: text(b.fehler, 500)
+    });
+    res.json({ ok: true });
+});
+
 // --- Authentik-Gruppen verwalten (Vorstand in der Mitglieder-App) ----------
 //
 // Vorstand und admin nehmen Mitglieder in Gruppen auf oder entfernen sie.

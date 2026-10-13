@@ -83,7 +83,14 @@ object SchopfPlayer {
         // Kommt die Nachricht, waehrend die App offen ist: gleich koppeln
         // (Suchen geht nur im Vordergrund). Der Dienst zeichnet danach neu.
         if (!gekoppelt && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && MainActivity.sichtbar) {
-            Handler(Looper.getMainLooper()).post { SchopfRoutenDienst.suchen(c.applicationContext) }
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    SchopfRoutenDienst.suchen(c.applicationContext)
+                    SchopfDiagnose.melden(c, "suche-gestartet")
+                } catch (e: Exception) {
+                    SchopfDiagnose.melden(c, "fehler-suche", fehler = e)
+                }
+            }
         }
         // Feste Lautstaerke: Die Tasten des Handys sollen nicht aus Versehen
         // den Raum lauter drehen.
@@ -150,12 +157,23 @@ object SchopfPlayer {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(c, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
-        ) return
+        ) {
+            SchopfDiagnose.melden(c, "keine-erlaubnis", gekoppelt)
+            return
+        }
         NotificationManagerCompat.from(c).notify(NUMMER, n.build())
+        // Hat das System sie wirklich? (Samsung blendet z.B. manches aus)
+        val sichtbarImSystem = c.getSystemService(NotificationManager::class.java)
+            .activeNotifications.any { it.id == NUMMER }
+        SchopfDiagnose.melden(
+            c, if (sichtbarImSystem) "angezeigt" else "nicht-im-system", gekoppelt,
+            stil = if (gekoppelt) "medien" else "normal"
+        )
     }
 
     @Synchronized
     fun weg(c: Context) {
+        SchopfDiagnose.melden(c, "weg")
         c.getSharedPreferences(SPEICHER, Context.MODE_PRIVATE).edit().clear().apply()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) SchopfRoutenDienst.laufend?.sitzungBeenden()
         NotificationManagerCompat.from(c).cancel(NUMMER)
@@ -276,6 +294,11 @@ class SchopfPushEmpfaenger : BroadcastReceiver() {
         if (extras.getString("notificationType") != "schopf_musik") return
         val d = listOf("art", "titel", "interpret", "laeuft", "bis", "t")
             .associateWith { extras.getString(it) }
-        SchopfPlayer.aktualisieren(c.applicationContext, d)
+        SchopfDiagnose.melden(c.applicationContext, "empfangen:${d["art"]}", t = d["t"])
+        try {
+            SchopfPlayer.aktualisieren(c.applicationContext, d)
+        } catch (e: Exception) {
+            SchopfDiagnose.melden(c.applicationContext, "fehler-aktualisieren", fehler = e, t = d["t"])
+        }
     }
 }

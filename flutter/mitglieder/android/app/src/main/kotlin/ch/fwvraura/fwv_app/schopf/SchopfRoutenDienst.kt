@@ -73,6 +73,7 @@ class SchopfRoutenDienst : MediaRoute2ProviderService() {
     override fun onCreate() {
         super.onCreate()
         laufend = this
+        SchopfDiagnose.melden(applicationContext, "dienst-gestartet")
         notifyRoutes(listOf(route))
         // Schicht laeuft schon: gleich koppeln und den Player oben umstellen.
         if (SchopfPlayer.aktiv(this)) {
@@ -88,6 +89,7 @@ class SchopfRoutenDienst : MediaRoute2ProviderService() {
 
     fun sitzungStarten() {
         if (getSessionInfo(SITZUNG) != null) return
+        SchopfDiagnose.melden(applicationContext, "sitzung-gemeldet", gekoppelt = true)
         notifySessionCreated(
             REQUEST_ID_NONE,
             RoutingSessionInfo.Builder(SITZUNG, packageName)

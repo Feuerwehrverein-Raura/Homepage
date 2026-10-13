@@ -2,6 +2,7 @@ package ch.fwvraura.fwv_app
 
 import android.os.Build
 import ch.fwvraura.fwv_app.kontakte.KontakteKanal
+import ch.fwvraura.fwv_app.schopf.SchopfDiagnose
 import ch.fwvraura.fwv_app.schopf.SchopfPlayer
 import ch.fwvraura.fwv_app.schopf.SchopfRoutenDienst
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -44,7 +45,12 @@ class MainActivity : AudioServiceActivity() {
         super.onResume()
         sichtbar = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && SchopfPlayer.aktiv(this)) {
-            SchopfRoutenDienst.suchen(applicationContext)
+            try {
+                SchopfRoutenDienst.suchen(applicationContext)
+                SchopfDiagnose.melden(applicationContext, "suche-beim-oeffnen")
+            } catch (e: Exception) {
+                SchopfDiagnose.melden(applicationContext, "fehler-suche-beim-oeffnen", fehler = e)
+            }
         }
     }
 
