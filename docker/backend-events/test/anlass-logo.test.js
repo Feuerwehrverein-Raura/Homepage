@@ -13,6 +13,8 @@ test('Reihe am Titel', () => {
     assert.equal(anlassReihe({ title: 'Preisjassen 2026' }).reihe, 'preisjassen');
     assert.equal(anlassReihe({ title: 'Weihnachtshock 2026' }).reihe, 'weihnachtshock');
     assert.equal(anlassReihe({ title: 'Spaghetti-Plausch 2026' }), null);
+    assert.equal(anlassReihe({ title: 'Weihnachtsessen 2026' }), null);
+    assert.equal(anlassReihe({ title: 'Jassabend' }), null);
     assert.equal(anlassReihe({}), null);
 });
 

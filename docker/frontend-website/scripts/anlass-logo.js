@@ -14,8 +14,8 @@
 const ANLASS_REIHEN = [
     { reihe: 'fasnacht', muster: /fasnacht/i },
     { reihe: 'chilbi', muster: /chilbi/i },
-    { reihe: 'preisjassen', muster: /preisjass|\bjass/i },
-    { reihe: 'weihnachtshock', muster: /weihnacht/i },
+    { reihe: 'preisjassen', muster: /preisjass/i },
+    { reihe: 'weihnachtshock', muster: /weihnachtshock/i },
 ];
 
 // DEUTSCH: Nur https-Adressen uebernehmen (kein javascript:, data:, http:)

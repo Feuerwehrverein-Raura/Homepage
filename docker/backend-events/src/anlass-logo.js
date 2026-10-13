@@ -3,6 +3,7 @@
 // gleich aussehen - App, Website, E-Mails.
 //
 // Erkannt wird die Reihe am Titel ("Fasnachtsauftakt 2027" -> fasnacht).
+// Bewusst eng: "Weihnachtsessen" oder "Jassabend" bekommen kein Logo.
 // Ein eigenes Bild am Anlass (image_url) geht immer vor. Die Bilder liegen auf
 // der Website unter /images/anlaesse/<reihe>.png (512x512, PNG); die ersten
 // sind Platzhalter vom 13.10.2026 und lassen sich durch echte Logos mit
@@ -13,8 +14,8 @@ const LOGO_BASIS = 'https://www.fwv-raura.ch/images/anlaesse/';
 const REIHEN = [
     { reihe: 'fasnacht', name: 'Fasnacht', muster: /fasnacht/i },
     { reihe: 'chilbi', name: 'Chilbi', muster: /chilbi/i },
-    { reihe: 'preisjassen', name: 'Preisjassen', muster: /preisjass|\bjass/i },
-    { reihe: 'weihnachtshock', name: 'Weihnachtshock', muster: /weihnacht/i },
+    { reihe: 'preisjassen', name: 'Preisjassen', muster: /preisjass/i },
+    { reihe: 'weihnachtshock', name: 'Weihnachtshock', muster: /weihnachtshock/i },
 ];
 
 /** Reihe eines Anlasses oder null. */
