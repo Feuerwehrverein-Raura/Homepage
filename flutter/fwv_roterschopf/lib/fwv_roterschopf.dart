@@ -10,6 +10,7 @@ export 'src/musik/modelle.dart';
 export 'src/musik/musik_screen.dart';
 export 'src/musik/laptop.dart';
 export 'src/musik/player.dart';
+export 'src/musik/radio.dart';
 export 'src/musik/zugang.dart';
 export 'src/ui/roter_schopf_screen.dart';
 export 'src/zugang.dart';

@@ -19,6 +19,8 @@ dependencies:
   # Musik-Player: streamen, im Hintergrund weiter (siehe musik/player.dart)
   just_audio: ^0.10.6
   just_audio_background: ^0.0.1-beta.17
+  # Radio-Adressen aufloesen (musik/radio.dart)
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

@@ -19,6 +19,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'modelle.dart';
+import 'radio.dart';
 import 'zugang.dart';
 
 /// Ein Eintrag der Warteschlange. [id] ist der Pfad des Titels, beim Radio
@@ -196,8 +197,12 @@ class JustAudioWiedergabe implements Wiedergabe {
 
 /// Zustand fuer die Oberflaeche: Warteschlange, was laeuft, Fehler.
 class MusikPlayer extends ChangeNotifier {
-  MusikPlayer({required this.zugang, Wiedergabe? wiedergabe})
-    : _w = wiedergabe ?? JustAudioWiedergabe() {
+  MusikPlayer({
+    required this.zugang,
+    Wiedergabe? wiedergabe,
+    Future<Uri> Function(Uri adresse)? senderAdresse,
+  }) : _w = wiedergabe ?? JustAudioWiedergabe(),
+       _senderAdresse = senderAdresse ?? senderAufloesen {
     _abos = [
       _w.stand.listen((s) {
         _index = s.index ?? _index;
@@ -260,6 +265,9 @@ class MusikPlayer extends ChangeNotifier {
 
   final MusikZugang zugang;
   final Wiedergabe _w;
+
+  /// Radio-Adresse aufloesen (Weiterleitungen, https) - in Tests ersetzt.
+  final Future<Uri> Function(Uri adresse) _senderAdresse;
   late final List<StreamSubscription<Object?>> _abos;
 
   List<WiedergabeEintrag> _liste = const [];
@@ -356,15 +364,26 @@ class MusikPlayer extends ChangeNotifier {
 
   Future<void> spieleSender(Radiosender s) async {
     if (istAktuell(s.url) && _holt == null) return umschalten();
-    _nr++;
+    final nr = ++_nr;
     _fehler = null;
-    await _starten(
-      s.name,
-      [WiedergabeEintrag(id: s.url, adresse: Uri.parse(s.url), titel: s.name, album: 'Radio')],
-      ab: 0,
-      radio: true,
-      zufall: false,
-    );
+    _holt = s.url;
+    notifyListeners();
+    try {
+      final adresse = await _senderAdresse(Uri.parse(s.url));
+      if (nr != _nr) return;
+      await _starten(
+        s.name,
+        [WiedergabeEintrag(id: s.url, adresse: adresse, titel: s.name, album: 'Radio')],
+        ab: 0,
+        radio: true,
+        zufall: false,
+      );
+    } finally {
+      if (nr == _nr) {
+        _holt = null;
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> _starten(

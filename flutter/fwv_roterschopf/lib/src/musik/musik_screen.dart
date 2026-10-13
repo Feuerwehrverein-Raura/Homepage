@@ -31,6 +31,7 @@ class MusikScreen extends StatefulWidget {
     this.player,
     this.wiedergabe,
     this.laptopSteuern = false,
+    this.senderAdresse,
   });
 
   final MusikZugang zugang;
@@ -41,6 +42,9 @@ class MusikScreen extends StatefulWidget {
 
   /// Nur fuer Tests, wenn kein [player] kommt; sonst just_audio.
   final Wiedergabe? wiedergabe;
+
+  /// Nur fuer Tests: Radio-Adressen nicht im Netz aufloesen.
+  final Future<Uri> Function(Uri adresse)? senderAdresse;
 
   /// Reiter "Im Schopf": den Laptop fernbedienen (Gruppe Roter Schopf,
   /// Vorstand, admin).
@@ -54,7 +58,11 @@ class _MusikScreenState extends State<MusikScreen> {
   MusikPlayer? _eigener;
   late final MusikPlayer _player =
       widget.player ??
-      (_eigener = MusikPlayer(zugang: widget.zugang, wiedergabe: widget.wiedergabe));
+      (_eigener = MusikPlayer(
+        zugang: widget.zugang,
+        wiedergabe: widget.wiedergabe,
+        senderAdresse: widget.senderAdresse,
+      ));
 
   @override
   void dispose() {

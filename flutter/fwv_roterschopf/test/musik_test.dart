@@ -286,7 +286,12 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       MaterialApp(
-        home: MusikScreen(zugang: z, wiedergabe: wiedergabe, laptopSteuern: laptop),
+        home: MusikScreen(
+          zugang: z,
+          wiedergabe: wiedergabe,
+          laptopSteuern: laptop,
+          senderAdresse: (u) async => u,
+        ),
       ),
     );
     await tester.pumpAndSettle();
