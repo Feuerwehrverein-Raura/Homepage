@@ -10,6 +10,7 @@
          wie in der Vorstands-App, damit nicht zwei nebeneinander laufen. -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <!-- DEUTSCH: Logos der Anlaesse (Fasnacht, Chilbi, ...) -->
+    <script src="scripts/sicher.js"></script>
     <script src="scripts/anlass-logo.js"></script>
     <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierten Feuerwehr-Rot-Farben (fire-50 bis fire-800) -->
     <script>
@@ -755,7 +756,7 @@
 
                 // DEUTSCH: Profilfoto anzeigen oder Platzhalter setzen, Loeschen-Button entsprechend ein-/ausblenden
                 if (memberData.foto) {
-                    document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${memberData.foto}" class="w-full h-full object-cover">`;
+                    document.getElementById('my-photo-preview').innerHTML = `<img src="${sichereUrl(API_BASE + memberData.foto)}" class="w-full h-full object-cover">`;
                     document.getElementById('my-photo-delete-btn').classList.remove('hidden');
                 } else {
                     document.getElementById('my-photo-preview').innerHTML = '<span class="text-gray-400 text-3xl">?</span>';
@@ -807,23 +808,23 @@
                     <div class="flex items-start space-x-3">
                         <div class="text-blue-500 text-2xl">@</div>
                         <div class="flex-1">
-                            <p class="text-sm text-blue-800 mb-1">Als <strong>${entry.funktion}</strong> hast du Zugang zu:</p>
+                            <p class="text-sm text-blue-800 mb-1">Als <strong>${escapeHtml(entry.funktion)}</strong> hast du Zugang zu:</p>
                             <div class="flex items-center gap-2 mb-3">
-                                <p class="text-lg font-mono font-semibold text-blue-900">${entry.email}</p>
-                                <button onclick="copyToClipboard('${entry.email}', this)" class="p-1 hover:bg-blue-100 rounded" title="Kopieren">
+                                <p class="text-lg font-mono font-semibold text-blue-900">${escapeHtml(entry.email)}</p>
+                                <button onclick="copyToClipboard('${escapeJsAttr(entry.email)}', this)" class="p-1 hover:bg-blue-100 rounded" title="Kopieren">
                                     <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 </button>
                             </div>
 
                             <!-- Password change for this specific email -->
                             <div class="bg-white rounded-lg p-3 mt-2">
-                                <p class="text-sm font-medium text-gray-700 mb-2">Passwort ändern für ${entry.email}</p>
+                                <p class="text-sm font-medium text-gray-700 mb-2">Passwort ändern für ${escapeHtml(entry.email)}</p>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <input type="password" id="password-${index}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Neues Passwort">
                                     <input type="password" id="password-confirm-${index}" class="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500" placeholder="Bestätigen">
                                 </div>
                                 <div class="flex justify-end mt-2">
-                                    <button onclick="changeFunctionEmailPassword('${entry.email}', ${index})" class="px-4 py-1.5 text-sm bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
+                                    <button onclick="changeFunctionEmailPassword('${escapeJsAttr(entry.email)}', ${index})" class="px-4 py-1.5 text-sm bg-fire-500 text-white rounded-lg hover:bg-fire-600 transition-colors">
                                         Passwort ändern
                                     </button>
                                 </div>
@@ -1024,10 +1025,10 @@
             // DEUTSCH: Fuer jeden Benachrichtigungstyp eine Karte mit Tailwind-Toggle-Schalter
             // und optionalem Feld fuer alternative E-Mail-Adresse rendern
             container.innerHTML = displayNotifications.map(notif => `
-                <div class="border border-gray-200 rounded-lg p-4" data-notification-type="${notif.notification_type}">
+                <div class="border border-gray-200 rounded-lg p-4" data-notification-type="${escapeHtml(notif.notification_type)}">
                     <div class="flex items-center justify-between mb-3">
                         <div>
-                            <h4 class="font-semibold text-gray-800">${notificationLabels[notif.notification_type] || notif.notification_type}</h4>
+                            <h4 class="font-semibold text-gray-800">${escapeHtml(notificationLabels[notif.notification_type] || notif.notification_type)}</h4>
                             <p class="text-sm text-gray-600">${notificationDescriptions[notif.notification_type] || ''}</p>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer">
@@ -1038,7 +1039,7 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Alternative E-Mail (optional)</label>
                         <input type="email" class="notif-alt-email w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"
-                               value="${notif.alternative_email || ''}"
+                               value="${escapeHtml(notif.alternative_email)}"
                                placeholder="Leer = Standard E-Mail verwenden">
                     </div>
                 </div>
@@ -1159,10 +1160,10 @@
                                     const time = shift.start_time && shift.end_time ? `${shift.start_time.substring(0,5)} - ${shift.end_time.substring(0,5)}` : '';
                                     return `
                                         <div class="text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded">
-                                            <span class="font-medium">${shift.name}</span>
-                                            ${date ? `<span class="text-gray-500 ml-2">${date}</span>` : ''}
-                                            ${time ? `<span class="text-gray-500 ml-1">(${time})</span>` : ''}
-                                            ${shift.bereich ? `<span class="text-xs text-gray-400 ml-2">${shift.bereich}</span>` : ''}
+                                            <span class="font-medium">${escapeHtml(shift.name)}</span>
+                                            ${date ? `<span class="text-gray-500 ml-2">${escapeHtml(date)}</span>` : ''}
+                                            ${time ? `<span class="text-gray-500 ml-1">(${escapeHtml(time)})</span>` : ''}
+                                            ${shift.bereich ? `<span class="text-xs text-gray-400 ml-2">${escapeHtml(shift.bereich)}</span>` : ''}
                                         </div>
                                     `;
                                 }).join('')}
@@ -1181,9 +1182,9 @@
                         <div class="flex justify-between items-start">
                             ${anlassLogoHtml(anlassLogoUrl(reg), 48, 'mr-3')}
                             <div class="flex-1">
-                                <h4 class="font-semibold text-gray-800">${reg.event_title}</h4>
+                                <h4 class="font-semibold text-gray-800">${escapeHtml(reg.event_title)}</h4>
                                 <p class="text-sm text-gray-600 mt-1">
-                                    Status: <span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(reg.status)}">${getStatusLabel(reg.status)}</span>
+                                    Status: <span class="px-2 py-1 text-xs font-medium rounded-full ${getStatusClass(reg.status)}">${escapeHtml(getStatusLabel(reg.status))}</span>
                                 </p>
                                 ${shiftsHtml}
                             </div>
@@ -1313,8 +1314,8 @@
                     const zeile = document.createElement('div');
                     zeile.className = 'flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2';
                     const links = document.createElement('div');
-                    links.innerHTML = `<div class="font-medium text-gray-800">${z.geraet}</div>` +
-                        `<div class="text-xs text-gray-500">${z.adresse} · ${wann}</div>`;
+                    links.innerHTML = `<div class="font-medium text-gray-800">${escapeHtml(z.geraet)}</div>` +
+                        `<div class="text-xs text-gray-500">${escapeHtml(z.adresse)} · ${escapeHtml(wann)}</div>`;
                     const knopf = document.createElement('button');
                     knopf.className = 'text-sm text-red-600 hover:text-red-700';
                     knopf.textContent = 'Entfernen';
@@ -1538,10 +1539,10 @@
                 <div class="border border-blue-100 bg-blue-50 rounded-lg p-4">
                     <div class="flex justify-between items-start">
                         <div class="flex-1">
-                            <h4 class="font-semibold text-gray-800">${email.function}</h4>
-                            <p class="text-blue-600 font-mono mt-1">${email.email}</p>
+                            <h4 class="font-semibold text-gray-800">${escapeHtml(email.function)}</h4>
+                            <p class="text-blue-600 font-mono mt-1">${escapeHtml(email.email)}</p>
                         </div>
-                        <button onclick="copyToClipboard('${email.email}')" class="text-gray-400 hover:text-gray-600" title="E-Mail kopieren">
+                        <button onclick="copyToClipboard('${escapeJsAttr(email.email)}')" class="text-gray-400 hover:text-gray-600" title="E-Mail kopieren">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                             </svg>
@@ -1553,13 +1554,13 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <span class="text-sm text-gray-600">Passwort:</span>
-                                    <span id="pw-${email.email.replace('@', '-at-')}" class="ml-2 font-mono text-gray-800">••••••••</span>
+                                    <span id="pw-${escapeHtml(email.email.replace('@', '-at-'))}" class="ml-2 font-mono text-gray-800">••••••••</span>
                                 </div>
                                 <div class="flex space-x-2">
-                                    <button onclick="togglePassword('${email.email.replace('@', '-at-')}', '${email.password}')" class="text-sm text-blue-600 hover:text-blue-800">
+                                    <button onclick="togglePassword('${escapeJsAttr(email.email.replace('@', '-at-'))}', '${escapeJsAttr(email.password)}')" class="text-sm text-blue-600 hover:text-blue-800">
                                         Zeigen
                                     </button>
-                                    <button onclick="copyToClipboard('${email.password}')" class="text-sm text-gray-500 hover:text-gray-700">
+                                    <button onclick="copyToClipboard('${escapeJsAttr(email.password)}')" class="text-sm text-gray-500 hover:text-gray-700">
                                         Kopieren
                                     </button>
                                 </div>
@@ -1575,15 +1576,15 @@
                     `}
 
                     <div class="mt-3 pt-3 border-t border-blue-200 text-sm text-gray-500">
-                        <p><strong>Server:</strong> ${email.server}</p>
-                        <p><strong>IMAP:</strong> ${email.imapPort} (SSL) | <strong>SMTP:</strong> ${email.smtpPort} (STARTTLS)</p>
+                        <p><strong>Server:</strong> ${escapeHtml(email.server)}</p>
+                        <p><strong>IMAP:</strong> ${escapeHtml(email.imapPort)} (SSL) | <strong>SMTP:</strong> ${escapeHtml(email.smtpPort)} (STARTTLS)</p>
                     </div>
 
                     <div class="mt-3 flex space-x-3">
-                        <button onclick="changeFunctionEmailPasswordPrompt('${email.email}')" class="text-sm px-3 py-1 bg-fire-500 text-white rounded hover:bg-fire-600">
+                        <button onclick="changeFunctionEmailPasswordPrompt('${escapeJsAttr(email.email)}')" class="text-sm px-3 py-1 bg-fire-500 text-white rounded hover:bg-fire-600">
                             Passwort ändern
                         </button>
-                        <a href="${email.webmail}" target="_blank" class="text-sm px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                        <a href="${sichereUrl(email.webmail)}" target="_blank" class="text-sm px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
                             Webmail öffnen
                         </a>
                     </div>
@@ -1612,11 +1613,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                         </svg>
                         <div>
-                            <p class="font-medium text-gray-800">${folder.name}</p>
-                            <p class="text-xs text-gray-500">Gruppen: ${folder.groups.join(', ')}</p>
+                            <p class="font-medium text-gray-800">${escapeHtml(folder.name)}</p>
+                            <p class="text-xs text-gray-500">Gruppen: ${escapeHtml(folder.groups.join(', '))}</p>
                         </div>
                     </div>
-                    <a href="https://nextcloud.fwv-raura.ch/apps/files/?dir=/__groupfolders/${folder.id}" target="_blank"
+                    <a href="https://nextcloud.fwv-raura.ch/apps/files/?dir=/__groupfolders/${encodeURIComponent(folder.id)}" target="_blank"
                        class="text-blue-600 hover:text-blue-800 text-sm flex items-center">
                         Öffnen
                         <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1653,8 +1654,8 @@
                         <div>
                             <span class="text-sm text-gray-600">Server:</span>
                             <div class="flex items-center">
-                                <span class="font-mono text-gray-800">${creds.server}</span>
-                                <button onclick="copyToClipboard('${creds.server}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
+                                <span class="font-mono text-gray-800">${escapeHtml(creds.server)}</span>
+                                <button onclick="copyToClipboard('${escapeJsAttr(creds.server)}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                 </button>
                             </div>
@@ -1662,8 +1663,8 @@
                         <div>
                             <span class="text-sm text-gray-600">Benutzer:</span>
                             <div class="flex items-center">
-                                <span class="font-mono text-gray-800">${creds.user}</span>
-                                <button onclick="copyToClipboard('${creds.user}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
+                                <span class="font-mono text-gray-800">${escapeHtml(creds.user)}</span>
+                                <button onclick="copyToClipboard('${escapeJsAttr(creds.user)}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                 </button>
                             </div>
@@ -1677,8 +1678,8 @@
                                 <span id="pw-smb" class="ml-2 font-mono text-gray-800">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>
                             </div>
                             <div class="flex space-x-2">
-                                <button onclick="togglePassword('smb', '${creds.password}')" class="text-sm text-amber-600 hover:text-amber-800">Zeigen</button>
-                                <button onclick="copyToClipboard('${creds.password}')" class="text-sm text-gray-500 hover:text-gray-700">Kopieren</button>
+                                <button onclick="togglePassword('smb', '${escapeJsAttr(creds.password)}')" class="text-sm text-amber-600 hover:text-amber-800">Zeigen</button>
+                                <button onclick="copyToClipboard('${escapeJsAttr(creds.password)}')" class="text-sm text-gray-500 hover:text-gray-700">Kopieren</button>
                             </div>
                         </div>
                         <p class="text-xs text-gray-400 mt-1">Letzte Rotation: ${updatedDate} &middot; N\u00e4chste: ${nextRotationStr}</p>
@@ -1689,10 +1690,9 @@
                         <div class="mt-2 space-y-1">
                             ${creds.shares.map(share => {
                                 const displayPath = '\\\\' + creds.server + '\\' + share;
-                                const copyPath = '\\\\\\\\' + creds.server + '\\\\' + share;
                                 return '<div class="flex items-center justify-between py-1">' +
-                                    '<span class="text-sm font-mono text-gray-700">' + displayPath + '</span>' +
-                                    '<button onclick="copyToClipboard(\'' + copyPath + '\')" class="text-xs text-gray-400 hover:text-gray-600">Kopieren</button>' +
+                                    '<span class="text-sm font-mono text-gray-700">' + escapeHtml(displayPath) + '</span>' +
+                                    '<button onclick="copyToClipboard(\'' + escapeJsAttr(displayPath) + '\')" class="text-xs text-gray-400 hover:text-gray-600">Kopieren</button>' +
                                 '</div>';
                             }).join('')}
                         </div>
@@ -1702,9 +1702,9 @@
                         <details class="text-sm text-gray-500">
                             <summary class="cursor-pointer hover:text-gray-700">Verbindungsanleitung</summary>
                             <div class="mt-2 space-y-2 pl-4">
-                                <p><strong>Windows:</strong> Explorer \u2192 Adressleiste \u2192 <code class="bg-gray-100 px-1 rounded">\\\\${creds.server}\\Ordnername</code></p>
-                                <p><strong>macOS:</strong> Finder \u2192 Gehe zu \u2192 Mit Server verbinden \u2192 <code class="bg-gray-100 px-1 rounded">smb://${creds.server}/Ordnername</code></p>
-                                <p><strong>Linux:</strong> Dateimanager \u2192 <code class="bg-gray-100 px-1 rounded">smb://${creds.server}/Ordnername</code></p>
+                                <p><strong>Windows:</strong> Explorer \u2192 Adressleiste \u2192 <code class="bg-gray-100 px-1 rounded">\\\\${escapeHtml(creds.server)}\\Ordnername</code></p>
+                                <p><strong>macOS:</strong> Finder \u2192 Gehe zu \u2192 Mit Server verbinden \u2192 <code class="bg-gray-100 px-1 rounded">smb://${escapeHtml(creds.server)}/Ordnername</code></p>
+                                <p><strong>Linux:</strong> Dateimanager \u2192 <code class="bg-gray-100 px-1 rounded">smb://${escapeHtml(creds.server)}/Ordnername</code></p>
                             </div>
                         </details>
                     </div>
@@ -1753,24 +1753,24 @@
                 const rotationInfo = hasRotation
                     ? (() => {
                         const nextRotationDate = new Date(sa.nextRotation).toLocaleDateString('de-CH');
-                        return `<p class="text-xs text-gray-400 mt-1">Letzte Rotation: ${updatedDate} \u00b7 N\u00e4chste: ${nextRotationDate} (alle ${sa.rotationDays} Tage)</p>`;
+                        return `<p class="text-xs text-gray-400 mt-1">Letzte Rotation: ${updatedDate} \u00b7 N\u00e4chste: ${nextRotationDate} (alle ${escapeHtml(sa.rotationDays)} Tage)</p>`;
                     })()
                     : '';
 
                 return `
                     <div class="border border-red-100 bg-red-50 rounded-lg p-4">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="font-semibold text-gray-800">${sa.displayName}</h3>
+                            <h3 class="font-semibold text-gray-800">${escapeHtml(sa.displayName)}</h3>
                             <span class="text-xs bg-fire-100 text-fire-700 px-2 py-1 rounded-full">Service Account</span>
                         </div>
-                        ${sa.description ? `<p class="text-sm text-gray-600 mb-3">${sa.description}</p>` : ''}
+                        ${sa.description ? `<p class="text-sm text-gray-600 mb-3">${escapeHtml(sa.description)}</p>` : ''}
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             ${hasUsername ? `
                             <div>
                                 <span class="text-sm text-gray-600">Benutzer:</span>
                                 <div class="flex items-center">
-                                    <span class="font-mono text-gray-800">${sa.username}</span>
-                                    <button onclick="copyToClipboard('${sa.username}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
+                                    <span class="font-mono text-gray-800">${escapeHtml(sa.username)}</span>
+                                    <button onclick="copyToClipboard('${escapeJsAttr(sa.username)}')" class="ml-2 text-gray-400 hover:text-gray-600" title="Kopieren">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                     </button>
                                 </div>
@@ -1789,8 +1789,8 @@
                                     <span id="pw-${saId}" class="ml-2 font-mono text-gray-800">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>
                                 </div>
                                 <div class="flex space-x-2">
-                                    <button onclick="togglePassword('${saId}', '${sa.password}')" class="text-sm text-fire-600 hover:text-fire-800">Zeigen</button>
-                                    <button onclick="copyToClipboard('${sa.password}')" class="text-sm text-gray-500 hover:text-gray-700">Kopieren</button>
+                                    <button onclick="togglePassword('${saId}', '${escapeJsAttr(sa.password)}')" class="text-sm text-fire-600 hover:text-fire-800">Zeigen</button>
+                                    <button onclick="copyToClipboard('${escapeJsAttr(sa.password)}')" class="text-sm text-gray-500 hover:text-gray-700">Kopieren</button>
                                 </div>
                             </div>
                             ${rotationInfo}
@@ -1822,10 +1822,10 @@
                         <svg class="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
-                        <span class="text-gray-800">${access.system}</span>
-                        <span class="text-gray-500 text-sm ml-2">(${access.access})</span>
+                        <span class="text-gray-800">${escapeHtml(access.system)}</span>
+                        <span class="text-gray-500 text-sm ml-2">(${escapeHtml(access.access)})</span>
                     </div>
-                    <a href="${access.url}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
+                    <a href="${sichereUrl(access.url)}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm">
                         Öffnen
                     </a>
                 </div>
@@ -1860,7 +1860,7 @@
                         <div class="flex justify-between items-start">
                             ${anlassLogoHtml(anlassLogoUrl(event), 48, 'mr-3')}
                             <div class="flex-1">
-                                <h4 class="font-semibold text-gray-800">${event.title}</h4>
+                                <h4 class="font-semibold text-gray-800">${escapeHtml(event.title)}</h4>
                                 <p class="text-sm text-gray-600 mt-1">
                                     ${startDate}${endDate ? ` - ${endDate}` : ''}
                                 </p>
@@ -1874,8 +1874,8 @@
                             <div class="mt-3 pt-3 border-t border-purple-200">
                                 <p class="text-sm text-gray-600 mb-2"><strong>Event-Zugangsdaten:</strong></p>
                                 <div class="bg-white rounded p-2 text-sm">
-                                    <p><strong>E-Mail:</strong> <span class="font-mono">${event.eventEmail}</span>
-                                        <button onclick="copyToClipboard('${event.eventEmail}')" class="ml-2 text-gray-400 hover:text-gray-600">
+                                    <p><strong>E-Mail:</strong> <span class="font-mono">${escapeHtml(event.eventEmail)}</span>
+                                        <button onclick="copyToClipboard('${escapeJsAttr(event.eventEmail)}')" class="ml-2 text-gray-400 hover:text-gray-600">
                                             <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                                             </svg>
@@ -1889,11 +1889,11 @@
                         ` : ''}
 
                         <div class="mt-3 flex space-x-3">
-                            <a href="${event.dashboardUrl}" target="_blank"
+                            <a href="${sichereUrl(event.dashboardUrl)}" target="_blank"
                                class="text-sm px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600">
                                 Event-Dashboard
                             </a>
-                            <a href="/events.html#event-${event.id}" target="_blank"
+                            <a href="/events.html#event-${encodeURIComponent(event.id)}" target="_blank"
                                class="text-sm px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
                                 Event ansehen
                             </a>
@@ -2220,7 +2220,7 @@
                     zeile.className = 'flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3';
                     const links = document.createElement('div');
                     links.innerHTML = `<div class="font-semibold text-gray-800"></div>
-                                       <div class="text-sm text-gray-500">${pl.anzahl} Titel${pl.erstellt_von_name ? ' · von ' + pl.erstellt_von_name : ''}</div>`;
+                                       <div class="text-sm text-gray-500">${escapeHtml(pl.anzahl)} Titel${pl.erstellt_von_name ? ' · von ' + escapeHtml(pl.erstellt_von_name) : ''}</div>`;
                     links.querySelector('.font-semibold').textContent = pl.name;
 
                     const rechts = document.createElement('div');
@@ -2526,7 +2526,7 @@
                 memberData.foto = data.photo_url;
 
                 // DEUTSCH: Vorschau aktualisieren und Loeschen-Button einblenden
-                document.getElementById('my-photo-preview').innerHTML = `<img src="${API_BASE}${data.photo_url}" class="w-full h-full object-cover">`;
+                document.getElementById('my-photo-preview').innerHTML = `<img src="${sichereUrl(API_BASE + data.photo_url)}" class="w-full h-full object-cover">`;
                 document.getElementById('my-photo-delete-btn').classList.remove('hidden');
 
                 alert('Foto erfolgreich hochgeladen!');

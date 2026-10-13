@@ -8,6 +8,7 @@
     <title>Event Dashboard - Feuerwehrverein Raura</title>
     <!-- DEUTSCH: Tailwind CSS wird ueber CDN geladen fuer das gesamte Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="scripts/sicher.js"></script>
     <script src="scripts/anlass-logo.js"></script>
     <script>
         // DEUTSCH: Benutzerdefinierte Tailwind-Konfiguration mit eigener Farbpalette "fire"
@@ -372,14 +373,14 @@
                             return `
                                 <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                                     <div>
-                                        <span class="font-medium">${shift.name}</span>
-                                        <span class="text-gray-500 text-sm ml-2">${shift.start_time || ''} - ${shift.end_time || ''}</span>
-                                        <span class="text-gray-400 text-xs ml-2">(${shift.bereich || 'Allgemein'})</span>
+                                        <span class="font-medium">${escapeHtml(shift.name)}</span>
+                                        <span class="text-gray-500 text-sm ml-2">${escapeHtml(shift.start_time)} - ${escapeHtml(shift.end_time)}</span>
+                                        <span class="text-gray-400 text-xs ml-2">(${escapeHtml(shift.bereich || 'Allgemein')})</span>
                                     </div>
                                     <div class="text-sm">
                                         <!-- DEUTSCH: Gruen = genehmigte Anmeldungen, Grau = benoetigte Anzahl -->
                                         <span class="text-green-600 font-medium">${regs.length}</span>
-                                        <span class="text-gray-400">/ ${shift.needed}</span>
+                                        <span class="text-gray-400">/ ${escapeHtml(shift.needed)}</span>
                                     </div>
                                 </div>
                             `;
@@ -419,14 +420,14 @@
                 return `
                     <div class="p-4 flex justify-between items-center">
                         <div>
-                            <div class="font-medium">${name}</div>
-                            <div class="text-sm text-gray-500">${reg.guest_email || ''}</div>
+                            <div class="font-medium">${escapeHtml(name)}</div>
+                            <div class="text-sm text-gray-500">${escapeHtml(reg.guest_email)}</div>
                         </div>
                         <div class="flex items-center space-x-3">
-                            <span class="px-2 py-1 text-xs rounded-full ${statusClass}">${getStatusLabel(reg.status)}</span>
+                            <span class="px-2 py-1 text-xs rounded-full ${statusClass}">${escapeHtml(getStatusLabel(reg.status))}</span>
                             ${reg.status === 'pending' ? `
-                                <button onclick="approveRegistration('${reg.id}')" class="text-green-600 hover:text-green-800 text-sm">Genehmigen</button>
-                                <button onclick="rejectRegistration('${reg.id}')" class="text-red-600 hover:text-red-800 text-sm">Ablehnen</button>
+                                <button onclick="approveRegistration('${escapeJsAttr(reg.id)}')" class="text-green-600 hover:text-green-800 text-sm">Genehmigen</button>
+                                <button onclick="rejectRegistration('${escapeJsAttr(reg.id)}')" class="text-red-600 hover:text-red-800 text-sm">Ablehnen</button>
                             ` : ''}
                         </div>
                     </div>

@@ -10,6 +10,7 @@
     <title>Veranstaltungen - Feuerwehrverein Raura</title>
     <!-- DEUTSCH: Tailwind CSS via CDN fuer Utility-basiertes Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="scripts/sicher.js"></script>
     <script src="scripts/arbeitsplan.js?v=2"></script>
     <script src="scripts/anlass-logo.js"></script>
     <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierter Farbpalette "fire" (Feuerwehr-Rot) -->
@@ -307,7 +308,7 @@
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                 </svg>
-                                <span>Angemeldet als <strong>${fullName}</strong></span>
+                                <span>Angemeldet als <strong>${escapeHtml(fullName)}</strong></span>
                             </div>
                         `;
                         loginSection.className = 'bg-green-50 border border-green-200 rounded-lg p-4';
@@ -488,8 +489,11 @@
                     const [, frontmatterStr, markdownContent] = frontmatterMatch;
                     const frontmatter = this.parseFrontmatter(frontmatterStr);
                     
-                    // DEUTSCH: Markdown-Beschreibung in HTML umwandeln
-                    const description = this.parseMarkdown(markdownContent.trim());
+                    // DEUTSCH: Markdown-Beschreibung in HTML umwandeln. Die Dateien liegen
+                    // im eigenen Repo (vertrauenswuerdig); das HTML steht deshalb separat in
+                    // descriptionHtml, description bleibt reiner Text (Suche, Kurztext).
+                    const description = markdownContent.trim();
+                    const descriptionHtml = this.parseMarkdown(description);
 
                     // DEUTSCH: Schichten (shifts) aus dem YAML parsen falls vorhanden
                     const shifts = [];
@@ -522,6 +526,7 @@
                         status: frontmatter.status || 'confirmed',
                         tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : (frontmatter.tags ? [frontmatter.tags] : []),
                         description: description,
+                        descriptionHtml: descriptionHtml,
                         shifts: shifts,
                         // DEUTSCH: Markdown hat keinen app-Block - Reihe am Titel erkennen
                         logo: anlassLogoUrl({ title: frontmatter.title })
@@ -786,7 +791,7 @@
 
                 return `
                     <div class="${categoryStyles.card} rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}"
-                         data-event-id="${event.id}">
+                         data-event-id="${escapeHtml(event.id)}">
                         <div class="p-6">
                             <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between">
                                 <div class="flex-1">
@@ -794,8 +799,8 @@
                                         <div class="flex items-start gap-4">
                                             ${anlassLogoHtml(event.logo, 56)}
                                             <div>
-                                                <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
-                                                <p class="text-fire-600 font-medium">${event.subtitle || ''}</p>
+                                                <h3 class="text-xl font-bold text-gray-800 mb-1">${escapeHtml(event.title)}</h3>
+                                                <p class="text-fire-600 font-medium">${escapeHtml(event.subtitle)}</p>
                                             </div>
                                         </div>
                                         <div class="flex space-x-2">
@@ -805,7 +810,7 @@
                                     </div>
                                     
                                     <div class="prose prose-sm max-w-none mb-4 text-gray-600">
-                                        ${this.truncateText(event.description, 200)}
+                                        ${escapeHtml(this.truncateText(event.description, 200))}
                                     </div>
                                     
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-500 mb-4">
@@ -823,11 +828,11 @@
                                         <div class="space-y-2">
                                             <div class="flex items-center">
                                                 <span class="mr-2">📍</span>
-                                                <span>${event.location}</span>
+                                                <span>${escapeHtml(event.location)}</span>
                                             </div>
                                             <div class="flex items-center">
                                                 <span class="mr-2">👤</span>
-                                                <span>${event.organizer}</span>
+                                                <span>${escapeHtml(event.organizer)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -835,7 +840,7 @@
                                     <div class="flex flex-wrap gap-2">
                                         ${(event.tags || []).map(tag => `
                                             <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                                                ${tag}
+                                                ${escapeHtml(tag)}
                                             </span>
                                         `).join('')}
                                     </div>
@@ -843,11 +848,11 @@
                                 
                                 <div class="mt-4 lg:mt-0 lg:ml-6 flex-shrink-0">
                                     <span class="inline-block px-3 py-1 ${categoryStyles.badge} rounded-full text-sm font-medium">
-                                        ${event.category || 'Event'}
+                                        ${escapeHtml(event.category || 'Event')}
                                     </span>
                                     ${event.cost && event.cost !== 'Kostenlos' ? `
                                         <div class="mt-2 text-lg font-bold text-fire-600">
-                                            ${event.cost}
+                                            ${escapeHtml(event.cost)}
                                         </div>
                                     ` : ''}
                                 </div>
@@ -867,11 +872,11 @@
 
                 return `
                     <div class="${categoryStyles.card} rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}"
-                         data-event-id="${event.id}">
+                         data-event-id="${escapeHtml(event.id)}">
                         <div class="p-5">
                             <div class="flex items-start justify-between mb-3">
                                 <span class="px-2 py-1 ${categoryStyles.badge} rounded-full text-xs font-medium">
-                                    ${event.category || 'Event'}
+                                    ${escapeHtml(event.category || 'Event')}
                                 </span>
                                 <div class="flex space-x-1">
                                     ${statusBadge}
@@ -882,13 +887,13 @@
                             <div class="flex items-start gap-3 mb-3">
                                 ${anlassLogoHtml(event.logo, 56)}
                                 <div class="min-w-0">
-                                    <h3 class="text-lg font-bold text-gray-800 mb-1">${event.title}</h3>
-                                    <p class="text-fire-600 text-sm">${event.subtitle || ''}</p>
+                                    <h3 class="text-lg font-bold text-gray-800 mb-1">${escapeHtml(event.title)}</h3>
+                                    <p class="text-fire-600 text-sm">${escapeHtml(event.subtitle)}</p>
                                 </div>
                             </div>
                             
                             <div class="text-sm text-gray-600 mb-4 line-clamp-2">
-                                ${this.truncateText(event.description, 100)}
+                                ${escapeHtml(this.truncateText(event.description, 100))}
                             </div>
                             
                             <div class="space-y-2 text-sm text-gray-500 mb-4">
@@ -898,20 +903,20 @@
                                 </div>
                                 <div class="flex items-center">
                                     <span class="mr-2">📍</span>
-                                    <span class="truncate">${event.location}</span>
+                                    <span class="truncate">${escapeHtml(event.location)}</span>
                                 </div>
                             </div>
                             
                             ${event.cost && event.cost !== 'Kostenlos' ? `
                                 <div class="text-fire-600 font-bold text-lg mb-2">
-                                    ${event.cost}
+                                    ${escapeHtml(event.cost)}
                                 </div>
                             ` : ''}
                             
                             <div class="flex flex-wrap gap-1">
                                 ${(event.tags || []).slice(0, 3).map(tag => `
                                     <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                                        ${tag}
+                                        ${escapeHtml(tag)}
                                     </span>
                                 `).join('')}
                             </div>
@@ -1083,8 +1088,8 @@
                             <div class="flex items-center gap-4">
                                 ${anlassLogoHtml(event.logo, 96)}
                                 <div>
-                                    <h2 class="text-3xl font-bold text-gray-800">${event.title}</h2>
-                                    ${event.subtitle ? `<p class="text-lg text-fire-600 font-medium mt-1">${event.subtitle}</p>` : ''}
+                                    <h2 class="text-3xl font-bold text-gray-800">${escapeHtml(event.title)}</h2>
+                                    ${event.subtitle ? `<p class="text-lg text-fire-600 font-medium mt-1">${escapeHtml(event.subtitle)}</p>` : ''}
                                 </div>
                             </div>
                             <button onclick="document.getElementById('event-modal').classList.add('hidden')" 
@@ -1097,21 +1102,23 @@
                             ${this.getStatusBadge(event)}
                             ${this.getRegistrationBadge(event)}
                             <span class="px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
-                                ${event.category || 'Event'}
+                                ${escapeHtml(event.category || 'Event')}
                             </span>
                         </div>
                         
-                        <div class="prose max-w-none mb-6">
-                            ${event.description}
-                        </div>
+                        <!-- DEUTSCH: Beschreibung aus der API ist reiner Text (Zeilenumbrueche
+                             bleiben stehen); nur der Markdown-Fallback liefert eigenes HTML -->
+                        ${event.descriptionHtml
+                            ? `<div class="prose max-w-none mb-6">${event.descriptionHtml}</div>`
+                            : `<div class="prose max-w-none mb-6 whitespace-pre-line">${escapeHtml(event.description)}</div>`}
 
                         ${event.pdf_filename ? `
                         <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
                             <svg class="w-8 h-8 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM6 20V4h7v5h5v11H6zm2-6h8v2H8v-2zm0-3h8v2H8v-2z"/></svg>
                             <div>
-                                <a href="${API_BASE}/events/${event.dbId || event.id}/pdf" target="_blank"
+                                <a href="${API_BASE}/events/${encodeURIComponent(event.dbId || event.id)}/pdf" target="_blank"
                                    class="text-blue-700 hover:text-blue-900 font-medium text-sm hover:underline">
-                                    📎 ${event.pdf_filename}
+                                    📎 ${escapeHtml(event.pdf_filename)}
                                 </a>
                                 <p class="text-xs text-blue-600 mt-0.5">PDF-Anhang herunterladen</p>
                             </div>
@@ -1127,16 +1134,16 @@
                                 <div class="space-y-2 text-sm">
                                     <div><strong>Datum:</strong> ${event.datumOffen ? 'Datum noch offen' : this.formatDate(event.startDate)}</div>
                                     ${event.datumOffen ? '' : `<div><strong>Zeit:</strong> ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</div>`}
-                                    <div><strong>Ort:</strong> ${event.location}</div>
+                                    <div><strong>Ort:</strong> ${escapeHtml(event.location)}</div>
                                 </div>
                             </div>
                             
                             <div class="space-y-3">
                                 <h4 class="font-semibold text-gray-800 text-lg">📞 Kontakt & Details</h4>
                                 <div class="space-y-2 text-sm">
-                                    <div><strong>Organisator:</strong> ${event.organizer}</div>
-                                    <div><strong>E-Mail:</strong> <a href="mailto:${event.email}" class="text-fire-600 hover:text-fire-700">${event.email}</a></div>
-                                    <div><strong>Kosten:</strong> <span class="font-medium">${event.cost}</span></div>
+                                    <div><strong>Organisator:</strong> ${escapeHtml(event.organizer)}</div>
+                                    <div><strong>E-Mail:</strong> <a href="mailto:${escapeHtml(event.email)}" class="text-fire-600 hover:text-fire-700">${escapeHtml(event.email)}</a></div>
+                                    <div><strong>Kosten:</strong> <span class="font-medium">${escapeHtml(event.cost)}</span></div>
                                     ${event.registrationDeadline ? `
                                         <div><strong>Anmeldeschluss:</strong> ${this.formatDate(event.registrationDeadline)}</div>
                                     ` : ''}
@@ -1148,7 +1155,7 @@
                         <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                             <h4 class="font-semibold text-gray-800 mb-2 text-sm">🔗 Direktlink</h4>
                             <div class="flex gap-2">
-                                <input id="event-direct-link" type="text" readonly value="${directLink}" onclick="this.select()"
+                                <input id="event-direct-link" type="text" readonly value="${escapeHtml(directLink)}" onclick="this.select()"
                                        class="flex-1 min-w-0 text-sm bg-white border border-gray-300 rounded px-3 py-2 text-gray-700">
                                 <button type="button"
                                         onclick="navigator.clipboard.writeText(document.getElementById('event-direct-link').value).then(() => { this.textContent = 'Kopiert ✓'; setTimeout(() => this.textContent = 'Kopieren', 1500); })"
@@ -1164,7 +1171,7 @@
                                 <div class="flex flex-wrap gap-2">
                                     ${event.tags.map(tag => `
                                         <span class="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
-                                            ${tag}
+                                            ${escapeHtml(tag)}
                                         </span>
                                     `).join('')}
                                 </div>
@@ -1200,7 +1207,7 @@
                                                     <div class="flex flex-wrap gap-2">
                                                         ${directRegs.approved.map(r => `
                                                             <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                                                                ✓ ${r.name}
+                                                                ✓ ${escapeHtml(r.name)}
                                                             </span>
                                                         `).join('')}
                                                     </div>
@@ -1209,7 +1216,7 @@
                                                     <div class="flex flex-wrap gap-2 ${directRegs.approved?.length > 0 ? 'mt-2' : ''}">
                                                         ${directRegs.pending.map(r => `
                                                             <span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
-                                                                ⏳ ${r.name}
+                                                                ⏳ ${escapeHtml(r.name)}
                                                             </span>
                                                         `).join('')}
                                                     </div>
@@ -1225,20 +1232,20 @@
                                                 : (shift.start_time || '');
                                             return '<div class="bg-white p-4 rounded-lg shadow-sm">' +
                                                 '<div class="flex justify-between items-center mb-2">' +
-                                                    '<span class="font-medium">' + bereich + '</span>' +
-                                                    '<span class="text-sm text-gray-500">' + timeStr + '</span>' +
+                                                    '<span class="font-medium">' + escapeHtml(bereich) + '</span>' +
+                                                    '<span class="text-sm text-gray-500">' + escapeHtml(timeStr) + '</span>' +
                                                 '</div>' +
                                                 (regs.approved?.length > 0 ?
                                                     '<div class="flex flex-wrap gap-2">' +
                                                         regs.approved.map(r =>
-                                                            '<span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ ' + r.name + '</span>'
+                                                            '<span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">✓ ' + escapeHtml(r.name) + '</span>'
                                                         ).join('') +
                                                     '</div>'
                                                 : '') +
                                                 (regs.pending?.length > 0 ?
                                                     '<div class="flex flex-wrap gap-2 ' + (regs.approved?.length > 0 ? 'mt-2' : '') + '">' +
                                                         regs.pending.map(r =>
-                                                            '<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">⏳ ' + r.name + '</span>'
+                                                            '<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">⏳ ' + escapeHtml(r.name) + '</span>'
                                                         ).join('') +
                                                     '</div>'
                                                 : '') +
@@ -1312,10 +1319,10 @@
                             <span class="flex-1 min-w-0 font-medium text-gray-800 truncate">${this.escapeHtml(r.name)}</span>
                             <label class="text-xs text-gray-500 whitespace-nowrap">Portionen</label>
                             <input type="number" min="1" step="1" value="${servings}"
-                                   onchange="eventsManager.updateRecipeServings('${rid}', this.value)"
+                                   onchange="eventsManager.updateRecipeServings('${escapeJsAttr(rid)}', this.value)"
                                    class="w-20 text-sm border border-amber-300 rounded px-2 py-1 text-right">
                             <button type="button" title="Rezept entfernen"
-                                    onclick="eventsManager.removeEventRecipe('${rid}')"
+                                    onclick="eventsManager.removeEventRecipe('${escapeJsAttr(rid)}')"
                                     class="text-red-500 hover:text-red-700 text-sm font-medium px-2">✕</button>
                         </div>`;
                     }).join('') || '<p class="text-sm text-gray-400 py-1">Noch keine Rezepte verknüpft.</p>';
@@ -1324,7 +1331,7 @@
                     const linkedIds = new Set(recipeList.map(r => String(r.recipe_id != null ? r.recipe_id : r.id)));
                     const recipeOptions = (Array.isArray(availRecipes) ? availRecipes : [])
                         .filter(r => !linkedIds.has(String(r.id)))
-                        .map(r => `<option value="${r.id}">${this.escapeHtml(r.name)}</option>`).join('');
+                        .map(r => `<option value="${escapeHtml(r.id)}">${this.escapeHtml(r.name)}</option>`).join('');
 
                     // --- 2. Manuelle Materialien (aus shopping-list: manual_needed > 0; entfernbar) ---
                     const manualItems = items.filter(it => (Number(it.manual_needed) || 0) > 0);
@@ -1333,12 +1340,12 @@
                             <span class="flex-1 min-w-0 font-medium text-gray-800 truncate">${this.escapeHtml(it.item_name)}</span>
                             <span class="text-sm text-gray-600 whitespace-nowrap">${this.fmtQty(it.manual_needed)} ${this.escapeHtml(it.unit || '')}</span>
                             <button type="button" title="Manuelles Material entfernen"
-                                    onclick="eventsManager.removeManualItem('${it.item_id}')"
+                                    onclick="eventsManager.removeManualItem('${escapeJsAttr(it.item_id)}')"
                                     class="text-red-500 hover:text-red-700 text-sm font-medium px-2">✕</button>
                         </div>`).join('') || '<p class="text-sm text-gray-400 py-1">Keine manuellen Materialien.</p>';
 
                     const itemOptions = (Array.isArray(availItems) ? availItems : [])
-                        .map(it => `<option value="${it.id}">${this.escapeHtml(it.name)}${it.unit ? ' (' + this.escapeHtml(it.unit) + ')' : ''}</option>`).join('');
+                        .map(it => `<option value="${escapeHtml(it.id)}">${this.escapeHtml(it.name)}${it.unit ? ' (' + this.escapeHtml(it.unit) + ')' : ''}</option>`).join('');
 
                     // --- 3. Benötigte Materialien / Einkaufsliste (needed vs. Lager vs. was fehlt) ---
                     const rows = items.map(it => {
@@ -1410,9 +1417,9 @@
                                     </table>
                                 </div>
                                 <div class="mt-3 text-sm text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
-                                    <span><strong>${shop.total_to_buy || 0}</strong> Positionen zu kaufen</span>
+                                    <span><strong>${escapeHtml(shop.total_to_buy || 0)}</strong> Positionen zu kaufen</span>
                                     <span>Offen: <strong>CHF ${(Number(shop.estimated_open_cost) || 0).toFixed(2)}</strong></span>
-                                    ${shop.total_purchased ? `<span class="text-green-600">${shop.total_purchased} erledigt</span>` : ''}
+                                    ${shop.total_purchased ? `<span class="text-green-600">${escapeHtml(shop.total_purchased)} erledigt</span>` : ''}
                                 </div>
                                 <p class="text-xs text-gray-400 mt-2">Mengen automatisch aus Zutaten × Portionen (+ manuelle Positionen) berechnet und mit dem Lager abgeglichen.</p>
                             </div>
@@ -1490,8 +1497,9 @@
                 await this._recipeAction('DELETE', `/manual-items/${encodeURIComponent(itemId)}`);
             }
 
+            // DEUTSCH: Gemeinsame Funktion aus scripts/sicher.js
             escapeHtml(s) {
-                return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+                return escapeHtml(s);
             }
 
             fmtQty(n) {
@@ -1606,8 +1614,8 @@
                                     return tagKopf + `
                                     <div class="p-3 border rounded-lg ${isFull ? 'bg-gray-100 opacity-60' : 'hover:bg-gray-50'}">
                                         <label class="flex items-start space-x-3 cursor-pointer ${isFull ? 'cursor-not-allowed' : ''}">
-                                            <input type="checkbox" name="shifts" value="${shift.id || index}"
-                                                   data-name="${shiftLabel}"
+                                            <input type="checkbox" name="shifts" value="${escapeHtml(shift.id || index)}"
+                                                   data-name="${escapeHtml(shiftLabel)}"
                                                    ${isFull ? 'disabled' : ''}
                                                    class="mt-1 w-4 h-4 text-fire-500 border-gray-300 rounded focus:ring-fire-500">
                                             <div class="flex-1 min-w-0">
@@ -1617,21 +1625,21 @@
                                                      sie sich ineinander. -->
                                                 <div class="flex flex-wrap justify-between items-baseline gap-x-2">
                                                     <div class="min-w-0">
-                                                        <span class="font-medium text-sm">${bereich}</span>
-                                                        <span class="text-gray-500 text-sm ml-2 whitespace-nowrap">${timeStr}</span>
+                                                        <span class="font-medium text-sm">${escapeHtml(bereich)}</span>
+                                                        <span class="text-gray-500 text-sm ml-2 whitespace-nowrap">${escapeHtml(timeStr)}</span>
                                                     </div>
                                                     <span class="text-xs whitespace-nowrap ${regs.spotsLeft > 1 ? 'text-green-600' : regs.spotsLeft === 1 ? 'text-orange-600' : 'text-red-600'}">
-                                                        ${isFull ? 'Voll' : `${regs.spotsLeft}/${shift.needed} frei`}
+                                                        ${isFull ? 'Voll' : `${escapeHtml(regs.spotsLeft)}/${escapeHtml(shift.needed)} frei`}
                                                     </span>
                                                 </div>
                                                 ${regs.approved.length > 0 ? `
                                                     <div class="mt-1 text-xs text-green-700">
-                                                        <span class="font-medium">Vergeben:</span> ${regs.approved.map(r => r.name).join(', ')}
+                                                        <span class="font-medium">Vergeben:</span> ${escapeHtml(regs.approved.map(r => r.name).join(', '))}
                                                     </div>
                                                 ` : ''}
                                                 ${regs.pending.length > 0 ? `
                                                     <div class="mt-1 text-xs text-yellow-700">
-                                                        <span class="font-medium">Reserviert:</span> ${regs.pending.map(r => r.name).join(', ')}
+                                                        <span class="font-medium">Reserviert:</span> ${escapeHtml(regs.pending.map(r => r.name).join(', '))}
                                                     </div>
                                                 ` : ''}
                                             </div>
@@ -1722,9 +1730,9 @@
                         
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Anzahl Personen *</label>
-                            <input type="number" name="participants" min="1" max="${event.maxParticipants || 10}" value="1" required 
+                            <input type="number" name="participants" min="1" max="${escapeHtml(event.maxParticipants || 10)}" value="1" required 
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
-                            ${event.maxParticipants ? `<p class="text-sm text-gray-500 mt-1">Maximal ${event.maxParticipants} Teilnehmer</p>` : ''}
+                            ${event.maxParticipants ? `<p class="text-sm text-gray-500 mt-1">Maximal ${escapeHtml(event.maxParticipants)} Teilnehmer</p>` : ''}
                         </div>
 
                         <!-- DEUTSCH: Namensfelder fuer Begleitpersonen (erscheinen bei Anzahl > 1) -->
@@ -1738,7 +1746,7 @@
 
                         ${event.cost && event.cost !== 'Kostenlos' ? `
                             <div class="bg-fire-50 p-4 rounded-lg">
-                                <p class="text-fire-800 font-medium">Kosten: ${event.cost}</p>
+                                <p class="text-fire-800 font-medium">Kosten: ${escapeHtml(event.cost)}</p>
                             </div>
                         ` : ''}
                         
@@ -1979,9 +1987,9 @@
                             <div class="space-y-2">
                                 ${mealOptions.map((option, i) => `
                                     <label class="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                                        <input type="radio" name="meal_selection" value="${option}" ${i === 0 ? 'checked' : ''}
+                                        <input type="radio" name="meal_selection" value="${escapeHtml(option)}" ${i === 0 ? 'checked' : ''}
                                                class="w-4 h-4 text-fire-500 border-gray-300 focus:ring-fire-500">
-                                        <span class="text-sm text-gray-900">${option}</span>
+                                        <span class="text-sm text-gray-900">${escapeHtml(option)}</span>
                                     </label>
                                 `).join('')}
                                 <label class="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
@@ -2033,9 +2041,9 @@
 
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Anzahl Personen *</label>
-                            <input type="number" name="participants" min="1" max="${event.maxParticipants || 10}" value="1" required
+                            <input type="number" name="participants" min="1" max="${escapeHtml(event.maxParticipants || 10)}" value="1" required
                                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-fire-500">
-                            ${event.maxParticipants ? `<p class="text-sm text-gray-500 mt-1">Maximal ${event.maxParticipants} Teilnehmer</p>` : ''}
+                            ${event.maxParticipants ? `<p class="text-sm text-gray-500 mt-1">Maximal ${escapeHtml(event.maxParticipants)} Teilnehmer</p>` : ''}
                         </div>
 
                         <!-- DEUTSCH: Namensfelder fuer Begleitpersonen (erscheinen bei Anzahl > 1) -->
@@ -2045,7 +2053,7 @@
 
                         ${event.cost && event.cost !== 'Kostenlos' ? `
                             <div class="bg-fire-50 p-4 rounded-lg">
-                                <p class="text-fire-800 font-medium">Kosten: ${event.cost}</p>
+                                <p class="text-fire-800 font-medium">Kosten: ${escapeHtml(event.cost)}</p>
                             </div>
                         ` : ''}
 
@@ -2159,11 +2167,11 @@
                         <div class="text-6xl mb-4">👤</div>
                         <h4 class="text-xl font-bold text-gray-800 mb-3">Mitglied erkannt!</h4>
                         <p class="text-gray-600 mb-6">
-                            Diese E-Mail-Adresse gehört zu <strong>${memberName}</strong>.<br>
+                            Diese E-Mail-Adresse gehört zu <strong>${escapeHtml(memberName)}</strong>.<br>
                             Als Mitglied können Sie sich direkt über den Mitglieder-Bereich anmelden.
                         </p>
                         <div class="space-y-3">
-                            <a href="mein.html?redirect=events&event=${this.selectedEvent?.id || ''}"
+                            <a href="mein.html?redirect=events&event=${encodeURIComponent(this.selectedEvent?.id || '')}"
                                class="block w-full bg-fire-500 text-white px-6 py-3 rounded-lg hover:bg-fire-600 transition-colors">
                                 Zum Mitglieder-Login
                             </a>
@@ -2245,7 +2253,7 @@
                         <div class="text-center py-6">
                             <div class="text-6xl mb-4">📧</div>
                             <h4 class="text-xl font-bold text-gray-800 mb-3">Fast geschafft!</h4>
-                            <p class="text-gray-600 mb-6">${text}</p>
+                            <p class="text-gray-600 mb-6">${escapeHtml(text)}</p>
                             <button type="button" onclick="document.getElementById('registration-modal').classList.add('hidden')"
                                     class="w-full bg-fire-500 text-white px-6 py-3 rounded-lg hover:bg-fire-600 transition-colors">
                                 Verstanden
@@ -2288,7 +2296,7 @@
             // DEUTSCH: Leitet zum Event-Dashboard weiter, wo der Arbeitsplan bearbeitet werden kann
             editArbeitsplan() {
                 if (this.selectedEvent) {
-                    window.location.href = `event-dashboard.html?event=${this.selectedEvent.id}`;
+                    window.location.href = `event-dashboard.html?event=${encodeURIComponent(this.selectedEvent.id)}`;
                 }
             }
 

@@ -100,6 +100,7 @@
     </script>
     <!-- DEUTSCH: Externe Konfigurationsdatei mit dynamischen E-Mail-Adressen und Einstellungen -->
     <script src="scripts/config.js"></script>
+    <script src="scripts/sicher.js"></script>
     <script src="scripts/anlass-logo.js"></script>
 </head>
 <body class="font-sans bg-gray-50">
@@ -1269,19 +1270,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 // DEUTSCH: Profilbild anzeigen oder Initialen-Avatar als Fallback generieren
                 const imageHtml = member.image
                     ? `<div class="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                         <img src="${member.image}" alt="${member.name}" class="w-full h-full object-cover">
+                         <img src="${sichereUrl(member.image)}" alt="${escapeHtml(member.name)}" class="w-full h-full object-cover">
                        </div>`
                     : `<div class="w-12 h-12 rounded-full bg-fire-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                         ${member.name.split(' ').map(n => n[0]).join('')}
+                         ${escapeHtml(member.name.split(' ').map(n => n[0]).join(''))}
                        </div>`;
 
                 // DEUTSCH: Kontaktinformationen sammeln (E-Mail und/oder Telefon)
                 const contactInfo = [];
                 if (member.email) {
-                    contactInfo.push(`<a href="mailto:${member.email}" class="text-fire-600 hover:text-fire-700 text-xs">📧 ${member.email}</a>`);
+                    contactInfo.push(`<a href="mailto:${escapeHtml(member.email)}" class="text-fire-600 hover:text-fire-700 text-xs">📧 ${escapeHtml(member.email)}</a>`);
                 }
                 if (member.phone) {
-                    contactInfo.push(`<a href="tel:${member.phone}" class="text-fire-600 hover:text-fire-700 text-xs">📞 ${member.phone}</a>`);
+                    contactInfo.push(`<a href="tel:${escapeHtml(member.phone)}" class="text-fire-600 hover:text-fire-700 text-xs">📞 ${escapeHtml(member.phone)}</a>`);
                 }
 
                 return `
@@ -1289,8 +1290,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="flex items-center space-x-3">
                             ${imageHtml}
                             <div class="flex-1 min-w-0">
-                                <h5 class="font-semibold text-gray-800 text-sm">${member.position}</h5>
-                                <p class="text-gray-600 text-xs mb-1">${member.name}</p>
+                                <h5 class="font-semibold text-gray-800 text-sm">${escapeHtml(member.position)}</h5>
+                                <p class="text-gray-600 text-xs mb-1">${escapeHtml(member.name)}</p>
                                 <div class="space-y-0.5">
                                     ${contactInfo.join('<br>')}
                                 </div>
@@ -1405,8 +1406,8 @@ async function loadFunktionen() {
             const memberNames = members.map(m => `${m.vorname} ${m.nachname}`).join(', ');
             html += `
                 <div class="flex items-center justify-between py-2">
-                    <span class="text-sm font-medium text-gray-700">${funktion}</span>
-                    <span class="text-sm text-gray-600">${memberNames}</span>
+                    <span class="text-sm font-medium text-gray-700">${escapeHtml(funktion)}</span>
+                    <span class="text-sm text-gray-600">${escapeHtml(memberNames)}</span>
                 </div>
             `;
         });
@@ -1586,7 +1587,7 @@ function renderUpcomingEvents(events) {
         // DEUTSCH: Zusaetzliche Event-Informationen zusammenbauen (Datum, Ort, Helfer, Kosten)
         let additionalInfo = `<p>📅 ${dateStr}</p>`;
         if (event.location) {
-            additionalInfo += `<p>📍 ${event.location}</p>`;
+            additionalInfo += `<p>📍 ${escapeHtml(event.location)}</p>`;
         }
 
         if (event.shifts && event.shifts.length > 0) {
@@ -1597,11 +1598,11 @@ function renderUpcomingEvents(events) {
         }
 
         if (event.cost && event.cost !== 'Kostenlos') {
-            additionalInfo += `<p>💰 ${event.cost}</p>`;
+            additionalInfo += `<p>💰 ${escapeHtml(event.cost)}</p>`;
         }
 
         // DEUTSCH: Link zur Event-Detailseite mit Slug als Query-Parameter
-        const eventUrl = event.slug ? `./events.html?event=${event.slug}` : './events.html';
+        const eventUrl = event.slug ? `./events.html?event=${encodeURIComponent(event.slug)}` : './events.html';
 
         return `
             <a href="${eventUrl}" class="block bg-gradient-to-br from-${color.from} to-${color.to} text-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform cursor-pointer">
@@ -1614,11 +1615,11 @@ function renderUpcomingEvents(events) {
                             <span class="text-2xl">${emoji}</span>
                         </div>`}
                         <div>
-                            <h3 class="text-xl font-bold">${event.title}</h3>
-                            <p class="text-${color.light}">${subtitle}</p>
+                            <h3 class="text-xl font-bold">${escapeHtml(event.title)}</h3>
+                            <p class="text-${color.light}">${escapeHtml(subtitle)}</p>
                         </div>
                     </div>
-                    ${description ? `<p class="text-${color.light} mb-4">${description}</p>` : ''}
+                    ${description ? `<p class="text-${color.light} mb-4">${escapeHtml(description)}</p>` : ''}
                     <div class="text-sm text-${color.lighter}">
                         ${additionalInfo}
                     </div>

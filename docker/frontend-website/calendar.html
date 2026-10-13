@@ -36,6 +36,7 @@
     </script>
     <!-- DEUTSCH: Zentrale Konfigurationsdatei mit API-URLs und Kontaktdaten -->
     <script src="scripts/config.js"></script>
+    <script src="scripts/sicher.js"></script>
     <script src="scripts/anlass-logo.js"></script>
 </head>
 <body class="font-sans antialiased bg-gray-50">
@@ -497,8 +498,8 @@
                     <div class="space-y-1">
                         ${dayEvents.map(event => `
                             <div class="text-xs p-1 bg-fire-100 text-fire-800 rounded truncate cursor-pointer hover:bg-fire-200 transition-colors"
-                                 data-event-id="${event.id}">
-                                ${event.title}
+                                 data-event-id="${escapeHtml(event.id)}">
+                                ${escapeHtml(event.title)}
                             </div>
                         `).join('')}
                     </div>
@@ -527,24 +528,24 @@
 
                 // DEUTSCH: Generiert HTML-Karten fuer alle Events mittels Template-Literals
                 container.innerHTML = sortedEvents.map(event => `
-                    <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" data-event-id="${event.id}">
+                    <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" data-event-id="${escapeHtml(event.id)}">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between">
                             <div class="flex-1 flex items-start gap-4">
                                 ${anlassLogoHtml(event.logo, 56)}
                                 <div class="flex-1">
-                                    <h3 class="text-xl font-bold text-gray-800 mb-2">${event.title}</h3>
-                                    <p class="text-gray-600 mb-3">${event.subtitle || ''}</p>
+                                    <h3 class="text-xl font-bold text-gray-800 mb-2">${escapeHtml(event.title)}</h3>
+                                    <p class="text-gray-600 mb-3">${escapeHtml(event.subtitle)}</p>
                                     <div class="flex flex-wrap gap-4 text-sm text-gray-500">
                                         <span>📅 ${this.formatDate(event.startDate)}</span>
                                         <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
-                                        <span>📍 ${event.location}</span>
+                                        <span>📍 ${escapeHtml(event.location)}</span>
                                     </div>
                                 </div>
                             </div>
                             <!-- DEUTSCH: Kategorie-Badge rechts auf Desktop, unten auf Mobil -->
                             <div class="mt-4 md:mt-0">
                                 <span class="px-3 py-1 bg-fire-100 text-fire-800 rounded-full text-sm font-medium">
-                                    ${event.category || 'Event'}
+                                    ${escapeHtml(event.category || 'Event')}
                                 </span>
                             </div>
                         </div>
@@ -590,8 +591,8 @@
                 document.getElementById('modal-content').innerHTML = `
                     <div class="space-y-3">
                         ${event.logo ? `<div class="flex justify-center">${anlassLogoHtml(event.logo, 96)}</div>` : ''}
-                        ${event.subtitle ? `<p class="text-fire-600 font-medium">${event.subtitle}</p>` : ''}
-                        <p class="text-gray-600">${event.description.split('\n')[0]}</p>
+                        ${event.subtitle ? `<p class="text-fire-600 font-medium">${escapeHtml(event.subtitle)}</p>` : ''}
+                        <p class="text-gray-600">${escapeHtml(event.description.split('\n')[0])}</p>
                         <div class="grid grid-cols-1 gap-3 text-sm">
                             <div class="flex items-center">
                                 <span class="font-semibold text-gray-700 w-20">Datum:</span>
@@ -603,20 +604,20 @@
                             </div>
                             <div class="flex items-center">
                                 <span class="font-semibold text-gray-700 w-20">Ort:</span>
-                                <span>${event.location}</span>
+                                <span>${escapeHtml(event.location)}</span>
                             </div>
                             <div class="flex items-center">
                                 <span class="font-semibold text-gray-700 w-20">Kategorie:</span>
-                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${event.category || 'Event'}</span>
+                                <span class="px-2 py-1 bg-fire-100 text-fire-800 rounded text-xs">${escapeHtml(event.category || 'Event')}</span>
                             </div>
                             <div class="flex items-center">
                                 <span class="font-semibold text-gray-700 w-20">Kontakt:</span>
-                                <span>${event.organizer}</span>
+                                <span>${escapeHtml(event.organizer)}</span>
                             </div>
                             ${event.cost ? `
                                 <div class="flex items-center">
                                     <span class="font-semibold text-gray-700 w-20">Kosten:</span>
-                                    <span>${event.cost}</span>
+                                    <span>${escapeHtml(event.cost)}</span>
                                 </div>
                             ` : ''}
                             ${event.registrationRequired ? `
