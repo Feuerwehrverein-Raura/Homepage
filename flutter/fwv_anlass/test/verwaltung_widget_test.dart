@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:fwv_core/fwv_core.dart';
@@ -689,6 +690,31 @@ void main() {
     await tippen(tester, find.widgetWithText(FilledButton, 'Senden'));
     expect(zugang.letzter('arbeitsplanSenden'), [_chilbi]);
   });
+
+  // Samsung A37 (384 dp) zeigte "Anmeldun": Jeder Reitertext muss ganz
+  // hineinpassen, auch auf schmalen Handys.
+  for (final breite in [360.0, 384.0, 393.0]) {
+    testWidgets('Reiter bei $breite dp: jeder Text ganz sichtbar', (tester) async {
+      await zeigen(
+        tester,
+        VerwaltungsAnlassScreen(verwaltung: verwaltung(), anlassId: _chilbi),
+        groesse: Size(breite, 800),
+      );
+      for (final r in ['Anmeldungen', 'Schichten', 'Notizen', 'Material']) {
+        final text = tester.renderObject<RenderParagraph>(
+          find.descendant(of: find.widgetWithText(Tab, r), matching: find.text(r)),
+        );
+        expect(
+          text.size.width,
+          greaterThanOrEqualTo(text.getMaxIntrinsicWidth(double.infinity) - 0.5),
+          reason: '"$r" abgeschnitten',
+        );
+      }
+      // Der letzte Reiter ist erreichbar.
+      await tippen(tester, find.widgetWithText(Tab, 'Material'));
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('schmales Handy im Dunkelmodus: nichts laeuft ueber', (tester) async {
     tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
