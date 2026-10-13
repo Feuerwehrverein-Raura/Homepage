@@ -3,6 +3,7 @@
      heller Grund. Durch ein echtes Logo ersetzen: gleiche Datei, 512x512. -->
 <circle cx="256" cy="256" r="248" fill="#B91C1C"/>
 <circle cx="256" cy="256" r="222" fill="#FFF8EC"/>
+<g transform="translate(256 210) scale(0.9) translate(-256 -214)">
 <g stroke="#7C2D12" stroke-width="5">
 <rect x="136" y="122" width="118" height="176" rx="14" fill="#fff" transform="rotate(-16 195 210)"/>
 <rect x="197" y="104" width="118" height="176" rx="14" fill="#fff"/>
@@ -24,4 +25,5 @@
 <circle cx="317" cy="226" r="6" fill="#7C2D12"/>
 <rect x="311" y="176" width="12" height="10" rx="3" fill="#B45309"/>
 </g>
-<text x="256" y="412" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="40" letter-spacing="1" fill="#B91C1C">PREISJASSEN</text></svg>
+</g>
+<path id="bogen" d="M 58 256 A 198 198 0 0 0 454 256" fill="none"/><text font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="46" letter-spacing="3" fill="#B91C1C"><textPath href="#bogen" startOffset="50%" text-anchor="middle">PREISJASSEN</textPath></text></svg>

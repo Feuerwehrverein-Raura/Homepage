@@ -11,4 +11,8 @@ Vereinsrot #B91C1C, heller Grund, Name unten.
 | preisjassen.png/.svg | Jasskarten | eigene Zeichnung (Platzhalter) |
 | weihnachtshock.png/.svg | Tannenbaum | eigene Zeichnung (Platzhalter) |
 
+Name im Bogen unten (SVG textPath). fasnacht.png entsteht aus
+`fasnacht-vorlage.html` (Headless-Chrome-Screenshot 512x512, transparenter
+Hintergrund).
+
 Ersetzen: gleiche Datei, gleiche Groesse - App und Website ziehen nach.

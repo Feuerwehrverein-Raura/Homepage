@@ -3,6 +3,7 @@
      heller Grund. Durch ein echtes Logo ersetzen: gleiche Datei, 512x512. -->
 <circle cx="256" cy="256" r="248" fill="#B91C1C"/>
 <circle cx="256" cy="256" r="222" fill="#FFF8EC"/>
+<g transform="translate(256 210) scale(0.9) translate(-256 -214)">
 <g stroke="#334155" stroke-width="7" fill="none">
 <circle cx="256" cy="200" r="104"/><circle cx="256" cy="200" r="70" stroke-width="4"/>
 <path d="M256 96 V304 M152 200 H360 M182 126 L330 274 M330 126 L182 274" stroke-width="5"/>
@@ -21,4 +22,5 @@
 <rect x="318" y="264" width="30" height="24" rx="6" fill="#EA580C"/>
 </g>
 <g fill="#F59E0B"><circle cx="256" cy="130" r="4"/><circle cx="326" cy="200" r="4"/><circle cx="186" cy="200" r="4"/><circle cx="256" cy="270" r="4"/></g>
-<text x="256" y="412" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="64" letter-spacing="2" fill="#B91C1C">CHILBI</text></svg>
+</g>
+<path id="bogen" d="M 58 256 A 198 198 0 0 0 454 256" fill="none"/><text font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="54" letter-spacing="6" fill="#B91C1C"><textPath href="#bogen" startOffset="50%" text-anchor="middle">CHILBI</textPath></text></svg>
