@@ -171,9 +171,15 @@ object SchopfPlayer {
         // Hat das System sie wirklich? (Samsung blendet z.B. manches aus)
         val sichtbarImSystem = c.getSystemService(NotificationManager::class.java)
             .activeNotifications.any { it.id == NUMMER }
+        // Was sonst noch im Weg stehen kann: abgeschaltete Benachrichtigungen,
+        // heruntergestufter Kanal, Routing-Sitzung weg.
+        val nm = c.getSystemService(NotificationManager::class.java)
+        val sitzung = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) SchopfRoutenDienst.gekoppelt() else false
         SchopfDiagnose.melden(
             c, if (sichtbarImSystem) "angezeigt" else "nicht-im-system", gekoppelt,
-            stil = if (medienStil) "medien" else "normal"
+            stil = if (medienStil) "medien" else "normal", laeuft = laeuft,
+            info = "erlaubt=${nm.areNotificationsEnabled()} kanal=${nm.getNotificationChannel(KANAL)?.importance}" +
+                " sitzung=$sitzung"
         )
     }
 
@@ -234,6 +240,7 @@ object SchopfPlayer {
         val p = c.getSharedPreferences(SPEICHER, Context.MODE_PRIVATE)
         val t = p.getString("t", null)
         if (t == null) {
+            SchopfDiagnose.melden(c, "knopf-ohne-freigabe:$aktion")
             fertig?.invoke()
             return
         }
@@ -248,6 +255,10 @@ object SchopfPlayer {
                 v.outputStream.use { it.write(JSONObject().put("t", t).toString().toByteArray()) }
                 if (v.responseCode == 200) {
                     val m = JSONObject(v.inputStream.bufferedReader().readText()).optJSONObject("musik")
+                    SchopfDiagnose.melden(
+                        c, "knopf-antwort:$aktion", laeuft = m?.optBoolean("laeuft"),
+                        info = "erreichbar=${m?.optBoolean("erreichbar")}"
+                    )
                     if (m != null && m.optBoolean("erreichbar")) {
                         aktualisieren(
                             c, mapOf(
@@ -262,10 +273,12 @@ object SchopfPlayer {
                     }
                 } else {
                     Log.w("SchopfPlayer", "$aktion: HTTP ${v.responseCode}")
+                    SchopfDiagnose.melden(c, "fehler-knopf:$aktion", info = "http=${v.responseCode}")
                 }
                 v.disconnect()
             } catch (e: Exception) {
                 Log.w("SchopfPlayer", "$aktion: ${e.message}")
+                SchopfDiagnose.melden(c, "fehler-knopf:$aktion", fehler = e)
             } finally {
                 fertig?.invoke()
             }
@@ -274,9 +287,14 @@ object SchopfPlayer {
 
     /** Knoepfe im Medien-Bereich oben (Session). */
     private class Rueckruf(private val c: Context) : MediaSessionCompat.Callback() {
-        override fun onPlay() = befehl(c, "umschalten")
-        override fun onPause() = befehl(c, "umschalten")
-        override fun onSkipToNext() = befehl(c, "weiter")
+        override fun onPlay() = oben("umschalten")
+        override fun onPause() = oben("umschalten")
+        override fun onSkipToNext() = oben("weiter")
+
+        private fun oben(aktion: String) {
+            SchopfDiagnose.melden(c, "knopf-oben:$aktion")
+            befehl(c, aktion)
+        }
     }
 }
 
@@ -284,6 +302,7 @@ object SchopfPlayer {
 class SchopfKnopfEmpfaenger : BroadcastReceiver() {
     override fun onReceive(c: Context, i: Intent) {
         val aktion = i.action ?: return
+        SchopfDiagnose.melden(c.applicationContext, "knopf-unten:$aktion")
         val ergebnis = goAsync()
         SchopfPlayer.befehl(c.applicationContext, aktion) { ergebnis.finish() }
     }

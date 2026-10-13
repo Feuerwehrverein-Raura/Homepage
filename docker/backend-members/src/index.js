@@ -6870,6 +6870,8 @@ app.post('/kiosk/schopf/diagnose', (req, res) => {
         sichtbar: b.sichtbar === true,
         gekoppelt: b.gekoppelt === true,
         stil: text(b.stil, 20),
+        laeuft: typeof b.laeuft === 'boolean' ? b.laeuft : null,
+        info: text(b.info, 200),
         fehler: text(b.fehler, 500)
     });
     res.json({ ok: true });

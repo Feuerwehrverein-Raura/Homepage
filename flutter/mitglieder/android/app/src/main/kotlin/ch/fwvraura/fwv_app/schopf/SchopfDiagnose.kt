@@ -28,10 +28,12 @@ object SchopfDiagnose {
         stil: String? = null,
         fehler: Throwable? = null,
         t: String? = null,
+        laeuft: Boolean? = null,
+        info: String? = null,
     ) {
         val text = fehler?.let { "${it.javaClass.simpleName}: ${it.message}" }
-        Log.i("SchopfPlayer", "$schritt gekoppelt=$gekoppelt stil=$stil sichtbar=${MainActivity.sichtbar}" +
-            (text?.let { " fehler=$it" } ?: ""))
+        Log.i("SchopfPlayer", "$schritt gekoppelt=$gekoppelt stil=$stil laeuft=$laeuft sichtbar=${MainActivity.sichtbar}" +
+            (info?.let { " $it" } ?: "") + (text?.let { " fehler=$it" } ?: ""))
         val freigabe = t ?: c.getSharedPreferences("schopf_player", Context.MODE_PRIVATE).getString("t", null)
             ?: return
         thread {
@@ -51,6 +53,8 @@ object SchopfDiagnose {
                     .put("sichtbar", MainActivity.sichtbar)
                     .put("gekoppelt", gekoppelt)
                     .put("stil", stil)
+                    .put("laeuft", laeuft)
+                    .put("info", info)
                     .put("fehler", text)
                 v.outputStream.use { it.write(daten.toString().toByteArray()) }
                 v.responseCode

@@ -83,6 +83,7 @@ class SchopfRoutenDienst : MediaRoute2ProviderService() {
     }
 
     override fun onDestroy() {
+        SchopfDiagnose.melden(applicationContext, "dienst-beendet")
         if (laufend === this) laufend = null
         super.onDestroy()
     }
@@ -101,7 +102,10 @@ class SchopfRoutenDienst : MediaRoute2ProviderService() {
     }
 
     fun sitzungBeenden() {
-        if (getSessionInfo(SITZUNG) != null) notifySessionReleased(SITZUNG)
+        if (getSessionInfo(SITZUNG) != null) {
+            SchopfDiagnose.melden(applicationContext, "sitzung-beendet")
+            notifySessionReleased(SITZUNG)
+        }
     }
 
     override fun onDiscoveryPreferenceChanged(preference: RouteDiscoveryPreference) {
@@ -111,10 +115,13 @@ class SchopfRoutenDienst : MediaRoute2ProviderService() {
     // Die Schopf-Musik kommt nie aufs Handy; "Roter Schopf" in der
     // Geraeteauswahl zu waehlen, aendert nichts an der eigenen Wiedergabe.
     override fun onCreateSession(requestId: Long, packageName: String, routeId: String, sessionHints: Bundle?) {
+        SchopfDiagnose.melden(applicationContext, "geraet-gewaehlt", info = "von=$packageName")
         notifyRequestFailed(requestId, REASON_ROUTE_NOT_AVAILABLE)
     }
 
     override fun onReleaseSession(requestId: Long, sessionId: String) {
+        // Das System (oder die Geraeteauswahl) hat die Kopplung getrennt.
+        SchopfDiagnose.melden(applicationContext, "sitzung-vom-system-beendet")
         notifySessionReleased(sessionId)
     }
 
