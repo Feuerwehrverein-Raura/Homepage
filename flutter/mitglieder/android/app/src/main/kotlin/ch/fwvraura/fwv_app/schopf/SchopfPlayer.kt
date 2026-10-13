@@ -148,7 +148,13 @@ object SchopfPlayer {
             .addAction(android.R.drawable.ic_media_next, "Weiter", knopf(c, "weiter"))
         // Medien-Stil nur gekoppelt: Ohne Kopplung wuerde Android die
         // Benachrichtigung samt Session ganz verstecken.
-        if (gekoppelt) {
+        // Und nur, solange es laeuft: Einen pausierten Player blendet SystemUI
+        // nach etwa 10 min aus (MediaTimeoutListener; ohne "Fortsetzen", das
+        // auf Samsung aus ist). Die Benachrichtigung bleibt dann trotzdem aus
+        // der normalen Liste gefiltert und ist nirgends mehr zu sehen
+        // (gemessen am A37, 13.10.2026). Pausiert also normal unten.
+        val medienStil = gekoppelt && laeuft
+        if (medienStil) {
             n.setStyle(MediaStyle().setMediaSession(s.sessionToken).setShowActionsInCompactView(0, 1))
         }
         // Nach Schichtende von selbst weg, auch wenn "weg" nie ankommt.
@@ -167,7 +173,7 @@ object SchopfPlayer {
             .activeNotifications.any { it.id == NUMMER }
         SchopfDiagnose.melden(
             c, if (sichtbarImSystem) "angezeigt" else "nicht-im-system", gekoppelt,
-            stil = if (gekoppelt) "medien" else "normal"
+            stil = if (medienStil) "medien" else "normal"
         )
     }
 
