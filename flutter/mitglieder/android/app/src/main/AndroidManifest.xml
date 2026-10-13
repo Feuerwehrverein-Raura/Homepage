@@ -46,10 +46,25 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <!-- Knoepfe in Benachrichtigungen ("Im Schopf laeuft": Pause/Weiter) -
-             ohne diesen Empfaenger kommen sie nie in der App an. -->
-        <receiver android:exported="false"
-            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
+        <!-- "Im Schopf laeuft" als Mini-Player oben (schopf/SchopfPlayer.kt):
+             stille Push-Nachrichten direkt abnehmen (neben firebase_messaging)
+             und die Knoepfe der Benachrichtigung. -->
+        <receiver android:name=".schopf.SchopfPushEmpfaenger"
+            android:exported="true"
+            android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name=".schopf.SchopfKnopfEmpfaenger" android:exported="false" />
+        <!-- Der Rote Schopf als Ausgabegeraet ("Roter Schopf" auf dem Knopf
+             des Mini-Players oben), schopf/SchopfRoutenDienst.kt. Nur das
+             System bindet ihn (prueft der Dienst selbst). -->
+        <service android:name=".schopf.SchopfRoutenDienst" android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.MediaRoute2ProviderService" />
+            </intent-filter>
+        </service>
         <!-- Musik im Hintergrund: Dienst und Medientasten (audio_service). -->
         <service android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"

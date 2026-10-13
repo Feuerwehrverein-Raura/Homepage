@@ -90,5 +90,8 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0")
     // Hinweis auf neue Versionen aus Play (lib/einstellungen/app_update.dart).
     implementation("com.google.android.play:app-update:2.1.0")
+    // Media-Session fuer "Im Schopf laeuft" oben in der Benachrichtigungsleiste
+    // (schopf/SchopfPlayer.kt).
+    implementation("androidx.media:media:1.8.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
