@@ -17,6 +17,7 @@ const appAnsicht = require('./app-ansicht');
 const { schichtKonflikte, eindeutig, konfliktText } = require('./doppelte-schicht');
 const organisatorAnsicht = require('./organisator-ansicht');
 const { anlassIcs, icsDateiname } = require('./ics');
+const { mitAnlassLogo } = require('./anlass-mail');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -106,7 +107,7 @@ async function notifySlotFreed({ eventId, prevStatus, freedPersons = 1 }) {
     if (prevStatus !== 'approved') return;
     try {
         const ev = await pool.query(
-            `SELECT id, title, slug, max_participants, registration_deadline
+            `SELECT id, title, slug, image_url, max_participants, registration_deadline
              FROM events WHERE id = $1`, [eventId]
         );
         if (ev.rows.length === 0) return;
@@ -135,12 +136,12 @@ async function notifySlotFreed({ eventId, prevStatus, freedPersons = 1 }) {
 
         // E-Mail an Mitglieder-Alias (alle aktiven Mitglieder mit zustellung_email=true)
         try {
-            await axios.post(`${DISPATCH_API}/email/send`, {
+            await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
                 to: 'mitglieder@fwv-raura.ch',
                 subject,
                 body,
                 event_id: eventId
-            });
+            }));
         } catch (e) { console.error('notifySlotFreed email failed:', e.message); }
 
         // Push-Broadcast an alle Mitglieder (ueber api-members)
@@ -207,13 +208,19 @@ async function notifyRegistrationChange({ eventId, eventTitle, memberId, guestNa
         console.error('Anmelde-Details fuer E-Mail nicht ladbar:', e.message);
     }
     const emailBody = `${greeting},\n\n${body}${details ? `\n\n${details}` : ''}\n\nMit freundlichen Gruessen\nFeuerwehrverein Raura`;
+    // Fuer das Logo: eigenes Bild des Anlasses nachladen (Titel reicht fuer die Reihe)
+    let anlass = { title: eventTitle };
     try {
-        await axios.post(`${DISPATCH_API}/email/send`, {
+        const ev = await pool.query('SELECT title, image_url FROM events WHERE id = $1', [eventId]);
+        if (ev.rows[0]) anlass = ev.rows[0];
+    } catch (_) {}
+    try {
+        await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(anlass, {
             to: targetEmail,
             subject: title,
             body: emailBody,
             event_id: eventId
-        });
+        }));
     } catch (e) {
         console.error('notifyRegistrationChange email failed:', e.message);
     }
@@ -380,12 +387,12 @@ Feuerwehrverein Raura
         }
 
         try {
-            await axios.post(`${DISPATCH_API}/email/send`, {
+            await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
                 to: email,
                 subject: subject,
                 body: body,
                 event_id: event.id
-            });
+            }));
             sent++;
             console.log(`Schicht-Benachrichtigung gesendet an ${email}`);
         } catch (err) {
@@ -405,7 +412,7 @@ async function checkAndSendArbeitsplan(eventId, options = {}) {
     try {
         // Event-Daten mit Deadline und Versandstatus abrufen
         const eventResult = await pool.query(`
-            SELECT id, title, registration_deadline, arbeitsplan_sent_at, status
+            SELECT id, title, image_url, registration_deadline, arbeitsplan_sent_at, status
             FROM events WHERE id = $1
         `, [eventId]);
 
@@ -583,7 +590,7 @@ async function checkAndSendArbeitsplan(eventId, options = {}) {
             }
 
             try {
-                await axios.post(`${DISPATCH_API}/email/send`, {
+                await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
                     to: email,
                     subject: `Arbeitsplan - ${event.title}`,
                     body: `Guten Tag ${name},
@@ -601,7 +608,7 @@ Feuerwehrverein Raura`,
                         content: pdfBase64,
                         contentType: 'application/pdf'
                     }]
-                });
+                }));
                 sentCount++;
                 successEmails.push({ name, email });
                 console.log(`Arbeitsplan gesendet an ${email}`);
@@ -1431,12 +1438,12 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
                 const manageHint = organizer_id
                     ? `Du kannst das Event direkt in der Mitglieder-App unter "Organisieren" verwalten — Anmeldungen einsehen und genehmigen, Schichten und Details bearbeiten, Teilnehmerliste als PDF.`
                     : `Du kannst die Anmeldungen im Vorstand-Dashboard verwalten:\nhttps://fwv-raura.ch/vorstand.html`;
-                await axios.post(`${DISPATCH_API}/email/send`, {
+                await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(newEvent, {
                     to: organizer_email,
                     subject: `Du bist Organisator/in: ${title}`,
                     body: `Hallo ${organizer_name || 'Organisator/in'},\n\nDu wurdest als Organisator/in fuer das Event "${title}" eingetragen.\n\nDatum: ${start_date ? new Date(start_date).toLocaleDateString('de-CH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'wird noch mitgeteilt'}\nOrt: ${newEvent.location || 'wird noch mitgeteilt'}\n\n${manageHint}\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar.\n\nFreundliche Gruesse\nFeuerwehrverein Raura`,
                     event_id: newEvent.id
-                });
+                }));
                 console.log(`Organisator-Benachrichtigung gesendet an ${organizer_email}`);
             } catch (emailErr) {
                 console.error('Organisator-Benachrichtigung fehlgeschlagen:', emailErr.message);
@@ -1619,12 +1626,12 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
                     emailBody += `\n\nEventseite:\n${eventUrl}\n\nBei Fragen wende dich an den Aktuar (aktuar@fwv-raura.ch).\n\nFreundliche Gruesse\nFeuerwehrverein Raura`;
                 }
 
-                await axios.post(`${DISPATCH_API}/email/send`, {
+                await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(updatedEvent, {
                     to: newOrgEmail,
                     subject: `Du bist Organisator/in: ${updatedEvent.title}`,
                     body: emailBody,
                     event_id: updatedEvent.id
-                });
+                }));
                 console.log(`Organisator-Benachrichtigung gesendet an ${newOrgEmail} fuer Event "${updatedEvent.title}" (${isVorstand ? 'Vorstand' : 'mit Zugangsdaten'})`);
             } catch (emailErr) {
                 console.error('Organisator-Benachrichtigung fehlgeschlagen:', emailErr.message);
@@ -2356,7 +2363,7 @@ Mit freundlichen Grüssen
 Feuerwehrverein Raura
     `.trim();
     try {
-        await axios.post(`${DISPATCH_API}/email/send`, { to: email, subject: confirmSubject, body: confirmBody });
+        await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(ev, { to: email, subject: confirmSubject, body: confirmBody }));
     } catch (emailError) {
         console.error('Bestätigungs-E-Mail konnte nicht gesendet werden:', emailError.message);
     }
@@ -2623,11 +2630,11 @@ Mit freundlichen Grüssen
 Feuerwehrverein Raura
             `.trim();
             try {
-                await axios.post(`${DISPATCH_API}/email/send`, {
+                await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(ev, {
                     to: email,
                     subject: `Bitte bestätige deine Anmeldung – ${ev.title}${name ? ` (${name})` : ''}`,
                     body: optinBody
-                });
+                }));
             } catch (emailError) {
                 console.error('Opt-in-Bestätigungsmail fehlgeschlagen:', emailError.message);
             }
@@ -3495,7 +3502,7 @@ async function suggestAlternativeForRegistration(regId, payload, actor) {
     }
     const reg = regResult.rows[0];
 
-    const eventResult = await pool.query('SELECT title FROM events WHERE id = $1', [reg.event_id]);
+    const eventResult = await pool.query('SELECT title, image_url FROM events WHERE id = $1', [reg.event_id]);
     const eventTitle = eventResult.rows[0]?.title || 'Event';
 
     const acceptToken = crypto.randomUUID();
@@ -3549,11 +3556,11 @@ Bei Fragen kontaktiere uns bitte.
 Mit freundlichen Gruessen
 Feuerwehrverein Raura`;
 
-    await axios.post(`${DISPATCH_API}/email/send`, {
+    await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(eventResult.rows[0] || { title: eventTitle }, {
         to: email,
         subject: `Alternative Schicht vorgeschlagen - ${eventTitle}`,
         body: emailBody
-    });
+    }));
 
     if (reg.member_id) {
         pushToMember(
@@ -4501,7 +4508,7 @@ async function ensureArbeitsplanReminderSchema() {
 async function findDueArbeitsplanReminders() {
     const result = await pool.query(`
         WITH ev AS (
-            SELECT e.id, e.title, e.location, e.status, e.organizer_name,
+            SELECT e.id, e.title, e.image_url, e.location, e.status, e.organizer_name,
                    COALESCE(NULLIF(TRIM(e.organizer_email), ''), om.email) AS organizer_email,
                    e.arbeitsplan_reminder_sent_at,
                    LEAST(e.start_date::date,
@@ -4659,7 +4666,7 @@ async function sendArbeitsplanReminder(event, { dryRun = false } = {}) {
             if (dryRun) { perEmail.push(p); continue; }
 
             try {
-                await axios.post(`${DISPATCH_API}/email/send`, {
+                await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
                     to: p.email,
                     subject: `Arbeitsplan - ${event.title}`,
                     body: `Guten Tag ${p.name},
@@ -4677,7 +4684,7 @@ Mit freundlichen Grüssen
 Feuerwehrverein Raura`,
                     attachments: [attachment],
                     event_id: event.id
-                });
+                }));
                 perEmail.push(p);
                 logInfo('Arbeitsplan per E-Mail versendet', { eventId: event.id, email: p.email });
             } catch (err) {
@@ -4854,7 +4861,7 @@ async function notifyEventRegistrants(eventId, payload, authHeader) {
     if (!message || !String(message).trim()) {
         throw { status: 400, error: 'Nachricht (message) ist erforderlich' };
     }
-    const ev = await pool.query('SELECT id, title, slug, start_date, location FROM events WHERE id = $1', [eventId]);
+    const ev = await pool.query('SELECT id, title, slug, image_url, start_date, location FROM events WHERE id = $1', [eventId]);
     if (ev.rows.length === 0) throw { status: 404, error: 'Event nicht gefunden' };
     const event = ev.rows[0];
     const subj = (subject && String(subject).trim()) || `Änderung: ${event.title}`;
@@ -4897,9 +4904,9 @@ async function notifyEventRegistrants(eventId, payload, authHeader) {
                 }, fwd);
                 posted++;
             } else if (email) {
-                await axios.post(`${DISPATCH_API}/email/send`, {
+                await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
                     to: email, subject: subj, body, event_id: eventId
-                }, fwd);
+                }), fwd);
                 emailed++;
             } else {
                 skipped++;
@@ -5515,7 +5522,7 @@ app.post('/shifts/send-reminders', authenticateAny, requireRole('vorstand', 'adm
         toDate.setDate(toDate.getDate() + days_ahead);
 
         const shiftsResult = await pool.query(`
-            SELECT s.*, e.title as event_title, e.location, e.slug
+            SELECT s.*, e.title as event_title, e.image_url as event_image_url, e.location, e.slug
             FROM shifts s
             JOIN events e ON s.event_id = e.id
             WHERE s.date BETWEEN $1 AND $2
@@ -5578,12 +5585,12 @@ Feuerwehrverein Raura
                 `.trim();
 
                 try {
-                    await axios.post(`${DISPATCH_API}/email/send`, {
+                    await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo({ title: shift.event_title, image_url: shift.event_image_url }, {
                         to: email,
                         subject: subject,
                         body: body,
                         event_id: shift.event_id
-                    });
+                    }));
                     if (reg.member_id) {
                         pushToMember(reg.member_id, 'shift_reminder', subject,
                             `${shift.event_title} · ${dateStr} ${timeStr}`,
@@ -5619,7 +5626,7 @@ app.post('/shifts/cron-reminders', requireApiKey, async (req, res) => {
         const toDate = new Date(fromDate);
 
         const shiftsResult = await pool.query(`
-            SELECT s.*, e.title as event_title, e.location, e.slug
+            SELECT s.*, e.title as event_title, e.image_url as event_image_url, e.location, e.slug
             FROM shifts s
             JOIN events e ON s.event_id = e.id
             WHERE s.date = $1
@@ -5678,12 +5685,12 @@ Feuerwehrverein Raura
                 `.trim();
 
                 try {
-                    await axios.post(`${DISPATCH_API}/email/send`, {
+                    await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo({ title: shift.event_title, image_url: shift.event_image_url }, {
                         to: email,
                         subject: subject,
                         body: body,
                         event_id: shift.event_id
-                    }, {
+                    }), {
                         headers: { 'x-api-key': process.env.API_KEY }
                     });
                     if (reg.member_id) {
@@ -6115,6 +6122,7 @@ app.post('/reminders/send-daily', async (req, res) => {
                 s.bereich,
                 e.id as event_id,
                 e.title as event_title,
+                e.image_url as event_image_url,
                 e.location as event_location
             FROM shifts s
             JOIN events e ON s.event_id = e.id
@@ -6202,12 +6210,12 @@ Feuerwehrverein Raura
                         continue;
                     }
 
-                    await axios.post(`${DISPATCH_API}/email/send`, {
+                    await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo({ title: shift.event_title, image_url: shift.event_image_url }, {
                         to: email,
                         subject: subject,
                         body: body,
                         event_id: shift.event_id
-                    });
+                    }));
                     if (reg.member_id) {
                         pushToMember(reg.member_id, 'shift_reminder', subject,
                             `${shift.event_title} · ${dateFormatted} ${startTime}-${endTime}`,
@@ -6336,6 +6344,7 @@ app.post('/reminders/send', authenticateAny, requireRole('vorstand', 'admin'), a
                 s.bereich,
                 e.id as event_id,
                 e.title as event_title,
+                e.image_url as event_image_url,
                 e.location as event_location
             FROM shifts s
             JOIN events e ON s.event_id = e.id
@@ -6413,12 +6422,12 @@ Feuerwehrverein Raura
                 `.trim();
 
                 try {
-                    await axios.post(`${DISPATCH_API}/email/send`, {
+                    await axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo({ title: shift.event_title, image_url: shift.event_image_url }, {
                         to: email,
                         subject: subject,
                         body: body,
                         event_id: shift.event_id
-                    });
+                    }));
 
                     await pool.query(`
                         INSERT INTO shift_reminders (registration_id, shift_id, reminder_type, email)
