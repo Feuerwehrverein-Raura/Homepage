@@ -1,7 +1,12 @@
-// Reiter "Roter Schopf" mit zwei Unter-Reitern:
+// Reiter "Roter Schopf" - alles, was das Lokal betrifft:
 //
 //   Lampen       die zwei Lichtgruppen, darunter jede Lampe einzeln
 //   Temperaturen Tiefkuehler und Heizkoerper-Thermostat
+//   Musik        den Laptop im Lokal fernbedienen (mit [musik])
+//
+// Oben rechts der Bildschirm des Laptops (mit [bildschirm]). Hoeren auf dem
+// Handy und Playlists zusammenstellen bleiben unter "Mehr" (fuer alle
+// Mitglieder).
 //
 // Vorbild: die Lichtseite des Kiosk-Laptops im Lokal (roterschopf-kiosk).
 // Jeder Unter-Reiter laedt selbst (eigene LadeAnsicht), damit Herunterziehen
@@ -18,12 +23,27 @@ import 'package:fwv_anlass/fwv_anlass.dart'
 import 'package:material_ui/material_ui.dart';
 
 import '../modelle.dart';
+import '../musik/laptop.dart';
+import '../musik/zugang.dart';
 import '../zugang.dart';
 
 class RoterSchopfScreen extends StatefulWidget {
-  const RoterSchopfScreen({super.key, required this.zugang, this.auffrischen, this.hinweis});
+  const RoterSchopfScreen({
+    super.key,
+    required this.zugang,
+    this.auffrischen,
+    this.hinweis,
+    this.musik,
+    this.bildschirm,
+  });
 
   final RoterSchopfZugang zugang;
+
+  /// Unter-Reiter "Musik": Fernbedienung des Laptops im Lokal.
+  final MusikZugang? musik;
+
+  /// Knopf oben rechts: Bildschirm des Laptops oeffnen.
+  final VoidCallback? bildschirm;
 
   /// Zeile oben, z.B. "Fuer deine Schicht Bar bis 01:00" (Zugang nur wegen
   /// der Schicht).
@@ -90,15 +110,25 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final musik = widget.musik;
     return DefaultTabController(
-      length: 2,
+      length: musik == null ? 2 : 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Roter Schopf'),
+          actions: [
+            if (widget.bildschirm != null)
+              IconButton(
+                tooltip: 'Bildschirm Roter Schopf',
+                icon: const Icon(Icons.desktop_windows_outlined),
+                onPressed: widget.bildschirm,
+              ),
+          ],
           bottom: reiterAufRot(
-            tabs: const [
-              Tab(text: 'Lampen'),
-              Tab(text: 'Temperaturen'),
+            tabs: [
+              const Tab(text: 'Lampen'),
+              const Tab(text: 'Temperaturen'),
+              if (musik != null) const Tab(text: 'Musik'),
             ],
           ),
         ),
@@ -132,6 +162,7 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
         laden: widget.zugang.zustand,
         bauen: (context, z, _) => _temperaturSeite(context, z),
       ),
+      if (widget.musik != null) LaptopSeite(zugang: widget.musik!),
     ],
   );
 

@@ -234,4 +234,32 @@ void main() {
     await starten(tester, mitGruppen(['Roter Schopf']));
     expect(anfragen.where((a) => a.url.path == '/kiosk/roter-schopf/zugang'), isEmpty);
   });
+
+  testWidgets('Schopf buendelt alles: Musik-Reiter und Bildschirm; Mehr ohne Doppel', (
+    tester,
+  ) async {
+    await starten(tester, mitGruppen(['Roter Schopf']));
+    await tester.tap(reiter('Schopf'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Tab, 'Musik'), findsOneWidget);
+    expect(find.byTooltip('Bildschirm Roter Schopf'), findsOneWidget);
+
+    // Unter "Mehr": Musik (Hoeren, Playlists) bleibt, der Bildschirm nicht.
+    await tester.tap(reiter('Mehr'));
+    await tester.pumpAndSettle();
+    expect(find.text('Musik im Roten Schopf'), findsOneWidget);
+    expect(find.text('Bildschirm Roter Schopf'), findsNothing);
+  });
+
+  testWidgets('Ohne Schopf-Reiter: Bildschirm bleibt unter Mehr', (tester) async {
+    await starten(tester, mitGruppen(['Mitglieder']));
+    await tester.tap(reiter('Mehr'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Bildschirm Roter Schopf'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Bildschirm Roter Schopf'), findsOneWidget);
+  });
 }

@@ -1,5 +1,5 @@
 // Reiter "Profil": eigene Angaben aus `GET members/me`, Bearbeiten, Meine
-// Anmeldungen und Austritt. Wie members-android ProfileFragment und
+// Anmeldungen, Konto (Benachrichtigungen, Zugaenge, VPN) und Austritt. Wie members-android ProfileFragment und
 // members-ios ProfileView.
 
 import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
@@ -10,6 +10,9 @@ import 'package:material_ui/material_ui.dart';
 import '../anlaesse/meine_anmeldungen_screen.dart';
 import '../dienste.dart';
 import '../gemeinsam.dart';
+import '../einstellungen/benachrichtigungen_screen.dart';
+import '../einstellungen/vpn_screen.dart';
+import '../einstellungen/zugaenge_screen.dart';
 import 'austritt_screen.dart';
 import 'profil_bearbeiten_screen.dart';
 
@@ -149,6 +152,28 @@ class _ProfilTabState extends State<ProfilTab> {
           ),
         ),
         ..._ausleihe(context),
+        // Was zum eigenen Konto gehoert - frueher unter "Mehr".
+        const Abschnitt('Konto'),
+        ListTile(
+          leading: const Icon(Icons.notifications_outlined),
+          title: const Text('Benachrichtigungen'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _oeffnen(BenachrichtigungenScreen(dienste: widget.dienste)),
+        ),
+        ListTile(
+          leading: const Icon(Icons.key_outlined),
+          title: const Text('Zugänge'),
+          subtitle: const Text('Funktions-Mails, Cloud, geteilte Konten'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _oeffnen(ZugaengeScreen(dienste: widget.dienste)),
+        ),
+        ListTile(
+          leading: const Icon(Icons.vpn_key_outlined),
+          title: const Text('VPN-Zugang'),
+          subtitle: const Text('Gerät mit dem Vereinsnetz verbinden'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => _oeffnen(VpnScreen(dienste: widget.dienste)),
+        ),
         const Divider(height: 32),
         ListTile(
           leading: Icon(Icons.exit_to_app, color: Theme.of(context).colorScheme.error),
@@ -193,6 +218,9 @@ class _ProfilTabState extends State<ProfilTab> {
       ),
     ];
   }
+
+  void _oeffnen(Widget seite) =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => seite));
 
   Widget _zeile(IconData symbol, String titel, String? wert) {
     if (wert == null || wert.isEmpty) return const SizedBox.shrink();

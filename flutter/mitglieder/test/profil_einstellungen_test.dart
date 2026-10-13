@@ -423,7 +423,7 @@ void main() {
       tester,
     ) async {
       await starten(tester);
-      await reiter(tester, 'Mehr');
+      await reiter(tester, 'Profil');
       await tippen(tester, find.text('VPN-Zugang'));
       expect(find.text('laptop'), findsOneWidget);
       expect(find.text('10.20.0.7 · noch nie verbunden'), findsOneWidget);
@@ -552,7 +552,7 @@ void main() {
         {'notification_type': 'general', 'enabled': false},
       ];
       await starten(tester);
-      await reiter(tester, 'Mehr');
+      await reiter(tester, 'Profil');
       await tippen(tester, find.text('Benachrichtigungen'));
 
       SwitchListTile schalter(String art) =>
@@ -592,7 +592,7 @@ void main() {
       );
 
       await starten(tester);
-      await reiter(tester, 'Mehr');
+      await reiter(tester, 'Profil');
       await tippen(tester, find.text('Zugänge'));
 
       expect(find.text('kassier@fwv-raura.ch'), findsOneWidget);
@@ -734,7 +734,7 @@ void main() {
     await tippen(tester, find.byTooltip('Profil bearbeiten'));
     await tester.tap(find.byTooltip('Zurück'));
     await tester.pumpAndSettle();
-    await reiter(tester, 'Mehr');
+    await reiter(tester, 'Profil');
     await tippen(tester, find.text('Zugänge'));
     await tippen(tester, find.text('Passwort ändern'));
     expect(tester.takeException(), isNull);

@@ -17,11 +17,8 @@ import '../dienste.dart';
 import '../gemeinsam.dart';
 import '../hauptseite.dart';
 import 'adressbuch.dart';
-import 'benachrichtigungen_screen.dart';
 import 'bildschirm.dart';
 import 'gruppen_screen.dart';
-import 'vpn_screen.dart';
-import 'zugaenge_screen.dart';
 
 class EinstellungenTab extends StatefulWidget {
   const EinstellungenTab({super.key, required this.dienste});
@@ -110,48 +107,25 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
             subtitle: Text(mitglied ? 'Angemeldet als' : 'Angemeldet als Externer Organisator'),
           ),
           if (mitglied) ...[
-            const Abschnitt('Konto'),
-            ListTile(
-              leading: const Icon(Icons.notifications_outlined),
-              title: const Text('Benachrichtigungen'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _oeffnen(BenachrichtigungenScreen(dienste: _d)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.key_outlined),
-              title: const Text('Zugänge'),
-              subtitle: const Text('Funktions-Mails, Cloud, geteilte Konten'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _oeffnen(ZugaengeScreen(dienste: _d)),
-            ),
-            ListTile(
-              leading: const Icon(Icons.vpn_key_outlined),
-              title: const Text('VPN-Zugang'),
-              subtitle: const Text('Gerät mit dem Vereinsnetz verbinden'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _oeffnen(VpnScreen(dienste: _d)),
-            ),
+            // Benachrichtigungen, Zugaenge und VPN stehen im Profil (Konto).
             const Abschnitt('Roter Schopf'),
             ListTile(
               leading: const Icon(Icons.queue_music),
               title: const Text('Musik im Roten Schopf'),
-              subtitle: const Text('Hören, Playlists, Radio – und den Laptop steuern'),
+              subtitle: const Text('Hören, Playlists und Radio'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => _oeffnen(
-                MusikScreen(
-                  zugang: _d.musik,
-                  player: _d.musikPlayer,
-                  laptopSteuern: _d.roterSchopfSichtbar,
-                ),
+              // Den Laptop fernbedienen gibt es im Reiter "Schopf".
+              onTap: () => _oeffnen(MusikScreen(zugang: _d.musik, player: _d.musikPlayer)),
+            ),
+            // Mit Reiter "Schopf" steht der Bildschirm dort.
+            if (!_d.roterSchopfSichtbar)
+              ListTile(
+                leading: const Icon(Icons.desktop_windows_outlined),
+                title: const Text('Bildschirm Roter Schopf'),
+                subtitle: const Text('Live sehen, ob die Musik läuft'),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => bildschirmOeffnen(context, _d),
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.desktop_windows_outlined),
-              title: const Text('Bildschirm Roter Schopf'),
-              subtitle: const Text('Live sehen, ob die Musik läuft'),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () => bildschirmOeffnen(context, _d),
-            ),
             if (darfGruppenVerwalten(sitzung)) ...[
               const Abschnitt('Vorstand'),
               ListTile(

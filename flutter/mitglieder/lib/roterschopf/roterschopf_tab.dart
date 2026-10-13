@@ -8,6 +8,7 @@ import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
+import '../einstellungen/bildschirm.dart';
 
 class RoterSchopfTab extends StatelessWidget {
   const RoterSchopfTab({super.key, required this.dienste});
@@ -21,6 +22,9 @@ class RoterSchopfTab extends StatelessWidget {
       zugang: dienste.roterSchopf,
       auffrischen: dienste.roterSchopfTakt,
       hinweis: schichtHinweis(dienste.schopfPruefung.schicht),
+      // Alles zum Lokal an einem Ort: Musik am Laptop und sein Bildschirm.
+      musik: dienste.musik,
+      bildschirm: () => bildschirmOeffnen(context, dienste),
     ),
   );
 }
