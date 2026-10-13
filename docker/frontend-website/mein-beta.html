@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mein Portal (Beta) - Feuerwehrverein Raura</title>
-    <!-- DEUTSCH: Die neue Fassung von "Mein Portal": die Mitglieder-App
-         (Flutter Web, flutter/mitglieder) eingebettet in die Website. Kopf
-         bleibt der der Website, darunter zeichnet die App in #fwv-app.
+    <title>Mein Bereich (Beta) - Feuerwehrverein Raura</title>
+    <!-- DEUTSCH: Die neue Fassung von "Mein Bereich": die Mitglieder-App
+         (Flutter Web, flutter/mitglieder) eingebettet in die Website. Kopf wie
+         events.html (weiss, Logo), darunter zeichnet die App in #fwv-app - so
+         bleibt deren rote Leiste die einzige rote Flaeche. Auf breiten
+         Bildschirmen steht die App als Karte in der Mitte.
          Gebaut wird sie nach /mein/ (build-containers.yml). Anmeldung und
          Token teilt sie mit der Website (auth-callback.html, auth_token).
          Laeuft parallel zu mein.html, bis die neue Fassung uebernimmt. -->
@@ -27,31 +29,53 @@
         }
     </script>
     <style>
-        /* DEUTSCH: Die App fuellt den Rest des Fensters unter Kopf und Hinweis.
+        /* DEUTSCH: Die App fuellt den Rest des Fensters unter dem Kopf.
            dvh statt vh: auf dem Handy ohne die ein- und ausfahrende Adressleiste. */
         html, body { height: 100%; }
-        body { display: flex; flex-direction: column; }
-        #fwv-app { flex: 1 1 auto; min-height: 0; position: relative; }
+        body { display: flex; flex-direction: column; height: 100dvh; }
+        #rahmen { flex: 1 1 auto; min-height: 0; display: flex; }
+        #fwv-app { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; }
+        /* DEUTSCH: Ab Tablet-Breite als Karte, hoechstens 960 px breit. */
+        @media (min-width: 768px) {
+            #rahmen { padding: 1.25rem 1rem; }
+            #fwv-app {
+                max-width: 960px; margin: 0 auto; width: 100%;
+                border-radius: 0.75rem;
+                box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.08);
+            }
+        }
     </style>
 </head>
-<body class="bg-gray-50" style="height: 100dvh;">
-    <nav class="bg-fire-700 text-white shadow-lg flex-none">
+<body class="bg-gray-100">
+    <nav class="bg-white shadow-sm flex-none relative z-10">
         <div class="container mx-auto px-4">
-            <div class="flex items-center justify-between h-14">
-                <a href="index.html" class="text-xl font-bold">Mein Portal</a>
-                <div class="flex space-x-4 items-center text-sm">
-                    <a href="index.html" class="hover:text-fire-200 transition-colors">Website</a>
-                    <a href="events.html" class="hidden sm:inline hover:text-fire-200 transition-colors">Veranstaltungen</a>
+            <div class="flex items-center justify-between h-14 md:h-16">
+                <a href="index.html" class="flex items-center space-x-2 md:space-x-3 min-w-0">
+                    <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="h-9 md:h-12 w-auto">
+                    <span class="font-bold text-fire-700 truncate">
+                        <span class="md:hidden text-lg">FWV Raura</span>
+                        <span class="hidden md:inline text-xl">Feuerwehrverein Raura</span>
+                    </span>
+                </a>
+                <div class="flex items-center space-x-4 md:space-x-6 text-sm md:text-base flex-none">
+                    <a href="index.html" class="hidden md:inline text-gray-700 hover:text-fire-600 transition-colors">Home</a>
+                    <a href="events.html" class="hidden md:inline text-gray-700 hover:text-fire-600 transition-colors">Veranstaltungen</a>
+                    <a href="calendar.html" class="hidden md:inline text-gray-700 hover:text-fire-600 transition-colors">Kalender</a>
+                    <span class="text-fire-600 font-semibold hidden md:inline">Mein Bereich</span>
+                    <!-- DEUTSCH: Beta-Hinweis als Abzeichen statt eigener Zeile; fuehrt zurueck zum bisherigen Portal. -->
+                    <a href="mein.html" title="Neue Fassung, dieselbe wie die App. Hier geht es zum bisherigen Portal."
+                       class="inline-flex items-center space-x-1 rounded-full bg-fire-50 text-fire-700 px-2.5 py-1 text-xs font-medium hover:bg-fire-100 transition-colors">
+                        <span class="font-semibold">Beta</span>
+                        <span class="text-fire-600">· Altes Portal</span>
+                    </a>
                 </div>
             </div>
         </div>
     </nav>
-    <div class="bg-fire-50 text-fire-900 text-xs sm:text-sm px-4 py-1 text-center flex-none">
-        Neue Fassung (Beta) – dieselbe wie die App.
-        <a href="mein.html" class="underline">Zum bisherigen Portal</a>
-    </div>
 
-    <div id="fwv-app"></div>
+    <div id="rahmen">
+        <div id="fwv-app"></div>
+    </div>
 
     <script src="mein/flutter_bootstrap.js" async></script>
 </body>

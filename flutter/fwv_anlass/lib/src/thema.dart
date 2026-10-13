@@ -104,6 +104,10 @@ ThemeData fwvThema() {
       elevation: 0,
       scrolledUnderElevation: 2,
       systemOverlayStyle: SystemUiOverlayStyle.light,
+      // Titel immer links. Sonst zentriert Flutter auf iPhone, Mac und im
+      // Browser auf Apple-Geraeten nur Leisten mit hoechstens einem Knopf -
+      // "Anlaesse" stand links, "Profil" in der Mitte.
+      centerTitle: false,
     ),
     // Untere Leiste weiss, Auswahl rot (alte BottomNavigationView).
     navigationBarTheme: NavigationBarThemeData(
