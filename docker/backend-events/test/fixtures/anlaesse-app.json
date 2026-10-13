@@ -26,7 +26,9 @@
         "plaetze_frei": null,
         "plaetze_text": null
       },
-      "kann_bearbeiten": false
+      "kann_bearbeiten": false,
+      "logo": null,
+      "reihe": null
     },
     "shifts": []
   },
@@ -57,7 +59,9 @@
         "plaetze_frei": null,
         "plaetze_text": null
       },
-      "kann_bearbeiten": false
+      "kann_bearbeiten": false,
+      "logo": "https://www.fwv-raura.ch/images/anlaesse/chilbi.png",
+      "reihe": "chilbi"
     },
     "shifts": [
       {
@@ -155,7 +159,9 @@
         "plaetze_frei": 9,
         "plaetze_text": "9 Plätze frei"
       },
-      "kann_bearbeiten": false
+      "kann_bearbeiten": false,
+      "logo": null,
+      "reihe": null
     },
     "shifts": []
   },
@@ -186,7 +192,9 @@
         "plaetze_frei": 0,
         "plaetze_text": "voll"
       },
-      "kann_bearbeiten": false
+      "kann_bearbeiten": false,
+      "logo": null,
+      "reihe": null
     },
     "shifts": []
   },
@@ -217,7 +225,9 @@
         "plaetze_frei": null,
         "plaetze_text": null
       },
-      "kann_bearbeiten": false
+      "kann_bearbeiten": false,
+      "logo": null,
+      "reihe": null
     },
     "shifts": []
   },
@@ -248,7 +258,9 @@
         "plaetze_frei": null,
         "plaetze_text": null
       },
-      "kann_bearbeiten": false
+      "kann_bearbeiten": false,
+      "logo": null,
+      "reihe": null
     },
     "shifts": []
   },
@@ -279,7 +291,9 @@
         "plaetze_frei": null,
         "plaetze_text": null
       },
-      "kann_bearbeiten": false
+      "kann_bearbeiten": false,
+      "logo": null,
+      "reihe": null
     },
     "shifts": []
   }

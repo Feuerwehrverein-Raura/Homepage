@@ -35,7 +35,9 @@
           "plaetze_frei": null,
           "plaetze_text": null
         },
-        "kann_bearbeiten": true
+        "kann_bearbeiten": true,
+        "logo": "https://www.fwv-raura.ch/images/anlaesse/chilbi.png",
+        "reihe": "chilbi"
       },
       "organisator": {
         "aktuell": true,
@@ -293,7 +295,9 @@
           "plaetze_frei": 0,
           "plaetze_text": "voll"
         },
-        "kann_bearbeiten": true
+        "kann_bearbeiten": true,
+        "logo": null,
+        "reihe": null
       },
       "organisator": {
         "aktuell": true,

@@ -14,6 +14,7 @@
 // "jetzt" werden deshalb ausdruecklich in Europe/Zurich bestimmt.
 
 const { bereichLesbar } = require('./arbeitsplan');
+const { anlassLogo, anlassReihe } = require('./anlass-logo');
 
 // Kategorien, bei denen eine Anmeldung noetig ist. Stand bisher doppelt in
 // den Apps (members-android OrganizerEditEventActivity, members-ios
@@ -231,7 +232,11 @@ function anlassAnsicht(event, { belegtePersonen = 0, kannBearbeiten = false, zei
                 plaetze_frei: plaetzeFrei,
                 plaetze_text: plaetzeFrei === null ? null : plaetzeText(plaetzeFrei)
             },
-            kann_bearbeiten: !!kannBearbeiten
+            kann_bearbeiten: !!kannBearbeiten,
+            // Logo der Reihe (Fasnacht, Chilbi, ...) oder eigenes Bild; null
+            // = keines (src/anlass-logo.js).
+            logo: anlassLogo(event),
+            reihe: anlassReihe(event)?.reihe || null
         }
     };
 }
