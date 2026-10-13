@@ -2606,7 +2606,7 @@ app.get('/members/directory', authenticateToken, async (req, res) => {
         const result = await pool.query(
             `SELECT id, vorname, nachname, email, mobile, telefon, funktion
              FROM members
-             WHERE COALESCE(status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt')
+             WHERE COALESCE(status, '') NOT IN ('Ausgetreten', 'Austritt_beantragt', 'Testkonto')
                AND COALESCE(vorname, '') <> ''
                AND COALESCE(nachname, '') <> ''
              ORDER BY nachname, vorname`
@@ -4500,7 +4500,9 @@ app.get('/members/stats/overview', authenticateAny, async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT
-                COUNT(*) as total,
+                -- Testkonten (z.B. der Zugang fuer die Google-Play-Pruefung)
+                -- sind keine Mitglieder.
+                COUNT(*) FILTER (WHERE status IS DISTINCT FROM 'Testkonto') as total,
                 COUNT(*) FILTER (WHERE status = 'Aktivmitglied') as aktiv,
                 COUNT(*) FILTER (WHERE status = 'Passivmitglied') as passiv,
                 COUNT(*) FILTER (WHERE status = 'Aufnahme pendent') as pendent,
