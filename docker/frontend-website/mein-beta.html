@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mein Portal (Beta) - Feuerwehrverein Raura</title>
+    <!-- DEUTSCH: Die neue Fassung von "Mein Portal": die Mitglieder-App
+         (Flutter Web, flutter/mitglieder) eingebettet in die Website. Kopf
+         bleibt der der Website, darunter zeichnet die App in #fwv-app.
+         Gebaut wird sie nach /mein/ (build-containers.yml). Anmeldung und
+         Token teilt sie mit der Website (auth-callback.html, auth_token).
+         Laeuft parallel zu mein.html, bis die neue Fassung uebernimmt. -->
+    <link rel="icon" type="image/png" href="mein/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fire: {
+                            50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171',
+                            500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* DEUTSCH: Die App fuellt den Rest des Fensters unter Kopf und Hinweis.
+           dvh statt vh: auf dem Handy ohne die ein- und ausfahrende Adressleiste. */
+        html, body { height: 100%; }
+        body { display: flex; flex-direction: column; }
+        #fwv-app { flex: 1 1 auto; min-height: 0; position: relative; }
+    </style>
+</head>
+<body class="bg-gray-50" style="height: 100dvh;">
+    <nav class="bg-fire-700 text-white shadow-lg flex-none">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-14">
+                <a href="index.html" class="text-xl font-bold">Mein Portal</a>
+                <div class="flex space-x-4 items-center text-sm">
+                    <a href="index.html" class="hover:text-fire-200 transition-colors">Website</a>
+                    <a href="events.html" class="hidden sm:inline hover:text-fire-200 transition-colors">Veranstaltungen</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="bg-fire-50 text-fire-900 text-xs sm:text-sm px-4 py-1 text-center flex-none">
+        Neue Fassung (Beta) – dieselbe wie die App.
+        <a href="mein.html" class="underline">Zum bisherigen Portal</a>
+    </div>
+
+    <div id="fwv-app"></div>
+
+    <script src="mein/flutter_bootstrap.js" async></script>
+</body>
+</html>

@@ -60,3 +60,6 @@ members-*.apk
 vorstand-*.aab
 vorstand-*.apk
 __pycache__/
+
+# Mitglieder-App im Browser: baut das CI (build-containers.yml) nach mein/
+docker/frontend-website/mein/

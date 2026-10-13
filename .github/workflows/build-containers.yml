@@ -103,6 +103,8 @@ jobs:
               - 'docker/backend-accounting/**'
             frontend-website:
               - 'docker/frontend-website/**'
+              # Die Mitglieder-App im Browser wird mitgebaut (mein/).
+              - 'flutter/**'
             frontend-pdf-designer:
               - 'docker/frontend-pdf-designer/**'
             wiki-docs:
@@ -253,6 +255,23 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+
+      # Die Mitglieder-App im Browser (flutter/mitglieder, eingebettet in
+      # mein-beta.html): nach docker/frontend-website/mein/ bauen, bevor das
+      # nginx-Image entsteht. Gleiche Flutter-Version wie flutter-apps.yml.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Mitglieder-App fuer das Web bauen
+        working-directory: flutter/mitglieder
+        run: |
+          flutter build web --release --base-href /mein/ --no-web-resources-cdn
+          rm -f build/web/*.symbols build/web/canvaskit/*.symbols build/web/canvaskit/*/*.symbols
+          rm -rf ../../docker/frontend-website/mein
+          cp -R build/web ../../docker/frontend-website/mein
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3

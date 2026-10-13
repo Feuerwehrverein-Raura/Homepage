@@ -8,6 +8,7 @@
 // angemeldet ist, die Version und Abmelden. Vorstand und admin sehen
 // zusaetzlich "Gruppen verwalten" (Authentik-Gruppen, gruppen_screen.dart).
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
@@ -16,6 +17,7 @@ import 'package:material_ui/material_ui.dart';
 import '../dienste.dart';
 import '../gemeinsam.dart';
 import '../hauptseite.dart';
+import '../web/browser.dart' show websiteAbmelden;
 import 'adressbuch.dart';
 import 'bildschirm.dart';
 import 'gruppen_screen.dart';
@@ -93,6 +95,8 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
   Future<void> _abmeldenTippen() async {
     setState(() => _abmelden = true);
     await _d.sitzung.abmelden();
+    // Im Browser wie mein.html auch die Authentik-Sitzung beenden.
+    if (kIsWeb) websiteAbmelden();
     if (mounted) setState(() => _abmelden = false);
   }
 
@@ -168,7 +172,9 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
               ),
             ),
             const Abschnitt('Adressbuch'),
-            if (_d.plattform == Plattform.ios)
+            // Den Kontakt-Abgleich gibt es nur auf Android (eigener Kanal);
+            // sonst (iOS, Browser) das Adressbuch ueber CardDAV.
+            if (_d.plattform != Plattform.android)
               ListTile(
                 leading: const Icon(Icons.contacts_outlined),
                 title: const Text('Mitglieder-Adressbuch einrichten'),

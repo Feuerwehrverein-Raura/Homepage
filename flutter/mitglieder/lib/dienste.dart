@@ -24,6 +24,7 @@ import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
 import 'roterschopf/schopf_pruefung.dart';
 import 'push/push_dienst.dart';
+import 'web/browser.dart';
 
 /// Datei teilen: Inhalt, Dateiname, MIME-Typ und (fuer iPad) die Stelle,
 /// an der das Teilen-Menue erscheint.
@@ -85,9 +86,11 @@ class Dienste {
     sitzung.beiNeuemToken = _tokenAnKontakteGeben;
   }
 
-  /// Die echte App: Geraete-Schluesselbund, echtes Backend, Firebase.
+  /// Die echte App: Geraete-Schluesselbund, echtes Backend, Firebase. Im
+  /// Browser statt dessen localStorage und die Anmeldung der Website
+  /// (web/browser.dart).
   factory Dienste.echt() {
-    final geheim = SichererSpeicher();
+    final geheim = kIsWeb ? browserSpeicher() : SichererSpeicher();
     final speicher = SitzungsSpeicher(geheim);
     final push = FirebasePush();
     const kontakte = KontakteAbgleich();
@@ -99,7 +102,7 @@ class Dienste {
     );
     return dienste = Dienste(
       sitzung: sitzung,
-      authentik: AppAuthAnmeldung(),
+      authentik: kIsWeb ? websiteAnmeldung() : AppAuthAnmeldung(),
       uebernahme: AltdatenUebernahme(
         quelle: const MethodChannelAltdatenQuelle(),
         speicher: speicher,
@@ -107,7 +110,7 @@ class Dienste {
       speicher: geheim,
       push: push,
       kontakte: kontakte,
-      update: Platform.isAndroid
+      update: !kIsWeb && Platform.isAndroid
           ? AndroidAppUpdate(appVersion: _appVersionAusPaket)
           : const KeinAppUpdate(),
       schopfPruefTakt: const Duration(minutes: 10),
