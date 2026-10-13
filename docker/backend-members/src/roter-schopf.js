@@ -59,11 +59,11 @@ const VORGABE = {
         }
     ],
     kuehlung: [
-        { name: 'Tiefkühlschrank Eis', adresse: '192.168.88.76', grenze: -12 },
-        { name: 'Tiefkühlschrank Landi', adresse: '192.168.88.71', grenze: -12 }
+        { kennung: 'eis', name: 'Tiefkühlschrank Eis', adresse: '192.168.88.76', grenze: -12 },
+        { kennung: 'landi', name: 'Tiefkühlschrank Landi', adresse: '192.168.88.71', grenze: -12 }
     ],
     thermostate: [
-        { name: 'Heizkörper', geraet: '192.168.33.31', id: 200 }
+        { kennung: 'heizkoerper', name: 'Heizkörper', geraet: '192.168.33.31', id: 200 }
     ]
 };
 
@@ -172,6 +172,8 @@ function roterSchopf({
         const temp = st && st['temperature:100'] ? st['temperature:100'].tC : null;
         const t = typeof temp === 'number' ? temp : null;
         return {
+            // Fuer den Verlauf: GET /kiosk/roter-schopf/verlauf?messstelle=kuehler:<kennung>
+            messstelle: `kuehler:${g.kennung}`,
             name: g.name,
             erreichbar: !!st,
             temperatur: t,
@@ -190,18 +192,27 @@ function roterSchopf({
         const em = await rpc(zentrale, 'EM.GetStatus', { id: 0 });
         const daten = em ? await rpc(zentrale, 'EMData.GetStatus', { id: 0 }) : null;
         const zahl = (v, stellen = 0) => (typeof v === 'number' ? Number(v.toFixed(stellen)) : null);
-        if (!em) return { erreichbar: false, leistung_w: null, phasen: [], zaehler_kwh: null };
+        if (!em) return { messstelle: 'hauptmessung', erreichbar: false, leistung_w: null, phasen: [], zaehler_kwh: null };
+        const kwh = v => (daten && typeof daten[v] === 'number' ? zahl(daten[v] / 1000, 2) : null);
         return {
+            messstelle: 'hauptmessung',
             erreichbar: true,
             leistung_w: zahl(em.total_act_power),
+            scheinleistung_va: zahl(em.total_aprt_power),
             strom_a: zahl(em.total_current, 2),
             phasen: ['a', 'b', 'c'].map((p, i) => ({
                 name: `L${i + 1}`,
                 spannung_v: zahl(em[`${p}_voltage`], 1),
                 strom_a: zahl(em[`${p}_current`], 2),
-                leistung_w: zahl(em[`${p}_act_power`])
+                leistung_w: zahl(em[`${p}_act_power`]),
+                scheinleistung_va: zahl(em[`${p}_aprt_power`]),
+                leistungsfaktor: zahl(em[`${p}_pf`], 2),
+                frequenz_hz: zahl(em[`${p}_freq`], 1),
+                zaehler_kwh: kwh(`${p}_total_act_energy`),
+                rueckspeisung_kwh: kwh(`${p}_total_act_ret_energy`)
             })),
-            zaehler_kwh: daten && typeof daten.total_act === 'number' ? zahl(daten.total_act / 1000, 1) : null
+            zaehler_kwh: kwh('total_act'),
+            rueckspeisung_kwh: kwh('total_act_ret')
         };
     }
 
@@ -210,6 +221,7 @@ function roterSchopf({
         const st = port ? await rpc(`${zentrale}:${port}`, 'BluTrv.GetStatus', { id: t.id }) : null;
         const zahl = v => (typeof v === 'number' ? v : null);
         return {
+            messstelle: `heizung:${t.kennung}`,
             name: t.name,
             // Gateway antwortet UND das Thermostat ist per Bluetooth verbunden.
             erreichbar: !!st && st.connected !== false,

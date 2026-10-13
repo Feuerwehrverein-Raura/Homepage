@@ -18,7 +18,8 @@ const admin = require('firebase-admin');
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
-const { roterSchopf, hatRoterSchopfZugang } = require('./roter-schopf');
+const { roterSchopf, hatRoterSchopfZugang, VORGABE: ROTER_SCHOPF_VORGABE } = require('./roter-schopf');
+const { schopfVerlauf, grenzenAus } = require('./schopf-verlauf');
 const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
 const { schichtZugang, alleAktiven, wer } = require('./schicht-zugang');
 const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
@@ -6695,6 +6696,13 @@ app.delete('/kiosk/sender/:id', authenticateToken, async (req, res) => {
 
 const roterSchopfDienst = roterSchopf();
 
+// Verlauf fuer die Diagramme: alle 5 min aus demselben Zustand mitschreiben
+// (src/schopf-verlauf.js).
+const schopfVerlaufDienst = schopfVerlauf({
+    pool, zustand: () => roterSchopfDienst.zustand(), grenzen: grenzenAus(ROTER_SCHOPF_VORGABE)
+});
+schopfVerlaufDienst.starten();
+
 // Wer gerade Schicht hat (1 h vorher bis 1 h nachher), darf auch ohne die
 // Gruppe - geprueft bei jedem Zugriff, siehe src/schicht-zugang.js.
 const schichtPruefung = schichtZugang(pool);
@@ -6732,6 +6740,18 @@ app.get('/kiosk/roter-schopf/zugang', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('GET /kiosk/roter-schopf/zugang:', error.message);
         res.status(500).json({ error: 'Zugang konnte nicht geprueft werden' });
+    }
+});
+
+// ?messstelle=kuehler:eis|kuehler:landi|heizung:heizkoerper|hauptmessung&zeitraum=24h|7d|30d|1j
+app.get('/kiosk/roter-schopf/verlauf', authenticateToken, roterSchopfZugang, async (req, res) => {
+    try {
+        const v = await schopfVerlaufDienst.verlauf(String(req.query.messstelle || ''), String(req.query.zeitraum || '24h'));
+        if (!v) return res.status(400).json({ error: 'messstelle oder zeitraum ungueltig' });
+        res.json(v);
+    } catch (error) {
+        console.error('GET /kiosk/roter-schopf/verlauf:', error.message);
+        res.status(500).json({ error: 'Verlauf konnte nicht gelesen werden' });
     }
 });
 

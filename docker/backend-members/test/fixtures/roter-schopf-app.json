@@ -121,6 +121,7 @@
   ],
   "kuehlung": [
     {
+      "messstelle": "kuehler:eis",
       "name": "Tiefkühlschrank Eis",
       "erreichbar": true,
       "temperatur": -18.2,
@@ -130,6 +131,7 @@
       "watt": 90
     },
     {
+      "messstelle": "kuehler:landi",
       "name": "Tiefkühlschrank Landi",
       "erreichbar": true,
       "temperatur": null,
@@ -141,6 +143,7 @@
   ],
   "thermostate": [
     {
+      "messstelle": "heizung:heizkoerper",
       "name": "Heizkörper",
       "erreichbar": true,
       "temperatur": 21.3,
@@ -153,29 +156,47 @@
     }
   ],
   "hauptmessung": {
+    "messstelle": "hauptmessung",
     "erreichbar": true,
     "leistung_w": 227,
+    "scheinleistung_va": 370,
     "strom_a": 1.38,
     "phasen": [
       {
         "name": "L1",
         "spannung_v": 238.5,
         "strom_a": 0.03,
-        "leistung_w": 0
+        "leistung_w": 0,
+        "scheinleistung_va": 7,
+        "leistungsfaktor": 0,
+        "frequenz_hz": 50,
+        "zaehler_kwh": 25.92,
+        "rueckspeisung_kwh": 0.05
       },
       {
         "name": "L2",
         "spannung_v": 238.9,
         "strom_a": 0.94,
-        "leistung_w": 134
+        "leistung_w": 134,
+        "scheinleistung_va": 228,
+        "leistungsfaktor": 0.6,
+        "frequenz_hz": 50,
+        "zaehler_kwh": 1566.29,
+        "rueckspeisung_kwh": 0.01
       },
       {
         "name": "L3",
         "spannung_v": 239.2,
         "strom_a": 0.41,
-        "leistung_w": 93
+        "leistung_w": 93,
+        "scheinleistung_va": 136,
+        "leistungsfaktor": 0.81,
+        "frequenz_hz": 49.9,
+        "zaehler_kwh": 526.73,
+        "rueckspeisung_kwh": 0
       }
     ],
-    "zaehler_kwh": 2118.9
+    "zaehler_kwh": 2118.95,
+    "rueckspeisung_kwh": 0.06
   }
 }

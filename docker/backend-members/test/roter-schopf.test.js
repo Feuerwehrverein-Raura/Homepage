@@ -38,12 +38,19 @@ function fakeLokal({ zentraleWeg = false, eisWarm = false } = {}) {
             if (u.pathname === '/script/4/gruppe') return antwort('ok');
             if (u.pathname === '/rpc/EM.GetStatus') {
                 return antwort({ id: 0, a_current: 0.027, a_voltage: 238.5, a_act_power: 0.0,
+                    a_aprt_power: 6.7, a_pf: 0.00, a_freq: 50.0,
                     b_current: 0.935, b_voltage: 238.9, b_act_power: 134.0,
+                    b_aprt_power: 227.6, b_pf: 0.60, b_freq: 50.0,
                     c_current: 0.414, c_voltage: 239.2, c_act_power: 93.2,
-                    total_current: 1.376, total_act_power: 227.257 });
+                    c_aprt_power: 136.2, c_pf: 0.81, c_freq: 49.9,
+                    n_current: null, total_current: 1.376, total_act_power: 227.257,
+                    total_aprt_power: 370.467 });
             }
             if (u.pathname === '/rpc/EMData.GetStatus') {
-                return antwort({ id: 0, total_act: 2118948.42 });
+                return antwort({ id: 0, a_total_act_energy: 25923.79, a_total_act_ret_energy: 49.58,
+                    b_total_act_energy: 1566290.58, b_total_act_ret_energy: 6.70,
+                    c_total_act_energy: 526734.05, c_total_act_ret_energy: 0.07,
+                    total_act: 2118948.42, total_act_ret: 56.35 });
             }
         }
         if (u.hostname === '192.168.88.84' && u.port) {
@@ -108,7 +115,19 @@ test('Zustand: Gruppen aus den Lampen, stromlose Regler, Tiefkuehler', async () 
     const landi = z.kuehlung.find(k => k.name === 'Tiefkühlschrank Landi');
     assert.equal(landi.zu_warm, true, 'Fuehler ohne Wert gilt als zu warm');
 
-    assert.deepEqual(z.thermostate, [{ name: 'Heizkörper', erreichbar: true, temperatur: 21.3,
+    assert.equal(eis.messstelle, 'kuehler:eis');
+    assert.equal(landi.messstelle, 'kuehler:landi');
+
+    // Hauptanschluss: alles, was der Pro 3EM misst.
+    const h = z.hauptmessung;
+    assert.equal(h.messstelle, 'hauptmessung');
+    assert.deepEqual([h.leistung_w, h.scheinleistung_va, h.strom_a, h.zaehler_kwh, h.rueckspeisung_kwh],
+        [227, 370, 1.38, 2118.95, 0.06]);
+    assert.deepEqual(h.phasen[1], { name: 'L2', spannung_v: 238.9, strom_a: 0.94, leistung_w: 134,
+        scheinleistung_va: 228, leistungsfaktor: 0.6, frequenz_hz: 50, zaehler_kwh: 1566.29,
+        rueckspeisung_kwh: 0.01 });
+
+    assert.deepEqual(z.thermostate, [{ messstelle: 'heizung:heizkoerper', name: 'Heizkörper', erreichbar: true, temperatur: 21.3,
         soll: 21, ventil: 0, batterie: 100, fehler: ['not_calibrated'] }]);
 
     if (process.env.FIXTURES_SCHREIBEN) {
