@@ -11,3 +11,7 @@ AuthentikAnmeldung websiteAnmeldung() => throw UnsupportedError('nur im Browser'
 
 /// Nach dem Abmelden auch die Website-Sitzung bei Authentik beenden.
 void websiteAbmelden() {}
+
+/// Nur im Browser: ob nach einer abgelaufenen Sitzung gleich wieder
+/// angemeldet werden darf.
+bool automatischAnmeldenErlaubt() => false;

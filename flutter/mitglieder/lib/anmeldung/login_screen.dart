@@ -6,6 +6,7 @@
 // (E-Mail + Passwort des Anlasses). Organisatoren, die Mitglied sind, melden
 // sich normal als Mitglied an.
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:fwv_anlass/fwv_anlass.dart' show FwvFarben, mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
@@ -13,6 +14,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
 import '../gemeinsam.dart' show logoMitglieder;
+import '../web/browser.dart' show automatischAnmeldenErlaubt;
 import 'authentik_anmeldung.dart';
 import 'organisator_login_screen.dart';
 import 'passwort_reset_screen.dart';
@@ -33,6 +35,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   late final _reiter = TabController(length: 2, vsync: this)..addListener(_reiterGewechselt);
 
   void _reiterGewechselt() => setState(() {});
+
+  @override
+  void initState() {
+    super.initState();
+    // Im Browser wie mein.html: Sitzung abgelaufen -> gleich wieder anmelden
+    // (meist ohne Eingabe, weil die Authentik-Sitzung noch gilt).
+    if (kIsWeb && _sitzung.hinweis != null && automatischAnmeldenErlaubt()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _mitAuthentik());
+    }
+  }
 
   @override
   void dispose() {

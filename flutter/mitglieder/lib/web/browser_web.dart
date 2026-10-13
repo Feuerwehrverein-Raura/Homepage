@@ -22,6 +22,19 @@ void websiteAbmelden() {
   web.window.location.href = '$_authentik/application/o/$_clientId/end-session/';
 }
 
+/// Wie mein.html: Ist die Sitzung abgelaufen, gleich wieder zu Authentik -
+/// dessen eigene Sitzung gilt meist noch, dann kommt man ohne Eingabe zurueck.
+/// Hoechstens einmal in 2 Minuten (sessionStorage), damit eine kaputte
+/// Anmeldung nicht endlos hin- und herleitet.
+bool automatischAnmeldenErlaubt() {
+  const schluessel = 'fwv_app.auto_anmeldung';
+  final jetzt = DateTime.now().millisecondsSinceEpoch;
+  final zuletzt = int.tryParse(web.window.sessionStorage.getItem(schluessel) ?? '');
+  if (zuletzt != null && jetzt - zuletzt < 2 * 60 * 1000) return false;
+  web.window.sessionStorage.setItem(schluessel, '$jetzt');
+  return true;
+}
+
 class _BrowserSpeicher implements GeheimSpeicher {
   // Das Token teilt die App mit der Website - alles andere nicht.
   static String _schluessel(String s) =>
