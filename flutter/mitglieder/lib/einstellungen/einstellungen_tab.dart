@@ -20,6 +20,16 @@ import 'adressbuch.dart';
 import 'bildschirm.dart';
 import 'gruppen_screen.dart';
 
+/// Anleitungen auf der Website - fuer die App, die Website, das erste
+/// Passwort und die Cloud.
+final Uri anleitungsBasis = Uri.parse('https://www.fwv-raura.ch/');
+const _anleitungen = [
+  (Icons.phone_android_outlined, 'Anleitung App', 'Alle Reiter der Mitglieder-App', 'anleitung-app.html'),
+  (Icons.language, 'Anleitung Website', 'Mein Portal und Anmeldung auf der Website', 'anleitung-website.html'),
+  (Icons.password, 'Passwort setzen', 'Erstes Passwort fürs Vereinskonto', 'anleitung-passwort.html'),
+  (Icons.cloud_outlined, 'Anleitung Cloud', 'Nextcloud im Browser und auf dem Handy', 'anleitung-nextcloud.html'),
+];
+
 class EinstellungenTab extends StatefulWidget {
   const EinstellungenTab({super.key, required this.dienste});
 
@@ -169,6 +179,17 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
             else
               KontakteAbschnitt(dienste: _d),
           ],
+          // Dieselben Anleitungen wie im Mitgliederbereich der Website
+          // (docker/frontend-website/anleitung-*.html), im Browser.
+          const Abschnitt('Hilfe'),
+          for (final (symbol, titel, untertitel, seite) in _anleitungen)
+            ListTile(
+              leading: Icon(symbol),
+              title: Text(titel),
+              subtitle: Text(untertitel),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => _d.linkOeffnen(anleitungsBasis.resolve(seite)),
+            ),
           const Abschnitt('App'),
           FutureBuilder<String>(
             future: _version,

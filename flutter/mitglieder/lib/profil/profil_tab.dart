@@ -163,7 +163,7 @@ class _ProfilTabState extends State<ProfilTab> {
         ListTile(
           leading: const Icon(Icons.key_outlined),
           title: const Text('Zugänge'),
-          subtitle: const Text('Funktions-Mails, Cloud, geteilte Konten'),
+          subtitle: const Text('Systeme, Funktions-Mails, Cloud, Netzlaufwerk, geteilte Konten'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => _oeffnen(ZugaengeScreen(dienste: widget.dienste)),
         ),

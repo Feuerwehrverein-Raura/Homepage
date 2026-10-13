@@ -479,12 +479,12 @@ void main() {
     testWidgets('Version, Newsletter an (lokal gemerkt)', (tester) async {
       await starten(tester);
       await reiter(tester, 'Mehr');
-      await sichtbar(tester, find.text('1.2.3 (45)'));
-
       await tippen(tester, find.byKey(const Key('newsletter')));
       expect(backend.letzter('POST', '/newsletter/subscribe'), {'email': 'erika@example.ch'});
       expect(roh.werte['newsletter_abonniert'], 'true');
       expect(tester.widget<SwitchListTile>(find.byKey(const Key('newsletter'))).value, isTrue);
+      // Unter "Hilfe" ganz unten.
+      await sichtbar(tester, find.text('1.2.3 (45)'));
     });
 
     testWidgets('Newsletter: Fehler setzt den Schalter zurueck', (tester) async {
@@ -545,6 +545,20 @@ void main() {
       await tippen(tester, find.text('Mitglieder-Adressbuch einrichten'));
       await tippen(tester, find.text('Profil installieren'));
       expect(geoeffnet, [Uri.parse('https://www.fwv-raura.ch/carddav.mobileconfig')]);
+    });
+
+    testWidgets('Hilfe: die vier Anleitungen der Website', (tester) async {
+      await starten(tester);
+      await reiter(tester, 'Mehr');
+      for (final (titel, seite) in [
+        ('Anleitung App', 'anleitung-app.html'),
+        ('Anleitung Website', 'anleitung-website.html'),
+        ('Passwort setzen', 'anleitung-passwort.html'),
+        ('Anleitung Cloud', 'anleitung-nextcloud.html'),
+      ]) {
+        await tippen(tester, find.text(titel));
+        expect(geoeffnet.last, Uri.parse('https://www.fwv-raura.ch/$seite'));
+      }
     });
 
     testWidgets('Benachrichtigungen: Schalter speichert alle Arten', (tester) async {
