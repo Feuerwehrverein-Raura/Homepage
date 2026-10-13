@@ -36,6 +36,7 @@
     </script>
     <!-- DEUTSCH: Zentrale Konfigurationsdatei mit API-URLs und Kontaktdaten -->
     <script src="scripts/config.js"></script>
+    <script src="scripts/anlass-logo.js"></script>
 </head>
 <body class="font-sans antialiased bg-gray-50">
     <!-- DEUTSCH: Hauptnavigation - Roter Balken mit Vereinslogo und Seitenlinks -->
@@ -248,7 +249,9 @@
                         registrationDeadline: e.registration_deadline ? new Date(e.registration_deadline) : null,
                         status: e.status || 'confirmed',
                         description: e.description || '',
-                        shifts: e.shifts || []
+                        shifts: e.shifts || [],
+                        // DEUTSCH: Logo der Reihe bzw. eigenes Bild (scripts/anlass-logo.js)
+                        logo: anlassLogoUrl(e)
                     }));
 
                     console.log(`🎯 ${this.events.length} Events von API geladen:`,
@@ -526,13 +529,16 @@
                 container.innerHTML = sortedEvents.map(event => `
                     <div class="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer" data-event-id="${event.id}">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between">
-                            <div class="flex-1">
-                                <h3 class="text-xl font-bold text-gray-800 mb-2">${event.title}</h3>
-                                <p class="text-gray-600 mb-3">${event.subtitle || ''}</p>
-                                <div class="flex flex-wrap gap-4 text-sm text-gray-500">
-                                    <span>📅 ${this.formatDate(event.startDate)}</span>
-                                    <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
-                                    <span>📍 ${event.location}</span>
+                            <div class="flex-1 flex items-start gap-4">
+                                ${anlassLogoHtml(event.logo, 56)}
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold text-gray-800 mb-2">${event.title}</h3>
+                                    <p class="text-gray-600 mb-3">${event.subtitle || ''}</p>
+                                    <div class="flex flex-wrap gap-4 text-sm text-gray-500">
+                                        <span>📅 ${this.formatDate(event.startDate)}</span>
+                                        <span>⏰ ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
+                                        <span>📍 ${event.location}</span>
+                                    </div>
                                 </div>
                             </div>
                             <!-- DEUTSCH: Kategorie-Badge rechts auf Desktop, unten auf Mobil -->
@@ -583,6 +589,7 @@
                 // DEUTSCH: Kosten und Anmeldepflicht werden nur angezeigt wenn vorhanden
                 document.getElementById('modal-content').innerHTML = `
                     <div class="space-y-3">
+                        ${event.logo ? `<div class="flex justify-center">${anlassLogoHtml(event.logo, 96)}</div>` : ''}
                         ${event.subtitle ? `<p class="text-fire-600 font-medium">${event.subtitle}</p>` : ''}
                         <p class="text-gray-600">${event.description.split('\n')[0]}</p>
                         <div class="grid grid-cols-1 gap-3 text-sm">

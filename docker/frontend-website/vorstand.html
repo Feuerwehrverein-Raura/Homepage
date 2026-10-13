@@ -22,6 +22,7 @@
     <!-- SheetJS fuer XLSX-Export mit mehreren Tabellenblaettern -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="scripts/arbeitsplan.js?v=2"></script>
+    <script src="scripts/anlass-logo.js"></script>
     <style>
         /* Brief-Maske: editierbare Felder unsichtbar eingebettet */
         .brief-input {
@@ -4852,7 +4853,10 @@
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4">
-                            <div class="text-sm font-medium text-gray-900 max-w-[280px] truncate" title="${(event.title || '').replace(/"/g, '&quot;')}">${event.title}</div>
+                            <div class="flex items-center gap-2">
+                                ${anlassLogoHtml(anlassLogoUrl(event), 32)}
+                                <div class="text-sm font-medium text-gray-900 max-w-[280px] truncate" title="${(event.title || '').replace(/"/g, '&quot;')}">${event.title}</div>
+                            </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-600">${startDate.toLocaleDateString('de-CH')}</div>

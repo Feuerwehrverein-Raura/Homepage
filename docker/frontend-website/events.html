@@ -11,6 +11,7 @@
     <!-- DEUTSCH: Tailwind CSS via CDN fuer Utility-basiertes Styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="scripts/arbeitsplan.js?v=2"></script>
+    <script src="scripts/anlass-logo.js"></script>
     <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierter Farbpalette "fire" (Feuerwehr-Rot) -->
     <script>
         tailwind.config = {
@@ -426,7 +427,9 @@
                         shifts: e.shifts || [],
                         directRegistrations: e.directRegistrations || { approved: [], pending: [], approvedCount: 0, pendingCount: 0 },
                         meal_options: e.meal_options || null,
-                        pdf_filename: e.pdf_filename || null
+                        pdf_filename: e.pdf_filename || null,
+                        // DEUTSCH: Logo der Reihe bzw. eigenes Bild (scripts/anlass-logo.js)
+                        logo: anlassLogoUrl(e)
                     })).sort((a, b) => a.startDate - b.startDate);
                 } catch (error) {
                     console.error('❌ API-Fehler, versuche Markdown-Fallback...', error);
@@ -519,7 +522,9 @@
                         status: frontmatter.status || 'confirmed',
                         tags: Array.isArray(frontmatter.tags) ? frontmatter.tags : (frontmatter.tags ? [frontmatter.tags] : []),
                         description: description,
-                        shifts: shifts
+                        shifts: shifts,
+                        // DEUTSCH: Markdown hat keinen app-Block - Reihe am Titel erkennen
+                        logo: anlassLogoUrl({ title: frontmatter.title })
                     };
                 } catch (error) {
                     console.error(`❌ Fehler beim Parsen von ${filename}:`, error);
@@ -786,9 +791,12 @@
                             <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between">
                                 <div class="flex-1">
                                     <div class="flex items-start justify-between mb-3">
-                                        <div>
-                                            <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
-                                            <p class="text-fire-600 font-medium">${event.subtitle || ''}</p>
+                                        <div class="flex items-start gap-4">
+                                            ${anlassLogoHtml(event.logo, 56)}
+                                            <div>
+                                                <h3 class="text-xl font-bold text-gray-800 mb-1">${event.title}</h3>
+                                                <p class="text-fire-600 font-medium">${event.subtitle || ''}</p>
+                                            </div>
                                         </div>
                                         <div class="flex space-x-2">
                                             ${statusBadge}
@@ -871,8 +879,13 @@
                                 </div>
                             </div>
                             
-                            <h3 class="text-lg font-bold text-gray-800 mb-1">${event.title}</h3>
-                            <p class="text-fire-600 text-sm mb-3">${event.subtitle || ''}</p>
+                            <div class="flex items-start gap-3 mb-3">
+                                ${anlassLogoHtml(event.logo, 56)}
+                                <div class="min-w-0">
+                                    <h3 class="text-lg font-bold text-gray-800 mb-1">${event.title}</h3>
+                                    <p class="text-fire-600 text-sm">${event.subtitle || ''}</p>
+                                </div>
+                            </div>
                             
                             <div class="text-sm text-gray-600 mb-4 line-clamp-2">
                                 ${this.truncateText(event.description, 100)}
@@ -1067,9 +1080,12 @@
                 content.innerHTML = `
                     <div class="p-6">
                         <div class="flex items-center justify-between mb-4">
-                            <div>
-                                <h2 class="text-3xl font-bold text-gray-800">${event.title}</h2>
-                                ${event.subtitle ? `<p class="text-lg text-fire-600 font-medium mt-1">${event.subtitle}</p>` : ''}
+                            <div class="flex items-center gap-4">
+                                ${anlassLogoHtml(event.logo, 96)}
+                                <div>
+                                    <h2 class="text-3xl font-bold text-gray-800">${event.title}</h2>
+                                    ${event.subtitle ? `<p class="text-lg text-fire-600 font-medium mt-1">${event.subtitle}</p>` : ''}
+                                </div>
                             </div>
                             <button onclick="document.getElementById('event-modal').classList.add('hidden')" 
                                     class="text-gray-500 hover:text-gray-700 text-3xl leading-none">

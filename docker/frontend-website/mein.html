@@ -9,6 +9,8 @@
     <!-- DEUTSCH: QR-Codes fuer die VPN-Konfiguration. Gleiche Bibliothek
          wie in der Vorstands-App, damit nicht zwei nebeneinander laufen. -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <!-- DEUTSCH: Logos der Anlaesse (Fasnacht, Chilbi, ...) -->
+    <script src="scripts/anlass-logo.js"></script>
     <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierten Feuerwehr-Rot-Farben (fire-50 bis fire-800) -->
     <script>
         // DEUTSCH: Erweitert die Standard-Tailwind-Farbpalette um die "fire"-Farbabstufungen
@@ -1177,6 +1179,7 @@
                 return `
                     <div class="border border-gray-200 rounded-lg p-4">
                         <div class="flex justify-between items-start">
+                            ${anlassLogoHtml(anlassLogoUrl(reg), 48, 'mr-3')}
                             <div class="flex-1">
                                 <h4 class="font-semibold text-gray-800">${reg.event_title}</h4>
                                 <p class="text-sm text-gray-600 mt-1">
@@ -1855,6 +1858,7 @@
                 return `
                     <div class="border border-purple-100 bg-purple-50 rounded-lg p-4">
                         <div class="flex justify-between items-start">
+                            ${anlassLogoHtml(anlassLogoUrl(event), 48, 'mr-3')}
                             <div class="flex-1">
                                 <h4 class="font-semibold text-gray-800">${event.title}</h4>
                                 <p class="text-sm text-gray-600 mt-1">

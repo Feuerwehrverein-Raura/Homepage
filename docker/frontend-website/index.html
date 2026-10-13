@@ -100,6 +100,7 @@
     </script>
     <!-- DEUTSCH: Externe Konfigurationsdatei mit dynamischen E-Mail-Adressen und Einstellungen -->
     <script src="scripts/config.js"></script>
+    <script src="scripts/anlass-logo.js"></script>
 </head>
 <body class="font-sans bg-gray-50">
     <!-- DEUTSCH: Hauptnavigation - fixiert am oberen Bildschirmrand (fixed top-0) mit hoechstem z-Index -->
@@ -1454,7 +1455,9 @@ async function loadUpcomingEvents() {
             // DEUTSCH: Termin steht noch nicht fest — start_date ordnet den
             // Anlass nur grob ein und wird nicht als Datum angezeigt.
             datumOffen: event.datum_offen === true,
-            slug: event.slug
+            slug: event.slug,
+            // DEUTSCH: Logo der Reihe bzw. eigenes Bild (scripts/anlass-logo.js)
+            logo: anlassLogoUrl(event)
         }));
 
         renderUpcomingEvents(events);
@@ -1604,9 +1607,12 @@ function renderUpcomingEvents(events) {
             <a href="${eventUrl}" class="block bg-gradient-to-br from-${color.from} to-${color.to} text-white rounded-lg shadow-lg overflow-hidden transform hover:scale-105 transition-transform cursor-pointer">
                 <div class="p-6">
                     <div class="flex items-center mb-4">
-                        <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
+                        ${event.logo
+                            // DEUTSCH: Mit Logo ersetzt es das Kategorie-Emoji; weisser Ring hebt es vom Verlauf ab
+                            ? anlassLogoHtml(event.logo, 56, 'bg-white ring-2 ring-white mr-4')
+                            : `<div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-4">
                             <span class="text-2xl">${emoji}</span>
-                        </div>
+                        </div>`}
                         <div>
                             <h3 class="text-xl font-bold">${event.title}</h3>
                             <p class="text-${color.light}">${subtitle}</p>
