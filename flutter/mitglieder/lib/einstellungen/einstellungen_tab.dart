@@ -2,7 +2,7 @@
 // Adressbuch, App-Version und Abmelden. Aufbau wie members-ios SettingsView
 // (die Android-App hat ihn uebernommen).
 //
-// "Musik im Roten Schopf" (Playlists, Radiosender) fuer jedes Mitglied.
+// "Musik" (hoeren, Playlists, Radiosender) fuer jedes Mitglied.
 //
 // Externe Organisatoren haben kein Mitgliederkonto; sie sehen nur, wer
 // angemeldet ist, die Version und Abmelden. Vorstand und admin sehen
@@ -108,17 +108,18 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
           ),
           if (mitglied) ...[
             // Benachrichtigungen, Zugaenge und VPN stehen im Profil (Konto).
-            const Abschnitt('Roter Schopf'),
+            const Abschnitt('Musik'),
             ListTile(
               leading: const Icon(Icons.queue_music),
-              title: const Text('Musik im Roten Schopf'),
+              title: const Text('Musik'),
               subtitle: const Text('Hören, Playlists und Radio'),
               trailing: const Icon(Icons.chevron_right),
               // Den Laptop fernbedienen gibt es im Reiter "Schopf".
               onTap: () => _oeffnen(MusikScreen(zugang: _d.musik, player: _d.musikPlayer)),
             ),
             // Mit Reiter "Schopf" steht der Bildschirm dort.
-            if (!_d.roterSchopfSichtbar)
+            if (!_d.roterSchopfSichtbar) ...[
+              const Abschnitt('Roter Schopf'),
               ListTile(
                 leading: const Icon(Icons.desktop_windows_outlined),
                 title: const Text('Bildschirm Roter Schopf'),
@@ -126,6 +127,7 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
                 trailing: const Icon(Icons.open_in_new),
                 onTap: () => bildschirmOeffnen(context, _d),
               ),
+            ],
             if (darfGruppenVerwalten(sitzung)) ...[
               const Abschnitt('Vorstand'),
               ListTile(

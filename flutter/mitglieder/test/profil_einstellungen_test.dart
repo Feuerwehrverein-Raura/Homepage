@@ -466,11 +466,11 @@ void main() {
       );
     });
 
-    testWidgets('Musik im Roten Schopf: Playlists von api-members', (tester) async {
+    testWidgets('Musik: Playlists von api-members', (tester) async {
       await starten(tester);
       await reiter(tester, 'Mehr');
-      await tester.ensureVisible(find.text('Musik im Roten Schopf'));
-      await tippen(tester, find.text('Musik im Roten Schopf'));
+      await tester.ensureVisible(find.widgetWithText(ListTile, 'Musik'));
+      await tippen(tester, find.widgetWithText(ListTile, 'Musik'));
       expect(find.text('Chilbi Abend'), findsOneWidget);
       expect(find.text('12 Titel · von Erika Muster'), findsOneWidget);
       expect(backend.gab('GET', '/kiosk/playlists'), isTrue);

@@ -1,4 +1,4 @@
-// "Musik im Roten Schopf": Playlists und Radiosender fuer den Laptop im
+// "Musik": Playlists und Radiosender fuer den Laptop im
 // Lokal - wie der Reiter "Musik" im Mitgliederbereich der Webseite
 // (mein.html). Jedes Mitglied darf zusammenstellen; der Laptop holt sich
 // alles alle fuenf Minuten selbst ab.
@@ -69,7 +69,7 @@ class _MusikScreenState extends State<MusikScreen> {
       length: widget.laptopSteuern ? 3 : 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Musik im Roten Schopf'),
+          title: const Text('Musik'),
           bottom: reiterAufRot(
             tabs: [
               const Tab(text: 'Playlists'),

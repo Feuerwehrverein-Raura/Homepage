@@ -247,7 +247,7 @@ void main() {
     // Unter "Mehr": Musik (Hoeren, Playlists) bleibt, der Bildschirm nicht.
     await tester.tap(reiter('Mehr'));
     await tester.pumpAndSettle();
-    expect(find.text('Musik im Roten Schopf'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'Musik'), findsOneWidget);
     expect(find.text('Bildschirm Roter Schopf'), findsNothing);
   });
 
