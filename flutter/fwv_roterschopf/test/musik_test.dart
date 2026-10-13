@@ -588,6 +588,63 @@ void main() {
     expect(find.text('Andere Sender'), findsOneWidget);
   });
 
+  test('Radiosender: Logo aus dem JSON, nur https', () {
+    Radiosender sender(Object? logo) => Radiosender.ausJson({
+      'id': 's',
+      'name': 'SRF 3',
+      'url': 'https://x.ch/s',
+      'logo_url': logo,
+    });
+    expect(sender('https://www.srf.ch/srf3.png').logo, Uri.parse('https://www.srf.ch/srf3.png'));
+    expect(sender(null).logo, isNull);
+    expect(sender('').logo, isNull);
+    expect(sender('http://basilisk.ch/logo.png').logo, isNull);
+  });
+
+  testWidgets('Senderlogo: Liste, Player und Sperrbildschirm; kaputtes Logo wird zum Symbol', (
+    tester,
+  ) async {
+    final z = await zeigen(tester);
+    final logo = Uri.parse('https://logo.example/srf3.png');
+    z.senderListe = [
+      Radiosender(id: 's1', name: 'Radio SRF 3', url: 'https://x.ch/srf3', logo: logo),
+      const Radiosender(id: 's2', name: 'Radio Swiss Jazz', url: 'https://x.ch/rsj'),
+    ];
+    await tester.tap(find.text('Radiosender'));
+    await tester.pumpAndSettle();
+
+    // Mit Logo wird es geladen, ohne steht gleich das Radio-Symbol da.
+    expect(find.byKey(const Key('sender-logo')), findsOneWidget);
+    expect(find.byIcon(Icons.radio), findsNWidgets(2));
+
+    // In Tests gibt es kein Netz: Das Laden scheitert, das Symbol bleibt.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('sender-logo-platzhalter')), findsOneWidget);
+    expect(find.byIcon(Icons.radio), findsNWidgets(2));
+    expect(tester.takeException(), isNull);
+
+    // Abspielen: das Logo kommt in die Benachrichtigung und den Mini-Player.
+    await tester.tap(find.byTooltip('Auf dem Handy hören').first);
+    await tester.pumpAndSettle();
+    expect(wiedergabe.geladen.single.bild, logo);
+    final mini = find.byKey(const Key('mini-player'));
+    expect(
+      find.descendant(of: mini, matching: find.byKey(const Key('sender-logo'))),
+      findsOneWidget,
+    );
+
+    // Grosser Player: Logo im Kreis, "Andere Sender" ohne Logo mit Symbol.
+    await tester.tap(mini);
+    await tester.pumpAndSettle();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+    await tester.pumpAndSettle();
+    expect(find.text('Radio Swiss Jazz'), findsOneWidget);
+    expect(find.byKey(const Key('sender-logo-platzhalter')), findsWidgets);
+    expect(find.byIcon(Icons.radio), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Radiosender auf dem Handy hoeren', (tester) async {
     await zeigen(tester);
     await tester.tap(find.text('Radiosender'));

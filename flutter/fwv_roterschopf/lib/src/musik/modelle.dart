@@ -133,14 +133,28 @@ class AbgleichTreffer {
 }
 
 class Radiosender {
-  const Radiosender({required this.id, required this.name, required this.url});
+  const Radiosender({required this.id, required this.name, required this.url, this.logo});
 
-  factory Radiosender.ausJson(Map<String, dynamic> j) =>
-      Radiosender(id: '${j['id']}', name: '${j['name']}', url: '${j['url']}');
+  factory Radiosender.ausJson(Map<String, dynamic> j) => Radiosender(
+    id: '${j['id']}',
+    name: '${j['name']}',
+    url: '${j['url']}',
+    logo: _logo(j['logo_url']),
+  );
 
   final String id;
   final String name;
   final String url;
+
+  /// Senderlogo, vom Server aus radio-browser.info nachgetragen. Null,
+  /// solange keines gefunden ist - dann zeigt die App ein Radio-Symbol.
+  final Uri? logo;
+}
+
+// Nur https: Der Server liefert nichts anderes, und http laedt die App nicht.
+Uri? _logo(Object? v) {
+  final u = Uri.tryParse(_text(v) ?? '');
+  return u != null && u.scheme == 'https' && u.host.isNotEmpty ? u : null;
 }
 
 /// Was der Laptop im Lokal gerade spielt (GET /kiosk/t400/musik, aus dem

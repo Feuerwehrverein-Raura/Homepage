@@ -31,6 +31,7 @@ class WiedergabeEintrag {
     required this.titel,
     this.interpret,
     this.album,
+    this.bild,
   });
 
   final String id;
@@ -38,6 +39,10 @@ class WiedergabeEintrag {
   final String titel;
   final String? interpret;
   final String? album;
+
+  /// Beim Radio das Senderlogo - auch fuer Benachrichtigung und
+  /// Sperrbildschirm.
+  final Uri? bild;
 }
 
 class WiedergabeStand {
@@ -123,7 +128,13 @@ class JustAudioWiedergabe implements Wiedergabe {
           AudioSource.uri(
             e.adresse,
             // Steht in der Benachrichtigung und auf dem Sperrbildschirm.
-            tag: MediaItem(id: e.id, title: e.titel, artist: e.interpret, album: e.album),
+            tag: MediaItem(
+              id: e.id,
+              title: e.titel,
+              artist: e.interpret,
+              album: e.album,
+              artUri: e.bild,
+            ),
           ),
       ],
       initialIndex: ab,
@@ -392,7 +403,15 @@ class MusikPlayer extends ChangeNotifier {
       if (nr != _nr) return;
       await _starten(
         s.name,
-        [WiedergabeEintrag(id: s.url, adresse: adresse, titel: s.name, album: 'Radio')],
+        [
+          WiedergabeEintrag(
+            id: s.url,
+            adresse: adresse,
+            titel: s.name,
+            album: 'Radio',
+            bild: s.logo,
+          ),
+        ],
         ab: 0,
         radio: true,
         zufall: false,
@@ -547,7 +566,7 @@ class MiniPlayer extends StatelessWidget {
                   ),
                 ListTile(
                   key: const Key('mini-player'),
-                  leading: Icon(player.radio ? Icons.radio : Icons.music_note),
+                  leading: player.radio ? SenderLogo(logo: e.bild) : const Icon(Icons.music_note),
                   title: Text(e.titel, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(
                     player.fehler ??
@@ -769,6 +788,48 @@ class _Naechste extends StatelessWidget {
   }
 }
 
+/// Logo eines Radiosenders im Kreis. Ohne Logo, solange es laedt und wenn
+/// es sich nicht laden laesst, steht [platzhalter] da (sonst das Radio-
+/// Symbol) - ein kaputtes Logo darf nie die Liste oder den Player stoeren.
+class SenderLogo extends StatelessWidget {
+  const SenderLogo({
+    super.key,
+    required this.logo,
+    this.groesse = 40,
+    this.platzhalter = const Icon(Icons.radio),
+  });
+
+  final Uri? logo;
+  final double groesse;
+  final Widget platzhalter;
+
+  @override
+  Widget build(BuildContext context) {
+    final logo = this.logo;
+    if (logo == null) return platzhalter;
+    return Image.network(
+      logo.toString(),
+      key: const Key('sender-logo'),
+      width: groesse,
+      height: groesse,
+      // Logos sind fuer hellen Grund gemacht, auch im dunklen Design.
+      frameBuilder: (context, bild, frame, sofort) => frame == null && !sofort
+          ? platzhalter
+          : Container(
+              width: groesse,
+              height: groesse,
+              padding: EdgeInsets.all(groesse * 0.1),
+              clipBehavior: Clip.antiAlias,
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: bild,
+            ),
+      errorBuilder: (context, _, _) =>
+          KeyedSubtree(key: const Key('sender-logo-platzhalter'), child: platzhalter),
+      fit: BoxFit.contain,
+    );
+  }
+}
+
 /// Radio im grossen Player: Sender, was gerade laeuft, andere Sender.
 class _RadioAnsicht extends StatefulWidget {
   const _RadioAnsicht({required this.player, required this.sender});
@@ -799,11 +860,15 @@ class _RadioAnsichtState extends State<_RadioAnsicht> {
       padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.paddingOf(context).bottom),
       children: [
         Center(
-          child: Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(color: farben.primaryContainer, shape: BoxShape.circle),
-            child: Icon(Icons.radio, size: 60, color: farben.onPrimaryContainer),
+          child: SenderLogo(
+            logo: sender.bild,
+            groesse: 120,
+            platzhalter: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(color: farben.primaryContainer, shape: BoxShape.circle),
+              child: Icon(Icons.radio, size: 60, color: farben.onPrimaryContainer),
+            ),
           ),
         ),
         const SizedBox(height: 16),
@@ -874,7 +939,7 @@ class _RadioAnsichtState extends State<_RadioAnsicht> {
                 for (final x in liste)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.radio),
+                    leading: SenderLogo(logo: x.logo),
                     title: Text(x.name),
                     trailing: const Icon(Icons.play_arrow),
                     onTap: () => player.spieleSender(x),

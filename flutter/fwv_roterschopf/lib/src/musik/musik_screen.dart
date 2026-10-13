@@ -844,7 +844,7 @@ class _SenderSeiteState extends State<_SenderSeite> {
           children: [
             for (final s in liste)
               ListTile(
-                leading: const Icon(Icons.radio),
+                leading: SenderLogo(logo: s.logo),
                 title: Text(s.name),
                 subtitle: Text(s.url, maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: Row(

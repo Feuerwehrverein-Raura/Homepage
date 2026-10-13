@@ -23,6 +23,7 @@ const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kio
 const { schichtZugang, alleAktiven, wer } = require('./schicht-zugang');
 const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
+const { logoNachtrag } = require('./sender-logo');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -6004,6 +6005,9 @@ async function kioskTabellen() {
             erstellt_von UUID REFERENCES members(id) ON DELETE SET NULL,
             erstellt_am TIMESTAMP DEFAULT NOW()
         );
+        -- Senderlogo aus radio-browser.info, im Hintergrund nachgetragen
+        -- (src/sender-logo.js). NULL: keines gefunden, die App zeigt ein Symbol.
+        ALTER TABLE kiosk_sender ADD COLUMN IF NOT EXISTS logo_url TEXT;
 
         -- Was der Laptop an Musik hat. Der Pfad ist der Schluessel, weil MPD
         -- Titel ueber genau diesen Pfad anspricht.
@@ -6613,12 +6617,22 @@ app.delete('/kiosk/playlists/:id', authenticateToken, async (req, res) => {
 
 // --- Radiosender -----------------------------------------------------------
 
+// Logos werden nie abgewartet: Anlegen und Auflisten antworten sofort, das
+// Logo steht beim naechsten Laden der Liste da.
+const senderLogoNachtragen = logoNachtrag({
+    speichern: (id, logo) => pool.query(
+        'UPDATE kiosk_sender SET logo_url = $1 WHERE id = $2 AND logo_url IS NULL', [logo, id]
+    ),
+    melden: (fehler) => console.warn('Senderlogo:', fehler.message),
+});
+
 app.get('/kiosk/sender', authenticateToken, async (req, res) => {
     try {
         await kioskTabellen();
         const ergebnis = await pool.query(
-            'SELECT id, name, url, sortierung FROM kiosk_sender ORDER BY sortierung, name'
+            'SELECT id, name, url, sortierung, logo_url FROM kiosk_sender ORDER BY sortierung, name'
         );
+        ergebnis.rows.forEach(senderLogoNachtragen);
         res.json(ergebnis.rows);
     } catch (error) {
         console.error('GET /kiosk/sender:', error.message);
@@ -6644,9 +6658,10 @@ app.post('/kiosk/sender', authenticateToken, async (req, res) => {
         const ergebnis = await pool.query(
             'INSERT INTO kiosk_sender (name, url, sortierung, erstellt_von) ' +
             'VALUES ($1, $2, (SELECT COALESCE(MAX(sortierung), 0) + 1 FROM kiosk_sender), $3) ' +
-            'RETURNING id, name, url, sortierung',
+            'RETURNING id, name, url, sortierung, logo_url',
             [name, url, member.id]
         );
+        senderLogoNachtragen(ergebnis.rows[0]);
         res.status(201).json(ergebnis.rows[0]);
     } catch (error) {
         console.error('POST /kiosk/sender:', error.message);
