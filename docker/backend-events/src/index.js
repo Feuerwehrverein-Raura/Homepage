@@ -6054,6 +6054,47 @@ app.post('/event-groups/:id/arbeitsplan-pdf', async (req, res) => {
 // ============================================
 
 // DEUTSCH: Tägliche Erinnerungen senden für morgige Schichten. Speichert in shift_reminders um Duplikate zu vermeiden
+// Push eine Stunde vor Schichtbeginn an Mitglieder mit bestaetigter Schicht.
+// Fenster 45-65 Minuten bei einem Takt von 5 Minuten: jede Schicht faellt
+// sicher hinein; doppelt verhindert die Tabelle shift_reminders (eindeutig je
+// Anmeldung, Schicht und Art). Zeiten sind Schweizer Ortszeit.
+async function schichtStundeVorherTick(jetzt = new Date()) {
+    try {
+        const r = await pool.query(`
+            SELECT r.id AS registration_id, r.member_id, s.id AS shift_id, s.name,
+                   to_char(s.start_time, 'HH24:MI') AS beginn, to_char(s.end_time, 'HH24:MI') AS ende,
+                   s.bereich, e.id AS event_id, e.title
+            FROM shifts s
+            JOIN events e ON e.id = s.event_id
+            JOIN registrations r ON r.event_id = s.event_id AND r.shift_ids && ARRAY[s.id]
+            WHERE e.status != 'cancelled'
+              AND r.status = 'approved'
+              AND r.member_id IS NOT NULL
+              AND ((s.date + s.start_time) AT TIME ZONE 'Europe/Zurich')
+                  BETWEEN $1::timestamptz + interval '45 minutes' AND $1::timestamptz + interval '65 minutes'
+        `, [jetzt]);
+        let gesendet = 0;
+        for (const z of r.rows) {
+            const neu = await pool.query(`
+                INSERT INTO shift_reminders (registration_id, shift_id, reminder_type)
+                VALUES ($1, $2, 'hour_before')
+                ON CONFLICT (registration_id, shift_id, reminder_type) DO NOTHING
+                RETURNING id
+            `, [z.registration_id, z.shift_id]);
+            if (!neu.rows.length) continue;
+            await pushToMember(z.member_id, 'shift_reminder', `In einer Stunde: ${z.title}`,
+                `${z.name}${z.bereich ? ' (' + z.bereich + ')' : ''} · ${z.beginn}–${z.ende}`,
+                { eventId: z.event_id }).catch(() => {});
+            gesendet++;
+        }
+        if (gesendet) logInfo('Schicht-Erinnerung 1 h vorher', { gesendet });
+        return r.rows;
+    } catch (error) {
+        console.error('Schicht-Erinnerung 1 h vorher:', error.message);
+        return [];
+    }
+}
+
 app.post('/reminders/send-daily', async (req, res) => {
     try {
         // Calculate tomorrow's date
@@ -6618,6 +6659,13 @@ app.listen(PORT, () => {
     ensureRegistrationConfirmationsSchema()
         .then(() => console.log('Registrierungs-Bestätigungs-Schema bereit'))
         .catch(e => console.error('ensureRegistrationConfirmationsSchema failed:', e.message));
+
+    // Schicht-Erinnerung eine Stunde vorher (Push), alle 5 Minuten geprueft.
+    // Nur Push: Die Mail kommt schon am Vortag (/reminders/send-daily).
+    if (process.env.NODE_ENV !== 'test') {
+        setTimeout(schichtStundeVorherTick, 90 * 1000);
+        setInterval(schichtStundeVorherTick, 5 * 60 * 1000);
+    }
 
     // Arbeitsplan eine Woche vor dem Anlass: stuendlich pruefen (erster Lauf nach
     // 1 Minute). Bewusst nur mit ARBEITSPLAN_REMINDER_ENABLED=true: der Versand

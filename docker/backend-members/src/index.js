@@ -20,7 +20,7 @@ const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
 const { roterSchopf, hatRoterSchopfZugang } = require('./roter-schopf');
 const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
-const { schichtZugang, alleAktiven } = require('./schicht-zugang');
+const { schichtZugang, alleAktiven, wer } = require('./schicht-zugang');
 const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
 
@@ -6701,6 +6701,13 @@ app.get('/kiosk/roter-schopf/zugang', authenticateToken, async (req, res) => {
     }
     try {
         const s = await schichtPruefung.pruefen(req.user);
+        if (s) {
+            // App waehrend der Schicht geoeffnet: den Schopf-Player gleich
+            // schicken - im Vordergrund kann die App sofort koppeln.
+            wer(pool, req.user)
+                .then(m => m && setTimeout(() => schopfMusikMelder.nochmals(m.id), 1500))
+                .catch(() => {});
+        }
         res.json(s
             ? { zugang: true, grund: 'schicht',
                 schicht: { name: s.schicht, anlass: s.anlass, beginn: s.beginn, ende: s.ende, bis: s.bis } }

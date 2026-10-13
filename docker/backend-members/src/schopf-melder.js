@@ -101,6 +101,11 @@ function schopfMelder({ aktive, zustand, senden, geheimnis, jetzt = () => new Da
 
     return {
         takt,
+        /** Dieser Person den Stand gleich nochmals schicken (App geoeffnet). */
+        nochmals(memberId) {
+            gezeigt.delete(String(memberId));
+            return takt();
+        },
         get gezeigt() { return new Map(gezeigt); }
     };
 }

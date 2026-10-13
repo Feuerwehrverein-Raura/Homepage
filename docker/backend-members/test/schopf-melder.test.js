@@ -83,3 +83,13 @@ test('Freigabe der Knoepfe: nur mit eigenem Schluessel, laeuft ab', () => {
     const jwt = require('jsonwebtoken');
     assert.equal(fernFreigabePruefen(GEHEIM, jwt.sign({ zweck: 'schopf-musik', wer: 'm1' }, GEHEIM)), null);
 });
+
+test('Nochmals: App geoeffnet - dieselbe Person bekommt den Stand erneut', async () => {
+    const { gesendet, melder } = aufbau();
+    await melder.takt();
+    await melder.takt();
+    assert.equal(gesendet.length, 1);
+    await melder.nochmals('m1');
+    assert.equal(gesendet.length, 2);
+    assert.equal(gesendet.at(-1).art, 'zeigen');
+});
