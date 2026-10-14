@@ -2448,7 +2448,17 @@ app.get('/funktionen', async (req, res) => {
 
 // Get all members (requires authentication)
 // DEUTSCH: Alle Mitglieder abrufen, optional filterbar nach Status und Suchbegriff
-app.get('/members', authenticateAny, async (req, res) => {
+/** Mitglied ohne Passwort-Hash - der geht nie ueber die API raus. */
+function ohneGeheimes(m) {
+    if (!m) return m;
+    const { password_hash, ...rest } = m;
+    return rest;
+}
+
+// Alle Mitglieder mit allen Angaben (IBAN, Geburtstag ...) nur fuer den
+// Vorstand. Bis 14.10.2026 genuegte "angemeldet" - jedes Mitglied bekam die
+// vollstaendigen Daten aller. Fuer Auswahllisten gibt es /members/directory.
+app.get('/members', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { status, search, ids } = req.query;
         let query = 'SELECT * FROM members WHERE 1=1';
@@ -2478,7 +2488,7 @@ app.get('/members', authenticateAny, async (req, res) => {
         query += ' ORDER BY nachname, vorname';
 
         const result = await pool.query(query, params);
-        res.json(result.rows);
+        res.json(result.rows.map(ohneGeheimes));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -2694,7 +2704,7 @@ app.get('/members/directory', authenticateToken, async (req, res) => {
 
 // Get single member (MUST come after /members/me)
 // DEUTSCH: Einzelnes Mitglied anhand der ID abrufen
-app.get('/members/:id', authenticateAny, async (req, res) => {
+app.get('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('SELECT * FROM members WHERE id = $1', [id]);
@@ -2703,7 +2713,7 @@ app.get('/members/:id', authenticateAny, async (req, res) => {
             return res.status(404).json({ error: 'Member not found' });
         }
 
-        res.json(result.rows[0]);
+        res.json(ohneGeheimes(result.rows[0]));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
