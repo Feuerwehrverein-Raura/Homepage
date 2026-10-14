@@ -16,7 +16,10 @@ GET /events
 ```
 
 **Query Parameter:**
-- `upcoming` - Nur zukünftige Events
+- `upcoming=true` - Nur zukünftige und laufende Events, nächste zuerst;
+  "Datum noch offen" am Ende
+- `limit` - Höchstens so viele Events (positive Ganzzahl, max. 100, nach
+  der Sortierung; ungültig = ohne Limit). Startseite: `upcoming=true&limit=3`
 - `aktuell=true` - Für die Mitglieder-App: nicht abgesagt und noch nicht
   vorbei (Ende bzw. Beginn ist heute oder später, Ortszeit Zürich),
   sortiert nach Beginn

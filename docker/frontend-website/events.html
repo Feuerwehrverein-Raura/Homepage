@@ -13,6 +13,7 @@
     <script src="scripts/sicher.js"></script>
     <script src="scripts/arbeitsplan.js?v=2"></script>
     <script src="scripts/anlass-logo.js"></script>
+    <script src="scripts/anlass-format.js"></script>
     <!-- DEUTSCH: Tailwind-Konfiguration mit benutzerdefinierter Farbpalette "fire" (Feuerwehr-Rot) -->
     <script>
         tailwind.config = {
@@ -417,7 +418,8 @@
                         location: e.location || '',
                         organizer: e.organizer_name || '',
                         email: e.organizer_email || '',
-                        cost: e.cost || 'Kostenlos',
+                        // DEUTSCH: Nackte Zahl -> "CHF 25.–", leer -> Kostenlos (anlass-format.js)
+                        cost: anlassKosten(e.cost),
                         registrationRequired: e.registration_required || false,
                         registrationDeadline: e.registration_deadline ? new Date(e.registration_deadline) : null,
                         participantRegistration: e.participant_registration || false,
@@ -518,7 +520,7 @@
                         location: frontmatter.location || '',
                         organizer: frontmatter.organizer || '',
                         email: frontmatter.email || '',
-                        cost: frontmatter.cost || 'Kostenlos',
+                        cost: anlassKosten(frontmatter.cost),
                         registrationRequired: frontmatter.registrationRequired === true || frontmatter.registrationRequired === 'true',
                         registrationDeadline: frontmatter.registrationDeadline ? new Date(frontmatter.registrationDeadline) : null,
                         participantRegistration: frontmatter.participantRegistration === true || frontmatter.participantRegistration === 'true',
@@ -796,15 +798,16 @@
                         <div class="p-6">
                             <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between">
                                 <div class="flex-1">
-                                    <div class="flex items-start justify-between mb-3">
-                                        <div class="flex items-start gap-4">
+                                    <!-- DEUTSCH: flex-wrap: auf dem Handy rutschen die Abzeichen unter den Titel statt ueber den Kartenrand -->
+                                    <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
+                                        <div class="flex items-start gap-4 min-w-0">
                                             ${anlassLogoHtml(event.logo, 56)}
                                             <div>
                                                 <h3 class="text-xl font-bold text-gray-800 mb-1">${escapeHtml(event.title)}</h3>
                                                 <p class="text-fire-600 font-medium">${escapeHtml(event.subtitle)}</p>
                                             </div>
                                         </div>
-                                        <div class="flex space-x-2">
+                                        <div class="flex flex-wrap gap-2">
                                             ${statusBadge}
                                             ${registrationBadge}
                                         </div>
@@ -818,12 +821,12 @@
                                         <div class="space-y-2">
                                             <div class="flex items-center">
                                                 <span class="mr-2">📅</span>
-                                                <span>${event.datumOffen ? 'Datum noch offen' : this.formatDate(event.startDate)}</span>
+                                                <span>${event.datumOffen ? 'Datum noch offen' : anlassZeitraum(event.startDate, event.endDate)}</span>
                                             </div>
                                             ${event.datumOffen ? '' : `
                                             <div class="flex items-center">
                                                 <span class="mr-2">⏰</span>
-                                                <span>${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</span>
+                                                <span>${anlassZeiten(event.startDate, event.endDate)}</span>
                                             </div>`}
                                         </div>
                                         <div class="space-y-2">
@@ -831,10 +834,11 @@
                                                 <span class="mr-2">📍</span>
                                                 <span>${escapeHtml(event.location)}</span>
                                             </div>
+                                            ${event.organizer ? `
                                             <div class="flex items-center">
                                                 <span class="mr-2">👤</span>
                                                 <span>${escapeHtml(event.organizer)}</span>
-                                            </div>
+                                            </div>` : ''}
                                         </div>
                                     </div>
                                     
@@ -875,11 +879,12 @@
                     <div class="${categoryStyles.card} rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden ${isPast ? 'opacity-75' : ''}"
                          data-event-id="${escapeHtml(event.id)}">
                         <div class="p-5">
-                            <div class="flex items-start justify-between mb-3">
+                            <!-- DEUTSCH: flex-wrap: Abzeichen umbrechen statt ueber den Kartenrand ragen -->
+                            <div class="flex flex-wrap items-start justify-between gap-1 mb-3">
                                 <span class="px-2 py-1 ${categoryStyles.badge} rounded-full text-xs font-medium">
                                     ${escapeHtml(event.category || 'Event')}
                                 </span>
-                                <div class="flex space-x-1">
+                                <div class="flex flex-wrap justify-end gap-1">
                                     ${statusBadge}
                                     ${registrationBadge}
                                 </div>
@@ -900,7 +905,7 @@
                             <div class="space-y-2 text-sm text-gray-500 mb-4">
                                 <div class="flex items-center">
                                     <span class="mr-2">📅</span>
-                                    <span>${event.datumOffen ? 'Datum noch offen' : this.formatDate(event.startDate)}</span>
+                                    <span>${event.datumOffen ? 'Datum noch offen' : anlassZeitraum(event.startDate, event.endDate)}</span>
                                 </div>
                                 <div class="flex items-center">
                                     <span class="mr-2">📍</span>
@@ -950,9 +955,9 @@
             // DEUTSCH: Erzeugt ein Status-Badge (Abgesagt oder Bestaetigt) fuer ein Event
             getStatusBadge(event) {
                 if (event.status === 'cancelled') {
-                    return '<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">❌ Abgesagt</span>';
+                    return '<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs whitespace-nowrap">❌ Abgesagt</span>';
                 } else if (event.status === 'confirmed') {
-                    return '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">✅ Bestätigt</span>';
+                    return '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs whitespace-nowrap">✅ Bestätigt</span>';
                 }
                 return '';
             }
@@ -966,24 +971,24 @@
                 if (category === 'Dorffest') {
                     // Dorffest: Helfer-Schichten
                     if (event.shifts && event.shifts.length > 0) {
-                        return '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">👷 Helfer gesucht</span>';
+                        return '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs whitespace-nowrap">👷 Helfer gesucht</span>';
                     }
                 } else if (category === 'GV') {
                     // GV: Teilnehmer-Anmeldung mit Essensauswahl
-                    return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">📧 Anmeldung erforderlich</span>';
+                    return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs whitespace-nowrap">📧 Anmeldung erforderlich</span>';
                 } else if (category === 'Ausflug') {
                     // Ausflug: Keine Anmeldung nötig
                     return '';
                 } else if (category === 'Ausflug mit Anmeldung' || category === 'Aufbau' || category === 'Abbau') {
                     // Ausflug mit Anmeldung / Aufbau / Abbau: Teilnehmer-Anmeldung
-                    return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">📧 Anmeldung erforderlich</span>';
+                    return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs whitespace-nowrap">📧 Anmeldung erforderlich</span>';
                 } else {
                     // Sonstiges: Fallback auf bisherige Logik
                     if (event.registrationRequired) {
                         if (event.shifts && event.shifts.length > 0) {
-                            return '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">👷 Helfer gesucht</span>';
+                            return '<span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs whitespace-nowrap">👷 Helfer gesucht</span>';
                         } else if (event.participantRegistration) {
-                            return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">📧 Anmeldung möglich</span>';
+                            return '<span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs whitespace-nowrap">📧 Anmeldung möglich</span>';
                         }
                     }
                 }
@@ -1136,8 +1141,8 @@
                             <div class="space-y-3">
                                 <h4 class="font-semibold text-gray-800 text-lg">📅 Termin</h4>
                                 <div class="space-y-2 text-sm">
-                                    <div><strong>Datum:</strong> ${event.datumOffen ? 'Datum noch offen' : this.formatDate(event.startDate)}</div>
-                                    ${event.datumOffen ? '' : `<div><strong>Zeit:</strong> ${this.formatTime(event.startDate)} - ${this.formatTime(event.endDate)}</div>`}
+                                    <div><strong>Datum:</strong> ${event.datumOffen ? 'Datum noch offen' : anlassZeitraum(event.startDate, event.endDate)}</div>
+                                    ${event.datumOffen ? '' : `<div><strong>Zeit:</strong> ${anlassZeiten(event.startDate, event.endDate)}</div>`}
                                     <div><strong>Ort:</strong> ${escapeHtml(event.location)}</div>
                                 </div>
                             </div>
@@ -1145,8 +1150,8 @@
                             <div class="space-y-3">
                                 <h4 class="font-semibold text-gray-800 text-lg">📞 Kontakt & Details</h4>
                                 <div class="space-y-2 text-sm">
-                                    <div><strong>Organisator:</strong> ${escapeHtml(event.organizer)}</div>
-                                    <div><strong>E-Mail:</strong> <a href="mailto:${escapeHtml(event.email)}" class="text-fire-600 hover:text-fire-700">${escapeHtml(event.email)}</a></div>
+                                    ${event.organizer ? `<div><strong>Organisator:</strong> ${escapeHtml(event.organizer)}</div>` : ''}
+                                    ${event.email ? `<div><strong>E-Mail:</strong> <a href="mailto:${escapeHtml(event.email)}" class="text-fire-600 hover:text-fire-700">${escapeHtml(event.email)}</a></div>` : ''}
                                     <div><strong>Kosten:</strong> <span class="font-medium">${escapeHtml(event.cost)}</span></div>
                                     ${event.registrationDeadline ? `
                                         <div><strong>Anmeldeschluss:</strong> ${this.formatDate(event.registrationDeadline)}</div>

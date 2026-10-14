@@ -1461,7 +1461,12 @@ async function loadUpcomingEvents() {
             logo: anlassLogoUrl(event)
         }));
 
-        renderUpcomingEvents(events);
+        // DEUTSCH: Absicherung, falls die API limit nicht beachtet: naechste
+        // zuerst, "Datum noch offen" (Platzhalter-Datum) ans Ende, nur 3.
+        events.sort((a, b) =>
+            (a.datumOffen - b.datumOffen) || (a.startDate - b.startDate));
+
+        renderUpcomingEvents(events.slice(0, 3));
 
     } catch (error) {
         console.error('Fehler beim Laden der Events:', error);

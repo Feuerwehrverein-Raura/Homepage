@@ -22,6 +22,7 @@ const { STANDARD_ORGANISATOR, ohneOrganisator, istStandardOrganisator } = requir
 const mitorganisatoren = require('./mitorganisatoren');
 const { schichtenPruefen } = require('./schicht-eintrag');
 const { pushZielDaten, mitZiel } = require('./push-ziel');
+const { listenLimit } = require('./liste-limit');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -851,6 +852,7 @@ function jsonbWert(feld, wert) {
 app.get('/events', async (req, res) => {
     try {
         const { upcoming, category, aktuell } = req.query;
+        const limit = listenLimit(req.query.limit);
         let query = `
             SELECT e.*,
                    m.vorname as organizer_vorname,
@@ -880,8 +882,18 @@ app.get('/events', async (req, res) => {
             query += ` AND COALESCE(e.status, '') <> 'cancelled'`
                 + ` AND (e.datum_offen IS TRUE OR COALESCE(e.end_date, e.start_date)::date >= $${params.length}::date)`;
             query += ` ORDER BY (e.datum_offen IS TRUE), CASE WHEN e.datum_offen IS TRUE THEN e.title END, e.start_date, e.id`;
+        } else if (upcoming === 'true') {
+            // Startseite "Kommende Termine": naechste zuerst; "Datum noch
+            // offen" (Platzhalter-Datum) ans Ende, sonst verdraengen die
+            // Platzhalter mit ?limit=3 die echten Termine.
+            query += ' ORDER BY (e.datum_offen IS TRUE), e.start_date, e.id';
         } else {
             query += ' ORDER BY e.start_date, e.id';
+        }
+        // Limit erst nach der Sortierung (die naechsten N), parametrisiert.
+        if (limit !== null) {
+            params.push(limit);
+            query += ` LIMIT $${params.length}`;
         }
         const eventsResult = await pool.query(query, params);
 

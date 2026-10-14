@@ -24,6 +24,7 @@
     <script src="scripts/sicher.js"></script>
     <script src="scripts/arbeitsplan.js?v=2"></script>
     <script src="scripts/anlass-logo.js"></script>
+    <script src="scripts/mailcow-groesse.js"></script>
     <style>
         /* Brief-Maske: editierbare Felder unsichtbar eingebettet */
         .brief-input {
@@ -1256,8 +1257,9 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Speicherplatz (MB)</label>
-                        <input type="number" id="mailbox-quota" value="1024" min="100"
+                        <input type="number" id="mailbox-quota" value="1024" min="0" step="1"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                        <p class="text-xs text-gray-500 mt-1">In Megabytes (1024 MB = 1 GB). 0 = unbegrenzt.</p>
                     </div>
                     <div class="flex items-center">
                         <input type="checkbox" id="mailbox-active" checked class="w-4 h-4 text-fire-600 rounded">
@@ -2267,6 +2269,48 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Mitorganisatoren (GET/POST/DELETE /events/:id/organizers). Nur beim
+                             Bearbeiten, weil es dafuer schon eine Event-ID braucht. Aenderungen
+                             gelten sofort, unabhaengig von "Speichern". -->
+                        <div id="co-organizers-section" class="md:col-span-2 border-t pt-4 mt-2 hidden">
+                            <h4 class="font-medium text-gray-800 mb-1">Mitorganisatoren</h4>
+                            <p class="text-xs text-gray-500 mb-3">Mitorganisatoren haben dieselben Rechte wie der Haupt-Organisator und bekommen die Meldungen zu neuen Anmeldungen. Aenderungen werden sofort gespeichert.</p>
+                            <ul id="co-organizers-list" class="divide-y divide-gray-200 border border-gray-200 rounded-lg mb-3">
+                                <!-- Dynamisch befuellt via renderCoOrganizers() -->
+                            </ul>
+                            <div id="co-organizers-add" class="bg-gray-50 rounded-lg p-3 space-y-3">
+                                <div class="flex border rounded-lg overflow-hidden">
+                                    <button type="button" id="co-org-tab-member" onclick="switchCoOrganizerMode('member')" class="flex-1 py-2 px-4 bg-fire-500 text-white font-medium text-sm">Mitglied</button>
+                                    <button type="button" id="co-org-tab-extern" onclick="switchCoOrganizerMode('extern')" class="flex-1 py-2 px-4 bg-gray-100 text-gray-700 font-medium text-sm">Extern (Nicht-Mitglied)</button>
+                                </div>
+                                <div id="co-org-member-section">
+                                    <label for="co-org-member" class="block text-sm font-medium text-gray-700 mb-1">Mitglied auswaehlen</label>
+                                    <select id="co-org-member" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                        <option value="">Bitte waehlen...</option>
+                                    </select>
+                                    <p class="text-xs text-gray-500 mt-1">Das Mitglied verwaltet den Anlass in der Mitglieder-App und bekommt eine E-Mail und eine Push-Nachricht.</p>
+                                </div>
+                                <div id="co-org-extern-section" class="hidden">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                            <label for="co-org-name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                            <input type="text" id="co-org-name" placeholder="z.B. Max Muster" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                        </div>
+                                        <div>
+                                            <label for="co-org-email" class="block text-sm font-medium text-gray-700 mb-1">E-Mail</label>
+                                            <input type="email" id="co-org-email" placeholder="max@example.ch" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500">
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">Externe bekommen ihre Zugangsdaten fuers Event-Dashboard per E-Mail (gueltig bis drei Monate nach dem Anlass).</p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <button type="button" id="co-org-add-btn" onclick="addCoOrganizer()" class="px-4 py-2 bg-fire-500 hover:bg-fire-600 text-white rounded-lg text-sm font-medium">Hinzufuegen</button>
+                                    <span id="co-org-message" class="text-sm"></span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Beschreibung</label>
                             <textarea id="event-description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500"></textarea>
@@ -5198,6 +5242,9 @@
             // Organisator-Notizen: bei neuen Events ausblenden (noch keine Event-ID vorhanden)
             document.getElementById('organizer-notes-section').classList.add('hidden');
             document.getElementById('organizer-notes-list').innerHTML = '';
+            // Mitorganisatoren gibt es erst, wenn der Anlass gespeichert ist
+            document.getElementById('co-organizers-section').classList.add('hidden');
+            coOrganizersEventId = null;
             resetOrganizerCreateAccessWrapper();
             document.getElementById('event-organizer-name').value = '';
             document.getElementById('event-organizer-email').value = '';
@@ -5292,6 +5339,9 @@
                 document.getElementById('organizer-note-files-info').textContent = '';
                 loadOrganizerNotes(event.id);
 
+                // Mitorganisatoren: Sektion einblenden und laden
+                openCoOrganizers(event.id);
+
                 document.getElementById('delete-event-btn').classList.remove('hidden');
                 document.getElementById('event-modal').classList.remove('hidden');
             } catch (error) {
@@ -5321,6 +5371,200 @@
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
+        }
+
+        // ===== Mitorganisatoren (api-events: /events/:id/organizers) =====
+        // Haupt-Organisator + Mitorganisatoren eines Anlasses anzeigen, Mitglied
+        // oder Externe hinzufuegen, entfernen. Gilt sofort (eigene API-Aufrufe),
+        // nicht erst mit "Speichern".
+        let coOrganizersEventId = null;
+
+        // Fehlertext aus der API-Antwort ({ error }) oder HTTP-Status
+        // (z.B. 409 "Das Mitglied ist bereits Mitorganisator").
+        async function coOrganizerFehler(response) {
+            const data = await response.json().catch(() => null);
+            if (data && typeof data.error === 'string') return data.error;
+            if (response.status === 403) return 'Keine Berechtigung';
+            if (response.status === 404) return 'Nicht gefunden';
+            return `Fehler (HTTP ${response.status})`;
+        }
+
+        function coOrganizerMeldung(text, ok) {
+            const el = document.getElementById('co-org-message');
+            el.textContent = text || '';
+            el.className = 'text-sm ' + (ok ? 'text-green-600' : 'text-red-600');
+        }
+
+        // Umschalten Mitglied / Extern im Hinzufuegen-Bereich.
+        function switchCoOrganizerMode(mode) {
+            const memberTab = document.getElementById('co-org-tab-member');
+            const externTab = document.getElementById('co-org-tab-extern');
+            const aktiv = ['bg-fire-500', 'text-white'];
+            const inaktiv = ['bg-gray-100', 'text-gray-700'];
+            memberTab.classList.remove(...(mode === 'member' ? inaktiv : aktiv));
+            memberTab.classList.add(...(mode === 'member' ? aktiv : inaktiv));
+            externTab.classList.remove(...(mode === 'extern' ? inaktiv : aktiv));
+            externTab.classList.add(...(mode === 'extern' ? aktiv : inaktiv));
+            document.getElementById('co-org-member-section').classList.toggle('hidden', mode !== 'member');
+            document.getElementById('co-org-extern-section').classList.toggle('hidden', mode !== 'extern');
+            document.getElementById('co-organizers-add').dataset.mode = mode;
+        }
+
+        // Sektion fuer einen Anlass oeffnen: Eingaben leeren, Mitglieder-Auswahl
+        // befuellen (gleiche Liste wie beim Organisator) und Liste laden.
+        async function openCoOrganizers(eventId) {
+            coOrganizersEventId = eventId;
+            document.getElementById('co-organizers-section').classList.remove('hidden');
+            document.getElementById('co-org-name').value = '';
+            document.getElementById('co-org-email').value = '';
+            coOrganizerMeldung('');
+            switchCoOrganizerMode('member');
+            if (!members || members.length === 0) {
+                await loadMembers();
+            }
+            const select = document.getElementById('co-org-member');
+            select.innerHTML = '<option value="">Bitte waehlen...</option>';
+            const sortiert = [...(members || [])].sort((a, b) =>
+                `${a.nachname} ${a.vorname}`.localeCompare(`${b.nachname} ${b.vorname}`));
+            for (const m of sortiert) {
+                const option = document.createElement('option');
+                option.value = m.id;
+                option.textContent = `${m.vorname || ''} ${m.nachname || ''}`.trim();
+                select.appendChild(option);
+            }
+            await loadCoOrganizers();
+        }
+
+        async function loadCoOrganizers() {
+            const eventId = coOrganizersEventId;
+            if (!eventId) return;
+            const list = document.getElementById('co-organizers-list');
+            list.innerHTML = '<li class="px-3 py-2 text-sm text-gray-400">Wird geladen...</li>';
+            try {
+                const response = await fetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/organizers`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(await coOrganizerFehler(response));
+                const data = await response.json();
+                // Inzwischen ein anderer Anlass geoeffnet? Dann nicht ueberschreiben.
+                if (eventId !== coOrganizersEventId) return;
+                renderCoOrganizers(data);
+            } catch (error) {
+                console.error('Error loading co-organizers:', error);
+                list.innerHTML = `<li class="px-3 py-2 text-sm text-red-500">Mitorganisatoren konnten nicht geladen werden: ${escapeHtml(error.message)}</li>`;
+            }
+        }
+
+        function renderCoOrganizers(data) {
+            const list = document.getElementById('co-organizers-list');
+            const haupt = data && data.hauptorganisator;
+            const weitere = (data && Array.isArray(data.mitorganisatoren)) ? data.mitorganisatoren : [];
+            const darfVerwalten = !data || data.darf_verwalten !== false;
+            document.getElementById('co-organizers-add').classList.toggle('hidden', !darfVerwalten);
+
+            const zeile = (name, email, abzeichen, aktion) => `
+                <li class="px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="text-sm font-medium text-gray-800 flex flex-wrap items-center gap-2">
+                            <span class="break-words">${escapeHtml(name)}</span>${abzeichen}
+                        </div>
+                        ${email ? `<div class="text-xs text-gray-500 break-all">${escapeHtml(email)}</div>` : ''}
+                    </div>
+                    ${aktion}
+                </li>`;
+
+            let html = haupt
+                ? zeile(haupt.name || haupt.email || 'Ohne Namen', haupt.email,
+                    '<span class="px-2 py-0.5 text-xs rounded-full bg-fire-100 text-fire-800 whitespace-nowrap">Haupt-Organisator</span>', '')
+                : '<li class="px-3 py-2 text-sm text-gray-500">Kein Haupt-Organisator eingetragen (der Vorstand organisiert).</li>';
+
+            html += weitere.map(o => {
+                const art = o.art === 'extern'
+                    ? '<span class="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800 whitespace-nowrap">Extern</span>'
+                    : '<span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-800 whitespace-nowrap">Mitglied</span>';
+                const bis = o.zugang_bis
+                    ? `<span class="text-xs text-gray-400 whitespace-nowrap">Zugang bis ${escapeHtml(new Date(o.zugang_bis).toLocaleDateString('de-CH'))}</span>`
+                    : '';
+                const entfernen = darfVerwalten
+                    ? `<button type="button" onclick="removeCoOrganizer('${escapeJsAttr(o.id)}', '${escapeJsAttr(o.name || '')}')" class="text-sm text-red-600 hover:text-red-800">Entfernen</button>`
+                    : '';
+                return zeile(o.name || o.email || 'Ohne Namen', o.email, art + bis, entfernen);
+            }).join('');
+
+            if (weitere.length === 0) {
+                html += '<li class="px-3 py-2 text-sm text-gray-400">Noch keine Mitorganisatoren.</li>';
+            }
+            list.innerHTML = html;
+        }
+
+        async function addCoOrganizer() {
+            const eventId = coOrganizersEventId;
+            if (!eventId) return;
+            const mode = document.getElementById('co-organizers-add').dataset.mode || 'member';
+            let body;
+            if (mode === 'member') {
+                const memberId = document.getElementById('co-org-member').value;
+                if (!memberId) { coOrganizerMeldung('Bitte ein Mitglied auswaehlen.'); return; }
+                body = { member_id: memberId };
+            } else {
+                const name = document.getElementById('co-org-name').value.trim();
+                const email = document.getElementById('co-org-email').value.trim();
+                if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    coOrganizerMeldung('Bitte Name und gueltige E-Mail angeben.');
+                    return;
+                }
+                body = { name, email };
+            }
+            const btn = document.getElementById('co-org-add-btn');
+            btn.disabled = true;
+            coOrganizerMeldung('');
+            try {
+                const response = await fetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/organizers`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (!response.ok) throw new Error(await coOrganizerFehler(response));
+                const eintrag = await response.json().catch(() => ({}));
+                if (mode === 'extern') {
+                    document.getElementById('co-org-name').value = '';
+                    document.getElementById('co-org-email').value = '';
+                    const gesendet = eintrag.zugang_gesendet !== false;
+                    coOrganizerMeldung(gesendet
+                        ? 'Hinzugefuegt. Die Zugangsdaten wurden per E-Mail gesendet.'
+                        : 'Hinzugefuegt, aber die E-Mail mit den Zugangsdaten konnte nicht gesendet werden.',
+                        gesendet);
+                } else {
+                    document.getElementById('co-org-member').value = '';
+                    coOrganizerMeldung('Hinzugefuegt.', true);
+                }
+                await loadCoOrganizers();
+            } catch (error) {
+                coOrganizerMeldung(error.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function removeCoOrganizer(orgId, name) {
+            const eventId = coOrganizersEventId;
+            if (!eventId) return;
+            if (!confirm(`${name || 'Mitorganisator'} als Mitorganisator entfernen? Ein Zugang fuers Event-Dashboard gilt ab sofort nicht mehr.`)) return;
+            coOrganizerMeldung('');
+            try {
+                const response = await fetch(`${API_BASE}/events/${encodeURIComponent(eventId)}/organizers/${encodeURIComponent(orgId)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!response.ok) throw new Error(await coOrganizerFehler(response));
+                coOrganizerMeldung('Entfernt.', true);
+                await loadCoOrganizers();
+            } catch (error) {
+                coOrganizerMeldung(error.message);
+            }
         }
 
         // Laedt alle Notizen eines Events und rendert sie (neueste zuerst vom Backend).
@@ -11170,7 +11414,7 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                     <tr>
                         <td class="px-6 py-4 font-medium">${escapeHtml(mb.username)}</td>
                         <td class="px-6 py-4">${escapeHtml(mb.name || '-')}</td>
-                        <td class="px-6 py-4">${Math.round(mb.quota_used / 1024 / 1024)} / ${escapeHtml(mb.quota)} MB</td>
+                        <td class="px-6 py-4">${escapeHtml(mailcowBelegung(mb.quota_used, mb.quota))}</td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 text-xs rounded-full ${mb.active == 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
                                 ${mb.active == 1 ? 'Aktiv' : 'Inaktiv'}
@@ -11233,9 +11477,9 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
                         <div class="text-sm text-gray-600 mb-2">${escapeHtml(q.name)}</div>
                         <div class="w-full bg-gray-200 rounded-full h-3 mb-1">
                             <div class="h-3 rounded-full ${q.percent_used > 90 ? 'bg-red-500' : q.percent_used > 70 ? 'bg-yellow-500' : 'bg-green-500'}"
-                                 style="width: ${Math.min(q.percent_used, 100)}%"></div>
+                                 style="width: ${Math.min(Number(q.percent_used) || 0, 100)}%"></div>
                         </div>
-                        <div class="text-xs text-gray-500">${Math.round(q.quota_used / 1024 / 1024)} / ${q.quota} MB (${q.percent_used}%)</div>
+                        <div class="text-xs text-gray-500">${escapeHtml(mailcowBelegung(q.quota_used, q.quota))}${Number(q.quota) > 0 ? ` (${Number(q.percent_used) || 0}%)` : ''}</div>
                     </div>
                 `).join('');
             } catch (error) {
@@ -11375,7 +11619,8 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
             document.getElementById('mailbox-password').value = '';
             document.getElementById('mailbox-password').required = false;
             document.getElementById('mailbox-password-hint').textContent = 'Leer lassen um Passwort nicht zu aendern';
-            document.getElementById('mailbox-quota').value = mb.quota || 1024;
+            // mb.quota kommt in Bytes, das Feld ist in MB; 0 bleibt 0 (unbegrenzt)
+            document.getElementById('mailbox-quota').value = mb.quota == null ? 1024 : mailcowBytesZuMb(mb.quota);
             document.getElementById('mailbox-active').checked = mb.active == 1;
             document.getElementById('mailbox-modal').classList.remove('hidden');
         }
@@ -11388,9 +11633,15 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
 
             const data = {
                 name: document.getElementById('mailbox-name').value,
-                quota: parseInt(document.getElementById('mailbox-quota').value),
+                // Mailcow erwartet beim Schreiben MB (nicht Bytes)
+                quota: mailcowMbAusEingabe(document.getElementById('mailbox-quota').value),
                 active: document.getElementById('mailbox-active').checked ? 1 : 0
             };
+
+            if (data.quota === null) {
+                alert('Speicherplatz bitte als ganze Zahl in MB angeben (0 = unbegrenzt).');
+                return;
+            }
 
             if (!isEdit) {
                 data.local_part = document.getElementById('mailbox-local').value;
