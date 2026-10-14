@@ -9,6 +9,11 @@
 //    App zeigt sie im Kanal "fwv_general" (flutter_local_notifications).
 //    Im Hintergrund zeigt Android sie selbst an (Kanal und Symbol aus dem
 //    Manifest). Antippen oeffnet die App.
+//  - Mitteilungen an den Vorstand (`notificationType` vorstand_*, siehe
+//    docker/backend-members/src/vorstand-melder.js) kommen im eigenen Kanal
+//    "fwv_vorstand" (Vorstand) - so laesst er sich auf dem Telefon getrennt
+//    stumm schalten. Antippen oeffnet den Reiter Vorstand im passenden
+//    Bereich (`data.bereich`, [PushZiel]).
 //  - Beim Abmelden wird das Token beim Backend abgemeldet
 //    (`DELETE members/me/fcm-token`) und auf dem Geraet verworfen — so kommt
 //    auch dann nichts mehr an, wenn das Abmelden beim Backend scheitert (das
@@ -24,6 +29,7 @@
 // docs/flutter-mitglieder-app-plan.md).
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:math';
 
@@ -34,6 +40,44 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:fwv_core/fwv_core.dart';
 
+/// Wohin das Antippen einer Push-Mitteilung fuehrt. Bisher nur Mitteilungen
+/// an den Vorstand: Reiter Vorstand, Bereich [bereich] (Schluessel aus
+/// fwv_vorstand `vorstandBereiche`, z.B. "antraege"), optional mit [id].
+@immutable
+class PushZiel {
+  const PushZiel({required this.bereich, this.id});
+
+  final String bereich;
+  final String? id;
+
+  /// Aus den Daten der Nachricht; null, wenn sie nirgends hinfuehrt.
+  static PushZiel? ausDaten(Map<String, Object?> daten) {
+    final art = daten['notificationType'];
+    if (art is! String || !art.startsWith('vorstand_')) return null;
+    final bereich = daten['bereich'];
+    final id = daten['id'];
+    return PushZiel(
+      // Ohne Bereich (aeltere Backends): wenigstens der Reiter Vorstand.
+      bereich: bereich is String && bereich.isNotEmpty ? bereich : 'antraege',
+      id: id is String && id.isNotEmpty ? id : null,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) => other is PushZiel && other.bereich == bereich && other.id == id;
+
+  @override
+  int get hashCode => Object.hash(bereich, id);
+
+  @override
+  String toString() => 'PushZiel($bereich, $id)';
+}
+
+/// Ist das eine Mitteilung an den Vorstand (eigener Android-Kanal)?
+bool istVorstandMitteilung(Map<String, Object?> daten) {
+  final art = daten['notificationType'];
+  return art is String && art.startsWith('vorstand_');
+}
 
 /// Ob dieses Geraet Mitteilungen anzeigen darf.
 enum PushErlaubnis { erlaubt, abgelehnt, nichtGefragt, nichtVerfuegbar }
@@ -109,11 +153,24 @@ class FirebasePush implements PushDienst {
     description: 'Anlässe, Anmeldungen, Schicht-Erinnerungen und Newsletter',
   );
 
+  /// Eigener Kanal fuer Mitteilungen an den Vorstand (Wichtigkeit normal).
+  static const vorstandKanal = AndroidNotificationChannel(
+    'fwv_vorstand',
+    'Vorstand',
+    description: 'Neue Anträge, Austritte, Löschungen und Anmeldungen',
+    importance: Importance.defaultImportance,
+  );
+
+  /// Wird aufgerufen, wenn eine Mitteilung angetippt wurde (auch die, mit
+  /// der die App gestartet wurde) - mit den Daten der Nachricht.
+  void Function(Map<String, Object?> daten)? beiAntippen;
+
   final _anzeige = FlutterLocalNotificationsPlugin();
   bool _bereit = false;
   void Function(String token)? _beiNeuemToken;
   StreamSubscription<String>? _tokenAbo;
   StreamSubscription<RemoteMessage>? _nachrichtAbo;
+  StreamSubscription<RemoteMessage>? _geoeffnetAbo;
 
   @override
   bool get verfuegbar => !kIsWeb && (Platform.isAndroid || (Platform.isIOS && _iosKonfiguriert));
@@ -142,10 +199,14 @@ class FirebasePush implements PushDienst {
             requestSoundPermission: false,
           ),
         ),
+        // Angetippt, waehrend die App lief (selbst gezeigt, siehe
+        // _imVordergrund): die Daten stecken im payload.
+        onDidReceiveNotificationResponse: (antwort) => _angetipptPayload(antwort.payload),
       );
-      await _anzeige
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(kanal);
+      final android = _anzeige
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      await android?.createNotificationChannel(kanal);
+      await android?.createNotificationChannel(vorstandKanal);
       // iOS zeigt Nachrichten im Vordergrund selbst an, wenn man es sagt.
       await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
         alert: true,
@@ -155,7 +216,20 @@ class FirebasePush implements PushDienst {
       final m = FirebaseMessaging.instance;
       _tokenAbo = m.onTokenRefresh.listen((t) => _beiNeuemToken?.call(t));
       _nachrichtAbo = FirebaseMessaging.onMessage.listen(_imVordergrund);
+      // Angetippt im Hintergrund (Android zeigte sie selbst an, bzw. iOS).
+      _geoeffnetAbo = FirebaseMessaging.onMessageOpenedApp.listen((n) => _angetippt(n.data));
       _bereit = true;
+      // Die App wurde durch Antippen gestartet: von Firebase (Hintergrund)
+      // oder von der selbst gezeigten Mitteilung.
+      final start = await m.getInitialMessage();
+      if (start != null) {
+        _angetippt(start.data);
+      } else if (Platform.isAndroid) {
+        final details = await _anzeige.getNotificationAppLaunchDetails();
+        if (details?.didNotificationLaunchApp ?? false) {
+          _angetipptPayload(details!.notificationResponse?.payload);
+        }
+      }
     } on Object catch (e) {
       debugPrint('Push nicht verfuegbar: $e');
     }
@@ -180,20 +254,41 @@ class FirebasePush implements PushDienst {
     if (n.data['notificationType'] == 'schopf_musik') return;
     final titel = n.notification?.title ?? n.data['title'] ?? 'FWV Raura';
     final text = n.notification?.body ?? n.data['body'] ?? '';
+    final k = istVorstandMitteilung(n.data) ? vorstandKanal : kanal;
     _anzeige.show(
       id: Random().nextInt(1 << 31),
       title: titel,
       body: text,
+      payload: jsonEncode(n.data),
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          kanal.id,
-          kanal.name,
-          channelDescription: kanal.description,
+          k.id,
+          k.name,
+          channelDescription: k.description,
+          importance: k.importance,
           icon: 'ic_benachrichtigung',
           styleInformation: BigTextStyleInformation(text),
         ),
       ),
     );
+  }
+
+  void _angetippt(Map<String, Object?> daten) {
+    try {
+      beiAntippen?.call(daten);
+    } on Object catch (e) {
+      debugPrint('Antippen nicht verarbeitet: $e');
+    }
+  }
+
+  void _angetipptPayload(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+    try {
+      final daten = jsonDecode(payload);
+      if (daten is Map) _angetippt(daten.cast<String, Object?>());
+    } on FormatException {
+      // Aeltere Mitteilungen ohne Daten: nur die App oeffnen.
+    }
   }
 
   @override
@@ -247,6 +342,7 @@ class FirebasePush implements PushDienst {
   Future<void> beenden() async {
     await _tokenAbo?.cancel();
     await _nachrichtAbo?.cancel();
+    await _geoeffnetAbo?.cancel();
   }
 }
 

@@ -37,6 +37,14 @@ class BenachrichtigungsArt {
       'Sonstige Informationen vom Vorstand',
     ),
   ];
+
+  /// Nur fuer den Vorstand (nicht in [alle]): neue Antraege, Austritte,
+  /// Loeschungen und Anmeldungen (docker/backend-members/src/vorstand-melder.js).
+  static const vorstand = BenachrichtigungsArt(
+    'vorstand_mitteilungen',
+    'Vorstand-Mitteilungen',
+    'Neue Anträge, Austritte, Löschungen und Anmeldungen',
+  );
 }
 
 /// Ein-/Aus je Art. Arten ohne gespeicherten Eintrag gelten als

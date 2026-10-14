@@ -53,6 +53,19 @@ async function pushToMember(memberId, notificationType, title, body, data = {}) 
     }
 }
 
+/**
+ * DEUTSCH: Push an den Vorstand ueber api-members /internal/vorstand-meldung
+ * (src/vorstand-melder.js dort: Empfaenger nach Funktion, Abschalter, Sperrfrist
+ * und Buendeln je Anlass). Fire-and-forget - die Anmeldung haengt nie daran.
+ */
+function vorstandMelden(art, angaben, ausloeser = null) {
+    const key = process.env.INTERNAL_API_KEY;
+    if (!key) return;
+    const url = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/vorstand-meldung';
+    axios.post(url, { art, angaben, ausloeser }, { headers: { 'X-Internal-Key': key }, timeout: 5000 })
+        .catch(err => console.error('Vorstand-Push fehlgeschlagen:', err.message));
+}
+
 async function memberIdByEmail(email) {
     if (!email) return null;
     const url = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/member-id-by-email';
@@ -2202,6 +2215,18 @@ app.post('/registrations', authenticateAny, async (req, res) => {
 
         const reg = result.rows[0];
 
+        // Push an den Vorstand nur, wenn die Anmeldung noch bestaetigt werden
+        // muss - traegt der Vorstand selbst ein, weiss er es schon.
+        if (reg.status === 'pending' && !isPrivileged) {
+            pool.query(`SELECT e.title,
+                    (SELECT TRIM(CONCAT(m.vorname, ' ', m.nachname)) FROM members m WHERE m.id = $2::uuid) AS mitglied
+                  FROM events e WHERE e.id = $1`, [event_id, member_id || null])
+                .then(e => vorstandMelden('anmeldung', {
+                    id: event_id, name: guest_name || e.rows[0]?.mitglied || '', anlass: e.rows[0]?.title
+                }, member_id || null))
+                .catch(err => console.error('Vorstand-Push (Anlass) fehlgeschlagen:', err.message));
+        }
+
         // Benachrichtigungen. Frueher ging nur eine Mail an den ganzen Vorstand
         // ("Status: approved", ohne Schicht) — der Vorstand informierte sich
         // ueber seine eigene Arbeit, waehrend die eingetragene Person nichts
@@ -2302,7 +2327,11 @@ async function finalizeRegistration(ctx) {
         })
     ]);
 
-    // Audit-Eintrag -> Vorstand-App-Push
+    // Push an den Vorstand: neue Anmeldung wartet auf Bestaetigung (pending).
+    // Wer sich selbst anmeldet, bekommt keinen Push.
+    vorstandMelden('anmeldung', { id: eventId, name, anlass: eventTitle }, memberId || null);
+
+    // Audit-Eintrag (Audit-Log im Vorstand-Bereich)
     try {
         await pool.query(`
             INSERT INTO audit_log (action, entity_type, email, new_values, created_at)

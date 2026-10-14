@@ -1390,6 +1390,20 @@ Feuerwehrverein Raura
     }
 });
 
+// DEUTSCH: Push an den Vorstand ueber api-members /internal/vorstand-meldung
+// (dort Empfaenger, Abschalter und Sperrfrist). Fire-and-forget: der Antrag
+// ist gespeichert, auch wenn der Push scheitert.
+function vorstandMelden(art, angaben) {
+    const key = process.env.INTERNAL_API_KEY;
+    if (!key) {
+        logWarn('INTERNAL_API_KEY fehlt - kein Vorstand-Push', { art });
+        return;
+    }
+    axios.post(`${process.env.MEMBERS_API_URL || 'http://api-members:3000'}/internal/vorstand-meldung`,
+        { art, angaben }, { headers: { 'X-Internal-Key': key }, timeout: 5000 })
+        .catch(e => logError('Vorstand-Push fehlgeschlagen', { art, error: e.message }));
+}
+
 // DEUTSCH: Schritt 2 - Bestaetigung per Klick auf den Link in der E-Mail
 // Verarbeitet Kontaktanfrage oder Mitgliedschaftsantrag, sendet Benachrichtigungen
 // Bei aktiven Feuerwehr-Mitgliedern: automatische Aufnahme als Aktivmitglied
@@ -1442,12 +1456,13 @@ app.get('/contact/confirm/:token', async (req, res) => {
             const plz = plzMatch ? plzMatch[1] : '';
             const ort = plzMatch ? plzMatch[2].trim() : cityRaw;
 
-            await pool.query(`
+            const antrag = await pool.query(`
                 INSERT INTO member_registrations
                 (anrede, geschlecht, geburtstag, vorname, nachname, strasse, plz, ort,
                  telefon, mobile, email, feuerwehr_status,
                  korrespondenz_methode, korrespondenz_adresse, status)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                RETURNING id
             `, [
                 membership.anrede || null, membership.geschlecht || null, membership.geburtstag || null,
                 membership.firstname, membership.lastname, membership.street,
@@ -1456,6 +1471,13 @@ app.get('/contact/confirm/:token', async (req, res) => {
                 membership.correspondenceMethod, membership.correspondenceAddress,
                 registrationStatus
             ]);
+
+            // Push an den Vorstand (api-members, src/vorstand-melder.js) -
+            // wartet nicht, Fehler nur ins Log.
+            vorstandMelden('antrag', {
+                id: antrag.rows[0]?.id,
+                name: `${membership.firstname || ''} ${membership.lastname || ''}`.trim()
+            });
 
             const fwStatusText =
                 membership.firefighterStatus === 'Ja (aktiv)' ? 'Aktives Feuerwehr-Mitglied (Raurica)' :

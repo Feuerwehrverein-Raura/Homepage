@@ -35,6 +35,14 @@ void main() {
       'Audit',
     ]);
   });
+
+  test('Bereiche fuer Push-Mitteilungen ueber ihren Schluessel', () {
+    expect(vorstandBereichIndex('anlaesse'), 0);
+    expect(vorstandBereichIndex('antraege'), 1);
+    expect(vorstandBereichIndex('mitglieder'), 2);
+    expect(vorstandBereichIndex('gibtsnicht'), isNull);
+    expect(vorstandBereichIndex(null), isNull);
+  });
 }
 
 String _jwt(String angabenJson) {

@@ -3,9 +3,12 @@
 // Die Schalter wirken beim Backend auf Push (und teils E-Mail); sie sind
 // auch ohne Push-Erlaubnis auf diesem Geraet sinnvoll. Gespeichert wird bei
 // jeder Aenderung, immer alle Arten auf einmal (wie die alten Apps).
-// Welche Arten es gibt: fwv_core BenachrichtigungsArt.
+// Welche Arten es gibt: fwv_core BenachrichtigungsArt. Der Vorstand sieht
+// zusaetzlich "Vorstand-Mitteilungen" (Antraege, Austritte, Loeschungen,
+// Anmeldungen; docker/backend-members/src/vorstand-melder.js).
 
 import 'package:fwv_core/fwv_core.dart';
+import 'package:fwv_vorstand/fwv_vorstand.dart' show istVorstand;
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
@@ -105,6 +108,18 @@ class _BenachrichtigungenScreenState extends State<BenachrichtigungenScreen> {
                     value: w.aktiv(art.schluessel),
                     onChanged: _speichert ? null : (v) => _setzen(art.schluessel, v),
                   ),
+                if (istVorstand(widget.dienste.sitzung.sitzung)) ...[
+                  const Abschnitt('Vorstand'),
+                  SwitchListTile(
+                    key: Key('art-${BenachrichtigungsArt.vorstand.schluessel}'),
+                    title: Text(BenachrichtigungsArt.vorstand.titel),
+                    subtitle: Text(BenachrichtigungsArt.vorstand.beschreibung),
+                    value: w.aktiv(BenachrichtigungsArt.vorstand.schluessel),
+                    onChanged: _speichert
+                        ? null
+                        : (v) => _setzen(BenachrichtigungsArt.vorstand.schluessel, v),
+                  ),
+                ],
                 const Abschnitt('Dieses Gerät'),
                 _geraet(context),
               ],

@@ -224,14 +224,20 @@ ThemeData fwvThema() {
 /// Ab vier Reitern schiebbar: Fest verteilt bekommt jeder auf einem Handy mit
 /// 384 dp nur 96 dp, und "Anmeldungen" wurde zu "Anmeldun" (Organisator,
 /// Samsung A37). Schiebbar ist jeder Reiter so breit wie sein Text.
-TabBar reiterAufRot({required List<Widget> tabs, EdgeInsetsGeometry? labelPadding}) => TabBar(
-      tabs: tabs,
-      isScrollable: tabs.length >= 4,
-      // Ohne das rueckt Material 3 schiebbare Reiter um 52 dp ein.
-      tabAlignment: tabs.length >= 4 ? TabAlignment.start : null,
-      labelPadding: labelPadding,
-      labelColor: FwvFarben.aufRot,
-      unselectedLabelColor: const Color(0xCCFFFFFF),
-      indicatorColor: FwvFarben.aufRot,
-      dividerColor: const Color(0x00000000),
-    );
+/// [controller]: ohne Angabe der DefaultTabController darueber.
+TabBar reiterAufRot({
+  required List<Widget> tabs,
+  EdgeInsetsGeometry? labelPadding,
+  TabController? controller,
+}) => TabBar(
+  controller: controller,
+  tabs: tabs,
+  isScrollable: tabs.length >= 4,
+  // Ohne das rueckt Material 3 schiebbare Reiter um 52 dp ein.
+  tabAlignment: tabs.length >= 4 ? TabAlignment.start : null,
+  labelPadding: labelPadding,
+  labelColor: FwvFarben.aufRot,
+  unselectedLabelColor: const Color(0xCCFFFFFF),
+  indicatorColor: FwvFarben.aufRot,
+  dividerColor: const Color(0x00000000),
+);

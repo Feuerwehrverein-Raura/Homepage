@@ -215,6 +215,7 @@ services:
       MAILCOW_API_URL: ${MAILCOW_API_URL:-https://mail.test.juroct.net}
       MAILCOW_API_KEY: ${MAILCOW_API_KEY}
       API_KEY: ${API_KEY}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}    # DEUTSCH: Push an den Vorstand bei neuem Mitgliedschaftsantrag (api-members)
       AUTHENTIK_URL: https://auth.fwv-raura.ch
       # DEUTSCH: Empfaenger des taeglichen Backup-XLSX (03:00 Europe/Zurich)
       BACKUP_EMAIL: ${BACKUP_EMAIL:-vorstand@fwv-raura.ch}

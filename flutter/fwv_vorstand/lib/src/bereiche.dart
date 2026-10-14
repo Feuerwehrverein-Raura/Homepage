@@ -13,8 +13,16 @@ import 'ui/mitglieder_ansicht.dart';
 import 'ui/nachricht_ansicht.dart';
 
 class VorstandBereich {
-  const VorstandBereich({required this.titel, required this.symbol, required this.bauen});
+  const VorstandBereich({
+    required this.schluessel,
+    required this.titel,
+    required this.symbol,
+    required this.bauen,
+  });
 
+  /// Kennung fuer Push-Mitteilungen (`data.bereich`, siehe
+  /// docker/backend-members/src/vorstand-melder.js).
+  final String schluessel;
   final String titel;
   final IconData symbol;
   final Widget Function(VorstandDienste d) bauen;
@@ -22,33 +30,46 @@ class VorstandBereich {
 
 final vorstandBereiche = <VorstandBereich>[
   VorstandBereich(
+    schluessel: 'anlaesse',
     titel: 'Anlässe',
     symbol: Icons.event_outlined,
     bauen: (d) => VerwaltungsUebersichtScreen(verwaltung: d.anlaesse, eingebettet: true),
   ),
   VorstandBereich(
+    schluessel: 'antraege',
     titel: 'Anträge',
     symbol: Icons.how_to_reg_outlined,
     bauen: (d) => AntraegeAnsicht(dienste: d),
   ),
   VorstandBereich(
+    schluessel: 'mitglieder',
     titel: 'Mitglieder',
     symbol: Icons.groups_outlined,
     bauen: (d) => MitgliederAnsicht(dienste: d),
   ),
   VorstandBereich(
+    schluessel: 'beitraege',
     titel: 'Beiträge',
     symbol: Icons.payments_outlined,
     bauen: (d) => BeitraegeAnsicht(dienste: d),
   ),
   VorstandBereich(
+    schluessel: 'nachricht',
     titel: 'Nachricht',
     symbol: Icons.campaign_outlined,
     bauen: (d) => NachrichtAnsicht(dienste: d),
   ),
   VorstandBereich(
+    schluessel: 'audit',
     titel: 'Audit',
     symbol: Icons.history_outlined,
     bauen: (d) => AuditAnsicht(dienste: d),
   ),
 ];
+
+/// Stelle des Bereichs mit [schluessel] in [vorstandBereiche], oder null.
+int? vorstandBereichIndex(String? schluessel) {
+  if (schluessel == null) return null;
+  final i = vorstandBereiche.indexWhere((b) => b.schluessel == schluessel);
+  return i < 0 ? null : i;
+}

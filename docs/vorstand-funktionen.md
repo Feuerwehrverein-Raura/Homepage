@@ -203,7 +203,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
 | [ ] | Audit-Log mit Aktionsfilter | ✓ | ½ | ✓ | – | – | GET /audit (M); A ohne Filter |
-| [ ] | Benachrichtigung bei neuen Audit-Ereignissen (Mitglied, Antrag, Anmeldung, Austritt) | – | ✓ | – | – | – | **nur in A** (alle 15 min) → in F als Push vom Backend |
+| [x] | Benachrichtigung bei neuen Audit-Ereignissen (Antrag, Austritt, Löschung, Anmeldung) | – | ✓ | – | – | ✓ | Push vom Backend (M src/vorstand-melder.js), Kanal "Vorstand", abschaltbar |
 
 ## 14. Export und Sonstiges
 

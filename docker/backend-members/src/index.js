@@ -26,6 +26,7 @@ const { schichtZugang, alleAktiven, wer } = require('./schicht-zugang');
 const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
 const { logoNachtrag } = require('./sender-logo');
+const { vorstandMelder, fcmNachricht, ABSCHALT_ART: VORSTAND_ABSCHALT_ART, ARTEN: VORSTAND_ARTEN } = require('./vorstand-melder');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -61,28 +62,6 @@ try {
  * @param {string} body             Notification-Body
  * @param {object} data             Optionale Key/Value-Strings fuer App-Routing
  */
-/**
- * DEUTSCH: Push an alle Vorstand-Mitglieder schicken (Präsident, Aktuar, Kassier,
- * Materialwart, Beisitzer). Genutzt um Vorstand ueber Mitglieder-Selbst-Aenderungen
- * zu informieren.
- */
-async function pushToVorstand(notificationType, title, body, data = {}) {
-    try {
-        const result = await pool.query(`
-            SELECT id FROM members
-            WHERE status = 'Aktivmitglied'
-              AND (funktion ILIKE '%Präsident%' OR funktion ILIKE '%Aktuar%'
-                OR funktion ILIKE '%Kassier%' OR funktion ILIKE '%Materialwart%'
-                OR funktion ILIKE '%Beisitzer%')
-        `);
-        for (const row of result.rows) {
-            sendPushToMember(row.id, notificationType, title, body, data).catch(() => {});
-        }
-    } catch (err) {
-        console.error('pushToVorstand failed:', err.message);
-    }
-}
-
 async function sendPushToMember(memberId, notificationType, title, body, data = {}) {
     if (!fcmInitialized) return;
     try {
@@ -2993,6 +2972,11 @@ app.post('/members/me/austritt', authenticateToken, async (req, res) => {
             reason: reason || null, austrittsdatum: austrittsdatum || null
         });
 
+        // Push an den Vorstand (src/vorstand-melder.js) - wartet nicht.
+        vorstandMeldung.melden('austritt', {
+            id: member.id, name: `${member.vorname || ''} ${member.nachname || ''}`.trim(), datum: austrittsdatum
+        }, { ausloeser: member.id });
+
         // E-Mail an Vorstand
         try {
             await axios.post(`${process.env.DISPATCH_API_URL || 'http://api-dispatch:3000'}/email/send`, {
@@ -3417,6 +3401,13 @@ app.delete('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), as
             member_name: memberName,
             request_id: request.id
         });
+
+        // Push an den Vorstand, ohne die Person, die die Loeschung anstoesst
+        // (src/vorstand-melder.js) - wartet nicht.
+        mitgliedZurAnmeldung(req).catch(() => null).then((wer) => vorstandMeldung.melden('loeschung', {
+            id, name: memberName,
+            von: wer ? `${wer.vorname || ''} ${wer.nachname || ''}`.trim() : req.user.email
+        }, { ausloeser: wer ? wer.id : null }));
 
         res.json({
             message: 'Löschanfrage erstellt. Aktuar und Kassier wurden per Email benachrichtigt.',
@@ -4695,6 +4686,59 @@ app.get('/members/emails/alias-config', authenticateAny, requireRole('vorstand',
 // Allowed senders for mitglieder@ alias (for Rspamd sender restriction)
 // DEUTSCH: Erlaubte Absender für mitglieder@fwv-raura.ch - wird von Rspamd als HTTP-Map abgefragt
 // Authentifizierung via INTERNAL_API_KEY Query-Parameter (kein JWT nötig, da Rspamd die URL direkt abruft)
+// --- Push an den Vorstand -------------------------------------------------
+//
+// Siehe src/vorstand-melder.js: Antraege, Austritte, Loeschungen und neue
+// Anlass-Anmeldungen. Empfaenger nach Funktion (wie die Authentik-Gruppen
+// Vorstand/admin), Abschalter "vorstand_mitteilungen" in der App.
+
+async function vorstandKandidaten() {
+    const r = await pool.query(`
+        SELECT m.id, m.funktion, m.status,
+               EXISTS (SELECT 1 FROM notification_preferences p
+                        WHERE p.member_id = m.id AND p.notification_type = $1
+                          AND p.enabled = false) AS abgeschaltet
+          FROM members m
+         WHERE COALESCE(TRIM(m.funktion), '') <> ''
+    `, [VORSTAND_ABSCHALT_ART]);
+    return r.rows;
+}
+
+async function vorstandPushSenden(memberIds, nachricht) {
+    if (!fcmInitialized || !memberIds.length) return;
+    const r = await pool.query(
+        'SELECT token FROM fcm_tokens WHERE member_id = ANY($1::uuid[])', [memberIds]);
+    const tokens = r.rows.map(t => t.token);
+    const kaputt = [];
+    for (let i = 0; i < tokens.length; i += 500) {
+        const teil = tokens.slice(i, i + 500);
+        const antwort = await admin.messaging().sendEachForMulticast(fcmNachricht(nachricht, teil));
+        antwort.responses.forEach((x, j) => {
+            if (!x.success && ['messaging/registration-token-not-registered',
+                'messaging/invalid-registration-token'].includes(x.error?.code)) kaputt.push(teil[j]);
+        });
+    }
+    if (kaputt.length) await pool.query('DELETE FROM fcm_tokens WHERE token = ANY($1::text[])', [kaputt]);
+}
+
+const vorstandMeldung = vorstandMelder({ kandidaten: vorstandKandidaten, senden: vorstandPushSenden });
+
+// Fuer api-dispatch (Mitgliedschaftsantrag) und api-events (Anmeldung).
+// Body: { art: 'antrag'|'anmeldung'|..., angaben: { id, name, anlass, ... },
+// ausloeser?: Mitglieds-Id }. Antwortet sofort; der Versand laeuft danach.
+app.post('/internal/vorstand-meldung', (req, res) => {
+    const apiKey = process.env.INTERNAL_API_KEY;
+    const provided = req.headers['x-internal-key'];
+    if (!apiKey || provided !== apiKey) return res.status(403).json({ error: 'Forbidden' });
+    const { art, angaben, ausloeser } = req.body || {};
+    if (!Object.prototype.hasOwnProperty.call(VORSTAND_ARTEN, art)) {
+        return res.status(400).json({ error: 'art unbekannt' });
+    }
+    vorstandMeldung.melden(art, angaben && typeof angaben === 'object' ? angaben : {},
+        { ausloeser: ausloeser || null });
+    res.status(202).json({ success: true });
+});
+
 // DEUTSCH: Interner Endpoint fuer andere Backends (api-events, api-dispatch),
 // um Push-Notifications an ein Mitglied zu senden. Authentifiziert per
 // INTERNAL_API_KEY (Header X-Internal-Key oder ?key=). Body:

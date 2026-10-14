@@ -63,6 +63,15 @@ class _HauptseiteState extends State<Hauptseite> {
   void initState() {
     super.initState();
     _aktiv = _externerOrganisator ? Reiter.organisator : Reiter.anlaesse;
+    // Mit einer angetippten Vorstand-Mitteilung gestartet: gleich dorthin.
+    if (widget.dienste.pushZiel.value != null) {
+      if (istVorstand(widget.dienste.sitzung.sitzung)) {
+        _aktiv = Reiter.vorstand;
+      } else {
+        scheduleMicrotask(() => widget.dienste.pushZiel.value = null);
+      }
+    }
+    widget.dienste.pushZiel.addListener(_pushZiel);
     widget.dienste.organisator.pruefen();
     widget.dienste.schopfPruefung.pruefen();
     // Nach dem (ersten) Login einmal nach dem Adressbuch fragen (Android).
@@ -70,6 +79,24 @@ class _HauptseiteState extends State<Hauptseite> {
       if (mounted) kontakteFrageStellen(context, widget.dienste);
       if (mounted) unawaited(updateHinweisZeigen(context, widget.dienste));
     });
+  }
+
+  @override
+  void dispose() {
+    widget.dienste.pushZiel.removeListener(_pushZiel);
+    super.dispose();
+  }
+
+  /// Vorstand-Mitteilung angetippt: zum Reiter Vorstand (den Bereich waehlt
+  /// der Reiter selbst). Wer nicht (mehr) Vorstand ist, bleibt, wo er ist.
+  void _pushZiel() {
+    final ziel = widget.dienste.pushZiel.value;
+    if (ziel == null || !mounted) return;
+    if (istVorstand(widget.dienste.sitzung.sitzung)) {
+      setState(() => _aktiv = Reiter.vorstand);
+    } else {
+      scheduleMicrotask(() => widget.dienste.pushZiel.value = null);
+    }
   }
 
   List<Reiter> _reiter(bool organisiert, bool lager, bool roterSchopf, {required bool seitenleiste}) =>

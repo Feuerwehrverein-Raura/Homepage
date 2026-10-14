@@ -103,7 +103,7 @@ class Dienste {
       http: http.Client(),
       beimAbmelden: (api) => abmeldenAufraeumen(api, dienste),
     );
-    return dienste = Dienste(
+    dienste = Dienste(
       sitzung: sitzung,
       authentik: kIsWeb ? websiteAnmeldung() : AppAuthAnmeldung(),
       uebernahme: AltdatenUebernahme(
@@ -118,6 +118,8 @@ class Dienste {
           : const KeinAppUpdate(),
       schopfPruefTakt: const Duration(minutes: 10),
     );
+    push.beiAntippen = dienste.pushAngetippt;
+    return dienste;
   }
 
   final SitzungsVerwaltung sitzung;
@@ -133,6 +135,18 @@ class Dienste {
 
   final PushDienst push;
   late final PushAnmeldung pushAnmeldung;
+
+  /// Wohin eine angetippte Push-Mitteilung fuehrt (Reiter Vorstand und
+  /// Bereich). Die Hauptseite wechselt dorthin, der Reiter Vorstand waehlt
+  /// den Bereich und setzt es danach auf null zurueck.
+  final pushZiel = ValueNotifier<PushZiel?>(null);
+
+  /// Eine Push-Mitteilung wurde angetippt (FirebasePush.beiAntippen).
+  void pushAngetippt(Map<String, Object?> daten) {
+    final ziel = PushZiel.ausDaten(daten);
+    if (ziel != null) pushZiel.value = ziel;
+  }
+
   final KontakteAbgleich kontakte;
 
   /// Hinweis auf neue Versionen (Play bzw. GitHub-APK; in Tests keiner).
