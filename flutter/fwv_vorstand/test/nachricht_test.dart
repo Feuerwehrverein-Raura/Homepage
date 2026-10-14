@@ -8,6 +8,8 @@ import 'package:material_ui/material_ui.dart';
 
 import 'hilfe.dart';
 
+const _chilbi = '00000000-0000-0000-0000-e00000000001';
+
 void main() {
   late FalschesBackend backend;
 
@@ -15,6 +17,21 @@ void main() {
     backend = FalschesBackend((a) {
       if ('${a.method} ${a.url.path}' == 'POST /push/broadcast') {
         return {'success': true, 'sent': 37};
+      }
+      // Kommende Anlaesse fuer "Beim Antippen öffnen" (Ideen ohne Datum nicht).
+      if ('${a.method} ${a.url.path}' == 'GET /events') {
+        return [
+          {
+            'id': _chilbi,
+            'title': 'Chilbi',
+            'app': {'gruppe': 'kommend', 'datum_text': 'Sa, 24. Oktober'},
+          },
+          {
+            'id': 'idee',
+            'title': 'Grillabend',
+            'app': {'gruppe': 'datum_offen'},
+          },
+        ];
       }
       return (404, {'error': 'nicht gefunden'});
     });
@@ -77,6 +94,28 @@ void main() {
     expect(senden(tester).onPressed, isNull);
   });
 
+  testWidgets('Beim Antippen öffnen: Anlass geht als ziel/eventId mit', (tester) async {
+    await oeffnen(tester);
+    await ausfuellen(tester);
+    expect(find.text('Die App zeigt die Mitteilung nach dem Öffnen nochmals an.'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('push-oeffnen')));
+    await tippen(tester, find.byKey(const Key('push-oeffnen')));
+    expect(find.text('Profil'), findsOneWidget);
+    expect(find.textContaining('Grillabend'), findsNothing, reason: 'nur kommende');
+    await tippen(tester, find.text('Anlass: Chilbi · Sa, 24. Oktober').last);
+
+    await tippen(tester, find.byKey(const Key('push-senden')));
+    await tippen(tester, imDialog('An alle senden'));
+    expect(backend.body('POST /push/broadcast'), {
+      'title': 'Übung am Samstag',
+      'body': 'Treffpunkt 9 Uhr Magazin.',
+      'ziel': 'anlass',
+      'eventId': _chilbi,
+    });
+    // Nach dem Senden wieder ohne Ziel.
+    expect(find.text('Die App zeigt die Mitteilung nach dem Öffnen nochmals an.'), findsOneWidget);
+  });
+
   testWidgets('Fehler: Meldung, Eingabe bleibt', (tester) async {
     backend.antwort = (_) => (502, {'error': 'Push-Broadcast fehlgeschlagen'});
     await oeffnen(tester);
@@ -108,5 +147,15 @@ void main() {
     expect(await backend.dienste.push.anAlle(titel: 'a', text: 'b'), 5);
     backend.antwort = (_) => {'success': true, 'sent': null};
     expect(await backend.dienste.push.anAlle(titel: 'a', text: 'b'), isNull);
+  });
+
+  test('PushOeffnen: Felder fuer den Body', () {
+    expect(PushOeffnen.nichts.daten, isEmpty);
+    expect(PushOeffnen.profil.daten, {'ziel': 'profil'});
+    expect(const PushOeffnen.anlass('e1', titel: 'Chilbi').daten, {
+      'ziel': 'anlass',
+      'eventId': 'e1',
+    });
+    expect(const PushOeffnen.anlass('e1'), const PushOeffnen.anlass('e1', titel: 'x'));
   });
 }

@@ -487,7 +487,8 @@ app.patch('/membership-fees/payments/:id/pay', vorstand, async (req, res) => {
             pushToMember(payment.member_id, 'general',
                 `Beitrag ${payment.year || ''} verbucht`,
                 `Dein Mitgliederbeitrag ${amt}wurde als bezahlt verbucht. Danke!`,
-                { year: String(payment.year || '') }).catch(() => {});
+                // ziel: Antippen fuehrt in der App ins Profil (Beitraege).
+                { year: String(payment.year || ''), ziel: 'beitraege' }).catch(() => {});
         }
         logInfo('Payment marked as paid', { id: req.params.id });
         res.json(payment);
@@ -541,7 +542,7 @@ async function runFeeReminders() {
         const dueStr = new Date(r.due_date).toLocaleDateString('de-CH');
         const title = `Beitrag ${r.year} offen`;
         const body = `Dein Mitgliederbeitrag ${r.year} (${amt}) ist seit ${dueStr} faellig und noch offen. Bitte begleiche ihn.`;
-        pushToMember(r.member_id, 'general', title, body, { year: String(r.year) }).catch(() => {});
+        pushToMember(r.member_id, 'general', title, body, { year: String(r.year), ziel: 'beitraege' }).catch(() => {});
         pushed++;
         if (r.email && r.zustellung_email) {
             try {

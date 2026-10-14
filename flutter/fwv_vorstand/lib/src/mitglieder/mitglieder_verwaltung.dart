@@ -6,6 +6,7 @@ import 'dart:typed_data';
 
 import 'package:fwv_core/fwv_core.dart';
 
+import '../push_dienst.dart';
 import 'modelle.dart';
 
 /// Ergebnis von POST /push/to-members.
@@ -125,11 +126,13 @@ class MitgliederVerwaltung {
   }
 
   /// App-Push (Kanal "general") an die Mitglieder, auf Wunsch auch per Mail.
+  /// [oeffnen]: wohin das Antippen in der App fuehrt.
   Future<Benachrichtigt> benachrichtigen(
     List<String> ids, {
     required String titel,
     required String text,
     bool auchEmail = false,
+    PushOeffnen oeffnen = PushOeffnen.nichts,
   }) async {
     final json = _map(
       await api.post(
@@ -139,6 +142,7 @@ class MitgliederVerwaltung {
           'title': titel.trim(),
           'body': text.trim(),
           'alsoEmail': auchEmail,
+          ...oeffnen.daten,
         },
       ),
     );

@@ -34,6 +34,7 @@ export 'src/ui/mitglieder_ansicht.dart';
 export 'src/ui/nachricht/empfaenger_auswahl.dart';
 export 'src/ui/nachricht/pingen_ansicht.dart';
 export 'src/ui/nachricht/push_ansicht.dart';
+export 'src/ui/nachricht/push_oeffnen_feld.dart';
 export 'src/ui/nachricht/verfassen_ansicht.dart';
 export 'src/ui/nachricht/verlauf_ansicht.dart';
 export 'src/ui/nachricht_ansicht.dart';

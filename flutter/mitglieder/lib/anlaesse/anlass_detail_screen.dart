@@ -34,7 +34,16 @@ class _AnlassDetailScreenState extends State<AnlassDetailScreen> {
   Anlass? _anlass;
 
   Future<Anlass> _laden() async {
-    final a = await widget.dienste.anlaesse.anlass(widget.anlassId);
+    final Anlass a;
+    try {
+      a = await widget.dienste.anlaesse.anlass(widget.anlassId);
+    } on ApiFehler catch (f) {
+      // Z.B. aus einer alten Push-Mitteilung: den Anlass gibt es nicht mehr.
+      if (f.status == 404) {
+        throw const ApiFehler('Diesen Anlass gibt es nicht mehr.', status: 404);
+      }
+      rethrow;
+    }
     if (mounted) setState(() => _anlass = a);
     return a;
   }

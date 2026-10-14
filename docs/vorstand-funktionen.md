@@ -56,7 +56,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [x] | Profilfoto hochladen (Galerie) | ✓ | ✓ | ½ | – | ✓ | POST /members/:id/photo; D nur API |
 | [x] | Profilfoto mit Kamera | – | ✓ | – | – | ✓ | **nur in A** |
 | [x] | Profilfoto loeschen | ✓ | ✓ | ½ | – | ✓ | DELETE /members/:id/photo |
-| [x] | Mitglied benachrichtigen (Push, optional E-Mail) | ✓ | ✓ | ✓ | – | ✓ | POST /push/to-members (E) |
+| [x] | Mitglied benachrichtigen (Push, optional E-Mail) | ✓ | ✓ | ✓ | – | ✓ | POST /push/to-members (E); F: «Beim Antippen öffnen» (ziel anlass+eventId / profil, sonst Dialog in der App) |
 | [x] | Anrufen/Mail/Karte aus dem Detail | – | – | – | – | ✓ | in keiner Variante – fuers Handy sinnvoll |
 | [ ] | Telefonliste PDF | ✓ | – | ✓ | – | – | GET /members/pdf/telefonliste |
 | [ ] | CSV-Export (alle, aktiv, Post, E-Mail) | ✓ | – | – | – | – | **nur in W** (Client) |
@@ -144,7 +144,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [ ] | Entwuerfe | ½ | – | – | – | – | W nur localStorage |
 | [ ] | Zeitgesteuert senden / «Geplant» | ½ | – | – | – | – | W Platzhalter |
 | [x] | Versandverlauf mit Filter | ✓ | ✓ | ✓ | – | ✓ | GET /dispatch-log |
-| [x] | App-Push an alle | ✓ | ✓ | ✓ | – | ✓ | POST /push/broadcast (E) |
+| [x] | App-Push an alle | ✓ | ✓ | ✓ | – | ✓ | POST /push/broadcast (E); F: «Beim Antippen öffnen» wie beim Benachrichtigen (E src/push-ziel.js) |
 | [ ] | Vorlagen anlegen/bearbeiten/loeschen | ½ | – | ✓ | – | – | /templates (D); W-Editor tot; **nur in D** nutzbar |
 | [x] | Massen-PDF per Post an Auswahl (Kostenschaetzung, Staging) | ½ | ✓ | ✓ | – | ✓ | POST /pingen/send-bulk-pdf; F braucht umgebung.pdfWaehlen |
 

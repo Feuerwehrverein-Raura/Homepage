@@ -47,17 +47,20 @@ void main() {
           'bereich': 'antraege',
           'id': '12',
         }),
-        const PushZiel(bereich: 'antraege', id: '12'),
+        const VorstandZiel(bereich: 'antraege', id: '12'),
       );
       expect(
         PushZiel.ausDaten({'notificationType': 'vorstand_anmeldung', 'bereich': 'anlaesse'}),
-        const PushZiel(bereich: 'anlaesse'),
+        const VorstandZiel(bereich: 'anlaesse'),
       );
       // Ohne Bereich wenigstens in den Reiter Vorstand.
-      expect(PushZiel.ausDaten({'notificationType': 'vorstand_austritt'})?.bereich, 'antraege');
+      expect(
+        PushZiel.ausDaten({'notificationType': 'vorstand_austritt'}),
+        const VorstandZiel(bereich: 'antraege'),
+      );
     });
 
-    test('andere Mitteilungen fuehren nirgends hin', () {
+    test('andere Mitteilungen fuehren nicht in den Vorstand', () {
       expect(PushZiel.ausDaten({'notificationType': 'event_update', 'bereich': 'x'}), isNull);
       expect(PushZiel.ausDaten({}), isNull);
       expect(istVorstandMitteilung({'notificationType': 'vorstand_loeschung'}), isTrue);
@@ -143,7 +146,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(vorstandBereich(tester), 2);
 
-    // Andere Mitteilungen aendern nichts.
+    // Andere Mitteilungen (ohne Anlass, ohne Text) aendern nichts.
     d.pushAngetippt({'notificationType': 'event_update'});
     await tester.pumpAndSettle();
     expect(vorstandBereich(tester), 2);

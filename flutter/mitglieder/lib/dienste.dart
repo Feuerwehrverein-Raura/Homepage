@@ -149,9 +149,10 @@ class Dienste {
   final PushDienst push;
   late final PushAnmeldung pushAnmeldung;
 
-  /// Wohin eine angetippte Push-Mitteilung fuehrt (Reiter Vorstand und
-  /// Bereich). Die Hauptseite wechselt dorthin, der Reiter Vorstand waehlt
-  /// den Bereich und setzt es danach auf null zurueck.
+  /// Wohin eine angetippte Push-Mitteilung fuehrt ([PushZiel]). Die
+  /// Hauptseite fuehrt dorthin (Anlass, Profil, Dialog) und setzt es danach
+  /// auf null zurueck; bei [VorstandZiel] waehlt der Reiter Vorstand den
+  /// Bereich und setzt es zurueck.
   final pushZiel = ValueNotifier<PushZiel?>(null);
 
   /// Eine Push-Mitteilung wurde angetippt (FirebasePush.beiAntippen).

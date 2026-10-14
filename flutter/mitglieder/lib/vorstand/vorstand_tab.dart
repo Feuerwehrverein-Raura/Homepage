@@ -11,6 +11,7 @@ import 'package:fwv_vorstand/fwv_vorstand.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
+import '../push/push_dienst.dart';
 
 class VorstandTab extends StatefulWidget {
   const VorstandTab({super.key, required this.dienste});
@@ -27,7 +28,11 @@ class _VorstandTabState extends State<VorstandTab> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    final ziel = widget.dienste.pushZiel.value;
+    // Nur Vorstand-Mitteilungen; alles andere erledigt die Hauptseite.
+    final ziel = switch (widget.dienste.pushZiel.value) {
+      final VorstandZiel z => z,
+      _ => null,
+    };
     _reiter = TabController(
       length: vorstandBereiche.length,
       vsync: this,
@@ -46,7 +51,7 @@ class _VorstandTabState extends State<VorstandTab> with SingleTickerProviderStat
 
   void _pushZiel() {
     final ziel = widget.dienste.pushZiel.value;
-    if (ziel == null || !mounted) return;
+    if (ziel is! VorstandZiel || !mounted) return;
     final i = vorstandBereichIndex(ziel.bereich);
     if (i != null) _reiter.animateTo(i);
     _erledigt();

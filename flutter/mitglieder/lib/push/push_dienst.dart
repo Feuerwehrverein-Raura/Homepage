@@ -14,6 +14,9 @@
 //    "fwv_vorstand" (Vorstand) - so laesst er sich auf dem Telefon getrennt
 //    stumm schalten. Antippen oeffnet den Reiter Vorstand im passenden
 //    Bereich (`data.bereich`, [PushZiel]).
+//  - Andere Mitteilungen fuehren zum Anlass (`data.eventId`), ins Profil
+//    (`data.ziel`) oder zeigen sich ohne Ziel nochmals als Dialog
+//    ([PushZiel.ausDaten]). Titel und Text gehen dafuer mit ([mitText]).
 //  - Beim Abmelden wird das Token beim Backend abgemeldet
 //    (`DELETE members/me/fcm-token`) und auf dem Geraet verworfen — so kommt
 //    auch dann nichts mehr an, wenn das Abmelden beim Backend scheitert (das
@@ -40,37 +43,129 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:fwv_core/fwv_core.dart';
 
-/// Wohin das Antippen einer Push-Mitteilung fuehrt. Bisher nur Mitteilungen
-/// an den Vorstand: Reiter Vorstand, Bereich [bereich] (Schluessel aus
-/// fwv_vorstand `vorstandBereiche`, z.B. "antraege"), optional mit [id].
+/// Wohin das Antippen einer Push-Mitteilung fuehrt ([PushZiel.ausDaten]).
+/// Die Hauptseite fuehrt dorthin ([Dienste.pushZiel]).
+///
+/// Schluessel in den Daten der Nachricht (docker/backend-events/src/push-ziel.js,
+/// docker/backend-members/src/push-daten.js):
+///  - notificationType vorstand_*: Reiter Vorstand, Bereich `bereich`.
+///  - ziel 'anlass' + eventId (event_update und shift_reminder auch ohne
+///    ziel): der Anlass.
+///  - ziel 'profil' bzw. 'beitraege': Reiter Profil.
+///  - sonst (z.B. Push an alle ohne Ziel, aeltere Nachrichten): die
+///    Mitteilung nochmals als Dialog (`title`, `body`).
 @immutable
-class PushZiel {
-  const PushZiel({required this.bereich, this.id});
+sealed class PushZiel {
+  const PushZiel();
+
+  /// Aus den Daten der Nachricht; null, wenn sie nirgends hinfuehrt.
+  static PushZiel? ausDaten(Map<String, Object?> daten) {
+    String? wert(String schluessel) {
+      final w = daten[schluessel];
+      return w is String && w.trim().isNotEmpty ? w.trim() : null;
+    }
+
+    final art = wert('notificationType');
+    // "Im Schopf laeuft ..." - nur die App oeffnen.
+    if (art == 'schopf_musik') return null;
+    if (art != null && art.startsWith('vorstand_')) {
+      return VorstandZiel(
+        // Ohne Bereich (aeltere Backends): wenigstens der Reiter Vorstand.
+        bereich: wert('bereich') ?? 'antraege',
+        id: wert('id'),
+      );
+    }
+    final ziel = wert('ziel');
+    final anlass = wert('eventId');
+    final zumAnlass =
+        ziel == 'anlass' || (ziel == null && (art == 'event_update' || art == 'shift_reminder'));
+    if (zumAnlass && anlass != null) return AnlassZiel(anlass);
+    final titel = wert('title');
+    final text = wert('body');
+    if (ziel == 'profil') return const ProfilZiel();
+    if (ziel == 'beitraege') return ProfilZiel(beitraege: true, titel: titel, text: text);
+    if (titel == null && text == null) return null;
+    return MitteilungZiel(titel: titel ?? 'FWV Raura', text: text ?? '');
+  }
+}
+
+/// Mitteilung an den Vorstand: Reiter Vorstand, Bereich [bereich]
+/// (Schluessel aus fwv_vorstand `vorstandBereiche`, z.B. "antraege"),
+/// optional mit [id].
+final class VorstandZiel extends PushZiel {
+  const VorstandZiel({required this.bereich, this.id});
 
   final String bereich;
   final String? id;
 
-  /// Aus den Daten der Nachricht; null, wenn sie nirgends hinfuehrt.
-  static PushZiel? ausDaten(Map<String, Object?> daten) {
-    final art = daten['notificationType'];
-    if (art is! String || !art.startsWith('vorstand_')) return null;
-    final bereich = daten['bereich'];
-    final id = daten['id'];
-    return PushZiel(
-      // Ohne Bereich (aeltere Backends): wenigstens der Reiter Vorstand.
-      bereich: bereich is String && bereich.isNotEmpty ? bereich : 'antraege',
-      id: id is String && id.isNotEmpty ? id : null,
-    );
-  }
-
   @override
-  bool operator ==(Object other) => other is PushZiel && other.bereich == bereich && other.id == id;
+  bool operator ==(Object other) =>
+      other is VorstandZiel && other.bereich == bereich && other.id == id;
 
   @override
   int get hashCode => Object.hash(bereich, id);
 
   @override
-  String toString() => 'PushZiel($bereich, $id)';
+  String toString() => 'VorstandZiel($bereich, $id)';
+}
+
+/// Ein Anlass (UUID): Reiter Anlaesse und die Detailseite.
+final class AnlassZiel extends PushZiel {
+  const AnlassZiel(this.anlassId);
+
+  final String anlassId;
+
+  @override
+  bool operator ==(Object other) => other is AnlassZiel && other.anlassId == anlassId;
+
+  @override
+  int get hashCode => anlassId.hashCode;
+
+  @override
+  String toString() => 'AnlassZiel($anlassId)';
+}
+
+/// Reiter Profil. Bei [beitraege] (Zahlung verbucht, Beitrag offen) zeigt
+/// die App die Mitteilung zusaetzlich als Dialog - eine eigene Beitrags-
+/// Ansicht fuer Mitglieder gibt es (noch) nicht.
+final class ProfilZiel extends PushZiel {
+  const ProfilZiel({this.beitraege = false, this.titel, this.text});
+
+  final bool beitraege;
+  final String? titel;
+  final String? text;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ProfilZiel &&
+      other.beitraege == beitraege &&
+      other.titel == titel &&
+      other.text == text;
+
+  @override
+  int get hashCode => Object.hash(beitraege, titel, text);
+
+  @override
+  String toString() => 'ProfilZiel(beitraege: $beitraege, $titel)';
+}
+
+/// Ohne Ziel: die Mitteilung nach dem Oeffnen nochmals als Dialog, damit
+/// sie nicht verloren geht.
+final class MitteilungZiel extends PushZiel {
+  const MitteilungZiel({required this.titel, required this.text});
+
+  final String titel;
+  final String text;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MitteilungZiel && other.titel == titel && other.text == text;
+
+  @override
+  int get hashCode => Object.hash(titel, text);
+
+  @override
+  String toString() => 'MitteilungZiel($titel)';
 }
 
 /// Ist das eine Mitteilung an den Vorstand (eigener Android-Kanal)?
@@ -78,6 +173,14 @@ bool istVorstandMitteilung(Map<String, Object?> daten) {
   final art = daten['notificationType'];
   return art is String && art.startsWith('vorstand_');
 }
+
+/// Die Daten einer Nachricht mit `title` und `body` (aus `notification`),
+/// soweit sie dort fehlen.
+Map<String, Object?> mitText(Map<String, Object?> daten, {String? titel, String? text}) => {
+  ...daten,
+  if (titel != null && daten['title'] == null) 'title': titel,
+  if (text != null && daten['body'] == null) 'body': text,
+};
 
 /// Ob dieses Geraet Mitteilungen anzeigen darf.
 enum PushErlaubnis { erlaubt, abgelehnt, nichtGefragt, nichtVerfuegbar }
@@ -217,13 +320,13 @@ class FirebasePush implements PushDienst {
       _tokenAbo = m.onTokenRefresh.listen((t) => _beiNeuemToken?.call(t));
       _nachrichtAbo = FirebaseMessaging.onMessage.listen(_imVordergrund);
       // Angetippt im Hintergrund (Android zeigte sie selbst an, bzw. iOS).
-      _geoeffnetAbo = FirebaseMessaging.onMessageOpenedApp.listen((n) => _angetippt(n.data));
+      _geoeffnetAbo = FirebaseMessaging.onMessageOpenedApp.listen((n) => _angetippt(_daten(n)));
       _bereit = true;
       // Die App wurde durch Antippen gestartet: von Firebase (Hintergrund)
       // oder von der selbst gezeigten Mitteilung.
       final start = await m.getInitialMessage();
       if (start != null) {
-        _angetippt(start.data);
+        _angetippt(_daten(start));
       } else if (Platform.isAndroid) {
         final details = await _anzeige.getNotificationAppLaunchDetails();
         if (details?.didNotificationLaunchApp ?? false) {
@@ -259,7 +362,9 @@ class FirebasePush implements PushDienst {
       id: Random().nextInt(1 << 31),
       title: titel,
       body: text,
-      payload: jsonEncode(n.data),
+      // Titel und Text mit: ohne Ziel zeigt die App sie nach dem Antippen
+      // nochmals ([MitteilungZiel]).
+      payload: jsonEncode(mitText(n.data, titel: titel, text: text)),
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           k.id,
@@ -272,6 +377,11 @@ class FirebasePush implements PushDienst {
       ),
     );
   }
+
+  /// Daten einer angetippten Nachricht, mit Titel und Text aus
+  /// `notification` (die FCM-Daten selbst haben sie nicht).
+  static Map<String, Object?> _daten(RemoteMessage n) =>
+      mitText(n.data, titel: n.notification?.title, text: n.notification?.body);
 
   void _angetippt(Map<String, Object?> daten) {
     try {

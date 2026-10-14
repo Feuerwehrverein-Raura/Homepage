@@ -7,6 +7,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../mitglieder/mitglieder_verwaltung.dart';
 import '../../mitglieder/modelle.dart';
+import '../../push_dienst.dart';
+import '../nachricht/push_oeffnen_feld.dart';
 
 /// Profilfoto rund; ohne Foto (oder wenn es nicht laedt) die Initialen.
 ///
@@ -126,7 +128,8 @@ class DatumFeld extends StatelessWidget {
   }
 }
 
-/// Dialog "Benachrichtigen": Titel, Nachricht, optional per E-Mail.
+/// Dialog "Benachrichtigen": Titel, Nachricht, optional per E-Mail und was
+/// das Antippen in der App oeffnet.
 /// Schickt selbst und meldet das Ergebnis.
 Future<void> benachrichtigen(
   BuildContext context,
@@ -161,6 +164,7 @@ class _BenachrichtigenDialogState extends State<_BenachrichtigenDialog> {
   final _text = TextEditingController();
   bool _auchEmail = false;
   bool _sendet = false;
+  PushOeffnen _oeffnen = PushOeffnen.nichts;
 
   @override
   void dispose() {
@@ -178,6 +182,7 @@ class _BenachrichtigenDialogState extends State<_BenachrichtigenDialog> {
         titel: _titel.text,
         text: _text.text,
         auchEmail: _auchEmail,
+        oeffnen: _oeffnen,
       );
       if (mounted) Navigator.of(context).pop(r);
     } on Object catch (e) {
@@ -225,6 +230,13 @@ class _BenachrichtigenDialogState extends State<_BenachrichtigenDialog> {
                   onChanged: hatEmail ? (v) => setState(() => _auchEmail = v) : null,
                   title: const Text('Zusätzlich per E-Mail'),
                   subtitle: hatEmail ? null : const Text('Keine E-Mail-Adresse hinterlegt'),
+                ),
+                const SizedBox(height: 8),
+                PushOeffnenFeld(
+                  api: widget.verwaltung.api,
+                  wert: _oeffnen,
+                  aktiv: !_sendet,
+                  geaendert: (w) => setState(() => _oeffnen = w),
                 ),
               ],
             ),

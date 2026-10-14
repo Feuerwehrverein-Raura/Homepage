@@ -3,13 +3,16 @@
 // Ansicht (Verfassen · Verlauf · Pingen · App-Push).
 //
 // Vorbild: vorstand.html (push-modal). Backend: api-events POST
-// /push/broadcast {title, body} -> {success, sent}.
+// /push/broadcast {title, body, ziel?, eventId?} -> {success, sent}.
+// "Beim Antippen öffnen" ([PushOeffnenFeld]): nichts, ein Anlass oder das
+// Profil in der Mitglieder-App.
 
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../dienste.dart';
 import '../../push_dienst.dart';
+import 'push_oeffnen_feld.dart';
 
 class PushAnsicht extends StatefulWidget {
   const PushAnsicht({super.key, required this.dienste});
@@ -34,6 +37,7 @@ class _PushAnsichtState extends State<PushAnsicht> {
   final _titel = TextEditingController();
   final _text = TextEditingController();
   var _sendet = false;
+  var _oeffnen = PushOeffnen.nichts;
   _Versand? _ergebnis;
 
   @override
@@ -74,12 +78,13 @@ class _PushAnsichtState extends State<PushAnsicht> {
     if (!ok || !mounted) return;
     setState(() => _sendet = true);
     try {
-      final geraete = await widget.dienste.push.anAlle(titel: titel, text: text);
+      final geraete = await widget.dienste.push.anAlle(titel: titel, text: text, oeffnen: _oeffnen);
       if (!mounted) return;
       setState(() {
         _ergebnis = _Versand(titel: titel, geraete: geraete);
         _titel.clear();
         _text.clear();
+        _oeffnen = PushOeffnen.nichts;
       });
     } on Object catch (e) {
       if (mounted) meldung(context, 'Push fehlgeschlagen: ${fehlerText(e)}');
@@ -162,6 +167,13 @@ class _PushAnsichtState extends State<PushAnsicht> {
                     : 'Das Wichtigste zuerst.',
                 helperMaxLines: 2,
               ),
+            ),
+            const SizedBox(height: 12),
+            PushOeffnenFeld(
+              api: widget.dienste.api,
+              wert: _oeffnen,
+              aktiv: !_sendet,
+              geaendert: (w) => setState(() => _oeffnen = w),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(

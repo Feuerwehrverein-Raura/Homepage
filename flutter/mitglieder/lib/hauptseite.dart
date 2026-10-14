@@ -14,6 +14,11 @@
 // oder waehrend der eigenen Schicht ([Dienste.roterSchopfSichtbar]). Die Reiter werden
 // erst beim ersten Oeffnen gebaut und bleiben danach erhalten (Scroll-Stand,
 // geladene Daten).
+//
+// Eine angetippte Push-Mitteilung ([Dienste.pushZiel], [PushZiel]) fuehrt
+// hierher: Vorstand-Mitteilungen in den Reiter Vorstand, Anlass-Mitteilungen
+// in den Reiter Anlaesse mit der Detailseite, Profil/Beitraege in den Reiter
+// Profil; ohne Ziel zeigt ein Dialog die Mitteilung nochmals.
 
 import 'dart:async';
 
@@ -22,7 +27,7 @@ import 'package:fwv_roterschopf/fwv_roterschopf.dart' show MusikScreen;
 import 'package:fwv_vorstand/fwv_vorstand.dart' show istVorstand;
 import 'package:material_ui/material_ui.dart';
 
-import 'anlaesse/anlaesse_tab.dart';
+import 'anlaesse/anlaesse_tab.dart' show AnlaesseTab, anlassOeffnen;
 import 'dienste.dart';
 import 'einstellungen/adressbuch.dart';
 import 'einstellungen/einstellungen_tab.dart';
@@ -31,13 +36,24 @@ import 'einstellungen/update_hinweis.dart';
 import 'lager/lager_tab.dart';
 import 'organisator/organisator_tab.dart';
 import 'profil/profil_tab.dart';
+import 'push/push_dienst.dart';
 import 'roterschopf/roterschopf_tab.dart';
 import 'vorstand/vorstand_tab.dart';
 
 /// [musik] und [gruppen] gibt es nur mit Seitenleiste (grosse Bildschirme):
 /// Dort stehen die Unterpunkte von "Mehr" direkt in der Leiste. Auf dem Handy
 /// sind sie Teil der Einstellungen.
-enum Reiter { anlaesse, organisator, vorstand, lager, roterSchopf, profil, musik, gruppen, einstellungen }
+enum Reiter {
+  anlaesse,
+  organisator,
+  vorstand,
+  lager,
+  roterSchopf,
+  profil,
+  musik,
+  gruppen,
+  einstellungen,
+}
 
 /// Ab dieser Breite stehen die Reiter links als Seitenleiste (Material:
 /// "medium" ab 600, hier etwas spaeter - darunter passt die Leiste unten
@@ -63,13 +79,21 @@ class _HauptseiteState extends State<Hauptseite> {
   void initState() {
     super.initState();
     _aktiv = _externerOrganisator ? Reiter.organisator : Reiter.anlaesse;
-    // Mit einer angetippten Vorstand-Mitteilung gestartet: gleich dorthin.
-    if (widget.dienste.pushZiel.value != null) {
-      if (istVorstand(widget.dienste.sitzung.sitzung)) {
-        _aktiv = Reiter.vorstand;
-      } else {
-        scheduleMicrotask(() => widget.dienste.pushZiel.value = null);
-      }
+    // Mit einer angetippten Mitteilung gestartet: gleich dorthin. Vorstand:
+    // der Reiter liest den Bereich beim Aufbau selbst; alles andere nach dem
+    // ersten Bild (Detailseite, Dialog brauchen den Navigator).
+    switch (widget.dienste.pushZiel.value) {
+      case null:
+        break;
+      case VorstandZiel():
+        if (istVorstand(widget.dienste.sitzung.sitzung)) {
+          _aktiv = Reiter.vorstand;
+        } else {
+          _zielErledigt();
+        }
+      case final ziel:
+        _aktiv = _reiterFuer(ziel) ?? _aktiv;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _pushZiel());
     }
     widget.dienste.pushZiel.addListener(_pushZiel);
     widget.dienste.organisator.pruefen();
@@ -87,20 +111,70 @@ class _HauptseiteState extends State<Hauptseite> {
     super.dispose();
   }
 
-  /// Vorstand-Mitteilung angetippt: zum Reiter Vorstand (den Bereich waehlt
-  /// der Reiter selbst). Wer nicht (mehr) Vorstand ist, bleibt, wo er ist.
+  /// Ziel zuruecksetzen - erst nach den anderen Zuhoerern (Reiter Vorstand).
+  void _zielErledigt() => scheduleMicrotask(() => widget.dienste.pushZiel.value = null);
+
+  /// In welchen Reiter ein Ziel fuehrt (null: bleiben, wo man ist). Externe
+  /// Organisatoren haben kein Profil.
+  Reiter? _reiterFuer(PushZiel ziel) => switch (ziel) {
+    VorstandZiel() => Reiter.vorstand,
+    AnlassZiel() => Reiter.anlaesse,
+    ProfilZiel() => _externerOrganisator ? null : Reiter.profil,
+    MitteilungZiel() => null,
+  };
+
+  /// Mitteilung angetippt. Vorstand: zum Reiter Vorstand (den Bereich waehlt
+  /// der Reiter selbst); wer nicht (mehr) Vorstand ist, bleibt, wo er ist.
+  /// Anlass: Reiter Anlaesse und die Detailseite (sie laedt den Anlass per
+  /// ID und meldet, wenn es ihn nicht mehr gibt). Profil: Reiter Profil,
+  /// bei Beitraegen mit der Mitteilung. Ohne Ziel: die Mitteilung als Dialog.
   void _pushZiel() {
     final ziel = widget.dienste.pushZiel.value;
     if (ziel == null || !mounted) return;
-    if (istVorstand(widget.dienste.sitzung.sitzung)) {
-      setState(() => _aktiv = Reiter.vorstand);
-    } else {
-      scheduleMicrotask(() => widget.dienste.pushZiel.value = null);
+    if (ziel is VorstandZiel) {
+      if (istVorstand(widget.dienste.sitzung.sitzung)) {
+        setState(() => _aktiv = Reiter.vorstand);
+      } else {
+        _zielErledigt();
+      }
+      return;
+    }
+    _zielErledigt();
+    final reiter = _reiterFuer(ziel);
+    if (reiter != null && reiter != _aktiv) setState(() => _aktiv = reiter);
+    switch (ziel) {
+      case AnlassZiel(:final anlassId):
+        unawaited(anlassOeffnen(context, widget.dienste, anlassId));
+      case ProfilZiel(:final beitraege, :final titel, :final text):
+        // Externe Organisatoren landen nicht im Profil: dann wenigstens die
+        // Mitteilung.
+        if ((beitraege || reiter == null) && (titel != null || text != null)) {
+          unawaited(_mitteilungZeigen(titel ?? 'FWV Raura', text ?? ''));
+        }
+      case MitteilungZiel(:final titel, :final text):
+        unawaited(_mitteilungZeigen(titel, text));
+      case VorstandZiel():
+        break;
     }
   }
 
-  List<Reiter> _reiter(bool organisiert, bool lager, bool roterSchopf, {required bool seitenleiste}) =>
-      _externerOrganisator
+  Future<void> _mitteilungZeigen(String titel, String text) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      key: const Key('push-mitteilung'),
+      icon: const Icon(Icons.notifications_outlined),
+      title: Text(titel),
+      content: text.isEmpty ? null : SingleChildScrollView(child: Text(text)),
+      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
+    ),
+  );
+
+  List<Reiter> _reiter(
+    bool organisiert,
+    bool lager,
+    bool roterSchopf, {
+    required bool seitenleiste,
+  }) => _externerOrganisator
       ? const [Reiter.organisator, Reiter.anlaesse, Reiter.einstellungen]
       : [
           Reiter.anlaesse,
@@ -243,7 +317,9 @@ class _HauptseiteState extends State<Hauptseite> {
         // zum ersten - Musik und Gruppen (Fenster schmaler geworden) zurueck
         // zu den Einstellungen, wo sie dann stehen.
         if (!reiter.contains(_aktiv)) {
-          _aktiv = (_aktiv == Reiter.musik || _aktiv == Reiter.gruppen) && reiter.contains(Reiter.einstellungen)
+          _aktiv =
+              (_aktiv == Reiter.musik || _aktiv == Reiter.gruppen) &&
+                  reiter.contains(Reiter.einstellungen)
               ? Reiter.einstellungen
               : reiter.first;
         }
@@ -282,7 +358,9 @@ class _HauptseiteState extends State<Hauptseite> {
                     // minWidth ist die Spalte der Symbole - auch ausgeklappt.
                     minWidth: 88,
                     minExtendedWidth: 220,
-                    labelType: ausgeklappt ? NavigationRailLabelType.none : NavigationRailLabelType.all,
+                    labelType: ausgeklappt
+                        ? NavigationRailLabelType.none
+                        : NavigationRailLabelType.all,
                     groupAlignment: -1,
                     // Ausgeklappt: die Anleitungen unten in der Leiste.
                     trailing: ausgeklappt && !_externerOrganisator ? _hilfe() : null,

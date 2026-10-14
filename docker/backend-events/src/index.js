@@ -20,6 +20,7 @@ const { anlassIcs, icsDateiname } = require('./ics');
 const { mitAnlassLogo } = require('./anlass-mail');
 const mitorganisatoren = require('./mitorganisatoren');
 const { schichtenPruefen } = require('./schicht-eintrag');
+const { pushZielDaten, mitZiel } = require('./push-ziel');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -48,7 +49,8 @@ async function pushToMember(memberId, notificationType, title, body, data = {}) 
         return;
     }
     try {
-        await axios.post(url, { memberId, notificationType, title, body, data },
+        // Anlass-Mitteilungen mit eventId: ziel 'anlass' (src/push-ziel.js).
+        await axios.post(url, { memberId, notificationType, title, body, data: mitZiel(notificationType, data) },
             { headers: { 'X-Internal-Key': key }, timeout: 5000 });
     } catch (err) {
         console.error('pushToMember failed:', err.message);
@@ -166,7 +168,7 @@ async function notifySlotFreed({ eventId, prevStatus, freedPersons = 1 }) {
                 notificationType: 'event_update',
                 title: subject,
                 body,
-                data: { eventId }
+                data: mitZiel('event_update', { eventId })
             }, {
                 headers: { 'X-Internal-Key': process.env.INTERNAL_API_KEY },
                 timeout: 10000
@@ -1443,7 +1445,7 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
                 notificationType: 'event_update',
                 title: `Neuer Anlass: ${newEvent.title}`,
                 body: `${dateStr ? dateStr + ' — ' : ''}Jetzt in der App anmelden.`,
-                data: { eventId: newEvent.id }
+                data: mitZiel('event_update', { eventId: newEvent.id })
             }, { headers: { 'X-Internal-Key': process.env.INTERNAL_API_KEY }, timeout: 10000 })
                 .catch(e => console.error('Neuer-Anlass-Broadcast fehlgeschlagen:', e.message));
         }
@@ -5330,16 +5332,37 @@ app.post('/events/:id/notify-registrants-as-organizer', authenticateAny, async (
     }
 });
 
+// DEUTSCH: Ziel eines Vorstand-Pushs ({ ziel, eventId } im Body) pruefen:
+// { daten } fuer FCM, oder { fehler } (unbekanntes Ziel, Anlass fehlt).
+async function pushZielPruefen(eingabe) {
+    let daten;
+    try {
+        daten = pushZielDaten(eingabe);
+    } catch (e) {
+        return { fehler: e.error || 'Ungültiges Ziel' };
+    }
+    if (daten.eventId) {
+        const ev = await pool.query('SELECT id FROM events WHERE id = $1', [daten.eventId]);
+        if (ev.rows.length === 0) return { fehler: 'Anlass nicht gefunden' };
+    }
+    return { daten };
+}
+
 // DEUTSCH: Vorstand/Admin — App-Push-Broadcast an alle Mitglieder. Kanal
 // 'general' (Mitglieder koennen ihn in der App-Einstellung abschalten). Erreicht
 // nur Mitglieder mit installierter App + erlaubten Benachrichtigungen; E-Mail/Post
 // bleiben die universellen Kanaele. Leitet an api-members /internal/push-broadcast.
+// Optional ziel ('anlass' + eventId, 'profil', 'beitraege'): wohin das Antippen
+// in der App fuehrt; ohne Ziel zeigt die App die Mitteilung als Dialog.
 app.post('/push/broadcast', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { title, body } = req.body || {};
         if (!title || !String(title).trim() || !body || !String(body).trim()) {
             return res.status(400).json({ error: 'title und body sind erforderlich' });
         }
+        // Optional: wohin das Antippen fuehrt (src/push-ziel.js).
+        const ziel = await pushZielPruefen(req.body);
+        if (ziel.fehler) return res.status(400).json({ error: ziel.fehler });
         const key = process.env.INTERNAL_API_KEY;
         if (!key) return res.status(500).json({ error: 'INTERNAL_API_KEY nicht gesetzt' });
         const membersUrl = (process.env.MEMBERS_API_URL || 'http://api-members:3000') + '/internal/push-broadcast';
@@ -5347,7 +5370,7 @@ app.post('/push/broadcast', authenticateAny, requireRole('vorstand', 'admin'), a
             notificationType: 'general',
             title: String(title).trim(),
             body: String(body).trim(),
-            data: {}
+            data: ziel.daten
         }, { headers: { 'X-Internal-Key': key }, timeout: 15000 });
         res.json({ success: true, sent: resp.data?.sent ?? null });
     } catch (error) {
@@ -5358,6 +5381,7 @@ app.post('/push/broadcast', authenticateAny, requireRole('vorstand', 'admin'), a
 
 // DEUTSCH: Vorstand/Admin — gezielte Benachrichtigung an AUSGEWAEHLTE Mitglieder
 // (Push, optional zusaetzlich E-Mail). memberIds = Array von Mitglieds-UUIDs.
+// Optional ziel/eventId wie bei /push/broadcast.
 app.post('/push/to-members', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { memberIds, title, body, alsoEmail } = req.body || {};
@@ -5367,6 +5391,8 @@ app.post('/push/to-members', authenticateAny, requireRole('vorstand', 'admin'), 
         if (!title || !String(title).trim() || !body || !String(body).trim()) {
             return res.status(400).json({ error: 'title und body erforderlich' });
         }
+        const ziel = await pushZielPruefen(req.body);
+        if (ziel.fehler) return res.status(400).json({ error: ziel.fehler });
         const t = String(title).trim(), b = String(body).trim();
         const fwd = req.headers['authorization'] ? { headers: { Authorization: req.headers['authorization'] } } : {};
         let members = [];
@@ -5377,7 +5403,7 @@ app.post('/push/to-members', authenticateAny, requireRole('vorstand', 'admin'), 
         const byId = new Map(members.map(m => [m.id, m]));
         let pushed = 0, emailed = 0;
         for (const id of memberIds) {
-            pushToMember(id, 'general', t, b, {}).catch(() => {});
+            pushToMember(id, 'general', t, b, ziel.daten).catch(() => {});
             pushed++;
             if (alsoEmail) {
                 const m = byId.get(id);

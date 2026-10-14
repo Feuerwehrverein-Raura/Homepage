@@ -549,6 +549,30 @@ void main() {
     expect(find.text('Benachrichtigung gesendet (Push: 1, E-Mail: 1)'), findsOneWidget);
   });
 
+  testWidgets('Benachrichtigen: Ziel Profil geht mit', (tester) async {
+    await starten(tester);
+    await oeffnen(tester, 'm1');
+    await tester.tap(find.byKey(const Key('weg-benachrichtigen')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('push-titel')), 'Adresse');
+    await tester.enterText(find.byKey(const Key('push-text')), 'Bitte prüfen.');
+    await tester.ensureVisible(find.byKey(const Key('push-oeffnen')));
+    await tester.tap(find.byKey(const Key('push-oeffnen')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Profil').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('push-senden')));
+    await tester.pumpAndSettle();
+
+    expect(backend.body(backend.wo('POST', '/push/to-members').single), {
+      'memberIds': ['m1'],
+      'title': 'Adresse',
+      'body': 'Bitte prüfen.',
+      'alsoEmail': false,
+      'ziel': 'profil',
+    });
+  });
+
   testWidgets('Foto: hochladen (Feld photo) und entfernen', (tester) async {
     await starten(tester);
     await oeffnen(tester, 'm2');

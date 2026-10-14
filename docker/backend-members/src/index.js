@@ -27,6 +27,7 @@ const { schopfMelder, fernFreigabePruefen } = require('./schopf-melder');
 const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./authentik-gruppen');
 const { logoNachtrag } = require('./sender-logo');
 const { vorstandMelder, fcmNachricht, ABSCHALT_ART: VORSTAND_ABSCHALT_ART, ARTEN: VORSTAND_ARTEN } = require('./vorstand-melder');
+const { fcmDaten, vorlageZiel } = require('./push-daten');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -61,6 +62,7 @@ try {
  * @param {string} title            Notification-Titel
  * @param {string} body             Notification-Body
  * @param {object} data             Optionale Key/Value-Strings fuer App-Routing
+ *                                  (ziel, eventId - siehe src/push-daten.js)
  */
 async function sendPushToMember(memberId, notificationType, title, body, data = {}) {
     if (!fcmInitialized) return;
@@ -78,9 +80,7 @@ async function sendPushToMember(memberId, notificationType, title, body, data = 
         );
         if (tokens.rows.length === 0) return;
 
-        const stringData = Object.fromEntries(
-            Object.entries({ notificationType, ...data }).map(([k, v]) => [k, String(v)])
-        );
+        const stringData = fcmDaten(notificationType, data);
         const message = {
             notification: { title, body },
             data: stringData,
@@ -1968,7 +1968,8 @@ async function sendNotificationEmail(memberId, templateName, variables = {}, pus
         if (pushType) {
             const title = pushTitle || templateName;
             const body = pushBody || (template.subject || templateName);
-            await sendPushToMember(memberId, pushType, title, body, { template: templateName });
+            await sendPushToMember(memberId, pushType, title, body,
+                { template: templateName, ziel: vorlageZiel(templateName) });
         }
     } catch (error) {
         console.error(`Failed to send notification email:`, error.message);
@@ -4793,9 +4794,7 @@ app.post('/internal/push-broadcast', async (req, res) => {
         const allTokens = tokens.rows.map(r => r.token);
         if (allTokens.length === 0) return res.json({ success: true, sent: 0 });
 
-        const stringData = Object.fromEntries(
-            Object.entries({ notificationType, ...(data || {}) }).map(([k, v]) => [k, String(v)])
-        );
+        const stringData = fcmDaten(notificationType, data);
         let sent = 0;
         const invalid = [];
         for (let i = 0; i < allTokens.length; i += 500) {
