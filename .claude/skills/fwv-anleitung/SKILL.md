@@ -22,6 +22,23 @@ neues Dokument bauen. Vorhanden: `anleitung-app.html`,
 - Ton: du-Form, kurze Saetze, Schweizer Schreibweise (ss statt ß,
   «Guillemets»). Knopfnamen fett, so wie sie in der App heissen.
 
+## Bildschirmfotos der App (Foto-Tour)
+
+Nie echte Mitgliederdaten fotografieren. Die Bilder der Mitglieder-App
+erzeugt eine Tour mit erfundenen Daten (Erika Muster), reproduzierbar:
+```sh
+cd flutter/mitglieder && TOUR=1 flutter test test/tour/bildschirmfotos_test.dart
+```
+Schreibt nach `docker/frontend-website/images/anleitung/`: `android/` und
+`ios/` (01-anlaesse … 21-austritt, gleiche Namen) und `web/mein-*`
+(Mein Bereich im Browser, 1280x800). `web/01–09` sind die oeffentlichen
+Seiten (von Hand). Nach jeder sichtbaren App-Aenderung Tour laufen lassen,
+geaenderte Bilder committen, betroffene PDFs neu erzeugen. Neue Bildschirme
+in `test/tour/bildschirmfotos_test.dart` ergaenzen (Daten in `tour_daten.dart`).
+
+Bilder einbinden immer mit `src` auf `ios/…` plus `data-ios`/`data-android`
+(nur die App-Anleitung hat ein Android-PDF).
+
 ## QR-Codes
 
 `qrcode` ist nicht installiert — in den Scratchpad legen:
