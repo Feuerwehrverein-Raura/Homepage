@@ -61,6 +61,27 @@ Schrittweise, die bestehenden Apps laufen weiter, bis der Ersatz fertig ist.
    `vorstand-desktop`), auf demselben Kern.
 3. Danach entscheiden, ob `vorstand.html` durch die Web-Version ersetzt wird.
 
+## Aenderung 14.10.2026: Vorstand in die Mitglieder-App
+
+Ersetzt den Teil «eigene Vorstand-App» oben. Es gibt **eine** App fuer
+Mitglieder, Organisatoren und Vorstand:
+
+- Vorstandsmitglieder sehen den Reiter **«Vorstand»** statt «Organisator»
+  (alle Anlaesse plus Mitglieder, Antraege, Beitraege, Versand, Audit …).
+- Angemeldet wird mit dem **persoenlichen Konto** (Authentik, Gruppe
+  Vorstand). Der Login ueber das Funktionspostfach (IMAP) entfaellt nach
+  der Uebergangszeit; die Funktion (Aktuar, Kassier …) liest das Backend aus
+  der Mitgliederdatenbank (Phase 0, umgesetzt 14.10.2026).
+- Dieselbe App laeuft auf Android, iPhone, im Browser («Mein Bereich» =
+  mein.html) und als **Desktop-Programm: Linux (Pflicht, zuerst), Windows,
+  macOS**. Sie ersetzt vorstand-android, vorstand-desktop und spaeter
+  vorstand.html.
+- Was nur der Vorstand braucht, kommt in ein eigenes Paket
+  `flutter/fwv_vorstand` (nicht in die Mitglieder-App selbst), damit die
+  Grenzen sichtbar bleiben.
+- Damit nichts verloren geht: Checkliste aller Funktionen aller Varianten
+  in `docs/vorstand-funktionen.md` (Phasen 1–3).
+
 ## Inventar, Einkauf, Kasse (entschieden 11.10.2026)
 
 Bisher eigene PWAs (`simple-inventory-system`, `simple-order-system`).
