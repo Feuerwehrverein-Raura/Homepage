@@ -231,7 +231,8 @@ class _ArtikelListeState extends State<_ArtikelListe> with AutomaticKeepAliveCli
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+          // Seitlich wie die Liste darunter (auf grossen Bildschirmen mittig).
+          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 12, 12, 4)).copyWith(bottom: 4),
           child: TextField(
             key: const Key('artikel-suche'),
             controller: _feld,

@@ -176,7 +176,9 @@ class _HauptseiteState extends State<Hauptseite> {
                         NavigationRailDestination(
                           icon: _ziel(r).icon,
                           selectedIcon: _ziel(r).selectedIcon,
-                          label: Text(_ziel(r).label),
+                          // Unten heisst der Reiter "Mehr" (Platz), hier ist
+                          // Platz fuer den richtigen Namen.
+                          label: Text(r == Reiter.einstellungen ? 'Einstellungen' : _ziel(r).label),
                         ),
                     ],
                   ),

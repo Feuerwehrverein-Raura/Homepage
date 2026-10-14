@@ -553,9 +553,12 @@ void main() {
       expect(find.byType(NavigationRail), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended, isTrue);
-      await tester.tap(find.descendant(of: find.byType(NavigationRail), matching: find.text('Mehr')));
+      // In der Seitenleiste heisst "Mehr" wieder "Einstellungen".
+      final leiste = find.byType(NavigationRail);
+      expect(find.descendant(of: leiste, matching: find.text('Mehr')), findsNothing);
+      await tester.tap(find.descendant(of: leiste, matching: find.text('Einstellungen')));
       await tester.pumpAndSettle();
-      expect(find.text('Einstellungen'), findsOneWidget);
+      expect(find.text('Newsletter abonniert'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
