@@ -77,6 +77,8 @@ class Beitragszahlung {
     this.referenz,
     this.bezahltAm,
     this.zahlungsart,
+    this.mitgliedStatus,
+    this.letzteErinnerung,
   });
 
   factory Beitragszahlung.ausJson(Map<String, dynamic> j) => Beitragszahlung(
@@ -94,6 +96,8 @@ class Beitragszahlung {
     referenz: _text(j['reference_nr']),
     bezahltAm: kalendertag(j['paid_date']),
     zahlungsart: _text(j['payment_method']),
+    mitgliedStatus: _text(j['member_status']),
+    letzteErinnerung: kalendertag(j['last_reminder_at']),
   );
 
   final String id;
@@ -113,6 +117,14 @@ class Beitragszahlung {
   final String? referenz;
   final DateTime? bezahltAm;
   final String? zahlungsart;
+
+  /// Status des Mitglieds (Aktivmitglied, Ehrenmitglied, ...).
+  final String? mitgliedStatus;
+
+  /// Letzte Zahlungserinnerung (das Backend erinnert hoechstens alle 30 Tage).
+  final DateTime? letzteErinnerung;
+
+  bool get ehrenmitglied => mitgliedStatus == 'Ehrenmitglied';
 
   ZahlungsStatus get status => switch (statusRoh) {
     'bezahlt' => ZahlungsStatus.bezahlt,
@@ -185,9 +197,15 @@ class BeitragsKennzahlen {
 }
 
 /// Jahreseinstellung (GET /membership-fees/settings/:year): Betrag, GV,
-/// Faelligkeit. Nur zur Anzeige - bearbeitet wird sie (noch) auf der Website.
+/// Faelligkeit, Beschreibung.
 class BeitragsEinstellung {
-  const BeitragsEinstellung({required this.jahr, required this.betrag, this.gv, this.faellig});
+  const BeitragsEinstellung({
+    required this.jahr,
+    required this.betrag,
+    this.gv,
+    this.faellig,
+    this.beschreibung,
+  });
 
   factory BeitragsEinstellung.ausJson(Map<String, dynamic> j) => BeitragsEinstellung(
     jahr: _zahl(j['year']).toInt(),
@@ -195,12 +213,17 @@ class BeitragsEinstellung {
     // gv_date ist freier Text (VARCHAR), kein Datum.
     gv: _text(j['gv_date']),
     faellig: kalendertag(j['due_date']),
+    beschreibung: _text(j['description']),
   );
 
   final int jahr;
   final num betrag;
   final String? gv;
   final DateTime? faellig;
+
+  /// Wird beim Speichern mitgeschickt - das Backend ueberschreibt sonst mit
+  /// leer (Upsert aller Felder).
+  final String? beschreibung;
 }
 
 /// Alles, was die Beitrags-Ansicht fuer ein Jahr braucht.
@@ -273,6 +296,138 @@ enum BriefKanal {
   final String titel;
 }
 
+/// Zustellwunsch eines Mitglieds (members.zustellung_email/_post).
+typedef Zustellwunsch = ({bool email, bool post});
+
+/// Wer beim Massenversand einen Beitragsbrief bekaeme - nach denselben Regeln
+/// wie send-email-bulk/send-post-bulk in api-accounting: offen, Zustellung
+/// per [kanal] gewuenscht, E-Mail bzw. ganze Adresse vorhanden, kein
+/// Ehrenmitglied, Referenz vorhanden.
+class VersandVorschau {
+  const VersandVorschau({
+    required this.kanal,
+    required this.empfaenger,
+    required this.ohneReferenz,
+    required this.unbekannt,
+  });
+
+  final BriefKanal kanal;
+
+  /// Bekommen den Brief (nach heutigem Stand).
+  final List<Beitragszahlung> empfaenger;
+
+  /// Offen und mit passendem Zustellwunsch, aber ohne Referenz - werden
+  /// uebersprungen (QR-Rechnung waere unbrauchbar).
+  final List<Beitragszahlung> ohneReferenz;
+
+  /// Offen, aber Zustellwunsch unbekannt (Mitglied nicht geladen): ob sie
+  /// etwas bekommen, entscheidet das Backend.
+  final List<Beitragszahlung> unbekannt;
+
+  int get hoechstens => empfaenger.length + unbekannt.length;
+}
+
+/// [zustellung]: Mitglied-ID -> Zustellwunsch; null = nicht geladen.
+VersandVorschau versandVorschau(
+  List<Beitragszahlung> zahlungen,
+  BriefKanal kanal,
+  Map<String, Zustellwunsch>? zustellung,
+) {
+  final empfaenger = <Beitragszahlung>[];
+  final ohneReferenz = <Beitragszahlung>[];
+  final unbekannt = <Beitragszahlung>[];
+  for (final z in zahlungen) {
+    if (z.statusRoh != 'offen' || z.ehrenmitglied) continue;
+    final erreichbar = switch (kanal) {
+      BriefKanal.email => (z.email ?? '').isNotEmpty,
+      BriefKanal.post => z.hatAdresse,
+    };
+    if (!erreichbar) continue;
+    final wunsch = zustellung?[z.mitgliedId];
+    if (wunsch == null) {
+      if (z.hatReferenz) unbekannt.add(z);
+      continue;
+    }
+    final gewuenscht = kanal == BriefKanal.email ? wunsch.email : wunsch.post;
+    if (!gewuenscht) continue;
+    (z.hatReferenz ? empfaenger : ohneReferenz).add(z);
+  }
+  return VersandVorschau(
+    kanal: kanal,
+    empfaenger: empfaenger,
+    ohneReferenz: ohneReferenz,
+    unbekannt: unbekannt,
+  );
+}
+
+/// Wie viele Zahlungen [jahr] die Zahlungserinnerung heute erfassen wuerde
+/// (runFeeReminders in api-accounting): nicht bezahlt, Faelligkeit vorbei,
+/// letzte Erinnerung mindestens 30 Tage her, Mitglied nicht ausgetreten.
+/// Das Backend erinnert fuer ALLE Jahre - hier zaehlt nur [zahlungen].
+List<Beitragszahlung> erinnerungFaellig(
+  List<Beitragszahlung> zahlungen,
+  BeitragsEinstellung? einstellung,
+  DateTime heute,
+) {
+  final faellig = einstellung?.faellig;
+  final tag = DateTime(heute.year, heute.month, heute.day);
+  if (faellig == null || faellig.isAfter(tag)) return const [];
+  final grenze = tag.subtract(const Duration(days: 30));
+  return [
+    for (final z in zahlungen)
+      if (z.statusRoh != 'bezahlt' &&
+          !const ['Ausgetreten', 'Austritt_beantragt'].contains(z.mitgliedStatus) &&
+          (z.letzteErinnerung == null || !z.letzteErinnerung!.isAfter(grenze)))
+        z,
+  ];
+}
+
+/// Antwort von send-email-bulk / send-post-bulk.
+class MassenversandErgebnis {
+  const MassenversandErgebnis({
+    required this.empfaenger,
+    required this.gesendet,
+    required this.fehlgeschlagen,
+    this.uebersprungen = 0,
+    this.fehler = const [],
+  });
+
+  factory MassenversandErgebnis.ausJson(Object? json) {
+    final j = json is Map ? json : const {};
+    return MassenversandErgebnis(
+      empfaenger: _zahl(j['candidates']).toInt(),
+      gesendet: _zahl(j['success']).toInt(),
+      fehlgeschlagen: _zahl(j['failed']).toInt(),
+      uebersprungen: _zahl(j['skipped']).toInt(),
+      fehler: [
+        if (j['failures'] is List)
+          for (final f in j['failures'] as List)
+            if (f is Map) '${_text(f['name']) ?? '?'}: ${_text(f['error']) ?? '?'}',
+      ],
+    );
+  }
+
+  final int empfaenger;
+  final int gesendet;
+  final int fehlgeschlagen;
+  final int uebersprungen;
+
+  /// "Name: Grund", hoechstens 20 (so viele schickt das Backend).
+  final List<String> fehler;
+}
+
+/// Ergebnis von POST /membership-fees/send-reminders.
+typedef Erinnerungen = ({int push, int email, int faellig});
+
+/// Ergebnis von POST /membership-fees/payments/generate. Achtung: das
+/// Backend zaehlt auch bestehende Eintraege als "created" (ON CONFLICT DO
+/// NOTHING) - die echte Zahl neuer Beitraege ergibt der Vergleich vorher/
+/// nachher.
+typedef Erzeugt = ({int mitglieder});
+
+/// Massenversand darf lange laufen: das Backend schickt Brief um Brief.
+const massenversandZeitlimit = Duration(minutes: 10);
+
 /// Aufrufe rund um die Mitgliederbeitraege (api-accounting, nur Vorstand).
 class BeitraegeDienst {
   const BeitraegeDienst(this.api);
@@ -327,4 +482,66 @@ class BeitraegeDienst {
   /// echter Brief ueber Pingen).
   Future<void> briefSenden(String id, BriefKanal kanal) =>
       api.post('membership-fees/payments/${_e(id)}/send', daten: {'channel': kanal.wert});
+
+  /// Jahreseinstellung anlegen oder ersetzen (alle Felder).
+  Future<BeitragsEinstellung> einstellungSpeichern({
+    required int jahr,
+    required num betrag,
+    String? gv,
+    DateTime? faellig,
+    String? beschreibung,
+  }) async {
+    final j = await api.post(
+      'membership-fees/settings',
+      daten: {
+        'year': jahr,
+        'amount': betrag,
+        'gv_date': gv?.trim().isEmpty ?? true ? null : gv!.trim(),
+        'due_date': faellig == null ? null : isoDatum(faellig),
+        'description': beschreibung?.trim().isEmpty ?? true ? null : beschreibung!.trim(),
+      },
+    );
+    return j is Map
+        ? BeitragsEinstellung.ausJson(Map<String, dynamic>.from(j))
+        : BeitragsEinstellung(jahr: jahr, betrag: betrag);
+  }
+
+  /// Offene Beitraege [jahr] ueber [betrag] fuer alle Aktiv- und
+  /// Passivmitglieder ohne Eintrag; bestehende bleiben.
+  Future<Erzeugt> erzeugen(int jahr, num betrag) async {
+    final j = await api.post(
+      'membership-fees/payments/generate',
+      daten: {'year': jahr, 'amount': betrag},
+    );
+    return (mitglieder: _zahl(j is Map ? j['total'] : null).toInt());
+  }
+
+  /// Beitragsbriefe [jahr] an alle (Regeln siehe [versandVorschau]).
+  /// SENDET SOFORT.
+  Future<MassenversandErgebnis> anAlleSenden(int jahr, BriefKanal kanal) async =>
+      MassenversandErgebnis.ausJson(
+        await api.post(
+          kanal == BriefKanal.email
+              ? 'membership-fees/send-email-bulk'
+              : 'membership-fees/send-post-bulk',
+          daten: {'year': jahr},
+          zeitlimit: massenversandZeitlimit,
+        ),
+      );
+
+  /// Zahlungserinnerungen (Push, und E-Mail bei Zustellung E-Mail) fuer
+  /// alle faelligen offenen Beitraege aller Jahre. SENDET SOFORT.
+  Future<Erinnerungen> erinnerungenSenden() async {
+    final j = await api.post(
+      'membership-fees/send-reminders',
+      daten: const <String, Object?>{},
+      zeitlimit: massenversandZeitlimit,
+    );
+    final m = j is Map ? j : const {};
+    return (
+      push: _zahl(m['pushed']).toInt(),
+      email: _zahl(m['emailed']).toInt(),
+      faellig: _zahl(m['candidates']).toInt(),
+    );
+  }
 }

@@ -312,6 +312,20 @@ void main() {
       };
       await oeffnen(tester);
       expect(find.textContaining('noch keine Beiträge erfasst'), findsOneWidget);
+      // Briefe an alle und Planen brauchen Beitraege.
+      await tester.scrollUntilVisible(
+        find.text('Website öffnen'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        tester
+            .widget<OutlinedButton>(find.byKey(const Key('jahreslauf-an-alle-email')))
+            .onPressed,
+        isNull,
+      );
+      await tester.ensureVisible(find.text('Website öffnen'));
+      await tester.pumpAndSettle();
       await tippen(tester, find.text('Website öffnen'));
       expect(backend.links, [Uri.parse('https://www.fwv-raura.ch/vorstand.html')]);
     });

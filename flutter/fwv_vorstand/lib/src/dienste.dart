@@ -9,7 +9,10 @@ import 'package:fwv_core/fwv_core.dart';
 
 import 'antraege/antraege_dienst.dart';
 import 'audit/audit_dienst.dart';
+import 'email/mailcow_dienst.dart';
+import 'geplant/geplante_auftraege.dart';
 import 'mitglieder/mitglieder_verwaltung.dart';
+import 'mitglieder/zugangs_dokumente.dart';
 import 'push_dienst.dart';
 import 'ui/beitraege/beitraege_daten.dart';
 import 'versand/versand_dienst.dart';
@@ -66,6 +69,16 @@ class VorstandDienste {
   /// den Massen-PDF-Versand liefert [umgebung] (`pdfWaehlen`); ohne ihn
   /// zeigt die Pingen-Ansicht nur einen Hinweis.
   VersandDienst get versand => VersandDienst(api);
+
+  /// Postfaecher, Aliase, Speicher (api-dispatch /mailcow) und Zustellliste
+  /// (api-members).
+  MailcowDienst get mailcow => MailcowDienst(api);
+
+  /// Geplante Auftraege (api-dispatch /scheduled-jobs), z.B. Beitragsversand.
+  GeplanteAuftraegeDienst get geplant => GeplanteAuftraegeDienst(api);
+
+  /// Login-Datenblatt, Anmeldebon und App-QR eines Mitglieds (api-members).
+  ZugangsDokumenteDienst get zugangsDokumente => ZugangsDokumenteDienst(api);
 }
 
 /// Vorstand-Seite der Website - fuer alles, was die App noch nicht kann.

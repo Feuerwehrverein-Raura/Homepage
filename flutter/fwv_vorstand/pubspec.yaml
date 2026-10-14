@@ -17,6 +17,9 @@ dependencies:
   fwv_anlass:
     path: ../fwv_anlass
   material_ui: ^1.6.0
+  # App-QR fuer Mitglieder anzeigen und als SVG ins Login-Datenblatt
+  # (https://pub.dev/packages/qr_flutter, 4.1.0; reicht package:qr 3.x durch).
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

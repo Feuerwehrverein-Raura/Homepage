@@ -1,6 +1,6 @@
 // Reiter "Vorstand" - fuer Vorstandsmitglieder an Stelle von "Organisator".
 // Oben die Bereiche als Reiter (Anlaesse, Antraege, Mitglieder, Beitraege,
-// Nachricht, Audit; Paket fwv_vorstand), darunter der Bereich. Die
+// Nachricht, E-Mail, Audit; Paket fwv_vorstand), darunter der Bereich. Die
 // Anlaesse sind die Organisator-Verwaltung fuer alle Anlaesse.
 //
 // Eine angetippte Vorstand-Mitteilung ([Dienste.pushZiel]) waehlt den

@@ -9,6 +9,7 @@ import 'dienste.dart';
 import 'ui/antraege_ansicht.dart';
 import 'ui/audit_ansicht.dart';
 import 'ui/beitraege_ansicht.dart';
+import 'ui/email_ansicht.dart';
 import 'ui/mitglieder_ansicht.dart';
 import 'ui/nachricht_ansicht.dart';
 
@@ -58,6 +59,12 @@ final vorstandBereiche = <VorstandBereich>[
     titel: 'Nachricht',
     symbol: Icons.campaign_outlined,
     bauen: (d) => NachrichtAnsicht(dienste: d),
+  ),
+  VorstandBereich(
+    schluessel: 'email',
+    titel: 'E-Mail',
+    symbol: Icons.mail_outline,
+    bauen: (d) => EmailAnsicht(dienste: d),
   ),
   VorstandBereich(
     schluessel: 'audit',

@@ -1,8 +1,10 @@
-// Beitraege im Vorstand-Bereich (docs/vorstand-funktionen.md, Abschnitt 11,
-// Phase 1): Jahr waehlen, Kennzahlen, Zahlungsliste mit Suche und Filter,
-// bezahlt/offen/Referenz setzen. Dazu der Beitragsbrief fuer EINE Zahlung
-// (Phase 2, mit Rueckfrage). Jahreseinstellung, Beitraege erzeugen,
-// Briefe an alle und Erinnerungen bleiben vorerst auf der Website.
+// Beitraege im Vorstand-Bereich (docs/vorstand-funktionen.md, Abschnitte 11
+// und 12). Phase 1: Jahr waehlen, Kennzahlen, Zahlungsliste mit Suche und
+// Filter, bezahlt/offen/Referenz setzen, Beitragsbrief fuer EINE Zahlung.
+// Phase 2 (beitraege/jahreslauf.dart): Jahresbeitrag festlegen, Beitraege
+// erzeugen, Briefe an alle per E-Mail/Post, Zahlungserinnerungen, Versand
+// planen und geplante Auftraege stornieren. Briefvorschau und Kassier-Wahl
+// gibt es nur auf der Website.
 //
 // Vorbild: vorstand.html (Reiter Mitgliedsbeitrag) und vorstand-desktop
 // (pages/membership-fees). Backend: api-accounting /membership-fees/...
@@ -12,6 +14,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../dienste.dart';
 import 'beitraege/beitraege_daten.dart';
+import 'beitraege/einstellung_dialog.dart';
+import 'beitraege/jahreslauf.dart';
 import 'beitraege/kennzahlen_karten.dart';
 import 'beitraege/zahlung_zeile.dart';
 
@@ -54,6 +58,23 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
       _jahr = jahr;
       _laden = GlobalKey();
     });
+  }
+
+  /// Jahresbeitrag bearbeiten; laedt danach neu. true = gespeichert.
+  Future<bool> _einstellungBearbeiten(BeitragsJahr daten, Future<void> Function() neuLaden) async {
+    final neu = await showDialog<BeitragsEinstellung>(
+      context: context,
+      builder: (_) => EinstellungDialog(
+        dienst: _dienst,
+        jahr: daten.jahr,
+        einstellung: daten.einstellung,
+        hatBeitraege: daten.zahlungen.isNotEmpty,
+      ),
+    );
+    if (neu == null || !mounted) return false;
+    meldung(context, 'Jahresbeitrag ${daten.jahr} gespeichert');
+    await neuLaden();
+    return true;
   }
 
   Future<void> _websiteOeffnen() async {
@@ -116,15 +137,19 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(16, 12, 16, 24)),
       children: [
-        _EinstellungZeile(jahr: daten.jahr, einstellung: daten.einstellung),
+        _EinstellungZeile(
+          jahr: daten.jahr,
+          einstellung: daten.einstellung,
+          bearbeiten: () => _einstellungBearbeiten(daten, neuLaden),
+        ),
         const SizedBox(height: 12),
         KennzahlenKarten(kennzahlen: daten.kennzahlen),
         if (alle.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Text(
-              'Für ${daten.jahr} sind noch keine Beiträge erfasst. Beiträge erzeugen '
-              'geht vorerst auf der Website.',
+              'Für ${daten.jahr} sind noch keine Beiträge erfasst – unten im Jahreslauf '
+              'erzeugen.',
               textAlign: TextAlign.center,
             ),
           )
@@ -182,29 +207,28 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
           ],
         ],
         const SizedBox(height: 24),
-        Card(
-          color: t.colorScheme.surfaceContainerLow,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Jahresbeitrag festlegen, Beiträge erzeugen, Briefe an alle und '
-                  'Zahlungserinnerungen: vorerst auf der Website (kommt mit Phase 2).',
-                  style: t.textTheme.bodySmall,
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: _websiteOeffnen,
-                    icon: const Icon(Icons.open_in_new, size: 18),
-                    label: const Text('Website öffnen'),
-                  ),
-                ),
-              ],
+        JahresAufgaben(
+          dienste: widget.dienste,
+          daten: daten,
+          neuLaden: neuLaden,
+          einstellungBearbeiten: () => _einstellungBearbeiten(daten, neuLaden),
+          heute: widget.heute ?? DateTime.now(),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Briefvorschau, alle drucken und Kassier wählen: auf der Website.',
+                style: t.textTheme.bodySmall,
+              ),
             ),
-          ),
+            TextButton.icon(
+              onPressed: _websiteOeffnen,
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: const Text('Website öffnen'),
+            ),
+          ],
         ),
       ],
     );
@@ -314,10 +338,15 @@ class _BeitraegeAnsichtState extends State<BeitraegeAnsicht> {
 /// Jahresbeitrag, Faelligkeit, GV - oder der Hinweis, dass nichts
 /// hinterlegt ist.
 class _EinstellungZeile extends StatelessWidget {
-  const _EinstellungZeile({required this.jahr, required this.einstellung});
+  const _EinstellungZeile({
+    required this.jahr,
+    required this.einstellung,
+    required this.bearbeiten,
+  });
 
   final int jahr;
   final BeitragsEinstellung? einstellung;
+  final VoidCallback bearbeiten;
 
   @override
   Widget build(BuildContext context) {
@@ -339,6 +368,12 @@ class _EinstellungZeile extends StatelessWidget {
             text,
             style: t.textTheme.bodyMedium?.copyWith(color: t.colorScheme.onSurfaceVariant),
           ),
+        ),
+        IconButton(
+          key: const Key('einstellung-bearbeiten'),
+          tooltip: 'Jahresbeitrag bearbeiten',
+          onPressed: bearbeiten,
+          icon: const Icon(Icons.edit_outlined),
         ),
       ],
     );

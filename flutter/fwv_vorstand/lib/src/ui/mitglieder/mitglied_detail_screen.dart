@@ -1,7 +1,7 @@
 // Ein Mitglied im Detail: Foto, schnelle Wege (Anrufen, Mail, Karte,
 // Benachrichtigen), alle Angaben in Gruppen, Zugaenge (Passwort, Cloud-
-// Gruppen) und Loeschen mit Rueckfrage (Aktuar und Kassier bestaetigen per
-// Mail).
+// Gruppen), Zugangsdokumente (Datenblatt, Anmeldebon, App-QR) und Loeschen
+// mit Rueckfrage (Aktuar und Kassier bestaetigen per Mail).
 
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:fwv_anlass/fwv_anlass.dart';
@@ -13,6 +13,7 @@ import '../../mitglieder/mitglieder_verwaltung.dart';
 import '../../mitglieder/modelle.dart';
 import 'bausteine.dart';
 import 'mitglied_formular_screen.dart';
+import 'zugangs_dokumente_teil.dart';
 
 class MitgliedDetailScreen extends StatefulWidget {
   const MitgliedDetailScreen({super.key, required this.dienste, required this.mitglied});
@@ -333,6 +334,8 @@ class _MitgliedDetailScreenState extends State<MitgliedDetailScreen> {
         ]),
         const Abschnitt('Zugänge'),
         _Zugaenge(verwaltung: _v, mitglied: m),
+        const Abschnitt('Zugangsdokumente'),
+        ZugangsDokumenteTeil(dienste: widget.dienste, mitglied: m),
         const SizedBox(height: 24),
         OutlinedButton.icon(
           key: const Key('mitglied-loeschen'),

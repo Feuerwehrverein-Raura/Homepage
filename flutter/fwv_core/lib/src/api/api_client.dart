@@ -43,17 +43,23 @@ abstract interface class TokenQuelle {
 /// Text, den das Backend in `error` oder `message` mitschickt, sonst ein
 /// allgemeiner Satz.
 class ApiFehler implements Exception {
-  const ApiFehler(this.meldung, {this.status});
+  const ApiFehler(this.meldung, {this.status, this.daten});
 
   /// Keine Antwort (kein Netz, Zeitueberschreitung).
   const ApiFehler.keineVerbindung()
     : meldung = 'Keine Verbindung zum Server. Bitte später erneut versuchen.',
-      status = null;
+      status = null,
+      daten = null;
 
   final String meldung;
 
   /// HTTP-Status, oder null, wenn keine Antwort kam.
   final int? status;
+
+  /// Die ganze Fehlerantwort als JSON (falls es eine gab) - fuer Dienste,
+  /// deren Backend den Grund nicht als Text in `error` schickt (Mailcow:
+  /// `{"error": [{"type": "danger", "msg": [...]}]}`).
+  final Object? daten;
 
   @override
   String toString() => status == null ? 'ApiFehler: $meldung' : 'ApiFehler $status: $meldung';
@@ -82,7 +88,10 @@ class ApiClient {
   Future<dynamic> get(String pfad, {Map<String, String>? abfrage}) =>
       _senden('GET', pfad, abfrage: abfrage);
 
-  Future<dynamic> post(String pfad, {Object? daten}) => _senden('POST', pfad, daten: daten);
+  /// [zeitlimit] statt des allgemeinen fuer Aufrufe, die lange laufen
+  /// duerfen (z.B. Massenversand, der Brief um Brief abarbeitet).
+  Future<dynamic> post(String pfad, {Object? daten, Duration? zeitlimit}) =>
+      _senden('POST', pfad, daten: daten, zeitlimit: zeitlimit);
 
   Future<dynamic> put(String pfad, {Object? daten}) => _senden('PUT', pfad, daten: daten);
 
@@ -155,9 +164,10 @@ class ApiClient {
     String pfad, {
     Map<String, String>? abfrage,
     Object? daten,
+    Duration? zeitlimit,
   }) async => _auswerten(
     await _mitErneuern(
-      (token) => _schicken(() {
+      (token) => _schicken(zeitlimit: zeitlimit, () {
         final anfrage = http.Request(methode, adresse(pfad, abfrage))
           ..headers['Accept'] = 'application/json';
         if (token != null) anfrage.headers['Authorization'] = 'Bearer $token';
@@ -192,10 +202,11 @@ class ApiClient {
     return antwort;
   }
 
-  Future<http.Response> _schicken(http.BaseRequest Function() bauen) async {
+  Future<http.Response> _schicken(http.BaseRequest Function() bauen, {Duration? zeitlimit}) async {
+    final limit = zeitlimit ?? this.zeitlimit;
     try {
-      final strom = await _http.send(bauen()).timeout(zeitlimit);
-      return await http.Response.fromStream(strom).timeout(zeitlimit);
+      final strom = await _http.send(bauen()).timeout(limit);
+      return await http.Response.fromStream(strom).timeout(limit);
     } on TimeoutException {
       throw const ApiFehler.keineVerbindung();
     } on http.ClientException {
@@ -229,6 +240,7 @@ class ApiClient {
     return ApiFehler(
       meldung ?? 'Der Server meldet einen Fehler (${antwort.statusCode}).',
       status: antwort.statusCode,
+      daten: json,
     );
   }
 }

@@ -32,6 +32,7 @@ void main() {
       'Mitglieder',
       'Beiträge',
       'Nachricht',
+      'E-Mail',
       'Audit',
     ]);
   });

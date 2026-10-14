@@ -72,10 +72,10 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [x] | Gruppen verwalten (Lager, Roter Schopf, …) | – | – | – | – | ✓ | /vorstand/gruppen* (M) |
 | [x] | Temporaeres Passwort (Reset) | ✓ | – | ✓ | – | ✓ | POST /members/:id/reset-password |
 | [x] | Passwort setzen | ✓ | – | ✓ | – | ✓ | POST /members/:id/set-password |
-| [ ] | Login-Datenblatt drucken (QR + neues Passwort) | ✓ | – | – | – | – | POST /members/:id/datenblatt – **nur in W** |
-| [ ] | Anmeldebon (Bondrucker Schopf, Einmal-Code) | ✓ | – | – | – | – | POST /members/:id/anmeldebon – **nur in W** |
+| [x] | Login-Datenblatt drucken (QR + neues Passwort) | ✓ | – | – | – | ✓ | POST /members/:id/datenblatt; F: HTML teilen/drucken |
+| [x] | Anmeldebon (Bondrucker Schopf, Einmal-Code) | ✓ | – | – | – | ✓ | POST /members/:id/anmeldebon |
 | [ ] | App-QR Vorstand: Liste/erstellen/widerrufen | ✓ | – | ✓ | – | – | /auth/vorstand/app-tokens – entfaellt mit Phase 0? |
-| [ ] | App-QR Mitglied: Liste/erstellen/widerrufen/drucken | ✓ | – | ✓ | – | – | /auth/member/app-tokens |
+| [x] | App-QR Mitglied: Liste/erstellen/widerrufen/drucken | ✓ | – | ✓ | – | ✓ | /auth/member/app-tokens; F im Mitglied-Detail, drucken ueber Datenblatt |
 | [ ] | Passwort-Tresor (Vaultwarden) lesen, kopieren, sperren | – | ✓ | ½ | – | – | vault.fwv-raura.ch – **nur in A** (D Platzhalter) |
 | [x] | Eigene Zugaenge (Funktions-Mail-Passwort aendern) | – | – | – | ✓ | ✓ | GET/PUT /members/me/… |
 
@@ -168,10 +168,10 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Postfaecher: Liste, anlegen, bearbeiten, loeschen | ✓ | ✓ | ½ | – | – | /mailcow/mailboxes (D); D ohne Bearbeiten |
-| [ ] | Aliase: Liste, anlegen, bearbeiten, loeschen | ✓ | ✓ | ½ | – | – | /mailcow/aliases |
-| [ ] | Speicherplatz | ✓ | ✓ | ✓ | – | – | GET /mailcow/quota |
-| [ ] | Zustellliste, Adressen kopieren, Alias mitglieder@ abgleichen | ✓ | ✓ | ✓ | – | – | /members/emails/zustellung, sync-alias |
+| [x] | Postfaecher: Liste, anlegen, bearbeiten, loeschen | ✓ | ✓ | ½ | – | ✓ | /mailcow/mailboxes (D); D ohne Bearbeiten |
+| [x] | Aliase: Liste, anlegen, bearbeiten, loeschen | ✓ | ✓ | ½ | – | ✓ | /mailcow/aliases |
+| [x] | Speicherplatz | ✓ | ✓ | ✓ | – | ✓ | GET /mailcow/quota |
+| [x] | Zustellliste, Adressen kopieren, Alias mitglieder@ abgleichen | ✓ | ✓ | ✓ | – | ✓ | /members/emails/zustellung, sync-alias |
 | [ ] | Posteingang (IMAP): Ordner, lesen, Anhaenge, Flags, verschieben, loeschen, Suche | ✓ | – | ✓ | – | – | /imap/* (D); Suche **nur in D** |
 | [ ] | Verfassen/Antworten/Weiterleiten mit Anhaengen, Entwurf | ✓ | – | ✓ | – | – | /imap/send, /imap/draft |
 | [ ] | Geteiltes Adressbuch: Liste, anlegen, bearbeiten, loeschen, uebernehmen | ✓ | – | ✓ | – | ½ | /contacts (D); F nur Mitglieder-Adressbuch |
@@ -180,23 +180,23 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Jahreseinstellungen (Betrag, GV-Datum, Faelligkeit) | ✓ | ✓ | ✓ | – | – | /membership-fees/settings (A) |
-| [ ] | Beitraege erzeugen | ✓ | ✓ | ✓ | – | – | POST …/payments/generate |
+| [x] | Jahreseinstellungen (Betrag, GV-Datum, Faelligkeit) | ✓ | ✓ | ✓ | – | ✓ | /membership-fees/settings (A) |
+| [x] | Beitraege erzeugen | ✓ | ✓ | ✓ | – | ✓ | POST …/payments/generate |
 | [x] | Kennzahlen, Zahlungsliste, Suche, Filter | ✓ | ✓ | ✓ | – | ✓ | …/summary, …/payments |
 | [x] | Bezahlt / offen / Referenz setzen | ✓ | ✓ | ✓ | – | ✓ | PATCH …/payments/:id/{pay,unpay,reference} |
 | [x] | Beitragsbrief einzeln (E-Mail/Post) | ✓ | ✓ | ✓ | – | ✓ | POST …/payments/:id/send |
-| [ ] | Beitragsbriefe an alle (E-Mail/Post) | ✓ | ✓ | ✓ | – | – | send-email-bulk / send-post-bulk |
+| [x] | Beitragsbriefe an alle (E-Mail/Post) | ✓ | ✓ | ✓ | – | ✓ | send-email-bulk / send-post-bulk; F nennt die Empfaengerzahl vorher |
 | [ ] | Briefvorschau mit Swiss-QR, alle drucken | ✓ | – | – | – | – | **nur in W** (Client) → ins Backend |
 | [ ] | Kassier waehlen (bei mehreren) | ✓ | – | – | – | – | **nur in W** |
-| [ ] | Zahlungserinnerungen (Push+Mail, 30-Tage-Takt) | ✓ | ✓ | ✓ | – | – | POST …/send-reminders |
+| [x] | Zahlungserinnerungen (Push+Mail, 30-Tage-Takt) | ✓ | ✓ | ✓ | – | ✓ | POST …/send-reminders |
 | [ ] | Rechnungen, Transaktionen, Konten | ½ | – | ½ | – | – | /invoices, /transactions (A) nur im Export; /transactions nicht geroutet |
 
 ## 12. Geplante Auftraege
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Beitragsversand planen | – | ✓ | ✓ | – | – | POST /scheduled-jobs (D) |
-| [ ] | Liste mit Status, stornieren | – | ✓ | ✓ | – | – | GET/DELETE /scheduled-jobs |
+| [x] | Beitragsversand planen | – | ✓ | ✓ | – | ✓ | POST /scheduled-jobs (D); F im Bereich Beitraege |
+| [x] | Liste mit Status, stornieren | – | ✓ | ✓ | – | ✓ | GET/DELETE /scheduled-jobs |
 
 ## 13. Audit und Benachrichtigungen
 
@@ -238,6 +238,21 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 - **Mitglieder-Kontaktdaten an Externe**: event-dashboard zeigt externen
   Organisatoren E-Mail und Telefon aller Mitglieder (Auswahl). Gewollt?
 - **Mitglied loeschen** in A ohne 4-Augen-Hinweis.
+- **Datenblatt** (POST /members/:id/datenblatt) nimmt den neuesten App-Token
+  des Mitglieds **ohne** auf `revoked_at` zu achten - ein widerrufener QR
+  kann so wieder auf Papier landen (und gilt dann trotzdem nicht). Fix im
+  Backend: `AND revoked_at IS NULL`. Die Tabelle wird dort zudem mit anderen
+  Spalten angelegt als in /auth/member/app-tokens (gen_random_uuid, ohne
+  last_used_at/revoked_at) - wer zuerst laeuft, gewinnt.
+- **Mailcow-Groessen**: GET liefert Bytes, POST/PUT erwarten MB. vorstand.html
+  zeigt `quota` als MB an (falsch) und schreibt beim Bearbeiten Bytes als MB
+  zurueck. A und F rechnen richtig.
+- **Beitraege erzeugen** meldet jede Zeile als `created`, auch wenn sie schon
+  bestand (ON CONFLICT DO NOTHING). F zaehlt vorher/nachher.
+- **Massenversand** (send-email-bulk/-post-bulk) laeuft synchron Brief um
+  Brief; bei vielen Empfaengern kann die Verbindung abbrechen, waehrend der
+  Server weiter sendet. Besser: als geplanten Auftrag sofort ausfuehren und
+  Status abfragen.
 
 ## Empfohlene Phasen
 
