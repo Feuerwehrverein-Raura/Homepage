@@ -714,9 +714,10 @@
                 const now = new Date();
                 let filtered = [...this.events];
 
-                // DEUTSCH: Zeitfilter anwenden (kommende = Startdatum >= jetzt, vergangene = Enddatum < jetzt)
+                // DEUTSCH: Zeitfilter anwenden (kommende = noch nicht vorbei, also auch
+                // laufende wie die Chilbi; vergangene = Enddatum < jetzt)
                 if (this.currentFilter === 'upcoming') {
-                    filtered = filtered.filter(event => event.startDate >= now);
+                    filtered = filtered.filter(event => (event.endDate || event.startDate) >= now);
                 } else if (this.currentFilter === 'past') {
                     filtered = filtered.filter(event => event.endDate < now);
                 }

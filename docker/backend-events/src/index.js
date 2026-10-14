@@ -864,7 +864,8 @@ app.get('/events', async (req, res) => {
         const params = [];
 
         if (upcoming === 'true') {
-            query += ' AND e.start_date >= NOW()';
+            // Laufende Anlaesse (Chilbi ueber mehrere Tage) zaehlen mit.
+            query += ' AND COALESCE(e.end_date, e.start_date) >= NOW()';
         }
         if (category) {
             params.push(category);
