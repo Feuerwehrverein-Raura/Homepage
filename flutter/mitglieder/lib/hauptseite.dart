@@ -273,9 +273,13 @@ class _HauptseiteState extends State<Hauptseite> {
                 ),
                 const VerticalDivider(width: 1, thickness: 1),
                 Expanded(
-                  child: MediaQuery(
-                    data: mq.copyWith(size: Size(breite - leiste - 1, mq.size.height)),
-                    child: inhalt,
+                  // Abschneiden: Seitenwechsel (z.B. die Bereiche im Reiter
+                  // Vorstand) glitten sonst ueber die Seitenleiste.
+                  child: ClipRect(
+                    child: MediaQuery(
+                      data: mq.copyWith(size: Size(breite - leiste - 1, mq.size.height)),
+                      child: inhalt,
+                    ),
                   ),
                 ),
               ],

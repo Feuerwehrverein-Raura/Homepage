@@ -3,6 +3,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_vorstand/fwv_vorstand.dart';
+import 'package:fwv_vorstand/src/zeit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'falsches_backend.dart';
@@ -41,7 +42,7 @@ void main() {
     expect(find.text('Ausstehend (2)'), findsOneWidget);
     expect(find.text('anna@example.ch'), findsOneWidget);
     expect(find.text('Feuerwehr: Ja, aktiv in der Feuerwehr Raurica'), findsOneWidget);
-    expect(find.text('Eingegangen 12.10.2026 19:04'), findsOneWidget);
+    expect(find.text("Eingegangen ${zeitText(utcZeitpunkt('2026-10-12 19:04:33.512345')!)}"), findsOneWidget);
   });
 
   testWidgets('Statusfilter: Genehmigt, Abgelehnt, Alle', (tester) async {
@@ -78,7 +79,7 @@ void main() {
     expect(backend.anfragen.last.url.path, '/member-registrations/r4');
     expect(find.text('Wohnt nicht in der Region'), findsOneWidget);
     expect(find.text('praesident@fwv-raura.ch'), findsOneWidget);
-    expect(find.text('22.08.2026 09:00'), findsOneWidget);
+    expect(find.text(zeitText(utcZeitpunkt('2026-08-22 09:00:00')!)), findsOneWidget);
     expect(find.text('12.05.1990'), findsOneWidget);
     expect(find.text('Frau · weiblich'), findsOneWidget);
     expect(find.text('Hauptstrasse 5, 4303 Kaiseraugst'), findsOneWidget);

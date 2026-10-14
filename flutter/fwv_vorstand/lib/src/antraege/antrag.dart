@@ -4,6 +4,7 @@
 // /contact/confirm), bearbeitet vom Vorstand.
 
 import 'package:fwv_core/fwv_core.dart';
+import '../zeit.dart';
 
 /// Bearbeitungsstand eines Antrags; [code] ist der Wert in der Datenbank.
 enum AntragStatus {
@@ -69,10 +70,10 @@ class Antrag {
     status: AntragStatus.aus(j['status']),
     statusRoh: jsonText(j['status']),
     bearbeitetVon: jsonText(j['processed_by']),
-    bearbeitetAm: jsonZeitpunkt(j['processed_at']),
+    bearbeitetAm: utcZeitpunkt(j['processed_at']),
     ablehnungsgrund: jsonText(j['rejection_reason']),
     mitgliedId: jsonText(j['member_id']),
-    eingegangen: jsonZeitpunkt(j['created_at']),
+    eingegangen: utcZeitpunkt(j['created_at']),
   );
 
   final String id;

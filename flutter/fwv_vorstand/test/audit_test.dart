@@ -4,6 +4,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_anlass/fwv_anlass.dart' show HinweisArt;
 import 'package:fwv_vorstand/fwv_vorstand.dart';
+import 'package:fwv_vorstand/src/zeit.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'falsches_backend.dart';
@@ -40,7 +41,8 @@ void main() {
       {'limit': '50', 'offset': '0'},
     ]);
     expect(find.text('Anmeldung fehlgeschlagen'), findsOneWidget);
-    expect(find.text('14.10.2026 09:05'), findsOneWidget);
+    // Backend liefert UTC ohne Zone; angezeigt wird Ortszeit (Rechner-Zone).
+    expect(find.text(zeitText(utcZeitpunkt('2026-10-14 09:05:11.123')!)), findsOneWidget);
     expect(find.text('boese@example.ch · IP 203.0.113.7'), findsOneWidget);
     expect(find.text('Grund: Invalid credentials'), findsOneWidget);
     expect(find.text('Mitglied geändert'), findsOneWidget);

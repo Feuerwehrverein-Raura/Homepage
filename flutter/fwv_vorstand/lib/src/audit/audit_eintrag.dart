@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'package:fwv_anlass/fwv_anlass.dart' show HinweisArt;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
+import '../zeit.dart';
 
 class AuditEintrag {
   const AuditEintrag({
@@ -36,7 +37,7 @@ class AuditEintrag {
     objektId: jsonText(j['entity_id']),
     email: jsonText(j['email']),
     ip: jsonText(j['ip_address']),
-    zeit: jsonZeitpunkt(j['created_at']),
+    zeit: utcZeitpunkt(j['created_at']),
     details: _objekt(j['details']),
     vorher: _objekt(j['old_values']),
     nachher: _objekt(j['new_values']),
