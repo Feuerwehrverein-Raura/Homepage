@@ -63,14 +63,15 @@ function fakeLokal({ zentraleWeg = false, eisWarm = false } = {}) {
             if (u.pathname === '/rpc/Switch.GetConfig') {
                 return antwort({ id: Number(kanal), name: `Lampe ${ip.split('.').pop()}/${kanal}` });
             }
-            if (u.pathname === '/rpc/BluTrv.GetStatus' && ip === '192.168.33.31') {
-                return antwort({ id: 200, target_C: 21, current_C: 21.3, pos: 0,
-                    errors: ['not_calibrated'], connected: true, battery: 100 });
-            }
             if (u.pathname === '/rpc/Switch.Set') {
                 ausgang[k] = u.searchParams.get('on') === 'true';
                 return antwort({ was_on: false });
             }
+        }
+        // BLU Gateway im Hausnetz (seit 14.10.2026), direkt gefragt.
+        if (u.hostname === '192.168.88.68' && u.pathname === '/rpc/BluTrv.GetStatus') {
+            return antwort({ id: 200, target_C: 21, current_C: 21.3, pos: 0,
+                errors: ['not_calibrated'], connected: true, battery: 100 });
         }
         if (u.hostname === '192.168.88.76') {
             return antwort({ 'switch:0': { output: true, apower: 89.6 },
@@ -161,7 +162,7 @@ test('Zentrale weg: alle Lampen nicht erreichbar, Tiefkuehler trotzdem da', asyn
     assert.ok(z.lampen.every(l => !l.erreichbar));
     assert.ok(z.gruppen.every(g => !g.erreichbar));
     assert.equal(z.kuehlung[0].erreichbar, true);
-    assert.equal(z.thermostate[0].erreichbar, false, 'Gateway haengt hinter der Zentrale');
+    assert.equal(z.thermostate[0].erreichbar, true, 'Gateway haengt im Hausnetz, nicht hinter der Zentrale');
 });
 
 test('Gruppe schalten geht ueber das Skript der Zentrale und wird vorgemerkt', async () => {

@@ -22,8 +22,10 @@
 // Nur Anzeige. Die Grenze ist dieselbe wie im Skript "Tiefkuehl-Waechter"
 // auf dem Geraet.
 //
-// Thermostate: Shelly BLU TRV am Heizkoerper, per Bluetooth am BLU Gateway
-// (hinter der Zentrale, wie die Lampen). Nur Anzeige.
+// Thermostate: Shelly BLU TRV am Heizkoerper, per Bluetooth am BLU Gateway.
+// Das Gateway haengt seit 14.10.2026 im Hausnetz (WLAN FWV-Raura) und wird
+// direkt gefragt (`adresse`, wie die Tiefkuehler); `geraet` waere der Weg
+// ueber die Zentrale (Port-Durchgang, wie die Lampen). Nur Anzeige.
 //
 // Quelle der Zuordnungen: roterschopf-kiosk/zentrale/ (lichtgruppen.js,
 // README.md). Aendert sich dort etwas, muss es hier nachgezogen werden.
@@ -63,7 +65,7 @@ const VORGABE = {
         { kennung: 'landi', name: 'Tiefkühlschrank Landi', adresse: '192.168.88.71', grenze: -12 }
     ],
     thermostate: [
-        { kennung: 'heizkoerper', name: 'Heizkörper', geraet: '192.168.33.31', id: 200 }
+        { kennung: 'heizkoerper', name: 'Heizkörper', adresse: '192.168.88.68', id: 200 }
     ]
 };
 
@@ -217,8 +219,9 @@ function roterSchopf({
     }
 
     async function thermostatMessen(t, karte) {
-        const port = karte ? karte.get(t.geraet) : null;
-        const st = port ? await rpc(`${zentrale}:${port}`, 'BluTrv.GetStatus', { id: t.id }) : null;
+        let ziel = t.adresse || null;
+        if (!ziel && karte && karte.get(t.geraet)) ziel = `${zentrale}:${karte.get(t.geraet)}`;
+        const st = ziel ? await rpc(ziel, 'BluTrv.GetStatus', { id: t.id }) : null;
         const zahl = v => (typeof v === 'number' ? v : null);
         return {
             messstelle: `heizung:${t.kennung}`,
