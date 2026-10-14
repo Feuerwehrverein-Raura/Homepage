@@ -2,11 +2,14 @@
 // Erneuern) und Geraet (Teilen, Links, Fotos) - dieselbe Umgebung wie die
 // Anlass-Verwaltung.
 
+import 'dart:typed_data';
+
 import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:fwv_core/fwv_core.dart';
 
 import 'antraege/antraege_dienst.dart';
 import 'audit/audit_dienst.dart';
+import 'mitglieder/mitglieder_verwaltung.dart';
 
 /// Gruppen, die den Vorstand-Bereich sehen (Gross/klein egal). Dieselbe Regel
 /// prueft das Backend (requireRole('vorstand', 'admin')).
@@ -17,7 +20,12 @@ bool istVorstand(Sitzung? sitzung) =>
     sitzung?.kontotyp == Kontotyp.mitglied && sitzung!.hatGruppe(vorstandGruppen);
 
 class VorstandDienste {
-  const VorstandDienste({required this.api, required this.anlaesse, required this.umgebung});
+  const VorstandDienste({
+    required this.api,
+    required this.anlaesse,
+    required this.umgebung,
+    this.fotoVerkleinern = fotoVerkleinernImHintergrund,
+  });
 
   /// api.fwv-raura.ch mit dem persoenlichen Token (erneuert sich selbst).
   final ApiClient api;
@@ -34,4 +42,11 @@ class VorstandDienste {
 
   /// Audit-Log (GET audit).
   AuditDienst get audit => AuditDienst(api);
+  /// Profilfotos vor dem Hochladen verkleinern (1024 px, JPEG); in Tests
+  /// ersetzbar.
+  final Future<Uint8List> Function(Uint8List roh) fotoVerkleinern;
+
+  /// Mitglieder, Kennzahlen, Passwoerter, Cloud-Gruppen, Benachrichtigen.
+  MitgliederVerwaltung get mitglieder =>
+      MitgliederVerwaltung(api, fotoVerkleinern: fotoVerkleinern);
 }

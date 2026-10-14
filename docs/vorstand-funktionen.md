@@ -44,20 +44,20 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Liste mit Suche (Server) | ✓ | ✓ | ✓ | – | – | GET /members?search= (M) |
-| [ ] | Statusfilter (Aktiv, Aufnahme pendent, Ehren, Testkonto) | ✓ | ✓ | ✓ | – | – | GET /members?status= |
-| [ ] | Kennzahlen (Gesamt, Aktiv, pendent, Ehren) | ✓ | ½ | ✓ | – | – | GET /members/stats/overview; A laedt, zeigt nicht |
-| [ ] | Detail ansehen | ✓ | ✓ | ✓ | – | – | GET /members/:id |
-| [ ] | Anlegen | ✓ | ✓ | ✓ | – | – | POST /members |
-| [ ] | Bearbeiten (alle Felder inkl. Adresszusatz, Versand-E-Mail, Zustellung, Geschlecht, FW-Zugehoerigkeit, Bemerkungen) | ✓ | ½ | ✓ | – | – | PUT /members/:id; A fehlen 5 Felder |
-| [ ] | Funktionen zuweisen (Mehrfach, Revisor schliesst Vorstand aus) | ✓ | ½ | ✓ | – | – | im PUT; Ausschluss nur im Browser geprueft |
-| [ ] | Eintrittsdatum automatisch bei «Feuerwehr Raurica» | ✓ | – | – | – | – | **nur in W** (Client-Logik) |
-| [ ] | Loeschen (mit Rueckfrage; Aktuar+Kassier bestaetigen per Mail) | ✓ | ✓ | ✓ | – | – | DELETE /members/:id |
-| [ ] | Profilfoto hochladen (Galerie) | ✓ | ✓ | ½ | – | – | POST /members/:id/photo; D nur API |
-| [ ] | Profilfoto mit Kamera | – | ✓ | – | – | – | **nur in A** |
-| [ ] | Profilfoto loeschen | ✓ | ✓ | ½ | – | – | DELETE /members/:id/photo |
-| [ ] | Mitglied benachrichtigen (Push, optional E-Mail) | ✓ | ✓ | ✓ | – | – | POST /push/to-members (E) |
-| [ ] | Anrufen/Mail/Karte aus dem Detail | – | – | – | – | – | in keiner Variante – fuers Handy sinnvoll |
+| [x] | Liste mit Suche (Server) | ✓ | ✓ | ✓ | – | ✓ | GET /members?search= (M) |
+| [x] | Statusfilter (Aktiv, Aufnahme pendent, Ehren, Testkonto) | ✓ | ✓ | ✓ | – | ✓ | GET /members?status= |
+| [x] | Kennzahlen (Gesamt, Aktiv, pendent, Ehren) | ✓ | ½ | ✓ | – | ✓ | GET /members/stats/overview; A laedt, zeigt nicht |
+| [x] | Detail ansehen | ✓ | ✓ | ✓ | – | ✓ | GET /members/:id |
+| [x] | Anlegen | ✓ | ✓ | ✓ | – | ✓ | POST /members |
+| [x] | Bearbeiten (alle Felder inkl. Adresszusatz, Versand-E-Mail, Zustellung, Geschlecht, FW-Zugehoerigkeit, Bemerkungen) | ✓ | ½ | ✓ | – | ✓ | PUT /members/:id; A fehlen 5 Felder |
+| [x] | Funktionen zuweisen (Mehrfach, Revisor schliesst Vorstand aus) | ✓ | ½ | ✓ | – | ✓ | im PUT; Ausschluss nur im Browser geprueft |
+| [x] | Eintrittsdatum automatisch bei «Feuerwehr Raurica» | ✓ | – | – | – | ✓ | **nur in W** (Client-Logik) |
+| [x] | Loeschen (mit Rueckfrage; Aktuar+Kassier bestaetigen per Mail) | ✓ | ✓ | ✓ | – | ✓ | DELETE /members/:id |
+| [x] | Profilfoto hochladen (Galerie) | ✓ | ✓ | ½ | – | ✓ | POST /members/:id/photo; D nur API |
+| [x] | Profilfoto mit Kamera | – | ✓ | – | – | ✓ | **nur in A** |
+| [x] | Profilfoto loeschen | ✓ | ✓ | ½ | – | ✓ | DELETE /members/:id/photo |
+| [x] | Mitglied benachrichtigen (Push, optional E-Mail) | ✓ | ✓ | ✓ | – | ✓ | POST /push/to-members (E) |
+| [x] | Anrufen/Mail/Karte aus dem Detail | – | – | – | – | ✓ | in keiner Variante – fuers Handy sinnvoll |
 | [ ] | Telefonliste PDF | ✓ | – | ✓ | – | – | GET /members/pdf/telefonliste |
 | [ ] | CSV-Export (alle, aktiv, Post, E-Mail) | ✓ | – | – | – | – | **nur in W** (Client) |
 | [ ] | Mitgliederverzeichnis (Auswahl beim Eintragen) | – | – | – | ✓ | ✓ | GET /members/directory |
@@ -66,12 +66,12 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Status Nextcloud-Admin / Vorstand-Gruppe / Social-Media-Gruppe | ✓ | ✓ | ✓ | – | – | GET /members/:id/{nextcloud-admin,vorstand-group,social-media-group} |
-| [ ] | Gruppen nach Funktion abgleichen | ✓ | ✓ | – | – | – | POST dieselben {enabled}; W automatisch nach Speichern |
+| [x] | Status Nextcloud-Admin / Vorstand-Gruppe / Social-Media-Gruppe | ✓ | ✓ | ✓ | – | ✓ | GET /members/:id/{nextcloud-admin,vorstand-group,social-media-group} |
+| [x] | Gruppen nach Funktion abgleichen | ✓ | ✓ | – | – | ✓ | POST dieselben {enabled}; W automatisch nach Speichern |
 | [ ] | Gruppen einzeln schalten | – | – | ✓ | – | – | **nur in D** |
 | [x] | Gruppen verwalten (Lager, Roter Schopf, …) | – | – | – | – | ✓ | /vorstand/gruppen* (M) |
-| [ ] | Temporaeres Passwort (Reset) | ✓ | – | ✓ | – | – | POST /members/:id/reset-password |
-| [ ] | Passwort setzen | ✓ | – | ✓ | – | – | POST /members/:id/set-password |
+| [x] | Temporaeres Passwort (Reset) | ✓ | – | ✓ | – | ✓ | POST /members/:id/reset-password |
+| [x] | Passwort setzen | ✓ | – | ✓ | – | ✓ | POST /members/:id/set-password |
 | [ ] | Login-Datenblatt drucken (QR + neues Passwort) | ✓ | – | – | – | – | POST /members/:id/datenblatt – **nur in W** |
 | [ ] | Anmeldebon (Bondrucker Schopf, Einmal-Code) | ✓ | – | – | – | – | POST /members/:id/anmeldebon – **nur in W** |
 | [ ] | App-QR Vorstand: Liste/erstellen/widerrufen | ✓ | – | ✓ | – | – | /auth/vorstand/app-tokens – entfaellt mit Phase 0? |
