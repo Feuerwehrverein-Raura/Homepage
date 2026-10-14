@@ -10,6 +10,12 @@ name: Build Android Members
 # GitHub-Release und rollender Zeiger members-latest.
 # Ablauf und Voraussetzungen: docs/flutter-mitglieder-app-plan.md (Release)
 # und docs/play-console-setup.md.
+#
+# Daneben dieselbe App als Desktop-Programm (docs/flutter-desktop.md):
+# Linux (.deb + .tar.gz), Windows (.zip), macOS (.dmg + .zip, unsigniert).
+# Diese Jobs haengen nicht am Android-Build - schlaegt einer fehl, geht das
+# Android-Release trotzdem raus. Angehaengt werden die Dateien erst, wenn
+# das GitHub-Release aus "build" steht (Job desktop-release).
 
 on:
   push:
@@ -285,3 +291,259 @@ jobs:
           set -euo pipefail
           pip install --quiet google-auth requests
           python3 "$GITHUB_WORKSPACE/.github/scripts/play-hochstufen.py" com.fwv.members "$VCODE" internal alpha
+
+  # ---------------------------------------------------------------------
+  # Desktop-Programm (ersetzt vorstand-desktop)
+
+  # Gebaut auf ubuntu-latest (24.04, glibc 2.39): laeuft auf Ubuntu 24.04+,
+  # Debian 13 und aehnlich neuen Systemen. ubuntu-22.04 wird bei GitHub
+  # gerade abgekuendigt (Brownouts), darum nicht aelter.
+  desktop-linux:
+    name: Desktop Linux
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter/mitglieder
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version bestimmen
+        shell: bash
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$REF" == refs/tags/members-v* ]]; then
+            VERSION="${REF_NAME#members-v}"
+          else
+            VERSION="${INPUT_VERSION:-0.0.0}"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' ist nicht X.Y.Z"
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VCODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          [ "$VCODE" -lt 1 ] && VCODE=1
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "VCODE=$VCODE" >> "$GITHUB_ENV"
+
+      - name: Linux-Bauwerkzeuge
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev libsecret-1-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Bauen
+        run: |
+          flutter pub get
+          flutter build linux --release --build-name "$VERSION" --build-number "$VCODE"
+
+      - name: Pakete (.tar.gz, .deb)
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/desktop"
+          tar -C build/linux/x64/release -czf "$GITHUB_WORKSPACE/desktop/fwv-raura-${VERSION}-linux-x64.tar.gz" \
+            --transform "s,^bundle,fwv-raura-${VERSION}," bundle
+          linux/packaging/deb-bauen.sh "$VERSION" "$GITHUB_WORKSPACE/desktop/fwv-raura_${VERSION}_amd64.deb"
+          dpkg-deb --info "$GITHUB_WORKSPACE/desktop/fwv-raura_${VERSION}_amd64.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: desktop/*
+          retention-days: 30
+          if-no-files-found: error
+
+  desktop-windows:
+    name: Desktop Windows
+    needs: test
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: flutter/mitglieder
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version bestimmen
+        shell: bash
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$REF" == refs/tags/members-v* ]]; then
+            VERSION="${REF_NAME#members-v}"
+          else
+            VERSION="${INPUT_VERSION:-0.0.0}"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' ist nicht X.Y.Z"
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VCODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          [ "$VCODE" -lt 1 ] && VCODE=1
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "VCODE=$VCODE" >> "$GITHUB_ENV"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Bauen
+        run: |
+          flutter pub get
+          flutter build windows --release --build-name "$VERSION" --build-number "$VCODE"
+
+      # Die Laufzeit von Visual C++ mitliefern - sonst startet das Programm
+      # auf Rechnern ohne "VC++ Redistributable" nicht.
+      - name: Zip
+        run: |
+          set -euo pipefail
+          OUT=build/windows/x64/runner/Release
+          for dll in msvcp140.dll vcruntime140.dll vcruntime140_1.dll; do
+            cp "/c/Windows/System32/$dll" "$OUT/"
+          done
+          mkdir -p "$GITHUB_WORKSPACE/desktop"
+          (cd "$OUT" && 7z a -tzip "$GITHUB_WORKSPACE/desktop/fwv-raura-${VERSION}-windows-x64.zip" .)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: desktop/*
+          retention-days: 30
+          if-no-files-found: error
+
+  # Unsigniert (kein Apple-Entwicklerkonto fuer Developer ID): beim ersten
+  # Start Rechtsklick -> Oeffnen, siehe docs/flutter-desktop.md.
+  desktop-macos:
+    name: Desktop macOS
+    needs: test
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: flutter/mitglieder
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version bestimmen
+        shell: bash
+        env:
+          REF: ${{ github.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$REF" == refs/tags/members-v* ]]; then
+            VERSION="${REF_NAME#members-v}"
+          else
+            VERSION="${INPUT_VERSION:-0.0.0}"
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' ist nicht X.Y.Z"
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VCODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          [ "$VCODE" -lt 1 ] && VCODE=1
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "VCODE=$VCODE" >> "$GITHUB_ENV"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Bauen
+        run: |
+          flutter pub get
+          flutter build macos --release --build-name "$VERSION" --build-number "$VCODE"
+
+      - name: Zip und DMG
+        run: |
+          set -euo pipefail
+          APP="build/macos/Build/Products/Release/FWV Raura.app"
+          mkdir -p "$GITHUB_WORKSPACE/desktop" dmg
+          ditto -c -k --keepParent "$APP" "$GITHUB_WORKSPACE/desktop/fwv-raura-${VERSION}-macos.zip"
+          cp -R "$APP" dmg/
+          ln -s /Applications dmg/Programme
+          hdiutil create -volname "FWV Raura" -srcfolder dmg -ov -format UDZO \
+            "$GITHUB_WORKSPACE/desktop/fwv-raura-${VERSION}-macos.dmg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: desktop/*
+          retention-days: 30
+          if-no-files-found: error
+
+  # Erst wenn das Release aus "build" steht: Dateien anhaengen und den
+  # rollenden Zeiger members-latest mit festen Dateinamen ergaenzen (fuer
+  # Links in Anleitungen). Der Update-Hinweis der Desktop-App liest die
+  # members-latest.json aus "build" und fuehrt zur Release-Seite.
+  desktop-release:
+    name: Desktop-Dateien ans Release
+    needs: [build, desktop-linux, desktop-windows, desktop-macos]
+    if: startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: desktop
+          merge-multiple: true
+
+      - name: Anhaengen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('members-v{0}', inputs.version) }}
+        run: |
+          set -euo pipefail
+          ls -la desktop
+          gh release upload "$TAG" desktop/* --clobber
+
+          NOTES="$(gh release view "$TAG" --json body --jq .body)"
+          if ! grep -q "### Desktop" <<< "$NOTES"; then
+            printf '%s\n\n%s\n' "$NOTES" "### Desktop (Linux, Windows, macOS)
+
+          - **Linux (Ubuntu 24.04+, Debian 13):** \`.deb\` installieren
+            (\`sudo apt install ./fwv-raura_*.deb\`) oder \`.tar.gz\` entpacken
+            und \`fwv_mitglieder\` starten. Braucht libsecret und einen
+            Schlüsselbund (GNOME-Schlüsselbund oder KWallet).
+          - **Windows 10/11:** \`.zip\` entpacken, \`fwv_mitglieder.exe\` starten.
+          - **macOS 12+:** \`.dmg\` öffnen, «FWV Raura» in Programme ziehen.
+            Unsigniert: beim ersten Start Rechtsklick → Öffnen." > notes.md
+            gh release edit "$TAG" --notes-file notes.md
+          fi
+
+          # Feste Namen unter members-latest
+          if gh release view members-latest >/dev/null 2>&1; then
+            cd desktop
+            cp fwv-raura_*_amd64.deb ../members-latest-linux-amd64.deb
+            cp fwv-raura-*-linux-x64.tar.gz ../members-latest-linux-x64.tar.gz
+            cp fwv-raura-*-windows-x64.zip ../members-latest-windows-x64.zip
+            cp fwv-raura-*-macos.dmg ../members-latest-macos.dmg
+            cd ..
+            gh release upload members-latest members-latest-linux-amd64.deb \
+              members-latest-linux-x64.tar.gz members-latest-windows-x64.zip \
+              members-latest-macos.dmg --clobber
+          fi

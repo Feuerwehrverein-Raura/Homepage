@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<!-- Backend, Authentik, Musik -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<!-- Anmeldung: lokaler Empfaenger fuer die Rueckleitung (127.0.0.1) -->
+	<key>com.apple.security.network.server</key>
+	<true/>
+	<!-- Fotos und Belege aus Dateien waehlen, Barcode mit der Kamera -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
+	<!-- PDF und Kalender-Dateien unter "Downloads" speichern und oeffnen -->
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
+	<key>com.apple.security.device.camera</key>
+	<true/>
+</dict>
+</plist>

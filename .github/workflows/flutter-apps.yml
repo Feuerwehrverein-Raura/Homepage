@@ -80,3 +80,32 @@ jobs:
 
       - name: APK bauen
         run: flutter build apk --debug
+
+  # Compile-Check des Desktop-Programms (Linux zuerst, docs/flutter-desktop.md).
+  # Debug reicht: es geht nur darum, dass der native Teil und die Plugins
+  # (libsecret fuer den Schluesselbund) auf Linux bauen.
+  linux:
+    name: Mitglieder-App Linux (debug)
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter/mitglieder
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux-Bauwerkzeuge
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev \
+            libstdc++-12-dev libsecret-1-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.5'
+          channel: stable
+          cache: true
+
+      - name: Linux bauen
+        run: flutter build linux --debug

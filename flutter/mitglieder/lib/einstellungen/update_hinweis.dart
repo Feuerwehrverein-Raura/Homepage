@@ -43,5 +43,13 @@ Future<void> updateHinweisZeigen(BuildContext context, Dienste dienste) async {
           action: SnackBarAction(label: 'Herunterladen', onPressed: () => unawaited(dienste.linkOeffnen(apk))),
         ),
       );
+    case DownloadUpdate(:final version, :final seite):
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Neue Version verfügbar: $version'),
+          duration: const Duration(seconds: 30),
+          action: SnackBarAction(label: 'Herunterladen', onPressed: () => unawaited(dienste.linkOeffnen(seite))),
+        ),
+      );
   }
 }

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=FWV Raura
+GenericName=Feuerwehrverein Raura
+Comment=App für Mitglieder, Organisatoren und Vorstand des Feuerwehrvereins Raura
+Exec=fwv-raura %U
+Icon=ch.fwvraura.members
+Terminal=false
+Categories=Office;Network;
+StartupWMClass=ch.fwvraura.members
+Keywords=FWV;Feuerwehrverein;Raura;Vorstand;Mitglieder;

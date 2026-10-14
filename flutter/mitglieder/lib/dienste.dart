@@ -21,6 +21,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'anmeldung/authentik_anmeldung.dart';
+import 'anmeldung/loopback_anmeldung.dart';
+import 'desktop/desktop.dart';
 import 'einstellungen/app_update.dart';
 import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
@@ -92,7 +94,8 @@ class Dienste {
 
   /// Die echte App: Geraete-Schluesselbund, echtes Backend, Firebase. Im
   /// Browser statt dessen localStorage und die Anmeldung der Website
-  /// (web/browser.dart).
+  /// (web/browser.dart). Als Desktop-Programm (desktop/desktop.dart):
+  /// Anmeldung ueber Loopback, Dateien oeffnen statt teilen, kein Push.
   factory Dienste.echt() {
     final geheim = kIsWeb ? browserSpeicher() : SichererSpeicher();
     final speicher = SitzungsSpeicher(geheim);
@@ -108,7 +111,11 @@ class Dienste {
     );
     dienste = Dienste(
       sitzung: sitzung,
-      authentik: kIsWeb ? websiteAnmeldung() : AppAuthAnmeldung(),
+      authentik: kIsWeb
+          ? websiteAnmeldung()
+          : istDesktop
+          ? LoopbackAnmeldung(browserOeffnen: _linkExtern)
+          : AppAuthAnmeldung(),
       uebernahme: AltdatenUebernahme(
         quelle: const MethodChannelAltdatenQuelle(),
         speicher: speicher,
@@ -118,7 +125,10 @@ class Dienste {
       kontakte: kontakte,
       update: !kIsWeb && Platform.isAndroid
           ? AndroidAppUpdate(appVersion: _appVersionAusPaket)
+          : istDesktop
+          ? DesktopAppUpdate(appVersion: _appVersionAusPaket)
           : const KeinAppUpdate(),
+      dateiTeilen: istDesktop ? dateiSpeichernUndOeffnen : null,
       schopfPruefTakt: const Duration(minutes: 10),
     );
     push.beiAntippen = dienste.pushAngetippt;
@@ -152,7 +162,8 @@ class Dienste {
 
   final KontakteAbgleich kontakte;
 
-  /// Hinweis auf neue Versionen (Play bzw. GitHub-APK; in Tests keiner).
+  /// Hinweis auf neue Versionen (Play bzw. GitHub-APK, Desktop: Release-
+  /// Seite; in Tests keiner).
   final AppUpdate update;
   late final OrganisatorPruefung organisator;
 
@@ -169,7 +180,8 @@ class Dienste {
   final Future<bool> Function(Uri adresse) linkOeffnen;
 
   /// Gibt eine Datei (PDF, .ics) ueber das Teilen-Menue des Systems weiter
-  /// — von dort laesst sie sich oeffnen, speichern oder verschicken.
+  /// — von dort laesst sie sich oeffnen, speichern oder verschicken. Auf
+  /// dem Desktop: unter "Downloads" speichern und oeffnen.
   final DateiTeilen dateiTeilen;
 
   /// "Jetzt" (in Tests fest, z.B. fuer den Monat im Kalender).

@@ -112,7 +112,14 @@ class SichererSpeicher implements GeheimSpeicher {
             // Wie die alte iOS-App: lesbar ab dem ersten Entsperren nach
             // dem Neustart, damit Hintergrund-Aufrufe (Push) funktionieren.
             iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-            mOptions: MacOsOptions(accessibility: KeychainAccessibility.first_unlock),
+            // macOS (Desktop-Programm): der alte Datei-Schluesselbund. Der
+            // "Data Protection"-Schluesselbund verlangt Keychain Sharing und
+            // damit ein Provisioning-Profil - ein unsigniertes Programm
+            // startete dann nur auf dem Mac, der es gebaut hat.
+            mOptions: MacOsOptions(
+              accessibility: KeychainAccessibility.first_unlock,
+              usesDataProtectionKeychain: false,
+            ),
           );
 
   final FlutterSecureStorage _speicher;

@@ -16,6 +16,7 @@ import '../dienste.dart';
 import '../gemeinsam.dart' show logoMitglieder;
 import '../web/browser.dart' show automatischAnmeldenErlaubt;
 import 'authentik_anmeldung.dart';
+import 'loopback_anmeldung.dart' show AbbrechbareAnmeldung;
 import 'organisator_login_screen.dart';
 import 'passwort_reset_screen.dart';
 import 'qr_scanner_screen.dart';
@@ -192,6 +193,24 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             ),
                             if (_reiter.index == 0) mitglied else qr,
                             if (_beschaeftigt) const LinearProgressIndicator(),
+                            // Desktop: wartet auf den Browser - wer den Tab
+                            // geschlossen hat, kommt hier wieder heraus.
+                            if (_beschaeftigt && widget.dienste.authentik is AbbrechbareAnmeldung)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  'Bitte im Browser anmelden …',
+                                  textAlign: TextAlign.center,
+                                  style: text.bodyMedium,
+                                ),
+                              ),
+                            if (_beschaeftigt && widget.dienste.authentik is AbbrechbareAnmeldung)
+                              TextButton(
+                                key: const Key('login-abbrechen'),
+                                onPressed: () =>
+                                    (widget.dienste.authentik as AbbrechbareAnmeldung).abbrechen(),
+                                child: const Text('Abbrechen'),
+                              ),
                             if (meldung != null)
                               Padding(
                                 padding: const EdgeInsets.all(16),

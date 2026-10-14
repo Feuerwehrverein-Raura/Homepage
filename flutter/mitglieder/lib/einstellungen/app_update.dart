@@ -1,4 +1,5 @@
-// Hinweis auf eine neue App-Version beim Start (nur Android).
+// Hinweis auf eine neue App-Version beim Start (Android; Desktop siehe
+// desktop/desktop.dart).
 //
 // Aus Google Play installiert: Play In-App-Updates, flexibel — Hinweis, auf
 // Antippen laedt Play im Hintergrund, danach "Neu starten". Gilt auch fuer
@@ -48,6 +49,13 @@ class ApkUpdate extends UpdateStand {
   const ApkUpdate({required this.version, required this.apk});
   final String version;
   final Uri apk;
+}
+
+/// Neuere Desktop-Fassung: [seite] ist die Release-Seite mit den Dateien.
+class DownloadUpdate extends UpdateStand {
+  const DownloadUpdate({required this.version, required this.seite});
+  final String version;
+  final Uri seite;
 }
 
 abstract class AppUpdate {
