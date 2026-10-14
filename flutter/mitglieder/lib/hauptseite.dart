@@ -28,6 +28,11 @@ import 'roterschopf/roterschopf_tab.dart';
 
 enum Reiter { anlaesse, organisator, lager, roterSchopf, profil, einstellungen }
 
+/// Ab dieser Breite stehen die Reiter links als Seitenleiste (Material:
+/// "medium" ab 600, hier etwas spaeter - darunter passt die Leiste unten
+/// besser zu den schmalen Inhalten).
+const seitenleisteAb = 840.0;
+
 class Hauptseite extends StatefulWidget {
   const Hauptseite({super.key, required this.dienste});
 
@@ -132,16 +137,63 @@ class _HauptseiteState extends State<Hauptseite> {
         if (!reiter.contains(_aktiv)) _aktiv = reiter.first;
         _besucht.add(_aktiv);
         final index = reiter.indexOf(_aktiv);
+        final inhalt = IndexedStack(
+          index: index,
+          children: [
+            for (final r in reiter)
+              _besucht.contains(r)
+                  ? KeyedSubtree(key: ValueKey(r), child: _inhalt(r))
+                  : SizedBox.shrink(key: ValueKey(r)),
+          ],
+        );
+        void waehlen(int i) => setState(() => _aktiv = reiter[i]);
+
+        // Grosse Bildschirme (Tablet, Browser): Reiter links als Seitenleiste
+        // statt unten, ab 1200 Punkten mit Beschriftung daneben. Der Inhalt
+        // bekommt die Breite neben der Leiste als Bildschirmbreite, damit
+        // mitSystemleiste richtig mittig einrueckt.
+        final breite = MediaQuery.sizeOf(context).width;
+        if (breite >= seitenleisteAb) {
+          final ausgeklappt = breite >= 1200;
+          final leiste = ausgeklappt ? 220.0 : 88.0;
+          final mq = MediaQuery.of(context);
+          return Scaffold(
+            body: Row(
+              children: [
+                SafeArea(
+                  right: false,
+                  child: NavigationRail(
+                    selectedIndex: index,
+                    onDestinationSelected: waehlen,
+                    extended: ausgeklappt,
+                    // minWidth ist die Spalte der Symbole - auch ausgeklappt.
+                    minWidth: 88,
+                    minExtendedWidth: 220,
+                    labelType: ausgeklappt ? NavigationRailLabelType.none : NavigationRailLabelType.all,
+                    groupAlignment: -1,
+                    destinations: [
+                      for (final r in reiter)
+                        NavigationRailDestination(
+                          icon: _ziel(r).icon,
+                          selectedIcon: _ziel(r).selectedIcon,
+                          label: Text(_ziel(r).label),
+                        ),
+                    ],
+                  ),
+                ),
+                const VerticalDivider(width: 1, thickness: 1),
+                Expanded(
+                  child: MediaQuery(
+                    data: mq.copyWith(size: Size(breite - leiste - 1, mq.size.height)),
+                    child: inhalt,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
         return Scaffold(
-          body: IndexedStack(
-            index: index,
-            children: [
-              for (final r in reiter)
-                _besucht.contains(r)
-                    ? KeyedSubtree(key: ValueKey(r), child: _inhalt(r))
-                    : SizedBox.shrink(key: ValueKey(r)),
-            ],
-          ),
+          body: inhalt,
           // Ab sechs Reitern (Vorstand, der organisiert) eine Stufe kleiner:
           // Auf 360 Punkte breiten Handys brach sonst "Organisator" mitten im
           // Wort um. Mit weniger Reitern bleibt alles wie gewohnt.
@@ -158,7 +210,7 @@ class _HauptseiteState extends State<Hauptseite> {
                 : NavigationBarTheme.of(context),
             child: NavigationBar(
               selectedIndex: index,
-              onDestinationSelected: (i) => setState(() => _aktiv = reiter[i]),
+              onDestinationSelected: waehlen,
               destinations: [for (final r in reiter) _ziel(r)],
             ),
           ),

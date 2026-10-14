@@ -8,7 +8,7 @@
          (Flutter Web, flutter/mitglieder) eingebettet in die Website. Kopf wie
          events.html (weiss, Logo), darunter zeichnet die App in #fwv-app - so
          bleibt deren rote Leiste die einzige rote Flaeche. Auf breiten
-         Bildschirmen steht die App als Karte in der Mitte.
+         Bildschirmen steht die App als Karte in der Mitte (max. 1440 px).
          Gebaut wird sie nach /mein/ (build-containers.yml). Anmeldung und
          Token teilt sie mit der Website (auth-callback.html, auth_token).
          Laeuft parallel zu mein.html, bis die neue Fassung uebernimmt. -->
@@ -35,11 +35,12 @@
         body { display: flex; flex-direction: column; height: 100dvh; }
         #rahmen { flex: 1 1 auto; min-height: 0; display: flex; }
         #fwv-app { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; }
-        /* DEUTSCH: Ab Tablet-Breite als Karte, hoechstens 960 px breit. */
+        /* DEUTSCH: Ab Tablet-Breite als Karte, hoechstens 1440 px breit - die App
+           ordnet sich darin selbst an (Seitenleiste, Kartenspalten). */
         @media (min-width: 768px) {
             #rahmen { padding: 1.25rem 1rem; }
             #fwv-app {
-                max-width: 960px; margin: 0 auto; width: 100%;
+                max-width: 1440px; margin: 0 auto; width: 100%;
                 border-radius: 0.75rem;
                 box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 8px 24px rgba(0,0,0,.08);
             }
@@ -53,8 +54,8 @@
                 <a href="index.html" class="flex items-center space-x-2 md:space-x-3 min-w-0">
                     <img src="images/logo.png" alt="Feuerwehrverein Raura Logo" class="h-9 md:h-12 w-auto">
                     <span class="font-bold text-fire-700 truncate">
-                        <span class="md:hidden text-lg">FWV Raura</span>
-                        <span class="hidden md:inline text-xl">Feuerwehrverein Raura</span>
+                        <span class="lg:hidden text-lg">FWV Raura</span>
+                        <span class="hidden lg:inline text-xl">Feuerwehrverein Raura</span>
                     </span>
                 </a>
                 <div class="flex items-center space-x-4 md:space-x-6 text-sm md:text-base flex-none">

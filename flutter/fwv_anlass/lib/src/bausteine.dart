@@ -3,6 +3,7 @@
 // Meldungen, Hinweis-Chips, Info-Zeilen, Schicht-Zeile, Knopfleiste unten,
 // Rueckfrage, PDF teilen, Zahl mit Plus/Minus.
 
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:fwv_core/fwv_core.dart';
@@ -19,8 +20,57 @@ import 'zugang.dart';
 /// NICHT mehr selbst dazu - der letzte Eintrag rutschte dann unter die
 /// Gestenleiste. Auf Seiten mit Reiterleiste ist der Wert 0 (die Leiste
 /// belegt den Platz schon), dort aendert sich nichts.
-EdgeInsets mitSystemleiste(BuildContext context, EdgeInsets abstand) =>
-    abstand.copyWith(bottom: abstand.bottom + MediaQuery.paddingOf(context).bottom);
+///
+/// Auf grossen Bildschirmen (Tablet, Browser) rueckt sie zudem seitlich ein,
+/// damit der Inhalt hoechstens [maxBreite] breit ist und mittig steht - Zeilen
+/// quer ueber 1300 Punkte liest niemand, und der Schalter klebte am rechten
+/// Rand. Die Bildlaufleiste bleibt dabei aussen. Auf dem Handy aendert sich
+/// nichts.
+EdgeInsets mitSystemleiste(
+  BuildContext context,
+  EdgeInsets abstand, {
+  double maxBreite = lesbareBreite,
+}) {
+  final rand = math.max(0.0, (MediaQuery.sizeOf(context).width - maxBreite) / 2);
+  return abstand.copyWith(
+    left: abstand.left + rand,
+    right: abstand.right + rand,
+    bottom: abstand.bottom + MediaQuery.paddingOf(context).bottom,
+  );
+}
+
+/// Hoechstbreite fuer Listen und Formulare auf grossen Bildschirmen.
+const lesbareBreite = 840.0;
+
+/// Hoechstbreite fuer Kartenlisten, die in Spalten stehen ([KartenSpalten]).
+const kartenBreite = 1240.0;
+
+/// Karten untereinander - oder, wenn Platz ist, in Spalten nebeneinander
+/// (je mindestens [minBreite]). Auf dem Handy eine Spalte wie bisher.
+class KartenSpalten extends StatelessWidget {
+  const KartenSpalten({super.key, required this.children, this.minBreite = 380, this.abstand = 12});
+
+  final List<Widget> children;
+  final double minBreite;
+  final double abstand;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, grenzen) {
+        final spalten = math.max(1, ((grenzen.maxWidth + abstand) / (minBreite + abstand)).floor());
+        if (spalten == 1 || children.length < 2) {
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+        }
+        final breite = (grenzen.maxWidth - abstand * (spalten - 1)) / spalten;
+        return Wrap(
+          spacing: abstand,
+          children: [for (final k in children) SizedBox(width: breite, child: k)],
+        );
+      },
+    );
+  }
+}
 
 /// Kurze Meldung unten am Bildschirm.
 void meldung(BuildContext context, String text) {

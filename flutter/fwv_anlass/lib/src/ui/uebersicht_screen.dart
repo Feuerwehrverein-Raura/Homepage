@@ -52,12 +52,24 @@ class _VerwaltungsUebersichtScreenState extends State<VerwaltungsUebersichtScree
           ];
           return ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 8, 12, 24)),
+            padding: mitSystemleiste(
+              context,
+              const EdgeInsets.fromLTRB(12, 8, 12, 24),
+              maxBreite: kartenBreite,
+            ),
             children: [
-              for (final a in aktuell) AnlassKarte(anlass: a, oeffnen: () => _oeffnen(a)),
+              KartenSpalten(
+                children: [
+                  for (final a in aktuell) AnlassKarte(anlass: a, oeffnen: () => _oeffnen(a)),
+                ],
+              ),
               if (vorbei.isNotEmpty) ...[
                 const Abschnitt('Vorbei'),
-                for (final a in vorbei) AnlassKarte(anlass: a, oeffnen: () => _oeffnen(a)),
+                KartenSpalten(
+                  children: [
+                    for (final a in vorbei) AnlassKarte(anlass: a, oeffnen: () => _oeffnen(a)),
+                  ],
+                ),
               ],
             ],
           );

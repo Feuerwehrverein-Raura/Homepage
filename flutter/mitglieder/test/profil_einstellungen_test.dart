@@ -210,6 +210,7 @@ void main() {
     WidgetTester tester, {
     Plattform plattform = Plattform.android,
     KontakteAbgleich kontakte = const KontakteAbgleich(),
+    Size groesse = const Size(360, 800),
   }) async {
     // Ohne nativen Kontakt-Abgleich (wie heute): der Kanal meldet
     // MissingPluginException — sofort, nicht erst ueber die echte Engine.
@@ -217,7 +218,7 @@ void main() {
       const MethodChannel(KontakteAbgleich.kanalName),
       (_) async => throw MissingPluginException(),
     );
-    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.physicalSize = groesse * 3;
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
 
@@ -545,6 +546,29 @@ void main() {
       await tippen(tester, find.text('Mitglieder-Adressbuch einrichten'));
       await tippen(tester, find.text('Profil installieren'));
       expect(geoeffnet, [Uri.parse('https://www.fwv-raura.ch/carddav.mobileconfig')]);
+    });
+
+    testWidgets('Grosser Bildschirm: Reiter links ausgeklappt, Wechsel geht', (tester) async {
+      await starten(tester, groesse: const Size(1300, 800));
+      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended, isTrue);
+      await tester.tap(find.descendant(of: find.byType(NavigationRail), matching: find.text('Mehr')));
+      await tester.pumpAndSettle();
+      expect(find.text('Einstellungen'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Tablet: Reiter links, schmal mit Beschriftung darunter', (tester) async {
+      await starten(tester, groesse: const Size(900, 700));
+      expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('Handy: Reiter unten wie bisher', (tester) async {
+      await starten(tester);
+      expect(find.byType(NavigationRail), findsNothing);
+      expect(find.byType(NavigationBar), findsOneWidget);
     });
 
     testWidgets('Hilfe: die vier Anleitungen der Website', (tester) async {

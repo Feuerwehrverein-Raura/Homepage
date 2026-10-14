@@ -130,6 +130,24 @@ ThemeData fwvThema() {
         ),
       ),
     ),
+    // Seitenleiste auf grossen Bildschirmen (Hauptseite ab 840 Punkten):
+    // gleiche Farben wie die Leiste unten, die Auswahl mit hellroter Pille.
+    navigationRailTheme: const NavigationRailThemeData(
+      backgroundColor: FwvFarben.flaeche,
+      indicatorColor: Color(0x1FB91C1C),
+      selectedIconTheme: IconThemeData(color: FwvFarben.rot),
+      unselectedIconTheme: IconThemeData(color: FwvFarben.textLeise),
+      selectedLabelTextStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: FwvFarben.rot,
+      ),
+      unselectedLabelTextStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: FwvFarben.textLeise,
+      ),
+    ),
     cardTheme: const CardThemeData(
       color: FwvFarben.flaeche,
       surfaceTintColor: Color(0x00000000),
