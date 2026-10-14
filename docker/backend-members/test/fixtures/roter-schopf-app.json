@@ -5,8 +5,9 @@
     {
       "kennung": "spots",
       "name": "Spots",
-      "anzahl": 8,
+      "anzahl": 7,
       "anzahl_an": 2,
+      "anzahl_aus_gesteckt": 1,
       "an": false,
       "teilweise": true,
       "erreichbar": true
@@ -14,8 +15,9 @@
     {
       "kennung": "arbeitsleuchten",
       "name": "Arbeitsleuchten",
-      "anzahl": 4,
+      "anzahl": 3,
       "anzahl_an": 0,
+      "anzahl_aus_gesteckt": 1,
       "an": false,
       "teilweise": false,
       "erreichbar": true

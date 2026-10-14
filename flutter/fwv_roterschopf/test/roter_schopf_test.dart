@@ -37,7 +37,10 @@ void main() {
     expect(z.stand, isNotNull);
     expect(z.gruppen.map((g) => g.kennung), ['spots', 'arbeitsleuchten']);
     final spots = z.gruppen.first;
-    expect([spots.anzahl, spots.anzahlAn, spots.an, spots.teilweise], [8, 2, false, true]);
+    expect(
+      [spots.anzahl, spots.anzahlAn, spots.an, spots.teilweise, spots.ausgesteckt],
+      [7, 2, false, true, 1],
+    );
     expect(z.lampen, hasLength(12));
     expect(z.lampen.where((l) => !l.erreichbar), hasLength(2));
     expect(z.lampen.firstWhere((l) => l.an).watt, 42);
@@ -72,8 +75,8 @@ void main() {
   ) async {
     final zugang = await zeigen(tester);
     expect(find.text('Spots'), findsOneWidget);
-    expect(find.text('2 von 8 an'), findsOneWidget);
-    expect(find.text('4 Lampen · aus'), findsOneWidget);
+    expect(find.text('2 von 7 an · 1 ausgesteckt'), findsOneWidget);
+    expect(find.text('3 Lampen · aus · 1 ausgesteckt'), findsOneWidget);
     expect(find.text('-18,2 °C'), findsNothing, reason: 'Temperaturen im zweiten Reiter');
 
     await tester.tap(find.text('Messwerte'));

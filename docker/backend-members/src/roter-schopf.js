@@ -261,17 +261,22 @@ function roterSchopf({
         const lampen = befehleAnwenden(messung.lampen);
         const gruppen = einstellung.gruppen.map(g => {
             const teile = lampen.filter(l => l.gruppe === g.kennung);
-            const anzahlAn = teile.filter(l => l.an).length;
+            // Nur Lampen, die antworten: Spots und Girlanden werden je nach
+            // Anlass ausgesteckt - eine ausgesteckte Lampe soll die Gruppe
+            // nicht als "teilweise" oder "aus" erscheinen lassen.
+            const da = teile.filter(l => l.erreichbar);
+            const anzahlAn = da.filter(l => l.an).length;
             return {
                 kennung: g.kennung,
                 name: g.name,
-                anzahl: teile.length,
+                anzahl: da.length,
                 anzahl_an: anzahlAn,
+                anzahl_aus_gesteckt: teile.length - da.length,
                 // Der Zustand kommt aus den Lampen, nicht aus dem Schalter der
                 // Zentrale: Der ist ein Wunsch, die Lampen sind die Wahrheit.
-                an: teile.length > 0 && anzahlAn === teile.length,
-                teilweise: anzahlAn > 0 && anzahlAn < teile.length,
-                erreichbar: teile.some(l => l.erreichbar)
+                an: da.length > 0 && anzahlAn === da.length,
+                teilweise: anzahlAn > 0 && anzahlAn < da.length,
+                erreichbar: da.length > 0
             };
         });
         return {

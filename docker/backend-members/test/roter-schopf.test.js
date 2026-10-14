@@ -103,7 +103,9 @@ test('Zustand: Gruppen aus den Lampen, stromlose Regler, Tiefkuehler', async () 
     assert.equal(z.zentrale, true);
     assert.equal(z.lampen.length, 12);
     const spots = z.gruppen.find(g => g.kennung === 'spots');
-    assert.deepEqual([spots.anzahl, spots.anzahl_an, spots.an, spots.teilweise], [8, 2, false, true]);
+    // Regler 4 (.7) ist stromlos: seine Spot-Lampe zaehlt als ausgesteckt.
+    assert.deepEqual([spots.anzahl, spots.anzahl_an, spots.an, spots.teilweise, spots.anzahl_aus_gesteckt],
+        [7, 2, false, true, 1]);
     const arbeit = z.gruppen.find(g => g.kennung === 'arbeitsleuchten');
     assert.deepEqual([arbeit.anzahl_an, arbeit.an, arbeit.teilweise], [0, false, false]);
 
@@ -136,6 +138,16 @@ test('Zustand: Gruppen aus den Lampen, stromlose Regler, Tiefkuehler', async () 
         fs.mkdirSync(path.dirname(ziel), { recursive: true });
         fs.writeFileSync(ziel, JSON.stringify(z, null, 2) + '\n');
     }
+});
+
+test('Gruppe ist an, wenn alle erreichbaren Lampen brennen (ausgesteckte zaehlen nicht)', async () => {
+    const lokal = fakeLokal();
+    for (const k of ['192.168.33.12:0', '192.168.33.13:0', '192.168.33.4:1', '192.168.33.5:0',
+        '192.168.33.5:1', '192.168.33.6:0', '192.168.33.8:1']) lokal.ausgang[k] = true;
+    const rs = roterSchopf({ abrufen: lokal.abrufen, jetzt: () => ZEIT, log: stumm });
+    const spots = (await rs.zustand()).gruppen.find(g => g.kennung === 'spots');
+    assert.deepEqual([spots.an, spots.teilweise, spots.anzahl, spots.anzahl_an, spots.anzahl_aus_gesteckt],
+        [true, false, 7, 7, 1]);
 });
 
 test('Zustand wird geteilt: zweiter Aufruf fragt die Zentrale nicht erneut', async () => {

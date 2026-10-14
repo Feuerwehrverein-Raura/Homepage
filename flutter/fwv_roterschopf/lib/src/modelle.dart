@@ -99,6 +99,7 @@ class LichtGruppe {
     required this.an,
     required this.teilweise,
     required this.erreichbar,
+    this.ausgesteckt = 0,
   });
 
   factory LichtGruppe.ausJson(Map<String, dynamic> j) => LichtGruppe(
@@ -109,18 +110,24 @@ class LichtGruppe {
     an: j['an'] == true,
     teilweise: j['teilweise'] == true,
     erreichbar: j['erreichbar'] == true,
+    ausgesteckt: _ganz(j['anzahl_aus_gesteckt']) ?? 0,
   );
 
   /// "spots", "arbeitsleuchten" — geschaltet wird mit `gruppe:<kennung>`.
   final String kennung;
   final String name;
+
+  /// Lampen, die antworten (ausgesteckte zaehlen nicht mit).
   final int anzahl;
   final int anzahlAn;
 
-  /// Alle Lampen der Gruppe brennen.
+  /// Alle erreichbaren Lampen der Gruppe brennen.
   final bool an;
   final bool teilweise;
   final bool erreichbar;
+
+  /// Lampen, die nicht antworten (ausgesteckt oder stromlos).
+  final int ausgesteckt;
 }
 
 class Lampe {

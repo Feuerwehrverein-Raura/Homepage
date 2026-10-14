@@ -227,11 +227,14 @@ class _RoterSchopfScreenState extends State<RoterSchopfScreen> {
 
   Widget _gruppe(LichtGruppe g) {
     final kennung = 'gruppe:${g.kennung}';
+    final zustand = g.teilweise
+        ? '${g.anzahlAn} von ${g.anzahl} an'
+        : '${g.anzahl} ${g.anzahl == 1 ? 'Lampe' : 'Lampen'} · ${g.an ? 'an' : 'aus'}';
     final unterzeile = !g.erreichbar
         ? 'nicht erreichbar'
-        : g.teilweise
-        ? '${g.anzahlAn} von ${g.anzahl} an'
-        : '${g.anzahl} Lampen · ${g.an ? 'an' : 'aus'}';
+        : g.ausgesteckt > 0
+        ? '$zustand · ${g.ausgesteckt} ausgesteckt'
+        : zustand;
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: ListTile(
