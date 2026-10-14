@@ -1,0 +1,4 @@
+# Bildschirmfoto-Tour fuer die Anleitungen (test/tour/bildschirmfotos_test.dart):
+# laeuft nur mit TOUR=1, sonst uebersprungen.
+tags:
+  tour:
