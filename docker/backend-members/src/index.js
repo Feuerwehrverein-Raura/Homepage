@@ -4727,9 +4727,13 @@ const vorstandMeldung = vorstandMelder({ kandidaten: vorstandKandidaten, senden:
 // Body: { art: 'antrag'|'anmeldung'|..., angaben: { id, name, anlass, ... },
 // ausloeser?: Mitglieds-Id }. Antwortet sofort; der Versand laeuft danach.
 app.post('/internal/vorstand-meldung', (req, res) => {
-    const apiKey = process.env.INTERNAL_API_KEY;
-    const provided = req.headers['x-internal-key'];
-    if (!apiKey || provided !== apiKey) return res.status(403).json({ error: 'Forbidden' });
+    // Interne Dienste: X-Internal-Key (INTERNAL_API_KEY) oder x-api-key
+    // (API_KEY, den alle Dienste haben - api-dispatch kennt nur diesen).
+    const intern = process.env.INTERNAL_API_KEY;
+    const dienst = process.env.API_KEY;
+    const ok = (intern && req.headers['x-internal-key'] === intern) ||
+        (dienst && req.headers['x-api-key'] === dienst);
+    if (!ok) return res.status(403).json({ error: 'Forbidden' });
     const { art, angaben, ausloeser } = req.body || {};
     if (!Object.prototype.hasOwnProperty.call(VORSTAND_ARTEN, art)) {
         return res.status(400).json({ error: 'art unbekannt' });

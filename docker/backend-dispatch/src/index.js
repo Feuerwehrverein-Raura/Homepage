@@ -1394,13 +1394,17 @@ Feuerwehrverein Raura
 // (dort Empfaenger, Abschalter und Sperrfrist). Fire-and-forget: der Antrag
 // ist gespeichert, auch wenn der Push scheitert.
 function vorstandMelden(art, angaben) {
-    const key = process.env.INTERNAL_API_KEY;
-    if (!key) {
-        logWarn('INTERNAL_API_KEY fehlt - kein Vorstand-Push', { art });
+    // INTERNAL_API_KEY, sonst der Dienst-Schluessel API_KEY (den hat
+    // api-dispatch immer; api-members nimmt beide an).
+    const kopf = process.env.INTERNAL_API_KEY
+        ? { 'X-Internal-Key': process.env.INTERNAL_API_KEY }
+        : (process.env.API_KEY ? { 'x-api-key': process.env.API_KEY } : null);
+    if (!kopf) {
+        logWarn('Kein interner Schluessel - kein Vorstand-Push', { art });
         return;
     }
     axios.post(`${process.env.MEMBERS_API_URL || 'http://api-members:3000'}/internal/vorstand-meldung`,
-        { art, angaben }, { headers: { 'X-Internal-Key': key }, timeout: 5000 })
+        { art, angaben }, { headers: kopf, timeout: 5000 })
         .catch(e => logError('Vorstand-Push fehlgeschlagen', { art, error: e.message }));
 }
 
