@@ -4408,7 +4408,14 @@ app.get('/calendar/items', authenticateAny, async (req, res) => {
 // DEUTSCH: Generiert ICS-Kalender-Datei mit allen nicht-abgesagten Events
 app.get('/calendar/ics', async (req, res) => {
     try {
-        const events = await pool.query('SELECT * FROM events WHERE status != $1 ORDER BY start_date', ['cancelled']);
+        // Nur echte Termine: Ideen mit offenem Datum standen sonst alle am
+        // 31.12. im abonnierten Kalender; Entwuerfe, Vorschlaege, abgelehnte
+        // und abgesagte Anlaesse gehoeren auch nicht hinein.
+        const events = await pool.query(`
+            SELECT * FROM events
+            WHERE COALESCE(status, '') NOT IN ('cancelled', 'draft', 'proposed', 'rejected')
+              AND COALESCE(datum_offen, false) = false
+            ORDER BY start_date`);
 
         const calendar = ical({
             name: 'Feuerwehrverein Raura',
@@ -4417,6 +4424,8 @@ app.get('/calendar/ics', async (req, res) => {
 
         events.rows.forEach(event => {
             calendar.createEvent({
+                // Feste UID: Kalender-Apps ersetzen den Eintrag bei Aenderungen.
+                id: `${event.id}@fwv-raura.ch`,
                 start: new Date(event.start_date),
                 end: event.end_date ? new Date(event.end_date) : undefined,
                 summary: event.title,
