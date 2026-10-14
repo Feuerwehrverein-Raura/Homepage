@@ -27,7 +27,7 @@ import 'gruppen_screen.dart';
 final Uri anleitungsBasis = Uri.parse('https://www.fwv-raura.ch/');
 const anleitungen = [
   (Icons.phone_android_outlined, 'Anleitung App', 'Alle Reiter der Mitglieder-App', 'anleitung-app.html'),
-  (Icons.language, 'Anleitung Website', 'Mein Portal und Anmeldung auf der Website', 'anleitung-website.html'),
+  (Icons.language, 'Anleitung Website', 'Veranstaltungen, Kalender und Mein Bereich', 'anleitung-website.html'),
   (Icons.password, 'Passwort setzen', 'Erstes Passwort fürs Vereinskonto', 'anleitung-passwort.html'),
   (Icons.cloud_outlined, 'Anleitung Cloud', 'Nextcloud im Browser und auf dem Handy', 'anleitung-nextcloud.html'),
 ];
