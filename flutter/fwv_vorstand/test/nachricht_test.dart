@@ -1,6 +1,6 @@
-// Nachricht: App-Push an alle geht erst nach der Rueckfrage raus, mit
+// Nachricht, Teil App-Push: geht erst nach der Rueckfrage raus, mit
 // title/body wie api-events POST /push/broadcast erwartet; die Zahl aus
-// `sent` wird angezeigt.
+// `sent` wird angezeigt. E-Mail/Brief, Verlauf, Pingen: versand_test.dart.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_vorstand/fwv_vorstand.dart';
@@ -20,8 +20,11 @@ void main() {
     });
   });
 
-  Future<void> oeffnen(WidgetTester tester, {Size groesse = handy}) =>
-      zeigen(tester, NachrichtAnsicht(dienste: backend.dienste), groesse: groesse);
+  Future<void> oeffnen(WidgetTester tester, {Size groesse = handy}) => zeigen(
+    tester,
+    NachrichtAnsicht(dienste: backend.dienste, start: NachrichtTeil.push),
+    groesse: groesse,
+  );
 
   FilledButton senden(WidgetTester tester) =>
       tester.widget<FilledButton>(find.byKey(const Key('push-senden')));
@@ -92,15 +95,12 @@ void main() {
     expect(find.text('Über 50 Zeichen: wird oft abgeschnitten.'), findsOneWidget);
   });
 
-  testWidgets('Desktop: Formular und Vorschau nebeneinander; Website-Link', (tester) async {
+  testWidgets('Desktop: Formular und Vorschau nebeneinander', (tester) async {
     await oeffnen(tester, groesse: desktop);
     final formular = tester.getTopLeft(find.byKey(const Key('push-titel')));
     final vorschau = tester.getTopLeft(find.byKey(const Key('push-vorschau')));
     expect(vorschau.dx, greaterThan(formular.dx + 300));
     expect(tester.takeException(), isNull);
-
-    await tippen(tester, find.text('Website öffnen'));
-    expect(backend.links, [Uri.parse('https://www.fwv-raura.ch/vorstand.html')]);
   });
 
   test('PushAnAlleDienst liest sent als Zahl oder Text', () async {

@@ -16,6 +16,8 @@ const { SwissQRBill, SwissQRCode } = require('swissqrbill/pdf');
 const { generate } = require('@pdfme/generator');
 const { text, image, barcodes } = require('@pdfme/schemas');
 const crypto = require('crypto');
+const nachrichtLayout = require('./nachricht-layout');
+const { briefErstellen, briefProtokollieren, absenderLaden, variablenEinsetzen } = require('./nachricht-routen');
 
 // ============================================
 // CONTACT FORM RATE LIMITING (in-memory)
@@ -733,16 +735,16 @@ app.post('/email/send', authenticateAny, requireRole('vorstand', 'admin'), async
             if (template.rows.length > 0) {
                 emailSubject = template.rows[0].subject;
                 emailBody = template.rows[0].body;
-
-                // Replace variables
-                if (variables) {
-                    Object.keys(variables).forEach(key => {
-                        const regex = new RegExp(`{{${key}}}`, 'g');
-                        emailSubject = emailSubject.replace(regex, variables[key]);
-                        emailBody = emailBody.replace(regex, variables[key]);
-                    });
-                }
             }
+        }
+
+        // Platzhalter ({{vorname}} ...) einsetzen - auch ohne Vorlage. Bisher
+        // nur mit template_id; frei getippte Texte gingen mit {{vorname}} raus.
+        // Im mitgegebenen HTML werden die Werte escaped.
+        if (variables) {
+            emailSubject = variablenEinsetzen(emailSubject, variables);
+            emailBody = variablenEinsetzen(emailBody, variables);
+            emailHtmlOverride = variablenEinsetzen(emailHtmlOverride, variables, true);
         }
 
         // Wenn HTML explizit mitgegeben: direkt nutzen. Sonst aus Body generieren.
@@ -804,6 +806,13 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
     console.log('[EMAIL BULK] /email/bulk called with:', { member_ids: req.body.member_ids, template_id: req.body.template_id, exclude_honored: req.body.exclude_honored });
     try {
         const { member_ids, template_id, variables, exclude_honored } = req.body;
+        // layout: 'standard' -> das Backend baut die HTML-Mail im offiziellen
+        // Layout aus dem Text (nachricht-layout.js), statt html vom Client.
+        // praeferenz_ignorieren: true -> auch an Mitglieder ohne
+        // E-Mail-Zustellung (Versandart "E-Mail"); sonst wie bisher nur mit.
+        const standardLayout = req.body.layout === 'standard';
+        const praeferenzIgnorieren = req.body.praeferenz_ignorieren === true;
+        const absender = standardLayout ? await absenderLaden(pool) : null;
 
         // Get members (Authorization-Header vom Request weiterreichen)
         console.log('[EMAIL BULK] Fetching members from:', `${process.env.MEMBERS_API_URL}/members`);
@@ -821,11 +830,16 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
         console.log('[EMAIL BULK] Processing', filteredMembers.length, 'members (requested:', requestedIds.size + ')');
 
         const results = [];
+        let skipped = 0;
         for (const member of filteredMembers) {
-            if (!member.email || !member.zustellung_email) continue;
+            if (!member.email || (!member.zustellung_email && !praeferenzIgnorieren)) {
+                skipped++;
+                continue;
+            }
             // Sicherheit: Ehrenmitglieder werden bei Mitgliedsbeitrag-Versand ausgeschlossen
             if (exclude_honored && member.status === 'Ehrenmitglied') {
                 console.log('[EMAIL BULK] Skipping Ehrenmitglied:', member.vorname, member.nachname);
+                skipped++;
                 continue;
             }
 
@@ -835,6 +849,10 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
                     anrede: member.anrede,
                     vorname: member.vorname,
                     nachname: member.nachname,
+                    strasse: member.strasse,
+                    plz: member.plz,
+                    ort: member.ort,
+                    email: member.email,
                     ...variables
                 };
 
@@ -845,7 +863,14 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
                     member_id: member.id,
                     subject: req.body.subject,
                     body: req.body.body,
-                    html: req.body.html,
+                    html: standardLayout
+                        ? nachrichtLayout.emailHtml({
+                            betreff: req.body.subject,
+                            text: req.body.body,
+                            mitglied: member,
+                            absender
+                        })
+                        : req.body.html,
                     attachments: req.body.attachments
                 }, {
                     headers: { Authorization: req.headers.authorization || '' }
@@ -858,7 +883,8 @@ app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async
         }
 
         console.log('[EMAIL BULK] Completed:', { total: results.length, success: results.filter(r => r.success).length });
-        res.json({ results, total: results.length, success: results.filter(r => r.success).length });
+        const success = results.filter(r => r.success).length;
+        res.json({ results, total: results.length, success, failed: results.length - success, skipped });
     } catch (error) {
         console.error('[EMAIL BULK] ERROR:', error.message, error.stack);
         res.status(500).json({ error: error.message });
@@ -2627,7 +2653,7 @@ app.get('/pingen/letters/:letterId/status', authenticateAny, requireRole('vorsta
 
         // Brief-Status abrufen
         const letterResponse = await axios.get(
-            `${PINGEN_API}/organisations/${process.env.PINGEN_ORGANISATION_ID}/letters/${letterId}`,
+            `${PINGEN_API}/organisations/${getPingenOrgId(staging)}/letters/${letterId}`,
             {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -4310,6 +4336,9 @@ app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'
         );
 
         logInfo('Letter sent via Pingen (HTML)', { member_id, name: recipient.name, subject });
+        await briefProtokollieren(pool, {
+            memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging
+        });
         res.json({ success: true, letter_id: letterRes.data.data?.id });
 
     } catch (error) {
@@ -4404,6 +4433,9 @@ app.post('/dispatch/send-pdf-post', authenticateAny, requireRole('vorstand', 'ad
         );
 
         logInfo('PDF-Brief sent via Pingen', { member_id, name: recipient.name, subject });
+        await briefProtokollieren(pool, {
+            memberId: member_id, recipient, subject, letterId: letterRes.data.data?.id, staging
+        });
         res.json({ success: true, letter_id: letterRes.data.data?.id });
 
     } catch (error) {
@@ -4412,61 +4444,64 @@ app.post('/dispatch/send-pdf-post', authenticateAny, requireRole('vorstand', 'ad
     }
 });
 
+// Rendert Brief-HTML zu einem PDF wie /dispatch/send-post (gleicher Rand,
+// Seitenzahlen); zonen=true legt die Pingen-Zonen ueber Seite 1.
+async function vorschauPdfRendern(html, pdf_margin, showZones) {
+    // Gleiche Rand-Logik wie /dispatch/send-post, damit die Vorschau 1:1 dem
+    // echten Brief entspricht (z.B. Event-Einladung: 15mm Oberrand).
+    const previewMargin = (pdf_margin && typeof pdf_margin === 'object')
+        ? pdf_margin
+        : { top: '0', right: '0', bottom: '20mm', left: '0' };
+    const mmOf = (v) => parseFloat(String(v || '0').replace('mm', '')) || 0;
+    const mTop = mmOf(previewMargin.top);
+    const mBottom = mmOf(previewMargin.bottom);
+    // Zonen-Overlay vor </body> injizieren (nur Seite 1). Die Zonen sind BLATT-
+    // Koordinaten: Container um den Oberrand nach oben verschieben (top: -mTop)
+    // und exakt an der Unterkante des Seiteninhalts kappen (height: 297-mBottom,
+    // overflow:hidden) — sonst fragmentiert das Overlay auf Seite 2 (rosa Streifen).
+    let finalHtml = html;
+    if (showZones) {
+        const zoneOverlay = `
+<div style="position: absolute; top: -${mTop}mm; left: 0; width: 210mm; height: ${297 - mBottom}mm; overflow: hidden; pointer-events: none; z-index: 9999;">
+<!-- Randsperrbereich 5mm rundum (Blatt-Koordinaten) -->
+<div style="position: absolute; top: 0; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-bottom: 1px dashed rgba(239,68,68,0.6);"></div>
+<div style="position: absolute; top: 292mm; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-top: 1px dashed rgba(239,68,68,0.6);"></div>
+<div style="position: absolute; top: 0; left: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
+<div style="position: absolute; top: 0; right: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
+<!-- Frankierbereich X=116, Y=40, W=89.5, H=47.5 -->
+<div style="position: absolute; top: 40mm; left: 116mm; width: 89.5mm; height: 47.5mm; background: rgba(251,146,60,0.15); border: 1px dashed rgba(251,146,60,0.6); font-size: 7pt; color: #9a3412; padding: 1mm;">Frankierbereich (116/40/89.5/47.5mm)</div>
+<!-- Adressbereich X=118, Y=60, W=85.5, H=25.5 -->
+<div style="position: absolute; top: 60mm; left: 118mm; width: 85.5mm; height: 25.5mm; background: rgba(220,38,38,0.15); border: 1.5px solid rgba(220,38,38,0.8); font-size: 7pt; color: #7f1d1d; padding: 1mm;">Adressbereich (118/60/85.5/25.5mm)</div>
+</div>`;
+        finalHtml = html.replace('</body>', zoneOverlay + '</body>');
+    }
+
+    const browser = await puppeteer.launch({
+        headless: 'new',
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+    await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: previewMargin,
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
+    });
+    await browser.close();
+    return pdfBuffer;
+}
+
 // DEUTSCH: Brief-Vorschau als PDF rendern (ohne Pingen-Versand)
 // Nimmt HTML entgegen und liefert ein PDF zurueck - fuer Vorschau-Anzeige im Frontend
 // Query-Param ?zones=1 fuegt Pingen-Zonen-Overlay (Frankier/Adressbereich) hinzu
 app.post('/dispatch/preview-pdf', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { html, pdf_margin } = req.body;
-        const showZones = req.query.zones === '1';
         if (!html) return res.status(400).json({ error: 'html erforderlich' });
-
-        // Gleiche Rand-Logik wie /dispatch/send-post, damit die Vorschau 1:1 dem
-        // echten Brief entspricht (z.B. Event-Einladung: 15mm Oberrand).
-        const previewMargin = (pdf_margin && typeof pdf_margin === 'object')
-            ? pdf_margin
-            : { top: '0', right: '0', bottom: '20mm', left: '0' };
-        const mmOf = (v) => parseFloat(String(v || '0').replace('mm', '')) || 0;
-        const mTop = mmOf(previewMargin.top);
-        const mBottom = mmOf(previewMargin.bottom);
-
-        // Zonen-Overlay vor </body> injizieren (nur Seite 1). Die Zonen sind BLATT-
-        // Koordinaten: Container um den Oberrand nach oben verschieben (top: -mTop)
-        // und exakt an der Unterkante des Seiteninhalts kappen (height: 297-mBottom,
-        // overflow:hidden) — sonst fragmentiert das Overlay auf Seite 2 (rosa Streifen).
-        let finalHtml = html;
-        if (showZones) {
-            const zoneOverlay = `
-<div style="position: absolute; top: -${mTop}mm; left: 0; width: 210mm; height: ${297 - mBottom}mm; overflow: hidden; pointer-events: none; z-index: 9999;">
-    <!-- Randsperrbereich 5mm rundum (Blatt-Koordinaten) -->
-    <div style="position: absolute; top: 0; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-bottom: 1px dashed rgba(239,68,68,0.6);"></div>
-    <div style="position: absolute; top: 292mm; left: 0; width: 210mm; height: 5mm; background: rgba(239,68,68,0.15); border-top: 1px dashed rgba(239,68,68,0.6);"></div>
-    <div style="position: absolute; top: 0; left: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
-    <div style="position: absolute; top: 0; right: 0; width: 5mm; height: 297mm; background: rgba(239,68,68,0.15);"></div>
-    <!-- Frankierbereich X=116, Y=40, W=89.5, H=47.5 -->
-    <div style="position: absolute; top: 40mm; left: 116mm; width: 89.5mm; height: 47.5mm; background: rgba(251,146,60,0.15); border: 1px dashed rgba(251,146,60,0.6); font-size: 7pt; color: #9a3412; padding: 1mm;">Frankierbereich (116/40/89.5/47.5mm)</div>
-    <!-- Adressbereich X=118, Y=60, W=85.5, H=25.5 -->
-    <div style="position: absolute; top: 60mm; left: 118mm; width: 85.5mm; height: 25.5mm; background: rgba(220,38,38,0.15); border: 1.5px solid rgba(220,38,38,0.8); font-size: 7pt; color: #7f1d1d; padding: 1mm;">Adressbereich (118/60/85.5/25.5mm)</div>
-</div>`;
-            finalHtml = html.replace('</body>', zoneOverlay + '</body>');
-        }
-
-        const browser = await puppeteer.launch({
-            headless: 'new',
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-        const page = await browser.newPage();
-        await page.setContent(finalHtml, { waitUntil: 'networkidle0' });
-        const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: previewMargin,
-            displayHeaderFooter: true,
-            headerTemplate: '<div></div>',
-            footerTemplate: '<div style="width: 100%; font-family: Arial, sans-serif; font-size: 9pt; color: #666; padding: 0 25mm 0 0; text-align: right;">Seite <span class="pageNumber"></span> von <span class="totalPages"></span></div>'
-        });
-        await browser.close();
-
+        const pdfBuffer = await vorschauPdfRendern(html, pdf_margin, req.query.zones === '1');
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'inline; filename="vorschau.pdf"');
         res.send(pdfBuffer);
@@ -4475,6 +4510,11 @@ app.post('/dispatch/preview-pdf', authenticateAny, requireRole('vorstand', 'admi
         res.status(500).json({ error: error.message });
     }
 });
+
+// Brief fuer ein Mitglied im offiziellen Layout bauen (Flutter-App): HTML +
+// Empfaenger fuer /dispatch/send-post, mit vorschau=true auch als PDF (base64).
+app.post('/dispatch/brief', authenticateAny, requireRole('vorstand', 'admin'),
+    briefErstellen({ pool, vorschauPdf: vorschauPdfRendern }));
 
 // ============================================
 // SCHEDULED JOBS — zeitgesteuerter Hintergrund-Worker

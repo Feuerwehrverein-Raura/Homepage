@@ -22,6 +22,12 @@ class FalschesBackend {
   final anfragen = <http.Request>[];
   final links = <Uri>[];
 
+  /// Ueber das Teilen-Menue weitergegebene Dateien (Name, Groesse).
+  final geteilt = <(String, int)>[];
+
+  /// Was der PDF-Waehler liefert (null = Abbruch).
+  ({Uint8List bytes, String dateiname})? pdf;
+
   late final api = ApiClient(
     http: MockClient((a) async {
       anfragen.add(a);
@@ -36,13 +42,14 @@ class FalschesBackend {
   );
 
   late final umgebung = VerwaltungsUmgebung(
-    dateiTeilen: (bytes, name, typ, {ursprung}) async {},
+    dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, bytes.length)),
     fotoWaehlen: ({required bool kamera}) async => Uint8List(0),
     linkOeffnen: (u) async {
       links.add(u);
       return true;
     },
     anhangVerkleinern: (roh) async => roh,
+    pdfWaehlen: () async => pdf,
   );
 
   late final dienste = VorstandDienste(

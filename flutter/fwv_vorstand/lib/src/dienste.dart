@@ -12,6 +12,7 @@ import 'audit/audit_dienst.dart';
 import 'mitglieder/mitglieder_verwaltung.dart';
 import 'push_dienst.dart';
 import 'ui/beitraege/beitraege_daten.dart';
+import 'versand/versand_dienst.dart';
 
 /// Gruppen, die den Vorstand-Bereich sehen (Gross/klein egal). Dieselbe Regel
 /// prueft das Backend (requireRole('vorstand', 'admin')).
@@ -59,6 +60,11 @@ class VorstandDienste {
 
   /// App-Push an alle (api-events).
   PushAnAlleDienst get push => PushAnAlleDienst(api);
+
+  /// E-Mail, Brief, Verlauf und Pingen (api-dispatch). Den PDF-Waehler fuer
+  /// den Massen-PDF-Versand liefert [umgebung] (`pdfWaehlen`); ohne ihn
+  /// zeigt die Pingen-Ansicht nur einen Hinweis.
+  VersandDienst get versand => VersandDienst(api);
 }
 
 /// Vorstand-Seite der Website - fuer alles, was die App noch nicht kann.

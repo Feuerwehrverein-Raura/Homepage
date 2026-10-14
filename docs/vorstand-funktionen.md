@@ -132,28 +132,28 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Versandart Auto/E-Mail/Post/PDF-Brief | ✓ | ½ | ✓ | – | – | /email/bulk, /dispatch/send-post, /send-pdf-post, /dispatch/smart (D) |
-| [ ] | Empfaenger: alle / nach Status / nach Zustellart | ½ | ½ | ✓ | – | – | W+A Statusfilter kaputt (Werte passen nicht) |
-| [ ] | Empfaenger einzeln auswaehlen | ½ | – | ✓ | – | – | W Knopf ohne Funktion |
-| [ ] | Vorlage waehlen | ½ | ✓ | ✓ | – | – | GET /templates; W nur eine fest eingebaute |
-| [ ] | Rich-Text-Editor, Platzhalter | ✓ | ✓ | ✓ | – | – | |
+| [x] | Versandart Auto/E-Mail/Post/PDF-Brief | ✓ | ½ | ✓ | – | ✓ | /email/bulk, /dispatch/send-post, /send-pdf-post, /dispatch/smart (D); F: Auto/E-Mail/Brief, PDF-Brief = Pingen-Massen-PDF |
+| [x] | Empfaenger: alle / nach Status / nach Zustellart | ½ | ½ | ✓ | – | ✓ | W+A Statusfilter kaputt (Werte passen nicht); F echte Werte, «Alle» ohne Ausgetreten/Verstorben/Testkonto |
+| [x] | Empfaenger einzeln auswaehlen | ½ | – | ✓ | – | ✓ | W Knopf ohne Funktion |
+| [x] | Vorlage waehlen | ½ | ✓ | ✓ | – | ✓ | GET /templates; W nur eine fest eingebaute |
+| [ ] | Rich-Text-Editor, Platzhalter | ✓ | ✓ | ✓ | – | ½ | F: Text mit Absaetzen + Platzhalter (ersetzt das Backend), kein Rich Text |
 | [ ] | Event-Einladung / Helferaufruf mit Schichten | ✓ | – | ✓ | – | – | |
-| [ ] | Vorschau E-Mail / Brief-PDF mit Adresszonen | ✓ | ½ | ✓ | – | – | POST /dispatch/preview-pdf?zones=1 |
-| [ ] | Anhaenge mitsenden | ½ | – | – | – | – | W waehlbar, aber nie gesendet |
+| [x] | Vorschau E-Mail / Brief-PDF mit Adresszonen | ✓ | ½ | ✓ | – | ✓ | POST /dispatch/preview-pdf?zones=1; F: POST /dispatch/brief {vorschau, zonen} |
+| [ ] | Anhaenge mitsenden | ½ | – | – | – | – | W waehlbar, aber nie gesendet; F bietet keine an |
 | [ ] | Entwuerfe | ½ | – | – | – | – | W nur localStorage |
 | [ ] | Zeitgesteuert senden / «Geplant» | ½ | – | – | – | – | W Platzhalter |
-| [ ] | Versandverlauf mit Filter | ✓ | ✓ | ✓ | – | – | GET /dispatch-log |
+| [x] | Versandverlauf mit Filter | ✓ | ✓ | ✓ | – | ✓ | GET /dispatch-log |
 | [x] | App-Push an alle | ✓ | ✓ | ✓ | – | ✓ | POST /push/broadcast (E) |
 | [ ] | Vorlagen anlegen/bearbeiten/loeschen | ½ | – | ✓ | – | – | /templates (D); W-Editor tot; **nur in D** nutzbar |
-| [ ] | Massen-PDF per Post an Auswahl (Kostenschaetzung, Staging) | ½ | ✓ | ✓ | – | – | POST /pingen/send-bulk-pdf |
+| [x] | Massen-PDF per Post an Auswahl (Kostenschaetzung, Staging) | ½ | ✓ | ✓ | – | ✓ | POST /pingen/send-bulk-pdf; F braucht umgebung.pdfWaehlen |
 
 ## 8. Pingen (Post)
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Konto/Guthaben (Live/Staging) | ½ | ✓ | ✓ | – | – | GET /pingen/account |
-| [ ] | Statistik, Briefliste | ½ | ½ | ✓ | – | – | GET /pingen/stats, /letters; W kaputt, A verwaist |
-| [ ] | Briefstatus pruefen / automatischer Abgleich | ½ | ½ | ✓ | – | – | GET /pingen/letters/:id/status |
+| [x] | Konto/Guthaben (Live/Staging) | ½ | ✓ | ✓ | – | ✓ | GET /pingen/account |
+| [x] | Statistik, Briefliste | ½ | ½ | ✓ | – | ✓ | GET /pingen/stats, /letters; W kaputt, A verwaist |
+| [x] | Briefstatus pruefen / automatischer Abgleich | ½ | ½ | ✓ | – | ✓ | GET /pingen/letters/:id/status (mit external_id; D schickte die Protokoll-ID); F: Knopf «offene pruefen» |
 | [ ] | Einzelbrief senden | ½ | – | ✓ | – | – | POST /pingen/send-manual |
 | [ ] | Webhooks verwalten | ½ | – | ✓ | – | – | /pingen/webhooks* – **nur in D** nutzbar |
 
@@ -162,7 +162,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
 | [ ] | PDF-Designer (pdfme, pdf.fwv-raura.ch) | ✓ | – | – | – | – | eigene App; **verlinken statt nachbauen**; braucht Token-Uebergabe (vorstand_token-Cookie) |
-| [ ] | Brieflayouts (allgemein, Einladung, Deckblatt, Beitrag) | ✓ | ½ | ✓ | – | – | heute im Client gebaut → ins Backend verlegen |
+| [ ] | Brieflayouts (allgemein, Einladung, Deckblatt, Beitrag) | ✓ | ½ | ✓ | – | ½ | allgemein jetzt im Backend (nachricht-layout.js, POST /dispatch/brief, /email/bulk layout=standard); Einladung, Deckblatt, Beitrag noch im Client |
 
 ## 10. E-Mail: Mailcow, Posteingang, Adressbuch
 
