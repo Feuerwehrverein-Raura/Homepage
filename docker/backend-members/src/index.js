@@ -18,6 +18,7 @@ const admin = require('firebase-admin');
 const { authenticateToken, authenticateAny, authenticateVorstand, requireRole } = require('./auth-middleware');
 const { syncVorstandToVaultwarden } = require('./vaultwarden-sync');
 const { gruppenAbfrage, memberJwtInhalt, mitgliedTokenPruefen, pruefAntwort } = require('./member-gruppen');
+const { vorstandsRollen } = require('./vorstand-rolle');
 const { roterSchopf, hatRoterSchopfZugang, VORGABE: ROTER_SCHOPF_VORGABE } = require('./roter-schopf');
 const { schopfVerlauf, grenzenAus } = require('./schopf-verlauf');
 const { hoerFreigabe, hoerFreigabeGueltig, kioskFernbedienung } = require('./kiosk-musik');
@@ -757,10 +758,31 @@ app.post('/auth/vorstand/refresh', async (req, res) => {
 // Get Vorstand user info
 // DEUTSCH: Gibt die Benutzer-Info des eingeloggten Vorstandsmitglieds zurück
 app.get('/auth/vorstand/me', authenticateVorstand, async (req, res) => {
+    // Persoenliches Login (Authentik): Rolle aus der Funktion des Mitglieds.
+    let rolle = req.user.role || null;
+    let rollen = rolle ? [rolle] : [];
+    let person = null;
+    if (!rolle) {
+        try {
+            const m = await wer(pool, req.user);
+            if (m) {
+                const r = await pool.query('SELECT vorname, nachname, funktion FROM members WHERE id = $1', [m.id]);
+                if (r.rows[0]) {
+                    rollen = vorstandsRollen(r.rows[0].funktion);
+                    rolle = rollen[0] || null;
+                    person = `${r.rows[0].vorname || ''} ${r.rows[0].nachname || ''}`.trim() || null;
+                }
+            }
+        } catch (error) {
+            console.error('GET /auth/vorstand/me (Rolle):', error.message);
+        }
+    }
     res.json({
         email: req.user.email,
-        role: req.user.role,
-        name: getRoleName(req.user.role),
+        role: rolle,
+        rollen,
+        name: rolle ? getRoleName(rolle) : 'Vorstand',
+        person,
         groups: req.user.groups
     });
 });

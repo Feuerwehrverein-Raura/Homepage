@@ -22,5 +22,8 @@
     "xlsx": "^0.18.5",
     "imapflow": "^1.0.162",
     "mailparser": "^3.7.1"
+  },
+  "scripts": {
+    "test": "node --test --test-force-exit test/"
   }
 }

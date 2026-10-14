@@ -14,24 +14,34 @@ const jwksClient = require('jwks-rsa');
 // DEUTSCH: Authentik URL (Identity Provider)
 const AUTHENTIK_URL = process.env.AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
 
-// DEUTSCH: JWKS-Client — holt RS256-Schlüssel vom Authentik JWKS-Endpunkt
-const client = jwksClient({
-    jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members/jwks/`,
-    cache: true,
-    cacheMaxAge: 600000,
-    rateLimit: true,
-    jwksRequestsPerMinute: 10
-});
+// DEUTSCH: Tokens von zwei Authentik-Providern wie in backend-members:
+//  - fwv-members      -> Website (mein.html, vorstand.html via Authentik)
+//  - fwv-members-app  -> Mitglieder-App (Android, iPhone, Desktop)
+// Bis 14.10.2026 nahm dieser Dienst nur fwv-members an - die App kam nicht durch.
+const ISSUERS = [
+    `${AUTHENTIK_URL}/application/o/fwv-members/`,
+    `${AUTHENTIK_URL}/application/o/fwv-members-app/`
+];
+const jwksClients = {
+    'fwv-members': jwksClient({
+        jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members/jwks/`,
+        cache: true, cacheMaxAge: 600000, rateLimit: true, jwksRequestsPerMinute: 10
+    }),
+    'fwv-members-app': jwksClient({
+        jwksUri: `${AUTHENTIK_URL}/application/o/fwv-members-app/jwks/`,
+        cache: true, cacheMaxAge: 600000, rateLimit: true, jwksRequestsPerMinute: 10
+    })
+};
 
-// DEUTSCH: Holt den öffentlichen Schlüssel anhand der Key-ID im Token-Header
+// DEUTSCH: Holt den öffentlichen Schlüssel - erst beim Website-, dann beim App-Provider.
 function getKey(header, callback) {
-    client.getSigningKey(header.kid, (err, key) => {
-        if (err) {
-            return callback(err);
-        }
-        const signingKey = key.getPublicKey();
-        callback(null, signingKey);
-    });
+    const versuchen = (slug, danach) => {
+        jwksClients[slug].getSigningKey(header.kid, (err, key) => {
+            if (err) return danach ? versuchen(danach, null) : callback(err);
+            callback(null, key.getPublicKey());
+        });
+    };
+    versuchen('fwv-members', 'fwv-members-app');
 }
 
 /**
@@ -45,9 +55,26 @@ function authenticateToken(req, res, next) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
+    // Mitglieder-Token (HS256, type 'member', QR-Login) wie in backend-members.
+    try {
+        const m = jwt.verify(token, process.env.JWT_SECRET);
+        if (m && m.type === 'member' && (m.email || m.sub || m.member_id || m.benutzername)) {
+            req.user = {
+                id: m.sub || m.member_id || m.email,
+                email: m.email,
+                benutzername: m.benutzername,
+                name: m.name,
+                groups: m.groups || []
+            };
+            return next();
+        }
+    } catch (_) {
+        // kein Mitglieder-Token - weiter mit Authentik
+    }
+
     jwt.verify(token, getKey, {
         algorithms: ['RS256'],
-        issuer: `${AUTHENTIK_URL}/application/o/fwv-members/`
+        issuer: ISSUERS
     }, (err, decoded) => {
         if (err) {
             console.error('Token verification failed:', err.message);

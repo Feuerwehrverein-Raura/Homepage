@@ -198,10 +198,20 @@ function authenticateAny(req, res, next) {
     return res.status(401).json({ error: 'Authentication required' });
 }
 
+/** Gehoert die Anmeldung zum Vorstand? Gruppen ohne Gross/klein. */
+function istVorstand(groups) {
+    return (groups || []).some(g => ['vorstand', 'admin'].includes(String(g).toLowerCase()));
+}
+
 /**
- * DEUTSCH: Middleware — NUR für Vorstand-Zugänge (IMAP-basierte Tokens).
- * Prüft ob der Token mit JWT_SECRET (HS256) signiert ist UND type='vorstand' enthält.
- * Wird bei Endpunkten verwendet die ausschliesslich dem Vorstand vorbehalten sind.
+ * DEUTSCH: Middleware — nur fuer den Vorstand. Nimmt an:
+ *  1. das Vorstand-Token (HS256, type 'vorstand': IMAP-Login ueber das
+ *     Funktionspostfach, QR-Login der Vorstand-Apps) - wie bisher;
+ *  2. das persoenliche Login (Authentik fwv-members/fwv-members-app oder
+ *     Mitglieder-Token), wenn die Gruppe Vorstand oder admin dabei ist. So
+ *     arbeitet die Mitglieder-App ohne eigenen Vorstand-Login. Die Rolle
+ *     (Funktion) fehlt dann im Token; wer sie braucht, liest sie aus der
+ *     Mitgliederdatenbank (vorstand-rolle.js).
  */
 function authenticateVorstand(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -211,27 +221,28 @@ function authenticateVorstand(req, res, next) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
+    let decoded = null;
     try {
-        // DEUTSCH: Token mit dem gemeinsamen JWT_SECRET verifizieren (HS256)
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        // DEUTSCH: Sicherstellen dass es sich um einen Vorstand-Token handelt
-        if (decoded.type !== 'vorstand') {
-            return res.status(403).json({ error: 'Vorstand access required' });
-        }
-
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+        // Kein HS256-Token dieses Servers - vielleicht Authentik (unten).
+    }
+    if (decoded && decoded.type === 'vorstand') {
         req.user = {
             id: decoded.email,
             email: decoded.email,
             role: decoded.role,
             groups: decoded.groups || ['vorstand']
         };
-
-        next();
-    } catch (err) {
-        console.error('Vorstand token verification failed:', err.message);
-        return res.status(403).json({ error: 'Invalid or expired token' });
+        return next();
     }
+
+    return authenticateToken(req, res, () => {
+        if (!istVorstand(req.user?.groups)) {
+            return res.status(403).json({ error: 'Vorstand access required' });
+        }
+        next();
+    });
 }
 
 // DEUTSCH: Alle Middleware-Funktionen exportieren damit sie in index.js verwendet werden können
@@ -240,5 +251,6 @@ module.exports = {
     requireRole,           // Rollenprüfung — z.B. requireRole('vorstand')
     requireApiKey,         // API-Key Prüfung — für interne Service-Aufrufe
     authenticateAny,       // Kombiniert: API-Key ODER Vorstand-JWT ODER Authentik-JWT
-    authenticateVorstand   // NUR Vorstand IMAP-Token (HS256)
+    authenticateVorstand,  // Vorstand: Vorstand-Token ODER persoenliches Login mit Gruppe Vorstand/admin
+    istVorstand
 };

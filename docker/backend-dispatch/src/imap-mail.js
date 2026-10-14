@@ -9,6 +9,7 @@
  * Alle Endpunkte sind /imap/* und werden via Traefik-Routing in api-dispatch eingebunden.
  */
 
+const { vorstandsRollen } = require('./vorstand-rolle');
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const nodemailer = require('nodemailer');
@@ -49,8 +50,37 @@ function decryptPassword(encryptedData) {
  */
 function allowedAccounts(req) {
     const role = (req.user?.role || '').toLowerCase();
-    if (!role || role === 'admin' || role === 'api') return [];
-    return [`${role}@${MAIL_DOMAIN}`];
+    // Persoenliches Login (Authentik): Rollen aus der Funktion des Mitglieds
+    // (rollenErgaenzen) - wer Aktuar und Kassier ist, sieht beide Postfaecher.
+    const rollen = role ? [role] : (req.user?.rollen || []);
+    return rollen
+        .filter(r => r && r !== 'admin' && r !== 'api')
+        .map(r => `${r}@${MAIL_DOMAIN}`);
+}
+
+/**
+ * Middleware: Fehlt die Rolle im Token (persoenliches Login statt
+ * Funktionspostfach), die Vorstandsrollen aus der Funktion des Mitglieds lesen.
+ */
+function rollenErgaenzen(pool) {
+    return async (req, res, next) => {
+        if (!req.user || req.user.role || req.user.rollen) return next();
+        try {
+            const name = req.user.benutzername || req.user.preferred_username;
+            const r = await pool.query(
+                `SELECT funktion FROM members
+                 WHERE ($1::text IS NOT NULL AND LOWER(benutzername) = LOWER($1))
+                    OR ($2::text IS NOT NULL AND LOWER(email) = LOWER($2))`,
+                [name || null, req.user.email || null]
+            );
+            // Nur eindeutig: geteilte E-Mail-Adressen duerfen kein fremdes Postfach oeffnen.
+            req.user.rollen = r.rows.length === 1 ? vorstandsRollen(r.rows[0].funktion) : [];
+        } catch (error) {
+            console.error('Vorstandsrolle nicht gelesen:', error.message);
+            req.user.rollen = [];
+        }
+        next();
+    };
 }
 
 /**
@@ -715,4 +745,4 @@ function mountContacts(app, pool, authVorstand) {
     });
 }
 
-module.exports = { mountImap, mountContacts };
+module.exports = { mountImap, mountContacts, allowedAccounts, rollenErgaenzen };

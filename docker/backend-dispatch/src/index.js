@@ -4501,8 +4501,8 @@ scheduledJobs.mountEndpoints(app, pool, requireVorstand);
 // DEUTSCH: Server starten und auf dem konfigurierten Port lauschen
 // IMAP-Webmail-Endpoints fuer Vorstand (lesen, markieren, loeschen, Anhaenge, senden)
 // + Geteiltes Adressbuch (shared_contacts) + Read-only Members.
-const { mountImap, mountContacts } = require('./imap-mail');
-const authVorstandMail = [authenticateAny, requireRole('vorstand', 'admin')];
+const { mountImap, mountContacts, rollenErgaenzen } = require('./imap-mail');
+const authVorstandMail = [authenticateAny, requireRole('vorstand', 'admin'), rollenErgaenzen(pool)];
 mountImap(app, pool, authVorstandMail);
 mountContacts(app, pool, authVorstandMail);
 
