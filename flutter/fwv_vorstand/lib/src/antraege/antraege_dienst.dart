@@ -32,12 +32,16 @@ class AntraegeDienst {
 
   /// Genehmigen legt das Mitglied an. Den Status bestimmt das Backend aus der
   /// Feuerwehr-Angabe: "Ja (aktiv)" wird Aktivmitglied (mit Login und
-  /// Willkommensmail), alle anderen "Aufnahme pendent" bis zur GV. Ein
-  /// gewaehlter Status im Body wird dort nicht gelesen - darum schickt die
-  /// App keinen. Liefert die ID des neuen Mitglieds.
-  Future<String?> genehmigen(String id) async {
+  /// Willkommensmail), alle anderen "Aufnahme pendent" bis zur GV - ausser
+  /// der Vorstand waehlt den [status] selbst (seit 14.10.2026 liest das
+  /// Backend memberStatus, nur diese zwei Werte). Liefert die ID des neuen
+  /// Mitglieds.
+  Future<String?> genehmigen(String id, {String? status}) async {
     final j = await _deutsch(
-      () => api.post('member-registrations/$id/approve', daten: const <String, Object?>{}),
+      () => api.post(
+        'member-registrations/$id/approve',
+        daten: <String, Object?>{'memberStatus': ?status},
+      ),
     );
     return j is Map ? jsonText(j['member_id']) : null;
   }

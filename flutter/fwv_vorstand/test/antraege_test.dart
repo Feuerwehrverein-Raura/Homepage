@@ -104,13 +104,18 @@ void main() {
 
     await tester.tap(find.text('Genehmigen'));
     await tester.pumpAndSettle();
+    // Vorschlag nach der Feuerwehr-Angabe (aktiv -> Aktivmitglied), der
+    // Vorstand kann umstellen.
+    await tester.tap(find.text('Aufnahme pendent'));
+    await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(of: find.byType(AlertDialog), matching: find.text('Genehmigen')),
     );
     await tester.pumpAndSettle();
 
-    // Den Status waehlt das Backend; der Body bleibt leer.
-    expect(backend.posts('/member-registrations/r1/approve'), [<String, dynamic>{}]);
+    expect(backend.posts('/member-registrations/r1/approve'), [
+      {'memberStatus': 'Aufnahme pendent'},
+    ]);
     expect(find.text('Antrag genehmigt – Mitglied angelegt.'), findsOneWidget);
     expect(find.text('Anna Aktiv'), findsNothing, reason: 'zurueck in der Liste, nicht mehr offen');
     expect(find.text('Beat Gönner'), findsOneWidget);

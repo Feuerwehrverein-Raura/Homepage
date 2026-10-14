@@ -3120,10 +3120,26 @@ app.delete('/members/me/photo', authenticateToken, async (req, res) => {
 
 // Update member by ID (requires Vorstand role) - MUST come after /members/me
 // DEUTSCH: Mitglied aktualisieren (nur Vorstand/Admin). Synchronisiert Authentik-Profil und -Gruppen, sendet Änderungs-E-Mail.
+// Spalten, die PUT /members/:id aendern darf (siehe dort).
+const MITGLIED_BEARBEITBAR = new Set([
+    'anrede', 'vorname', 'nachname', 'geschlecht', 'geburtstag',
+    'strasse', 'adresszusatz', 'plz', 'ort', 'telefon', 'mobile', 'email', 'versand_email',
+    'status', 'funktion', 'eintrittsdatum', 'austrittsdatum', 'iban',
+    'zustellung_email', 'zustellung_post', 'bemerkungen', 'feuerwehr_zugehoerigkeit',
+    'tshirt_groesse'
+]);
+
 app.put('/members/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = { ...req.body };
+        // Nur bearbeitbare Stammdaten. Die Schluessel landen als Spaltennamen
+        // im SQL - ungeprueft waere das eine Einschleusung, und ueber diesen
+        // Weg duerfen password_hash, authentik_user_id, id usw. nie gesetzt
+        // werden. Unbekanntes wird verworfen (das Web schickt teils das ganze
+        // Objekt mit).
+        const updates = Object.fromEntries(
+            Object.entries(req.body || {}).filter(([k]) => MITGLIED_BEARBEITBAR.has(k))
+        );
 
         // Format phone numbers if provided
         if (updates.telefon !== undefined) {
@@ -4253,7 +4269,10 @@ app.get('/audit', authenticateVorstand, async (req, res) => {
         const result = await pool.query(query, params);
 
         // Log that someone viewed the audit log (skip for background polls)
-        if (!since) {
+        // Nur das erste Oeffnen protokollieren - nicht jedes Filtern, Suchen
+        // oder "Mehr laden" (sonst fuellt sich das Log mit AUDIT_VIEW selbst)
+        // und nicht das Abfragen neuer Eintraege (since).
+        if (!since && !action && !email && !(parseInt(offset) > 0)) {
             await logAudit(pool, 'AUDIT_VIEW', null, req.user.email, getClientIp(req), { filters: { action, email } });
         }
 
@@ -4330,9 +4349,13 @@ app.post('/member-registrations/:id/approve', authenticateVorstand, async (req, 
         // FW-Raura-Angehörige (aktiv) werden sofort Aktivmitglied; alle anderen
         // (ehemalig / kein) kommen als "Aufnahme pendent" und werden erst an der
         // GV definitiv aufgenommen (Status dort manuell auf Aktivmitglied gesetzt).
-        const memberStatus = registration.feuerwehr_status === 'Ja (aktiv)'
-            ? 'Aktivmitglied'
-            : 'Aufnahme pendent';
+        // Der Vorstand kann den Status beim Genehmigen waehlen (App, Web,
+        // Android schicken memberStatus) - nur diese zwei Werte; sonst wie
+        // bisher nach der Feuerwehr-Angabe.
+        const gewaehlt = req.body?.memberStatus;
+        const memberStatus = ['Aktivmitglied', 'Aufnahme pendent'].includes(gewaehlt)
+            ? gewaehlt
+            : (registration.feuerwehr_status === 'Ja (aktiv)' ? 'Aktivmitglied' : 'Aufnahme pendent');
 
         // Create member from registration
         const memberResult = await pool.query(`

@@ -39,20 +39,51 @@ class _AntragScreenState extends State<AntragScreen> {
   }
 
   Future<void> _genehmigen(Antrag a) async {
-    final ok = await nachfragen(
-      context,
-      titel: '${a.name} aufnehmen?',
-      text:
-          'Das Mitglied wird angelegt. Den Status setzt das Backend nach der '
-          'Feuerwehr-Angabe: Angehörige der Feuerwehr Raurica (aktiv) werden '
-          'sofort Aktivmitglied und erhalten Login und Willkommensmail, alle '
-          'anderen «Aufnahme pendent» bis zur Generalversammlung.\n\n'
-          'Angabe im Antrag: ${a.feuerwehrText ?? 'keine'}',
-      ja: 'Genehmigen',
-      gefaehrlich: false,
+    // Vorschlag wie das Backend: aktive Feuerwehr Raurica -> Aktivmitglied.
+    final vorschlag = a.feuerwehrText?.contains('aktiv') == true ? 'Aktivmitglied' : 'Aufnahme pendent';
+    final status = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        var wahl = vorschlag;
+        return StatefulBuilder(
+          builder: (context, setze) => AlertDialog(
+            title: Text('${a.name} aufnehmen?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Angabe im Antrag: ${a.feuerwehrText ?? 'keine'}'),
+                const SizedBox(height: 12),
+                RadioGroup<String>(
+                  groupValue: wahl,
+                  onChanged: (v) => setze(() => wahl = v ?? wahl),
+                  child: const Column(
+                    children: [
+                      RadioListTile(
+                        value: 'Aktivmitglied',
+                        title: Text('Aktivmitglied'),
+                        subtitle: Text('Sofort mit Login und Willkommensmail'),
+                      ),
+                      RadioListTile(
+                        value: 'Aufnahme pendent',
+                        title: Text('Aufnahme pendent'),
+                        subtitle: Text('Bis zur Generalversammlung'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Abbrechen')),
+              FilledButton(onPressed: () => Navigator.pop(context, wahl), child: const Text('Genehmigen')),
+            ],
+          ),
+        );
+      },
     );
-    if (!ok || !mounted) return;
-    await _senden(() => _dienst.genehmigen(a.id), 'Antrag genehmigt – Mitglied angelegt.');
+    if (status == null || !mounted) return;
+    await _senden(() => _dienst.genehmigen(a.id, status: status), 'Antrag genehmigt – Mitglied angelegt.');
   }
 
   Future<void> _ablehnen(Antrag a) async {
