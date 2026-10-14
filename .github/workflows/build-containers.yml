@@ -267,8 +267,17 @@ jobs:
 
       - name: Mitglieder-App fuer das Web bauen
         working-directory: flutter/mitglieder
+        # Versionsnummer wie die Android-App: der neuste Tag members-vX.Y.Z
+        # (sonst zeigt die Web-Fassung 1.0.0 aus pubspec.yaml). ls-remote,
+        # weil der Checkout keine Tags hat.
         run: |
-          flutter build web --release --base-href /mein/ --no-web-resources-cdn
+          VERSION=$(git ls-remote --tags --refs origin 'members-v*' \
+            | sed 's#.*refs/tags/members-v##' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+          IFS=. read -r A B C <<< "$VERSION"
+          VCODE=$((A * 10000 + B * 100 + C))
+          echo "Web-Fassung $VERSION ($VCODE)"
+          flutter build web --release --base-href /mein/ --no-web-resources-cdn \
+            --build-name "$VERSION" --build-number "$VCODE"
           rm -f build/web/*.symbols build/web/canvaskit/*.symbols build/web/canvaskit/*/*.symbols
           rm -rf ../../docker/frontend-website/mein
           cp -R build/web ../../docker/frontend-website/mein
