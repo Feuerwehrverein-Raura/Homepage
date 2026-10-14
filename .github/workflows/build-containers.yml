@@ -257,7 +257,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Die Mitglieder-App im Browser (flutter/mitglieder, eingebettet in
-      # mein-beta.html): nach docker/frontend-website/mein/ bauen, bevor das
+      # mein.html): nach docker/frontend-website/mein/ bauen, bevor das
       # nginx-Image entsteht. Gleiche Flutter-Version wie flutter-apps.yml.
       - uses: subosito/flutter-action@v2
         with:
