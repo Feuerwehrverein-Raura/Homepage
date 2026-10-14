@@ -593,10 +593,13 @@ app.post('/auth/vorstand/login', async (req, res) => {
             let groups = ['vorstand'];
             let memberName = getRoleName(role);
 
-            // Check if member has Admin function in database
+            // Check if member has Admin function in database. Nur das Mitglied mit
+            // genau dieser Adresse - frueher stand hier "OR funktion ILIKE '%Admin%'":
+            // Dann bekam JEDE Vorstands-Anmeldung Admin-Rechte und den Namen der
+            // Admin-Person, sobald irgendein Mitglied die Funktion Admin hatte.
             try {
                 const memberResult = await pool.query(
-                    "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1 OR funktion ILIKE '%Admin%'",
+                    "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1",
                     [emailLower]
                 );
                 if (memberResult.rows.length > 0) {
@@ -706,7 +709,7 @@ app.post('/auth/vorstand/refresh', async (req, res) => {
         let memberName = getRoleName(role);
         try {
             const memberResult = await pool.query(
-                "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1 OR funktion ILIKE '%Admin%'",
+                "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1",
                 [emailLower]
             );
             if (memberResult.rows.length > 0) {
@@ -1309,7 +1312,7 @@ app.post('/auth/vorstand/qr-login', async (req, res) => {
         let memberName = getRoleName(role);
         try {
             const memberResult = await pool.query(
-                "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1 OR funktion ILIKE '%Admin%'",
+                "SELECT vorname, nachname, funktion FROM members WHERE LOWER(email) = $1",
                 [emailLower]
             );
             if (memberResult.rows.length > 0) {

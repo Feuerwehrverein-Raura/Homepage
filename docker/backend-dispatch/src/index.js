@@ -644,7 +644,7 @@ app.get('/health', (req, res) => {
 // ============================================
 
 // DEUTSCH: Alle Templates abrufen, optional nach Typ filtern (email, brief_ch, brief_de)
-app.get('/templates', authenticateAny, async (req, res) => {
+app.get('/templates', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { type } = req.query;
         let query = 'SELECT * FROM dispatch_templates';
@@ -661,7 +661,7 @@ app.get('/templates', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Neues Template erstellen (Name, Typ, Betreff, Inhalt, Variablen)
-app.post('/templates', authenticateAny, async (req, res) => {
+app.post('/templates', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { name, type, subject, body, variables } = req.body;
         const result = await pool.query(`
@@ -675,7 +675,7 @@ app.post('/templates', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Bestehendes Template aktualisieren (nach ID)
-app.put('/templates/:id', authenticateAny, async (req, res) => {
+app.put('/templates/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { name, type, subject, body, variables } = req.body;
@@ -694,7 +694,7 @@ app.put('/templates/:id', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Template loeschen (nach ID)
-app.delete('/templates/:id', authenticateAny, async (req, res) => {
+app.delete('/templates/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query('DELETE FROM dispatch_templates WHERE id = $1 RETURNING id', [id]);
@@ -713,7 +713,7 @@ app.delete('/templates/:id', authenticateAny, async (req, res) => {
 // ============================================
 
 // DEUTSCH: Einzelne E-Mail senden - optional mit Template und Variablen (z.B. {{vorname}})
-app.post('/email/send', authenticateAny, async (req, res) => {
+app.post('/email/send', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     console.log('[EMAIL] /email/send called with:', { to: req.body.to, cc: req.body.cc, template_id: req.body.template_id, member_id: req.body.member_id, hasHtml: !!req.body.html });
     try {
         const { to, cc, subject, body, html, template_id: rawTemplateId, variables, member_id, event_id } = req.body;
@@ -800,7 +800,7 @@ app.post('/email/send', authenticateAny, async (req, res) => {
 
 // DEUTSCH: Massen-E-Mail an mehrere Mitglieder senden (nur an jene mit E-Mail-Zustellung)
 // Wenn exclude_honored=true gesetzt ist, werden Ehrenmitglieder ausgeschlossen (Sicherheit fuer Beitragsbriefe)
-app.post('/email/bulk', authenticateAny, async (req, res) => {
+app.post('/email/bulk', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     console.log('[EMAIL BULK] /email/bulk called with:', { member_ids: req.body.member_ids, template_id: req.body.template_id, exclude_honored: req.body.exclude_honored });
     try {
         const { member_ids, template_id, variables, exclude_honored } = req.body;
@@ -872,7 +872,7 @@ app.post('/email/bulk', authenticateAny, async (req, res) => {
 
 // DEUTSCH: Automatischer Versand an mehrere Mitglieder - waehlt Kanal basierend auf Zustellpraeferenz
 // E-Mail wenn zustellung_email=true, sonst Brief via Pingen (CH oder DE je nach PLZ)
-app.post('/dispatch/smart', authenticateAny, async (req, res) => {
+app.post('/dispatch/smart', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     console.log('[SMART DISPATCH] Starting smart dispatch...');
     try {
         const { template_group, member_ids, variables = {}, staging = false } = req.body;
@@ -1021,7 +1021,7 @@ app.post('/dispatch/smart', authenticateAny, async (req, res) => {
 
 // DEUTSCH: Einzelnen Brief via Pingen versenden - HTML wird zu PDF konvertiert, Adresse eingebettet
 // Ablauf: HTML->PDF (Puppeteer) -> Adresse einbetten -> Upload -> Brief erstellen -> Versand
-app.post('/pingen/send', authenticateAny, async (req, res) => {
+app.post('/pingen/send', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { html, recipient, member_id, event_id, staging = false, use_cover_page = false, template_id } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -1591,7 +1591,7 @@ Feuerwehrverein Raura
 // ============================================
 
 // DEUTSCH: Anzahl offener Mitgliedschaftsantraege abrufen (fuer Badge im UI)
-app.get('/member-registrations/count/pending', authenticateAny, async (req, res) => {
+app.get('/member-registrations/count/pending', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(
             `SELECT COUNT(*) as count FROM member_registrations WHERE status = 'pending'`
@@ -1604,7 +1604,7 @@ app.get('/member-registrations/count/pending', authenticateAny, async (req, res)
 });
 
 // DEUTSCH: Alle Registrierungen abrufen, optional nach Status filtern (pending/approved/rejected)
-app.get('/member-registrations', authenticateAny, async (req, res) => {
+app.get('/member-registrations', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { status } = req.query;
         let query = `
@@ -1631,7 +1631,7 @@ app.get('/member-registrations', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Einzelne Registrierung nach ID abrufen (Detail-Ansicht)
-app.get('/member-registrations/:id', authenticateAny, async (req, res) => {
+app.get('/member-registrations/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
@@ -1654,7 +1654,7 @@ app.get('/member-registrations/:id', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Mitgliedschaftsantrag genehmigen - erstellt Mitglied in DB und sendet Willkommens-E-Mail
-app.post('/member-registrations/:id/approve', authenticateAny, async (req, res) => {
+app.post('/member-registrations/:id/approve', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { processed_by = 'vorstand' } = req.body;
@@ -1736,7 +1736,7 @@ Feuerwehrverein Raura
 });
 
 // DEUTSCH: Mitgliedschaftsantrag ablehnen - setzt Status auf 'rejected' und sendet Ablehnungs-E-Mail
-app.post('/member-registrations/:id/reject', authenticateAny, async (req, res) => {
+app.post('/member-registrations/:id/reject', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { processed_by = 'vorstand', reason = '' } = req.body;
@@ -1932,7 +1932,7 @@ async function mailcowApi(method, endpoint, data = null) {
 }
 
 // DEUTSCH: Alle Mailboxen der Domain fwv-raura.ch abrufen
-app.get('/mailcow/mailboxes', authenticateAny, async (req, res) => {
+app.get('/mailcow/mailboxes', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/mailbox/all');
         // Filter by domain since domain-specific endpoint returns empty
@@ -1947,7 +1947,7 @@ app.get('/mailcow/mailboxes', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Einzelne Mailbox nach E-Mail-Adresse abrufen
-app.get('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
+app.get('/mailcow/mailboxes/:email', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const response = await mailcowApi('GET', `/get/mailbox/${req.params.email}`);
         res.json(response.data);
@@ -1957,7 +1957,7 @@ app.get('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Neue Mailbox erstellen (Benutzername, Name, Passwort, Quota)
-app.post('/mailcow/mailboxes', authenticateAny, async (req, res) => {
+app.post('/mailcow/mailboxes', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { local_part, name, password, quota = 1024, active = 1 } = req.body;
 
@@ -1982,7 +1982,7 @@ app.post('/mailcow/mailboxes', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Mailbox aktualisieren (Name, Quota, Passwort, Aktiv-Status)
-app.put('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
+app.put('/mailcow/mailboxes/:email', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { name, quota, active, password } = req.body;
         const updateData = {
@@ -2007,7 +2007,7 @@ app.put('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Mailbox loeschen (nach E-Mail-Adresse)
-app.delete('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
+app.delete('/mailcow/mailboxes/:email', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const response = await mailcowApi('POST', '/delete/mailbox', [req.params.email]);
         res.json(response.data);
@@ -2017,7 +2017,7 @@ app.delete('/mailcow/mailboxes/:email', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Alle E-Mail-Aliase der Domain abrufen (z.B. info@ -> vorstand@)
-app.get('/mailcow/aliases', authenticateAny, async (req, res) => {
+app.get('/mailcow/aliases', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/alias/all');
         // Filter by domain since domain-specific endpoint returns empty
@@ -2031,7 +2031,7 @@ app.get('/mailcow/aliases', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Neuen E-Mail-Alias erstellen (Weiterleitungsadresse)
-app.post('/mailcow/aliases', authenticateAny, async (req, res) => {
+app.post('/mailcow/aliases', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { address, goto, active = 1 } = req.body;
 
@@ -2052,7 +2052,7 @@ app.post('/mailcow/aliases', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Alias aktualisieren (Zieladresse oder Aktiv-Status aendern)
-app.put('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
+app.put('/mailcow/aliases/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { goto, active } = req.body;
         const updateData = {
@@ -2071,7 +2071,7 @@ app.put('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Alias loeschen (nach ID)
-app.delete('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
+app.delete('/mailcow/aliases/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const response = await mailcowApi('POST', '/delete/alias', [req.params.id]);
         res.json(response.data);
@@ -2081,7 +2081,7 @@ app.delete('/mailcow/aliases/:id', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Domain-Informationen abrufen (Speicherplatz, Anzahl Mailboxen, etc.)
-app.get('/mailcow/domain', authenticateAny, async (req, res) => {
+app.get('/mailcow/domain', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const response = await mailcowApi('GET', `/get/domain/${MAILCOW_DOMAIN}`);
         res.json(response.data);
@@ -2091,7 +2091,7 @@ app.get('/mailcow/domain', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Speicherplatz-Nutzung aller Mailboxen abrufen (Quota in Prozent)
-app.get('/mailcow/quota', authenticateAny, async (req, res) => {
+app.get('/mailcow/quota', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const response = await mailcowApi('GET', '/get/mailbox/all');
         const mailboxes = Array.isArray(response.data)
@@ -2126,7 +2126,7 @@ const defaultLayoutSettings = {
 
 // DEUTSCH: Arbeitsplan als PDF generieren - benoetigt Event mit Schichten und optional Logo
 // Konvertiert HTML-Template via Puppeteer zu PDF und laedt es optional in Nextcloud hoch
-app.post('/arbeitsplan/pdf', authenticateAny, async (req, res) => {
+app.post('/arbeitsplan/pdf', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { event, logoBase64 } = req.body;
 
@@ -2514,7 +2514,7 @@ function generateArbeitsplanHTML(event, logoBase64, layoutSettings = {}) {
 // ============================================
 
 // DEUTSCH: Versand-Protokoll abrufen - filterbar nach Typ (email/pingen), Status, Mitglied, Event
-app.get('/dispatch-log', authenticateAny, async (req, res) => {
+app.get('/dispatch-log', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { type, status, member_id, event_id, limit = 100 } = req.query;
         let query = 'SELECT * FROM dispatch_log WHERE 1=1';
@@ -2552,7 +2552,7 @@ app.get('/dispatch-log', authenticateAny, async (req, res) => {
 // ============================================
 
 // DEUTSCH: Alle versendeten Pingen-Briefe mit Mitglied- und Event-Infos abrufen
-app.get('/pingen/letters', authenticateAny, async (req, res) => {
+app.get('/pingen/letters', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { event_id, member_id, limit = 50 } = req.query;
         let query = `
@@ -2584,7 +2584,7 @@ app.get('/pingen/letters', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Aktuellen Brief-Status direkt von der Pingen-API abrufen und in DB aktualisieren
-app.get('/pingen/letters/:letterId/status', authenticateAny, async (req, res) => {
+app.get('/pingen/letters/:letterId/status', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { letterId } = req.params;
         const staging = req.query.staging === 'true';
@@ -2645,7 +2645,7 @@ app.get('/pingen/letters/:letterId/status', authenticateAny, async (req, res) =>
 });
 
 // DEUTSCH: Pingen-Konto-Informationen abrufen (Guthaben, Waehrung, Organisation)
-app.get('/pingen/account', authenticateAny, async (req, res) => {
+app.get('/pingen/account', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const staging = req.query.staging === 'true';
         const PINGEN_API = getPingenApi(staging);
@@ -2685,7 +2685,7 @@ app.get('/pingen/account', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Pingen-Versandstatistiken abrufen (Anzahl gesendet, ausstehend, fehlgeschlagen, letzte 7/30 Tage)
-app.get('/pingen/stats', authenticateAny, async (req, res) => {
+app.get('/pingen/stats', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT
@@ -2706,7 +2706,7 @@ app.get('/pingen/stats', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Liste aller Mitglieder mit Post-Zustellung und gueltiger Adresse abrufen
-app.get('/pingen/post-members', authenticateAny, async (req, res) => {
+app.get('/pingen/post-members', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT id, vorname, nachname, strasse, adresszusatz, plz, ort, email
@@ -2737,7 +2737,7 @@ app.get('/pingen/post-members', authenticateAny, async (req, res) => {
 
 // DEUTSCH: Massen-PDF-Versand per Post an alle oder ausgewaehlte Mitglieder (in 5er-Batches)
 // Jedes PDF bekommt die individuelle Empfaengeradresse eingebettet
-app.post('/pingen/send-bulk-pdf', authenticateAny, async (req, res) => {
+app.post('/pingen/send-bulk-pdf', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { pdf_base64, subject, member_ids, staging = false, use_cover_page = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -2934,7 +2934,7 @@ app.post('/pingen/send-bulk-pdf', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Einzelnen Brief manuell erstellen und via Pingen versenden (mit Betreff und Inhalt)
-app.post('/pingen/send-manual', authenticateAny, async (req, res) => {
+app.post('/pingen/send-manual', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { member_id, event_id, subject, body, staging = false, use_cover_page = false } = req.body;
 
@@ -3016,7 +3016,7 @@ app.post('/pingen/send-manual', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Arbeitsplan-PDF per Post an ein einzelnes Mitglied via Pingen versenden
-app.post('/pingen/send-arbeitsplan', authenticateAny, async (req, res) => {
+app.post('/pingen/send-arbeitsplan', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { event_id, member_id, pdf_base64, staging = false, use_cover_page = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -3359,7 +3359,7 @@ app.post('/pingen/webhook', async (req, res) => {
 });
 
 // DEUTSCH: Pingen-Webhook bei Pingen registrieren (damit Pingen Status-Updates hierher sendet)
-app.post('/pingen/webhooks/register', authenticateAny, async (req, res) => {
+app.post('/pingen/webhooks/register', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { webhook_url, staging = false } = req.body;
         const PINGEN_API = getPingenApi(staging);
@@ -3409,7 +3409,7 @@ app.post('/pingen/webhooks/register', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Alle bei Pingen registrierten Webhooks abrufen
-app.get('/pingen/webhooks', authenticateAny, async (req, res) => {
+app.get('/pingen/webhooks', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const staging = req.query.staging === 'true';
         const PINGEN_API = getPingenApi(staging);
@@ -3442,7 +3442,7 @@ app.get('/pingen/webhooks', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Einen registrierten Pingen-Webhook loeschen (nach ID)
-app.delete('/pingen/webhooks/:id', authenticateAny, async (req, res) => {
+app.delete('/pingen/webhooks/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const staging = req.query.staging === 'true';
@@ -3691,7 +3691,7 @@ async function sendToPingen(html, member, memberId, eventId, staging = false, us
 // ============================================
 
 // DEUTSCH: Alle aktiven PDF-Templates abrufen (ohne Schema-Details fuer Uebersicht)
-app.get('/pdf-templates', authenticateAny, async (req, res) => {
+app.get('/pdf-templates', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(`
             SELECT id, name, slug, description, category, variables, is_default, is_active, created_at, updated_at
@@ -3707,7 +3707,7 @@ app.get('/pdf-templates', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Einzelnes PDF-Template nach ID abrufen (inkl. vollstaendigem Schema)
-app.get('/pdf-templates/:id', authenticateAny, async (req, res) => {
+app.get('/pdf-templates/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(
             'SELECT * FROM pdf_templates WHERE id = $1',
@@ -3724,7 +3724,7 @@ app.get('/pdf-templates/:id', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Neues PDF-Template erstellen (Name, Slug, Kategorie, Schema, Basis-PDF)
-app.post('/pdf-templates', authenticateAny, async (req, res) => {
+app.post('/pdf-templates', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { name, slug, description, category, template_schema, base_pdf, variables } = req.body;
 
@@ -3750,7 +3750,7 @@ app.post('/pdf-templates', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: PDF-Template aktualisieren (alle Felder optional, COALESCE behaelt bestehende Werte)
-app.put('/pdf-templates/:id', authenticateAny, async (req, res) => {
+app.put('/pdf-templates/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { name, slug, description, category, template_schema, base_pdf, variables, is_default } = req.body;
 
@@ -3782,7 +3782,7 @@ app.put('/pdf-templates/:id', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: PDF-Template loeschen (nach ID)
-app.delete('/pdf-templates/:id', authenticateAny, async (req, res) => {
+app.delete('/pdf-templates/:id', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(
             'DELETE FROM pdf_templates WHERE id = $1 RETURNING name',
@@ -3803,7 +3803,7 @@ app.delete('/pdf-templates/:id', authenticateAny, async (req, res) => {
 
 // DEUTSCH: Aktives Layout-Template abrufen (fuer dynamische PDFs wie Arbeitsplan, Rechnungen)
 // Gibt Standard-Layout zurueck falls kein Template konfiguriert ist
-app.get('/pdf-templates/layout/active', authenticateAny, async (req, res) => {
+app.get('/pdf-templates/layout/active', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query(
             "SELECT * FROM pdf_templates WHERE category = 'layout' AND is_active = true ORDER BY is_default DESC, updated_at DESC LIMIT 1"
@@ -3874,7 +3874,7 @@ app.get('/pdf-templates/layout/active', authenticateAny, async (req, res) => {
 // ============================================
 
 // DEUTSCH: Alle Vereins-Einstellungen als Key-Value-Objekt abrufen
-app.get('/organisation-settings', authenticateAny, async (req, res) => {
+app.get('/organisation-settings', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const result = await pool.query('SELECT key, value, value_json, description FROM organisation_settings');
         const settings = {};
@@ -3889,7 +3889,7 @@ app.get('/organisation-settings', authenticateAny, async (req, res) => {
 });
 
 // DEUTSCH: Vereins-Einstellung erstellen oder aktualisieren (Upsert per Key)
-app.put('/organisation-settings/:key', authenticateAny, async (req, res) => {
+app.put('/organisation-settings/:key', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { value, value_json } = req.body;
 
@@ -3938,7 +3938,7 @@ const mmToPoints = (mm) => mm * 2.83465;
 
 // DEUTSCH: QR-Rechnung fuer ein Mitglied generieren (PDF mit Schweizer QR-Einzahlungsschein)
 // Laedt Layout aus PDF-Template, Kontodaten aus Org-Settings, Mitglied aus DB
-app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
+app.post('/invoices/generate-qr', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const {
             member_id,
@@ -4204,7 +4204,7 @@ app.post('/invoices/generate-qr', authenticateAny, async (req, res) => {
 // DEUTSCH: Sendet Mitgliedsbeitrags-Brief als fertig-formatiertes HTML via Pingen
 // Das HTML enthaelt bereits den Empfaenger im Adressfenster (Schweizer Standard X=118mm/Y=60mm)
 // daher kein Adress-Embedding oder Deckblatt noetig - auto_send mit address_position=right
-app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
+app.post('/dispatch/send-post', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { html, recipient, member_id, subject, staging = false, pdf_margin } = req.body;
 
@@ -4295,7 +4295,7 @@ app.post('/dispatch/send-post', authenticateAny, async (req, res) => {
 // DEUTSCH: PDF-Brief mit Deckblatt senden
 // Generiert ein Deckblatt aus dem HTML, konvertiert beides zu PDF,
 // fuegt Deckblatt + hochgeladenes PDF zusammen und sendet via Pingen
-app.post('/dispatch/send-pdf-post', authenticateAny, async (req, res) => {
+app.post('/dispatch/send-pdf-post', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { cover_html, pdf_base64, recipient, member_id, subject, staging = false } = req.body;
 
@@ -4389,7 +4389,7 @@ app.post('/dispatch/send-pdf-post', authenticateAny, async (req, res) => {
 // DEUTSCH: Brief-Vorschau als PDF rendern (ohne Pingen-Versand)
 // Nimmt HTML entgegen und liefert ein PDF zurueck - fuer Vorschau-Anzeige im Frontend
 // Query-Param ?zones=1 fuegt Pingen-Zonen-Overlay (Frankier/Adressbereich) hinzu
-app.post('/dispatch/preview-pdf', authenticateAny, async (req, res) => {
+app.post('/dispatch/preview-pdf', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {
         const { html, pdf_margin } = req.body;
         const showZones = req.query.zones === '1';
@@ -4515,7 +4515,7 @@ if (process.env.ENABLE_DAILY_BACKUP !== 'false') {
 }
 
 // Manueller Trigger fuer Backup-Test (nur Vorstand/Admin).
-app.post('/internal/run-backup-now', authenticateAny, async (req, res) => {
+app.post('/internal/run-backup-now', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     if (!req.user?.groups?.some(g => ['vorstand', 'admin'].includes(g))) {
         return res.status(403).json({ error: 'Vorstand/Admin only' });
     }

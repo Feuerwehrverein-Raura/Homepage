@@ -8,6 +8,11 @@ const helmet = require('helmet');     // DEUTSCH: Sicherheits-Headers setzen (XS
 const { Pool } = require('pg');       // DEUTSCH: PostgreSQL-Verbindungspool
 const { authenticateAny, requireRole } = require('./auth-middleware');
 
+// Rechnungen und Mitgliedsbeitraege nur fuer den Vorstand (oder interne
+// Dienste mit API-Schluessel). Bis 14.10.2026 waren /invoices/:id/pay und
+// die /membership-fees-Endpunkte ohne jede Pruefung oeffentlich erreichbar.
+const vorstand = [authenticateAny, requireRole('vorstand', 'admin')];
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SERVICE_NAME = 'api-accounting';
@@ -279,7 +284,7 @@ app.post('/invoices', authenticateAny, requireRole('vorstand', 'admin'), async (
 });
 
 // DEUTSCH: PATCH /invoices/:id/pay — Rechnung als bezahlt markieren (setzt Status auf 'paid' und Bezahldatum)
-app.patch('/invoices/:id/pay', async (req, res) => {
+app.patch('/invoices/:id/pay', vorstand, async (req, res) => {
     try {
         const result = await pool.query(`
             UPDATE invoices SET status = 'paid', paid_date = NOW()
@@ -345,7 +350,7 @@ app.get('/reports/cashflow', authenticateAny, requireRole('vorstand', 'admin'), 
 // ============================================
 
 // DEUTSCH: GET /membership-fees/settings — Alle Jahres-Einstellungen abrufen
-app.get('/membership-fees/settings', async (req, res) => {
+app.get('/membership-fees/settings', vorstand, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM membership_fee_settings ORDER BY year DESC');
         res.json(result.rows);
@@ -355,7 +360,7 @@ app.get('/membership-fees/settings', async (req, res) => {
 });
 
 // DEUTSCH: GET /membership-fees/settings/:year — Einstellung fuer ein bestimmtes Jahr
-app.get('/membership-fees/settings/:year', async (req, res) => {
+app.get('/membership-fees/settings/:year', vorstand, async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM membership_fee_settings WHERE year = $1', [req.params.year]);
         if (result.rows.length === 0) {
@@ -368,7 +373,7 @@ app.get('/membership-fees/settings/:year', async (req, res) => {
 });
 
 // DEUTSCH: POST /membership-fees/settings — Neue Jahres-Einstellung erstellen oder aktualisieren (Upsert)
-app.post('/membership-fees/settings', async (req, res) => {
+app.post('/membership-fees/settings', vorstand, async (req, res) => {
     try {
         const { year, amount, gv_date, due_date, description } = req.body;
         if (!year || !amount) {
@@ -395,7 +400,7 @@ app.post('/membership-fees/settings', async (req, res) => {
 });
 
 // DEUTSCH: GET /membership-fees/payments?year=YYYY — Alle Zahlungen fuer ein Jahr mit Mitgliederdaten
-app.get('/membership-fees/payments', async (req, res) => {
+app.get('/membership-fees/payments', vorstand, async (req, res) => {
     try {
         const { year } = req.query;
         if (!year) {
@@ -419,7 +424,7 @@ app.get('/membership-fees/payments', async (req, res) => {
 });
 
 // DEUTSCH: POST /membership-fees/payments/generate — Zahlungseintraege fuer alle Mitglieder eines Jahres generieren
-app.post('/membership-fees/payments/generate', async (req, res) => {
+app.post('/membership-fees/payments/generate', vorstand, async (req, res) => {
     try {
         const { year, amount } = req.body;
         if (!year || !amount) {
@@ -456,7 +461,7 @@ app.post('/membership-fees/payments/generate', async (req, res) => {
 });
 
 // DEUTSCH: PATCH /membership-fees/payments/:id/pay — Zahlung als bezahlt markieren
-app.patch('/membership-fees/payments/:id/pay', async (req, res) => {
+app.patch('/membership-fees/payments/:id/pay', vorstand, async (req, res) => {
     try {
         const { paid_date, payment_method, bank_reference, notes } = req.body;
 
@@ -492,7 +497,7 @@ app.patch('/membership-fees/payments/:id/pay', async (req, res) => {
 });
 
 // DEUTSCH: PATCH /membership-fees/payments/:id/unpay — Zahlung zuruecksetzen auf offen
-app.patch('/membership-fees/payments/:id/unpay', async (req, res) => {
+app.patch('/membership-fees/payments/:id/unpay', vorstand, async (req, res) => {
     try {
         const result = await pool.query(`
             UPDATE membership_fee_payments
@@ -582,7 +587,7 @@ app.post('/membership-fees/send-reminders', authenticateAny, requireRole('vorsta
 
 // DEUTSCH: PATCH /membership-fees/payments/:id/reference — QR-Referenznummer zuweisen
 // Die Referenz wird jedes Jahr von der Bank neu zugewiesen, pro Mitglied und Jahr
-app.patch('/membership-fees/payments/:id/reference', async (req, res) => {
+app.patch('/membership-fees/payments/:id/reference', vorstand, async (req, res) => {
     try {
         const { reference_nr, bank_reference } = req.body;
         const refValue = reference_nr !== undefined ? reference_nr : bank_reference;
@@ -885,7 +890,7 @@ app.post('/membership-fees/send-post-bulk', authenticateAny, requireRole('vorsta
 });
 
 // DEUTSCH: GET /membership-fees/summary?year=YYYY — Zusammenfassung: bezahlt/offen/Gesamtbetrag
-app.get('/membership-fees/summary', async (req, res) => {
+app.get('/membership-fees/summary', vorstand, async (req, res) => {
     try {
         const { year } = req.query;
         if (!year) {

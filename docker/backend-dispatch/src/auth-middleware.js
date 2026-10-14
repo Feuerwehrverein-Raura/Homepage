@@ -76,8 +76,10 @@ function requireRole(...roles) {
             return res.status(401).json({ error: 'Not authenticated' });
         }
 
-        const userGroups = req.user.groups || [];
-        const hasRole = roles.some(role => userGroups.includes(role));
+        // Ohne Gross/klein: Authentik liefert "Vorstand", das Vorstand-JWT
+        // "vorstand" - beides ist dieselbe Gruppe (wie hatRolle in backend-events).
+        const userGroups = (req.user.groups || []).map(g => String(g).toLowerCase());
+        const hasRole = roles.some(role => userGroups.includes(String(role).toLowerCase()));
 
         if (!hasRole) {
             return res.status(403).json({ error: 'Insufficient permissions' });
