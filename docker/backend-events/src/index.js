@@ -18,6 +18,7 @@ const { schichtKonflikte, eindeutig, konfliktText } = require('./doppelte-schich
 const organisatorAnsicht = require('./organisator-ansicht');
 const { anlassIcs, icsDateiname } = require('./ics');
 const { mitAnlassLogo } = require('./anlass-mail');
+const { STANDARD_ORGANISATOR, ohneOrganisator, istStandardOrganisator } = require('./organisator-standard');
 const mitorganisatoren = require('./mitorganisatoren');
 const { schichtenPruefen } = require('./schicht-eintrag');
 const { pushZielDaten, mitZiel } = require('./push-ziel');
@@ -1347,6 +1348,10 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
             datum_offen
         } = req.body;
 
+        // Ohne Organisator organisiert der Vorstand (organisator-standard.js).
+        const vorstandOrganisiert = ohneOrganisator({ organizer_id, organizer_name, organizer_email });
+        if (vorstandOrganisiert) ({ organizer_name, organizer_email } = STANDARD_ORGANISATOR);
+
         // Pflichtfelder pruefen, sonst 400 statt undurchschaubarem 500
         if (!title || !title.trim()) {
             return res.status(400).json({ error: 'title ist ein Pflichtfeld' });
@@ -1451,7 +1456,7 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
         }
 
         // Organisator benachrichtigen (immer wenn organizer_email gesetzt)
-        if (organizer_email && !create_access) {
+        if (organizer_email && !create_access && !vorstandOrganisiert) {
             try {
                 const eventUrl = `https://fwv-raura.ch/events.html?event=${newEvent.slug || newEvent.id}`;
                 // Verknuepftes Mitglied → auf die Mitglieder-App verweisen (vorstand.html
@@ -1546,7 +1551,14 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
             RETURNING *
         `, values);
 
-        const updatedEvent = result.rows[0];
+        let updatedEvent = result.rows[0];
+        // Organisator entfernt? Dann organisiert wieder der Vorstand.
+        if (updatedEvent && ohneOrganisator(updatedEvent)) {
+            const standard = await pool.query(
+                'UPDATE events SET organizer_name = $1, organizer_email = $2 WHERE id = $3 RETURNING *',
+                [STANDARD_ORGANISATOR.organizer_name, STANDARD_ORGANISATOR.organizer_email, id]);
+            updatedEvent = standard.rows[0] || updatedEvent;
+        }
 
         // Vorschlag genehmigt (proposed -> planned): den vorschlagenden Organisator
         // (organizer_id = Mitglied) per App-Push informieren, dass sein Event-
@@ -1568,7 +1580,9 @@ app.put('/events/:id', authenticateAny, requireRole('vorstand', 'admin'), async 
         // M2: Zugang auch erstellen, wenn "Organisator-Zugang einrichten" angehakt ist
         // und noch keiner existiert — vorher wirkte create_access im Edit nur bei
         // einem Organisator-E-Mail-Wechsel.
-        if (newOrgEmail && (newOrgEmail !== oldOrgEmail || (create_access && !updatedEvent.event_email))) {
+        // Die Vorgabe "Vorstand" bekommt keine "Du bist Organisator"-Mail.
+        if (newOrgEmail && !istStandardOrganisator(updatedEvent) &&
+            (newOrgEmail !== oldOrgEmail || (create_access && !updatedEvent.event_email))) {
             // Pruefen ob Vorstandsmitglied (braucht keine separaten Zugangsdaten)
             const vorstandEmails = [
                 'praesident@fwv-raura.ch', 'aktuar@fwv-raura.ch', 'kassier@fwv-raura.ch',
