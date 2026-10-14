@@ -385,6 +385,57 @@ class SchichtZeile extends StatelessWidget {
   }
 }
 
+/// Belegung zum Ankreuzen: "2/3", voll mit "voll" ("3/3 voll").
+String schichtBelegungText(Schicht s) {
+  final b = s.app.belegung;
+  final gebraucht = b.gebraucht > 0 ? b.gebraucht : (s.gebraucht ?? 0);
+  final voll = gebraucht > 0 && b.besetzt >= gebraucht;
+  return '${b.besetzt}/$gebraucht${voll ? ' voll' : ''}';
+}
+
+/// Schichten zum Ankreuzen (Person eintragen, Anmeldung aendern): Bereich,
+/// Tag und Zeit, Belegung "besetzt/gebraucht". Volle Schichten lassen sich
+/// trotzdem waehlen - das Backend traegt ein und meldet es.
+class SchichtAuswahl extends StatelessWidget {
+  const SchichtAuswahl({
+    super.key,
+    required this.schichten,
+    required this.gewaehlt,
+    required this.aendern,
+  });
+
+  final List<Schicht> schichten;
+  final Set<String> gewaehlt;
+  final void Function(String schichtId, bool gewaehlt) aendern;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final s in schichten)
+          CheckboxListTile(
+            key: Key('schicht-wahl-${s.id}'),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: gewaehlt.contains(s.id),
+            onChanged: (v) => aendern(s.id, v ?? false),
+            title: Text(s.app.bereichText ?? s.name ?? '', style: t.textTheme.titleSmall),
+            subtitle: switch ([?s.app.datumText, ?s.app.zeitText].join(' · ')) {
+              '' => null,
+              final wann => Text(wann),
+            },
+            secondary: HinweisChip(
+              schichtBelegungText(s),
+              art: s.app.belegung.offen > 0 ? HinweisArt.gut : HinweisArt.neutral,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class UntenLeiste extends StatelessWidget {
   const UntenLeiste({super.key, required this.kinder});
 

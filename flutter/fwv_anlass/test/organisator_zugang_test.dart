@@ -138,6 +138,58 @@ void main() {
     });
   });
 
+  group('Person in Schichten eintragen (muendlich gemeldet)', () {
+    test('Mitglied mit Schichten: shift_ids im Body, ohne Doppelte', () async {
+      final w = await dienst().personHinzufuegen(
+        'e1',
+        const NeuePerson(mitgliedId: 'm1', schichtIds: ['s2', 's1', 's2']),
+      );
+      expect(route(anfragen.single), 'POST /events/e1/registrations-as-organizer');
+      expect(body(anfragen.single), {
+        'member_id': 'm1',
+        'participants': 1,
+        'shift_ids': ['s2', 's1'],
+      });
+      expect(w, isNull);
+    });
+
+    test('Externer Login: gleicher Body an my-event; Hinweis bei voller Schicht', () async {
+      antwort = (_) => {
+        'success': true,
+        'warnung': 'Schicht bereits voll, trotzdem eingetragen: Bar 3/3',
+      };
+      final w = await dienst(extern: true)
+          .personHinzufuegen('e2', const NeuePerson(name: 'Gast', schichtIds: ['s1']));
+      expect(route(anfragen.single), 'POST /events/my-event/registrations');
+      expect(body(anfragen.single), {
+        'guest_name': 'Gast',
+        'participants': 1,
+        'shift_ids': ['s1'],
+      });
+      expect(w, 'Schicht bereits voll, trotzdem eingetragen: Bar 3/3');
+    });
+
+    test('ohne Schichten: kein shift_ids (wie bisher)', () async {
+      await dienst().personHinzufuegen('e1', const NeuePerson(name: 'Gast'));
+      expect((body(anfragen.single)! as Map).containsKey('shift_ids'), isFalse);
+    });
+
+    test('Anmeldung aendern: Schichten ersetzen, Reihenfolge egal', () async {
+      const r = VerwalteteAnmeldung(id: 'r1', name: 'Hans', schichtIds: ['s1', 's2']);
+      final gleich = AnmeldungEntwurf.aus(r)..schichtIds = ['s2', 's1'];
+      expect(await dienst().anmeldungAendern('e1', r, gleich), isFalse);
+      final neu = AnmeldungEntwurf.aus(r)..schichtIds = ['s3'];
+      expect(await dienst().anmeldungAendern('e1', r, neu), isTrue);
+      expect(route(anfragen.single), 'PUT /events/e1/registrations/r1/as-organizer');
+      expect(body(anfragen.single), {
+        'shift_ids': ['s3'],
+      });
+      anfragen.clear();
+      await dienst().anmeldungAendern('e1', r, AnmeldungEntwurf.aus(r)..schichtIds = []);
+      expect(body(anfragen.single), {'shift_ids': <String>[]});
+    });
+  });
+
   group('Anmeldung bearbeiten (iOS-Fehler: Bemerkungen ueberschrieben)', () {
     test('nur geaenderte Felder; Begleitpersonen, Allergien, Menue nie im Body', () async {
       final neu = AnmeldungEntwurf.aus(paar)..personen = 3;

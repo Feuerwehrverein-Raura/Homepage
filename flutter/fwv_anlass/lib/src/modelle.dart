@@ -347,7 +347,8 @@ class AnmeldungEntwurf {
     this.personen = 1,
     this.bemerkung = '',
     this.status = 'pending',
-  });
+    List<String>? schichtIds,
+  }) : schichtIds = schichtIds ?? [];
 
   factory AnmeldungEntwurf.aus(VerwalteteAnmeldung a) => AnmeldungEntwurf(
     name: a.name,
@@ -356,6 +357,7 @@ class AnmeldungEntwurf {
     personen: a.personen,
     bemerkung: a.bemerkung ?? '',
     status: a.status,
+    schichtIds: List.of(a.schichtIds),
   );
 
   String name;
@@ -364,6 +366,10 @@ class AnmeldungEntwurf {
   int personen;
   String bemerkung;
   String status;
+
+  /// Schichten der Anmeldung; geaendert ersetzt `shift_ids` alle bisherigen
+  /// (leer = ohne Schicht).
+  List<String> schichtIds;
 
   /// Body mit den geaenderten Feldern. Name und E-Mail nur bei Gaesten —
   /// bei Mitgliedern stehen sie im Mitgliederverzeichnis.
@@ -374,7 +380,15 @@ class AnmeldungEntwurf {
     if (personen != original.personen) 'participants': personen,
     if (bemerkung.trim() != original.bemerkung.trim()) 'notes': bemerkung.trim(),
     if (status != original.status) 'status': status,
+    if (!_gleicheSchichten(schichtIds, original.schichtIds)) 'shift_ids': List.of(schichtIds),
   };
+
+  /// Reihenfolge spielt keine Rolle.
+  static bool _gleicheSchichten(List<String> a, List<String> b) {
+    final x = a.toSet();
+    final y = b.toSet();
+    return x.length == y.length && x.containsAll(y);
+  }
 }
 
 /// Formularwerte eines Anlasses (`PUT events/:id/as-organizer`).

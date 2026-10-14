@@ -11,9 +11,12 @@ import 'package:material_ui/material_ui.dart';
 import '../bausteine.dart';
 import '../modelle.dart';
 import '../zugang.dart';
+import 'anmeldung_screens.dart';
 
 /// Reiter "Schichten" eines Anlasses: Liste mit Belegung, Antippen zum
-/// Aendern, "+" fuer eine neue Schicht.
+/// Aendern, "+" fuer eine neue Schicht. Pro Schicht "Person eintragen":
+/// meldet sich jemand muendlich fuer diese Schicht, oeffnet das das
+/// Formular mit der Schicht schon angekreuzt.
 class SchichtenAnsicht extends StatelessWidget {
   const SchichtenAnsicht({
     super.key,
@@ -31,6 +34,19 @@ class SchichtenAnsicht extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) =>
             SchichtFormular(verwaltung: verwaltung, anlass: anlass.anlass, schicht: schicht),
+      ),
+    );
+    if (ok == true) await neuLaden();
+  }
+
+  Future<void> _personEintragen(BuildContext context, Schicht schicht) async {
+    final ok = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => PersonHinzufuegenScreen(
+          verwaltung: verwaltung,
+          anlass: anlass.anlass,
+          vorauswahl: [schicht.id],
+        ),
       ),
     );
     if (ok == true) await neuLaden();
@@ -73,6 +89,7 @@ class SchichtenAnsicht extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final schichten = anlass.anlass.schichten;
+    final eintragen = verwaltung.zugang.rechte(anlass).hinzufuegen;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       floatingActionButton: FloatingActionButton.extended(
@@ -114,7 +131,22 @@ class SchichtenAnsicht extends StatelessWidget {
                   onTap: () => _formular(context, schicht: s),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                    child: SchichtZeile(schicht: s),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SchichtZeile(schicht: s),
+                        if (eintragen)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              key: Key('schicht-person-${s.id}'),
+                              onPressed: () => _personEintragen(context, s),
+                              icon: const Icon(Icons.person_add_alt, size: 18),
+                              label: const Text('Person eintragen'),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ),

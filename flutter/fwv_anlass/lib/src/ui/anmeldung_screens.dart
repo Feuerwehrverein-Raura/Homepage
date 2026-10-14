@@ -50,6 +50,21 @@ class _AnmeldungBearbeitenScreenState extends State<AnmeldungBearbeitenScreen> {
 
   VerwalteteAnmeldung get _r => widget.anmeldung;
 
+  List<Schicht> get _schichten => widget.anlass.anlass.schichten;
+
+  /// Schicht an- oder abwaehlen. Danach stehen nur noch Schichten dieses
+  /// Anlasses in der Auswahl (eine geloeschte Schicht faellt weg).
+  void _schicht(String id, bool an) {
+    final neu = _e.schichtIds.toSet();
+    an ? neu.add(id) : neu.remove(id);
+    setState(
+      () => _e.schichtIds = [
+        for (final s in _schichten)
+          if (neu.contains(s.id)) s.id,
+      ],
+    );
+  }
+
   Future<void> _speichern() async {
     if (!(_form.currentState?.validate() ?? false)) return;
     setState(() => _laeuft = true);
@@ -99,7 +114,9 @@ class _AnmeldungBearbeitenScreenState extends State<AnmeldungBearbeitenScreen> {
         'Begleitpersonen: ${_r.begleitpersonen.map((b) => b.name).join(', ')}',
       if (_r.allergien != null) 'Allergien: ${_r.allergien}',
       if (_r.menue != null) 'Menü: ${_r.menue}',
-      for (final s in _r.schichten) 'Schicht: ${s.beschriftung}',
+      // Ohne Schichten am Anlass laesst sich nichts waehlen - nur anzeigen.
+      if (_schichten.isEmpty)
+        for (final s in _r.schichten) 'Schicht: ${s.beschriftung}',
     ];
     return Scaffold(
       appBar: AppBar(title: const Text('Anmeldung ändern')),
@@ -173,6 +190,16 @@ class _AnmeldungBearbeitenScreenState extends State<AnmeldungBearbeitenScreen> {
               ],
               onChanged: (v) => setState(() => _e.status = v ?? _e.status),
             ),
+            if (_schichten.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text('Schichten', style: t.textTheme.titleSmall),
+              SchichtAuswahl(
+                key: const Key('anmeldung-schichten'),
+                schichten: _schichten,
+                gewaehlt: _e.schichtIds.toSet(),
+                aendern: _schicht,
+              ),
+            ],
             if (bleibt.isNotEmpty) ...[
               const SizedBox(height: 20),
               Text('Bleibt unverändert', style: t.textTheme.titleSmall),
@@ -206,13 +233,22 @@ class _AnmeldungBearbeitenScreenState extends State<AnmeldungBearbeitenScreen> {
 
 // ---------------------------------------------------------------------------
 
-/// Person von Hand eintragen (telefonisch gemeldet): Mitglied aus dem
-/// Verzeichnis oder Gast. Wird gleich bestaetigt.
+/// Person von Hand eintragen (muendlich oder telefonisch gemeldet): Mitglied
+/// aus dem Verzeichnis oder Gast, auf Wunsch gleich in Schichten. Wird gleich
+/// bestaetigt. Vom Knopf an einer Schicht kommt [vorauswahl] mit.
 class PersonHinzufuegenScreen extends StatefulWidget {
-  const PersonHinzufuegenScreen({super.key, required this.verwaltung, required this.anlass});
+  const PersonHinzufuegenScreen({
+    super.key,
+    required this.verwaltung,
+    required this.anlass,
+    this.vorauswahl = const [],
+  });
 
   final AnlassVerwaltung verwaltung;
   final Anlass anlass;
+
+  /// Schicht-IDs, die schon angekreuzt sind.
+  final List<String> vorauswahl;
 
   @override
   State<PersonHinzufuegenScreen> createState() => _PersonHinzufuegenScreenState();
@@ -230,7 +266,13 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
   String _telefon = '';
   int _personen = 1;
   String _bemerkung = '';
+  late final Set<String> _schichtIds = {...widget.vorauswahl};
   bool _laeuft = false;
+
+  List<Schicht> get _gewaehlteSchichten => [
+    for (final s in widget.anlass.schichten)
+      if (_schichtIds.contains(s.id)) s,
+  ];
 
   Future<void> _speichern() async {
     if (!_alsGast && _mitglied == null) {
@@ -240,7 +282,7 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
     if (!(_form.currentState?.validate() ?? false)) return;
     setState(() => _laeuft = true);
     try {
-      await widget.verwaltung.zugang.personHinzufuegen(
+      final warnung = await widget.verwaltung.zugang.personHinzufuegen(
         widget.anlass.id,
         NeuePerson(
           mitgliedId: _alsGast ? null : _mitglied!.id,
@@ -249,10 +291,13 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
           telefon: _alsGast ? _telefon : null,
           personen: _personen,
           bemerkung: _bemerkung,
+          // In der Reihenfolge der Schichten, nur die dieses Anlasses.
+          schichtIds: [for (final s in _gewaehlteSchichten) s.id],
         ),
       );
       if (!mounted) return;
-      meldung(context, '${_alsGast ? _name.trim() : _mitglied!.name} eingetragen');
+      final wer = _alsGast ? _name.trim() : _mitglied!.name;
+      meldung(context, warnung == null ? '$wer eingetragen' : '$wer eingetragen. $warnung');
       Navigator.of(context).pop(true);
     } on Object catch (e) {
       if (mounted) meldung(context, fehlerText(e));
@@ -319,6 +364,9 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context);
+    final schichten = widget.anlass.schichten;
+    final gewaehlt = _gewaehlteSchichten;
     return Scaffold(
       appBar: AppBar(title: const Text('Person eintragen')),
       body: Form(
@@ -326,6 +374,35 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
         child: ListView(
           padding: mitSystemleiste(context, const EdgeInsets.all(16)),
           children: [
+            // Oben sichtbar, wofuer eingetragen wird (vor allem vom Knopf an
+            // der Schicht aus) - die Auswahl selbst steht weiter unten. Immer
+            // genau ein Kind, damit die Felder darunter ihren Platz in der
+            // Liste behalten (sonst uebernimmt ein Feld den Zustand eines
+            // anderen, z.B. "Name" den leeren der "E-Mail").
+            if (gewaehlt.isEmpty)
+              const SizedBox.shrink()
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  key: const Key('person-schichten-kurz'),
+                  margin: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: const Icon(Icons.event_available_outlined),
+                    title: Text(gewaehlt.length == 1 ? 'Für die Schicht' : 'Für die Schichten'),
+                    subtitle: Text(
+                      [
+                        for (final s in gewaehlt)
+                          [
+                            s.app.bereichText ?? s.name ?? '',
+                            ?s.app.datumText,
+                            ?s.app.zeitText,
+                          ].join(' · '),
+                      ].join('\n'),
+                    ),
+                  ),
+                ),
+              ),
             SegmentedButton<bool>(
               segments: const [
                 ButtonSegment(
@@ -341,6 +418,8 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
             const SizedBox(height: 12),
             if (_alsGast) ...[
               TextFormField(
+                // Wert mitgeben: weggescrollt baut die Liste das Feld neu.
+                initialValue: _name,
                 decoration: const InputDecoration(labelText: 'Name *'),
                 textCapitalization: TextCapitalization.words,
                 validator: (v) => _pflicht(v, 'Bitte einen Namen angeben.'),
@@ -348,6 +427,8 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
               ),
               const SizedBox(height: 12),
               TextFormField(
+                // Wert mitgeben: weggescrollt baut die Liste das Feld neu.
+                initialValue: _email,
                 decoration: const InputDecoration(labelText: 'E-Mail'),
                 keyboardType: TextInputType.emailAddress,
                 autocorrect: false,
@@ -356,12 +437,25 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
               ),
               const SizedBox(height: 12),
               TextFormField(
+                // Wert mitgeben: weggescrollt baut die Liste das Feld neu.
+                initialValue: _telefon,
                 decoration: const InputDecoration(labelText: 'Telefon'),
                 keyboardType: TextInputType.phone,
                 onChanged: (v) => _telefon = v,
               ),
             ] else
               _mitgliedWahl(),
+            if (schichten.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Text('Schichten', style: t.textTheme.titleSmall),
+              Text('Ohne Auswahl: Anmeldung ohne Schicht.', style: t.textTheme.bodySmall),
+              SchichtAuswahl(
+                schichten: schichten,
+                gewaehlt: _schichtIds,
+                aendern: (id, an) =>
+                    setState(() => an ? _schichtIds.add(id) : _schichtIds.remove(id)),
+              ),
+            ],
             const SizedBox(height: 16),
             ZahlWaehler(
               titel: 'Personen',
@@ -370,16 +464,15 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
             ),
             const SizedBox(height: 12),
             TextFormField(
+              // Wert mitgeben: weggescrollt baut die Liste das Feld neu.
+              initialValue: _bemerkung,
               decoration: const InputDecoration(labelText: 'Bemerkung'),
               minLines: 1,
               maxLines: 4,
               onChanged: (v) => _bemerkung = v,
             ),
             const SizedBox(height: 8),
-            Text(
-              'Die Anmeldung ist gleich bestätigt.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            Text('Die Anmeldung ist gleich bestätigt.', style: t.textTheme.bodySmall),
           ],
         ),
       ),

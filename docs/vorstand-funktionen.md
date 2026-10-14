@@ -108,9 +108,9 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [x] | Springer-Schichten generieren | ✓ | – | ✓ | – | ✓ | Client-Logik (springerSchichten) |
 | [ ] | Anmeldungen ansehen (nach Schicht, GV mit Menue/Allergien) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | [ ] | Anmeldung bestaetigen / ablehnen | ✓ | ✓ | ✓ | ✓ | ✓ | /registrations/:id/approve|reject |
-| [ ] | Anmeldung bearbeiten (inkl. Status) | ✓ | ✓ | ✓ | ½ | ✓ | PUT /registrations/:id |
+| [ ] | Anmeldung bearbeiten (inkl. Status, Schichten) | ✓ | ✓ | ✓ | ½ | ✓ | PUT /registrations/:id; F: PUT …/as-organizer mit shift_ids |
 | [ ] | Anmeldung loeschen | – | – | – | ✓ | ✓ | DELETE …/as-organizer |
-| [ ] | Person eintragen (Mitglied/Gast, auch ohne Schicht) | ✓ | ✓ | ✓ | ✓ | ✓ | POST /registrations |
+| [ ] | Person eintragen (Mitglied/Gast, auch ohne Schicht) | ✓ | ✓ | ✓ | ✓ | ✓ | POST /registrations; F/O: …/registrations-as-organizer bzw. my-event/registrations mit shift_ids (Schichten waehlbar, F: Knopf «Person eintragen» an der Schicht; volle Schicht: warnung) |
 | [ ] | Andere Schicht vorschlagen | ✓ | ✓ | ✓ | ✓ | ✓ | …/suggest-alternative |
 | [ ] | Angemeldete informieren | ✓ | ✓ | ✓ | ✓ | ✓ | POST /events/:id/notify-registrants |
 | [ ] | Arbeitsplan ansehen / PDF | ✓ | ✓ | ✓ | ✓ | ✓ | /events/:id/arbeitsplan, /pdf/arbeitsplan |

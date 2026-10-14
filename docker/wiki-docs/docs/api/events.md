@@ -242,6 +242,17 @@ POST /events/my-event/registrations/:id/reject
 Authorization: Bearer <token>
 ```
 
+### Person hinzufügen (Organisator)
+```http
+POST /events/my-event/registrations
+Authorization: Bearer <token>
+```
+
+Wie `POST /events/:id/registrations-as-organizer` (siehe
+[Person in Schichten eintragen](#person-in-schichten-eintragen)):
+`member_id` oder `guest_name`, optional `guest_email`, `guest_phone`,
+`participants`, `notes`, `shift_ids`; gleich bestätigt.
+
 ### Arbeitsplan versenden (Organisator)
 ```http
 POST /events/my-event/send-arbeitsplan
@@ -335,9 +346,9 @@ normalen Token:
 | `GET /events/:id/organizer-registrations` | Anmeldungen roh, mit `parsed_notes` |
 | `POST /events/:id/registrations/:regId/approve-as-organizer` | bestätigen |
 | `POST /events/:id/registrations/:regId/reject-as-organizer` | ablehnen |
-| `PUT /events/:id/registrations/:regId/as-organizer` | ändern: nur mitgeschickte Felder (`guest_name`, `guest_email`, `guest_phone`, `participants`, `notes`, `status`); das `notes`-JSON wird zusammengeführt, Begleitpersonen, Allergien und Menü bleiben |
+| `PUT /events/:id/registrations/:regId/as-organizer` | ändern: nur mitgeschickte Felder (`guest_name`, `guest_email`, `guest_phone`, `participants`, `notes`, `status`, `shift_ids`); das `notes`-JSON wird zusammengeführt, Begleitpersonen, Allergien und Menü bleiben; `shift_ids` ersetzt die Schichten (`[]`/`null` = ohne Schicht, Prüfung siehe unten) |
 | `DELETE /events/:id/registrations/:regId/as-organizer` | löschen |
-| `POST /events/:id/registrations-as-organizer` | Person hinzufügen (`member_id` oder `guest_name`), gleich bestätigt |
+| `POST /events/:id/registrations-as-organizer` | Person hinzufügen (`member_id` oder `guest_name`, optional `shift_ids`), gleich bestätigt |
 | `POST /events/:id/registrations/:regId/suggest-alternative-as-organizer` | andere Schicht vorschlagen (`newShiftId`, `shiftInfo`, `comment`, `email`) |
 | `POST /events/:id/notify-registrants-as-organizer` | Angemeldete informieren (`subject`, `message`) → `{ emailed, posted, pushed, skipped, unreachable }` |
 | `PUT /events/:id/as-organizer` | Anlass ändern (nur mitgeschickte Felder) |
@@ -347,6 +358,40 @@ normalen Token:
 | `GET /events/:id/organizers` | Haupt-Organisator, Mitorganisatoren, `darf_verwalten` |
 | `POST /events/:id/organizers` | Mitorganisator hinzufügen: `{ member_id }` oder `{ name, email }` (extern) — nur Vorstand und Haupt-Organisator |
 | `DELETE /events/:id/organizers/:orgId` | Mitorganisator entfernen (sein Login gilt sofort nicht mehr) — nur Vorstand und Haupt-Organisator |
+
+#### Person in Schichten eintragen
+
+Meldet sich jemand mündlich für eine Schicht, trägt ihn der Organisator
+(oder der Vorstand) mit `shift_ids` ein — beim Hinzufügen
+(`POST /events/:id/registrations-as-organizer`,
+`POST /events/my-event/registrations`) und beim Ändern
+(`PUT …/registrations/:regId/as-organizer`). Ohne `shift_ids` bleibt alles
+wie bisher (Anmeldung ohne Schicht bzw. Schichten unverändert).
+
+```json
+{ "member_id": "…", "shift_ids": ["<schicht-uuid>", "<schicht-uuid>"] }
+```
+
+- doppelte IDs fallen weg
+- alle Schichten müssen zu diesem Anlass gehören, sonst `400`
+  (`code: "schicht_fremd"`)
+- steht dieselbe Person (Mitglied oder Gäste-Adresse) schon mit einer anderen
+  Anmeldung auf der Schicht: `409` (`code: "schicht_doppelt"`), wie bei
+  `PUT /registrations/:id`
+- ist eine Schicht schon voll (bestätigte Anmeldungen ≥ `needed`), wird
+  trotzdem eingetragen; die Antwort enthält dann einen Hinweis:
+
+```json
+{
+  "success": true,
+  "registration": { "id": "…", "shift_ids": ["…"], "status": "approved" },
+  "warnung": "Schicht bereits voll, trotzdem eingetragen: Abbau (2026-10-25 10:00) 1/1"
+}
+```
+
+`warnung` ist `null`, wenn alles frei war. Die eingetragene Person bekommt
+eine Nachricht mit Anlass und Schichten (auch beim externen Event-Login).
+Prüfung: `src/schicht-eintrag.js`, Tests: `test/schicht-eintrag.test.js`.
 
 ### Mitorganisatoren
 

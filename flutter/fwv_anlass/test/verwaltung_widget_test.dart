@@ -73,9 +73,12 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
 
   @override
   Future<void> anmeldungLoeschen(String a, String r) => _merken('anmeldungLoeschen', [a, r], null);
+
+  /// Hinweis, den das Backend beim Eintragen meldet (volle Schicht).
+  String? warnung;
   @override
-  Future<void> personHinzufuegen(String a, NeuePerson p) =>
-      _merken('personHinzufuegen', [a, p.alsJson()], null);
+  Future<String?> personHinzufuegen(String a, NeuePerson p) =>
+      _merken('personHinzufuegen', [a, p.alsJson()], warnung);
   @override
   Future<List<VerzeichnisMitglied>> mitgliederVerzeichnis() => _merken('verzeichnis', [], const [
     VerzeichnisMitglied(id: 'm1', name: 'Erika Muster'),
@@ -639,6 +642,124 @@ void main() {
       'participants': 1,
     });
   });
+
+  // Chilbi: Aufbau (1/4), Schicht 1 (2/2, voll), Schicht 2 (1/2).
+  const aufbau = '00000000-0000-0000-0000-500000000001';
+  const schicht1 = '00000000-0000-0000-0000-500000000002';
+  const schicht2 = '00000000-0000-0000-0000-500000000003';
+
+  bool angekreuzt(WidgetTester tester, String schichtId) =>
+      tester.widget<CheckboxListTile>(find.byKey(Key('schicht-wahl-$schichtId'))).value!;
+
+  testWidgets('Knopf an der Schicht: Formular mit der Schicht vorausgewaehlt', (tester) async {
+    zugang.warnung = 'Schicht bereits voll, trotzdem eingetragen: Schicht 1 2/2';
+    await anlass(tester, _chilbi);
+    await tippen(tester, find.widgetWithText(Tab, 'Schichten'));
+    await tippen(tester, find.byKey(const Key('schicht-person-$schicht1')));
+    expect(find.byKey(const Key('person-eintragen')), findsOneWidget, reason: 'Formular offen');
+    expect(find.byKey(const Key('person-schichten-kurz')), findsOneWidget);
+    expect(find.text('Für die Schicht'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('schicht-wahl-$schicht2')),
+      200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
+    expect(angekreuzt(tester, schicht1), isTrue);
+    expect(angekreuzt(tester, aufbau), isFalse);
+    expect(angekreuzt(tester, schicht2), isFalse);
+    expect(find.text('2/2 voll'), findsOneWidget, reason: 'Belegung x/y');
+    expect(find.text('1/4'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('mitglied-suche')),
+      -200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
+    await tester.enterText(find.byKey(const Key('mitglied-suche')), 'hans');
+    await tester.pumpAndSettle();
+    await tippen(tester, find.text('Hans Helfer'));
+    await tippen(tester, find.byKey(const Key('person-eintragen')));
+    expect(zugang.letzter('personHinzufuegen'), [
+      _chilbi,
+      {
+        'member_id': 'm2',
+        'participants': 1,
+        'shift_ids': [schicht1],
+      },
+    ]);
+    expect(find.textContaining('Schicht bereits voll'), findsOneWidget, reason: 'Hinweis');
+    expect(find.byKey(const Key('person-eintragen')), findsNothing, reason: 'Formular zu');
+  });
+
+  testWidgets('Person eintragen: Schichten ankreuzen, in Reihenfolge der Schichten', (
+    tester,
+  ) async {
+    await anlass(tester, _chilbi);
+    await tippen(tester, find.text('Person'));
+    expect(find.byKey(const Key('person-schichten-kurz')), findsNothing);
+    await tippen(tester, find.text('Gast'));
+    await tester.enterText(find.widgetWithText(TextFormField, 'Name *'), 'Muendlich');
+    await tippen(tester, find.byKey(const Key('schicht-wahl-$schicht2')));
+    await tippen(tester, find.byKey(const Key('schicht-wahl-$aufbau')));
+    expect(find.text('Für die Schichten'), findsOneWidget);
+    await tippen(tester, find.byKey(const Key('person-eintragen')));
+    expect((zugang.letzter('personHinzufuegen') as List).last, {
+      'guest_name': 'Muendlich',
+      'participants': 1,
+      'shift_ids': [aufbau, schicht2],
+    });
+  });
+
+  testWidgets('Anmeldung aendern: Schichten tauschen', (tester) async {
+    await anlass(tester, _chilbi);
+    // Erste Anmeldung: Gast Neu, Schicht 2
+    await tippen(tester, find.text('Ändern').first);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('schicht-wahl-$schicht2')),
+      200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
+    expect(angekreuzt(tester, schicht2), isTrue);
+    expect(find.textContaining('Schicht: '), findsNothing, reason: 'nicht mehr nur Anzeige');
+    await tippen(tester, find.byKey(const Key('schicht-wahl-$schicht2')));
+    await tippen(tester, find.byKey(const Key('schicht-wahl-$aufbau')));
+    await tippen(tester, find.byKey(const Key('anmeldung-speichern')));
+    expect((zugang.letzter('anmeldungAendern') as List).last, {
+      'shift_ids': [aufbau],
+    });
+  });
+
+  for (final groesse in [const Size(360, 640), const Size(1400, 900)]) {
+    testWidgets('Schichten und Person eintragen bei ${groesse.width} dp: nichts laeuft ueber', (
+      tester,
+    ) async {
+      await zeigen(
+        tester,
+        VerwaltungsAnlassScreen(verwaltung: verwaltung(), anlassId: _chilbi),
+        groesse: groesse,
+      );
+      await tippen(tester, find.widgetWithText(Tab, 'Schichten'));
+      expect(find.byKey(const Key('schicht-person-$schicht2')), findsOneWidget);
+      await tippen(tester, find.byKey(const Key('schicht-person-$schicht2')));
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('schicht-wahl-$schicht2')),
+        200,
+        scrollable: find.byType(Scrollable).hitTestable().first,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Zurück'));
+      await tester.pumpAndSettle();
+      await tippen(tester, find.widgetWithText(Tab, 'Anmeldungen'));
+      await tippen(tester, find.text('Ändern').first);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('anmeldung-schichten')),
+        200,
+        scrollable: find.byType(Scrollable).hitTestable().first,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('Andere Schicht vorschlagen', (tester) async {
     await anlass(tester, _chilbi);

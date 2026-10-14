@@ -165,7 +165,7 @@
 
     <!-- DEUTSCH: Modal zum Hinzufuegen eines Teilnehmers (Mitglied/Gast Toggle wie Vorstand) -->
     <div id="add-participant-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between p-4 border-b">
                 <h3 class="text-lg font-bold text-gray-800">Person hinzufügen</h3>
                 <button onclick="closeAddParticipant()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
@@ -203,6 +203,12 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
                             <input type="tel" id="add-p-phone" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-fire-500 text-sm" placeholder="079 ...">
                         </div>
+                    </div>
+                    <!-- DEUTSCH: Schichten (nur wenn der Anlass welche hat) -->
+                    <div id="add-p-shifts-section" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Schichten</label>
+                        <div id="add-p-shifts" class="max-h-48 overflow-y-auto border border-gray-300 rounded-lg divide-y"></div>
+                        <p class="text-xs text-gray-500 mt-1">Ohne Auswahl: Anmeldung ohne Schicht.</p>
                     </div>
                     <!-- Gemeinsame Felder -->
                     <div>
@@ -378,10 +384,13 @@
                                         <span class="text-gray-500 text-sm ml-2">${escapeHtml(shift.start_time)} - ${escapeHtml(shift.end_time)}</span>
                                         <span class="text-gray-400 text-xs ml-2">(${escapeHtml(shift.bereich || 'Allgemein')})</span>
                                     </div>
-                                    <div class="text-sm">
+                                    <div class="text-sm flex items-center gap-3 shrink-0">
                                         <!-- DEUTSCH: Gruen = genehmigte Anmeldungen, Grau = benoetigte Anzahl -->
-                                        <span class="text-green-600 font-medium">${regs.length}</span>
-                                        <span class="text-gray-400">/ ${escapeHtml(shift.needed)}</span>
+                                        <span><span class="text-green-600 font-medium">${regs.length}</span>
+                                        <span class="text-gray-400">/ ${escapeHtml(shift.needed)}</span></span>
+                                        <!-- DEUTSCH: Jemand meldet sich muendlich fuer diese Schicht -->
+                                        <button type="button" onclick="openAddParticipant('${escapeHtml(shift.id)}')"
+                                            class="px-2 py-1 text-xs bg-fire-500 text-white rounded-lg hover:bg-fire-600">Person eintragen</button>
                                     </div>
                                 </div>
                             `;
@@ -650,11 +659,35 @@
             }
         });
 
-        // DEUTSCH: Modal oeffnen/schliessen
-        function openAddParticipant() {
+        // DEUTSCH: Schicht-Auswahl im Modal: Datum, Zeit, Name und Belegung (genehmigt / benoetigt)
+        function renderAddShifts(vorauswahl) {
+            const shifts = eventData.shifts || [];
+            const section = document.getElementById('add-p-shifts-section');
+            section.classList.toggle('hidden', shifts.length === 0);
+            document.getElementById('add-p-shifts').innerHTML = shifts.map(shift => {
+                const belegt = (eventData.registrations || []).filter(r =>
+                    r.shift_ids && r.shift_ids.includes(shift.id) && r.status === 'approved'
+                ).length;
+                const voll = Number(shift.needed) > 0 && belegt >= Number(shift.needed);
+                const zeit = [shift.start_time, shift.end_time].filter(Boolean).map(z => String(z).slice(0, 5)).join(' - ');
+                return `
+                    <label class="flex items-start gap-2 p-2 text-sm cursor-pointer hover:bg-gray-50">
+                        <input type="checkbox" class="add-p-shift mt-1" value="${escapeHtml(shift.id)}" ${shift.id === vorauswahl ? 'checked' : ''}>
+                        <span class="flex-1">
+                            <span class="font-medium">${escapeHtml(shift.name)}</span>
+                            <span class="block text-xs text-gray-500">${escapeHtml(formatDate(shift.date))}${zeit ? ' · ' + escapeHtml(zeit) : ''}</span>
+                        </span>
+                        <span class="${voll ? 'text-red-600' : 'text-gray-500'} text-xs whitespace-nowrap">${belegt}/${escapeHtml(shift.needed)}</span>
+                    </label>`;
+            }).join('');
+        }
+
+        // DEUTSCH: Modal oeffnen/schliessen; [schichtId] ist vorausgewaehlt (Knopf an der Schicht)
+        function openAddParticipant(schichtId) {
             document.getElementById('add-p-event-label').textContent = eventData.title;
             if (membersList.length === 0) loadMembersList();
             setAddMode('member');
+            renderAddShifts(schichtId);
             document.getElementById('add-participant-modal').classList.remove('hidden');
         }
         function closeAddParticipant() {
@@ -696,6 +729,9 @@
                 };
             }
 
+            const shiftIds = Array.from(document.querySelectorAll('.add-p-shift:checked')).map(c => c.value);
+            if (shiftIds.length > 0) body.shift_ids = shiftIds;
+
             try {
                 const response = await fetch(`${API_BASE}/events/my-event/registrations`, {
                     method: 'POST',
@@ -710,9 +746,11 @@
                     const err = await response.json();
                     throw new Error(err.error || 'Fehler');
                 }
+                const result = await response.json();
 
                 closeAddParticipant();
-                alert(`${displayName} wurde erfolgreich angemeldet.`);
+                // DEUTSCH: Volle Schicht blockiert nicht, das Backend meldet es aber (warnung)
+                alert(`${displayName} wurde erfolgreich angemeldet.${result.warnung ? '\n\nHinweis: ' + result.warnung : ''}`);
                 await loadDashboard();
             } catch (error) {
                 alert('Fehler: ' + error.message);

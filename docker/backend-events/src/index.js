@@ -19,6 +19,7 @@ const organisatorAnsicht = require('./organisator-ansicht');
 const { anlassIcs, icsDateiname } = require('./ics');
 const { mitAnlassLogo } = require('./anlass-mail');
 const mitorganisatoren = require('./mitorganisatoren');
+const { schichtenPruefen } = require('./schicht-eintrag');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -2002,7 +2003,8 @@ app.get('/events/my-event/members', authenticateEventOrganizer, async (req, res)
     }
 });
 
-// DEUTSCH: Teilnehmer manuell hinzufuegen (Event-Organisator)
+// DEUTSCH: Teilnehmer manuell hinzufuegen (Event-Organisator). Optional
+// shift_ids: die Person gleich in Schichten eintragen (src/schicht-eintrag.js).
 app.post('/events/my-event/registrations', authenticateEventOrganizer, async (req, res) => {
     try {
         const eventId = req.eventOrganizer.event_id;
@@ -2015,19 +2017,35 @@ app.post('/events/my-event/registrations', authenticateEventOrganizer, async (re
         const name = guest_name || '';
         const email = guest_email || '';
 
+        const schichten = await schichtenPruefen(pool, {
+            eventId, shiftIds: req.body.shift_ids, memberId: member_id || null, email
+        });
+        if (schichten.fehler) return res.status(schichten.fehler.status).json(schichten.fehler.body);
+
         const registration = await pool.query(`
             INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
-            VALUES ($1, $2, $3, $4, NULL, $5, 'approved')
+            VALUES ($1, $2, $3, $4, $5, $6, 'approved')
             RETURNING *
         `, [
             eventId,
             member_id || null,
             name,
             email,
+            schichten.shiftIds ?? null,
             JSON.stringify({ phone: guest_phone, participants: participants || 1, notes })
         ]);
 
-        res.json({ success: true, registration: registration.rows[0] });
+        const reg = registration.rows[0];
+        res.json({ success: true, registration: reg, warnung: schichten.warnung ?? null });
+
+        // Wie beim Eintrag in der App: Person und Organisatoren informieren.
+        pool.query('SELECT title FROM events WHERE id = $1', [eventId])
+            .then(ev => notifyRegistrationChange({
+                eventId, eventTitle: ev.rows[0]?.title || 'Event',
+                memberId: reg.member_id, guestName: reg.guest_name, guestEmail: reg.guest_email,
+                shiftIds: reg.shift_ids, action: 'added'
+            }))
+            .catch(() => {});
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -3390,8 +3408,10 @@ app.delete('/events/:id/organizers/:orgId', authenticateAny, async (req, res) =>
 });
 
 // DEUTSCH: Anmeldung als Event-Organisator bearbeiten.
-// Erlaubt: guest_name, guest_email, guest_phone, participants, notes, status.
-// Felder die nicht im Body sind, bleiben unveraendert.
+// Erlaubt: guest_name, guest_email, guest_phone, participants, notes, status,
+// shift_ids (ersetzt die Schichten; [] oder null = ohne Schicht; geprueft wie
+// beim Eintragen, src/schicht-eintrag.js). Felder die nicht im Body sind,
+// bleiben unveraendert.
 app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, async (req, res) => {
     try {
         const { eventId, regId } = req.params;
@@ -3407,6 +3427,12 @@ app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, a
 
         const { guest_name, guest_email, guest_phone, participants, notes, status } = req.body || {};
 
+        const schichten = await schichtenPruefen(pool, {
+            eventId, shiftIds: (req.body || {}).shift_ids,
+            memberId: reg.member_id, email: guest_email ?? reg.guest_email, ausser: regId
+        });
+        if (schichten.fehler) return res.status(schichten.fehler.status).json(schichten.fehler.body);
+
         // notes ist JSON {phone, participants, notes} — wir mergen
         let notesJson = {};
         try { notesJson = typeof reg.notes === 'string' ? JSON.parse(reg.notes) : (reg.notes || {}); } catch (_) { notesJson = {}; }
@@ -3419,7 +3445,8 @@ app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, a
                 guest_name  = COALESCE($1, guest_name),
                 guest_email = COALESCE($2, guest_email),
                 notes       = $3,
-                status      = COALESCE($4, status)
+                status      = COALESCE($4, status),
+                shift_ids   = CASE WHEN $7::boolean THEN $8::uuid[] ELSE shift_ids END
             WHERE id = $5 AND event_id = $6
             RETURNING *
         `, [
@@ -3427,10 +3454,12 @@ app.put('/events/:eventId/registrations/:regId/as-organizer', authenticateAny, a
             guest_email ?? null,
             JSON.stringify(notesJson),
             status ?? null,
-            regId, eventId
+            regId, eventId,
+            schichten.angegeben,
+            schichten.angegeben ? schichten.shiftIds : null
         ]);
 
-        res.json({ success: true, registration: result.rows[0] });
+        res.json({ success: true, registration: result.rows[0], warnung: schichten.warnung ?? null });
 
         const updated = result.rows[0];
         const statusChanged = status && status !== existing.rows[0].status;
@@ -3511,19 +3540,26 @@ app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, 
             return res.status(400).json({ error: 'Mitglied oder Gastname erforderlich' });
         }
 
+        // Optional gleich in Schichten eintragen (src/schicht-eintrag.js).
+        const schichten = await schichtenPruefen(pool, {
+            eventId: id, shiftIds: (req.body || {}).shift_ids, memberId: member_id || null, email: guest_email
+        });
+        if (schichten.fehler) return res.status(schichten.fehler.status).json(schichten.fehler.body);
+
         const result = await pool.query(`
             INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status, approved_by, approved_at)
-            VALUES ($1, $2, $3, $4, NULL, $5, 'approved', $6, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, 'approved', $7, NOW())
             RETURNING *
         `, [
             id,
             member_id || null,
             guest_name || '',
             guest_email || '',
+            schichten.shiftIds ?? null,
             JSON.stringify({ phone: guest_phone, participants: participants || 1, notes }),
             req.user.email || req.user.name || 'organizer'
         ]);
-        res.json({ success: true, registration: result.rows[0] });
+        res.json({ success: true, registration: result.rows[0], warnung: schichten.warnung ?? null });
 
         const ev = await pool.query('SELECT title FROM events WHERE id=$1', [id]);
         const newReg = result.rows[0];

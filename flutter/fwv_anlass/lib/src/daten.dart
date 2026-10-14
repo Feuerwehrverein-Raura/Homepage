@@ -10,7 +10,8 @@ import 'package:fwv_core/fwv_core.dart';
 
 import 'modelle.dart';
 
-/// Body fuer "Person hinzufuegen": Mitglied (ID) oder Gast (Name).
+/// Body fuer "Person hinzufuegen": Mitglied (ID) oder Gast (Name), auf
+/// Wunsch gleich in Schichten ([schichtIds], `shift_ids`).
 class NeuePerson {
   const NeuePerson({
     this.mitgliedId,
@@ -19,6 +20,7 @@ class NeuePerson {
     this.telefon,
     this.personen = 1,
     this.bemerkung,
+    this.schichtIds = const [],
   });
 
   final String? mitgliedId;
@@ -27,6 +29,9 @@ class NeuePerson {
   final String? telefon;
   final int personen;
   final String? bemerkung;
+
+  /// Schichten, in die die Person eingetragen wird; leer = ohne Schicht.
+  final List<String> schichtIds;
 
   bool get gueltig => mitgliedId != null || (name?.trim().isNotEmpty ?? false);
 
@@ -40,6 +45,7 @@ class NeuePerson {
       if (gast) 'guest_phone': ?t(telefon),
       'participants': personen,
       'notes': ?t(bemerkung),
+      if (schichtIds.isNotEmpty) 'shift_ids': [...schichtIds.toSet()],
     };
   }
 }

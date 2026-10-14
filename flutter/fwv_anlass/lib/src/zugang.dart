@@ -91,7 +91,11 @@ abstract class AnlassVerwaltungZugang {
     AnmeldungEntwurf neu,
   );
   Future<void> anmeldungLoeschen(String anlassId, String anmeldungId);
-  Future<void> personHinzufuegen(String anlassId, NeuePerson person);
+
+  /// Person von Hand eintragen (gleich bestaetigt). Gibt den Hinweis des
+  /// Backends zurueck (z.B. "Schicht bereits voll, trotzdem eingetragen …"),
+  /// sonst null.
+  Future<String?> personHinzufuegen(String anlassId, NeuePerson person);
   Future<List<VerzeichnisMitglied>> mitgliederVerzeichnis();
   Future<String> alternativeVorschlagen(
     String anlassId,

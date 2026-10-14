@@ -71,11 +71,19 @@ class OrganisatorZugang extends AnlassVerwaltungZugang {
   Future<void> anmeldungLoeschen(String anlassId, String anmeldungId) =>
       api.delete('events/${_e(anlassId)}/registrations/${_e(anmeldungId)}/as-organizer');
 
-  /// Person von Hand eintragen (gleich bestaetigt).
+  /// Person von Hand eintragen (gleich bestaetigt), auf Wunsch gleich in
+  /// Schichten. Ist eine Schicht voll, traegt das Backend trotzdem ein und
+  /// meldet es in `warnung`.
   @override
-  Future<void> personHinzufuegen(String anlassId, NeuePerson person) => externerLogin
-      ? api.post('events/my-event/registrations', daten: person.alsJson())
-      : api.post('events/${_e(anlassId)}/registrations-as-organizer', daten: person.alsJson());
+  Future<String?> personHinzufuegen(String anlassId, NeuePerson person) async {
+    final antwort = externerLogin
+        ? await api.post('events/my-event/registrations', daten: person.alsJson())
+        : await api.post(
+            'events/${_e(anlassId)}/registrations-as-organizer',
+            daten: person.alsJson(),
+          );
+    return antwort is Map ? jsonText(antwort['warnung']) : null;
+  }
 
   /// Mitglieder zum Auswaehlen.
   @override
