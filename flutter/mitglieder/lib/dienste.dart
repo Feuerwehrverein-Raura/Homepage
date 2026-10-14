@@ -13,6 +13,7 @@ import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_lager/fwv_lager.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
 import 'package:fwv_vorstand/fwv_vorstand.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -59,6 +60,7 @@ class Dienste {
     Plattform? plattform,
     Future<Uint8List> Function(Uint8List roh)? anhangVerkleinern,
     Future<Uint8List?> Function({required bool kamera})? dokumentFotoWaehlen,
+    Future<GewaehlteDatei?> Function()? pdfWaehlen,
     Future<String?> Function(BuildContext context)? barcodeScannen,
     Uri? inventarBasis,
     this.update = const KeinAppUpdate(),
@@ -67,6 +69,7 @@ class Dienste {
     Duration? schopfPruefTakt,
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
        dokumentFotoWaehlen = dokumentFotoWaehlen ?? _dokumentFotoMitImagePicker,
+       pdfWaehlen = pdfWaehlen ?? _pdfMitFilePicker,
        barcodeScannen = barcodeScannen ?? _barcodeMitKamera,
        inventarBasis = inventarBasis ?? inventarApiBasis,
        anhangVerkleinern = anhangVerkleinern ?? anhangBildVerkleinern,
@@ -182,6 +185,10 @@ class Dienste {
   /// Abbruch.
   final Future<Uint8List?> Function({required bool kamera}) dokumentFotoWaehlen;
 
+  /// PDF vom Geraet waehlen (PDF-Aushang im Vorstand-Formular); null bei
+  /// Abbruch. In Tests ersetzt.
+  final Future<GewaehlteDatei?> Function() pdfWaehlen;
+
   /// Barcode lesen (Kamera-Screen aus fwv_lager; in Tests ersetzt).
   final Future<String?> Function(BuildContext context) barcodeScannen;
 
@@ -272,15 +279,13 @@ class Dienste {
     umgebung: _verwaltungsUmgebung,
   );
 
-  // TODO(pdf-aushang): pdfWaehlen setzen, sobald die App einen Dateiwaehler
-  // hat (z.B. file_picker) - bis dahin laedt der Vorstand den PDF-Aushang
-  // auf der Website hoch; in der App kann er ihn nur entfernen.
   VerwaltungsUmgebung get _verwaltungsUmgebung => VerwaltungsUmgebung(
     dateiTeilen: dateiTeilen,
     // Notizen und Belege: Rueckkamera (das Profilfoto nimmt die vordere).
     fotoWaehlen: dokumentFotoWaehlen,
     linkOeffnen: linkOeffnen,
     anhangVerkleinern: anhangVerkleinern,
+    pdfWaehlen: pdfWaehlen,
   );
 
   /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.
@@ -426,6 +431,23 @@ Future<Uint8List?> _dokumentFotoMitImagePicker({required bool kamera}) async {
     preferredCameraDevice: CameraDevice.rear,
   );
   return datei?.readAsBytes();
+}
+
+/// PDF ueber den Dateiwaehler des Systems (file_picker: Android Dokumente,
+/// iOS Dateien, Web Datei-Dialog). Zu grosse Dateien werden gar nicht erst
+/// gelesen; ob es wirklich ein PDF ist, prueft das Formular ([istPdf]).
+Future<GewaehlteDatei?> _pdfMitFilePicker() async {
+  final datei = await FilePicker.pickFile(
+    dialogTitle: 'PDF-Aushang wählen',
+    type: FileType.custom,
+    allowedExtensions: const ['pdf'],
+  );
+  if (datei == null) return null;
+  final groesse = datei.lengthSync() ?? await datei.length();
+  if (groesse != null && groesse > pdfHoechstGroesse) {
+    throw const ApiFehler('Das PDF darf höchstens 10 MB gross sein.');
+  }
+  return (bytes: await datei.readAsBytes(), dateiname: datei.name);
 }
 
 Future<String?> _barcodeMitKamera(BuildContext context) => barcodeScannen(context);

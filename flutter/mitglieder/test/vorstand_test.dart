@@ -6,6 +6,7 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fwv_anlass/fwv_anlass.dart' show GewaehlteDatei;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_mitglieder/anmeldung/authentik_anmeldung.dart';
 import 'package:fwv_mitglieder/dienste.dart';
@@ -56,7 +57,15 @@ void main() {
     };
   });
 
-  Future<void> starten(WidgetTester tester, List<String> gruppen) async {
+  // Nachgebauter Dateiwaehler (kein file_picker im Test).
+  final pdf = (bytes: Uint8List.fromList(utf8.encode('%PDF-1.4')), dateiname: 'aushang.pdf');
+  var pdfGewaehlt = 0;
+  Future<GewaehlteDatei?> pdfWaehlen() async {
+    pdfGewaehlt++;
+    return pdf;
+  }
+
+  Future<Dienste> starten(WidgetTester tester, List<String> gruppen) async {
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
       const MethodChannel(KontakteAbgleich.kanalName),
       (_) async => throw MissingPluginException(),
@@ -82,9 +91,11 @@ void main() {
       appVersion: () async => '1.0.0 (1)',
       plattform: Plattform.ios,
       roterSchopfTakt: null,
+      pdfWaehlen: pdfWaehlen,
     );
     await tester.pumpWidget(FwvApp(dienste: d));
     await tester.pumpAndSettle();
+    return d;
   }
 
   Finder reiter(String name) =>
@@ -104,7 +115,16 @@ void main() {
     expect(find.text('Vorschläge (1)'), findsOneWidget);
     expect(find.text('Grillabend'), findsOneWidget);
     expect(find.text('Neuer Anlass'), findsOneWidget);
+    expect(find.text('Vergangene anzeigen'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Dateiwaehler fuer den PDF-Aushang: Vorstand und Organisator', (tester) async {
+    final d = await starten(tester, ['Mitglieder', 'Vorstand']);
+    pdfGewaehlt = 0;
+    expect(await d.vorstand.anlaesse.umgebung.pdfWaehlen!(), pdf);
+    expect(await d.anlassVerwaltung.umgebung.pdfWaehlen!(), pdf);
+    expect(pdfGewaehlt, 2);
   });
 
   testWidgets('admin gilt als Vorstand (Gross/klein egal)', (tester) async {

@@ -94,7 +94,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Alle Anlaesse (Vorstandssicht) | ✓ | ✓ | ✓ | – | ½ | F: VorstandZugang, aktuelle + undatierte (organisator-uebersicht); vergangene fehlen noch |
+| [x] | Alle Anlaesse (Vorstandssicht) | ✓ | ✓ | ✓ | – | ✓ | F: VorstandZugang, aktuelle + undatierte (organisator-uebersicht); Schalter «Vergangene anzeigen» = ?vergangene=true (letzte 24 Monate) |
 | [x] | Vorschlaege: Liste, genehmigen, bearbeiten, ablehnen | ✓ | ✓ | ✓ | – | ✓ | GET /events/proposals, PUT/DELETE /events/:id |
 | [x] | Anlass anlegen (Kategorie steuert Felder, Menue bei GV) | ✓ | ✓ | ✓ | – | ✓ | POST /events (+ /shifts) |
 | [x] | Anlass bearbeiten | ✓ | ✓ | ✓ | ✓ | ✓ | PUT /events/:id bzw. …/as-organizer |
@@ -102,7 +102,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [x] | Anlass loeschen | ✓ | ½ | ✓ | – | ✓ | DELETE /events/:id |
 | [x] | Organisator zuweisen (Mitglied) | ✓ | ✓ | ✓ | – | ✓ | organizer_id |
 | [x] | Externer Organisator + Zugang erstellen | ✓ | ✓ | ✓ | – | ✓ | create_access → event-dashboard |
-| [ ] | PDF-Aushang hochladen/entfernen | ✓ | ✓ | ✓ | ½ | ½ | pdf_attachment; O: nur alt-Android; F: entfernen ja, hochladen braucht Dateiwaehler (umgebung.pdfWaehlen) |
+| [ ] | PDF-Aushang hochladen/entfernen | ✓ | ✓ | ✓ | ½ | ✓ | pdf_attachment; O: nur alt-Android; F: Dateiwaehler file_picker (umgebung.pdfWaehlen), max. 10 MB |
 | [x] | Schichten anlegen/aendern/loeschen | ✓ | ✓ | ✓ | ✓ | ✓ | /shifts bzw. shifts-as-organizer |
 | [x] | Springer-Schichten generieren | ✓ | – | ✓ | – | ✓ | Client-Logik (springerSchichten) |
 | [ ] | Anmeldungen ansehen (nach Schicht, GV mit Menue/Allergien) | ✓ | ✓ | ✓ | ✓ | ✓ | |

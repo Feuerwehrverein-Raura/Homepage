@@ -64,6 +64,46 @@ void main() {
     expect(anfragen, isEmpty);
   });
 
+  test('Vergangene: ?vergangene=true nur beim Vorstand; anlass() findet auch vergangene', () async {
+    Map<String, Object?> anlass(String id, {required bool aktuell}) => {
+      'id': id,
+      'slug': id,
+      'title': 'Anlass $id',
+      'organisator': {'aktuell': aktuell},
+    };
+    antwort = (a) => {
+      'zugang': 'vorstand',
+      'anlaesse': [
+        anlass('neu', aktuell: true),
+        if (a.url.queryParameters['vergangene'] == 'true') anlass('alt', aktuell: false),
+      ],
+    };
+    expect(vorstand.kannVergangeneZeigen, isTrue);
+    expect(OrganisatorZugang(api).kannVergangeneZeigen, isFalse);
+
+    final u = await vorstand.uebersichtMitVergangenen();
+    expect(u.anlaesse.map((a) => (a.anlass.id, a.aktuell)), [('neu', true), ('alt', false)]);
+    expect(
+      anfragen.single.url.toString(),
+      endsWith('/events/organisator-uebersicht?vergangene=true'),
+    );
+
+    anfragen.clear();
+    expect((await vorstand.anlass('neu')).anlass.id, 'neu');
+    expect(anfragen.map((a) => a.url.query), [''], reason: 'aktuelle: ein Aufruf ohne Parameter');
+    anfragen.clear();
+    expect((await vorstand.anlass('alt')).anlass.id, 'alt');
+    expect(anfragen.map((a) => a.url.query), ['', 'vergangene=true']);
+
+    // Organisator: kein zweiter Aufruf, kein Parameter
+    anfragen.clear();
+    await expectLater(OrganisatorZugang(api).anlass('alt'), throwsA(isA<NichtErlaubt>()));
+    expect(anfragen.map((a) => a.url.query), ['']);
+    anfragen.clear();
+    await OrganisatorZugang(api).uebersichtMitVergangenen();
+    expect(anfragen.single.url.query, '');
+  });
+
   test('Bestehendes ueber die as-organizer-Routen', () async {
     await vorstand.bestaetigen('e1', 'r1');
     await vorstand.schichtLoeschen('e1', 's1');

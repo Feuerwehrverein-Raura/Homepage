@@ -2,7 +2,9 @@
 // Abfrage pro Anlass): aktuelle zuerst, dann die eben vergangenen. Gleich
 // fuer Organisator und Vorstand; der Vorstand ([kannAnlegen]) sieht oben
 // zudem die offenen Vorschlaege (genehmigen, bearbeiten, ablehnen) und hat
-// unten "Neuer Anlass".
+// unten "Neuer Anlass". Mit [AnlassVerwaltungZugang.kannVergangeneZeigen]
+// (Vorstand) schaltet "Vergangene anzeigen" die vergangenen Anlaesse der
+// letzten 24 Monate in den Abschnitt "Vorbei" (Standard: aus).
 
 import 'package:material_ui/material_ui.dart';
 
@@ -36,22 +38,33 @@ class _VerwaltungsUebersichtScreenState extends State<VerwaltungsUebersichtScree
   var _vorschlaege = const <OffenerVorschlag>[];
   final _laeuft = <String>{};
 
+  /// Auch vergangene Anlaesse zeigen (nur mit [kannVergangeneZeigen]).
+  var _vergangene = false;
+
   AnlassVerwaltungZugang get _z => widget.verwaltung.zugang;
 
+  Future<VerwaltungsUebersicht> _uebersicht() =>
+      _vergangene && _z.kannVergangeneZeigen ? _z.uebersichtMitVergangenen() : _z.uebersicht();
+
   Future<VerwaltungsUebersicht> _laden() async {
-    if (!_z.kannAnlegen) return _z.uebersicht();
+    if (!_z.kannAnlegen) return _uebersicht();
     // Vorschlaege duerfen fehlen - die Anlaesse sind wichtiger.
     final vorschlaege = _z.vorschlaege().then<List<OffenerVorschlag>?>(
       (v) => v,
       onError: (_) => null,
     );
-    final u = await _z.uebersicht();
+    final u = await _uebersicht();
     final v = await vorschlaege;
     if (mounted && v != null) setState(() => _vorschlaege = v);
     return u;
   }
 
   Future<void> _neuLaden() async => _lader.currentState?.neuLaden();
+
+  void _vergangeneUmschalten(bool an) {
+    setState(() => _vergangene = an);
+    _neuLaden();
+  }
 
   Future<void> _oeffnen(VerwalteterAnlass a) async {
     await Navigator.of(context).push(
@@ -112,6 +125,10 @@ class _VerwaltungsUebersichtScreenState extends State<VerwaltungsUebersichtScree
     );
   }
 
+  String get _leerText => _z.kannAnlegen
+      ? 'Zurzeit keine aktuellen Anlässe. Mit «Neuer Anlass» legst du einen an.'
+      : 'Du verwaltest zurzeit keine Anlässe.';
+
   @override
   Widget build(BuildContext context) {
     final z = _z;
@@ -129,10 +146,10 @@ class _VerwaltungsUebersichtScreenState extends State<VerwaltungsUebersichtScree
       body: LadeAnsicht<VerwaltungsUebersicht>(
         key: _lader,
         laden: _laden,
-        istLeer: (u) => u.anlaesse.isEmpty && _vorschlaege.isEmpty,
-        leer: z.kannAnlegen
-            ? 'Zurzeit keine aktuellen Anlässe. Mit «Neuer Anlass» legst du einen an.'
-            : 'Du verwaltest zurzeit keine Anlässe.',
+        // Mit dem Schalter "Vergangene anzeigen" nie leer - sonst liesse er
+        // sich ohne aktuelle Anlaesse nicht einschalten.
+        istLeer: (u) => u.anlaesse.isEmpty && _vorschlaege.isEmpty && !z.kannVergangeneZeigen,
+        leer: _leerText,
         bauen: (context, u, _) {
           final aktuell = [
             for (final a in u.anlaesse)
@@ -172,6 +189,25 @@ class _VerwaltungsUebersichtScreenState extends State<VerwaltungsUebersichtScree
                   for (final a in aktuell) AnlassKarte(anlass: a, oeffnen: () => _oeffnen(a)),
                 ],
               ),
+              // Unter den aktuellen: eingeschaltet folgt gleich "Vorbei".
+              if (z.kannVergangeneZeigen) ...[
+                if (u.anlaesse.isEmpty && _vorschlaege.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _vergangene ? 'Keine Anlässe in den letzten 24 Monaten.' : _leerText,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                SwitchListTile(
+                  key: const Key('vergangene-anzeigen'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  title: const Text('Vergangene anzeigen'),
+                  subtitle: const Text('Anlässe der letzten 24 Monate'),
+                  value: _vergangene,
+                  onChanged: _vergangeneUmschalten,
+                ),
+              ],
               if (vorbei.isNotEmpty) ...[
                 const Abschnitt('Vorbei'),
                 KartenSpalten(

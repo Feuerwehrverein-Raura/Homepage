@@ -199,7 +199,14 @@ class _AnlassBearbeitenScreenState extends State<AnlassBearbeitenScreen> {
   Future<void> _pdfWaehlen() async {
     final waehlen = widget.verwaltung.umgebung.pdfWaehlen;
     if (waehlen == null) return;
-    final d = await waehlen();
+    final GewaehlteDatei? d;
+    try {
+      d = await waehlen();
+    } on Object catch (e) {
+      // z.B. Datei zu gross (der Waehler liest sie dann gar nicht erst)
+      if (mounted) meldung(context, fehlerText(e));
+      return;
+    }
     if (d == null || !mounted) return;
     if (!istPdf(d.bytes)) {
       meldung(context, 'Bitte ein PDF wählen.');
@@ -364,7 +371,9 @@ class _AnlassBearbeitenScreenState extends State<AnlassBearbeitenScreen> {
           leading: const Icon(Icons.picture_as_pdf_outlined),
           title: Text(name ?? 'Kein PDF angehängt'),
           subtitle: _e.pdfNeu != null
-              ? const Text('Wird beim Speichern hochgeladen')
+              ? Text(
+                  '${dateiGroesseText(_e.pdfNeu!.bytes.length)} · Wird beim Speichern hochgeladen',
+                )
               : (_e.pdfEntfernen ? const Text('Wird beim Speichern entfernt') : null),
         ),
       ),

@@ -1,7 +1,9 @@
-// Zugang fuer den Vorstand (siehe zugang.dart): alle aktuellen Anlaesse.
+// Zugang fuer den Vorstand (siehe zugang.dart): alle aktuellen Anlaesse,
+// auf Wunsch auch die vergangenen.
 //
 // Das Backend liefert dem Vorstand in `GET events/organisator-uebersicht`
-// alle aktuellen und undatierten Anlaesse (zugang 'vorstand'), und alle
+// alle aktuellen und undatierten Anlaesse (zugang 'vorstand'), mit
+// `?vergangene=true` dazu die der letzten 24 Monate; alle
 // `…-as-organizer`-Routen lassen Vorstand/Admin zu (ensureOrganizerAccess).
 // Darum erbt dieser Zugang alles Bestehende vom Organisator-Zugang und
 // nimmt nur fuer das, was dem Vorstand vorbehalten ist, die
@@ -31,6 +33,16 @@ class VorstandZugang extends OrganisatorZugang {
 
   @override
   bool get kannLoeschen => true;
+
+  @override
+  bool get kannVergangeneZeigen => true;
+
+  /// `?vergangene=true`: dazu die vergangenen Anlaesse der letzten 24 Monate
+  /// (neuste zuerst, nach den aktuellen) - mit demselben Organisator-Block.
+  @override
+  Future<VerwaltungsUebersicht> uebersichtMitVergangenen() async => VerwaltungsUebersicht.ausJson(
+    await api.get('events/organisator-uebersicht', abfrage: const {'vergangene': 'true'}),
+  );
 
   static String _e(String id) => Uri.encodeComponent(id);
 
@@ -120,6 +132,12 @@ class VorstandZugang extends OrganisatorZugang {
 
 /// Groesster PDF-Aushang, den das Formular annimmt (wie vorstand.html).
 const pdfHoechstGroesse = 10 * 1024 * 1024;
+
+/// Dateigroesse fuer die Anzeige: "850 KB", "2,4 MB".
+String dateiGroesseText(int bytes) {
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).ceil()} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1).replaceAll('.', ',')} MB';
+}
 
 /// Beginnt die Datei wie ein PDF ("%PDF")?
 bool istPdf(Uint8List bytes) =>

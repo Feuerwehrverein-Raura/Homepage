@@ -220,6 +220,14 @@ test('Vertrag Mitglieder-App gegen den echten Server', { skip: !DB && 'TEST_DATA
         assert.equal(vorstand.zugang, 'vorstand');
         assert.ok(!vorstand.anlaesse.some(e => e.slug === 'vergangen'), 'nur aktuelle');
         assert.ok(vorstand.anlaesse.some(e => e.slug === 'ausflug-2026'));
+        assert.equal(vorstand.vergangene, false);
+        const mitVergangenen = await hole('/events/organisator-uebersicht?vergangene=true', 'vorstand');
+        assert.equal(mitVergangenen.vergangene, true);
+        const vergangen = mitVergangenen.anlaesse.find(e => e.slug === 'vergangen');
+        assert.equal(vergangen.organisator.aktuell, false, 'vergangene mit ?vergangene=true');
+        assert.equal(vergangen.organisator.aktionen.anlass_bearbeiten, true);
+        assert.deepEqual(organisatorProjektion(await hole('/events/organisator-uebersicht?vergangene=true', 'erika')),
+            organisatorProjektion(erika), 'Organisatorin: Parameter ohne Wirkung');
 
         assert.equal((await fetch(BASE + '/events/organisator-uebersicht')).status, 401);
     });

@@ -9,7 +9,8 @@
 //    Anlass vorbei ist; Routen `…-as-organizer`, fuer externe Organisatoren
 //    `events/my-event/…`; Uebersicht `GET events/organisator-uebersicht`.
 //  - [VorstandZugang] (Reiter "Vorstand" der Mitglieder-App): alle
-//    aktuellen Anlaesse plus Anlass anlegen und loeschen, Vorschlaege,
+//    aktuellen Anlaesse (auf Wunsch auch die vergangenen,
+//    [kannVergangeneZeigen]) plus Anlass anlegen und loeschen, Vorschlaege,
 //    Organisator zuweisen, PDF-Aushang. Fuer das Bestehende nimmt er die
 //    `…-as-organizer`-Routen (die lassen Vorstand/Admin zu), fuer den Rest
 //    die Vorstand-Routen (`POST/PUT/DELETE events/:id`,
@@ -51,13 +52,24 @@ abstract class AnlassVerwaltungZugang {
   /// Alle Anlaesse dieses Zugangs mit Anmeldungen und Zahlen.
   Future<VerwaltungsUebersicht> uebersicht();
 
+  /// Kann die Uebersicht auch vergangene Anlaesse zeigen (nur Vorstand)?
+  bool get kannVergangeneZeigen => false;
+
+  /// Uebersicht mit den vergangenen Anlaessen dazu (Vorstand: letzte 24
+  /// Monate, im Abschnitt "Vorbei"). Standard: wie [uebersicht].
+  Future<VerwaltungsUebersicht> uebersichtMitVergangenen() => uebersicht();
+
   /// Ein Anlass (UUID oder Slug); ohne ID der erste (externer Organisator
-  /// mit genau einem Anlass).
+  /// mit genau einem Anlass). Ein vergangener Anlass, den nur
+  /// [uebersichtMitVergangenen] kennt, wird dort gesucht.
   Future<VerwalteterAnlass> anlass(String? id) async {
     final u = await uebersicht();
-    final a = (id == null || id.isEmpty)
+    var a = (id == null || id.isEmpty)
         ? (u.anlaesse.isEmpty ? null : u.anlaesse.first)
         : u.anlassMitId(id);
+    if (a == null && id != null && id.isNotEmpty && kannVergangeneZeigen) {
+      a = (await uebersichtMitVergangenen()).anlassMitId(id);
+    }
     if (a == null) throw const NichtErlaubt('Diesen Anlass kannst du hier nicht verwalten.');
     return a;
   }

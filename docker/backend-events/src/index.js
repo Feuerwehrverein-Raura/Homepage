@@ -2904,11 +2904,17 @@ app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
 // Wer was sieht:
 //  - Organisator-Login (POST /events/login): genau sein Anlass, solange er
 //    nicht vorbei oder abgesagt ist.
-//  - Vorstand/Admin: alle aktuellen Anlaesse.
+//  - Vorstand/Admin: alle aktuellen Anlaesse; mit ?vergangene=true dazu die
+//    vergangenen der letzten 24 Monate (neuste zuerst, nach den aktuellen),
+//    mit demselben organisator-Block - voll verwaltbar. Fuer alle anderen
+//    wird der Parameter ignoriert.
 //  - Mitglied: die Anlaesse, die es organisiert (gleiche Regel wie
 //    GET /events/organized-by-me) — aktuelle und die der letzten 7 Tage.
 //  - sonst: leere Liste. Kontaktdaten der Angemeldeten bekommt nur, wer den
 //    Anlass organisiert (test/datenschutz.test.js).
+// Wie weit der Vorstand mit ?vergangene=true zurueckschaut.
+const VERGANGENE_MONATE = 24;
+
 async function organisatorUebersichtZugang(req, res, next) {
     const orgToken = eventOrganisatorToken(req);
     if (orgToken) {
@@ -2964,9 +2970,12 @@ app.get('/events/organisator-uebersicht', organisatorUebersichtZugang, async (re
         }
 
         if (istVorstandBenutzer(req.user)) {
+            const vergangene = req.query.vergangene === 'true';
+            // Ohne Parameter ab heute, sonst ab heute vor 24 Monaten.
+            const ab = vergangene ? `($1::date - INTERVAL '${VERGANGENE_MONATE} months')::date` : '$1::date';
             const anlaesse = await anlaesseFuerUebersicht(
-                `(e.datum_offen IS TRUE OR ${letzterTag} >= $1::date)`, [heute], 'vorstand');
-            return res.json({ zugang: 'vorstand', anlaesse });
+                `(e.datum_offen IS TRUE OR ${letzterTag} >= ${ab})`, [heute], 'vorstand');
+            return res.json({ zugang: 'vorstand', vergangene, anlaesse });
         }
 
         const identity = await resolveOrganizerIdentity(req);

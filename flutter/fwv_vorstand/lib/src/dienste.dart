@@ -34,7 +34,8 @@ class VorstandDienste {
   final ApiClient api;
 
   /// Anlass-Verwaltung fuer alle Anlaesse mit dem [VorstandZugang] (Backend
-  /// liefert dem Vorstand in events/organisator-uebersicht alles Aktuelle;
+  /// liefert dem Vorstand in events/organisator-uebersicht alles Aktuelle,
+  /// auf Wunsch mit den vergangenen Anlaessen der letzten 24 Monate;
   /// dazu anlegen, loeschen, Vorschlaege, Organisator zuweisen).
   final AnlassVerwaltung anlaesse;
 

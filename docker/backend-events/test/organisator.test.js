@@ -44,6 +44,9 @@ async function seed(pool) {
     await ev(3, 'abgesagt', '2026-10-24 18:00', { login: 'abgesagt@example.ch', status: 'cancelled' });
     await ev(4, 'mit-organisator', '2026-10-25 18:00', { organizer_email: 'org@example.ch' });
     await ev(5, 'endet-heute', '2026-10-10 18:00', { end: '2026-10-11 16:00', login: 'heute@example.ch' });
+    // aelter als 24 Monate: auch mit ?vergangene=true nicht in der Uebersicht
+    await ev(6, 'uralt', '2024-09-01 18:00', { organizer_email: 'org@example.ch' });
+    await ev(7, 'letztes-jahr', '2025-11-15 18:00');
 }
 
 test('Organisator-Login und oeffentliche Anmeldung', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (t) => {
@@ -184,6 +187,45 @@ test('Organisator-Login und oeffentliche Anmeldung', { skip: !DB && 'TEST_DATABA
         // Der Organisator (E-Mail des Anlasses) bleibt Organisator, mit oder ohne Gruppen.
         const org = jwt.sign({ type: 'member', sub: 'org-ohne-konto', email: 'org@example.ch', groups: ['Mitglieder'] }, SECRET);
         assert.equal((await anmeldungen(org)).status, 200);
+    });
+
+    await t.test('Organisator-Uebersicht: ?vergangene=true nur fuer Vorstand/Admin', async () => {
+        const uebersicht = async (token, abfrage = '') => {
+            const r = await fetch(`${BASE}/events/organisator-uebersicht${abfrage}`,
+                { headers: { Authorization: `Bearer ${token}` } });
+            assert.equal(r.status, 200);
+            return r.json();
+        };
+        const slugs = u => u.anlaesse.map(e => e.slug);
+        const vorstand = jwt.sign({ type: 'vorstand', email: 'aktuar@example.ch', groups: ['vorstand'] }, SECRET);
+
+        const ohne = await uebersicht(vorstand);
+        assert.equal(ohne.vergangene, false);
+        assert.ok(!slugs(ohne).includes('vorbei'), 'ohne Parameter nur aktuelle');
+
+        const mit = await uebersicht(vorstand, '?vergangene=true');
+        assert.equal(mit.zugang, 'vorstand');
+        assert.equal(mit.vergangene, true);
+        // aktuelle wie ohne Parameter vorne, danach die vergangenen, neuste zuerst
+        assert.deepEqual(slugs(mit), [...slugs(ohne), 'vorbei', 'letztes-jahr']);
+        assert.ok(!slugs(mit).includes('uralt'), 'nur die letzten 24 Monate');
+        const vorbei = mit.anlaesse.find(e => e.slug === 'vorbei');
+        assert.equal(vorbei.organisator.aktuell, false);
+        assert.equal(vorbei.organisator.aktionen.anlass_bearbeiten, true, 'voll verwaltbar');
+        assert.equal(vorbei.organisator.aktionen.loeschen, true);
+        assert.ok(vorbei.organisator.zahlen);
+        assert.ok(Array.isArray(vorbei.organisator.anmeldungen));
+        assert.equal(vorbei.app.kann_bearbeiten, true);
+
+        const admin = jwt.sign({ type: 'member', sub: HANS, email: 'hans@example.ch', groups: ['admin'] }, SECRET);
+        assert.deepEqual(slugs(await uebersicht(admin, '?vergangene=true')), slugs(mit), 'admin wie Vorstand');
+
+        // Organisator (Mitglied) und Organisator-Login: Parameter wird ignoriert
+        const org = jwt.sign({ type: 'member', sub: 'org-ohne-konto', email: 'org@example.ch' }, SECRET);
+        assert.deepEqual(await uebersicht(org, '?vergangene=true'), await uebersicht(org));
+        assert.ok(!slugs(await uebersicht(org, '?vergangene=true')).includes('uralt'));
+        const login = jwt.sign({ type: 'event-organizer', event_id: E(1) }, SECRET);
+        assert.deepEqual(slugs(await uebersicht(login, '?vergangene=true')), ['kommend']);
     });
 
     await t.test('Organisator-Login: vorbei und abgesagt werden abgewiesen', async () => {

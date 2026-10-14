@@ -276,6 +276,28 @@ class _FalscherVorstand extends _FalscherZugang {
   @override
   bool get kannLoeschen => true;
   @override
+  bool get kannVergangeneZeigen => true;
+
+  /// Wie der Vertrag, dazu ein vergangener Anlass (wie `?vergangene=true`).
+  @override
+  Future<VerwaltungsUebersicht> uebersichtMitVergangenen() {
+    final alt =
+        jsonDecode(jsonEncode((this.json['anlaesse'] as List).first)) as Map<String, dynamic>;
+    alt['id'] = _altesFest;
+    alt['slug'] = 'altes-fest';
+    alt['title'] = 'Altes Fest';
+    (alt['organisator'] as Map)['aktuell'] = false;
+    return _merken(
+      'uebersichtMitVergangenen',
+      [],
+      VerwaltungsUebersicht.ausJson({
+        ...this.json,
+        'anlaesse': [...this.json['anlaesse'] as List, alt],
+      }),
+    );
+  }
+
+  @override
   Future<String> anlassAnlegen(AnlassEntwurf e) => _merken('anlassAnlegen', [
     e.alsNeuJson(anmeldepflichtig: ['Dorffest', 'GV']),
   ], 'neu1');
@@ -312,6 +334,7 @@ final _png = Uint8List.fromList(
 
 const _chilbi = '00000000-0000-0000-0000-e00000000001';
 const _essen = '00000000-0000-0000-0000-e00000000004';
+const _altesFest = '00000000-0000-0000-0000-e00000000099';
 
 void main() {
   late _FalscherZugang zugang;
@@ -324,11 +347,16 @@ void main() {
     links = [];
   });
 
-  AnlassVerwaltung verwaltung([AnlassVerwaltungZugang? anderer]) => AnlassVerwaltung(
+  AnlassVerwaltung verwaltung([
+    AnlassVerwaltungZugang? anderer,
+    Future<GewaehlteDatei?> Function()? pdfWaehlen,
+  ]) => AnlassVerwaltung(
     zugang: anderer ?? zugang,
     umgebung: VerwaltungsUmgebung(
-      pdfWaehlen: () async =>
-          (bytes: Uint8List.fromList(utf8.encode('%PDF-1.4 x')), dateiname: 'aushang.pdf'),
+      pdfWaehlen:
+          pdfWaehlen ??
+          () async =>
+              (bytes: Uint8List.fromList(utf8.encode('%PDF-1.4 x')), dateiname: 'aushang.pdf'),
       dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, typ)),
       fotoWaehlen: ({required bool kamera}) async => Uint8List.fromList([1, 2, 3]),
       linkOeffnen: (u) async {
@@ -818,6 +846,7 @@ void main() {
     await zeigen(tester, VerwaltungsUebersichtScreen(verwaltung: verwaltung()));
     expect(find.text('Neuer Anlass'), findsNothing);
     expect(find.textContaining('Vorschläge'), findsNothing);
+    expect(find.byKey(const Key('vergangene-anzeigen')), findsNothing, reason: 'nur Vorstand');
     await tippen(tester, find.text('Chilbi 2026'));
     expect(find.byTooltip('Anlass löschen'), findsNothing);
     await tippen(tester, find.widgetWithText(Tab, 'Schichten'));
@@ -983,7 +1012,8 @@ void main() {
     await eingeben(tester, find.byKey(const Key('organisator-email')), 'max@example.ch');
     await tippen(tester, find.byKey(const Key('organisator-zugang')));
     await tippen(tester, find.byKey(const Key('pdf-waehlen')));
-    expect(find.text('Wird beim Speichern hochgeladen'), findsOneWidget);
+    expect(find.text('aushang.pdf'), findsOneWidget);
+    expect(find.text('1 KB · Wird beim Speichern hochgeladen'), findsOneWidget);
     await tippen(tester, find.byKey(const Key('anlass-speichern')));
     expect(v.letzter('anlassAendern'), [
       _chilbi,
@@ -997,6 +1027,81 @@ void main() {
         'pdf_filename': 'aushang.pdf',
       },
     ]);
+  });
+
+  testWidgets('Vorstand: Vergangene anzeigen - Standard aus, eingeschaltet unter "Vorbei"', (
+    tester,
+  ) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(tester, VerwaltungsUebersichtScreen(verwaltung: verwaltung(v)));
+    final schalter = find.byKey(const Key('vergangene-anzeigen'));
+    // unter den aktuellen Anlaessen
+    await tester.scrollUntilVisible(schalter, 200);
+    expect(tester.widget<SwitchListTile>(schalter).value, isFalse);
+    expect(find.text('Altes Fest'), findsNothing);
+    expect(find.text('Vorbei'), findsNothing);
+    expect(v.gab('uebersichtMitVergangenen'), isFalse);
+
+    await tippen(tester, schalter);
+    expect(tester.widget<SwitchListTile>(schalter).value, isTrue);
+    expect(v.gab('uebersichtMitVergangenen'), isTrue);
+    await tester.scrollUntilVisible(find.text('Altes Fest'), 200);
+    final vorbei = tester.getRect(find.text('Vorbei'));
+    expect(tester.getRect(find.text('Altes Fest')).top, greaterThan(vorbei.top));
+    expect(
+      find.text('Chilbi 2026', skipOffstage: false),
+      findsOneWidget,
+      reason: 'aktuelle bleiben',
+    );
+
+    // Oeffnen: den vergangenen Anlass kennt nur die Uebersicht mit Vergangenen.
+    await tippen(tester, find.text('Altes Fest'));
+    expect(find.widgetWithText(Tab, 'Anmeldungen'), findsOneWidget);
+    expect(find.byTooltip('Anlass bearbeiten'), findsOneWidget, reason: 'voll verwaltbar');
+    expect(find.byTooltip('Anlass löschen'), findsOneWidget);
+
+    Navigator.of(tester.element(find.byType(VerwaltungsAnlassScreen))).pop();
+    await tester.pumpAndSettle();
+    await tippen(tester, schalter);
+    expect(find.text('Altes Fest', skipOffstage: false), findsNothing);
+  });
+
+  testWidgets('Vorstand: PDF zu gross oder kein PDF - Meldung, nichts gewaehlt', (tester) async {
+    final v = _FalscherVorstand(_vertrag());
+    final antworten = <Future<GewaehlteDatei?> Function()>[
+      () async => throw const ApiFehler('Das PDF darf höchstens 10 MB gross sein.'),
+      () async => (
+        bytes: Uint8List(pdfHoechstGroesse + 1)..setAll(0, utf8.encode('%PDF')),
+        dateiname: 'riesig.pdf',
+      ),
+      () async => (bytes: Uint8List.fromList(utf8.encode('kein pdf')), dateiname: 'x.pdf'),
+      () async => null,
+    ];
+    var i = 0;
+    await zeigen(
+      tester,
+      VerwaltungsAnlassScreen(verwaltung: verwaltung(v, () => antworten[i++]()), anlassId: _chilbi),
+    );
+    await tippen(tester, find.byTooltip('Anlass bearbeiten'));
+    for (final text in [
+      'Das PDF darf höchstens 10 MB gross sein.',
+      'Das PDF darf höchstens 10 MB gross sein.',
+      'Bitte ein PDF wählen.',
+      null,
+    ]) {
+      tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).clearSnackBars();
+      await tester.pumpAndSettle();
+      await tippen(tester, find.byKey(const Key('pdf-waehlen')));
+      if (text != null) expect(find.text(text), findsOneWidget);
+      expect(find.text('Kein PDF angehängt'), findsOneWidget);
+    }
+    expect(i, 4);
+  });
+
+  test('dateiGroesseText', () {
+    expect(dateiGroesseText(10), '1 KB');
+    expect(dateiGroesseText(850 * 1024), '850 KB');
+    expect(dateiGroesseText((2.4 * 1024 * 1024).round()), '2,4 MB');
   });
 
   testWidgets('Vorstand: Anlass loeschen nur nach Rueckfrage', (tester) async {
