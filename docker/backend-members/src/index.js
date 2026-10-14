@@ -2229,12 +2229,60 @@ app.post('/auth/callback', async (req, res) => {
         res.json({
             access_token: tokenData.access_token,
             token_type: tokenData.token_type,
-            expires_in: tokenData.expires_in
+            expires_in: tokenData.expires_in,
+            // Nur mit Scope offline_access (Mitglieder-Web): damit erneuert
+            // der Browser still ueber /auth/refresh, statt alle 10 min zu
+            // Authentik zu springen.
+            ...(tokenData.refresh_token ? { refresh_token: tokenData.refresh_token } : {})
         });
 
     } catch (error) {
         console.error('OAuth callback error:', error);
         res.status(500).json({ error: error.message });
+    }
+});
+
+// Erneuern fuer das Mitglieder-Web (Client fwv-members, mein.html und die
+// Mitglieder-App im Browser). Der Client ist vertraulich: Das Secret kennt
+// nur dieser Server, darum laeuft das Erneuern hier und nicht im Browser.
+// Nimmt dieselbe Form wie der Token-Endpunkt von Authentik an
+// (grant_type=refresh_token, refresh_token=..., als Formular oder JSON) und
+// antwortet wie dieser - so braucht die App keinen Sonderweg
+// (OidcKonfiguration.website in flutter/fwv_core). Nur fuer fwv-members.
+app.post('/auth/refresh', express.urlencoded({ extended: false }), async (req, res) => {
+    try {
+        const refreshToken = String(req.body?.refresh_token || '');
+        if (!refreshToken) return res.status(400).json({ error: 'refresh_token fehlt' });
+        const clientId = process.env.AUTHENTIK_CLIENT_ID;
+        const clientSecret = process.env.AUTHENTIK_CLIENT_SECRET;
+        if (!clientId || !clientSecret) return res.status(500).json({ error: 'OAuth2 configuration error' });
+
+        const antwort = await fetch(`${process.env.AUTHENTIK_URL}/application/o/token/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken,
+                client_id: clientId,
+                client_secret: clientSecret
+            }),
+            signal: AbortSignal.timeout(15000)
+        });
+        if (!antwort.ok) {
+            // Abgelaufen oder schon eingeloest: Die App meldet dann neu an.
+            logWarn('AUTH-REFRESH abgelehnt', { status: antwort.status });
+            return res.status(401).json({ error: 'refresh_token ungueltig oder abgelaufen' });
+        }
+        const daten = await antwort.json();
+        res.json({
+            access_token: daten.access_token,
+            token_type: daten.token_type,
+            expires_in: daten.expires_in,
+            ...(daten.refresh_token ? { refresh_token: daten.refresh_token } : {})
+        });
+    } catch (error) {
+        console.error('POST /auth/refresh:', error.message);
+        res.status(502).json({ error: 'Authentik nicht erreichbar' });
     }
 });
 

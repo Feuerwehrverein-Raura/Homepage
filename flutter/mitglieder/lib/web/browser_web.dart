@@ -9,7 +9,7 @@ import '../anmeldung/authentik_anmeldung.dart';
 
 /// Wie mein.html (AUTHENTIK_URL, CLIENT_ID, REDIRECT_URI).
 const _authentik = 'https://auth.fwv-raura.ch';
-const _clientId = 'fwv-members';
+final _clientId = OidcKonfiguration.website.clientId;
 
 GeheimSpeicher browserSpeicher() => _BrowserSpeicher();
 
@@ -36,9 +36,13 @@ bool automatischAnmeldenErlaubt() {
 }
 
 class _BrowserSpeicher implements GeheimSpeicher {
-  // Das Token teilt die App mit der Website - alles andere nicht.
-  static String _schluessel(String s) =>
-      s == SitzungsSchluessel.accessToken ? s : 'fwv_app.$s';
+  // Token und Erneuerungs-Token teilt die App mit der Website
+  // (auth-callback.html) - alles andere nicht.
+  static String _schluessel(String s) => switch (s) {
+    SitzungsSchluessel.accessToken => s,
+    SitzungsSchluessel.refreshToken => 'auth_refresh_token',
+    _ => 'fwv_app.$s',
+  };
 
   @override
   Future<String?> lesen(String schluessel) async =>
@@ -63,7 +67,8 @@ class _WebsiteAnmeldung implements AuthentikAnmeldung {
     final rueckweg = Uri.encodeComponent('${ort.pathname}${ort.search}');
     final ziel = Uri.encodeComponent('${ort.origin}/auth-callback.html');
     ort.href = '$_authentik/application/o/authorize/?client_id=$_clientId'
-        '&redirect_uri=$ziel&response_type=code&scope=openid%20profile%20email&state=$rueckweg';
+        '&redirect_uri=$ziel&response_type=code'
+        '&scope=${Uri.encodeComponent(OidcKonfiguration.website.scopes.join(' '))}&state=$rueckweg';
     return Completer<AuthentikTokens?>().future;
   }
 }

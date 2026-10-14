@@ -104,6 +104,16 @@
                 // DEUTSCH: Token im localStorage speichern fuer spaetere API-Aufrufe
                 localStorage.setItem('auth_token', accessToken);
 
+                // DEUTSCH: Erneuerungs-Token (nur Mitglieder-Web mit Scope offline_access):
+                // DEUTSCH: Damit erneuert die Mitglieder-App im Browser still ueber
+                // DEUTSCH: POST /auth/refresh, statt alle 10 min zu Authentik zu springen.
+                // DEUTSCH: Ohne neues Token das alte entfernen - es gehoerte zur alten Anmeldung.
+                if (clientType === 'members' && data.refresh_token) {
+                    localStorage.setItem('auth_refresh_token', data.refresh_token);
+                } else if (clientType === 'members') {
+                    localStorage.removeItem('auth_refresh_token');
+                }
+
                 // DEUTSCH: Weiterleitungsziel aus dem state-Parameter bestimmen.
                 // DEUTSCH: state enthaelt die URL-encoded Seite, von der der Login gestartet wurde.
                 // DEUTSCH: Standard-Fallback ist die Startseite (/).

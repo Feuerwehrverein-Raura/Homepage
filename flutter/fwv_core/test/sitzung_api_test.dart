@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 const _tokenEndpunkt = 'https://auth.fwv-raura.ch/application/o/token/';
+const _backendErneuern = 'https://api.fwv-raura.ch/auth/refresh';
 
 /// Nachgebauter Server: Backend und Authentik-Token-Endpunkt.
 class _Server {
@@ -34,7 +35,8 @@ class _Server {
     if (keinNetz) throw http.ClientException('offline');
     final pfad = anfrage.url.toString();
 
-    if (pfad == _tokenEndpunkt) {
+    // Authentik (App) oder das Backend (Mitglieder-Web) - gleiche Form.
+    if (pfad == _tokenEndpunkt || pfad == _backendErneuern) {
       refreshAufrufe++;
       // Etwas warten, damit parallele Aufrufe wirklich gleichzeitig ankommen.
       await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -156,6 +158,28 @@ void main() {
       expect(s!.accessToken, 'neu-access');
       expect(s.refreshToken, 'neu-refresh');
       expect(server.anfragen.last.headers['Authorization'], 'Bearer neu-access');
+    });
+
+    test('Mitglieder-Web: erneuert beim Backend mit Client fwv-members', () async {
+      verwaltung = SitzungsVerwaltung(
+        speicher: speicher,
+        http: server.client,
+        oidc: OidcKonfiguration.website,
+      );
+      await anmelden(
+        const Sitzung(accessToken: 'alt', refreshToken: 'r1', kontotyp: Kontotyp.mitglied),
+      );
+
+      expect(await verwaltung.api.get('members/me'), isNotNull);
+
+      final refresh = server.anfragen.singleWhere((a) => a.url.toString() == _backendErneuern);
+      expect(refresh.bodyFields, {
+        'grant_type': 'refresh_token',
+        'refresh_token': 'r1',
+        'client_id': 'fwv-members',
+      });
+      expect(server.anfragen.any((a) => a.url.toString() == _tokenEndpunkt), isFalse);
+      expect((await speicher.laden())!.refreshToken, 'neu-refresh');
     });
 
     test('ohne neuen Refresh-Token bleibt der alte', () async {

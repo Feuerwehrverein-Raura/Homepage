@@ -29,6 +29,19 @@ class OidcKonfiguration {
     tokenEndpunkt: 'https://auth.fwv-raura.ch/application/o/token/',
   );
 
+  /// Mitglieder-Web (Client "fwv-members"): mein.html und die Mitglieder-App
+  /// im Browser. Angemeldet wird ueber die Website (auth-callback.html tauscht
+  /// den Code beim Backend). Der Client ist vertraulich, darum erneuert das
+  /// Backend: `POST /auth/refresh` nimmt dieselbe Form an wie der
+  /// Token-Endpunkt von Authentik und haengt das Secret an.
+  static const website = OidcKonfiguration(
+    issuer: 'https://auth.fwv-raura.ch/application/o/fwv-members/',
+    clientId: 'fwv-members',
+    redirectUri: 'https://www.fwv-raura.ch/auth-callback.html',
+    scopes: ['openid', 'profile', 'email', 'offline_access'],
+    tokenEndpunkt: 'https://api.fwv-raura.ch/auth/refresh',
+  );
+
   final String issuer;
   final String clientId;
   final String redirectUri;

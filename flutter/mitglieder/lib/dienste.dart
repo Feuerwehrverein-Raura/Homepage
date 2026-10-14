@@ -97,6 +97,8 @@ class Dienste {
     late final Dienste dienste;
     final sitzung = SitzungsVerwaltung(
       speicher: speicher,
+      // Im Browser erneuert das Backend (Client der Website).
+      oidc: kIsWeb ? OidcKonfiguration.website : OidcKonfiguration.mitgliederApp,
       http: http.Client(),
       beimAbmelden: (api) => abmeldenAufraeumen(api, dienste),
     );
