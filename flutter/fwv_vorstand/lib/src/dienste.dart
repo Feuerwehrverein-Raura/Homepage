@@ -10,6 +10,8 @@ import 'package:fwv_core/fwv_core.dart';
 import 'antraege/antraege_dienst.dart';
 import 'audit/audit_dienst.dart';
 import 'mitglieder/mitglieder_verwaltung.dart';
+import 'push_dienst.dart';
+import 'ui/beitraege/beitraege_daten.dart';
 
 /// Gruppen, die den Vorstand-Bereich sehen (Gross/klein egal). Dieselbe Regel
 /// prueft das Backend (requireRole('vorstand', 'admin')).
@@ -42,6 +44,7 @@ class VorstandDienste {
 
   /// Audit-Log (GET audit).
   AuditDienst get audit => AuditDienst(api);
+
   /// Profilfotos vor dem Hochladen verkleinern (1024 px, JPEG); in Tests
   /// ersetzbar.
   final Future<Uint8List> Function(Uint8List roh) fotoVerkleinern;
@@ -49,4 +52,13 @@ class VorstandDienste {
   /// Mitglieder, Kennzahlen, Passwoerter, Cloud-Gruppen, Benachrichtigen.
   MitgliederVerwaltung get mitglieder =>
       MitgliederVerwaltung(api, fotoVerkleinern: fotoVerkleinern);
+
+  /// Mitgliederbeitraege (api-accounting).
+  BeitraegeDienst get beitraege => BeitraegeDienst(api);
+
+  /// App-Push an alle (api-events).
+  PushAnAlleDienst get push => PushAnAlleDienst(api);
 }
+
+/// Vorstand-Seite der Website - fuer alles, was die App noch nicht kann.
+final vorstandWebseite = Uri.parse('https://www.fwv-raura.ch/vorstand.html');

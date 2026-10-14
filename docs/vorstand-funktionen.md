@@ -143,7 +143,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [ ] | Entwuerfe | ½ | – | – | – | – | W nur localStorage |
 | [ ] | Zeitgesteuert senden / «Geplant» | ½ | – | – | – | – | W Platzhalter |
 | [ ] | Versandverlauf mit Filter | ✓ | ✓ | ✓ | – | – | GET /dispatch-log |
-| [ ] | App-Push an alle | ✓ | ✓ | ✓ | – | – | POST /push/broadcast (E) |
+| [x] | App-Push an alle | ✓ | ✓ | ✓ | – | ✓ | POST /push/broadcast (E) |
 | [ ] | Vorlagen anlegen/bearbeiten/loeschen | ½ | – | ✓ | – | – | /templates (D); W-Editor tot; **nur in D** nutzbar |
 | [ ] | Massen-PDF per Post an Auswahl (Kostenschaetzung, Staging) | ½ | ✓ | ✓ | – | – | POST /pingen/send-bulk-pdf |
 
@@ -182,9 +182,9 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 |---|---|---|---|---|---|---|---|
 | [ ] | Jahreseinstellungen (Betrag, GV-Datum, Faelligkeit) | ✓ | ✓ | ✓ | – | – | /membership-fees/settings (A) |
 | [ ] | Beitraege erzeugen | ✓ | ✓ | ✓ | – | – | POST …/payments/generate |
-| [ ] | Kennzahlen, Zahlungsliste, Suche, Filter | ✓ | ✓ | ✓ | – | – | …/summary, …/payments |
-| [ ] | Bezahlt / offen / Referenz setzen | ✓ | ✓ | ✓ | – | – | PATCH …/payments/:id/{pay,unpay,reference} |
-| [ ] | Beitragsbrief einzeln (E-Mail/Post) | ✓ | ✓ | ✓ | – | – | POST …/payments/:id/send |
+| [x] | Kennzahlen, Zahlungsliste, Suche, Filter | ✓ | ✓ | ✓ | – | ✓ | …/summary, …/payments |
+| [x] | Bezahlt / offen / Referenz setzen | ✓ | ✓ | ✓ | – | ✓ | PATCH …/payments/:id/{pay,unpay,reference} |
+| [x] | Beitragsbrief einzeln (E-Mail/Post) | ✓ | ✓ | ✓ | – | ✓ | POST …/payments/:id/send |
 | [ ] | Beitragsbriefe an alle (E-Mail/Post) | ✓ | ✓ | ✓ | – | – | send-email-bulk / send-post-bulk |
 | [ ] | Briefvorschau mit Swiss-QR, alle drucken | ✓ | – | – | – | – | **nur in W** (Client) → ins Backend |
 | [ ] | Kassier waehlen (bei mehreren) | ✓ | – | – | – | – | **nur in W** |
