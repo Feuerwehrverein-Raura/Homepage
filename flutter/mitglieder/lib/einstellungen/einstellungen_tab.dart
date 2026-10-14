@@ -25,7 +25,7 @@ import 'gruppen_screen.dart';
 /// Anleitungen auf der Website - fuer die App, die Website, das erste
 /// Passwort und die Cloud.
 final Uri anleitungsBasis = Uri.parse('https://www.fwv-raura.ch/');
-const _anleitungen = [
+const anleitungen = [
   (Icons.phone_android_outlined, 'Anleitung App', 'Alle Reiter der Mitglieder-App', 'anleitung-app.html'),
   (Icons.language, 'Anleitung Website', 'Mein Portal und Anmeldung auf der Website', 'anleitung-website.html'),
   (Icons.password, 'Passwort setzen', 'Erstes Passwort fürs Vereinskonto', 'anleitung-passwort.html'),
@@ -33,9 +33,21 @@ const _anleitungen = [
 ];
 
 class EinstellungenTab extends StatefulWidget {
-  const EinstellungenTab({super.key, required this.dienste});
+  const EinstellungenTab({
+    super.key,
+    required this.dienste,
+    this.musikUndGruppenAusgelagert = false,
+    this.hilfeAusgelagert = false,
+  });
 
   final Dienste dienste;
+
+  /// Auf grossen Bildschirmen stehen Musik und Gruppen als eigene Eintraege
+  /// in der Seitenleiste (hauptseite.dart) - hier dann nicht doppelt.
+  final bool musikUndGruppenAusgelagert;
+
+  /// Die Anleitungen stehen in der ausgeklappten Seitenleiste unten.
+  final bool hilfeAusgelagert;
 
   @override
   State<EinstellungenTab> createState() => _EinstellungenTabState();
@@ -122,15 +134,17 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
           ),
           if (mitglied) ...[
             // Benachrichtigungen, Zugaenge und VPN stehen im Profil (Konto).
-            const Abschnitt('Musik'),
-            ListTile(
-              leading: const Icon(Icons.queue_music),
-              title: const Text('Musik'),
-              subtitle: const Text('Hören, Playlists und Radio'),
-              trailing: const Icon(Icons.chevron_right),
-              // Den Laptop fernbedienen gibt es im Reiter "Schopf".
-              onTap: () => _oeffnen(MusikScreen(zugang: _d.musik, player: _d.musikPlayer)),
-            ),
+            if (!widget.musikUndGruppenAusgelagert) ...[
+              const Abschnitt('Musik'),
+              ListTile(
+                leading: const Icon(Icons.queue_music),
+                title: const Text('Musik'),
+                subtitle: const Text('Hören, Playlists und Radio'),
+                trailing: const Icon(Icons.chevron_right),
+                // Den Laptop fernbedienen gibt es im Reiter "Schopf".
+                onTap: () => _oeffnen(MusikScreen(zugang: _d.musik, player: _d.musikPlayer)),
+              ),
+            ],
             // Mit Reiter "Schopf" steht der Bildschirm dort.
             if (!_d.roterSchopfSichtbar) ...[
               const Abschnitt('Roter Schopf'),
@@ -142,7 +156,7 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
                 onTap: () => bildschirmOeffnen(context, _d),
               ),
             ],
-            if (darfGruppenVerwalten(sitzung)) ...[
+            if (darfGruppenVerwalten(sitzung) && !widget.musikUndGruppenAusgelagert) ...[
               const Abschnitt('Vorstand'),
               ListTile(
                 leading: const Icon(Icons.group_outlined),
@@ -187,15 +201,17 @@ class _EinstellungenTabState extends State<EinstellungenTab> {
           ],
           // Dieselben Anleitungen wie im Mitgliederbereich der Website
           // (docker/frontend-website/anleitung-*.html), im Browser.
-          const Abschnitt('Hilfe'),
-          for (final (symbol, titel, untertitel, seite) in _anleitungen)
-            ListTile(
-              leading: Icon(symbol),
-              title: Text(titel),
-              subtitle: Text(untertitel),
-              trailing: const Icon(Icons.open_in_new),
-              onTap: () => _d.linkOeffnen(anleitungsBasis.resolve(seite)),
-            ),
+          if (!widget.hilfeAusgelagert) ...[
+            const Abschnitt('Hilfe'),
+            for (final (symbol, titel, untertitel, seite) in anleitungen)
+              ListTile(
+                leading: Icon(symbol),
+                title: Text(titel),
+                subtitle: Text(untertitel),
+                trailing: const Icon(Icons.open_in_new),
+                onTap: () => _d.linkOeffnen(anleitungsBasis.resolve(seite)),
+              ),
+          ],
           const Abschnitt('App'),
           FutureBuilder<String>(
             future: _version,

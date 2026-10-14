@@ -553,12 +553,25 @@ void main() {
       expect(find.byType(NavigationRail), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
       expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended, isTrue);
-      // In der Seitenleiste heisst "Mehr" wieder "Einstellungen".
+      // In der Seitenleiste heisst "Mehr" wieder "Einstellungen"; Musik steht
+      // als eigener Eintrag daneben, die Anleitungen unten in der Leiste.
       final leiste = find.byType(NavigationRail);
       expect(find.descendant(of: leiste, matching: find.text('Mehr')), findsNothing);
+      expect(find.descendant(of: leiste, matching: find.text('Musik')), findsOneWidget);
+      // Erika ist nicht im Vorstand: keine Gruppen.
+      expect(find.descendant(of: leiste, matching: find.text('Gruppen')), findsNothing);
       await tester.tap(find.descendant(of: leiste, matching: find.text('Einstellungen')));
       await tester.pumpAndSettle();
       expect(find.text('Newsletter abonniert'), findsOneWidget);
+      // Musik und Hilfe nicht doppelt in den Einstellungen.
+      expect(find.text('Hören, Playlists und Radio'), findsNothing);
+      expect(find.text('Alle Reiter der Mitglieder-App'), findsNothing);
+      await tester.tap(find.descendant(of: leiste, matching: find.text('Anleitung App')));
+      await tester.pumpAndSettle();
+      expect(geoeffnet.last, Uri.parse('https://www.fwv-raura.ch/anleitung-app.html'));
+      await tester.tap(find.descendant(of: leiste, matching: find.text('Musik')));
+      await tester.pumpAndSettle();
+      expect(find.text('Playlists'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
 
@@ -572,6 +585,7 @@ void main() {
       await starten(tester);
       expect(find.byType(NavigationRail), findsNothing);
       expect(find.byType(NavigationBar), findsOneWidget);
+      expect(find.descendant(of: find.byType(NavigationBar), matching: find.text('Musik')), findsNothing);
     });
 
     testWidgets('Hilfe: die vier Anleitungen der Website', (tester) async {

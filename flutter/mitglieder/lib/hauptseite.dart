@@ -1,4 +1,7 @@
-// Hauptseite nach der Anmeldung: Reiter unten.
+// Hauptseite nach der Anmeldung: Reiter unten - auf grossen Bildschirmen
+// (Tablet, Browser) links als Seitenleiste. Dort stehen die Unterpunkte von
+// "Mehr" direkt in der Leiste (Musik, Gruppen fuer den Vorstand), der Rest
+// heisst "Einstellungen"; ausgeklappt stehen unten die Anleitungen.
 //
 // Mitglieder:          Anlässe · (Organisator) · (Lager) · (Schopf) · Profil · Mehr
 // Externe Organisatoren: Organisator · Anlässe · Mehr
@@ -14,19 +17,24 @@
 import 'dart:async';
 
 import 'package:fwv_core/fwv_core.dart';
+import 'package:fwv_roterschopf/fwv_roterschopf.dart' show MusikScreen;
 import 'package:material_ui/material_ui.dart';
 
 import 'anlaesse/anlaesse_tab.dart';
 import 'dienste.dart';
 import 'einstellungen/adressbuch.dart';
 import 'einstellungen/einstellungen_tab.dart';
+import 'einstellungen/gruppen_screen.dart';
 import 'einstellungen/update_hinweis.dart';
 import 'lager/lager_tab.dart';
 import 'organisator/organisator_tab.dart';
 import 'profil/profil_tab.dart';
 import 'roterschopf/roterschopf_tab.dart';
 
-enum Reiter { anlaesse, organisator, lager, roterSchopf, profil, einstellungen }
+/// [musik] und [gruppen] gibt es nur mit Seitenleiste (grosse Bildschirme):
+/// Dort stehen die Unterpunkte von "Mehr" direkt in der Leiste. Auf dem Handy
+/// sind sie Teil der Einstellungen.
+enum Reiter { anlaesse, organisator, lager, roterSchopf, profil, musik, gruppen, einstellungen }
 
 /// Ab dieser Breite stehen die Reiter links als Seitenleiste (Material:
 /// "medium" ab 600, hier etwas spaeter - darunter passt die Leiste unten
@@ -61,7 +69,8 @@ class _HauptseiteState extends State<Hauptseite> {
     });
   }
 
-  List<Reiter> _reiter(bool organisiert, bool lager, bool roterSchopf) => _externerOrganisator
+  List<Reiter> _reiter(bool organisiert, bool lager, bool roterSchopf, {required bool seitenleiste}) =>
+      _externerOrganisator
       ? const [Reiter.organisator, Reiter.anlaesse, Reiter.einstellungen]
       : [
           Reiter.anlaesse,
@@ -69,16 +78,24 @@ class _HauptseiteState extends State<Hauptseite> {
           if (lager) Reiter.lager,
           if (roterSchopf) Reiter.roterSchopf,
           Reiter.profil,
+          if (seitenleiste) Reiter.musik,
+          if (seitenleiste && darfGruppenVerwalten(widget.dienste.sitzung.sitzung)) Reiter.gruppen,
           Reiter.einstellungen,
         ];
 
-  Widget _inhalt(Reiter r) => switch (r) {
+  Widget _inhalt(Reiter r, {required bool seitenleiste, required bool ausgeklappt}) => switch (r) {
     Reiter.anlaesse => AnlaesseTab(dienste: widget.dienste),
     Reiter.organisator => OrganisatorTab(dienste: widget.dienste),
     Reiter.lager => LagerTab(dienste: widget.dienste),
     Reiter.roterSchopf => RoterSchopfTab(dienste: widget.dienste),
     Reiter.profil => ProfilTab(dienste: widget.dienste),
-    Reiter.einstellungen => EinstellungenTab(dienste: widget.dienste),
+    Reiter.musik => MusikScreen(zugang: widget.dienste.musik, player: widget.dienste.musikPlayer),
+    Reiter.gruppen => GruppenScreen(zugang: GruppenZugang(widget.dienste.sitzung.api)),
+    Reiter.einstellungen => EinstellungenTab(
+      dienste: widget.dienste,
+      musikUndGruppenAusgelagert: seitenleiste,
+      hilfeAusgelagert: ausgeklappt,
+    ),
   };
 
   NavigationDestination _ziel(Reiter r) => switch (r) {
@@ -107,6 +124,16 @@ class _HauptseiteState extends State<Hauptseite> {
       selectedIcon: Icon(Icons.person),
       label: 'Profil',
     ),
+    Reiter.musik => const NavigationDestination(
+      icon: Icon(Icons.queue_music_outlined),
+      selectedIcon: Icon(Icons.queue_music),
+      label: 'Musik',
+    ),
+    Reiter.gruppen => const NavigationDestination(
+      icon: Icon(Icons.group_outlined),
+      selectedIcon: Icon(Icons.group),
+      label: 'Gruppen',
+    ),
     // "Mehr" statt "Einstellungen": Mit Lager und Schopf hat der Vorstand
     // fuenf oder sechs Reiter, dann bricht "Einstellungen" mitten im Wort um
     // ("Einstellung/en"). Die Seite selbst heisst weiter Einstellungen.
@@ -116,6 +143,41 @@ class _HauptseiteState extends State<Hauptseite> {
       label: 'Mehr',
     ),
   };
+
+  Widget _hilfe() => Padding(
+    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+    child: SizedBox(
+      width: 196,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 24),
+          Padding(
+            padding: const EdgeInsets.only(left: 12, bottom: 4),
+            child: Text(
+              'Hilfe',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          for (final (symbol, titel, _, seite) in anleitungen)
+            TextButton.icon(
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                alignment: Alignment.centerLeft,
+                textStyle: const TextStyle(fontSize: 13),
+              ),
+              onPressed: () => widget.dienste.linkOeffnen(anleitungsBasis.resolve(seite)),
+              icon: Icon(symbol, size: 18),
+              label: Text(titel),
+            ),
+        ],
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -127,14 +189,23 @@ class _HauptseiteState extends State<Hauptseite> {
         widget.dienste.schopfPruefung,
       ]),
       builder: (context, _) {
+        final breite = MediaQuery.sizeOf(context).width;
+        final seitenleiste = breite >= seitenleisteAb;
+        final ausgeklappt = breite >= 1200;
         final reiter = _reiter(
           widget.dienste.organisator.organisiert,
           widget.dienste.lagerSichtbar,
           widget.dienste.roterSchopfSichtbar,
+          seitenleiste: seitenleiste,
         );
         // Verschwindet der aktive Reiter (z.B. keine Anlaesse mehr), zurueck
-        // zum ersten.
-        if (!reiter.contains(_aktiv)) _aktiv = reiter.first;
+        // zum ersten - Musik und Gruppen (Fenster schmaler geworden) zurueck
+        // zu den Einstellungen, wo sie dann stehen.
+        if (!reiter.contains(_aktiv)) {
+          _aktiv = (_aktiv == Reiter.musik || _aktiv == Reiter.gruppen) && reiter.contains(Reiter.einstellungen)
+              ? Reiter.einstellungen
+              : reiter.first;
+        }
         _besucht.add(_aktiv);
         final index = reiter.indexOf(_aktiv);
         final inhalt = IndexedStack(
@@ -142,7 +213,10 @@ class _HauptseiteState extends State<Hauptseite> {
           children: [
             for (final r in reiter)
               _besucht.contains(r)
-                  ? KeyedSubtree(key: ValueKey(r), child: _inhalt(r))
+                  ? KeyedSubtree(
+                      key: ValueKey(r),
+                      child: _inhalt(r, seitenleiste: seitenleiste, ausgeklappt: ausgeklappt),
+                    )
                   : SizedBox.shrink(key: ValueKey(r)),
           ],
         );
@@ -152,9 +226,7 @@ class _HauptseiteState extends State<Hauptseite> {
         // statt unten, ab 1200 Punkten mit Beschriftung daneben. Der Inhalt
         // bekommt die Breite neben der Leiste als Bildschirmbreite, damit
         // mitSystemleiste richtig mittig einrueckt.
-        final breite = MediaQuery.sizeOf(context).width;
-        if (breite >= seitenleisteAb) {
-          final ausgeklappt = breite >= 1200;
+        if (seitenleiste) {
           final leiste = ausgeklappt ? 220.0 : 88.0;
           final mq = MediaQuery.of(context);
           return Scaffold(
@@ -171,6 +243,8 @@ class _HauptseiteState extends State<Hauptseite> {
                     minExtendedWidth: 220,
                     labelType: ausgeklappt ? NavigationRailLabelType.none : NavigationRailLabelType.all,
                     groupAlignment: -1,
+                    // Ausgeklappt: die Anleitungen unten in der Leiste.
+                    trailing: ausgeklappt && !_externerOrganisator ? _hilfe() : null,
                     destinations: [
                       for (final r in reiter)
                         NavigationRailDestination(
