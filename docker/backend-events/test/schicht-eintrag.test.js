@@ -120,7 +120,7 @@ const PASSWORT = 'chilbi-passwort-1';
 const id = (praefix, n) => `00000000-0000-0000-0000-${praefix}${String(n).padStart(12 - praefix.length, '0')}`;
 const ERIKA = id('a', 1), HANS = id('a', 2), OTTO = id('a', 3);
 const E1 = id('e', 1), E2 = id('e', 2);
-const BAR = id('b', 1), KASSE = id('b', 2), VOLL = id('b', 3), ANDERS = id('b', 9);
+const BAR = id('b', 1), KASSE = id('b', 2), VOLL = id('b', 3), PARALLEL = id('b', 4), ANDERS = id('b', 9);
 
 async function seed(pool) {
     const q = (sql, p) => pool.query(sql, p);
@@ -137,9 +137,10 @@ async function seed(pool) {
              VALUES ($1, 'anders', 'Anderer Anlass', 'Sonstiges', '2026-11-24 18:00', 'planned')`, [E2]);
     await q(`INSERT INTO shifts (id, event_id, name, date, start_time, end_time, needed) VALUES
         ($1, $5, 'Bar', '2026-10-24', '18:00', '22:00', 3),
-        ($2, $5, 'Kasse', '2026-10-24', '18:00', '22:00', 2),
+        ($2, $5, 'Kasse', '2026-10-24', '22:00', '02:00', 2),
         ($3, $5, 'Abbau', '2026-10-25', '10:00', '12:00', 1),
-        ($4, $6, 'Fremd', '2026-11-24', '18:00', '22:00', 2)`, [BAR, KASSE, VOLL, ANDERS, E1, E2]);
+        ($4, $6, 'Fremd', '2026-11-24', '18:00', '22:00', 2),
+        ($7, $5, 'Kueche', '2026-10-24', '19:00', '21:00', 2)`, [BAR, KASSE, VOLL, ANDERS, E1, E2, PARALLEL]);
     // Abbau ist schon voll
     await q(`INSERT INTO registrations (event_id, guest_name, guest_email, shift_ids, status)
              VALUES ($1, 'Voll', 'voll@example.ch', $2, 'approved')`, [E1, [VOLL]]);
@@ -231,6 +232,13 @@ test('Person in Schicht eintragen gegen den echten Server', { skip: !DB && 'TEST
         const r = await eintragen('erika', { member_id: HANS, shift_ids: [BAR] });
         assert.equal(r.status, 409);
         assert.equal(r.json.code, 'schicht_doppelt');
+    });
+
+    await t.test('gleichzeitig auf einer anderen Schicht (Bar 18-22, Kueche 19-21): 409', async () => {
+        const r = await eintragen('erika', { member_id: HANS, shift_ids: [PARALLEL] });
+        assert.equal(r.status, 409, JSON.stringify(r.json));
+        assert.equal(r.json.code, 'schicht_gleichzeitig');
+        assert.match(r.json.error, /Kueche/);
     });
 
     await t.test('Schicht eines anderen Anlasses: 400, nichts gespeichert', async () => {
