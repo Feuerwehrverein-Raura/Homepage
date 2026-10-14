@@ -68,6 +68,14 @@
     table.diff th { font-size: .75rem; text-transform: uppercase;
         letter-spacing: .05em; color: #6b7280; font-weight: 600; }
 
+    /* Telefonbild neben den Schritten, wie in der App-Anleitung. */
+    .mit-bild { display: grid; gap: 2rem; align-items: start;
+        grid-template-columns: minmax(0, 1fr) 13rem; }
+    .mit-bild figure.shot { margin-top: 0; }
+    @media (max-width: 767px) {
+        .mit-bild { grid-template-columns: 1fr; gap: 1.25rem; }
+        .mit-bild figure.shot img { max-width: 15rem; }
+    }
 
     /* -------------------------------------------------------- Druck
        Aus derselben Datei entsteht das PDF. Im Druck faellt weg, was nur
@@ -96,6 +104,10 @@
             object-position: top left; }
         aside.note { break-inside: avoid; }
         .chapter a { color: #1f2937; text-decoration: none; }
+        .mit-bild { display: grid !important;
+            grid-template-columns: minmax(0, 1fr) 48mm !important;
+            gap: 8mm !important; }
+        .mit-bild figure.shot img { max-height: 105mm; }
     }
 </style>
 </head>
@@ -142,7 +154,7 @@
             <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
         </div>
         <h1 class="text-4xl font-bold mb-4">Passwort setzen</h1>
-        <p class="text-xl max-w-2xl">Vergessen — oder noch nie eines gehabt? Beides geht gleich: Du setzt das Vereins-Passwort selbst, in der App oder über die Website. Der Vorstand muss dafür nichts tun.</p>
+        <p class="text-xl max-w-2xl">Vergessen — oder noch nie eines gehabt? Beides geht gleich: Du setzt das Vereins-Passwort selbst, in der Mitglieder-App oder in Mein Bereich auf der Website. Der Vorstand muss dafür nichts tun.</p>
         <div class="mt-6"><a href="anleitungen/anleitung-passwort.pdf" class="nur-bildschirm inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>Als PDF</span></a></div>
     </div>
 </header>
@@ -152,8 +164,9 @@
     <div class="container mx-auto px-4">
         <div class="flex space-x-5 py-3 whitespace-nowrap text-sm">
             <a href="#ueberblick" class="text-gray-600 hover:text-fire-600 transition-colors">Auch beim ersten Mal</a>
-            <a href="#app" class="text-gray-600 hover:text-fire-600 transition-colors">In der App</a>
-            <a href="#website" class="text-gray-600 hover:text-fire-600 transition-colors">Über die Website</a>
+            <a href="#app" class="text-gray-600 hover:text-fire-600 transition-colors">Mit Code</a>
+            <a href="#website" class="text-gray-600 hover:text-fire-600 transition-colors">Mit Link</a>
+            <a href="#zugaenge" class="text-gray-600 hover:text-fire-600 transition-colors">Andere Passwörter</a>
             <a href="#probleme" class="text-gray-600 hover:text-fire-600 transition-colors">Wenn es nicht klappt</a>
         </div>
     </div>
@@ -169,9 +182,9 @@
   <p>Der Verein hat nie Passwörter verschickt. Wer sich zum
     <strong>ersten Mal</strong> anmeldet, hat also gar keines — und geht
     genau denselben Weg wie jemand, der seines vergessen hat.</p>
-  <p>Der Knopf heisst zwar <em>Passwort vergessen</em>. Er setzt aber
-    ebenso gut ein erstes. Lass dich davon nicht abhalten: Wenn du noch nie
-    drin warst, ist das hier dein Weg hinein.</p>
+  <p>Der Knopf heisst zwar <strong>Passwort vergessen?</strong>. Er setzt
+    aber ebenso gut ein erstes. Lass dich davon nicht abhalten: Wenn du noch
+    nie drin warst, ist das hier dein Weg hinein.</p>
   <aside class="note">
     <b>Bei der Aufnahme kam eine E-Mail</b> mit einem Link zum Setzen des
     Passworts. Ist die verschwunden oder der Link abgelaufen, macht das
@@ -179,14 +192,21 @@
   </aside>
 
   <h3>Ein Passwort für alles</h3>
-  <p>Für die Website und für die Mitglieder-App gilt <strong>dasselbe
-    Konto</strong>. Es liegt bei der Anmeldestelle des Vereins unter
-    <code>auth.fwv-raura.ch</code>, und dort hängen auch die übrigen
-    Dienste dran — Nextcloud, das Wiki, das Vorstands-Portal.</p>
+  <p>Für die Mitglieder-App und für <strong>Mein Bereich</strong> auf der
+    Website gilt <strong>dasselbe Konto</strong>. Mein Bereich ist nämlich
+    die Mitglieder-App selbst, nur im Browser. Das Konto liegt bei der
+    Anmeldestelle des Vereins unter <code>auth.fwv-raura.ch</code>. Dort
+    hängen auch die übrigen Dienste dran — Nextcloud, das Wiki, das
+    Vorstands-Portal.</p>
   <p>Was du hier setzt, gilt also überall. Du musst das nirgends ein
     zweites Mal machen.</p>
   <p>Der Vorstand muss dafür nichts tun. Es gibt zwei Wege, und beide
     führen zum selben Ergebnis — nimm den, der dir gerade näher liegt.</p>
+  <aside class="note">
+    <b>Du bleibst angemeldet.</b> App und Website melden dich nicht von
+    selbst ab, solange du sie mindestens einmal in 30 Tagen öffnest. Das
+    Passwort brauchst du also nur selten.
+  </aside>
   <aside class="note">
     <b>Der Verein sieht dein Passwort nicht.</b> Auch der Aktuar kann es
     nicht nachschlagen, nur den Vorgang anstossen. Deshalb lohnt sich der
@@ -195,43 +215,67 @@
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="app">
-  <h2>Der Weg in der App</h2>
-  <p>Der kürzere Weg, wenn du das Telefon ohnehin in der Hand hast: Er
-    bleibt ganz in der App, ein Browser wird nicht gebraucht, und am Ende
-    bist du gleich angemeldet.</p>
+  <h2>Mit Code: in der App oder in Mein Bereich</h2>
+  <p>Der kürzere Weg. Er geht in der Mitglieder-App auf dem Telefon und
+    genauso in <strong>Mein Bereich</strong> auf der Website — dort
+    erscheint dieselbe Anmeldung. Du bekommst einen Code per E-Mail, und am
+    Ende bist du gleich angemeldet.</p>
+  <div class="mit-bild">
+  <div>
   <ol class="steps">
-    <li>Die Mitglieder-App öffnen. Auf dem Anmeldebildschirm ganz unten
-      steht <strong>Passwort vergessen</strong> — antippen.</li>
-    <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
+    <li>Die Mitglieder-App öffnen. Oder auf <code>www.fwv-raura.ch</code>
+      auf <strong>Mein Bereich</strong> klicken.</li>
+    <li>Auf der Anmeldung ist der Reiter <strong>Mitglied</strong> gewählt.
+      Unter dem Knopf <strong>Mit Vereinskonto anmelden</strong> steht
+      <strong>Passwort vergessen?</strong> — antippen.</li>
+    <li>Es öffnet sich «Passwort zurücksetzen». Bei <strong>E-Mail</strong>
+      die Adresse eingeben, die der Verein von dir hat, und
       <strong>Code anfordern</strong> drücken.</li>
-    <li>In den Posteingang schauen. In der E-Mail steht ein Zahlencode.</li>
-    <li>Zurück in der App: Code eintippen, das neue Passwort zweimal
-      eingeben und bestätigen.</li>
+    <li>In den Posteingang schauen. In der E-Mail steht ein sechsstelliger
+      Code.</li>
+    <li>Zurück auf «Passwort zurücksetzen»: Den Code bei <strong>Code aus der E-Mail</strong>
+      eintippen. Dann das neue Passwort bei <strong>Neues Passwort</strong>
+      und nochmals bei <strong>Wiederholen</strong> eingeben.</li>
+    <li><strong>Passwort setzen</strong> drücken.</li>
   </ol>
-  <p>Danach bist du direkt in der App angemeldet — und kannst dich mit
-    demselben Passwort auch auf der Website anmelden.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/12-login.jpg" data-ios="images/anleitung/ios/12-login.jpg" data-android="images/anleitung/android/12-login.jpg" alt="Anmeldung der App mit den Reitern Mitglied und QR-Code">
+    <figcaption>Schritt 2: «Passwort vergessen?» unter dem Anmeldeknopf</figcaption>
+  </figure>
+  </div>
+  <p>Danach bist du direkt angemeldet. Mit demselben Passwort meldest du
+    dich auch überall sonst an — über
+    <strong>Mit Vereinskonto anmelden</strong>.</p>
   <aside class="note">
-    <b>Der Code ist nur kurz gültig.</b> Kommt die E-Mail erst später, oder
-    hast du zwischendurch etwas anderes gemacht, fordere einfach einen
-    neuen an.
+    <b>Der Code gilt 15 Minuten.</b> Kommt die E-Mail erst später, oder
+    hast du zwischendurch etwas anderes gemacht, drück
+    <strong>Code erneut anfordern</strong>. Nach fünf falschen Eingaben
+    braucht es ebenfalls einen neuen Code.
+  </aside>
+  <aside class="note">
+    <b>Teilt ihr euch eine E-Mail-Adresse?</b> Dann steht in der E-Mail für
+    jede Person ein eigener Code, jeweils mit Name. Nimm nur deinen eigenen
+    — er setzt genau dein Konto zurück.
   </aside>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="website">
-  <h2>Der Weg über die Website</h2>
-  <p>Kein Telefon zur Hand, oder du sitzt sowieso am Rechner? Dann geht es
-    über die Anmeldeseite.</p>
+  <h2>Mit Link: über die Anmeldeseite</h2>
+  <p>Wenn du auf <strong>Mit Vereinskonto anmelden</strong> drückst,
+    erscheint die Anmeldeseite des Vereins. Auch dort lässt sich das
+    Passwort setzen — diesmal mit einem Link statt eines Codes.</p>
   <ol class="steps">
-    <li>Auf <code>www.fwv-raura.ch</code> auf <strong>Mein Bereich</strong>
-      klicken. Es erscheint die Anmeldeseite des Vereins.</li>
+    <li>In der App oder in <strong>Mein Bereich</strong> auf
+      <strong>Mit Vereinskonto anmelden</strong> drücken. Es erscheint die
+      Anmeldeseite des Vereins.</li>
     <li>Ganz unten steht <strong>Benutzername oder Passwort
       vergessen?</strong> — anklicken.</li>
     <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
       <strong>Continue</strong> drücken.</li>
     <li>In den Posteingang schauen. Der Link in der E-Mail führt auf eine
       Seite, auf der du ein neues Passwort setzt.</li>
-    <li>Mit dem neuen Passwort anmelden — auf der Website wie in der
-      App.</li>
+    <li>Zurück zur Anmeldung und mit dem neuen Passwort anmelden.</li>
   </ol>
   <p>Die Seite lässt sich auch direkt aufrufen:
     <code>auth.fwv-raura.ch/if/flow/password-recovery/</code></p>
@@ -247,6 +291,39 @@
   </figure>
 </section>
 
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="zugaenge">
+  <h2>Andere Passwörter: die Zugänge</h2>
+  <p>Manche Ämter bringen eigene Passwörter mit — etwa für ein
+    Funktions-Postfach wie <code>aktuar@fwv-raura.ch</code>, für das
+    Netzlaufwerk oder für ein geteiltes Konto. Das sind
+    <strong>nicht</strong> die Passwörter deines Vereinskontos. Du findest
+    sie in der App und in Mein Bereich.</p>
+  <div class="mit-bild">
+  <div>
+  <ol class="steps">
+    <li>In der App oder in <strong>Mein Bereich</strong> auf
+      <strong>Profil</strong> gehen.</li>
+    <li>Unter «Konto» auf <strong>Zugänge</strong> tippen.</li>
+    <li>Ein Passwort ist zuerst verdeckt. Das Auge zeigt es an, das
+      Symbol daneben kopiert es — auch ohne Aufdecken.</li>
+  </ol>
+  <h3>Passwort eines Funktions-Postfachs ändern</h3>
+  <p>Bei jedem Funktions-Postfach steht <strong>Passwort ändern</strong>.
+    Das neue Passwort muss mindestens zwölf Zeichen haben. Zweimal
+    eingeben und <strong>Passwort setzen</strong> drücken.</p>
+  <aside class="note">
+    <b>Es gilt sofort für alle.</b> Nutzen mehrere Personen dasselbe
+    Postfach, müssen auch sie das neue Passwort eintragen — sag es ihnen
+    vorher.
+  </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/07-zugaenge.jpg" data-ios="images/anleitung/ios/07-zugaenge.jpg" data-android="images/anleitung/android/07-zugaenge.jpg" alt="Die Zugänge mit einer Funktions-E-Mail und verdecktem Passwort">
+    <figcaption>Funktions-Postfach mit «Passwort ändern»</figcaption>
+  </figure>
+  </div>
+</section>
+
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="probleme">
   <h2>Wenn es nicht klappt</h2>
   <h3>Es kommt keine E-Mail</h3>
@@ -259,8 +336,8 @@
 
   <h3>Der Link aus der Willkommens-E-Mail geht nicht mehr</h3>
   <p>Solche Links laufen nach einiger Zeit ab — das ist kein Fehler,
-    sondern Absicht. Nimm einfach einen der beiden Wege oben; sie führen
-    zum selben Formular und lassen sich beliebig oft benutzen.</p>
+    sondern Absicht. Nimm einfach einen der beiden Wege oben; sie lassen
+    sich beliebig oft benutzen.</p>
 
   <h3>Ich weiss meinen Benutzernamen nicht</h3>
   <p>Du brauchst ihn nicht. Für das Zurücksetzen genügt die E-Mail-Adresse,
@@ -271,6 +348,18 @@
     eigene Name, <code>12345678</code> — weist die Anmeldestelle ebenfalls
     ab. Ein Satz, den du dir merken kannst, ist die einfachste sichere
     Lösung.</p>
+
+  <h3>Ich bin kein Mitglied, sondern organisiere einen Anlass</h3>
+  <p>Dann gilt diese Anleitung nicht für dich. Tippe auf der Anmeldung auf
+    <strong>Externer Organisator? Hier anmelden</strong> und nimm die
+    E-Mail-Adresse und das Passwort, die du für deinen Anlass bekommen
+    hast.</p>
+
+  <h3>Wo finde ich diese Anleitung wieder?</h3>
+  <p>In der App und in Mein Bereich: auf dem Telefon unter
+    <strong>Mehr</strong>, Abschnitt «Hilfe». Auf einem breiten Bildschirm
+    steht «Hilfe» links in der Seitenleiste. Dort sind alle vier
+    Anleitungen verlinkt.</p>
 
   <h3>Ich komme trotzdem nicht rein</h3>
   <p>Melde dich beim Aktuar unter <code>aktuar@fwv-raura.ch</code>. Er
@@ -338,7 +427,7 @@
         </div>
         <div class="border-t border-gray-700 mt-8 pt-8 text-center">
             <p class="text-gray-400 text-sm">
-                Feuerwehrverein Raura Kaiseraugst — Stand: August 2026.
+                Feuerwehrverein Raura Kaiseraugst — Stand: Oktober 2026.
                 Fehlt ein Schritt oder stimmt etwas nicht mehr, melde dich beim Aktuar.
             </p>
         </div>

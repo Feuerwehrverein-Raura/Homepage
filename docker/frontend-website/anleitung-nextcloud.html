@@ -61,6 +61,15 @@
     figure.shot figcaption { color: #6b7280; font-size: .8rem;
         margin-top: .5rem; }
 
+    /* Bilder nebeneinander: breites Cloud-Bild neben einem schmalen
+       App-Bild; ein einzelnes App-Bild nur in Telefonbreite. */
+    .shots { display: flex; gap: 1rem; align-items: flex-start;
+        margin-top: 1.25rem; }
+    .shots figure.shot { margin: 0; }
+    .shots .breit { flex: 2.4 1 0; min-width: 0; }
+    .shots .hoch { flex: 1 1 0; min-width: 0; }
+    figure.shot.telefon { max-width: 15rem; }
+
     table.diff { border-collapse: collapse; width: 100%; font-size: .95rem;
         color: #374151; }
     table.diff th, table.diff td { text-align: left; padding: .5rem .6rem;
@@ -92,6 +101,7 @@
         .chapter h2 { font-size: 15pt; }
         .chapter h3 { font-size: 11pt; break-after: avoid; }
         figure.shot { break-inside: avoid; }
+        figure.shot.telefon { max-width: 48mm; }
         figure.shot img { max-height: 150mm; object-fit: contain;
             object-position: top left; }
         aside.note { break-inside: avoid; }
@@ -172,20 +182,21 @@
     <b>Nimm den unscheinbaren Knopf ganz unten:</b>
     <em>Anmelden mit Authentik</em>. Nur der führt zum Ziel. Das Formular
     darüber gehört zu Nextcloud-eigenen Konten, und ein solches hat bei uns
-    niemand — dort einzutippen führt zu „falsches Passwort", egal wie
+    niemand — dort einzutippen führt zu «falsches Passwort», egal wie
     richtig du tippst.
   </aside>
   <ol class="steps">
     <li><code>nextcloud.fwv-raura.ch</code> aufrufen.</li>
     <li>Ganz unten auf <strong>Anmelden mit Authentik</strong> klicken.</li>
-    <li>Auf der Seite des Vereins mit deinem gewohnten Vereins-Login
-      anmelden — dasselbe Konto wie in der App und im Mitgliederbereich.</li>
+    <li>Auf der Anmeldeseite des Vereins (<code>auth.fwv-raura.ch</code>)
+      mit deinem Vereinskonto anmelden. Es ist dasselbe Konto wie in der
+      Mitglieder-App und in «Mein Bereich» auf der Website.</li>
     <li>Fertig, du bist in der Cloud.</li>
   </ol>
   <p>Warst du am selben Tag schon einmal angemeldet, geht es meist ohne
     Nachfrage durch — der Klick auf den Knopf genügt.</p>
   <aside class="note">
-    <b>„Passwort vergessen?" auf dieser Seite hilft dir nicht.</b> Der Link
+    <b>«Passwort vergessen?» auf dieser Seite hilft dir nicht.</b> Der Link
     gehört zum Nextcloud-Formular. Wenn du dein Vereins-Passwort setzen
     oder zurücksetzen willst, steht der Weg in der
     <a href="anleitung-passwort.html">Anleitung zum Passwort</a>.
@@ -216,14 +227,22 @@
     alles, was <em>ausserhalb</em> dieser Ordner liegt — dort kannst du
     ablegen, was du willst.
   </aside>
-  <p>Fehlt dir ein Ordner, den du erwartest, stimmt vermutlich deine
-    Gruppenzugehörigkeit nicht. Das ist nichts, was du selbst richten
-    kannst — melde dich beim Aktuar.</p>
-  <figure class="shot">
-    <img src="images/anleitung/nextcloud/02-dateien.jpg"
-         alt="Die Dateiansicht mit den Gruppenordnern">
-    <figcaption>Die Gruppenordner nach dem Anmelden</figcaption>
-  </figure>
+  <p>Welche Ordner du hast, siehst du auch in der App und in «Mein
+    Bereich»: <strong>Profil</strong> → <strong>Zugänge</strong>, Abschnitt
+    <strong>Cloud-Ordner</strong>. Fehlt dir ein Ordner, stimmt vermutlich
+    deine Gruppenzugehörigkeit nicht. Das kannst du nicht selbst richten —
+    melde dich beim Aktuar.</p>
+  <div class="shots">
+    <figure class="shot breit">
+      <img src="images/anleitung/nextcloud/02-dateien.jpg"
+           alt="Die Dateiansicht mit den Gruppenordnern">
+      <figcaption>Die Gruppenordner nach dem Anmelden</figcaption>
+    </figure>
+    <figure class="shot hoch">
+      <img src="images/anleitung/ios/07-zugaenge.jpg" data-ios="images/anleitung/ios/07-zugaenge.jpg" data-android="images/anleitung/android/07-zugaenge.jpg" alt="Die Zugänge in der App mit dem Abschnitt Cloud-Ordner">
+      <figcaption>Profil → Zugänge: deine Cloud-Ordner</figcaption>
+    </figure>
+  </div>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="arbeiten">
@@ -293,23 +312,38 @@
     Browserfenster. Dort erscheint dieselbe Anmeldeseite — und wieder
     führt nur <em>Anmelden mit Authentik</em> zum Ziel.</p>
   <aside class="note">
-    <b>Das Adressbuch geht einfacher.</b> Wenn es dir nur darum geht, die
-    Nummern der Mitglieder im Telefon zu haben, brauchst du die
-    Nextcloud-App nicht — das erledigt die Mitglieder-App unter
-    <em>Einstellungen &rarr; Adressbuch</em>. Siehe die
-    <a href="anleitung-app.html#adressbuch">App-Anleitung</a>.
+    <b>Für das Adressbuch brauchst du die Nextcloud-App nicht.</b> Willst
+    du nur die Nummern der Mitglieder im Telefon haben, geht das über die
+    Mitglieder-App unter <strong>Mehr</strong>, Abschnitt
+    <strong>Adressbuch</strong>.
   </aside>
+  <ul>
+    <li><strong>iPhone und Browser:</strong> Tippe auf
+      <strong>Mitglieder-Adressbuch einrichten</strong>. Dort steht der Weg
+      Schritt für Schritt.</li>
+    <li><strong>Android:</strong> Schalte <strong>Kontakte abgleichen</strong>
+      ein. Die Mitglieder erscheinen dann im Konto «FWV Raura» in deinen
+      Kontakten.</li>
+  </ul>
+  <p>Mehr dazu in der
+    <a href="anleitung-app.html#adressbuch">App-Anleitung</a>.</p>
+  <figure class="shot telefon">
+    <img src="images/anleitung/ios/10-adressbuch.jpg" data-ios="images/anleitung/ios/10-adressbuch.jpg" data-android="images/anleitung/android/10-adressbuch.jpg" alt="Die Seite Adressbuch in der App">
+    <figcaption>Mitglieder-Adressbuch einrichten (iPhone)</figcaption>
+  </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="probleme">
   <h2>Wenn es klemmt</h2>
-  <h3>„Falscher Benutzername oder falsches Passwort"</h3>
+  <h3>«Falscher Benutzername oder falsches Passwort»</h3>
   <p>Du hast das obere Formular benutzt. Lade die Seite neu und nimm den
     Knopf <strong>Anmelden mit Authentik</strong> ganz unten.</p>
 
   <h3>Ich sehe keinen einzigen Vereinsordner</h3>
-  <p>Dann fehlt deine Gruppenzugehörigkeit. Das passiert selten, ist aber
-    nichts, was du selbst beheben kannst — eine kurze Meldung an
+  <p>Dann fehlt deine Gruppenzugehörigkeit. Schau zuerst in der App oder
+    in «Mein Bereich» unter <strong>Profil</strong> →
+    <strong>Zugänge</strong> nach. Steht dort kein Cloud-Ordner, kannst du
+    das nicht selbst beheben — eine kurze Meldung an
     <code>aktuar@fwv-raura.ch</code> genügt.</p>
 
   <h3>Ein Ordner ist plötzlich weg</h3>
@@ -319,6 +353,14 @@
   <h3>Ich komme gar nicht bis zur Anmeldeseite</h3>
   <p>Prüfe die Adresse: <code>nextcloud.fwv-raura.ch</code>, ohne
     <em>www</em> davor.</p>
+
+  <h3>Wo finde ich diese Anleitung wieder?</h3>
+  <p>In der Mitglieder-App und in «Mein Bereich» sind alle vier
+    Anleitungen verlinkt. Auf dem Telefon findest du sie unter
+    <strong>Mehr</strong>, Abschnitt <strong>Hilfe</strong>. Auf einem
+    breiten Bildschirm stehen sie links in der Seitenleiste unter
+    <strong>Hilfe</strong>. Dort heisst diese hier
+    <strong>Anleitung Cloud</strong>.</p>
 </section>
 
     </div>
@@ -377,7 +419,7 @@
         </div>
         <div class="border-t border-gray-700 mt-8 pt-8 text-center">
             <p class="text-gray-400 text-sm">
-                Feuerwehrverein Raura Kaiseraugst — Stand: August 2026.
+                Feuerwehrverein Raura Kaiseraugst — Stand: Oktober 2026.
                 Fehlt ein Schritt oder stimmt etwas nicht mehr, melde dich beim Aktuar.
             </p>
         </div>

@@ -71,16 +71,30 @@
     /* Bei der App liegt das Telefonbild neben dem Text, nicht darunter. */
     .guide-app section.chapter { display: grid; gap: 2rem;
         grid-template-columns: minmax(0, 1fr) 14rem; align-items: start; }
+    /* Kapitel ohne Telefonbild oder mit Bild aus dem Browser (quer):
+       eine Spalte, das Bild in voller Breite unter dem Text. */
+    .guide-app section.chapter.breit { grid-template-columns: minmax(0, 1fr); gap: 0; }
     @media (max-width: 767px) {
         .guide-app section.chapter { grid-template-columns: 1fr; gap: 1.25rem; }
         .guide-app figure.shot img { max-width: 15rem; }
+        .guide-app section.chapter.breit figure.shot img { max-width: 100%; }
     }
     @media print {
         .guide-app section.chapter { display: grid !important;
             grid-template-columns: minmax(0, 1fr) 52mm !important;
             gap: 8mm !important; }
+        .guide-app section.chapter.breit {
+            grid-template-columns: minmax(0, 1fr) !important; gap: 0 !important; }
         .guide-app figure.shot img { max-height: 120mm; }
+        .guide-app section.chapter.breit figure.shot img { max-height: 105mm;
+            width: auto; max-width: 100%; }
     }
+
+    /* Fuer wen ein Kapitel gilt (Organisator, Lager, Vorstand ...). */
+    .chapter p.fuer { display: inline-block; margin: 0 0 .75rem;
+        padding: .15rem .6rem; border-radius: 9999px; font-size: .8rem;
+        font-weight: 600; color: #991b1b; background: #fee2e2;
+        line-height: 1.5; }
 
     /* -------------------------------------------------------- Druck
        Aus derselben Datei entsteht das PDF. Im Druck faellt weg, was nur
@@ -155,7 +169,7 @@
             <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
         </div>
         <h1 class="text-4xl font-bold mb-4">Die Mitglieder-App</h1>
-        <p class="text-xl max-w-2xl">Anlässe sehen, sich für Schichten eintragen, das eigene Profil pflegen — alles vom Telefon aus. Diese Anleitung führt durch jeden Bildschirm.</p>
+        <p class="text-xl max-w-2xl">Anlässe sehen, dich für Schichten eintragen, dein Profil pflegen. Die App gibt es für Android, fürs iPhone und im Browser als «Mein Bereich» — überall mit denselben Knöpfen. Diese Anleitung zeigt, wie es geht.</p>
         <div class="nur-bildschirm mt-6 flex flex-wrap items-center gap-3">
             <span class="text-sm text-fire-100">Bilder von</span>
             <div class="seg inline-flex rounded-full overflow-hidden border border-white/40">
@@ -175,33 +189,46 @@
     <div class="container mx-auto px-4">
         <div class="flex space-x-5 py-3 whitespace-nowrap text-sm">
             <a href="#installieren" class="text-gray-600 hover:text-fire-600 transition-colors">Installieren</a>
+            <a href="#browser" class="text-gray-600 hover:text-fire-600 transition-colors">Im Browser</a>
+            <a href="#reiter" class="text-gray-600 hover:text-fire-600 transition-colors">Die Reiter</a>
             <a href="#anmelden" class="text-gray-600 hover:text-fire-600 transition-colors">Anmelden</a>
-            <a href="#passwort" class="text-gray-600 hover:text-fire-600 transition-colors">Passwort</a>
             <a href="#anlaesse" class="text-gray-600 hover:text-fire-600 transition-colors">Anlässe</a>
             <a href="#mithelfen" class="text-gray-600 hover:text-fire-600 transition-colors">Mithelfen</a>
             <a href="#anmeldungen" class="text-gray-600 hover:text-fire-600 transition-colors">Meine Anmeldungen</a>
             <a href="#profil" class="text-gray-600 hover:text-fire-600 transition-colors">Profil</a>
             <a href="#zugaenge" class="text-gray-600 hover:text-fire-600 transition-colors">Zugänge</a>
-            <a href="#adressbuch" class="text-gray-600 hover:text-fire-600 transition-colors">Adressbuch</a>
-            <a href="#meldungen" class="text-gray-600 hover:text-fire-600 transition-colors">Benachrichtigungen</a>
-            <a href="#organisator" class="text-gray-600 hover:text-fire-600 transition-colors">Für Organisatoren</a>
+            <a href="#ausleihen" class="text-gray-600 hover:text-fire-600 transition-colors">Material ausleihen</a>
+            <a href="#mehr" class="text-gray-600 hover:text-fire-600 transition-colors">Mehr</a>
+            <a href="#musik" class="text-gray-600 hover:text-fire-600 transition-colors">Musik</a>
+            <a href="#organisator" class="text-gray-600 hover:text-fire-600 transition-colors">Organisatoren</a>
+            <a href="#lager" class="text-gray-600 hover:text-fire-600 transition-colors">Lager</a>
+            <a href="#schopf" class="text-gray-600 hover:text-fire-600 transition-colors">Roter Schopf</a>
+            <a href="#gruppen" class="text-gray-600 hover:text-fire-600 transition-colors">Vorstand</a>
         </div>
     </div>
 </div>
 
 <main class="py-8">
     <div class="container mx-auto px-4 max-w-4xl space-y-6">
-    
-    
-    
 
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="installieren">
+<section class="chapter breit bg-white rounded-lg shadow p-6 md:p-8" id="installieren">
   <div>
     <h2>App aufs Telefon holen</h2>
-    <h3>Android</h3>
+    <p>Die Mitglieder-App gibt es auf drei Wegen. Alle drei können dasselbe
+      und brauchen dasselbe Vereinskonto:</p>
+    <ul>
+      <li><strong>Android:</strong> aus dem Play Store oder als Datei.</li>
+      <li><strong>iPhone:</strong> vorerst im Browser, als «Mein Bereich»
+        auf der Website.</li>
+      <li><strong>Computer und Tablet:</strong> im Browser unter
+        <a href="https://www.fwv-raura.ch/mein.html">fwv-raura.ch/mein.html</a>
+        — siehe <a href="#browser">nächstes Kapitel</a>.</li>
+    </ul>
+
+    <h3>Android über den Play Store</h3>
     <p>Die App liegt im Play Store, aber noch als <strong>geschlossener
       Test</strong>. Das heisst: Sie ist nicht öffentlich zu finden.
-      Freischalten kannst du dich aber selbst — zwei Links, in dieser
+      Freischalten kannst du dich selbst — zwei Links, in dieser
       Reihenfolge, am besten direkt auf dem Telefon.</p>
     <ol class="steps">
       <li>Der Testgruppe beitreten:
@@ -240,9 +267,10 @@
       <a href="mailto:aktuar@fwv-raura.ch?subject=Zugang%20zur%20Mitglieder-App">aktuar@fwv-raura.ch</a>
       weiter.
     </aside>
-    <h4 style="font-weight:600;margin:1.5rem 0 .35rem">Ohne Play Store: die Datei direkt laden</h4>
+
+    <h3>Android ohne Play Store: die Datei direkt laden</h3>
     <p>Dieser Weg braucht keine Freischaltung. Dafür fragt Android beim
-      Öffnen, ob es Apps aus dieser Quelle installieren darf — das musst du
+      Öffnen, ob es Apps aus dieser Quelle installieren darf. Das musst du
       einmal erlauben, danach läuft es wie bei jeder anderen App.</p>
     <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin:.9rem 0">
       <img src="images/anleitung/qr-app-android.png"
@@ -262,323 +290,857 @@
       einem ausgedruckten Blatt. Eine Übersicht aller Vereins-Apps steht auf
       <a href="https://www.fwv-raura.ch/apps.html">fwv-raura.ch/apps.html</a>.
     </aside>
+
     <h3>iPhone</h3>
-    <p>Die iOS-Fassung ist fertig, aber noch nicht im App Store. Sobald die
-      Verteilung über TestFlight steht, kommt sie auf dieselbe Seite.</p>
+    <p>Im App Store ist die Mitglieder-App noch nicht. Bis es so weit ist,
+      öffnest du sie in Safari:
+      <a href="https://www.fwv-raura.ch/mein.html">fwv-raura.ch/mein.html</a>.
+      Dort läuft genau dieselbe App, mit denselben Reitern und Knöpfen. Die
+      Bilder in dieser Anleitung passen also auch dort.</p>
+  </div>
+</section>
+
+<section class="chapter breit bg-white rounded-lg shadow p-6 md:p-8" id="browser">
+  <div>
+    <h2>Im Browser: «Mein Bereich»</h2>
+    <p>«Mein Bereich» auf der Website <em>ist</em> die Mitglieder-App. Du
+      findest ihn oben in der Navigation der Website oder direkt unter
+      <a href="https://www.fwv-raura.ch/mein.html">fwv-raura.ch/mein.html</a>.
+      Alles in dieser Anleitung geht dort genauso.</p>
+    <p>Bist du auf der Website angemeldet, bist du es auch in «Mein
+      Bereich» — und umgekehrt. Es ist dasselbe Vereinskonto.</p>
+    <h3>Was auf grossen Bildschirmen anders aussieht</h3>
+    <ul>
+      <li>Die Reiter stehen <strong>links als Leiste</strong> statt unten.</li>
+      <li><strong>Musik</strong> hat dort einen eigenen Eintrag. Für den
+        Vorstand auch <strong>Gruppen</strong>.</li>
+      <li>Was auf dem Telefon <strong>Mehr</strong> heisst, heisst hier
+        <strong>Einstellungen</strong>.</li>
+      <li>Die Anleitungen stehen bei einem breiten Fenster unten links unter
+        <strong>Hilfe</strong>.</li>
+    </ul>
+    <p>Auf dem Telefon im Browser sieht «Mein Bereich» aus wie die App: die
+      Reiter unten, Musik, Gruppen und Hilfe unter <strong>Mehr</strong>.</p>
     <aside class="note">
-      <b>Beide Apps können dasselbe.</b> Sie sehen nur unterschiedlich aus,
-      weil jede den Gestaltungsregeln ihres Systems folgt.<span
-      class="nur-bildschirm"> Oben lässt sich umschalten, welche Bilder du
-      sehen willst.</span>
+      <b>Keine Mitteilungen im Browser.</b> Der Browser zeigt keine
+      Meldungen aufs Gerät. Was du unter Benachrichtigungen eingeschaltet
+      hast, kommt per E-Mail.
     </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/ios/01-anlaesse.jpg" data-ios="images/anleitung/ios/01-anlaesse.jpg" data-android="images/anleitung/android/01-anlaesse.jpg" alt="Die Anlass-Liste der App">
-    <figcaption>So sieht die App nach dem Anmelden aus</figcaption>
+    <img src="images/anleitung/web/mein-01-anlaesse.jpg" alt="Mein Bereich im Browser mit der Reiterleiste links">
+    <figcaption>«Mein Bereich» im Browser: links die Reiter, darunter die Hilfe</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="reiter">
+  <div>
+    <h2>Die Reiter auf einen Blick</h2>
+    <p>Unten in der App stehen die Reiter. Nicht alle sehen alle. Die App
+      blendet nur ein, was für dich gilt — du musst nichts einschalten.</p>
+    <table class="diff">
+      <thead>
+        <tr><th>Reiter</th><th>Was drin ist</th><th>Wer ihn sieht</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Anlässe</strong></td><td>alle Anlässe, Kalender,
+          Anmelden</td><td>alle</td></tr>
+        <tr><td><strong>Organisator</strong></td><td>deine Anlässe mit den
+          Anmeldungen</td><td>wer einen Anlass organisiert</td></tr>
+        <tr><td><strong>Lager</strong></td><td>Artikel, Lagerorte,
+          Ausleihen</td><td>Gruppe Lager und Vorstand</td></tr>
+        <tr><td><strong>Schopf</strong></td><td>Licht, Messwerte und Musik im
+          Roten Schopf</td><td>Gruppe Roter Schopf und Vorstand — und alle
+          während ihrer eigenen Schicht</td></tr>
+        <tr><td><strong>Profil</strong></td><td>deine Angaben, Anmeldungen,
+          Zugänge, Ausleihen</td><td>alle</td></tr>
+        <tr><td><strong>Mehr</strong></td><td>Musik, Newsletter, Adressbuch,
+          Hilfe, Abmelden</td><td>alle</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:.85rem">Die meisten Mitglieder sehen also drei
+      Reiter: <strong>Anlässe</strong>, <strong>Profil</strong> und
+      <strong>Mehr</strong>.</p>
+    <aside class="note">
+      <b>Schopf während der Schicht.</b> Hast du eine bestätigte Schicht,
+      erscheint der Reiter <strong>Schopf</strong> eine Stunde vor Beginn
+      und verschwindet eine Stunde nach dem Ende wieder von selbst.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/01-anlaesse.jpg" data-ios="images/anleitung/ios/01-anlaesse.jpg" data-android="images/anleitung/android/01-anlaesse.jpg" alt="Die App mit allen sechs Reitern unten">
+    <figcaption>Alle sechs Reiter — so sieht es der Vorstand</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anmelden">
   <div>
     <h2>Anmelden</h2>
-    <p>Es gibt drei Wege hinein. Der erste ist der übliche.</p>
-    <h3>Mit dem Vereins-Login</h3>
+    <p>Du meldest dich mit deinem <strong>Vereinskonto</strong> an. Es ist
+      dasselbe wie auf der Website und in der Cloud (Nextcloud).</p>
+    <h3>Mit dem Vereinskonto</h3>
     <ol class="steps">
-      <li>In der App auf <strong>Anmelden</strong> tippen.</li>
-      <li>Das Telefon fragt, ob die App die Vereins-Anmeldung verwenden
-        darf — <strong>Fortfahren</strong>.</li>
-      <li>Im Browserfenster mit deinem Vereins-Konto anmelden und die
-        Berechtigungen bestätigen.</li>
-      <li>Fertig. Die App merkt sich die Anmeldung; beim nächsten Start
-        bist du direkt drin.</li>
+      <li>Oben ist der Reiter <strong>Mitglied</strong> gewählt. Auf
+        <strong>Mit Vereinskonto anmelden</strong> tippen.</li>
+      <li>Fragt das Telefon, ob die App die Anmeldung verwenden darf:
+        <strong>Fortfahren</strong>.</li>
+      <li>Benutzername oder E-Mail und Passwort eingeben.</li>
+      <li>Fertig. Die App bringt dich zurück und zeigt die Anlässe.</li>
     </ol>
+    <p>Die App merkt sich die Anmeldung. Benutzt du sie mindestens einmal
+      innert 30 Tagen, bleibst du angemeldet.</p>
     <h3>Mit QR-Code</h3>
-    <p>Macht dir die Anmeldung Mühe, oder nutzt du keine E-Mail? Dann
-      druckt dir der Vorstand einen <strong>QR-Code</strong> aus. In der
-      App auf <strong>Mit QR-Code anmelden</strong> tippen und den Zettel
-      vor die Kamera halten — fertig, ohne Benutzername und ohne Passwort.
-      Beim ersten Mal fragt das Telefon nach der Kamera-Erlaubnis.</p>
-    <p>Du siehst danach genau dasselbe wie alle anderen: deine Anlässe,
-      dein Profil, deine Anmeldungen. Der QR-Code ist nur ein bequemerer
-      Weg hinein, kein zweites Konto.</p>
+    <p>Keine E-Mail, oder ist dir die Anmeldung zu umständlich? Dann druckt
+      dir der Vorstand ein Mitglieder-Datenblatt mit einem Login-Code.</p>
+    <ol class="steps">
+      <li>Oben auf den Reiter <strong>QR-Code</strong> tippen.</li>
+      <li><strong>QR-Code scannen</strong> tippen. Beim ersten Mal fragt das
+        Telefon nach der Kamera — erlauben.</li>
+      <li>Den Code auf dem Blatt vor die Kamera halten. Fertig.</li>
+    </ol>
     <aside class="note">
-      <b>Den Zettel gut aufbewahren.</b> Wer ihn hat, kommt in dein Konto.
-      Ist er verloren gegangen, sag dem Vorstand Bescheid — er sperrt den
+      <b>Das Blatt gut aufbewahren.</b> Wer es hat, kommt in dein Konto.
+      Ist es verloren gegangen, sag dem Vorstand Bescheid. Er sperrt den
       alten Code und druckt einen neuen.
     </aside>
-    <h3>Passwort vergessen</h3>
-    <p>Wenn du beim Anmelden nicht weiterkommst, weil das Passwort fehlt:
-      siehe den <a href="#passwort">nächsten Abschnitt</a>. Das
-      Vereins-Passwort lässt sich selbst zurücksetzen — direkt in der App
-      oder über die Website.</p>
+    <h3>Externe Organisatoren</h3>
+    <p>Organisierst du einen Anlass, bist aber nicht Mitglied? Dann tippst
+      du ganz unten auf <strong>Externer Organisator? Hier anmelden</strong>
+      und gibst E-Mail und Passwort ein, die du für deinen Anlass bekommen
+      hast. Mitglieder melden sich immer mit dem Vereinskonto an — auch
+      wenn sie organisieren.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/ios/05-profil.jpg" data-ios="images/anleitung/ios/05-profil.jpg" data-android="images/anleitung/android/05-profil.jpg" alt="Das Profil nach dem Anmelden">
-    <figcaption>Nach der Anmeldung: dein Profil</figcaption>
+    <img src="images/anleitung/ios/12-login.jpg" data-ios="images/anleitung/ios/12-login.jpg" data-android="images/anleitung/android/12-login.jpg" alt="Anmeldebildschirm mit den Reitern Mitglied und QR-Code">
+    <figcaption>Anmelden: Mitglied oder QR-Code</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="passwort">
   <div>
     <h2>Passwort vergessen</h2>
-    <p>Es gibt nur <em>ein</em> Vereins-Passwort — dasselbe für die App und
-      für die Website. Zurücksetzen kannst du es selbst, ohne dass jemand
-      aus dem Vorstand etwas tun muss. Zwei Wege führen zum Ziel; welchen
-      du nimmst, spielt keine Rolle.</p>
-    <p><strong>Auch wenn du noch nie eines hattest:</strong> Der Verein hat
-      nie Passwörter verschickt. Wer sich zum ersten Mal anmeldet, geht
-      denselben Weg — der Knopf heisst <em>Passwort vergessen</em>, setzt
-      aber genauso ein erstes.</p>
-
+    <p>Es gibt nur <em>ein</em> Vereins-Passwort — dasselbe für App, Website
+      und Cloud. Zurücksetzen kannst du es selbst.</p>
+    <p><strong>Auch wenn du noch nie eines hattest:</strong> Der Verein
+      verschickt keine Passwörter. Wer sich zum ersten Mal anmeldet, geht
+      denselben Weg und setzt so sein erstes Passwort.</p>
     <h3>In der App</h3>
-    <p>Der kürzere Weg, wenn du das Telefon ohnehin in der Hand hast: er
-      bleibt ganz in der App, ein Browser wird nicht gebraucht.</p>
     <ol class="steps">
-      <li>Auf dem Anmeldebildschirm unten auf
-        <strong>Passwort vergessen</strong> tippen.</li>
+      <li>Auf dem Anmeldebildschirm auf <strong>Passwort vergessen?</strong>
+        tippen.</li>
       <li>Die E-Mail-Adresse eingeben, die der Verein von dir hat, und
-        <strong>Code anfordern</strong> drücken.</li>
-      <li>In den Posteingang schauen — dort steht ein Zahlencode.</li>
-      <li>Code und das neue Passwort eintippen und bestätigen. Danach bist
-        du gleich angemeldet.</li>
+        <strong>Code anfordern</strong> tippen.</li>
+      <li>Im Posteingang nachsehen. Dort steht ein Zahlencode.</li>
+      <li>Den <strong>Code aus der E-Mail</strong> und zweimal das neue
+        Passwort eingeben, dann <strong>Passwort setzen</strong>. Danach
+        bist du gleich angemeldet.</li>
     </ol>
-
     <h3>Auf der Website</h3>
-    <p>Kein Telefon zur Hand, oder du sitzt sowieso am Rechner:</p>
-    <ol class="steps">
-      <li>Auf der Anmeldeseite unten auf
-        <strong>Benutzername oder Passwort vergessen?</strong> klicken.</li>
-      <li>Die E-Mail-Adresse eingeben und <strong>Continue</strong>
-        drücken.</li>
-      <li>Der Link in der E-Mail führt auf eine Seite, auf der du ein neues
-        Passwort setzt.</li>
-      <li>Mit dem neuen Passwort anmelden — in der App wie auf der
-        Website.</li>
-    </ol>
+    <p>Sitzt du am Computer, geht es auch über die Anmeldeseite: unten auf
+      <strong>Benutzername oder Passwort vergessen?</strong> klicken, die
+      E-Mail-Adresse eingeben und dem Link in der E-Mail folgen.</p>
     <aside class="note">
       <b>Keine E-Mail bekommen?</b> Zuerst im Spam-Ordner nachsehen. Kommt
       dort nichts an, ist unter dieser Adresse vermutlich kein Konto
-      hinterlegt — dann hilft nur der Vorstand weiter.
+      hinterlegt. Dann hilft der Vorstand weiter.
     </aside>
-    <p>Den Weg gibt es auch direkt:
-      <code>auth.fwv-raura.ch/if/flow/password-recovery/</code></p>
-    <p>Ausführlicher, mit allem was schiefgehen kann, steht das in der
+    <p>Ausführlicher steht das in der
       <a href="anleitung-passwort.html">Anleitung zum Passwort</a>.</p>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/gemeinsam-auth-recovery.jpg" alt="Formular zum Zurücksetzen des Passworts">
+    <img src="images/anleitung/gemeinsam-auth-recovery.jpg" alt="Formular zum Zurücksetzen des Passworts auf der Website">
     <figcaption>Der Weg über die Website: E-Mail eingeben</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anlaesse">
   <div>
-    <h2>Anlässe ansehen</h2>
-    <p>Der erste Tab zeigt alle Anlässe des Vereins. Oben schaltest du
-      zwischen <strong>Liste</strong> und <strong>Kalender</strong> um.</p>
-    <p>Die Liste zeigt Titel, Datum und Ort untereinander — gut, um zu
-      sehen, was als Nächstes ansteht. Der Kalender zeigt den Monat mit
-      farbigen Punkten an den Tagen: jede Farbe steht für eine Art von
-      Eintrag, von Anlässen über Vorstandssitzungen bis zu fälligen
-      Beiträgen. Tippst du einen Tag an, erscheinen darunter nur dessen
-      Einträge.</p>
-    <p>Ein Tipp auf einen Anlass öffnet die Einzelheiten: Datum, Ort,
-      Kosten, Organisator, Beschreibung — und die Schichten, falls es
-      welche gibt.</p>
+    <h2>Anlässe finden</h2>
+    <p>Der Reiter <strong>Anlässe</strong> zeigt, was im Verein ansteht.
+      Oben schaltest du zwischen <strong>Liste</strong> und
+      <strong>Kalender</strong> um.</p>
+    <h3>Liste</h3>
+    <p>Jede Karte zeigt Titel, Datum und Ort. Darunter steht ein farbiger
+      Vermerk, zum Beispiel:</p>
+    <ul>
+      <li><strong>Helfer gesucht</strong> — es gibt Schichten mit freien
+        Plätzen.</li>
+      <li><strong>Anmeldung offen</strong> — du kannst dich als Gast
+        anmelden.</li>
+      <li><strong>Anmeldeschluss vorbei</strong> oder
+        <strong>Ausgebucht</strong> — anmelden geht nicht mehr.</li>
+    </ul>
+    <p>Ganz unten stehen Ideen, für die es noch kein Datum gibt.</p>
+    <h3>Kalender</h3>
+    <p>Der Kalender zeigt einen Monat. Ein roter Punkt unter einem Tag heisst:
+      An diesem Tag ist etwas los. Mit den Pfeilen blätterst du. Unter dem
+      Kalender stehen die Einträge des Monats. Tippst du einen Tag an,
+      stehen dort nur noch die Einträge dieses Tages.</p>
+    <h3>Kalender abonnieren</h3>
+    <p>Oben rechts das Kalender-Symbol: <strong>Kalender abonnieren</strong>.
+      Dann stehen alle Anlässe in deiner eigenen Kalender-App und bleiben
+      von selbst aktuell.</p>
+    <ul>
+      <li><strong>iPhone:</strong> <strong>In der Kalender-App
+        abonnieren</strong> tippen — fertig.</li>
+      <li><strong>Google Kalender:</strong> <strong>Link kopieren</strong>,
+        dann im Browser calendar.google.com öffnen, «Weitere Kalender» →
+        «Per URL» und den Link einfügen.</li>
+    </ul>
+    <h3>Anlass vorschlagen</h3>
+    <p>Hast du eine Idee für einen Anlass? Oben rechts auf <strong>+</strong>
+      tippen, Titel, Datum und Beschreibung ausfüllen und <strong>Vorschlag
+      senden</strong>. Der Vorstand prüft den Vorschlag und meldet sich.</p>
   </div>
   <figure class="shot">
     <img src="images/anleitung/ios/02-kalender.jpg" data-ios="images/anleitung/ios/02-kalender.jpg" data-android="images/anleitung/android/02-kalender.jpg" alt="Monatsansicht des Kalenders">
-    <figcaption>Kalender mit farbigen Punkten je Eintragsart</figcaption>
+    <figcaption>Der Kalender mit den Anlässen des Monats</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anlass">
+  <div>
+    <h2>Ein Anlass im Detail</h2>
+    <p>Ein Tipp auf einen Anlass öffnet alles, was du wissen musst: Datum,
+      Zeit, Ort, Kosten, wer organisiert, bis wann man sich anmelden kann
+      und eine Beschreibung.</p>
+    <p>Hat der Anlass Schichten, stehen sie darunter, jede mit ihrem Stand:
+      <strong>3 Plätze frei</strong> oder <strong>voll</strong>.</p>
+    <h3>Die Knöpfe unten</h3>
+    <ul>
+      <li><strong>Helfen</strong> — du trägst dich für Schichten ein.</li>
+      <li><strong>Anmelden</strong> — du meldest dich als Gast an (bei
+        Anlässen ohne Schichten).</li>
+      <li><strong>Arbeitsplan ansehen</strong> — wer wann wo arbeitet. Oben
+        rechts gibt es den Plan als <strong>PDF</strong> zum Speichern oder
+        Weiterschicken.</li>
+    </ul>
+    <p>Kann man sich nicht anmelden, steht unten stattdessen der Grund,
+      zum Beispiel dass der Anmeldeschluss vorbei ist.</p>
+    <h3>In den eigenen Kalender</h3>
+    <p>Oben rechts das Kalender-Symbol <strong>Zum Kalender</strong> legt
+      diesen einen Anlass in deinen Kalender.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/03-anlass-detail.jpg" data-ios="images/anleitung/ios/03-anlass-detail.jpg" data-android="images/anleitung/android/03-anlass-detail.jpg" alt="Ein Anlass mit Schichten und den Knöpfen Helfen und Arbeitsplan ansehen">
+    <figcaption>Anlass mit Schichten, unten Helfen und Arbeitsplan</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="mithelfen">
   <div>
-    <h2>Mithelfen oder teilnehmen</h2>
-    <p>Unten auf der Anlass-Seite steht ein Knopf. Wie er heisst, hängt
-      vom Anlass ab:</p>
-    <ul>
-      <li><strong>Helfen</strong> — der Anlass hat Schichten. Du wählst
-        eine oder mehrere aus.</li>
-      <li><strong>Anmelden</strong> — es geht um deine Teilnahme. Du gibst
-        an, mit wie vielen Personen du kommst, und kannst Allergien
-        vermerken.</li>
-    </ul>
-    <p>Name, E-Mail und Telefon sind aus deinem Profil vorausgefüllt. Du
-      kannst sie ändern, etwa wenn du jemanden mit anmeldest.</p>
+    <h2>So meldest du dich für eine Schicht an</h2>
+    <ol class="steps">
+      <li>Im Reiter <strong>Anlässe</strong> den Anlass antippen.</li>
+      <li>Unten auf <strong>Helfen</strong> tippen.</li>
+      <li>Unter «Schichten» eine oder mehrere Schichten ankreuzen. Volle
+        Schichten lassen sich nicht wählen.</li>
+      <li>Name, E-Mail und Telefon prüfen. Sie kommen aus deinem Profil und
+        lassen sich hier ändern.</li>
+      <li>Wenn nötig eine <strong>Bemerkung</strong> schreiben, etwa «Nur bis
+        19 Uhr».</li>
+      <li><strong>Anmeldung senden</strong> tippen.</li>
+    </ol>
+    <p>Die Anmeldung geht an den Organisator. Er bestätigt sie — oder
+      schlägt dir eine andere Schicht vor, wenn deine schon voll ist. Wie es
+      steht, siehst du unter <a href="#anmeldungen">Meine
+      Anmeldungen</a>.</p>
+    <h3>Als Gast anmelden</h3>
+    <p>Heisst der Knopf <strong>Anmelden</strong>, geht es um deine
+      Teilnahme. Du gibst an, mit wie vielen <strong>Personen</strong> du
+      kommst, und kannst <strong>Allergien / Unverträglichkeiten</strong>
+      vermerken. Dann <strong>Anmeldung senden</strong>.</p>
     <aside class="note">
-      <b>Kein Knopf sichtbar?</b> Dann verlangt dieser Anlass keine
-      Anmeldung — etwa ein Ausflug, zu dem man einfach kommt.
+      <b>Kein Knopf sichtbar?</b> Dann braucht es für diesen Anlass keine
+      Anmeldung — etwa beim Grillabend, zu dem man einfach kommt.
     </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/ios/04-anmeldung.jpg" data-ios="images/anleitung/ios/04-anmeldung.jpg" data-android="images/anleitung/android/04-anmeldung.jpg" alt="Schichtauswahl beim Anmelden">
-    <figcaption>Schichten auswählen, Kontakt ist vorausgefüllt</figcaption>
+    <img src="images/anleitung/ios/04-anmeldung.jpg" data-ios="images/anleitung/ios/04-anmeldung.jpg" data-android="images/anleitung/android/04-anmeldung.jpg" alt="Formular Helfen mit Schichtauswahl und Kontakt">
+    <figcaption>Schichten ankreuzen, Kontakt ist schon ausgefüllt</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="anmeldungen">
   <div>
     <h2>Meine Anmeldungen</h2>
-    <p>Im Profil unter <strong>Meine Anmeldungen</strong> siehst du alles,
-      wozu du dich eingetragen hast — mit Datum, Ort und den Schichten,
-      die dir zugeteilt sind.</p>
-    <p>Der farbige Vermerk rechts sagt, wie es um die Anmeldung steht:</p>
+    <p>Im Reiter <strong>Profil</strong> unter <strong>Meine
+      Anmeldungen</strong> siehst du alles, wofür du dich eingetragen hast —
+      mit Datum, Ort und deinen Schichten. Ein Tipp öffnet den Anlass.</p>
+    <p>Der farbige Vermerk rechts zeigt den Stand:</p>
     <ul>
-      <li><strong>offen</strong> — der Organisator hat sie noch nicht
-        angesehen</li>
-      <li><strong>bestätigt</strong> — du bist eingeteilt</li>
+      <li><strong>offen</strong> — der Organisator hat noch nicht
+        entschieden.</li>
+      <li><strong>bestätigt</strong> — du bist eingeteilt.</li>
       <li><strong>abgelehnt</strong> — meist, weil die Schicht schon voll
-        war</li>
+        war.</li>
     </ul>
+    <aside class="note">
+      <b>Doch nicht dabei?</b> Zurückziehen kannst du eine Anmeldung in der
+      App nicht. Melde
+      dich beim Organisator; sein Name steht beim Anlass unter
+      «Organisation».
+    </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/ios/06-meine-anmeldungen.jpg" data-ios="images/anleitung/ios/06-meine-anmeldungen.jpg" data-android="images/anleitung/android/06-meine-anmeldungen.jpg" alt="Liste der eigenen Anmeldungen">
-    <figcaption>Eigene Anmeldungen mit Status</figcaption>
+    <img src="images/anleitung/ios/06-meine-anmeldungen.jpg" data-ios="images/anleitung/ios/06-meine-anmeldungen.jpg" data-android="images/anleitung/android/06-meine-anmeldungen.jpg" alt="Liste der eigenen Anmeldungen mit Status">
+    <figcaption>Eigene Anmeldungen mit Stand</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="profil">
   <div>
     <h2>Profil und Foto</h2>
-    <p>Der Profil-Tab zeigt deine Angaben. Über <strong>Bearbeiten</strong>
-      oben rechts änderst du Name, Kontakt und Adresse selbst — es braucht
-      niemanden im Vorstand dafür.</p>
-    <p>Beim Profilfoto hast du die Wahl zwischen Mediathek und Kamera. Die
-      App verkleinert das Bild vor dem Hochladen, du musst dich also nicht
-      um die Dateigrösse kümmern. Entfernen geht ebenfalls, mit Rückfrage.</p>
-    <p><strong>Status</strong> und <strong>Funktion</strong> lassen sich
-      nicht selbst ändern — die pflegt der Vorstand.</p>
-    <p>Ganz unten steht <strong>Austritt beantragen</strong>. Der Antrag
-      löscht nichts und beendet nichts: Er geht an den Vorstand, der
-      darüber entscheidet.</p>
+    <p>Der Reiter <strong>Profil</strong> zeigt, was der Verein von dir
+      weiss: Kontakt, Adresse, Geburtstag, Status und IBAN.</p>
+    <h3>Angaben ändern</h3>
+    <ol class="steps">
+      <li>Oben rechts auf den Stift tippen — oder weiter unten auf
+        <strong>Profil bearbeiten</strong>.</li>
+      <li>Ändern, was nicht mehr stimmt: Name, E-Mail, Telefon, Adresse,
+        Geburtstag, IBAN.</li>
+      <li>Oben rechts <strong>Speichern</strong> tippen.</li>
+    </ol>
+    <h3>Profilfoto</h3>
+    <p>In <strong>Profil bearbeiten</strong> wählst du
+      <strong>Kamera</strong> oder <strong>Galerie</strong>. Die App
+      verkleinert das Bild selbst. Mit <strong>Entfernen</strong> löschst du
+      das Foto wieder.</p>
+    <p><strong>Status</strong> und <strong>Funktion</strong> pflegt der
+      Vorstand. Stimmt dort etwas nicht, sag ihm Bescheid.</p>
+    <h3>Was sonst im Profil steht</h3>
+    <ul>
+      <li><a href="#anmeldungen">Meine Anmeldungen</a></li>
+      <li><a href="#ausleihen">Material ausleihen</a> und Meine
+        Ausleihen</li>
+      <li>unter «Konto»: <a href="#meldungen">Benachrichtigungen</a>,
+        <a href="#zugaenge">Zugänge</a> und <a href="#vpn">VPN-Zugang</a></li>
+      <li>ganz unten: <a href="#austritt">Austritt beantragen</a></li>
+    </ul>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/ios/05-profil.jpg" data-ios="images/anleitung/ios/05-profil.jpg" data-android="images/anleitung/android/05-profil.jpg" alt="Profilansicht mit Foto">
-    <figcaption>Profil mit Foto, Funktion und Kontakt</figcaption>
-  </figure>
-</section>
-
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="zugaenge">
-  <div>
-    <h2>Zugänge</h2>
-    <p>Ebenfalls im Profil: <strong>Zugänge</strong>. Hier steht, auf
-      welche Systeme du Zugriff hast — Website, Nextcloud, Vorstand-Portal
-      und was sonst für deine Funktion freigeschaltet ist.</p>
-    <p>Hast du eine Funktions-E-Mail wie <code>aktuar@fwv-raura.ch</code>,
-      findest du hier die Zugangsdaten samt Serveradressen. <strong>Das
-      Passwort kannst du hier auch ändern</strong> — das ist die einzige
-      Stelle, an der das geht.</p>
-    <aside class="note">
-      <b>Passwörter sind verdeckt.</b> Ein Tipp darauf zeigt sie an, langes
-      Drücken kopiert sie. Das schützt vor neugierigen Blicken über die
-      Schulter — mehr nicht. Zeig den Bildschirm nicht herum.
-    </aside>
-  </div>
-  <figure class="shot">
-    <img src="images/anleitung/ios/07-zugaenge.jpg" data-ios="images/anleitung/ios/07-zugaenge.jpg" data-android="images/anleitung/android/07-zugaenge.jpg" alt="Übersicht der Zugänge">
-    <figcaption>Systeme, Funktions-E-Mails, geteilte Konten</figcaption>
-  </figure>
-</section>
-
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="adressbuch">
-  <div>
-    <h2>Mitglieder im Adressbuch</h2>
-    <p>Unter <strong>Einstellungen → Mitglieder-Adressbuch einrichten</strong>
-      verbindest du dein Telefon mit dem Vereins-Adressbuch. Danach stehen
-      alle Mitglieder in deinen Kontakten, und bei einem Anruf siehst du
-      den Namen statt einer unbekannten Nummer.</p>
-    <p>Der bequeme Weg ist das Profil zum Installieren; die App bietet es
-      an. Wer lieber von Hand einrichtet, findet dort auch den Servernamen
-      zum Kopieren und die Schritte einzeln aufgeführt.</p>
-    <p>Die Kontakte bleiben von allein aktuell — das Adressbuch wird
-      nachts aufgefrischt. Voraussetzung ist ein Nextcloud-Konto.</p>
-  </div>
-  <figure class="shot">
-    <img src="images/anleitung/ios/10-adressbuch.jpg" data-ios="images/anleitung/ios/10-adressbuch.jpg" data-android="images/anleitung/android/10-adressbuch.jpg" alt="Anleitung zum Adressbuch">
-    <figcaption>Adressbuch einrichten</figcaption>
+    <img src="images/anleitung/ios/05-profil.jpg" data-ios="images/anleitung/ios/05-profil.jpg" data-android="images/anleitung/android/05-profil.jpg" alt="Profilansicht mit Kontaktangaben">
+    <figcaption>Dein Profil — oben rechts der Stift zum Bearbeiten</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="meldungen">
   <div>
     <h2>Benachrichtigungen</h2>
-    <p>Unter <strong>Einstellungen → Benachrichtigungen</strong> legst du
-      fest, worüber du informiert wirst: Einladungen zu Anlässen,
-      Erinnerungen an Schichten, Rückmeldungen zu deinen Anmeldungen und
-      Vereinsmitteilungen.</p>
-    <p>Die Einstellungen gelten für E-Mail <em>und</em> für Meldungen aufs
-      Telefon. Schaltest du etwas ab, bekommst du es auf keinem der beiden
-      Wege.</p>
+    <p>Im <strong>Profil</strong> unter <strong>Benachrichtigungen</strong>
+      legst du fest, wovon du hören willst. Jeder Schalter gilt für sich:</p>
+    <ul>
+      <li><strong>Schicht-Erinnerungen</strong> — Erinnerung und Änderungen
+        bei deinen Schichten</li>
+      <li><strong>Anlass-Änderungen</strong> — Anmeldungen, Änderungen und
+        Absagen von Anlässen</li>
+      <li><strong>Newsletter</strong> — Vereins-Newsletter und
+        Rundmails</li>
+      <li><strong>Allgemeine Mitteilungen</strong> — sonstige Informationen
+        vom Vorstand</li>
+    </ul>
+    <p>Die Schalter werden sofort gespeichert.</p>
+    <h3>Dieses Gerät</h3>
+    <p>Unten steht, ob das Telefon Mitteilungen zeigen darf. Steht dort
+      <strong>Mitteilungen erlauben</strong>, einmal antippen und zustimmen.
+      Steht dort, dass Mitteilungen abgeschaltet sind, erlaubst du sie in
+      den Einstellungen des Telefons.</p>
     <aside class="note">
-      <b>Meldungen aufs iPhone kommen noch nicht.</b> Die Einstellungen
-      wirken bereits für E-Mail; die Zustellung aufs Gerät wird gerade
-      eingerichtet. Auf Android funktioniert sie schon.
+      <b>«Mitteilungen aufs Gerät gibt es hier noch nicht»?</b> Dann kommen
+      die gewählten Meldungen per E-Mail. Das gilt auch im Browser.
     </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/ios/09-benachrichtigungen.jpg" data-ios="images/anleitung/ios/09-benachrichtigungen.jpg" data-android="images/anleitung/android/09-benachrichtigungen.jpg" alt="Benachrichtigungs-Einstellungen">
+    <img src="images/anleitung/ios/09-benachrichtigungen.jpg" data-ios="images/anleitung/ios/09-benachrichtigungen.jpg" data-android="images/anleitung/android/09-benachrichtigungen.jpg" alt="Schalter für die Arten von Benachrichtigungen">
     <figcaption>Vier Arten, einzeln schaltbar</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="zugaenge">
+  <div>
+    <h2>Zugänge</h2>
+    <p>Im <strong>Profil</strong> unter <strong>Zugänge</strong> steht, wo
+      du überall hineinkommst. Was du siehst, hängt von deiner Funktion ab.
+      Die meisten Mitglieder sehen nur «Systeme».</p>
+    <ul>
+      <li><strong>Systeme</strong> — Website, Cloud und weitere, mit deiner
+        Rolle. Ein Tipp öffnet sie.</li>
+      <li><strong>Funktions-E-Mails</strong> — etwa
+        <code>aktuar@fwv-raura.ch</code>, mit Server und Passwort.</li>
+      <li><strong>Cloud-Ordner</strong> — welche Ordner in der Cloud du
+        siehst.</li>
+      <li><strong>Netzlaufwerk</strong> — Adresse, Benutzer und Passwort
+        für die Dateiablage.</li>
+      <li><strong>Geteilte Konten</strong> — Zugänge, die mehrere
+        gemeinsam nutzen.</li>
+    </ul>
+    <h3>Passwort einer Funktions-E-Mail ändern</h3>
+    <ol class="steps">
+      <li>Bei der Funktions-E-Mail auf <strong>Passwort ändern</strong>
+        tippen.</li>
+      <li>Das <strong>Neue Passwort</strong> zweimal eingeben, mindestens 12
+        Zeichen.</li>
+      <li><strong>Passwort setzen</strong> tippen. Es gilt sofort — auch für
+        alle anderen, die dieses Postfach nutzen.</li>
+    </ol>
+    <aside class="note">
+      <b>Passwörter sind verdeckt.</b> Das Auge zeigt sie an, das Symbol
+      daneben kopiert sie, ohne sie aufzudecken. Zeig den Bildschirm nicht
+      herum.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/07-zugaenge.jpg" data-ios="images/anleitung/ios/07-zugaenge.jpg" data-android="images/anleitung/android/07-zugaenge.jpg" alt="Zugänge mit Systemen, Funktions-E-Mail und Cloud-Ordnern">
+    <figcaption>Systeme, Funktions-E-Mail und Cloud-Ordner</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="vpn">
+  <div>
+    <h2>VPN-Zugang</h2>
+    <p>Über VPN verbindet sich dein Gerät mit dem Vereinsnetz — für die
+      Dateiablage und das Netz im Roten Schopf. Nur der Vereinsverkehr läuft
+      durch; dein übriges Surfen bleibt, wie es ist.</p>
+    <p>Du brauchst dazu die kostenlose App <strong>WireGuard</strong> aus
+      dem App Store oder Play Store.</p>
+    <ol class="steps">
+      <li>Im <strong>Profil</strong> auf <strong>VPN-Zugang</strong>
+        tippen.</li>
+      <li>Einen Gerätenamen eingeben, zum Beispiel <code>handy</code> oder
+        <code>laptop</code>.</li>
+      <li><strong>Zugang erstellen</strong> tippen.</li>
+      <li><strong>In WireGuard öffnen</strong> tippen und die WireGuard-App
+        wählen. Dort den Tunnel einschalten.</li>
+    </ol>
+    <aside class="note">
+      <b>Die Einstellungen kommen nur einmal.</b> Aus Sicherheitsgründen
+      zeigt die App sie nur direkt nach dem Erstellen. Verlierst du sie,
+      löschst du das Gerät und legst einen neuen Zugang an.
+    </aside>
+    <p>Unter «Deine Geräte» siehst du alle Zugänge. Mit dem Papierkorb
+      entfernst du einen — das Gerät kommt danach nicht mehr ins
+      Vereinsnetz.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/18-vpn.jpg" data-ios="images/anleitung/ios/18-vpn.jpg" data-android="images/anleitung/android/18-vpn.jpg" alt="VPN-Zugang mit zwei Geräten">
+    <figcaption>Deine Geräte und ein neuer Zugang</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="ausleihen">
+  <div>
+    <h2>Material ausleihen</h2>
+    <p>Festbänke, Geschirr, ganze Kisten: Was der Verein im Lager hat, kannst
+      du selbst ausleihen. Jedes Mitglied darf das.</p>
+    <ol class="steps">
+      <li>Im <strong>Profil</strong> auf <strong>Material ausleihen</strong>
+        tippen.</li>
+      <li>Den Zeitraum wählen — vom Abholen bis zum Zurückbringen. Ändern
+        geht oben mit <strong>Ändern</strong>.</li>
+      <li>Die App zeigt, was in dieser Zeit frei ist. Bei Artikeln die Menge
+        mit <strong>+</strong> und <strong>−</strong> einstellen, ganze Kisten
+        ankreuzen.</li>
+      <li><strong>Weiter</strong> tippen.</li>
+      <li>Alles prüfen, wenn du willst eine Notiz schreiben (wofür,
+        Abholzeit) und <strong>Verbindlich ausleihen</strong> tippen.</li>
+    </ol>
+    <p>Die Ausleihe ist damit sofort reserviert. Das Lager wird
+      benachrichtigt, und du bekommst eine Bestätigung per E-Mail.</p>
+    <h3>Meine Ausleihen</h3>
+    <p>Gleich darunter im Profil: <strong>Meine Ausleihen</strong>. Dort
+      siehst du, was du reserviert oder abgeholt hast.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/19-material-ausleihen.jpg" data-ios="images/anleitung/ios/19-material-ausleihen.jpg" data-android="images/anleitung/android/19-material-ausleihen.jpg" alt="Ausleihen mit Zeitraum, Artikeln und Kisten">
+    <figcaption>Zeitraum, Mengen, Kisten — dann Weiter</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="austritt">
+  <div>
+    <h2>Austritt beantragen</h2>
+    <p>Ganz unten im <strong>Profil</strong> steht <strong>Austritt
+      beantragen</strong>.</p>
+    <ol class="steps">
+      <li>Wenn du willst, ein <strong>Wunschdatum</strong> und eine
+        <strong>Begründung</strong> angeben. Beides ist freiwillig.</li>
+      <li>Unten auf <strong>Austritt beantragen</strong> tippen.</li>
+      <li>Die Rückfrage mit <strong>Antrag senden</strong> bestätigen.</li>
+    </ol>
+    <p>Der Antrag löscht nichts und beendet nichts. Er geht an den
+      Vorstand. Deine Mitgliedschaft und deine Daten bleiben bestehen, bis
+      der Vorstand gemäss Statuten entschieden hat.</p>
+    <aside class="note">
+      <b>Danach bist du abgemeldet.</b> Nach dem Senden meldet die App dich
+      ab.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/21-austritt.jpg" data-ios="images/anleitung/ios/21-austritt.jpg" data-android="images/anleitung/android/21-austritt.jpg" alt="Rückfrage vor dem Austritts-Antrag">
+    <figcaption>Vor dem Senden fragt die App nach</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="mehr">
+  <div>
+    <h2>Mehr: die Einstellungen</h2>
+    <p>Der letzte Reiter heisst <strong>Mehr</strong>. Oben steht, mit
+      welchem Konto du angemeldet bist. Darunter:</p>
+    <ul>
+      <li><strong>Musik</strong> — Playlists und Radio, siehe
+        <a href="#musik">Musik</a>.</li>
+      <li><strong>Bildschirm Roter Schopf</strong> — live sehen, was auf dem
+        Laptop im Lokal läuft. Wer den Reiter Schopf hat, findet ihn
+        dort.</li>
+      <li><strong>Gruppen verwalten</strong> — nur für den Vorstand, siehe
+        <a href="#gruppen">Für den Vorstand</a>.</li>
+      <li><strong>Newsletter abonniert</strong> — der Schalter meldet dich
+        beim Vereins-Newsletter an oder ab.</li>
+      <li><strong>Adressbuch</strong> — die Mitglieder in deine Kontakte,
+        siehe <a href="#adressbuch">nächstes Kapitel</a>.</li>
+      <li><strong>Hilfe</strong>, <strong>Version</strong> und
+        <strong>Abmelden</strong>.</li>
+    </ul>
+    <aside class="note">
+      <b>Newsletter bestätigen.</b> Beim Abonnieren schickt der Verein eine
+      E-Mail mit einem Link. Erst mit diesem Klick bist du dabei. Der
+      Schalter zeigt, was du zuletzt hier gewählt hast.
+    </aside>
+    <p>Im Browser heisst dieser Reiter <strong>Einstellungen</strong>.
+      Musik und Gruppen stehen dort als eigene Einträge in der Leiste.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/08-einstellungen.jpg" data-ios="images/anleitung/ios/08-einstellungen.jpg" data-android="images/anleitung/android/08-einstellungen.jpg" alt="Der Reiter Mehr mit Musik, Vorstand, Newsletter und Adressbuch">
+    <figcaption>Mehr: Musik, Newsletter, Adressbuch</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="adressbuch">
+  <div>
+    <h2>Mitglieder im Adressbuch</h2>
+    <p>Du kannst alle Mitglieder in die Kontakte deines Telefons holen.
+      Dann zeigt es bei einem Anruf den Namen statt einer unbekannten
+      Nummer. Die Kontakte bleiben von selbst aktuell.</p>
+    <h3>Android: Kontakte abgleichen</h3>
+    <p>Nach der ersten Anmeldung fragt die App: «Mitglieder ins Adressbuch
+      übernehmen?» Mit <strong>Ja, übernehmen</strong> ist es erledigt.</p>
+    <p>Später geht es unter <strong>Mehr</strong> → «Adressbuch» mit dem
+      Schalter <strong>Kontakte abgleichen</strong>. Die Mitglieder stehen
+      dann im Konto «FWV Raura».</p>
+    <ul>
+      <li><strong>Jetzt abgleichen</strong> holt sofort den neusten
+        Stand.</li>
+      <li><strong>Gelöschte wiederherstellen</strong> holt Kontakte zurück,
+        die du von Hand gelöscht hast.</li>
+      <li>Schalter aus oder abmelden: Die FWV-Kontakte verschwinden wieder
+        vom Telefon.</li>
+    </ul>
+    <h3>iPhone und Computer: über die Cloud</h3>
+    <p>Hier richtest du das Adressbuch einmal als Konto ein. Unter
+      <strong>Mehr</strong> auf <strong>Mitglieder-Adressbuch
+      einrichten</strong> tippen.</p>
+    <ul>
+      <li>Am einfachsten: <strong>Profil installieren</strong>. Safari lädt
+        ein Profil; in den Einstellungen des iPhones bestätigen und das
+        Cloud-Passwort eingeben. Der Hinweis «Nicht verifiziert» ist
+        normal.</li>
+      <li>Oder von Hand: Die App zeigt den Server
+        <code>nextcloud.fwv-raura.ch</code> und die Schritte einzeln.</li>
+    </ul>
+    <aside class="note">
+      <b>Du brauchst ein Cloud-Konto.</b> Der Weg über die Cloud braucht
+      Benutzername und Passwort für die Nextcloud. Mehr dazu in der
+      <a href="anleitung-nextcloud.html">Anleitung Cloud</a>.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/10-adressbuch.jpg" data-ios="images/anleitung/ios/10-adressbuch.jpg" data-android="images/anleitung/android/10-adressbuch.jpg" alt="Adressbuch einrichten">
+    <figcaption>Adressbuch einrichten</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="hilfe">
+  <div>
+    <h2>Hilfe, Version, Abmelden</h2>
+    <p>Ganz unten unter <strong>Mehr</strong>:</p>
+    <ul>
+      <li><strong>Hilfe</strong> — die Anleitungen des Vereins: diese hier,
+        die zur Website, zum ersten Passwort und zur Cloud. Ein Tipp öffnet
+        sie im Browser.</li>
+      <li><strong>Version</strong> — welche Fassung der App du hast. Das
+        hilft, wenn du einen Fehler meldest.</li>
+      <li><strong>Abmelden</strong> — meldet dich ab. Im Browser auch auf
+        der Website.</li>
+    </ul>
+    <aside class="note">
+      <b>Etwas klappt nicht?</b> Schreib an
+      <a href="mailto:aktuar@fwv-raura.ch">aktuar@fwv-raura.ch</a> und
+      sag, was du getan hast, was passiert ist und welche Version du
+      hast.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/20-hilfe.jpg" data-ios="images/anleitung/ios/20-hilfe.jpg" data-android="images/anleitung/android/20-hilfe.jpg" alt="Hilfe mit den Anleitungen, Version und Abmelden">
+    <figcaption>Hilfe, Version und Abmelden</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="musik">
+  <div>
+    <h2>Musik</h2>
+    <p>Im Roten Schopf spielt ein Laptop die Musik. Was er spielt, stellen
+      die Mitglieder zusammen — auch du. Du findest es unter
+      <strong>Mehr</strong> → <strong>Musik</strong>.</p>
+    <h3>Playlists</h3>
+    <ul>
+      <li><strong>Alle Titel</strong> spielt die ganze Sammlung
+        zufällig.</li>
+      <li>Das Dreieck neben einer Playlist spielt sie auf deinem Telefon ab
+        — zum Vorhören.</li>
+      <li><strong>Neue Playlist</strong>: Namen geben, über
+        <strong>Titel suchen</strong> Lieder hinzufügen, dann
+        speichern.</li>
+      <li>Mit dem Papierkorb löschst du eine Playlist. Sie verschwindet dann
+        auch vom Laptop im Lokal.</li>
+    </ul>
+    <h3>Radiosender</h3>
+    <p>Im zweiten Reiter <strong>Radiosender</strong> stehen die Sender,
+      die der Laptop kennt. Auch die kannst du auf dem Telefon hören.</p>
+    <aside class="note">
+      <b>Der Laptop holt sich alles selbst.</b> Neue oder geänderte
+      Playlists sind nach ein paar Minuten im Lokal. Die Musik dort
+      <em>fernsteuern</em> geht im Reiter <a href="#schopf">Schopf</a>.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/17-musik.jpg" data-ios="images/anleitung/ios/17-musik.jpg" data-android="images/anleitung/android/17-musik.jpg" alt="Musik mit Playlists und Radiosendern">
+    <figcaption>Playlists — hören oder neu zusammenstellen</figcaption>
   </figure>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="organisator">
   <div>
+    <p class="fuer">Nur für Organisatoren</p>
     <h2>Für Organisatoren</h2>
-    <p>Organisierst du selbst einen Anlass, bekommst du einen zusätzlichen
-      Tab. Der Verein erkennt das an der E-Mail-Adresse, die beim Anlass
-      als Organisator hinterlegt ist — du musst nichts einschalten.</p>
-    <p>Dort siehst du deine Anlässe mit allen Anmeldungen und kannst:</p>
-    <ul>
-      <li>Anmeldungen <strong>genehmigen</strong> oder ablehnen</li>
-      <li>jemanden von Hand <strong>erfassen</strong>, der telefonisch
-        zugesagt hat</li>
-      <li>alle Angemeldeten <strong>benachrichtigen</strong></li>
-      <li>eine <strong>andere Schicht vorschlagen</strong>, wenn eine voll
-        und eine andere leer ist</li>
-      <li>über <strong>Mehr</strong>: Anlass und Schichten bearbeiten,
-        Notizen mit Fotos anlegen, Rezepte und Material verwalten,
-        Teilnehmerliste und Aushang als PDF öffnen</li>
-    </ul>
-    <p>Nach dem Benachrichtigen zeigt die App, wen die Nachricht
-      <em>nicht</em> erreicht hat. Diese Liste lohnt einen Blick — wer
-      keine Adresse hinterlegt hat, wurde übergangen.</p>
+    <p>Organisierst du einen Anlass, bekommst du den Reiter
+      <strong>Organisator</strong>. Der Verein erkennt das am Anlass selbst
+      — du musst nichts einschalten.</p>
+    <p>Der Reiter zeigt deine Anlässe, aktuelle zuerst. Auf jeder Karte
+      steht, wie viele Anmeldungen <strong>bestätigt</strong> und wie viele
+      noch <strong>offen</strong> sind und wie viele Personen kommen. Der
+      gelbe Vermerk «1 offen» heisst: Da wartet jemand auf deine
+      Antwort.</p>
+    <p>Ein Tipp auf einen Anlass öffnet die Verwaltung — siehe nächste
+      Seite.</p>
+    <aside class="note">
+      <b>Nicht Mitglied?</b> Externe Organisatoren melden sich mit
+      <strong>Externer Organisator? Hier anmelden</strong> an. Sie sehen
+      direkt ihren einen Anlass.
+    </aside>
   </div>
   <figure class="shot">
-    <img src="images/anleitung/ios/11-organisator.jpg" data-ios="images/anleitung/ios/11-organisator.jpg" data-android="images/anleitung/android/11-organisator.jpg" alt="Organisator-Bereich">
-    <figcaption>Anmeldungen verwalten</figcaption>
+    <img src="images/anleitung/ios/11-organisator.jpg" data-ios="images/anleitung/ios/11-organisator.jpg" data-android="images/anleitung/android/11-organisator.jpg" alt="Übersicht der eigenen Anlässe im Reiter Organisator">
+    <figcaption>Deine Anlässe mit offenen Anmeldungen</figcaption>
   </figure>
 </section>
 
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="unterschiede">
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="organisator-anlass">
   <div>
-    <h2>Android und iPhone im Vergleich</h2>
-    <p>Beide Apps können dasselbe. Zwei Punkte unterscheiden sich:</p>
+    <p class="fuer">Nur für Organisatoren</p>
+    <h2>Einen Anlass verwalten</h2>
+    <p>Oben stehen bis zu vier Reiter. Welche du siehst, hängt vom Anlass
+      ab.</p>
+    <h3>Anmeldungen</h3>
+    <p>Jede Anmeldung zeigt Name, Schichten, Bemerkung und Kontakt. Darunter
+      die Knöpfe:</p>
+    <ul>
+      <li><strong>Bestätigen</strong> oder <strong>Ablehnen</strong> — die
+        Person bekommt eine Nachricht.</li>
+      <li><strong>Ändern</strong> — Angaben oder Schichten anpassen.</li>
+      <li><strong>Andere Schicht</strong> — einen Vorschlag schicken, wenn
+        eine Schicht voll und eine andere leer ist.</li>
+      <li><strong>Person</strong> (unten rechts) — jemanden eintragen, der
+        telefonisch zugesagt hat. Mitglied oder Gast.</li>
+    </ul>
+    <p>Oben über den Anmeldungen:</p>
+    <ul>
+      <li><strong>Informieren</strong> — allen Angemeldeten eine Nachricht
+        schicken. Danach zeigt die App, wen sie per E-Mail, per Post oder in
+        der App erreicht hat und wen nicht.</li>
+      <li><strong>PDF</strong> — Teilnehmerliste, Arbeitsplan oder
+        Aushang.</li>
+      <li><strong>Arbeitsplan senden</strong> — alle eingeteilten Helfer
+        bekommen den Plan per E-Mail oder Post.</li>
+    </ul>
+    <h3>Schichten, Notizen, Material</h3>
+    <ul>
+      <li><strong>Schichten</strong> — anlegen, ändern, löschen.
+        Eingeteilte erfahren es automatisch.</li>
+      <li><strong>Notizen</strong> — für dich und den Vorstand, auch mit
+        Fotos von Quittungen oder Plänen.</li>
+      <li><strong>Material</strong> — Rezepte und Material für den Anlass,
+        daraus die Einkaufsliste.</li>
+    </ul>
+    <p>Oben rechts der Stift: <strong>Anlass bearbeiten</strong>.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/13-organisator-anlass.jpg" data-ios="images/anleitung/ios/13-organisator-anlass.jpg" data-android="images/anleitung/android/13-organisator-anlass.jpg" alt="Verwaltung eines Anlasses mit den Reitern Anmeldungen, Schichten, Notizen und Material">
+    <figcaption>Anmeldung bestätigen, ablehnen oder umteilen</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="lager">
+  <div>
+    <p class="fuer">Nur Gruppe Lager und Vorstand</p>
+    <h2>Lager</h2>
+    <p>Der Reiter <strong>Lager</strong> zeigt den Bestand des Vereins. Oben
+      gibt es drei Reiter:</p>
+    <ul>
+      <li><strong>Artikel</strong> — alles im Lager mit Menge und Ort.
+        Oben suchst du nach Name oder Code.</li>
+      <li><strong>Lagerorte</strong> — was wo steht.</li>
+      <li><strong>Nachbestellen</strong> — was knapp ist.</li>
+    </ul>
+    <p>Unten rechts <strong>Scannen</strong>: Strichcode eines Artikels vor
+      die Kamera halten, und die App öffnet ihn. Oben rechts legst du
+      einen neuen Artikel an.</p>
+    <h3>Ausleihen verwalten</h3>
+    <p>Das Symbol mit den Händen oben rechts öffnet die Ausleihen. Dort
+      gibst du Material <strong>aus</strong>, nimmst es
+      <strong>zurück</strong> oder sagst eine Ausleihe ab. Mit
+      <strong>Für Externe</strong> erfasst du eine Ausleihe für jemanden
+      ausserhalb des Vereins.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/14-lager.jpg" data-ios="images/anleitung/ios/14-lager.jpg" data-android="images/anleitung/android/14-lager.jpg" alt="Lager mit Artikelliste und Knopf Scannen">
+    <figcaption>Artikel mit Bestand, unten Scannen</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="schopf">
+  <div>
+    <p class="fuer">Gruppe Roter Schopf, Vorstand — oder während deiner Schicht</p>
+    <h2>Roter Schopf: Licht</h2>
+    <p>Der Reiter <strong>Schopf</strong> steuert das Lokal. Du siehst ihn,
+      wenn du in der Gruppe Roter Schopf oder im Vorstand bist.</p>
+    <p>Hast du eine bestätigte Schicht, erscheint er auch für dich — eine
+      Stunde vor Beginn bis eine Stunde nach dem Ende. Oben steht dann, für
+      welche Schicht und bis wann.</p>
+    <h3>Lampen schalten</h3>
+    <ul>
+      <li>Unter «Gruppen» schaltest du <strong>Spots</strong> oder
+        <strong>Arbeitsleuchten</strong> alle zusammen.</li>
+      <li>Unter «Einzelne Lampen» jede Lampe für sich. Eine gelbe Birne
+        heisst: Sie brennt.</li>
+    </ul>
+    <aside class="note">
+      <b>Lampe grau und nicht schaltbar?</b> Dann ist sie gerade nicht
+      erreichbar. Oben rechts bei «Einzelne Lampen» steht, wie viele
+      antworten.
+    </aside>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/15-schopf-lampen.jpg" data-ios="images/anleitung/ios/15-schopf-lampen.jpg" data-android="images/anleitung/android/15-schopf-lampen.jpg" alt="Roter Schopf mit Lichtgruppen und einzelnen Lampen">
+    <figcaption>Licht im Roten Schopf</figcaption>
+  </figure>
+</section>
+
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="schopf-messwerte">
+  <div>
+    <p class="fuer">Gruppe Roter Schopf, Vorstand — oder während deiner Schicht</p>
+    <h2>Roter Schopf: Messwerte, Musik, Bildschirm</h2>
+    <h3>Messwerte</h3>
+    <p>Hier siehst du den Strom im Lokal, die Temperatur der Tiefkühler und
+      die Heizung. Ein rot hinterlegter Tiefkühler meldet ein Problem —
+      etwa, dass sein Fühler keinen Wert liefert.</p>
+    <p>Die Werte sind nur zum Ansehen. Einen Tiefkühler kann man in der
+      App nicht ausschalten.</p>
+    <h3>Musik im Schopf</h3>
+    <p>Der dritte Reiter steuert den Laptop im Lokal: was gerade läuft,
+      Pause und Weiter, Lautstärke, eine Playlist oder einen Sender
+      starten.</p>
+    <aside class="note">
+      <b>Alle im Raum hören es.</b> Bevor du die Musik wechselst, fragt die
+      App nach.
+    </aside>
+    <h3>Bildschirm</h3>
+    <p>Oben rechts das Bildschirm-Symbol: <strong>Bildschirm Roter
+      Schopf</strong>. Damit siehst du im Browser live, was auf dem Laptop
+      läuft. Steuern mit Tastatur und Maus darf nur der Vorstand.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/ios/16-schopf-messwerte.jpg" data-ios="images/anleitung/ios/16-schopf-messwerte.jpg" data-android="images/anleitung/android/16-schopf-messwerte.jpg" alt="Messwerte mit Strom, Tiefkühlern und Heizung">
+    <figcaption>Strom, Tiefkühler, Heizung</figcaption>
+  </figure>
+</section>
+
+<section class="chapter breit bg-white rounded-lg shadow p-6 md:p-8" id="gruppen">
+  <div>
+    <p class="fuer">Nur für den Vorstand</p>
+    <h2>Für den Vorstand: Gruppen verwalten</h2>
+    <p>Wer in welcher Gruppe ist, entscheidet, was er in der App sieht —
+      etwa die Gruppe «Roter Schopf» den Reiter Schopf oder «Lager» das
+      Lager. Der Vorstand pflegt diese Gruppen selbst.</p>
+    <ol class="steps">
+      <li>Unter <strong>Mehr</strong> auf <strong>Gruppen verwalten</strong>
+        tippen. Im Browser steht <strong>Gruppen</strong> direkt in der
+        Leiste links.</li>
+      <li>Die Gruppe antippen.</li>
+      <li>Mit <strong>Aufnehmen</strong> ein Mitglied hinzufügen, mit dem
+        Symbol daneben jemanden entfernen.</li>
+    </ol>
+    <p>Gruppen mit dem Vermerk <strong>automatisch</strong> setzt das
+      System nach der Funktion des Mitglieds. Eine Änderung von Hand kann
+      beim nächsten Abgleich wieder verschwinden. Aufnehmen kann man nur
+      Mitglieder mit einem Vereinskonto.</p>
+  </div>
+  <figure class="shot">
+    <img src="images/anleitung/web/mein-13-gruppen.jpg" alt="Gruppen verwalten im Browser">
+    <figcaption>Gruppen verwalten im Browser</figcaption>
+  </figure>
+</section>
+
+<section class="chapter breit bg-white rounded-lg shadow p-6 md:p-8" id="unterschiede">
+  <div>
+    <h2>Android, iPhone und Browser im Vergleich</h2>
+    <p>Die App kann überall dasselbe. Ein paar Dinge laufen je nach Gerät
+      anders:</p>
     <table class="diff">
       <thead>
-        <tr><th>Thema</th><th>Android</th><th>iPhone</th></tr>
+        <tr><th>Thema</th><th>Android</th><th>iPhone</th><th>Browser</th></tr>
       </thead>
       <tbody>
         <tr>
-          <td>Meldungen aufs Gerät</td>
-          <td>funktioniert</td>
-          <td>in Arbeit</td>
+          <td>Installieren</td>
+          <td>Play Store (Test) oder Datei</td>
+          <td>vorerst über den Browser</td>
+          <td>fwv-raura.ch/mein.html</td>
+        </tr>
+        <tr>
+          <td>Reiter</td>
+          <td>unten</td>
+          <td>unten</td>
+          <td>links bei breitem Fenster</td>
         </tr>
         <tr>
           <td>Mitglieder im Adressbuch</td>
-          <td>gleicht laufend ab</td>
-          <td>über CardDAV-Konto</td>
+          <td>Kontakte abgleichen</td>
+          <td>über die Cloud (CardDAV)</td>
+          <td>über die Cloud (CardDAV)</td>
+        </tr>
+        <tr>
+          <td>Mitteilungen aufs Gerät</td>
+          <td>ja</td>
+          <td>siehe Benachrichtigungen → «Dieses Gerät»</td>
+          <td>nein, per E-Mail</td>
         </tr>
       </tbody>
     </table>
-    <p>Der Unterschied beim Adressbuch hat einen technischen Grund: Unter
-      iOS darf keine App Kontakte bereitstellen. Dort richtet man das
-      Adressbuch einmal als Konto ein — danach bleibt es genauso aktuell.</p>
+    <p style="margin-top:.85rem">Der Unterschied beim Adressbuch hat einen
+      technischen Grund: Auf dem iPhone darf keine App selbst Kontakte
+      anlegen. Dort richtet man das Adressbuch einmal als Konto ein — danach
+      bleibt es genauso aktuell.</p>
   </div>
-  <figure class="shot">
-    <img src="images/anleitung/ios/08-einstellungen.jpg" data-ios="images/anleitung/ios/08-einstellungen.jpg" data-android="images/anleitung/android/08-einstellungen.jpg" alt="Einstellungen der App">
-    <figcaption>Einstellungen</figcaption>
-  </figure>
 </section>
 
 
@@ -642,7 +1204,7 @@
         </div>
         <div class="border-t border-gray-700 mt-8 pt-8 text-center">
             <p class="text-gray-400 text-sm">
-                Feuerwehrverein Raura Kaiseraugst — Stand: August 2026.
+                Feuerwehrverein Raura Kaiseraugst — Stand: Oktober 2026.
                 Fehlt ein Schritt oder stimmt etwas nicht mehr, melde dich beim Aktuar.
             </p>
         </div>

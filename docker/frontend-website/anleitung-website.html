@@ -60,6 +60,9 @@
         border-radius: .5rem; background: #f9fafb; }
     figure.shot figcaption { color: #6b7280; font-size: .8rem;
         margin-top: .5rem; }
+    /* Zwei Bilder nebeneinander, auf dem Telefon untereinander */
+    .zwei-bilder { display: grid; gap: 1rem; }
+    @media (min-width: 640px) { .zwei-bilder { grid-template-columns: 1fr 1fr; } }
 
     table.diff { border-collapse: collapse; width: 100%; font-size: .95rem;
         color: #374151; }
@@ -92,6 +95,8 @@
         .chapter h2 { font-size: 15pt; }
         .chapter h3 { font-size: 11pt; break-after: avoid; }
         figure.shot { break-inside: avoid; }
+        .zwei-bilder { grid-template-columns: 1fr 1fr; gap: 5mm;
+            break-inside: avoid; }
         figure.shot img { max-height: 150mm; object-fit: contain;
             object-position: top left; }
         aside.note { break-inside: avoid; }
@@ -142,7 +147,7 @@
             <span style="font-size:10pt; color:#6b7280;">Feuerwehrverein Raura Kaiseraugst</span>
         </div>
         <h1 class="text-4xl font-bold mb-4">Die Vereinswebsite</h1>
-        <p class="text-xl max-w-2xl">Termine nachschlagen, sich für eine Schicht eintragen, den Kalender abonnieren — und im Mitgliederbereich die eigenen Daten und Zugänge verwalten. Diese Anleitung geht Seite für Seite durch.</p>
+        <p class="text-xl max-w-2xl">Termine nachschlagen, sich für eine Schicht eintragen, den Kalender abonnieren — und in «Mein Bereich» die Mitglieder-App direkt im Browser nutzen. Diese Anleitung geht Seite für Seite durch.</p>
         <div class="mt-6"><a href="anleitungen/anleitung-website.pdf" class="nur-bildschirm inline-flex items-center space-x-2 bg-white text-fire-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fire-50 transition-colors"><span>⬇</span><span>Als PDF</span></a></div>
     </div>
 </header>
@@ -158,7 +163,7 @@
             <a href="#arbeitsplan" class="text-gray-600 hover:text-fire-600 transition-colors">Arbeitsplan</a>
             <a href="#kalender" class="text-gray-600 hover:text-fire-600 transition-colors">Kalender</a>
             <a href="#abonnieren" class="text-gray-600 hover:text-fire-600 transition-colors">Abonnieren</a>
-            <a href="#portal" class="text-gray-600 hover:text-fire-600 transition-colors">Mein Portal</a>
+            <a href="#mein-bereich" class="text-gray-600 hover:text-fire-600 transition-colors">Mein Bereich</a>
             <a href="#apps" class="text-gray-600 hover:text-fire-600 transition-colors">Apps</a>
             <a href="#kontakt" class="text-gray-600 hover:text-fire-600 transition-colors">Kontakt</a>
         </div>
@@ -187,8 +192,8 @@
     <li><strong>Kalender</strong> — dieselben Termine als Monatsansicht,
       zum Abonnieren.</li>
     <li><strong>Mitglieder</strong> beziehungsweise
-      <strong>Mein Bereich</strong> — der Mitgliederbereich. Nur hier wird
-      eine Anmeldung verlangt.</li>
+      <strong>Mein Bereich</strong> — die Mitglieder-App im Browser. Nur
+      hier wird eine Anmeldung verlangt.</li>
     <li><strong>Vorstand</strong> — der Arbeitsbereich des Vorstands.
       Geschützt und nur für den Vorstand; wer kein Amt hat, kommt am
       Anmeldefenster nicht vorbei.</li>
@@ -260,12 +265,28 @@
     <li>Unter <strong>Schichten auswählen</strong> ankreuzen, wann du
       kannst. Volle Schichten sind als <em>Voll</em> gekennzeichnet und
       zeigen, wer schon eingeteilt ist.</li>
-    <li>Absenden. Du bekommst eine Bestätigung per E-Mail.</li>
+    <li><strong>Anmeldung absenden</strong> drücken. Du bekommst eine
+      E-Mail.</li>
   </ol>
   <p>Bist du Mitglied, lohnt sich der rote Knopf ganz oben:
     <strong>Als Mitglied anmelden</strong> füllt Name und Kontaktdaten aus
-    deinem Profil ein, und die Anmeldung erscheint danach unter
-    <a href="#portal">Meine Veranstaltungen</a> in deinem Portal.</p>
+    deinem Profil ein. Nach dem Absenden kommst du in
+    <a href="#mein-bereich">Mein Bereich</a>. Dort steht die Anmeldung im
+    <strong>Profil</strong> unter <strong>Meine Anmeldungen</strong>.</p>
+  <h3>Als Gast</h3>
+  <p>Ohne Mitglieder-Anmeldung kommt die Bestätigung als E-Mail mit einem
+    Link. Erst wenn du darauf klickst, gilt die Anmeldung. Das Formular
+    sagt dir das mit <em>Fast geschafft!</em>.</p>
+  <p>Gibst du als Gast eine Adresse ein, die zu einem Mitglied gehört,
+    meldet die Seite <em>Mitglied erkannt!</em>. Dann hast du zwei
+    Wege:</p>
+  <ul>
+    <li><strong>Zum Mitglieder-Login</strong> öffnet
+      <a href="#mein-bereich">Mein Bereich</a>. Dort meldest du dich an und
+      trägst dich beim Anlass ein.</li>
+    <li><strong>Trotzdem als Gast anmelden</strong> schickt die Anmeldung
+      so ab, wie du sie eingegeben hast.</li>
+  </ul>
   <aside class="note">
     <b>Zwei Schichten am Stück</b> sind dem Verein lieber als zwei einzelne
     verteilt über den Abend — das steht als Hinweis auch im Formular. Wer
@@ -287,7 +308,9 @@
   <p><strong>PDF herunterladen</strong> erzeugt daraus ein Blatt zum
     Ausdrucken und Aufhängen. <strong>Bearbeiten</strong> führt weiter auf
     das Dashboard des Anlasses — dort lässt sich die Einteilung ändern,
-    was aber nur denen offensteht, die den Anlass organisieren.</p>
+    was aber nur denen offensteht, die den Anlass organisieren. Als
+    Mitglied geht das einfacher in <a href="#mein-bereich">Mein
+    Bereich</a> unter <strong>Organisator</strong>.</p>
   <figure class="shot">
     <img src="images/anleitung/web/06-arbeitsplan.jpg"
          alt="Arbeitsplan als Tabelle mit Zeitblöcken und Posten">
@@ -338,165 +361,61 @@
   </figure>
 </section>
 
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="portal">
-  <h2>Mein Portal — der Mitgliederbereich</h2>
-  <p>Hinter <strong>Mein Bereich</strong> liegt der einzige Teil der
-    Website, der eine Anmeldung verlangt. Der Klick führt auf die
-    Anmeldeseite des Vereins; danach landest du wieder auf der Website.
-    Es ist dasselbe Konto wie in der App.</p>
-  <p>Oben stehen vier Reiter: <strong>Mein Profil</strong>,
-    <strong>Benachrichtigungen</strong>, <strong>Meine Events</strong> und
-    <strong>Zugänge</strong> — dieselbe Aufteilung wie in der App.</p>
+<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="mein-bereich">
+  <h2>Mein Bereich — die App im Browser</h2>
+  <p>Hinter <strong>Mein Bereich</strong> liegt die Mitglieder-App. Sie
+    läuft direkt im Browser, du musst nichts installieren. Je nach Seite
+    heisst der Eintrag oben <strong>Mitglieder</strong> oder
+    <strong>Mein Bereich</strong>.</p>
+  <p>Oben bleibt der weisse Kopf der Website, darunter läuft die App. Auf
+    einem grossen Bildschirm stehen ihre Bereiche links in einer Leiste,
+    auf dem Telefon unten.</p>
+  <div class="zwei-bilder">
+    <figure class="shot">
+      <img src="images/anleitung/web/mein-01-anlaesse.jpg"
+           alt="Mein Bereich mit der Leiste links und der Liste der Anlässe">
+      <figcaption>Links die Bereiche, rechts die Anlässe</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="images/anleitung/web/mein-05-profil.jpg"
+           alt="Profil in Mein Bereich mit Kontaktdaten">
+      <figcaption>Dein Profil (Beispieldaten)</figcaption>
+    </figure>
+  </div>
+
+  <h3>Anmelden</h3>
+  <ol class="steps">
+    <li>Auf <strong>Mein Bereich</strong> oder <strong>Mitglieder</strong>
+      klicken.</li>
+    <li><strong>Mit Vereinskonto anmelden</strong> drücken.</li>
+    <li>Auf der Anmeldeseite des Vereins Benutzername und Passwort
+      eingeben. Es ist dasselbe Konto wie in der App.</li>
+  </ol>
+  <p>Benutzt du Mein Bereich mindestens alle 30 Tage, bleibst du
+    angemeldet. Danach fragt die Seite wieder nach dem Passwort.</p>
   <aside class="note">
     <b>Passwort vergessen — oder noch nie eines gehabt?</b> Beides geht
     gleich: Auf der Anmeldeseite unten auf
     <em>Benutzername oder Passwort vergessen?</em> klicken und der E-Mail
-    folgen. Der Verein hat nie Passwörter verschickt, das ist also auch der
+    folgen. Der Verein hat nie Passwörter verschickt. Das ist also auch der
     Weg für die erste Anmeldung. Er ist in der
-    <a href="anleitung-passwort.html">eigenen Anleitung</a> Schritt für
-    Schritt beschrieben — er gilt für App und Website gleichermassen.
-  </aside>
-  <figure class="shot">
-    <img src="images/anleitung/gemeinsam-auth-login.jpg"
-         alt="Anmeldeseite des Vereins">
-    <figcaption>Die Anmeldung gilt für Website und App</figcaption>
-  </figure>
-
-  <h3>Mein Profil</h3>
-  <p>Ganz oben das <strong>Profilfoto</strong>, bis 5 MB, als JPG, PNG oder
-    GIF. Darunter die <strong>Stammdaten</strong>: Vorname, Nachname,
-    Funktion und Status. Die letzten beiden sind grau hinterlegt und
-    lassen sich nicht ändern — die pflegt der Vorstand.</p>
-  <p>Änderbar sind <strong>Kontaktdaten</strong>, <strong>Adresse</strong>
-    und die <strong>Bankverbindung</strong> — Letztere braucht der Verein
-    für Rückerstattungen. <strong>Speichern</strong> nicht vergessen; was
-    du hier änderst, gilt auch in der App.</p>
-  <p>Hast du ein Amt, steht darunter der Block
-    <strong>Funktions-E-Mails</strong>: die Adresse, ein Feld zum Ändern
-    des Passworts, die Servereinstellungen für ein Mailprogramm und der
-    Knopf zum Webmail.</p>
-  <figure class="shot">
-    <img src="images/anleitung/web/10-portal-profil.jpg"
-         alt="Reiter Mein Profil mit persönlichen Daten">
-    <figcaption>Mein Profil — Stammdaten, Adresse, Bankverbindung</figcaption>
-  </figure>
-
-  <h3>Benachrichtigungen</h3>
-  <p>Vier Arten von E-Mails lassen sich einzeln ein- und ausschalten:
-    Änderungen an Anlässen, allgemeine Vereinsmitteilungen, der monatliche
-    Newsletter und Erinnerungen an anstehende Schichten.</p>
-  <p>Zu jeder Art kannst du eine <strong>abweichende Adresse</strong>
-    angeben — etwa die Funktionsadresse für Vereinsmitteilungen und privat
-    für die Schicht-Erinnerungen. Bleibt das Feld leer, geht alles an die
-    Adresse aus deinem Profil.</p>
-  <figure class="shot">
-    <img src="images/anleitung/web/11-portal-meldungen.jpg"
-         alt="Reiter Benachrichtigungen mit vier Schaltern">
-    <figcaption>Was du per E-Mail bekommen willst — und wohin</figcaption>
-  </figure>
-
-  <h3>Meine Events</h3>
-  <p>Jede Anmeldung, die du je abgeschickt hast, mit Datum und Status:
-    <em>Bestätigt</em> heisst, du bist eingeteilt; <em>Abgelehnt</em>
-    heisst, es hat für diesen Anlass nicht gereicht oder du hast wieder
-    abgesagt.</p>
-  <p>Hast du dich für Schichten eingetragen, stehen sie unter
-    <strong>Deine Schichten</strong> aufgeführt — mit Nummer, Tag, Zeit
-    und Posten. So siehst du auf einen Blick, wann du wo eingeteilt
-    bist.</p>
-  <figure class="shot">
-    <img src="images/anleitung/web/12-portal-events.jpg"
-         alt="Reiter Meine Events mit Anmeldungen und Schichten">
-    <figcaption>Meine Events — Anmeldungen und eigene Schichten</figcaption>
-  </figure>
-
-  <h3>Zugänge</h3>
-  <p>Der Reiter sammelt alles, womit du dich anderswo anmeldest:</p>
-  <ul>
-    <li><strong>Funktions-E-Mails</strong> — Adresse, Passwort und
-      Serverdaten. <em>Zeigen</em> macht das Passwort sichtbar,
-      <em>Kopieren</em> legt es in die Zwischenablage.</li>
-    <li><strong>Nextcloud Gruppenordner</strong> — die Ablagen, auf die
-      deine Funktion Zugriff hat.</li>
-    <li><strong>Gemeinsame Zugänge</strong> — Logins, die sich mehrere
-      teilen, etwa für die Kasse oder die Küchenanzeige. Diese Passwörter
-      werden automatisch alle sieben Tage gewechselt; hier steht immer das
-      gültige, samt Datum der nächsten Rotation.</li>
-    <li><strong>System-Zugänge</strong> — eine Übersicht, welche Systeme
-      des Vereins dir offenstehen, mit Direktlink.</li>
-  </ul>
-  <p>Organisierst du einen Anlass, kommt <strong>Events als
-    Organisator</strong> dazu — siehe das <a href="#organisator">nächste
-    Kapitel</a>.</p>
-  <aside class="note">
-    <b>Passwörter bleiben im Portal.</b> Weil sie von selbst wechseln,
-    lohnt es sich nicht, sie aufzuschreiben — beim nächsten Mal wieder
-    hier nachsehen.
-  </aside>
-  <figure class="shot">
-    <img src="images/anleitung/web/13-portal-zugaenge.jpg"
-         alt="Reiter Zugänge mit Funktions-E-Mails und gemeinsamen Logins">
-    <figcaption>Zugänge — Adressen, gemeinsame Logins, Systeme</figcaption>
-  </figure>
-</section>
-
-<section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="organisator">
-  <h2>Wenn du einen Anlass organisierst</h2>
-  <p>Für jeden Anlass gibt es ein eigenes <strong>Dashboard</strong>. Dort
-    siehst du, wer sich angemeldet hat, teilst die Schichten ein und
-    schickst den fertigen Arbeitsplan an alle Helfer.</p>
-
-  <h3>Hineinkommen</h3>
-  <p>Der Zugang ist an den <em>Anlass</em> gebunden, nicht an dein
-    Mitgliederkonto. Du meldest dich also nicht mit dem Vereins-Login an,
-    sondern mit einer eigenen Adresse für diesen Anlass:</p>
-  <ol class="steps">
-    <li>Im Portal unter <strong>Zugänge</strong> steht bei
-      <em>Events als Organisator</em> deine Anlass-Adresse, etwa
-      <code>fasnacht-2026@fwv-raura.ch</code>, und bis wann der Zugang
-      gilt.</li>
-    <li>Das <strong>Passwort</strong> kam per E-Mail, als der Vorstand dich
-      als Organisator eingetragen hat. Findest du sie nicht mehr, kann der
-      Vorstand den Zugang neu ausstellen.</li>
-    <li>Mit <strong>Event-Dashboard</strong> im Portal (oder mit
-      <em>Bearbeiten</em> im Arbeitsplan-Fenster) die Anmeldeseite öffnen
-      und beides eingeben.</li>
-  </ol>
-  <aside class="note">
-    <b>Der Zugang läuft ab.</b> Zu jedem Anlass gehört ein Ablaufdatum —
-    danach heisst es „Der Zugang ist abgelaufen". Das ist Absicht: Nach dem
-    Anlass soll niemand mehr in den Anmeldungen stöbern. Der Vorstand kann
-    ihn verlängern. Angemeldet bleibst du einen Tag lang, danach wieder
-    das Passwort.
+    <a href="anleitung-passwort.html">Anleitung Passwort</a> Schritt für
+    Schritt beschrieben.
   </aside>
 
-  <h3>Anmeldungen</h3>
-  <p>Der Reiter <strong>Anmeldungen</strong> listet alle, die sich
-    eingetragen haben. Über die Schalter <strong>Alle</strong>,
-    <strong>Ausstehend</strong> und <strong>Genehmigt</strong> filterst du
-    — <em>Ausstehend</em> ist der Stapel, der auf dich wartet.</p>
-  <p>Zu jeder Anmeldung gehören zwei Knöpfe: <strong>Genehmigen</strong>
-    und <strong>Ablehnen</strong>. Beides wird der betroffenen Person
-    mitgeteilt, du musst also nicht selbst nachfassen.</p>
-  <p>Fehlt jemand, der sich mündlich gemeldet hat, trägst du ihn mit
-    <strong>Person hinzufügen</strong> selbst ein — wahlweise als
-    <strong>Mitglied</strong> aus der Vereinsliste oder als
-    <strong>Gast</strong> mit Namen von Hand.</p>
-
-  <h3>Schichten und Arbeitsplan</h3>
-  <p>Im Reiter <strong>Schichten</strong> steht die Einteilung: welche
-    Posten es gibt, wie viele Leute je Schicht gebraucht werden und wer
-    schon drinsteht. Hat ein Anlass keine Schichten, bleibt der Reiter
-    leer — dann geht es nur um die Teilnahme.</p>
-  <p><strong>Arbeitsplan versenden</strong> schickt den fertigen Plan per
-    E-Mail an alle eingeteilten Helfer. Du wirst vorher gefragt, und
-    danach siehst du eine Liste, an wen er tatsächlich gegangen ist — und
-    an wen nicht, etwa wenn eine Adresse fehlt.</p>
-  <aside class="note">
-    <b>Erst einteilen, dann versenden.</b> Der Versand schickt den Stand
-    von jetzt. Änderst du danach die Einteilung, bekommt das niemand
-    automatisch mit — dann noch einmal versenden.
-  </aside>
+  <h3>Was drin ist</h3>
+  <p>Mein Bereich kann genau dasselbe wie die App auf dem Telefon: Anlässe
+    ansehen und sich eintragen, das <strong>Profil</strong> mit deinen
+    Daten und <strong>Meine Anmeldungen</strong>, die Zugänge, die
+    Benachrichtigungen und mehr. Was du hier änderst, gilt auch in der
+    App.</p>
+  <p>Organisierst du einen Anlass, verwaltest du ihn unter
+    <strong>Organisator</strong>: Anmeldungen genehmigen, Leute von Hand
+    eintragen, alle benachrichtigen.</p>
+  <p>Wie das alles im Einzelnen geht, steht in der
+    <a href="anleitung-app.html">Anleitung App</a>. Sie gilt für Mein
+    Bereich genauso. Links unter <strong>Hilfe</strong> findest du die
+    Anleitungen auch direkt in Mein Bereich.</p>
 </section>
 
 <section class="chapter bg-white rounded-lg shadow p-6 md:p-8" id="apps">
@@ -504,6 +423,15 @@
   <p>Unter <strong>Apps</strong> liegen die Programme des Vereins zum
     Herunterladen — die Mitglieder-App für Android sowie die Werkzeuge für
     den Vereinsbetrieb, etwa die Küchenanzeige.</p>
+  <p>Die Mitglieder-App gibt es auf zwei Wegen: über den Play Store, für
+    den du dich zuerst selbst freischaltest, oder mit
+    <strong>APK herunterladen</strong> direkt als Datei. Die Seite zeigt
+    beide Schritt für Schritt.</p>
+  <aside class="note">
+    <b>Kein Android-Telefon?</b> Dann nimm
+    <a href="#mein-bereich">Mein Bereich</a> im Browser. Es kann dasselbe
+    wie die App.
+  </aside>
   <p>Was in der Mitglieder-App steckt und wie sie eingerichtet wird, steht
     in der eigenen <a href="anleitung-app.html">App-Anleitung</a>.</p>
   <figure class="shot">
@@ -591,7 +519,7 @@
         </div>
         <div class="border-t border-gray-700 mt-8 pt-8 text-center">
             <p class="text-gray-400 text-sm">
-                Feuerwehrverein Raura Kaiseraugst — Stand: August 2026.
+                Feuerwehrverein Raura Kaiseraugst — Stand: Oktober 2026.
                 Fehlt ein Schritt oder stimmt etwas nicht mehr, melde dich beim Aktuar.
             </p>
         </div>
