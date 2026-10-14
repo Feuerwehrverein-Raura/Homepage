@@ -18,6 +18,7 @@ const { schichtKonflikte, eindeutig, konfliktText } = require('./doppelte-schich
 const organisatorAnsicht = require('./organisator-ansicht');
 const { anlassIcs, icsDateiname } = require('./ics');
 const { mitAnlassLogo } = require('./anlass-mail');
+const mitorganisatoren = require('./mitorganisatoren');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -777,7 +778,11 @@ const istVorstandBenutzer = user => hatRolle(user, 'vorstand', 'admin');
 // ein Organisator-Login genau sein Event.
 async function anfragender(req) {
     const orgToken = eventOrganisatorToken(req);
-    if (orgToken) return { vorstand: false, identity: null, organisatorEventId: orgToken.event_id };
+    if (orgToken) {
+        // Entfernter Mitorganisator: sein Token gilt nicht mehr.
+        const gueltig = await organisatorLoginGueltig(orgToken);
+        return { vorstand: false, identity: null, organisatorEventId: gueltig ? orgToken.event_id : null };
+    }
     const user = await optionalerBenutzer(req);
     if (!user) return { vorstand: false, identity: null, organisatorEventId: null };
     if (istVorstandBenutzer(user)) return { vorstand: true, identity: null, organisatorEventId: null };
@@ -1000,7 +1005,7 @@ async function requireEventRecipeAccess(req, res, next) {
     try {
         const isPrivileged = hatRolle(req.user, 'vorstand', 'admin');
         const ev = await pool.query(
-            'SELECT slug, organizer_email, organizer_id FROM events WHERE slug = $1 OR id::text = $1 LIMIT 1',
+            'SELECT id, slug, organizer_email, organizer_id FROM events WHERE slug = $1 OR id::text = $1 LIMIT 1',
             [req.params.id]
         );
         if (ev.rows.length === 0) return res.status(404).json({ error: 'Event nicht gefunden' });
@@ -1466,27 +1471,13 @@ app.post('/events', authenticateAny, requireRole('vorstand', 'admin'), async (re
         // E-Mail mit Zugangsdaten an Organisator senden (create_access Modus)
         if (create_access && organizer_email && eventPassword) {
             try {
+                // Text gemeinsam mit den externen Mitorganisatoren (src/mitorganisatoren.js)
                 await axios.post(`${DISPATCH_API}/email/send`, {
                     to: organizer_email,
-                    subject: `Ihre Zugangsdaten fuer ${title}`,
-                    body: `
-Guten Tag ${organizer_name || 'Organisator'},
-
-Sie wurden als Organisator fuer das Event "${title}" eingetragen.
-
-Hier sind Ihre Zugangsdaten fuer das Event-Dashboard:
-
-URL: https://fwv-raura.ch/event-dashboard.html
-E-Mail: ${eventEmail}
-Passwort: ${eventPassword}
-
-Dieser Zugang ist gueltig bis ${eventAccessExpires.toLocaleDateString('de-CH')}.
-
-Bei Fragen wenden Sie sich bitte an den Vorstand.
-
-Mit freundlichen Gruessen
-Feuerwehrverein Raura
-                    `.trim(),
+                    ...mitorganisatoren.zugangsdatenMail({
+                        name: organizer_name, titel: title, loginEmail: eventEmail,
+                        passwort: eventPassword, gueltigBis: eventAccessExpires
+                    }),
                     event_id: newEvent.id
                 });
                 console.log(`Event-Zugangsdaten gesendet an ${organizer_email}`);
@@ -1693,6 +1684,16 @@ app.post('/events/login', async (req, res) => {
             [email.toLowerCase()]
         );
 
+        // Externe Mitorganisatoren haben einen eigenen Login (eigene E-Mail,
+        // eigenes Passwort, src/mitorganisatoren.js). Nur wenn der Login des
+        // Haupt-Organisators nicht passt — dessen Pruefung bleibt unveraendert.
+        const hauptPasswortOk = result.rows.length > 0 &&
+            crypto.createHash('sha256').update(password).digest('hex') === result.rows[0].event_password_hash;
+        if (!hauptPasswortOk) {
+            const mit = await mitorganisatorLogin(email, password);
+            if (mit) return res.status(mit.status).json(mit.json);
+        }
+
         if (result.rows.length === 0) {
             return res.status(401).json({ error: 'Ungueltige Zugangsdaten' });
         }
@@ -1744,6 +1745,73 @@ app.post('/events/login', async (req, res) => {
     }
 });
 
+// DEUTSCH: Login eines externen Mitorganisators (Tabelle event_organizers) —
+// { status, json } oder null, wenn kein Eintrag mit diesem Passwort passt.
+// Dieselbe E-Mail kann bei mehreren Anlaessen Mitorganisator sein; jeder
+// Eintrag hat sein eigenes Passwort, das passende bestimmt den Anlass.
+async function mitorganisatorLogin(email, password) {
+    let kandidaten;
+    try {
+        kandidaten = (await pool.query(
+            `SELECT o.id, o.name, o.email, o.password_hash, o.access_expires,
+                    e.id AS event_id, e.title, e.slug, e.status, e.start_date, e.end_date, e.datum_offen
+               FROM event_organizers o
+               JOIN events e ON e.id = o.event_id
+              WHERE o.member_id IS NULL AND o.password_hash IS NOT NULL
+                AND LOWER(o.email) = LOWER($1)
+              ORDER BY e.start_date DESC`,
+            [String(email).trim()])).rows;
+    } catch (e) {
+        console.error('Mitorganisator-Login:', e.message);
+        return null;
+    }
+    const passend = kandidaten.filter(k => mitorganisatoren.passwortPruefen(String(password), k.password_hash));
+    if (passend.length === 0) return null;
+    const abgelaufen = k => k.access_expires && new Date(k.access_expires) < new Date();
+    const k = passend.find(x => !abgelaufen(x) && !organisatorAnsicht.organisatorLoginGesperrt(x)) || passend[0];
+    if (abgelaufen(k)) {
+        return { status: 401, json: { error: 'Der Zugang ist abgelaufen. Bitte kontaktieren Sie den Vorstand.' } };
+    }
+    const gesperrt = organisatorAnsicht.organisatorLoginGesperrt(k);
+    if (gesperrt) return { status: 403, json: { error: gesperrt, code: 'anlass_vorbei' } };
+
+    const token = jwt.sign({
+        type: 'event-organizer',
+        event_id: k.event_id,
+        event_title: k.title,
+        event_email: k.email,
+        organizer_name: k.name,
+        // Eintrag in event_organizers: wird er entfernt, gilt das Token nicht mehr
+        organisator_id: k.id
+    }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    return {
+        status: 200,
+        json: {
+            success: true,
+            token,
+            event: { id: k.event_id, title: k.title, slug: k.slug, organizer_name: k.name }
+        }
+    };
+}
+
+// DEUTSCH: Gilt ein Organisator-Login-Token noch? Das des Haupt-Organisators
+// immer (wie bisher); das eines Mitorganisators nur, solange sein Eintrag
+// besteht und nicht abgelaufen ist (Entfernen widerruft den Zugang sofort).
+async function organisatorLoginGueltig(decoded) {
+    if (!decoded || !decoded.organisator_id) return true;
+    try {
+        const r = await pool.query(
+            `SELECT 1 FROM event_organizers
+              WHERE id = $1 AND event_id = $2
+                AND (access_expires IS NULL OR access_expires > NOW())`,
+            [decoded.organisator_id, decoded.event_id]);
+        return r.rows.length > 0;
+    } catch (e) {
+        console.error('organisatorLoginGueltig:', e.message);
+        return false;
+    }
+}
+
 // DEUTSCH: Event-Daten fuer eingeloggten Organisator abrufen (nur sein eigenes Event, inkl. Schichten und Registrierungen)
 app.get('/events/my-event', authenticateEventOrganizer, async (req, res) => {
     try {
@@ -1771,8 +1839,14 @@ app.get('/events/my-event', authenticateEventOrganizer, async (req, res) => {
             ORDER BY r.created_at DESC
         `, [eventId]);
 
+        // Login-Daten des Haupt-Organisators gehen niemanden etwas an — auch
+        // nicht die Mitorganisatoren, die dieselbe Route nutzen.
+        const zeile = { ...event };
+        for (const f of INTERNE_ANLASS_FELDER) delete zeile[f];
         res.json({
-            ...event,
+            ...zeile,
+            // Wer angemeldet ist (Haupt- oder Mitorganisator) — fuers Dashboard
+            angemeldet_als: req.eventOrganizer.organizer_name || event.organizer_name || null,
             shifts: shifts.rows,
             registrations: registrations.rows
         });
@@ -1984,6 +2058,9 @@ async function authenticateEventOrganizer(req, res, next) {
             'SELECT id, status, start_date, end_date, datum_offen FROM events WHERE id = $1', [decoded.event_id]);
         const gesperrt = organisatorAnsicht.organisatorLoginGesperrt(ev.rows[0]);
         if (gesperrt) return res.status(401).json({ error: gesperrt, code: 'anlass_vorbei' });
+        if (!(await organisatorLoginGueltig(decoded))) {
+            return res.status(401).json({ error: 'Der Zugang wurde entfernt.', code: 'zugang_entfernt' });
+        }
     } catch (error) {
         return res.status(500).json({ error: error.message });
     }
@@ -2267,6 +2344,9 @@ Eingetragen von: ${eingetragenVon}${notes ? `\nBemerkungen: ${notes}` : ''}`;
                 && !empfaenger.some(e => e.toLowerCase() === organisator.toLowerCase())) {
                 empfaenger.push(organisator);
             }
+            // Mitorganisatoren teilen die Arbeit — sie erfahren es auch.
+            empfaenger.push(...mitorganisatoren.empfaengerListe([], await mitorganisatorenEmails(event_id),
+                [...empfaenger, eingetragenVon]));
             for (const to of empfaenger) {
                 await axios.post(`${DISPATCH_API}/email/send`, { to, subject, body, event_id });
             }
@@ -2421,10 +2501,17 @@ ${notes ? `\nBemerkungen: ${notes}` : ''}
     const notifyEmail = (ev.category === 'GV')
         ? 'vorstand@fwv-raura.ch'
         : (ev.organizer_email || process.env.CONTACT_EMAIL || 'kontakt@fwv-raura.ch');
-    try {
-        await axios.post(`${DISPATCH_API}/email/send`, { to: notifyEmail, subject: orgSubject, body: orgBody, event_id: eventId });
-    } catch (emailError) {
-        console.error('Organisator-E-Mail konnte nicht gesendet werden:', emailError.message);
+    // Mitorganisatoren bekommen dieselbe Meldung (nicht bei der GV — die
+    // geht nur an den Vorstand). Jede Adresse nur einmal.
+    const orgEmpfaenger = ev.category === 'GV'
+        ? [notifyEmail]
+        : mitorganisatoren.empfaengerListe(notifyEmail, await mitorganisatorenEmails(eventId));
+    for (const to of orgEmpfaenger) {
+        try {
+            await axios.post(`${DISPATCH_API}/email/send`, { to, subject: orgSubject, body: orgBody, event_id: eventId });
+        } catch (emailError) {
+            console.error('Organisator-E-Mail konnte nicht gesendet werden:', emailError.message);
+        }
     }
 
     return registration.rows[0];
@@ -2861,17 +2948,60 @@ async function resolveOrganizerIdentity(req) {
             console.error('resolveOrganizerIdentity error:', e.message);
         }
     }
-    return { memberId, emails: [...emails] };
+    // Anlaesse, bei denen die Identitaet Mitorganisator ist (event_organizers):
+    // Mitglieder ueber member_id, Externe ueber ihre E-Mail (wie organizer_email).
+    let mitAnlaesse = [];
+    if (memberId || emails.size > 0) {
+        try {
+            const r = await pool.query(
+                `SELECT DISTINCT event_id::text AS id FROM event_organizers
+                  WHERE ($1::uuid IS NOT NULL AND member_id = $1::uuid)
+                     OR (member_id IS NULL AND LOWER(email) = ANY($2::text[]))`,
+                [memberId, [...emails]]);
+            mitAnlaesse = r.rows.map(x => x.id);
+        } catch (e) {
+            console.error('resolveOrganizerIdentity (Mitorganisatoren) error:', e.message);
+        }
+    }
+    return { memberId, emails: [...emails], mitAnlaesse };
 }
 
-// DEUTSCH: Prueft ob die aufgeloeste Identitaet Organisator des Event-Rows ist
+// DEUTSCH: Ist die Identitaet HAUPT-Organisator des Event-Rows?
 // (organizer_id-Match ODER eine der bekannten E-Mails == organizer_email).
-function isOrganizerIdentityMatch(identity, event) {
-    if (!identity) return false;
+// Nur er (und der Vorstand) verwaltet die Mitorganisatoren.
+function istHauptorganisator(identity, event) {
+    if (!identity || !event) return false;
     if (identity.memberId && event.organizer_id &&
         String(event.organizer_id) === String(identity.memberId)) return true;
     const oe = (event.organizer_email || '').toLowerCase();
     return oe !== '' && identity.emails.includes(oe);
+}
+
+// DEUTSCH: Prueft ob die aufgeloeste Identitaet Organisator des Event-Rows ist:
+// Haupt-Organisator oder Mitorganisator (gleiche Rechte). Der Event-Row
+// braucht dafuer `id`.
+function isOrganizerIdentityMatch(identity, event) {
+    if (istHauptorganisator(identity, event)) return true;
+    return !!identity && !!event && event.id != null &&
+        (identity.mitAnlaesse || []).includes(String(event.id));
+}
+
+// DEUTSCH: E-Mail-Adressen aller Mitorganisatoren eines Anlasses (Mitglieder:
+// members.email, Externe: ihre E-Mail) — fuer Benachrichtigungen.
+async function mitorganisatorenEmails(eventId) {
+    try {
+        const r = await pool.query(
+            `SELECT COALESCE(NULLIF(TRIM(m.email), ''), o.email) AS email
+               FROM event_organizers o
+               LEFT JOIN members m ON m.id = o.member_id
+              WHERE o.event_id = $1
+              ORDER BY o.created_at, o.id`,
+            [eventId]);
+        return r.rows.map(x => x.email).filter(Boolean);
+    } catch (e) {
+        console.error('mitorganisatorenEmails:', e.message);
+        return [];
+    }
 }
 
 app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
@@ -2881,13 +3011,14 @@ app.get('/events/organized-by-me', authenticateAny, async (req, res) => {
         const result = await pool.query(
             `SELECT * FROM events
               WHERE ( LOWER(organizer_email) = ANY($1::text[])
-                      OR ($2::uuid IS NOT NULL AND organizer_id = $2::uuid) )
+                      OR ($2::uuid IS NOT NULL AND organizer_id = $2::uuid)
+                      OR id = ANY($3::uuid[]) )
                 AND (status IS NULL OR status NOT IN ('proposed', 'rejected'))
                 -- ohne Enddatum zaehlt der Beginn — sonst blieben eintaegige
                 -- Anlaesse ohne end_date fuer immer "aktuell"
                 AND COALESCE(end_date, start_date) >= NOW() - INTERVAL '7 days'
               ORDER BY start_date ASC`,
-            [identity.emails, identity.memberId]
+            [identity.emails, identity.memberId, identity.mitAnlaesse]
         );
         res.json(result.rows);
     } catch (error) {
@@ -2924,7 +3055,9 @@ async function organisatorUebersichtZugang(req, res, next) {
     return authenticateAny(req, res, next);
 }
 
-async function anlaesseFuerUebersicht(where, params, zugang) {
+// identity (nur zugang 'mitglied'): wer anfragt — der Haupt-Organisator darf
+// die Mitorganisatoren verwalten, ein Mitorganisator nicht.
+async function anlaesseFuerUebersicht(where, params, zugang, identity = null) {
     const zeit = appAnsicht.jetzt();
     const events = (await pool.query(
         `SELECT e.*,
@@ -2950,7 +3083,11 @@ async function anlaesseFuerUebersicht(where, params, zugang) {
     return organisatorAnsicht.anlaesseSortieren(events.map(e => organisatorAnsicht.anlassFuerOrganisator(
         { ...e, shifts: shifts.rows.filter(s => s.event_id === e.id) },
         regs.rows.filter(r => r.event_id === e.id),
-        { zugang, zeit })));
+        {
+            zugang, zeit,
+            organisatorenVerwalten: zugang === 'vorstand' ||
+                (zugang === 'mitglied' && istHauptorganisator(identity, e))
+        })));
 }
 
 app.get('/events/organisator-uebersicht', organisatorUebersichtZugang, async (req, res) => {
@@ -2965,6 +3102,9 @@ app.get('/events/organisator-uebersicht', organisatorUebersichtZugang, async (re
                 [req.organisatorLogin.event_id]);
             const gesperrt = organisatorAnsicht.organisatorLoginGesperrt(ev.rows[0], zeit);
             if (gesperrt) return res.status(401).json({ error: gesperrt, code: 'anlass_vorbei' });
+            if (!(await organisatorLoginGueltig(req.organisatorLogin))) {
+                return res.status(401).json({ error: 'Der Zugang wurde entfernt.', code: 'zugang_entfernt' });
+            }
             const anlaesse = await anlaesseFuerUebersicht('e.id = $1', [ev.rows[0].id], 'organisator-login');
             return res.json({ zugang: 'organisator-login', anlaesse });
         }
@@ -2982,9 +3122,10 @@ app.get('/events/organisator-uebersicht', organisatorUebersichtZugang, async (re
         if (identity.emails.length === 0 && !identity.memberId) return res.json({ zugang: 'mitglied', anlaesse: [] });
         const anlaesse = await anlaesseFuerUebersicht(
             `( LOWER(e.organizer_email) = ANY($1::text[])
-               OR ($2::uuid IS NOT NULL AND e.organizer_id = $2::uuid) )
+               OR ($2::uuid IS NOT NULL AND e.organizer_id = $2::uuid)
+               OR e.id = ANY($4::uuid[]) )
              AND (e.datum_offen IS TRUE OR ${letzterTag} >= $3::date - 7)`,
-            [identity.emails, identity.memberId, heute], 'mitglied');
+            [identity.emails, identity.memberId, heute, identity.mitAnlaesse], 'mitglied', identity);
         res.json({ zugang: 'mitglied', anlaesse });
     } catch (error) {
         console.error('GET /events/organisator-uebersicht error:', error.message);
@@ -3080,6 +3221,173 @@ async function ensureOrganizerAccess(req, res, eventId) {
     }
     return event.rows[0];
 }
+
+// ============================================================
+// DEUTSCH: Mitorganisatoren (src/mitorganisatoren.js, Tabelle event_organizers).
+//  - GET    /events/:id/organizers         alle Organisatoren (Vorstand + alle Organisatoren)
+//  - POST   /events/:id/organizers         { member_id } oder { name, email } (extern, mit Login)
+//  - DELETE /events/:id/organizers/:orgId  entfernt; ein Login gilt ab sofort nicht mehr
+// Hinzufuegen/entfernen: Vorstand und Haupt-Organisator. Den Haupt-Organisator
+// aendert weiterhin nur der Vorstand (PUT /events/:id).
+// ============================================================
+async function ensureMitorganisatorenSchema() {
+    for (const sql of mitorganisatoren.SCHEMA_SQL) await pool.query(sql);
+}
+
+// Vorstand/Admin oder Haupt-Organisator — sonst 403 (null zurueck).
+async function ensureOrganisatorenVerwalten(req, res, eventId) {
+    const event = await pool.query(
+        `SELECT e.id, e.title, e.slug, e.start_date, e.end_date, e.location, e.image_url,
+                e.organizer_email, e.organizer_id, e.organizer_name,
+                NULLIF(TRIM(CONCAT(m.vorname, ' ', m.nachname)), '') AS organizer_member_name
+           FROM events e LEFT JOIN members m ON m.id = e.organizer_id
+          WHERE e.id = $1`, [eventId]);
+    if (event.rows.length === 0) { res.status(404).json({ error: 'Event nicht gefunden' }); return null; }
+    if (hatRolle(req.user, 'vorstand', 'admin')) return event.rows[0];
+    const identity = await resolveOrganizerIdentity(req);
+    if (!istHauptorganisator(identity, event.rows[0])) {
+        res.status(403).json({ error: 'Mitorganisatoren verwalten nur der Vorstand und der Haupt-Organisator' });
+        return null;
+    }
+    return event.rows[0];
+}
+
+const UUID_MUSTER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+app.get('/events/:id/organizers', authenticateAny, async (req, res) => {
+    try {
+        if (!UUID_MUSTER.test(req.params.id)) return res.status(404).json({ error: 'Event nicht gefunden' });
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return;
+        const [haupt, liste] = await Promise.all([
+            pool.query(
+                `SELECT e.organizer_id, e.organizer_email, e.organizer_name,
+                        NULLIF(TRIM(CONCAT(m.vorname, ' ', m.nachname)), '') AS member_name, m.email AS member_email
+                   FROM events e LEFT JOIN members m ON m.id = e.organizer_id WHERE e.id = $1`, [event.id]),
+            pool.query(
+                `SELECT o.*, m.vorname AS member_vorname, m.nachname AS member_nachname, m.email AS member_email
+                   FROM event_organizers o LEFT JOIN members m ON m.id = o.member_id
+                  WHERE o.event_id = $1 ORDER BY o.created_at, o.id`, [event.id])
+        ]);
+        const h = haupt.rows[0] || {};
+        const hatHaupt = !!(h.organizer_id || h.member_name || h.organizer_name || h.organizer_email);
+        let darfVerwalten = hatRolle(req.user, 'vorstand', 'admin');
+        if (!darfVerwalten) darfVerwalten = istHauptorganisator(await resolveOrganizerIdentity(req), event);
+        res.json({
+            hauptorganisator: hatHaupt ? {
+                member_id: h.organizer_id || null,
+                name: h.member_name || h.organizer_name || h.organizer_email,
+                email: h.organizer_email || h.member_email || null
+            } : null,
+            mitorganisatoren: liste.rows.map(mitorganisatoren.eintragAnsicht),
+            darf_verwalten: darfVerwalten
+        });
+    } catch (error) {
+        console.error('GET /events/:id/organizers error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/events/:id/organizers', authenticateAny, async (req, res) => {
+    try {
+        if (!UUID_MUSTER.test(req.params.id)) return res.status(404).json({ error: 'Event nicht gefunden' });
+        const event = await ensureOrganisatorenVerwalten(req, res, req.params.id);
+        if (!event) return;
+        const { member_id } = req.body || {};
+        const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+        const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+        const von = req.user?.email || req.user?.name || 'Unbekannt';
+        const eventUrl = `https://fwv-raura.ch/events.html?event=${event.slug || event.id}`;
+        const hauptName = event.organizer_member_name || event.organizer_name || null;
+
+        if (member_id) {
+            // Mitglied: verwaltet den Anlass in der Mitglieder-App, kein eigener Login.
+            if (!UUID_MUSTER.test(String(member_id))) return res.status(400).json({ error: 'Ungueltige Mitglieds-ID' });
+            const m = await pool.query('SELECT id, vorname, nachname, email FROM members WHERE id = $1', [member_id]);
+            if (m.rows.length === 0) return res.status(404).json({ error: 'Mitglied nicht gefunden' });
+            if (event.organizer_id && String(event.organizer_id) === String(member_id)) {
+                return res.status(409).json({ error: 'Das Mitglied ist bereits Haupt-Organisator' });
+            }
+            const mitglied = m.rows[0];
+            const ins = await pool.query(
+                `INSERT INTO event_organizers (event_id, member_id, created_by)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT DO NOTHING
+                 RETURNING *`, [event.id, member_id, von]);
+            if (ins.rows.length === 0) return res.status(409).json({ error: 'Das Mitglied ist bereits Mitorganisator' });
+            const name = [mitglied.vorname, mitglied.nachname].filter(Boolean).join(' ');
+            pushToMember(member_id, 'event_update', `Mitorganisator/in: ${event.title}`,
+                'Du kannst den Anlass jetzt in der App unter "Organisator" verwalten.', { eventId: event.id })
+                .catch(() => {});
+            if (mitglied.email) {
+                axios.post(`${DISPATCH_API}/email/send`, mitAnlassLogo(event, {
+                    to: mitglied.email,
+                    ...mitorganisatoren.mitgliedMail({ name, titel: event.title, eventUrl, hauptorganisator: hauptName }),
+                    event_id: event.id
+                })).catch(e => console.error('Mitorganisator-Mail fehlgeschlagen:', e.message));
+            }
+            return res.status(201).json(mitorganisatoren.eintragAnsicht({
+                ...ins.rows[0], member_vorname: mitglied.vorname, member_nachname: mitglied.nachname,
+                member_email: mitglied.email
+            }));
+        }
+
+        // Extern: eigener Login (E-Mail + Passwort) fuers Event-Dashboard,
+        // Zugangsdaten per E-Mail — wie beim externen Haupt-Organisator.
+        if (!name || !mitorganisatoren.emailGueltig(email)) {
+            return res.status(400).json({ error: 'Mitglied oder Name und gueltige E-Mail erforderlich' });
+        }
+        if ((event.organizer_email || '').trim().toLowerCase() === email.toLowerCase()) {
+            return res.status(409).json({ error: 'Diese E-Mail gehoert dem Haupt-Organisator' });
+        }
+        const passwort = mitorganisatoren.neuesPasswort();
+        const bis = mitorganisatoren.zugangBis(event);
+        const ins = await pool.query(
+            `INSERT INTO event_organizers (event_id, name, email, password_hash, access_expires, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT DO NOTHING
+             RETURNING *`,
+            [event.id, name.slice(0, 200), email.toLowerCase().slice(0, 200),
+                mitorganisatoren.passwortHashen(passwort), bis, von]);
+        if (ins.rows.length === 0) return res.status(409).json({ error: 'Diese E-Mail ist bereits Mitorganisator' });
+        let mailGesendet = true;
+        try {
+            await axios.post(`${DISPATCH_API}/email/send`, {
+                to: email,
+                ...mitorganisatoren.zugangsdatenMail({
+                    name, titel: event.title, loginEmail: email.toLowerCase(), passwort,
+                    gueltigBis: bis, rolle: 'Mitorganisator'
+                }),
+                event_id: event.id
+            });
+        } catch (e) {
+            mailGesendet = false;
+            console.error('Mitorganisator-Zugangsdaten nicht gesendet:', e.message);
+        }
+        res.status(201).json({ ...mitorganisatoren.eintragAnsicht(ins.rows[0]), zugang_gesendet: mailGesendet });
+    } catch (error) {
+        console.error('POST /events/:id/organizers error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/events/:id/organizers/:orgId', authenticateAny, async (req, res) => {
+    try {
+        if (!UUID_MUSTER.test(req.params.id) || !UUID_MUSTER.test(req.params.orgId)) {
+            return res.status(404).json({ error: 'Nicht gefunden' });
+        }
+        const event = await ensureOrganisatorenVerwalten(req, res, req.params.id);
+        if (!event) return;
+        const del = await pool.query(
+            'DELETE FROM event_organizers WHERE id = $1 AND event_id = $2 RETURNING id',
+            [req.params.orgId, event.id]);
+        if (del.rows.length === 0) return res.status(404).json({ error: 'Mitorganisator nicht gefunden' });
+        res.json({ success: true });
+    } catch (error) {
+        console.error('DELETE /events/:id/organizers error:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // DEUTSCH: Anmeldung als Event-Organisator bearbeiten.
 // Erlaubt: guest_name, guest_email, guest_phone, participants, notes, status.
@@ -6703,6 +7011,9 @@ app.listen(PORT, () => {
     ensureOrganizerNotesSchema()
         .then(() => console.log('Organisator-Notizen-Schema bereit'))
         .catch(e => console.error('ensureOrganizerNotesSchema failed:', e.message));
+    ensureMitorganisatorenSchema()
+        .then(() => console.log('Mitorganisatoren-Schema bereit'))
+        .catch(e => console.error('ensureMitorganisatorenSchema failed:', e.message));
     ensureRegistrationConfirmationsSchema()
         .then(() => console.log('Registrierungs-Bestätigungs-Schema bereit'))
         .catch(e => console.error('ensureRegistrationConfirmationsSchema failed:', e.message));

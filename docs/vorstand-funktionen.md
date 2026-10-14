@@ -102,6 +102,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [x] | Anlass loeschen | ✓ | ½ | ✓ | – | ✓ | DELETE /events/:id |
 | [x] | Organisator zuweisen (Mitglied) | ✓ | ✓ | ✓ | – | ✓ | organizer_id |
 | [x] | Externer Organisator + Zugang erstellen | ✓ | ✓ | ✓ | – | ✓ | create_access → event-dashboard |
+| [x] | Mehrere Organisatoren (Mitorganisatoren, Mitglied oder extern) | – | – | – | ½ | ✓ | GET/POST/DELETE /events/:id/organizers (Tabelle event_organizers); gleiche Rechte wie der Haupt-Organisator; verwalten: Vorstand + Haupt-Organisator; extern mit eigenem Login per E-Mail; O: event-dashboard nur Login |
 | [ ] | PDF-Aushang hochladen/entfernen | ✓ | ✓ | ✓ | ½ | ✓ | pdf_attachment; O: nur alt-Android; F: Dateiwaehler file_picker (umgebung.pdfWaehlen), max. 10 MB |
 | [x] | Schichten anlegen/aendern/loeschen | ✓ | ✓ | ✓ | ✓ | ✓ | /shifts bzw. shifts-as-organizer |
 | [x] | Springer-Schichten generieren | ✓ | – | ✓ | – | ✓ | Client-Logik (springerSchichten) |

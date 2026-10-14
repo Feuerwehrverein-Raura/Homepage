@@ -287,4 +287,33 @@ class OrganisatorZugang extends AnlassVerwaltungZugang {
   @override
   Future<Uint8List> arbeitsplanPdf(String anlassId) =>
       api.datei('events/${_e(anlassId)}/pdf/arbeitsplan');
+
+  // -------------------------------------------------------------------
+  // Mitorganisatoren (`events/:id/organizers`). Lesen duerfen alle
+  // Organisatoren, aendern nur Vorstand und Haupt-Organisator — das prueft
+  // das Backend. Der externe Login hat diese Routen nicht.
+
+  @override
+  Future<OrganisatorenListe> organisatoren(String anlassId) async {
+    if (externerLogin) throw const NichtErlaubt();
+    return OrganisatorenListe.ausJson(await api.get('events/${_e(anlassId)}/organizers'));
+  }
+
+  @override
+  Future<OrganisatorEintrag> mitorganisatorHinzufuegen(
+    String anlassId,
+    NeuerMitorganisator neu,
+  ) async {
+    if (externerLogin) throw const NichtErlaubt();
+    final antwort = await api.post('events/${_e(anlassId)}/organizers', daten: neu.alsJson());
+    return OrganisatorEintrag.ausJson(
+      antwort is Map ? Map<String, dynamic>.from(antwort) : const <String, dynamic>{},
+    );
+  }
+
+  @override
+  Future<void> mitorganisatorEntfernen(String anlassId, String eintragId) async {
+    if (externerLogin) throw const NichtErlaubt();
+    await api.delete('events/${_e(anlassId)}/organizers/${_e(eintragId)}');
+  }
 }

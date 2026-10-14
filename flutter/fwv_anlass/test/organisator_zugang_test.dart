@@ -493,6 +493,64 @@ void main() {
     expect(Zurueckbuchung.ausJson({'restocked': 0, 'items': []}).text, startsWith('Nichts'));
   });
 
+  test(
+    'Mitorganisatoren: Liste, Mitglied, extern, entfernen; nicht ueber den Event-Login',
+    () async {
+      antwort = (a) => switch (route(a)) {
+        'GET /events/e1/organizers' => {
+          'hauptorganisator': {'member_id': 'm1', 'name': 'Erika Muster', 'email': 'erika@x.ch'},
+          'mitorganisatoren': [
+            {'id': 'o1', 'art': 'mitglied', 'member_id': 'm2', 'name': 'Hans Helfer'},
+            {
+              'id': 'o2',
+              'art': 'extern',
+              'name': 'Eva Extern',
+              'email': 'eva@x.ch',
+              'zugang_bis': '2027-01-24 18:00:00',
+            },
+          ],
+          'darf_verwalten': true,
+        },
+        'POST /events/e1/organizers' => {
+          'id': 'o3',
+          'art': 'extern',
+          'name': 'Neu',
+          'email': 'n@x.ch',
+        },
+        _ => {'success': true},
+      };
+      final d = dienst();
+      final l = await d.organisatoren('e1');
+      expect(l.hauptorganisator?.name, 'Erika Muster');
+      expect(l.hauptorganisator?.id, isNull);
+      expect(l.darfVerwalten, isTrue);
+      expect(l.mitorganisatoren.map((e) => e.artText), [
+        'Mitglied',
+        'Extern · Zugang bis 24.01.2027',
+      ]);
+      await d.mitorganisatorHinzufuegen('e1', const NeuerMitorganisator.mitglied('m3'));
+      final neu = await d.mitorganisatorHinzufuegen(
+        'e1',
+        const NeuerMitorganisator.extern(name: ' Neu ', email: ' n@x.ch '),
+      );
+      expect(neu.extern, isTrue);
+      await d.mitorganisatorEntfernen('e1', 'o2');
+      expect(anfragen.map(route), [
+        'GET /events/e1/organizers',
+        'POST /events/e1/organizers',
+        'POST /events/e1/organizers',
+        'DELETE /events/e1/organizers/o2',
+      ]);
+      expect(body(anfragen[1]), {'member_id': 'm3'});
+      expect(body(anfragen[2]), {'name': 'Neu', 'email': 'n@x.ch'});
+      expect(const NeuerMitorganisator.extern(name: 'X', email: 'kaputt').gueltig, isFalse);
+
+      anfragen.clear();
+      await expectLater(dienst(extern: true).organisatoren('e1'), throwsA(isA<NichtErlaubt>()));
+      expect(anfragen, isEmpty);
+    },
+  );
+
   test('PDFs und Arbeitsplan senden', () async {
     final d = dienst(extern: true);
     antwort = (_) => Uint8List.fromList([37, 80, 68, 70]);

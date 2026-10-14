@@ -130,7 +130,9 @@ function zahlen(anmeldungen) {
 // Was der Anfragende an diesem Anlass tun darf. Der Organisator-Login
 // (POST /events/login) hat nur die /events/my-event/...-Routen: bestaetigen,
 // ablehnen, hinzufuegen, Arbeitsplan senden.
-function aktionen(zugang, event, anmeldungen) {
+// organisatorenVerwalten: Mitorganisatoren hinzufuegen/entfernen — nur der
+// Vorstand und der Haupt-Organisator (nicht die Mitorganisatoren selbst).
+function aktionen(zugang, event, anmeldungen, { organisatorenVerwalten = false } = {}) {
     const voll = zugang !== 'organisator-login';
     const hatSchichten = (event.shifts || []).length > 0;
     return {
@@ -149,7 +151,8 @@ function aktionen(zugang, event, anmeldungen) {
         arbeitsplan_senden: !voll && hatSchichten,
         pdf_teilnehmerliste: anmeldungen.some(a => a.status !== 'rejected'),
         pdf_arbeitsplan: hatSchichten,
-        pdf_aushang: !!event.pdf_filename
+        pdf_aushang: !!event.pdf_filename,
+        organisatoren_verwalten: voll && organisatorenVerwalten
     };
 }
 
@@ -180,7 +183,9 @@ const OHNE_FELDER = ['event_email', 'event_password_hash', 'event_password_encry
 //   event:   Zeile aus events, mit shifts (Zeilen)
 //   regs:    Anmeldungen (siehe anmeldungFuerOrganisator)
 //   zugang:  'vorstand' | 'mitglied' | 'organisator-login'
-function anlassFuerOrganisator(event, regs, { zugang = 'mitglied', zeit = appAnsicht.jetzt() } = {}) {
+//   organisatorenVerwalten: Vorstand oder Haupt-Organisator (siehe aktionen)
+function anlassFuerOrganisator(event, regs,
+    { zugang = 'mitglied', zeit = appAnsicht.jetzt(), organisatorenVerwalten = false } = {}) {
     const schichten = event.shifts || [];
     const schichtenNachId = Object.fromEntries(schichten.map(s => [s.id, s]));
     const anmeldungen = anmeldungenSortieren(regs.map(r => anmeldungFuerOrganisator(r, schichtenNachId)));
@@ -213,7 +218,7 @@ function anlassFuerOrganisator(event, regs, { zugang = 'mitglied', zeit = appAns
         organisator: {
             aktuell: istAktuellFuerOrganisator(event, zeit),
             zahlen: zahlen(anmeldungen),
-            aktionen: aktionen(zugang, event, anmeldungen),
+            aktionen: aktionen(zugang, event, anmeldungen, { organisatorenVerwalten }),
             anmeldungen
         }
     };

@@ -64,7 +64,8 @@
           "arbeitsplan_senden": false,
           "pdf_teilnehmerliste": true,
           "pdf_arbeitsplan": true,
-          "pdf_aushang": false
+          "pdf_aushang": false,
+          "organisatoren_verwalten": true
         },
         "anmeldungen": [
           {
@@ -324,7 +325,8 @@
           "arbeitsplan_senden": false,
           "pdf_teilnehmerliste": true,
           "pdf_arbeitsplan": false,
-          "pdf_aushang": false
+          "pdf_aushang": false,
+          "organisatoren_verwalten": true
         },
         "anmeldungen": [
           {

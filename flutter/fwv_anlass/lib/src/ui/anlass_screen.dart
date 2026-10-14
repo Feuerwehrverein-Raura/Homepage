@@ -4,6 +4,8 @@
 //  - Schichten, Notizen, Rezepte & Material — nur wenn der Zugang sie
 //    erlaubt ([AnlassRechte]).
 // Oben rechts: Anlass bearbeiten; der Vorstand kann ihn auch loeschen.
+// Werkzeug "Organisatoren": Mitorganisatoren verwalten (Vorstand und
+// Haupt-Organisator, organisatoren_screen.dart).
 //
 // Gleich fuer Organisator und Vorstand; was geht, sagt der Zugang. Vorbild:
 // members-ios OrganizerView, members-android OrganizerDashboardFragment.
@@ -19,6 +21,7 @@ import 'anlass_bearbeiten_screen.dart';
 import 'anmeldung_screens.dart';
 import 'material_screen.dart';
 import 'notizen_screen.dart';
+import 'organisatoren_screen.dart';
 import 'schichten_screen.dart';
 
 class VerwaltungsAnlassScreen extends StatefulWidget {
@@ -230,6 +233,7 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
               mitteilen: () => _oeffnen(MitteilenScreen(verwaltung: _v, anlass: a.anlass)),
               pdf: () => _pdfWaehlen(a),
               arbeitsplanSenden: () => _arbeitsplanSenden(a),
+              organisatoren: () => _oeffnen(OrganisatorenScreen(verwaltung: _v, anlass: a.anlass)),
             ),
             Abschnitt('Anmeldungen (${a.zahlen.anmeldungen})'),
             if (a.anmeldungen.isEmpty)
@@ -375,12 +379,16 @@ class _Werkzeuge extends StatelessWidget {
     required this.mitteilen,
     required this.pdf,
     required this.arbeitsplanSenden,
+    required this.organisatoren,
   });
 
   final AnlassRechte rechte;
   final VoidCallback mitteilen;
   final VoidCallback pdf;
   final VoidCallback arbeitsplanSenden;
+
+  /// Mitorganisatoren verwalten (Vorstand und Haupt-Organisator).
+  final VoidCallback organisatoren;
 
   @override
   Widget build(BuildContext context) {
@@ -394,6 +402,8 @@ class _Werkzeuge extends StatelessWidget {
         if (rechte.einPdf) knopf(Icons.picture_as_pdf_outlined, 'PDF', pdf),
         if (rechte.arbeitsplanSenden)
           knopf(Icons.send_outlined, 'Arbeitsplan senden', arbeitsplanSenden),
+        if (rechte.organisatorenVerwalten)
+          knopf(Icons.groups_outlined, 'Organisatoren', organisatoren),
       ],
     );
   }

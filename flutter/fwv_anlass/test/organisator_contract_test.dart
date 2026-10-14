@@ -49,6 +49,7 @@ void main() {
     expect(c.rechte.arbeitsplanSenden, isFalse);
     expect(c.rechte.pdfArbeitsplan, isTrue);
     expect(c.rechte.pdfAushang, isFalse);
+    expect(c.rechte.organisatorenVerwalten, isTrue, reason: 'Erika ist Haupt-Organisatorin');
 
     final erste = c.anmeldungen.first;
     expect(erste.name, 'Gast Neu');

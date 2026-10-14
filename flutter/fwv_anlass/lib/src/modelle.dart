@@ -172,6 +172,7 @@ class AnlassRechte {
     this.pdfTeilnehmerliste = false,
     this.pdfArbeitsplan = false,
     this.pdfAushang = false,
+    this.organisatorenVerwalten = false,
   });
 
   factory AnlassRechte.ausJson(Object? json) {
@@ -193,6 +194,7 @@ class AnlassRechte {
       pdfTeilnehmerliste: w('pdf_teilnehmerliste'),
       pdfArbeitsplan: w('pdf_arbeitsplan'),
       pdfAushang: w('pdf_aushang'),
+      organisatorenVerwalten: w('organisatoren_verwalten'),
     );
   }
 
@@ -213,6 +215,10 @@ class AnlassRechte {
   final bool pdfTeilnehmerliste;
   final bool pdfArbeitsplan;
   final bool pdfAushang;
+
+  /// Mitorganisatoren hinzufuegen und entfernen - nur der Vorstand und der
+  /// Haupt-Organisator, nicht die Mitorganisatoren selbst.
+  final bool organisatorenVerwalten;
 
   bool get einPdf => pdfTeilnehmerliste || pdfArbeitsplan || pdfAushang;
 }

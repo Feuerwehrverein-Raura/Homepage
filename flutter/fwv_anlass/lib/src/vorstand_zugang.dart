@@ -68,6 +68,7 @@ class VorstandZugang extends OrganisatorZugang {
       pdfTeilnehmerliste: r.pdfTeilnehmerliste,
       pdfArbeitsplan: r.pdfArbeitsplan,
       pdfAushang: r.pdfAushang,
+      organisatorenVerwalten: r.organisatorenVerwalten,
     );
   }
 

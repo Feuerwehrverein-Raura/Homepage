@@ -88,6 +88,15 @@ test('Aktionen: Organisator-Login nur bestaetigen/hinzufuegen', () => {
     assert.equal(o.aktionen('mitglied', { shifts: [] }, []).alternative, false);
 });
 
+test('Aktionen: Mitorganisatoren verwalten nur Vorstand und Haupt-Organisator', () => {
+    const ev = { shifts: [] };
+    assert.equal(o.aktionen('mitglied', ev, []).organisatoren_verwalten, false, 'Standard: Mitorganisator');
+    assert.equal(o.aktionen('mitglied', ev, [], { organisatorenVerwalten: true }).organisatoren_verwalten, true);
+    assert.equal(o.aktionen('vorstand', ev, [], { organisatorenVerwalten: true }).organisatoren_verwalten, true);
+    assert.equal(o.aktionen('organisator-login', ev, [], { organisatorenVerwalten: true }).organisatoren_verwalten,
+        false, 'nie ueber den Event-Login');
+});
+
 test('Organisator-Login: vorbei, abgesagt, Datum offen', () => {
     const gesperrt = ev => o.organisatorLoginGesperrt(ev, JETZT);
     assert.equal(gesperrt({ start_date: '2026-10-17 10:00:00' }), null);

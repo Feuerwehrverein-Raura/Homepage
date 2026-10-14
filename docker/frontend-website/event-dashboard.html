@@ -308,7 +308,8 @@
         function renderDashboard() {
             // DEUTSCH: Header-Bereich mit Event-Titel und Organisator-Name befuellen
             document.getElementById('event-title-header').textContent = eventData.title;
-            document.getElementById('organizer-name-header').textContent = eventData.organizer_name || 'Organisator';
+            // DEUTSCH: angemeldet_als = wer eingeloggt ist (auch ein Mitorganisator mit eigenem Login)
+            document.getElementById('organizer-name-header').textContent = eventData.angemeldet_als || eventData.organizer_name || 'Organisator';
 
             // DEUTSCH: Event-Infokarte mit Titel, Datum, Ort, Status und Beschreibung befuellen
             document.getElementById('event-title').textContent = eventData.title;

@@ -344,6 +344,28 @@ normalen Token:
 | `POST /events/:id/shifts-as-organizer`, `PUT/DELETE /events/:id/shifts/:shiftId/as-organizer` | Schichten |
 | `GET/POST /events/:id/organizer-notes`, `DELETE …/:noteId`, `GET/DELETE …/:noteId/attachments/:attId` | Notizen mit Anhängen (Base64) |
 | `GET /events/:id/recipes`, `…/shopping-list`, `POST …/manual-items` usw. | Rezepte und Material (Inventar) |
+| `GET /events/:id/organizers` | Haupt-Organisator, Mitorganisatoren, `darf_verwalten` |
+| `POST /events/:id/organizers` | Mitorganisator hinzufügen: `{ member_id }` oder `{ name, email }` (extern) — nur Vorstand und Haupt-Organisator |
+| `DELETE /events/:id/organizers/:orgId` | Mitorganisator entfernen (sein Login gilt sofort nicht mehr) — nur Vorstand und Haupt-Organisator |
+
+### Mitorganisatoren
+
+Neben dem Haupt-Organisator (`organizer_id` bzw. `organizer_name`/
+`organizer_email`; Kontaktperson in Mails, Arbeitsplan und Website) kann ein
+Anlass beliebig viele Mitorganisatoren haben (Tabelle `event_organizers`).
+Sie haben dieselben Rechte wie der Haupt-Organisator (alle Routen oben,
+`organized-by-me`, `organisator-uebersicht`) und bekommen die Meldungen zu
+neuen Anmeldungen. Den Haupt-Organisator ändern und den Anlass löschen kann
+nur der Vorstand; Mitorganisatoren verwalten nur Vorstand und
+Haupt-Organisator (`aktionen.organisatoren_verwalten`).
+
+- **Mitglied** (`member_id`): verwaltet den Anlass in der Mitglieder-App;
+  bekommt eine E-Mail und eine Push-Nachricht.
+- **Extern** (`name`, `email`): eigener Login fürs Event-Dashboard mit der
+  eigenen E-Mail und einem zufälligen Passwort (scrypt mit Salz), gültig bis
+  drei Monate nach dem Anlass; die Zugangsdaten gehen per E-Mail (gleicher
+  Text wie beim externen Haupt-Organisator). `POST /events/login` nimmt
+  diese Zugangsdaten an; das Token trägt zusätzlich `organisator_id`.
 
 ### Rezepte, Material und Einkauf (Inventar-Proxy)
 

@@ -394,3 +394,93 @@ class Zurueckbuchung {
       ? 'Nichts zurückzubuchen — erst Gekauftes abhaken.'
       : 'Ins Lager gebucht: ${posten.map((p) => '${p.name} +${mengeText(p.menge)}').join(', ')}';
 }
+
+/// Organisatoren eines Anlasses (`GET events/:id/organizers`): der
+/// Haupt-Organisator (Kontaktperson; aendern kann ihn nur der Vorstand) und
+/// die Mitorganisatoren mit denselben Rechten.
+class OrganisatorenListe {
+  const OrganisatorenListe({
+    this.hauptorganisator,
+    this.mitorganisatoren = const [],
+    this.darfVerwalten = false,
+  });
+
+  factory OrganisatorenListe.ausJson(Object? json) {
+    final m = json is Map ? json : const {};
+    final h = m['hauptorganisator'];
+    return OrganisatorenListe(
+      hauptorganisator: h is Map ? OrganisatorEintrag.ausJson(Map<String, dynamic>.from(h)) : null,
+      mitorganisatoren: jsonListe(m['mitorganisatoren'], OrganisatorEintrag.ausJson),
+      darfVerwalten: jsonWahr(m['darf_verwalten']) ?? false,
+    );
+  }
+
+  final OrganisatorEintrag? hauptorganisator;
+  final List<OrganisatorEintrag> mitorganisatoren;
+
+  /// Vorstand oder Haupt-Organisator: hinzufuegen und entfernen.
+  final bool darfVerwalten;
+}
+
+/// Ein Organisator: Mitglied (verwaltet in der App) oder extern (eigener
+/// Login fuers Event-Dashboard, befristet).
+class OrganisatorEintrag {
+  const OrganisatorEintrag({
+    this.id,
+    required this.name,
+    this.mitgliedId,
+    this.email,
+    this.extern = false,
+    this.zugangBis,
+  });
+
+  factory OrganisatorEintrag.ausJson(Map<String, dynamic> m) => OrganisatorEintrag(
+    id: jsonText(m['id']),
+    name: jsonText(m['name']) ?? jsonText(m['email']) ?? 'Ohne Namen',
+    mitgliedId: jsonText(m['member_id']),
+    email: jsonText(m['email']),
+    extern: jsonText(m['art']) == 'extern',
+    zugangBis: jsonDatum(m['zugang_bis']),
+  );
+
+  /// Eintrag der Mitorganisatoren; null beim Haupt-Organisator.
+  final String? id;
+  final String name;
+  final String? mitgliedId;
+  final String? email;
+  final bool extern;
+
+  /// Nur extern: bis wann der Login gilt.
+  final DateTime? zugangBis;
+
+  /// "Mitglied", "Extern · Zugang bis 24.01.2027"
+  String get artText {
+    if (!extern) return mitgliedId != null ? 'Mitglied' : 'Extern';
+    final b = zugangBis;
+    if (b == null) return 'Extern';
+    String zwei(int z) => z.toString().padLeft(2, '0');
+    return 'Extern · Zugang bis ${zwei(b.day)}.${zwei(b.month)}.${b.year}';
+  }
+}
+
+/// Body fuer "Mitorganisator hinzufuegen": Mitglied (ID) oder extern (Name
+/// und E-Mail; das Backend erstellt einen Login und schickt ihn per E-Mail).
+class NeuerMitorganisator {
+  const NeuerMitorganisator.mitglied(String this.mitgliedId) : name = '', email = '';
+
+  const NeuerMitorganisator.extern({required this.name, required this.email}) : mitgliedId = null;
+
+  final String? mitgliedId;
+  final String name;
+  final String email;
+
+  bool get istMitglied => mitgliedId != null;
+
+  static final _emailMuster = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
+  bool get gueltig =>
+      istMitglied || (name.trim().isNotEmpty && _emailMuster.hasMatch(email.trim()));
+
+  Map<String, Object?> alsJson() =>
+      istMitglied ? {'member_id': mitgliedId} : {'name': name.trim(), 'email': email.trim()};
+}

@@ -193,6 +193,23 @@ abstract class AnlassVerwaltungZugang {
 
   /// PDF-Aushang entfernen.
   Future<void> pdfAushangEntfernen(String anlassId) async => throw const NichtErlaubt();
+
+  // -------------------------------------------------------------------
+  // Mitorganisatoren (Vorstand und Haupt-Organisator verwalten, siehe
+  // [AnlassRechte.organisatorenVerwalten]). Standard: [NichtErlaubt].
+
+  /// Haupt-Organisator und Mitorganisatoren.
+  Future<OrganisatorenListe> organisatoren(String anlassId) async => throw const NichtErlaubt();
+
+  /// Mitglied oder extern (bekommt einen eigenen Login per E-Mail).
+  Future<OrganisatorEintrag> mitorganisatorHinzufuegen(
+    String anlassId,
+    NeuerMitorganisator neu,
+  ) async => throw const NichtErlaubt();
+
+  /// Entfernen; ein Login des Externen gilt ab sofort nicht mehr.
+  Future<void> mitorganisatorEntfernen(String anlassId, String eintragId) async =>
+      throw const NichtErlaubt();
 }
 
 /// Was die Oberflaeche vom Geraet braucht (Teilen-Menue, Kamera, Links) —

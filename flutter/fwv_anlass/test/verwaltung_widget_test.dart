@@ -248,6 +248,38 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
   Future<Uint8List> aushangPdf(String a) => _merken('aushangPdf', [a], Uint8List(0));
   @override
   Future<Uint8List> arbeitsplanPdf(String a) => _merken('arbeitsplanPdf', [a], Uint8List(0));
+
+  // Mitorganisatoren: Liste im Speicher, wie das Backend sie liefert.
+  final mitorganisatorListe = <OrganisatorEintrag>[];
+  @override
+  Future<OrganisatorenListe> organisatoren(String a) => _merken(
+    'organisatoren',
+    [a],
+    OrganisatorenListe(
+      hauptorganisator: const OrganisatorEintrag(name: 'Erika Muster', mitgliedId: 'm1'),
+      mitorganisatoren: List.of(mitorganisatorListe),
+      darfVerwalten: true,
+    ),
+  );
+  @override
+  Future<OrganisatorEintrag> mitorganisatorHinzufuegen(String a, NeuerMitorganisator neu) {
+    final e = OrganisatorEintrag(
+      id: 'o${mitorganisatorListe.length + 1}',
+      name: neu.istMitglied ? 'Hans Helfer' : neu.name.trim(),
+      mitgliedId: neu.mitgliedId,
+      email: neu.istMitglied ? null : neu.email.trim(),
+      extern: !neu.istMitglied,
+      zugangBis: neu.istMitglied ? null : DateTime(2027, 1, 24),
+    );
+    mitorganisatorListe.add(e);
+    return _merken('mitorganisatorHinzufuegen', [a, neu.alsJson()], e);
+  }
+
+  @override
+  Future<void> mitorganisatorEntfernen(String a, String id) {
+    mitorganisatorListe.removeWhere((e) => e.id == id);
+    return _merken('mitorganisatorEntfernen', [a, id], null);
+  }
 }
 
 /// Nachgebauter Vorstand: alles vom Organisator plus anlegen, loeschen,
@@ -747,6 +779,68 @@ void main() {
     expect(find.byType(Checkbox), findsNothing);
     expect(find.text('Belege'), findsNothing);
     expect(zugang.gab('belege'), isFalse);
+  });
+
+  testWidgets('Organisatoren: Mitglied und Externen hinzufuegen, entfernen mit Rueckfrage', (
+    tester,
+  ) async {
+    await anlass(tester, _chilbi);
+    await tippen(tester, find.widgetWithText(ActionChip, 'Organisatoren'));
+    expect(zugang.letzter('organisatoren'), [_chilbi]);
+    expect(find.text('Erika Muster'), findsOneWidget);
+    expect(find.text('Mitorganisatoren (0)'), findsOneWidget);
+
+    // Mitglied aus dem Verzeichnis
+    await tippen(tester, find.byKey(const Key('mitorganisator-neu')));
+    await tippen(tester, find.byKey(const Key('mitorganisator-mitglied')));
+    expect(find.text('Mitorganisator wählen'), findsOneWidget);
+    await tippen(tester, find.text('Hans Helfer'));
+    expect(zugang.letzter('mitorganisatorHinzufuegen'), [
+      _chilbi,
+      {'member_id': 'm2'},
+    ]);
+    expect(find.text('Hans Helfer ist jetzt Mitorganisator'), findsOneWidget);
+    expect(find.text('Mitorganisatoren (1)'), findsOneWidget);
+
+    // Extern: Name und E-Mail, ungueltige E-Mail abgewiesen
+    await tippen(tester, find.byKey(const Key('mitorganisator-neu')));
+    await tippen(tester, find.byKey(const Key('mitorganisator-extern')));
+    await tester.enterText(find.byKey(const Key('extern-name')), 'Eva Extern');
+    await tester.enterText(find.byKey(const Key('extern-email')), 'keine-mail');
+    await tippen(tester, find.byKey(const Key('extern-hinzufuegen')));
+    expect(find.text('Bitte eine gültige E-Mail angeben.'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('extern-email')), ' eva@example.ch ');
+    await tippen(tester, find.byKey(const Key('extern-hinzufuegen')));
+    expect(zugang.letzter('mitorganisatorHinzufuegen'), [
+      _chilbi,
+      {'name': 'Eva Extern', 'email': 'eva@example.ch'},
+    ]);
+    expect(find.textContaining('Zugangsdaten an eva@example.ch gesendet'), findsOneWidget);
+    expect(find.textContaining('Extern · Zugang bis 24.01.2027'), findsOneWidget);
+
+    // Entfernen nur nach Rueckfrage
+    await tippen(tester, find.byKey(const Key('mitorganisator-entfernen-o2')));
+    expect(find.text('Mitorganisator entfernen?'), findsOneWidget);
+    expect(
+      find.textContaining('Der Zugang zum Event-Dashboard gilt ab sofort nicht mehr.'),
+      findsOneWidget,
+    );
+    await tippen(tester, find.widgetWithText(FilledButton, 'Entfernen'));
+    expect(zugang.letzter('mitorganisatorEntfernen'), [_chilbi, 'o2']);
+    expect(find.text('Mitorganisatoren (1)'), findsOneWidget);
+    expect(find.text('Eva Extern'), findsNothing);
+  });
+
+  testWidgets('Mitorganisator: kein Knopf "Organisatoren", sonst alle Rechte', (tester) async {
+    final json = _vertrag();
+    for (final a in json['anlaesse'] as List) {
+      (a as Map)['organisator']['aktionen']['organisatoren_verwalten'] = false;
+    }
+    zugang.json = json;
+    await anlass(tester, _chilbi);
+    expect(find.widgetWithText(ActionChip, 'Organisatoren'), findsNothing);
+    expect(find.widgetWithText(ActionChip, 'Informieren'), findsOneWidget);
+    expect(find.byTooltip('Anlass bearbeiten'), findsOneWidget);
   });
 
   testWidgets('Externer Organisator: nur bestaetigen/ablehnen, keine Reiter', (tester) async {
