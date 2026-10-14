@@ -12,6 +12,7 @@ import 'package:fwv_anlass/fwv_anlass.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_lager/fwv_lager.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart';
+import 'package:fwv_vorstand/fwv_vorstand.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -232,6 +233,12 @@ class Dienste {
 
   /// Anlaesse, Kalender, Arbeitsplan, Anmeldungen.
   AnlaesseDienst get anlaesse => AnlaesseDienst(sitzung.api);
+
+  /// Vorstand-Bereich (Paket fwv_vorstand): dieselbe Anlass-Verwaltung -
+  /// das Backend liefert dem Vorstand dort alle Anlaesse - plus Antraege,
+  /// Mitglieder, Beitraege, Nachricht, Audit.
+  VorstandDienste get vorstand =>
+      VorstandDienste(api: sitzung.api, anlaesse: anlassVerwaltung, umgebung: anlassVerwaltung.umgebung);
 
   /// Organisator-Bereich (Paket fwv_anlass, gemeinsam mit der spaeteren
   /// Vorstand-App): eigene Anlaesse; externe Organisatoren (Event-Login)

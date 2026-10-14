@@ -1,0 +1,27 @@
+name: fwv_vorstand
+description: "Vorstand-Bereich der Mitglieder-App (Anträge, Mitglieder, Beiträge, Versand, Audit) – Checkliste docs/vorstand-funktionen.md"
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  fwv_core:
+    path: ../fwv_core
+  # Gemeinsame Bausteine der Oberflaeche (Laden, Meldungen, Chips, Rueckfrage)
+  # und die Anlass-Verwaltung (Vorstand = Organisator fuer alle Anlaesse).
+  fwv_anlass:
+    path: ../fwv_anlass
+  material_ui: ^1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  http: ^1.6.0
+
+flutter:

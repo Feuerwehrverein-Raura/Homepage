@@ -10,9 +10,13 @@ import '../zugang.dart';
 import 'anlass_screen.dart';
 
 class VerwaltungsUebersichtScreen extends StatefulWidget {
-  const VerwaltungsUebersichtScreen({super.key, required this.verwaltung});
+  const VerwaltungsUebersichtScreen({super.key, required this.verwaltung, this.eingebettet = false});
 
   final AnlassVerwaltung verwaltung;
+
+  /// Ohne eigene Titelleiste - z.B. als Bereich im Reiter "Vorstand", der
+  /// seine Leiste selbst zeigt.
+  final bool eingebettet;
 
   @override
   State<VerwaltungsUebersichtScreen> createState() => _VerwaltungsUebersichtScreenState();
@@ -35,7 +39,7 @@ class _VerwaltungsUebersichtScreenState extends State<VerwaltungsUebersichtScree
   Widget build(BuildContext context) {
     final z = widget.verwaltung.zugang;
     return Scaffold(
-      appBar: AppBar(title: Text(z.bezeichnung)),
+      appBar: widget.eingebettet ? null : AppBar(title: Text(z.bezeichnung)),
       body: LadeAnsicht<VerwaltungsUebersicht>(
         key: _lader,
         laden: z.uebersicht,

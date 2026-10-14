@@ -36,6 +36,8 @@ dependencies:
     path: ../fwv_lager
   fwv_roterschopf:
     path: ../fwv_roterschopf
+  fwv_vorstand:
+    path: ../fwv_vorstand
   # Musik im Hintergrund (Player in fwv_roterschopf), hier nur eingerichtet
   just_audio_background: ^0.0.1-beta.17
   flutter:

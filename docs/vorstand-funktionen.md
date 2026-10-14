@@ -6,6 +6,12 @@ Bereich», Desktop Linux/Windows/macOS). Heute gibt es dieselbe Arbeit in
 mehreren Varianten mit **unterschiedlichen** Funktionen. Diese Liste
 fuehrt jede Funktion einmal auf, damit beim Umzug nichts verloren geht.
 
+**Entscheid 14.10.2026:** Vorstandsmitglieder sehen den Reiter
+«Organisator» **nicht**. An seiner Stelle steht «Vorstand» mit allen
+Funktionen dahinter – auch allem, was der Organisator kann, fuer alle
+Anlaesse. Code: Paket `flutter/fwv_vorstand`, je Bereich eine Ansicht
+(`lib/src/ui/*_ansicht.dart`), Reiter in `mitglieder/lib/vorstand/`.
+
 **So benutzen:** `[x]`, sobald die Funktion in der neuen App da ist.
 Funktionen, die es nur in einer Variante gibt, sind mit **nur in …**
 markiert. Unter «Offene Fragen» stehen halbfertige oder tote Teile –

@@ -4,6 +4,7 @@
 // heisst "Einstellungen"; ausgeklappt stehen unten die Anleitungen.
 //
 // Mitglieder:          Anlässe · (Organisator) · (Lager) · (Schopf) · Profil · Mehr
+// Vorstand:            Anlässe · Vorstand · Lager · Schopf · Profil · Mehr
 // Externe Organisatoren: Organisator · Anlässe · Mehr
 //
 // "Organisator" erscheint bei Mitgliedern nur, wenn sie Anlaesse
@@ -18,6 +19,7 @@ import 'dart:async';
 
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_roterschopf/fwv_roterschopf.dart' show MusikScreen;
+import 'package:fwv_vorstand/fwv_vorstand.dart' show istVorstand;
 import 'package:material_ui/material_ui.dart';
 
 import 'anlaesse/anlaesse_tab.dart';
@@ -30,11 +32,12 @@ import 'lager/lager_tab.dart';
 import 'organisator/organisator_tab.dart';
 import 'profil/profil_tab.dart';
 import 'roterschopf/roterschopf_tab.dart';
+import 'vorstand/vorstand_tab.dart';
 
 /// [musik] und [gruppen] gibt es nur mit Seitenleiste (grosse Bildschirme):
 /// Dort stehen die Unterpunkte von "Mehr" direkt in der Leiste. Auf dem Handy
 /// sind sie Teil der Einstellungen.
-enum Reiter { anlaesse, organisator, lager, roterSchopf, profil, musik, gruppen, einstellungen }
+enum Reiter { anlaesse, organisator, vorstand, lager, roterSchopf, profil, musik, gruppen, einstellungen }
 
 /// Ab dieser Breite stehen die Reiter links als Seitenleiste (Material:
 /// "medium" ab 600, hier etwas spaeter - darunter passt die Leiste unten
@@ -74,7 +77,12 @@ class _HauptseiteState extends State<Hauptseite> {
       ? const [Reiter.organisator, Reiter.anlaesse, Reiter.einstellungen]
       : [
           Reiter.anlaesse,
-          if (organisiert) Reiter.organisator,
+          // Vorstand statt Organisator: Der Vorstand verwaltet alle Anlaesse
+          // (und mehr) - ein eigener Organisator-Reiter waere doppelt.
+          if (istVorstand(widget.dienste.sitzung.sitzung))
+            Reiter.vorstand
+          else if (organisiert)
+            Reiter.organisator,
           if (lager) Reiter.lager,
           if (roterSchopf) Reiter.roterSchopf,
           Reiter.profil,
@@ -86,6 +94,7 @@ class _HauptseiteState extends State<Hauptseite> {
   Widget _inhalt(Reiter r, {required bool seitenleiste, required bool ausgeklappt}) => switch (r) {
     Reiter.anlaesse => AnlaesseTab(dienste: widget.dienste),
     Reiter.organisator => OrganisatorTab(dienste: widget.dienste),
+    Reiter.vorstand => VorstandTab(dienste: widget.dienste),
     Reiter.lager => LagerTab(dienste: widget.dienste),
     Reiter.roterSchopf => RoterSchopfTab(dienste: widget.dienste),
     Reiter.profil => ProfilTab(dienste: widget.dienste),
@@ -103,6 +112,11 @@ class _HauptseiteState extends State<Hauptseite> {
       icon: Icon(Icons.event_outlined),
       selectedIcon: Icon(Icons.event),
       label: 'Anlässe',
+    ),
+    Reiter.vorstand => const NavigationDestination(
+      icon: Icon(Icons.shield_outlined),
+      selectedIcon: Icon(Icons.shield),
+      label: 'Vorstand',
     ),
     Reiter.organisator => const NavigationDestination(
       icon: Icon(Icons.assignment_outlined),

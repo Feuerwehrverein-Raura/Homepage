@@ -441,6 +441,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  fwv_vorstand:
+    dependency: "direct main"
+    description:
+      path: "../fwv_vorstand"
+      relative: true
+    source: path
+    version: "0.1.0"
   hooks:
     dependency: transitive
     description:
