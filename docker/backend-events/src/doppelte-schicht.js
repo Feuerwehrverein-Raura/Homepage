@@ -49,4 +49,89 @@ function konfliktText(konflikte) {
         .join(', ');
 }
 
-module.exports = { schichtKonflikte, eindeutig, konfliktText };
+// ---------------------------------------------------------------------------
+// Niemand soll gleichzeitig auf zwei Schichten stehen (Entscheid 14.10.2026:
+// Stefan stand an der Chilbi Sa 22-02 bei Bar UND Kueche). Gilt ueber alle
+// Anlaesse und auch fuer mehrere Schichten in derselben Anfrage. Schichten,
+// die direkt aneinander anschliessen (16-18 und 18-20), sind erlaubt.
+// Ende <= Beginn heisst: endet am Folgetag (22:00-02:00).
+
+const MIN = 60 * 1000;
+
+/** Zeitraum einer Schicht in ms (Ortszeit egal - nur Vergleiche), oder null. */
+function zeitraum(s) {
+    if (!s || !s.date || !s.start_time || !s.end_time) return null;
+    const tag = Date.parse(`${String(s.date).slice(0, 10)}T00:00:00Z`);
+    if (Number.isNaN(tag)) return null;
+    const min = t => { const [h, m] = String(t).split(':').map(Number); return h * 60 + (m || 0); };
+    const a = tag + min(s.start_time) * MIN;
+    let b = tag + min(s.end_time) * MIN;
+    if (b <= a) b += 24 * 60 * MIN;
+    return { a, b };
+}
+
+function ueberschneiden(x, y) {
+    const p = zeitraum(x), q = zeitraum(y);
+    return !!p && !!q && p.a < q.b && q.a < p.b;
+}
+
+/** Paare (neu, bestehend), die sich zeitlich ueberschneiden - reine Logik. */
+function zeitPaare(neu, bestehend) {
+    const paare = [];
+    for (let i = 0; i < neu.length; i++) {
+        for (let j = i + 1; j < neu.length; j++) {
+            if (ueberschneiden(neu[i], neu[j])) paare.push({ neu: neu[j], mit: neu[i] });
+        }
+        for (const b of bestehend) {
+            if (String(b.shift_id) === String(neu[i].shift_id)) continue; // gleiche Schicht: schichtKonflikte
+            if (ueberschneiden(neu[i], b)) paare.push({ neu: neu[i], mit: b });
+        }
+    }
+    return paare;
+}
+
+/**
+ * Schichten aus [shiftIds], die sich mit einer anderen Schicht derselben
+ * Person ueberschneiden (bestehende aktive Anmeldungen ausser [ausser],
+ * oder eine andere Schicht derselben Anfrage).
+ * Liefert [{ neu, mit }] mit je { shift_id, name, bereich, date, start_time, end_time, anlass }.
+ */
+async function zeitKonflikte(db, { memberId, email, shiftIds, ausser = null }) {
+    const ids = eindeutig(shiftIds);
+    if (!ids || ids.length === 0) return [];
+    const felder = `s.id AS shift_id, s.name, s.bereich, s.date::text AS date,
+        s.start_time::text AS start_time, s.end_time::text AS end_time, e.title AS anlass`;
+    const neu = (await db.query(`
+        SELECT ${felder} FROM shifts s LEFT JOIN events e ON e.id = s.event_id
+         WHERE s.id = ANY($1::uuid[])`, [ids])).rows;
+    if (neu.length === 0) return [];
+    const adresse = String(email || '').trim().toLowerCase();
+    let bestehend = [];
+    if (memberId || adresse) {
+        const tage = neu.map(s => String(s.date).slice(0, 10)).sort();
+        bestehend = (await db.query(`
+            SELECT DISTINCT ${felder}
+              FROM registrations r
+              JOIN shifts s ON s.id = ANY(r.shift_ids)
+              LEFT JOIN events e ON e.id = s.event_id
+             WHERE r.status = ANY($1::text[])
+               AND ($2::uuid IS NULL OR r.id <> $2::uuid)
+               AND (($3::uuid IS NOT NULL AND r.member_id = $3::uuid)
+                    OR ($4 <> '' AND lower(trim(r.guest_email)) = $4))
+               AND s.date BETWEEN ($5::date - 1) AND ($6::date + 1)`,
+        [AKTIV, ausser, memberId || null, adresse, tage[0], tage[tage.length - 1]])).rows;
+    }
+    return zeitPaare(neu, bestehend);
+}
+
+/** "Kueche Sa 17.10. 22:00-02:00 gleichzeitig mit Bar 22:00-02:00 (Chilbi 2026)" */
+function zeitText(paare) {
+    const zeit = s => `${String(s.start_time || '').slice(0, 5)}–${String(s.end_time || '').slice(0, 5)}`;
+    const tag = s => { const [j, m, t] = String(s.date).slice(0, 10).split('-'); return `${t}.${m}.${j}`; };
+    const schicht = s => [s.bereich, s.name].filter(Boolean).join(' ');
+    return paare.map(({ neu, mit }) =>
+        `${schicht(neu)} am ${tag(neu)} ${zeit(neu)} überschneidet sich mit ${schicht(mit)} ${zeit(mit)}` +
+        (mit.anlass && mit.anlass !== neu.anlass ? ` (${mit.anlass})` : '')).join('; ');
+}
+
+module.exports = { schichtKonflikte, eindeutig, konfliktText, zeitKonflikte, zeitPaare, zeitText };

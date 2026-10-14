@@ -14,10 +14,10 @@ const { formatDateDE, bereichLesbar, renderArbeitsplanPdf } = arbeitsplan;
 const buildArbeitsplan = eventId => arbeitsplan.buildArbeitsplan(pool, eventId);
 const registrationDetailsText = (eventId, shiftIds) => arbeitsplan.registrationDetailsText(pool, eventId, shiftIds);
 const appAnsicht = require('./app-ansicht');
-const { schichtKonflikte, eindeutig, konfliktText } = require('./doppelte-schicht');
+const { schichtKonflikte, eindeutig, konfliktText, zeitKonflikte, zeitText } = require('./doppelte-schicht');
 const organisatorAnsicht = require('./organisator-ansicht');
 const { anlassIcs, icsDateiname } = require('./ics');
-const { mitAnlassLogo } = require('./anlass-mail');
+const { mitAnlassLogo, escapeHtml } = require('./anlass-mail');
 const { STANDARD_ORGANISATOR, ohneOrganisator, istStandardOrganisator } = require('./organisator-standard');
 const mitorganisatoren = require('./mitorganisatoren');
 const { schichtenPruefen } = require('./schicht-eintrag');
@@ -2330,6 +2330,15 @@ app.post('/registrations', authenticateAny, async (req, res) => {
                 code: 'schicht_doppelt'
             });
         }
+        const gleichzeitig = await zeitKonflikte(pool, {
+            memberId: member_id, email: guest_email, shiftIds: shift_ids
+        });
+        if (gleichzeitig.length > 0) {
+            return res.status(409).json({
+                error: `Gleichzeitig schon eingeteilt: ${zeitText(gleichzeitig)}`,
+                code: 'schicht_gleichzeitig'
+            });
+        }
 
         const result = await pool.query(`
             INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
@@ -2685,6 +2694,14 @@ app.post('/registrations/public', async (req, res) => {
                     success: false,
                     message: `Du bist für diese Schicht schon eingetragen: ${konfliktText(doppelt)}.`,
                     code: 'schicht_doppelt'
+                });
+            }
+            const gleichzeitig = await zeitKonflikte(pool, { memberId, email, shiftIds });
+            if (gleichzeitig.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: `Zu dieser Zeit bist du schon eingeteilt: ${zeitText(gleichzeitig)}.`,
+                    code: 'schicht_gleichzeitig'
                 });
             }
         }
@@ -4097,6 +4114,23 @@ app.get('/registrations/alternative-response/:token', async (req, res) => {
                     </html>
                 `);
             }
+            // Zu dieser Zeit schon anderswo eingeteilt? Dann nicht uebernehmen.
+            const gleichzeitig = await zeitKonflikte(pool, {
+                memberId: reg.member_id, email: reg.guest_email,
+                shiftIds: [suggestion.suggested_shift_id], ausser: reg.id
+            });
+            if (gleichzeitig.length > 0) {
+                return res.status(409).send(`
+                    <html>
+                    <head><meta charset="utf-8"><title>Zeit schon belegt</title></head>
+                    <body style="font-family: sans-serif; padding: 40px; text-align: center;">
+                        <h1>Zu dieser Zeit schon eingeteilt</h1>
+                        <p>${escapeHtml(zeitText(gleichzeitig))}</p>
+                        <p>Bitte melde dich beim Organisator, damit er eine andere Lösung findet.</p>
+                    </body>
+                    </html>
+                `);
+            }
             // Accept: Update registration to new shift
             await pool.query(`
                 UPDATE registrations
@@ -4182,6 +4216,17 @@ app.put('/registrations/:id', authenticateAny, requireRole('vorstand', 'admin'),
                 return res.status(409).json({
                     error: `Bereits mit einer anderen Anmeldung auf dieser Schicht: ${konfliktText(doppelt)}`,
                     code: 'schicht_doppelt'
+                });
+            }
+            const gleichzeitig = await zeitKonflikte(pool, {
+                memberId: member_id || bisher.member_id,
+                email: guest_email ?? bisher.guest_email,
+                shiftIds: shift_ids, ausser: id
+            });
+            if (gleichzeitig.length > 0) {
+                return res.status(409).json({
+                    error: `Gleichzeitig schon eingeteilt: ${zeitText(gleichzeitig)}`,
+                    code: 'schicht_gleichzeitig'
                 });
             }
         }

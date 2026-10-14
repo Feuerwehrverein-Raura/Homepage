@@ -15,7 +15,7 @@
 // Belegung wie ueberall im Backend: bestaetigte Anmeldungen ('approved',
 // 'confirmed') gegen shifts.needed.
 
-const { schichtKonflikte, eindeutig, konfliktText } = require('./doppelte-schicht');
+const { schichtKonflikte, eindeutig, konfliktText, zeitKonflikte, zeitText } = require('./doppelte-schicht');
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -74,6 +74,16 @@ async function schichtenPruefen(db, { eventId, shiftIds, memberId, email, ausser
                     error: `Bereits auf dieser Schicht eingetragen: ${konfliktText(doppelt)}`,
                     code: 'schicht_doppelt'
                 }
+            }
+        };
+    }
+
+    const gleichzeitig = await zeitKonflikte(db, { memberId, email, shiftIds: ids, ausser });
+    if (gleichzeitig.length > 0) {
+        return {
+            fehler: {
+                status: 409,
+                body: { error: `Gleichzeitig schon eingeteilt: ${zeitText(gleichzeitig)}`, code: 'schicht_gleichzeitig' }
             }
         };
     }

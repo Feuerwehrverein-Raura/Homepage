@@ -22,7 +22,7 @@ const FREMD = '00000000-0000-0000-0000-5000000000f1';
 
 // Nachgebaute Datenbank: kennt die Schichten des Anlasses und die
 // Doppel-Abfrage (doppelte-schicht.js).
-function fakeDb({ schichten = [], doppelt = [] } = {}) {
+function fakeDb({ schichten = [], doppelt = [], gleichzeitig = [] } = {}) {
     const anfragen = [];
     return {
         anfragen,
@@ -31,6 +31,14 @@ function fakeDb({ schichten = [], doppelt = [] } = {}) {
             if (/FROM shifts s\s+WHERE s\.event_id/.test(sql)) {
                 return { rows: schichten.filter(s => params[1].includes(s.id)) };
             }
+            // Zeitpruefung (zeitKonflikte): die angefragten Schichten mit Zeiten ...
+            if (/FROM shifts s LEFT JOIN events/.test(sql)) {
+                return { rows: schichten.filter(s => params[0].includes(s.id))
+                    .map(s => ({ shift_id: s.id, name: s.name, bereich: s.bereich || null, date: s.date,
+                        start_time: s.start_time, end_time: s.end_time || null, anlass: 'Chilbi' })) };
+            }
+            // ... und die bestehenden Schichten der Person.
+            if (/SELECT DISTINCT s\.id AS shift_id, s\.name, s\.bereich/.test(sql)) return { rows: gleichzeitig };
             if (/JOIN shifts s ON s\.id = ANY\(r\.shift_ids\)/.test(sql)) return { rows: doppelt };
             throw new Error('unerwartete Abfrage: ' + sql);
         }
@@ -293,4 +301,17 @@ test('Person in Schicht eintragen gegen den echten Server', { skip: !DB && 'TEST
         assert.equal(r.status, 200);
         assert.equal(r.json.registration.shift_ids, null);
     });
+});
+
+test('gleichzeitig auf einer anderen Schicht: 409 schicht_gleichzeitig', async () => {
+    const db = fakeDb({
+        schichten: [{ id: S1, name: 'Schicht 6', bereich: 'Kueche', date: '2026-10-17',
+            start_time: '22:00:00', end_time: '02:00:00', needed: 2, belegt: 0 }],
+        gleichzeitig: [{ shift_id: S2, name: 'Schicht 6', bereich: 'Bar', date: '2026-10-17',
+            start_time: '22:00:00', end_time: '02:00:00', anlass: 'Chilbi' }]
+    });
+    const r = await schichtenPruefen(db, { eventId: 'e', shiftIds: [S1], memberId: '11111111-1111-1111-1111-111111111111' });
+    assert.equal(r.fehler.status, 409);
+    assert.equal(r.fehler.body.code, 'schicht_gleichzeitig');
+    assert.match(r.fehler.body.error, /Kueche Schicht 6 am 17\.10\.2026 22:00–02:00 überschneidet sich mit Bar Schicht 6/);
 });
