@@ -3,7 +3,7 @@
 //    Schicht vorschlagen; oben Informieren, PDFs, Arbeitsplan senden.
 //  - Schichten, Notizen, Rezepte & Material — nur wenn der Zugang sie
 //    erlaubt ([AnlassRechte]).
-// Oben rechts: Anlass bearbeiten.
+// Oben rechts: Anlass bearbeiten; der Vorstand kann ihn auch loeschen.
 //
 // Gleich fuer Organisator und Vorstand; was geht, sagt der Zugang. Vorbild:
 // members-ios OrganizerView, members-android OrganizerDashboardFragment.
@@ -145,6 +145,33 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
     }
   }
 
+  /// Nur Vorstand: Anlass mit Schichten und Anmeldungen loeschen.
+  Future<void> _loeschen(VerwalteterAnlass a) async {
+    final n = a.zahlen.anmeldungen;
+    final ok = await nachfragen(
+      context,
+      titel: 'Anlass löschen?',
+      text:
+          '«${a.anlass.titel}» wird mit allen Schichten'
+          '${n > 0 ? ' und $n ${n == 1 ? 'Anmeldung' : 'Anmeldungen'}' : ''} endgültig gelöscht. '
+          'Die Angemeldeten bekommen keine Nachricht - vorher informieren oder den Anlass '
+          'lieber absagen (Status «Abgesagt»).',
+      ja: 'Löschen',
+    );
+    if (!ok || !mounted) return;
+    setState(() => _laeuft.add('anlass'));
+    try {
+      await _z.anlassLoeschen(a.anlass.id);
+      if (!mounted) return;
+      meldung(context, 'Anlass gelöscht');
+      Navigator.of(context).maybePop(true);
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _laeuft.remove('anlass'));
+    }
+  }
+
   Future<void> _arbeitsplanSenden(VerwalteterAnlass a) async {
     final ok = await nachfragen(
       context,
@@ -249,9 +276,22 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
         actions: [
           if (a != null && _z.rechte(a).anlassBearbeiten)
             IconButton(
-              onPressed: () => _oeffnen(AnlassBearbeitenScreen(verwaltung: _v, anlass: a.anlass)),
+              onPressed: () => _oeffnen(
+                AnlassBearbeitenScreen(
+                  verwaltung: _v,
+                  anlass: a.anlass,
+                  organisator: _z.kannAnlegen ? a.organisatorAngabe : null,
+                ),
+              ),
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Anlass bearbeiten',
+            ),
+          if (a != null && _z.kannLoeschen)
+            IconButton(
+              key: const Key('anlass-loeschen'),
+              onPressed: _laeuft.contains('anlass') ? null : () => _loeschen(a),
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Anlass löschen',
             ),
         ],
         bottom: mitReitern ? reiterAufRot(tabs: [for (final x in reiter) x.$1]) : null,

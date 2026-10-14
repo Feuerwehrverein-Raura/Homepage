@@ -32,8 +32,9 @@ class VorstandDienste {
   /// api.fwv-raura.ch mit dem persoenlichen Token (erneuert sich selbst).
   final ApiClient api;
 
-  /// Anlass-Verwaltung fuer alle Anlaesse (Backend liefert dem Vorstand
-  /// in events/organisator-uebersicht alles Aktuelle).
+  /// Anlass-Verwaltung fuer alle Anlaesse mit dem [VorstandZugang] (Backend
+  /// liefert dem Vorstand in events/organisator-uebersicht alles Aktuelle;
+  /// dazu anlegen, loeschen, Vorschlaege, Organisator zuweisen).
   final AnlassVerwaltung anlaesse;
 
   /// Teilen, Links, Fotos - wie in der Anlass-Verwaltung.

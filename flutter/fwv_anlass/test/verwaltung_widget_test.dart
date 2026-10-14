@@ -250,6 +250,59 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
   Future<Uint8List> arbeitsplanPdf(String a) => _merken('arbeitsplanPdf', [a], Uint8List(0));
 }
 
+/// Nachgebauter Vorstand: alles vom Organisator plus anlegen, loeschen,
+/// Vorschlaege (wie VorstandZugang).
+class _FalscherVorstand extends _FalscherZugang {
+  _FalscherVorstand(super.json);
+
+  final vorschlagListe = [
+    OffenerVorschlag.ausJson({
+      'id': 'v1',
+      'title': 'Grillabend',
+      'start_date': '2027-06-12 18:00:00',
+      'location': 'Schopf',
+      'description': 'Gemütlich grillen.',
+      'organizer_id': 'm1',
+      'organizer_vorname': 'Erika',
+      'organizer_nachname': 'Muster',
+    }),
+    OffenerVorschlag.ausJson({'id': 'v2', 'title': 'Kartbahn', 'organizer_name': 'Hans Helfer'}),
+  ];
+
+  @override
+  String get bezeichnung => 'Anlässe';
+  @override
+  bool get kannAnlegen => true;
+  @override
+  bool get kannLoeschen => true;
+  @override
+  Future<String> anlassAnlegen(AnlassEntwurf e) => _merken('anlassAnlegen', [
+    e.alsNeuJson(anmeldepflichtig: ['Dorffest', 'GV']),
+  ], 'neu1');
+  @override
+  Future<bool> anlassAendern(String a, AnlassEntwurf original, AnlassEntwurf neu) {
+    final body = neu.aenderungen(original);
+    return _merken('anlassAendern', [a, body], body.isNotEmpty);
+  }
+
+  @override
+  Future<void> anlassLoeschen(String a) => _merken('anlassLoeschen', [a], null);
+  @override
+  Future<List<OffenerVorschlag>> vorschlaege() =>
+      _merken('vorschlaege', [], List.of(vorschlagListe));
+  @override
+  Future<void> vorschlagFreigeben(String a) {
+    vorschlagListe.removeWhere((v) => v.anlass.id == a);
+    return _merken('vorschlagFreigeben', [a], null);
+  }
+
+  @override
+  Future<void> vorschlagAblehnen(String a) {
+    vorschlagListe.removeWhere((v) => v.anlass.id == a);
+    return _merken('vorschlagAblehnen', [a], null);
+  }
+}
+
 // Kleinstes gueltiges PNG (1x1), fuer die Beleg-Ansicht.
 final _png = Uint8List.fromList(
   base64Decode(
@@ -271,9 +324,11 @@ void main() {
     links = [];
   });
 
-  AnlassVerwaltung verwaltung() => AnlassVerwaltung(
-    zugang: zugang,
+  AnlassVerwaltung verwaltung([AnlassVerwaltungZugang? anderer]) => AnlassVerwaltung(
+    zugang: anderer ?? zugang,
     umgebung: VerwaltungsUmgebung(
+      pdfWaehlen: () async =>
+          (bytes: Uint8List.fromList(utf8.encode('%PDF-1.4 x')), dateiname: 'aushang.pdf'),
       dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, typ)),
       fotoWaehlen: ({required bool kamera}) async => Uint8List.fromList([1, 2, 3]),
       linkOeffnen: (u) async {
@@ -737,6 +792,258 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).hitTestable().first,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  // ---------------------------------------------------------------------
+  // Vorstand
+
+  Future<void> eingeben(WidgetTester tester, Finder f, String text) async {
+    if (f.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        f,
+        200,
+        scrollable: find.byType(Scrollable).hitTestable().first,
+      );
+    }
+    await tester.ensureVisible(f);
+    await tester.pumpAndSettle();
+    await tester.enterText(f, text);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('Organisator: kein "Neuer Anlass", kein Loeschen, Formular wie bisher', (
+    tester,
+  ) async {
+    await zeigen(tester, VerwaltungsUebersichtScreen(verwaltung: verwaltung()));
+    expect(find.text('Neuer Anlass'), findsNothing);
+    expect(find.textContaining('Vorschläge'), findsNothing);
+    await tippen(tester, find.text('Chilbi 2026'));
+    expect(find.byTooltip('Anlass löschen'), findsNothing);
+    await tippen(tester, find.widgetWithText(Tab, 'Schichten'));
+    expect(find.byKey(const Key('springer-generieren')), findsNothing);
+    await tippen(tester, find.byTooltip('Anlass bearbeiten'));
+    for (final k in ['organisator-art', 'anlass-datum-offen', 'anlass-pdf']) {
+      await tester.drag(find.byType(ListView).last, const Offset(0, -2000));
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key(k)), findsNothing, reason: k);
+    }
+    expect(zugang.gab('vorschlaege'), isFalse);
+  });
+
+  testWidgets('Vorstand: Vorschlaege oben - genehmigen, ablehnen mit Rueckfrage', (tester) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(tester, VerwaltungsUebersichtScreen(verwaltung: verwaltung(v)));
+    expect(find.text('Anlässe'), findsOneWidget);
+    expect(find.text('Vorschläge (2)'), findsOneWidget);
+    expect(find.text('Vorschlag von Erika Muster'), findsOneWidget);
+    expect(find.text('12.06.2027, 18:00 · Schopf'), findsOneWidget);
+    expect(find.text('Chilbi 2026'), findsOneWidget, reason: 'die Anlaesse bleiben');
+    expect(find.text('Neuer Anlass'), findsOneWidget);
+
+    await tippen(tester, find.widgetWithText(FilledButton, 'Genehmigen').first);
+    expect(v.letzter('vorschlagFreigeben'), ['v1']);
+    expect(find.text('Vorschläge (1)'), findsOneWidget);
+
+    await tippen(tester, find.widgetWithText(TextButton, 'Ablehnen'));
+    expect(find.text('Vorschlag ablehnen?'), findsOneWidget);
+    await tippen(tester, find.widgetWithText(FilledButton, 'Ablehnen'));
+    expect(v.letzter('vorschlagAblehnen'), ['v2']);
+    expect(find.textContaining('Vorschläge'), findsNothing);
+  });
+
+  testWidgets('Vorstand: Vorschlag bearbeiten oeffnet das Formular mit Organisator', (
+    tester,
+  ) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(tester, VerwaltungsUebersichtScreen(verwaltung: verwaltung(v)));
+    await tippen(tester, find.widgetWithText(OutlinedButton, 'Bearbeiten').first);
+    expect(find.text('Anlass bearbeiten'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('organisator-mitglied')),
+      200,
+      scrollable: find.byType(Scrollable).hitTestable().first,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('organisator-mitglied')),
+        matching: find.text('Erika Muster'),
+      ),
+      findsOneWidget,
+    );
+    await tippen(tester, find.byKey(const Key('anlass-speichern')));
+    expect(v.letzter('anlassAendern'), ['v1', <String, Object?>{}], reason: 'nichts geaendert');
+  });
+
+  testWidgets('Vorstand: neuer Anlass (Dorffest) mit Mitglied, Schicht und Springer', (
+    tester,
+  ) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(tester, VerwaltungsUebersichtScreen(verwaltung: verwaltung(v)));
+    await tippen(tester, find.text('Neuer Anlass'));
+    expect(find.text('Neuer Anlass'), findsOneWidget, reason: 'Titel des Formulars');
+    await eingeben(tester, find.widgetWithText(TextFormField, 'Titel *'), 'Chilbi 2027');
+
+    // Dorffest: nur Schichten, keine Anmeldefelder (siehe Body unten).
+    await tippen(tester, find.byKey(const Key('anlass-kategorie')));
+    await tippen(tester, find.text('Dorffest').last);
+
+    await tippen(
+      tester,
+      find.descendant(
+        of: find.byKey(const Key('anlass-beginn')),
+        matching: find.text('Datum wählen'),
+      ),
+    );
+    await tippen(tester, find.text('OK'));
+
+    await tippen(tester, find.text('Mitglied wählen'));
+    await tippen(tester, find.text('Hans Helfer'));
+    expect(find.text('Hans Helfer'), findsOneWidget);
+
+    await tippen(tester, find.byKey(const Key('neue-schicht')));
+    expect(find.text('Neue Schicht'), findsOneWidget);
+    expect(find.text('Schicht löschen'), findsNothing);
+    await tester.enterText(find.byKey(const Key('schicht-name')), 'Bar 1');
+    await tippen(tester, find.text('Von'));
+    await tippen(tester, find.text('OK'));
+    await tippen(tester, find.text('Bis'));
+    await tippen(tester, find.text('OK'));
+    await tippen(tester, find.byKey(const Key('schicht-speichern')));
+    expect(v.gab('schichtAnlegen'), isFalse, reason: 'erst beim Anlegen des Anlasses');
+
+    await tippen(tester, find.byKey(const Key('springer-generieren')));
+    expect(find.text('1 Springer-Schicht ergänzt'), findsOneWidget);
+    expect(find.text('Springer – Springer'), findsOneWidget);
+
+    await tippen(tester, find.byKey(const Key('anlass-speichern')));
+    final body = (v.letzter('anlassAnlegen') as List).single as Map<String, Object?>;
+    final heute = isoDatum(DateTime.now());
+    expect(body, {
+      'title': 'Chilbi 2027',
+      'subtitle': null,
+      'category': 'Dorffest',
+      'status': 'planned',
+      'start_date': heute,
+      'end_date': null,
+      'datum_offen': false,
+      'location': null,
+      'description': null,
+      'cost': null,
+      'registration_required': true,
+      'registration_deadline': null,
+      'max_participants': null,
+      'meal_options': null,
+      'organizer_id': 'm2',
+      'organizer_name': 'Hans Helfer',
+      'organizer_email': null,
+      'create_access': false,
+    });
+    final schichten = [
+      for (final a in v.aufrufe)
+        if (a.$1 == 'schichtAnlegen') a.$2,
+    ];
+    expect(schichten, [
+      [
+        'neu1',
+        {
+          'name': 'Bar 1',
+          'bereich': 'Allgemein',
+          'description': null,
+          'date': heute,
+          'start_time': '12:00',
+          'end_time': '12:00',
+          'needed': 1,
+        },
+      ],
+      [
+        'neu1',
+        {
+          'name': 'Springer',
+          'bereich': 'Springer',
+          'description': null,
+          'date': heute,
+          'start_time': '12:00',
+          'end_time': '12:00',
+          'needed': 1,
+        },
+      ],
+    ]);
+    expect(find.text('Anlass angelegt'), findsOneWidget);
+    expect(find.text('Chilbi 2026'), findsOneWidget, reason: 'zurueck in der Uebersicht');
+  });
+
+  testWidgets('Vorstand: extern mit Zugang, Termin offen, PDF - nur Geaendertes', (tester) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(tester, VerwaltungsAnlassScreen(verwaltung: verwaltung(v), anlassId: _chilbi));
+    await tippen(tester, find.byTooltip('Anlass bearbeiten'));
+    await tippen(tester, find.byKey(const Key('anlass-datum-offen')));
+    // Organisator ohne Mitglied-ID: steht als extern im Formular.
+    await eingeben(tester, find.byKey(const Key('organisator-name')), 'Max Muster');
+    await eingeben(tester, find.byKey(const Key('organisator-email')), 'max@example.ch');
+    await tippen(tester, find.byKey(const Key('organisator-zugang')));
+    await tippen(tester, find.byKey(const Key('pdf-waehlen')));
+    expect(find.text('Wird beim Speichern hochgeladen'), findsOneWidget);
+    await tippen(tester, find.byKey(const Key('anlass-speichern')));
+    expect(v.letzter('anlassAendern'), [
+      _chilbi,
+      {
+        'datum_offen': true,
+        'organizer_id': null,
+        'organizer_name': 'Max Muster',
+        'organizer_email': 'max@example.ch',
+        'create_access': true,
+        'pdf_attachment': base64Encode(utf8.encode('%PDF-1.4 x')),
+        'pdf_filename': 'aushang.pdf',
+      },
+    ]);
+  });
+
+  testWidgets('Vorstand: Anlass loeschen nur nach Rueckfrage', (tester) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(tester, VerwaltungsAnlassScreen(verwaltung: verwaltung(v), anlassId: _chilbi));
+    await tippen(tester, find.byTooltip('Anlass löschen'));
+    expect(find.text('Anlass löschen?'), findsOneWidget);
+    await tippen(tester, find.text('Abbrechen'));
+    expect(v.gab('anlassLoeschen'), isFalse);
+
+    await tippen(tester, find.byTooltip('Anlass löschen'));
+    await tippen(tester, find.widgetWithText(FilledButton, 'Löschen'));
+    expect(v.letzter('anlassLoeschen'), [_chilbi]);
+    expect(find.text('Anlass gelöscht'), findsOneWidget);
+  });
+
+  testWidgets('Vorstand: Springer im Reiter Schichten - je Zeitfenster einer', (tester) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(tester, VerwaltungsAnlassScreen(verwaltung: verwaltung(v), anlassId: _chilbi));
+    await tippen(tester, find.widgetWithText(Tab, 'Schichten'));
+    await tippen(tester, find.byKey(const Key('springer-generieren')));
+    expect(find.text('3 Springer-Schichten anlegen?'), findsOneWidget);
+    await tippen(tester, find.widgetWithText(FilledButton, 'Anlegen'));
+    final neu = [
+      for (final a in v.aufrufe)
+        if (a.$1 == 'schichtAnlegen') a.$2.last as Map,
+    ];
+    expect(
+      [for (final s in neu) '${s['date']} ${s['start_time']}-${s['end_time']}'],
+      ['2026-10-16 08:00-null', '2026-10-17 12:00-14:00', '2026-10-17 17:00-20:00'],
+    );
+    expect(neu.every((s) => s['bereich'] == 'Springer' && s['needed'] == 1), isTrue);
+  });
+
+  testWidgets('Vorstand am Desktop: Uebersicht in Spalten, Formular lesbar breit', (tester) async {
+    final v = _FalscherVorstand(_vertrag());
+    await zeigen(
+      tester,
+      VerwaltungsUebersichtScreen(verwaltung: verwaltung(v)),
+      groesse: const Size(1400, 900),
+    );
+    final k1 = tester.getRect(find.byKey(const Key('vorschlag-v1')));
+    final k2 = tester.getRect(find.byKey(const Key('vorschlag-v2')));
+    expect(k1.top, k2.top, reason: 'nebeneinander');
+    await tippen(tester, find.text('Neuer Anlass'));
+    final titel = tester.getRect(find.widgetWithText(TextFormField, 'Titel *'));
+    expect(titel.width, lessThanOrEqualTo(840));
     expect(tester.takeException(), isNull);
   });
 }

@@ -15,6 +15,9 @@
 //  - Anmeldung bearbeiten ueberschrieb die Bemerkungen (Begleitpersonen,
 //    Allergien, Menue gingen verloren).
 
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:fwv_core/fwv_core.dart';
 
 /// Mit welchem Zugang die Uebersicht geholt wurde.
@@ -72,6 +75,8 @@ class VerwalteterAnlass {
     this.zahlen = const AnmeldeZahlen(),
     this.rechte = const AnlassRechte(),
     this.anmeldungen = const [],
+    this.organisatorId,
+    this.organisatorEmail,
   });
 
   factory VerwalteterAnlass.ausJson(Map<dynamic, dynamic> m) {
@@ -82,8 +87,24 @@ class VerwalteterAnlass {
       zahlen: AnmeldeZahlen.ausJson(o['zahlen']),
       rechte: AnlassRechte.ausJson(o['aktionen']),
       anmeldungen: jsonListe(o['anmeldungen'], VerwalteteAnmeldung.ausJson),
+      organisatorId: jsonText(m['organizer_id']),
+      organisatorEmail: jsonText(m['organizer_email']),
     );
   }
+
+  /// Mitglied, das den Anlass organisiert (`organizer_id`), sonst null.
+  final String? organisatorId;
+
+  /// E-Mail des Organisators (`organizer_email`) - nur fuers Formular des
+  /// Vorstands (Organisator zuweisen).
+  final String? organisatorEmail;
+
+  /// Organisator, wie das Formular des Vorstands ihn zeigt.
+  OrganisatorAngabe get organisatorAngabe => OrganisatorAngabe(
+    mitgliedId: organisatorId,
+    name: anlass.organisator ?? '',
+    email: organisatorEmail ?? '',
+  );
 
   final Anlass anlass;
 
@@ -366,25 +387,31 @@ class AnlassEntwurf {
     this.maxTeilnehmer,
     this.anmeldungVerlangt = false,
     this.menueOptionen = const [],
+    this.datumOffen = false,
+    this.organisator,
   });
 
   /// Werte aus dem Anlass, so wie das Backend sie liefert — auch die, die
-  /// das Formular nicht zeigt, gehen so nie verloren.
-  factory AnlassEntwurf.aus(Anlass a) => AnlassEntwurf(
-    titel: a.titel,
-    untertitel: a.untertitel ?? '',
-    ort: a.ort ?? '',
-    kategorie: a.kategorie,
-    kosten: a.kosten ?? '',
-    beschreibung: a.beschreibung ?? '',
-    status: a.status,
-    beginn: Zeitpunkt.ausDb(a.beginn),
-    ende: Zeitpunkt.ausDb(a.ende),
-    anmeldeschluss: Zeitpunkt.ausDb(a.anmeldeschluss),
-    maxTeilnehmer: a.maxTeilnehmer,
-    anmeldungVerlangt: a.anmeldungVerlangt,
-    menueOptionen: List.of(a.menueOptionen),
-  );
+  /// das Formular nicht zeigt, gehen so nie verloren. [organisator] nur im
+  /// Formular des Vorstands (sonst bleibt er unberuehrt).
+  factory AnlassEntwurf.aus(Anlass a, {OrganisatorAngabe? organisator, bool? datumOffen}) =>
+      AnlassEntwurf(
+        titel: a.titel,
+        untertitel: a.untertitel ?? '',
+        ort: a.ort ?? '',
+        kategorie: a.kategorie,
+        kosten: a.kosten ?? '',
+        beschreibung: a.beschreibung ?? '',
+        status: a.status,
+        beginn: Zeitpunkt.ausDb(a.beginn),
+        ende: Zeitpunkt.ausDb(a.ende),
+        anmeldeschluss: Zeitpunkt.ausDb(a.anmeldeschluss),
+        maxTeilnehmer: a.maxTeilnehmer,
+        anmeldungVerlangt: a.anmeldungVerlangt,
+        menueOptionen: List.of(a.menueOptionen),
+        datumOffen: datumOffen ?? a.app.datumOffen,
+        organisator: organisator,
+      );
 
   String titel;
   String untertitel;
@@ -399,6 +426,61 @@ class AnlassEntwurf {
   int? maxTeilnehmer;
   bool anmeldungVerlangt;
   List<String> menueOptionen;
+
+  /// Termin steht noch nicht fest (`datum_offen`, nur Vorstand): der Beginn
+  /// dient dann nur der Einordnung und wird nirgends angezeigt.
+  bool datumOffen;
+
+  /// Organisator (nur Vorstand); null: das Formular fasst ihn nicht an.
+  OrganisatorAngabe? organisator;
+
+  /// Neuer PDF-Aushang (nur Vorstand); null: keiner gewaehlt.
+  GewaehlteDatei? pdfNeu;
+
+  /// Bisherigen PDF-Aushang entfernen (nur Vorstand).
+  bool pdfEntfernen = false;
+
+  Map<String, Object?> get _pdf => {
+    if (pdfNeu case final p?) ...{
+      'pdf_attachment': base64Encode(p.bytes),
+      'pdf_filename': p.dateiname,
+    } else if (pdfEntfernen) ...{
+      'pdf_attachment': null,
+      'pdf_filename': null,
+    },
+  };
+
+  /// Body fuer einen neuen Anlass (`POST events`, nur Vorstand). Wie
+  /// vorstand.html: Anmeldung verlangt, wenn die Kategorie sie braucht
+  /// ([anmeldepflichtig]) oder sie eingeschaltet ist; Anmeldefelder und
+  /// Menuewahl nur, wenn die Kategorie sie hat ([KategorieFelder]).
+  Map<String, Object?> alsNeuJson({List<String> anmeldepflichtig = const []}) {
+    String? leer(String s) => s.trim().isEmpty ? null : s.trim();
+    final felder = KategorieFelder.fuer(kategorie);
+    final menue = [
+      for (final m in menueOptionen)
+        if (m.trim().isNotEmpty) m.trim(),
+    ];
+    return {
+      'title': titel.trim(),
+      'subtitle': leer(untertitel),
+      'category': kategorie,
+      'status': status ?? 'planned',
+      'start_date': beginn?.alsDb(),
+      'end_date': ende?.alsDb(),
+      'datum_offen': datumOffen,
+      'location': leer(ort),
+      'description': leer(beschreibung),
+      'cost': leer(kosten),
+      'registration_required':
+          (felder.anmeldung && anmeldungVerlangt) || anmeldepflichtig.contains(kategorie),
+      'registration_deadline': felder.anmeldung ? anmeldeschluss?.alsDb() : null,
+      'max_participants': felder.anmeldung ? maxTeilnehmer : null,
+      'meal_options': felder.menue && menue.isNotEmpty ? menue : null,
+      ...?organisator?.alsJson(),
+      ..._pdf,
+    };
+  }
 
   /// Body mit den geaenderten Feldern; leer, wenn nichts geaendert wurde.
   Map<String, Object?> aenderungen(AnlassEntwurf original) {
@@ -427,8 +509,158 @@ class AnlassEntwurf {
       if (anmeldungVerlangt != original.anmeldungVerlangt)
         'registration_required': anmeldungVerlangt,
       if (!_gleich(menue, menueAlt)) 'meal_options': menue.isEmpty ? null : menue,
+      if (datumOffen != original.datumOffen) 'datum_offen': datumOffen,
+      if (organisator case final o? when !o.gleich(original.organisator)) ...o.alsJson(),
+      ..._pdf,
     };
   }
+}
+
+/// Eine vom Geraet gewaehlte Datei (z.B. der PDF-Aushang).
+typedef GewaehlteDatei = ({Uint8List bytes, String dateiname});
+
+/// Welche Teile des Anlass-Formulars eine Kategorie braucht - wie
+/// `updateEventFormByCategory` in vorstand.html.
+class KategorieFelder {
+  const KategorieFelder({
+    this.anmeldung = true,
+    this.menue = false,
+    this.schichten = true,
+    this.ohneAnmeldung = false,
+  });
+
+  static KategorieFelder fuer(String? kategorie) => switch (kategorie) {
+    // Dorffest: nur Schichten
+    'Dorffest' => const KategorieFelder(anmeldung: false),
+    // GV: Anmeldung und Menuewahl
+    'GV' => const KategorieFelder(menue: true, schichten: false),
+    'Aufbau' || 'Abbau' || 'Ausflug mit Anmeldung' => const KategorieFelder(schichten: false),
+    // Ausflug: keine Anmeldung
+    'Ausflug' => const KategorieFelder(anmeldung: false, schichten: false, ohneAnmeldung: true),
+    // Sonstiges (und Unbekanntes): beides, der Vorstand entscheidet
+    _ => const KategorieFelder(),
+  };
+
+  /// Teilnehmer-Anmeldung (Anmeldeschluss, Max. Teilnehmer).
+  final bool anmeldung;
+
+  /// Menuewahl (GV).
+  final bool menue;
+
+  /// Helfer-Schichten.
+  final bool schichten;
+
+  /// Hinweis "Bei Ausflug keine Anmeldung".
+  final bool ohneAnmeldung;
+}
+
+/// Organisator eines Anlasses, wie der Vorstand ihn setzt: ein Mitglied
+/// ([mitgliedId], verwaltet den Anlass in der Mitglieder-App) oder extern
+/// (Name und E-Mail; auf Wunsch mit eigenem Organisator-Zugang).
+class OrganisatorAngabe {
+  const OrganisatorAngabe({
+    this.mitgliedId,
+    this.name = '',
+    this.email = '',
+    this.zugangErstellen = false,
+  });
+
+  final String? mitgliedId;
+  final String name;
+  final String email;
+
+  /// Nur extern: Login fuers Event-Dashboard erstellen; die Zugangsdaten
+  /// gehen per E-Mail an den Organisator (`create_access`).
+  final bool zugangErstellen;
+
+  bool get istMitglied => mitgliedId != null;
+
+  /// Felder fuer `POST events` / `PUT events/:id` (wie saveEvent in
+  /// vorstand.html). Ein Mitglied bekommt nie einen eigenen Zugang.
+  Map<String, Object?> alsJson() {
+    String? t(String s) => s.trim().isEmpty ? null : s.trim();
+    return {
+      'organizer_id': mitgliedId,
+      'organizer_name': t(name),
+      'organizer_email': t(email),
+      'create_access': !istMitglied && zugangErstellen && t(email) != null,
+    };
+  }
+
+  bool gleich(OrganisatorAngabe? o) =>
+      o != null &&
+      mitgliedId == o.mitgliedId &&
+      name.trim() == o.name.trim() &&
+      email.trim() == o.email.trim() &&
+      zugangErstellen == o.zugangErstellen;
+}
+
+/// Ein Anlass-Vorschlag eines Mitglieds (`GET events/proposals`, Status
+/// `proposed`): der Vorstand genehmigt, bearbeitet oder lehnt ab.
+class OffenerVorschlag {
+  const OffenerVorschlag({
+    required this.anlass,
+    this.vorgeschlagenVon,
+    this.organisator = const OrganisatorAngabe(),
+    this.datumOffen = false,
+  });
+
+  factory OffenerVorschlag.ausJson(Map<String, dynamic> m) {
+    final mitglied = [
+      jsonText(m['organizer_vorname']),
+      jsonText(m['organizer_nachname']),
+    ].whereType<String>().join(' ').trim();
+    return OffenerVorschlag(
+      anlass: Anlass.ausJson(m),
+      vorgeschlagenVon: mitglied.isNotEmpty
+          ? mitglied
+          : jsonText(m['organizer_name']) ??
+                jsonText(m['organizer_member_email']) ??
+                jsonText(m['organizer_email']),
+      organisator: OrganisatorAngabe(
+        mitgliedId: jsonText(m['organizer_id']),
+        name: mitglied.isNotEmpty ? mitglied : (jsonText(m['organizer_name']) ?? ''),
+        email: jsonText(m['organizer_email']) ?? jsonText(m['organizer_member_email']) ?? '',
+      ),
+      datumOffen: jsonWahr(m['datum_offen']) ?? false,
+    );
+  }
+
+  /// Die Zeile, wie sie ist (ohne `app`-Block).
+  final Anlass anlass;
+  final String? vorgeschlagenVon;
+  final OrganisatorAngabe organisator;
+  final bool datumOffen;
+
+  /// "17.10.2026, 10:00" bzw. "Datum noch offen".
+  String? get wannText => datumOffen ? 'Datum noch offen' : Zeitpunkt.ausDb(anlass.beginn)?.anzeige;
+}
+
+/// Springer-Schichten fuer alle Zeitfenster (Datum, Von, Bis) der
+/// [vorhandene]n Schichten, die noch keinen Springer haben - wie
+/// `generateSpringerShifts` in vorstand.html. Springer- und
+/// Vorbereitungs-Schichten selbst zaehlen nicht als Zeitfenster.
+List<SchichtEntwurf> springerSchichten(Iterable<SchichtEntwurf> vorhandene) {
+  String schluessel(SchichtEntwurf s) => '${isoDatum(s.datum!)}|${s.von.trim()}|${s.bis.trim()}';
+  final mitSpringer = {
+    for (final s in vorhandene)
+      if (s.bereich == 'Springer' && s.datum != null) schluessel(s),
+  };
+  final neu = <String, SchichtEntwurf>{};
+  for (final s in vorhandene) {
+    if (s.bereich == 'Springer' || s.bereich == 'Vorbereitung') continue;
+    if (s.datum == null || s.von.trim().isEmpty) continue;
+    final k = schluessel(s);
+    if (mitSpringer.contains(k) || neu.containsKey(k)) continue;
+    neu[k] = SchichtEntwurf(
+      name: 'Springer',
+      bereich: 'Springer',
+      datum: s.datum,
+      von: s.von.trim(),
+      bis: s.bis.trim(),
+    );
+  }
+  return neu.values.toList();
 }
 
 bool _gleich(List<String> a, List<String> b) {

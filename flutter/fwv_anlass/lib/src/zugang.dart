@@ -8,14 +8,14 @@
 //  - [OrganisatorZugang] (jetzt): die eigenen Anlaesse, befristet bis der
 //    Anlass vorbei ist; Routen `…-as-organizer`, fuer externe Organisatoren
 //    `events/my-event/…`; Uebersicht `GET events/organisator-uebersicht`.
-//  - VorstandZugang (spaeter, Vorstand-App): alle Anlaesse plus Anlass
-//    anlegen und loeschen und den Organisator zuweisen. Er implementiert
-//    diese Klasse mit den Vorstand-Routen (`PUT events/:id`,
-//    `POST registrations/:id/approve`, `POST events/:id/notify-registrants`
-//    usw.) und setzt [kannAnlegen]/[kannLoeschen]. Die zusaetzlichen
-//    Aufrufe (anlegen, loeschen, Organisator zuweisen) kommen dann hier als
-//    neue Methoden dazu — mit einer Standard-Umsetzung, die
-//    [NichtErlaubt] wirft, damit [OrganisatorZugang] unveraendert bleibt.
+//  - [VorstandZugang] (Reiter "Vorstand" der Mitglieder-App): alle
+//    aktuellen Anlaesse plus Anlass anlegen und loeschen, Vorschlaege,
+//    Organisator zuweisen, PDF-Aushang. Fuer das Bestehende nimmt er die
+//    `…-as-organizer`-Routen (die lassen Vorstand/Admin zu), fuer den Rest
+//    die Vorstand-Routen (`POST/PUT/DELETE events/:id`,
+//    `GET events/proposals`) und setzt [kannAnlegen]/[kannLoeschen]. Die
+//    zusaetzlichen Aufrufe stehen unten mit einer Standard-Umsetzung, die
+//    [NichtErlaubt] wirft - so bleibt [OrganisatorZugang] unveraendert.
 //
 // Langfristig soll das Backend pro Aktion EINE Route haben, die selbst
 // prueft "Vorstand oder Organisator dieses Anlasses und noch nicht vorbei".
@@ -149,6 +149,38 @@ abstract class AnlassVerwaltungZugang {
   Future<Uint8List> teilnehmerlistePdf(String anlassId);
   Future<Uint8List> aushangPdf(String anlassId);
   Future<Uint8List> arbeitsplanPdf(String anlassId);
+
+  // -------------------------------------------------------------------
+  // Nur Vorstand ([kannAnlegen]/[kannLoeschen]). Standard: [NichtErlaubt],
+  // damit der OrganisatorZugang unveraendert bleibt.
+
+  /// Neuer Anlass ([AnlassEntwurf.alsNeuJson]); gibt die ID zurueck.
+  /// Schichten legt die Oberflaeche danach mit [schichtAnlegen] an.
+  Future<String> anlassAnlegen(AnlassEntwurf entwurf) async => throw const NichtErlaubt();
+
+  /// Anlass mit Schichten und Anmeldungen loeschen.
+  Future<void> anlassLoeschen(String anlassId) async => throw const NichtErlaubt();
+
+  /// Offene Anlass-Vorschlaege von Mitgliedern.
+  Future<List<OffenerVorschlag>> vorschlaege() async => throw const NichtErlaubt();
+
+  /// Vorschlag genehmigen (Status `planned`; der Vorschlagende bleibt
+  /// Organisator und bekommt eine Push-Nachricht).
+  Future<void> vorschlagFreigeben(String anlassId) async => throw const NichtErlaubt();
+
+  /// Vorschlag ablehnen (der vorgeschlagene Anlass wird geloescht).
+  Future<void> vorschlagAblehnen(String anlassId) async => throw const NichtErlaubt();
+
+  /// Organisator setzen: Mitglied oder extern (auf Wunsch mit Zugang).
+  Future<void> organisatorZuweisen(String anlassId, OrganisatorAngabe organisator) async =>
+      throw const NichtErlaubt();
+
+  /// PDF-Aushang anhaengen (ersetzt einen bisherigen).
+  Future<void> pdfAushangSetzen(String anlassId, GewaehlteDatei pdf) async =>
+      throw const NichtErlaubt();
+
+  /// PDF-Aushang entfernen.
+  Future<void> pdfAushangEntfernen(String anlassId) async => throw const NichtErlaubt();
 }
 
 /// Was die Oberflaeche vom Geraet braucht (Teilen-Menue, Kamera, Links) —
@@ -160,7 +192,13 @@ class VerwaltungsUmgebung {
     required this.fotoWaehlen,
     required this.linkOeffnen,
     this.anhangVerkleinern = anhangBildVerkleinern,
+    this.pdfWaehlen,
   });
+
+  /// PDF vom Geraet waehlen (PDF-Aushang); null bei Abbruch. Ohne diese
+  /// Funktion (die App hat noch keinen Dateiwaehler) bietet das Formular
+  /// nur das Entfernen an.
+  final Future<GewaehlteDatei?> Function()? pdfWaehlen;
 
   /// Datei ueber das Teilen-Menue weitergeben; [ursprung] fuer das iPad.
   final Future<void> Function(Uint8List bytes, String dateiname, String mimeTyp, {Rect? ursprung})

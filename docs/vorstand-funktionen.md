@@ -94,17 +94,17 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 
 | | Funktion | W | A | D | O | F | API / Hinweis |
 |---|---|---|---|---|---|---|---|
-| [ ] | Alle Anlaesse (Vorstandssicht) | ✓ | ✓ | ✓ | – | ½ | GET /events; F nur eigene (organisator-uebersicht kann Vorstand) |
-| [ ] | Vorschlaege: Liste, genehmigen, bearbeiten, ablehnen | ✓ | ✓ | ✓ | – | – | GET /events/proposals, PUT/DELETE /events/:id |
-| [ ] | Anlass anlegen (Kategorie steuert Felder, Menue bei GV) | ✓ | ✓ | ✓ | – | – | POST /events (+ /shifts) |
-| [ ] | Anlass bearbeiten | ✓ | ✓ | ✓ | ✓ | ✓ | PUT /events/:id bzw. …/as-organizer |
-| [ ] | «Termin noch offen» (datum_offen) | ✓ | – | – | – | – | **nur in W** |
-| [ ] | Anlass loeschen | ✓ | ½ | ✓ | – | – | DELETE /events/:id |
-| [ ] | Organisator zuweisen (Mitglied) | ✓ | ✓ | ✓ | – | – | organizer_id |
-| [ ] | Externer Organisator + Zugang erstellen | ✓ | ✓ | ✓ | – | – | create_access → event-dashboard |
-| [ ] | PDF-Aushang hochladen/entfernen | ✓ | ✓ | ✓ | ½ | – | pdf_attachment; O: nur alt-Android |
-| [ ] | Schichten anlegen/aendern/loeschen | ✓ | ✓ | ✓ | ✓ | ✓ | /shifts bzw. shifts-as-organizer |
-| [ ] | Springer-Schichten generieren | ✓ | – | ✓ | – | – | Client-Logik |
+| [ ] | Alle Anlaesse (Vorstandssicht) | ✓ | ✓ | ✓ | – | ½ | F: VorstandZugang, aktuelle + undatierte (organisator-uebersicht); vergangene fehlen noch |
+| [x] | Vorschlaege: Liste, genehmigen, bearbeiten, ablehnen | ✓ | ✓ | ✓ | – | ✓ | GET /events/proposals, PUT/DELETE /events/:id |
+| [x] | Anlass anlegen (Kategorie steuert Felder, Menue bei GV) | ✓ | ✓ | ✓ | – | ✓ | POST /events (+ /shifts) |
+| [x] | Anlass bearbeiten | ✓ | ✓ | ✓ | ✓ | ✓ | PUT /events/:id bzw. …/as-organizer |
+| [x] | «Termin noch offen» (datum_offen) | ✓ | – | – | – | ✓ | W und F |
+| [x] | Anlass loeschen | ✓ | ½ | ✓ | – | ✓ | DELETE /events/:id |
+| [x] | Organisator zuweisen (Mitglied) | ✓ | ✓ | ✓ | – | ✓ | organizer_id |
+| [x] | Externer Organisator + Zugang erstellen | ✓ | ✓ | ✓ | – | ✓ | create_access → event-dashboard |
+| [ ] | PDF-Aushang hochladen/entfernen | ✓ | ✓ | ✓ | ½ | ½ | pdf_attachment; O: nur alt-Android; F: entfernen ja, hochladen braucht Dateiwaehler (umgebung.pdfWaehlen) |
+| [x] | Schichten anlegen/aendern/loeschen | ✓ | ✓ | ✓ | ✓ | ✓ | /shifts bzw. shifts-as-organizer |
+| [x] | Springer-Schichten generieren | ✓ | – | ✓ | – | ✓ | Client-Logik (springerSchichten) |
 | [ ] | Anmeldungen ansehen (nach Schicht, GV mit Menue/Allergien) | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | [ ] | Anmeldung bestaetigen / ablehnen | ✓ | ✓ | ✓ | ✓ | ✓ | /registrations/:id/approve|reject |
 | [ ] | Anmeldung bearbeiten (inkl. Status) | ✓ | ✓ | ✓ | ½ | ✓ | PUT /registrations/:id |
@@ -113,7 +113,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 | [ ] | Andere Schicht vorschlagen | ✓ | ✓ | ✓ | ✓ | ✓ | …/suggest-alternative |
 | [ ] | Angemeldete informieren | ✓ | ✓ | ✓ | ✓ | ✓ | POST /events/:id/notify-registrants |
 | [ ] | Arbeitsplan ansehen / PDF | ✓ | ✓ | ✓ | ✓ | ✓ | /events/:id/arbeitsplan, /pdf/arbeitsplan |
-| [ ] | Arbeitsplan an Helfer senden | – | – | – | ✓ | ✓ | /events/my-event/send-arbeitsplan – nur extern; fuer Vorstand fehlt eine Route |
+| [x] | Arbeitsplan an Helfer senden | – | – | – | ✓ | ✓ | extern /events/my-event/send-arbeitsplan; Vorstand POST /events/:id/send-arbeitsplan |
 | [ ] | Teilnehmerliste PDF / Aushang PDF | ✓ | ✓ | ✓ | ✓ | ✓ | |
 | [ ] | Einladung erzeugen (springt in Versand) | ✓ | – | ✓ | – | – | |
 | [ ] | Organisator-Notizen mit Anhaengen | ✓ | ✓ | ✓ | ✓ | ✓ | /events/:id/organizer-notes |

@@ -48,6 +48,9 @@ void main() {
         {'id': 'e1', 'title': 'Chilbi 2026'},
       ]),
       'GET /events/organisator-uebersicht' => json({'zugang': 'vorstand', 'anlaesse': []}),
+      'GET /events/proposals' => json([
+        {'id': 'v1', 'title': 'Grillabend', 'status': 'proposed', 'organizer_name': 'Hans'},
+      ]),
       'GET /members/me' => json({'id': 'a1', 'vorname': 'Erika', 'nachname': 'Muster'}),
       _ => json({'error': 'nicht gefunden'}, 404),
     };
@@ -97,6 +100,10 @@ void main() {
     for (final b in ['Anlässe', 'Anträge', 'Mitglieder', 'Beiträge']) {
       expect(find.widgetWithText(Tab, b), findsOneWidget);
     }
+    // Anlaesse mit dem Vorstand-Zugang: Vorschlaege und "Neuer Anlass".
+    expect(find.text('Vorschläge (1)'), findsOneWidget);
+    expect(find.text('Grillabend'), findsOneWidget);
+    expect(find.text('Neuer Anlass'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

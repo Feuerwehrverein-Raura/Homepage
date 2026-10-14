@@ -234,27 +234,39 @@ class Dienste {
   /// Anlaesse, Kalender, Arbeitsplan, Anmeldungen.
   AnlaesseDienst get anlaesse => AnlaesseDienst(sitzung.api);
 
-  /// Vorstand-Bereich (Paket fwv_vorstand): dieselbe Anlass-Verwaltung -
-  /// das Backend liefert dem Vorstand dort alle Anlaesse - plus Antraege,
-  /// Mitglieder, Beitraege, Nachricht, Audit.
-  VorstandDienste get vorstand =>
-      VorstandDienste(api: sitzung.api, anlaesse: anlassVerwaltung, umgebung: anlassVerwaltung.umgebung);
+  /// Vorstand-Bereich (Paket fwv_vorstand): dieselbe Anlass-Verwaltung mit
+  /// dem Vorstand-Zugang (alle aktuellen Anlaesse, anlegen, loeschen,
+  /// Vorschlaege, Organisator zuweisen) plus Antraege, Mitglieder,
+  /// Beitraege, Nachricht, Audit.
+  VorstandDienste get vorstand {
+    final umgebung = _verwaltungsUmgebung;
+    return VorstandDienste(
+      api: sitzung.api,
+      anlaesse: AnlassVerwaltung(zugang: VorstandZugang(sitzung.api), umgebung: umgebung),
+      umgebung: umgebung,
+    );
+  }
 
-  /// Organisator-Bereich (Paket fwv_anlass, gemeinsam mit der spaeteren
-  /// Vorstand-App): eigene Anlaesse; externe Organisatoren (Event-Login)
+  /// Organisator-Bereich (Paket fwv_anlass, gemeinsam mit dem Reiter
+  /// "Vorstand"): eigene Anlaesse; externe Organisatoren (Event-Login)
   /// ueber ihre eigenen Routen.
   AnlassVerwaltung get anlassVerwaltung => AnlassVerwaltung(
     zugang: OrganisatorZugang(
       sitzung.api,
       externerLogin: sitzung.sitzung?.kontotyp == Kontotyp.organisator,
     ),
-    umgebung: VerwaltungsUmgebung(
-      dateiTeilen: dateiTeilen,
-      // Notizen und Belege: Rueckkamera (das Profilfoto nimmt die vordere).
-      fotoWaehlen: dokumentFotoWaehlen,
-      linkOeffnen: linkOeffnen,
-      anhangVerkleinern: anhangVerkleinern,
-    ),
+    umgebung: _verwaltungsUmgebung,
+  );
+
+  // TODO(pdf-aushang): pdfWaehlen setzen, sobald die App einen Dateiwaehler
+  // hat (z.B. file_picker) - bis dahin laedt der Vorstand den PDF-Aushang
+  // auf der Website hoch; in der App kann er ihn nur entfernen.
+  VerwaltungsUmgebung get _verwaltungsUmgebung => VerwaltungsUmgebung(
+    dateiTeilen: dateiTeilen,
+    // Notizen und Belege: Rueckkamera (das Profilfoto nimmt die vordere).
+    fotoWaehlen: dokumentFotoWaehlen,
+    linkOeffnen: linkOeffnen,
+    anhangVerkleinern: anhangVerkleinern,
   );
 
   /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.

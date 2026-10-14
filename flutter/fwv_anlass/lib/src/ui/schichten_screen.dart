@@ -36,6 +36,40 @@ class SchichtenAnsicht extends StatelessWidget {
     if (ok == true) await neuLaden();
   }
 
+  /// Nur Vorstand: fuer jedes Zeitfenster ohne Springer eine
+  /// Springer-Schicht anlegen (wie vorstand.html).
+  Future<void> _springer(BuildContext context) async {
+    final neu = springerSchichten(anlass.anlass.schichten.map(SchichtEntwurf.aus));
+    if (neu.isEmpty) {
+      meldung(
+        context,
+        anlass.anlass.schichten.any((s) => s.bereich != 'Springer')
+            ? 'Alle Zeitfenster haben schon Springer.'
+            : 'Keine Zeitfenster - zuerst andere Schichten (Bar, Küche …) anlegen.',
+      );
+      return;
+    }
+    final ok = await nachfragen(
+      context,
+      titel: neu.length == 1
+          ? '1 Springer-Schicht anlegen?'
+          : '${neu.length} Springer-Schichten anlegen?',
+      text: 'Je eine Springer-Schicht für jedes Zeitfenster, das noch keine hat.',
+      ja: 'Anlegen',
+      gefaehrlich: false,
+    );
+    if (!ok || !context.mounted) return;
+    try {
+      for (final s in neu) {
+        await verwaltung.zugang.schichtAnlegen(anlass.anlass.id, s);
+      }
+      if (context.mounted) meldung(context, 'Springer-Schichten angelegt');
+    } on Object catch (e) {
+      if (context.mounted) meldung(context, fehlerText(e));
+    }
+    await neuLaden();
+  }
+
   @override
   Widget build(BuildContext context) {
     final schichten = anlass.anlass.schichten;
@@ -53,6 +87,16 @@ class SchichtenAnsicht extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 8, 12, 96)),
           children: [
+            if (verwaltung.zugang.kannAnlegen && schichten.isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ActionChip(
+                  key: const Key('springer-generieren'),
+                  avatar: const Icon(Icons.directions_run, size: 18),
+                  label: const Text('Springer generieren'),
+                  onPressed: () => _springer(context),
+                ),
+              ),
             if (schichten.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(24),
@@ -82,13 +126,33 @@ class SchichtenAnsicht extends StatelessWidget {
 }
 
 class SchichtFormular extends StatefulWidget {
-  const SchichtFormular({super.key, required this.verwaltung, required this.anlass, this.schicht});
+  const SchichtFormular({
+    super.key,
+    required this.verwaltung,
+    required Anlass this.anlass,
+    this.schicht,
+  }) : entwurf = null,
+       startDatum = null;
+
+  /// Ohne Anlass (der wird erst noch angelegt): speichert nichts, sondern
+  /// gibt den [SchichtEntwurf] zurueck.
+  const SchichtFormular.lokal({super.key, required this.verwaltung, this.entwurf, this.startDatum})
+    : anlass = null,
+      schicht = null;
 
   final AnlassVerwaltung verwaltung;
-  final Anlass anlass;
+
+  /// null: lokal (siehe [SchichtFormular.lokal]).
+  final Anlass? anlass;
 
   /// null: neue Schicht.
   final Schicht? schicht;
+
+  /// Lokal: die Schicht, die geaendert wird (null: neu).
+  final SchichtEntwurf? entwurf;
+
+  /// Lokal: Datum einer neuen Schicht (erster Tag des Anlasses).
+  final DateTime? startDatum;
 
   @override
   State<SchichtFormular> createState() => _SchichtFormularState();
@@ -99,10 +163,20 @@ class _SchichtFormularState extends State<SchichtFormular> {
   late final SchichtEntwurf? _original = widget.schicht == null
       ? null
       : SchichtEntwurf.aus(widget.schicht!);
-  late final SchichtEntwurf _e = widget.schicht == null
-      // Neue Schicht: am ersten Tag des Anlasses.
-      ? SchichtEntwurf(datum: Zeitpunkt.ausDb(widget.anlass.beginn)?.datum)
-      : SchichtEntwurf.aus(widget.schicht!);
+  late final SchichtEntwurf _e = switch ((widget.schicht, widget.entwurf)) {
+    (final Schicht s, _) => SchichtEntwurf.aus(s),
+    (_, final SchichtEntwurf e) => SchichtEntwurf(
+      name: e.name,
+      bereich: e.bereich,
+      beschreibung: e.beschreibung,
+      datum: e.datum,
+      von: e.von,
+      bis: e.bis,
+      gebraucht: e.gebraucht,
+    ),
+    // Neue Schicht: am ersten Tag des Anlasses.
+    _ => SchichtEntwurf(datum: widget.startDatum ?? Zeitpunkt.ausDb(widget.anlass?.beginn)?.datum),
+  };
   late final Future<EventOptionen> _optionen = widget.verwaltung.zugang.optionen();
   bool _laeuft = false;
 
@@ -114,19 +188,19 @@ class _SchichtFormularState extends State<SchichtFormular> {
       meldung(context, 'Bitte ein Datum wählen.');
       return;
     }
+    final anlass = widget.anlass;
+    if (anlass == null) {
+      Navigator.of(context).pop(_e);
+      return;
+    }
     setState(() => _laeuft = true);
     try {
       final original = _original;
       var geschickt = true;
       if (original == null) {
-        await _dienst.schichtAnlegen(widget.anlass.id, _e);
+        await _dienst.schichtAnlegen(anlass.id, _e);
       } else {
-        geschickt = await _dienst.schichtAendern(
-          widget.anlass.id,
-          widget.schicht!.id,
-          original,
-          _e,
-        );
+        geschickt = await _dienst.schichtAendern(anlass.id, widget.schicht!.id, original, _e);
       }
       if (!mounted) return;
       meldung(context, geschickt ? 'Schicht gespeichert' : 'Nichts geändert');
@@ -152,7 +226,7 @@ class _SchichtFormularState extends State<SchichtFormular> {
     if (!ok || !mounted) return;
     setState(() => _laeuft = true);
     try {
-      await _dienst.schichtLoeschen(widget.anlass.id, s.id);
+      await _dienst.schichtLoeschen(widget.anlass!.id, s.id);
       if (!mounted) return;
       meldung(context, 'Schicht gelöscht');
       Navigator.of(context).pop(true);
@@ -190,7 +264,7 @@ class _SchichtFormularState extends State<SchichtFormular> {
 
   @override
   Widget build(BuildContext context) {
-    final neu = widget.schicht == null;
+    final neu = widget.schicht == null && widget.entwurf == null;
     return Scaffold(
       appBar: AppBar(title: Text(neu ? 'Neue Schicht' : 'Schicht ändern')),
       body: FutureBuilder<EventOptionen>(
@@ -263,7 +337,7 @@ class _SchichtFormularState extends State<SchichtFormular> {
                   max: 100,
                   aendern: (n) => setState(() => _e.gebraucht = n),
                 ),
-                if (!neu) ...[
+                if (widget.schicht != null) ...[
                   const SizedBox(height: 24),
                   OutlinedButton.icon(
                     onPressed: _laeuft ? null : _loeschen,
