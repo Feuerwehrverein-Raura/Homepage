@@ -771,7 +771,7 @@ function OrderCard({
                   {item.completed ? '✓' : `${item.quantity}×`}
                 </span>
                 <span className={`text-3xl ml-4 ${item.completed ? 'line-through text-gray-500' : 'text-white'}`}>
-                  {item.item_name || '(Unbekannter Artikel)'}
+                  {item.item_name ? item.item_name.replace(/\s*\|\s*/g, ' ') : '(Unbekannter Artikel)'}
                 </span>
               </div>
               <div className={`text-2xl px-4 py-2 rounded-lg font-medium ${

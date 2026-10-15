@@ -12,6 +12,7 @@ import https from 'https';
 import crypto from 'crypto';
 import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } from './anlass.js';
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
+import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
@@ -1057,7 +1058,7 @@ app.post('/api/orders', async (req, res) => {
     for (const item of items) {
       await client.query(
         'INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [order.id, item.id, item.item_name || item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
+        [order.id, item.id, anzeigeName(item.item_name || item.name) || null, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
       );
     }
 
@@ -1181,7 +1182,7 @@ app.post('/api/orders/:id/items', async (req, res) => {
     for (const item of items) {
       await client.query(
         'INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-        [id, item.id, item.item_name || item.name, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
+        [id, item.id, anzeigeName(item.item_name || item.name) || null, item.quantity, item.price, item.notes || null, item.printer_station || 'bar']
       );
     }
 
@@ -1797,13 +1798,13 @@ app.get('/api/stats/daily', async (req, res) => {
     // Best selling items for this business day
     const itemsResult = await pool.query(`
       SELECT
-        COALESCE(oi.item_name, 'Sonderposten') as name,
+        COALESCE(${anzeigeNameSql('oi.item_name')}, 'Sonderposten') as name,
         SUM(oi.quantity) as total_sold,
         SUM(oi.quantity * oi.price) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE o.created_at >= $1 AND o.created_at < $2
-      GROUP BY oi.item_name
+      GROUP BY ${anzeigeNameSql('oi.item_name')}
       ORDER BY total_sold DESC
       LIMIT 10
     `, [startDate.toISOString(), endDate.toISOString()]);
@@ -1865,13 +1866,13 @@ app.post('/api/stats/send-report', authenticateToken, async (req: AuthenticatedR
     // Get top items
     const itemsResult = await pool.query(`
       SELECT
-        COALESCE(oi.item_name, 'Sonderposten') as name,
+        COALESCE(${anzeigeNameSql('oi.item_name')}, 'Sonderposten') as name,
         SUM(oi.quantity) as total_sold,
         SUM(oi.quantity * oi.price) as total_revenue
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
       WHERE o.created_at >= $1 AND o.created_at < $2
-      GROUP BY oi.item_name
+      GROUP BY ${anzeigeNameSql('oi.item_name')}
       ORDER BY total_sold DESC
       LIMIT 10
     `, [startDate.toISOString(), endDate.toISOString()]);
@@ -2132,7 +2133,7 @@ async function printViaEpos(
 
   let itemsXml = '';
   items.forEach((item: any) => {
-    itemsXml += `<text em="true" width="2" height="2"/><text>${escapeXml(item.quantity + 'x ' + item.item_name)}&#10;</text>`;
+    itemsXml += `<text em="true" width="2" height="2"/><text>${escapeXml(item.quantity + 'x ' + anzeigeName(item.item_name))}&#10;</text>`;
     if (item.notes) {
       itemsXml += `<text em="false" width="1" height="2"/><text>  -&gt; ${escapeXml(item.notes)}&#10;</text>`;
     }
@@ -2256,7 +2257,7 @@ async function printViaRawTcp(
           .style('b');
 
         items.forEach((item: any) => {
-          printer.text(`${item.quantity}x ${item.item_name}`);
+          printer.text(`${item.quantity}x ${anzeigeName(item.item_name)}`);
           if (item.notes) {
             printer.style('normal').text(`   -> ${item.notes}`).style('b');
           }
@@ -2355,7 +2356,7 @@ async function printReceipt(orderId: number, tableNumber: number, items: any[]):
         console.log('---');
 
         (stationItems as any[]).forEach((item: any) => {
-          console.log(`${item.quantity}x ${item.item_name}`);
+          console.log(`${item.quantity}x ${anzeigeName(item.item_name)}`);
           if (item.notes) console.log(`   Note: ${item.notes}`);
         });
 

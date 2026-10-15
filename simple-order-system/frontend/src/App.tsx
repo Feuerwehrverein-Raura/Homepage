@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { InstallPrompt } from './InstallPrompt';
+import { anzeigeName, kategorienSortieren, kachelnBilden, gruppenPreis, variantenName, STANDARD_KATEGORIEN } from './kacheln';
 
 // Offline Banner Component
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
@@ -229,6 +231,12 @@ function App() {
   const [hatService, setHatService] = useState<boolean>(serviceGemerkt);
   // Meistverkaufte Artikel: item_id -> Rang (0 = am meisten verkauft)
   const [beliebtRang, setBeliebtRang] = useState<Record<string, number>>({});
+  // Kassen-Einstellungen fuer die Kacheln (src/kacheln.ts): Reihenfolge der
+  // Kategorien (leer = Standard) und "Meistverkaufte zuerst" (Standard aus).
+  const [kategorienReihenfolge, setKategorienReihenfolge] = useState<string>('');
+  const [meistverkauftZuerst, setMeistverkauftZuerst] = useState(false);
+  // Offenes Untermenue ("Gruppe | Variante"): Kategorie + Gruppe
+  const [offeneGruppe, setOffeneGruppe] = useState<{ category: string; gruppe: string } | null>(null);
   // Doppeltipp-Schutz fuers Anlegen: state allein reicht nicht, zwei Tipps
   // im selben Augenblick saehen beide noch loading=false.
   const sendetRef = useRef(false);
@@ -308,6 +316,10 @@ function App() {
     if (token) fetchBeliebt();
   }, [token, anlassId]);
 
+  useEffect(() => {
+    if (token) fetchKachelEinstellungen();
+  }, [token]);
+
   const authHeaders = (): HeadersInit => token ? { 'Authorization': `Bearer ${token}` } : {};
 
   const fetchTwintQr = async () => {
@@ -363,6 +375,19 @@ function App() {
       setBeliebtRang(rang);
     } catch {
       // ohne Sortierung weiter
+    }
+  };
+
+  // Kachel-Einstellungen aus /api/settings. Fehler: Standard bleibt.
+  const fetchKachelEinstellungen = async () => {
+    try {
+      const res = await fetch(`${API_URL}/settings`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setKategorienReihenfolge(typeof data?.kategorien_reihenfolge === 'string' ? data.kategorien_reihenfolge : '');
+      setMeistverkauftZuerst(data?.meistverkauft_zuerst === 'true');
+    } catch {
+      // Standard
     }
   };
 
@@ -822,7 +847,7 @@ function App() {
           const [itemId] = key.split('-');
           const item = splitPaymentOrder.items?.find(i => i.id === parseInt(itemId));
           if (item) {
-            itemCounts[item.item_name] = (itemCounts[item.item_name] || 0) + 1;
+            itemCounts[anzeigeName(item.item_name)] = (itemCounts[anzeigeName(item.item_name)] || 0) + 1;
           }
         });
         description = Object.entries(itemCounts).map(([name, count]) => `${count}x ${name}`).join(', ');
@@ -885,7 +910,7 @@ function App() {
           quantity: c.quantity,
           price: c.customPrice || c.price,
           notes: c.notes,
-          item_name: c.name,
+          item_name: anzeigeName(c.name),
           printer_station: c.printer_station,
           is_custom: !!c.customPrice,
         })),
@@ -992,7 +1017,7 @@ function App() {
               quantity: c.quantity,
               price: c.customPrice || c.price,
               notes: c.notes,
-              item_name: c.name,
+              item_name: anzeigeName(c.name),
               printer_station: c.printer_station,
               is_custom: !!c.customPrice,
             })),
@@ -1042,7 +1067,7 @@ function App() {
   };
 
   const total = cart.reduce((sum, item) => sum + (item.customPrice || item.price) * item.quantity, 0);
-  const categories = [...new Set(items.map(i => i.category))];
+  const categories = kategorienSortieren(items.map(i => i.category), kategorienReihenfolge);
 
   // Tische: bei Service - und immer, solange noch Tisch-Bestellungen offen
   // sind (die duerfen nicht unsichtbar liegen bleiben).
@@ -1061,19 +1086,10 @@ function App() {
     .filter(c => c.id === id && !c.customPrice)
     .reduce((summe, c) => summe + c.quantity, 0);
 
-  // Artikel einer Kategorie: meistverkaufte zuerst, sonst wie geliefert
-  // (nach Namen). Unbekannte hinten.
-  const artikelDerKategorie = (category: string) => items
-    .map((item, i) => ({ item, i }))
-    .filter(({ item }) => item.category === category)
-    .sort((a, b) => {
-      const ra = beliebtRang[String(a.item.id)];
-      const rb = beliebtRang[String(b.item.id)];
-      const wa = ra === undefined ? Number.MAX_SAFE_INTEGER : ra;
-      const wb = rb === undefined ? Number.MAX_SAFE_INTEGER : rb;
-      return (wa - wb) || (a.i - b.i);
-    })
-    .map(({ item }) => item);
+  // Kacheln einer Kategorie (src/kacheln.ts): nach Name, "Gruppe | Variante"
+  // als eine Kachel mit Untermenue; meistverkaufte zuerst nur auf Wunsch.
+  const kachelnDerKategorie = (category: string) =>
+    kachelnBilden(items.filter(i => i.category === category), beliebtRang, meistverkauftZuerst);
 
   // Ohne Tische nicht in der Tische-Ansicht stehen bleiben.
   useEffect(() => {
@@ -1284,7 +1300,7 @@ function App() {
       </div>
 
       {view === 'settings' ? (
-        <SettingsView token={token} onAnlass={(stand) => { anlassUebernehmen(stand); fetchTwintQr(); }} />
+        <SettingsView token={token} onAnlass={(stand) => { anlassUebernehmen(stand); fetchTwintQr(); }} onGespeichert={fetchKachelEinstellungen} />
       ) : showHistoryView ? (
         <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token}
           anlass={historyAnlass} anlaesse={historyAnlaesse} onAnlass={setHistoryAnlass} />
@@ -1384,14 +1400,14 @@ function App() {
                               >
                                 <span className="flex-1">
                                   {item.completed && !item.paid && '✓ '}
-                                  {item.quantity}x {item.item_name}
+                                  {item.quantity}x {anzeigeName(item.item_name)}
                                 </span>
                                 <span className="mr-2">CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
                                 {!item.paid && !item.completed && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (confirm(`"${item.quantity}x ${item.item_name}" wirklich stornieren?`)) {
+                                      if (confirm(`"${item.quantity}x ${anzeigeName(item.item_name)}" wirklich stornieren?`)) {
                                         cancelOrderItem(order.id, item.id);
                                       }
                                     }}
@@ -1494,23 +1510,37 @@ function App() {
                       {category}
                     </h3>
                     {/* Grosse Kacheln: ein Tipp = +1, Menge im Warenkorb als
-                        Badge, meistverkaufte zuerst (GET /api/items/beliebt). */}
+                        Badge, nach Name (src/kacheln.ts). "Gruppe | Variante"
+                        ist eine Kachel, die das Untermenue oeffnet. */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
-                      {artikelDerKategorie(category).map(item => {
-                        const menge = mengeImKorb(item.id);
+                      {kachelnDerKategorie(category).map(kachel => {
+                        const menge = kachel.art === 'gruppe'
+                          ? kachel.varianten.reduce((summe, v) => summe + mengeImKorb(v.id), 0)
+                          : mengeImKorb(kachel.artikel.id);
                         return (
                           <button
-                            key={item.id}
-                            onClick={() => addToCart(item)}
+                            key={kachel.schluessel}
+                            onClick={() => kachel.art === 'gruppe'
+                              ? setOffeneGruppe({ category, gruppe: kachel.gruppe })
+                              : addToCart(kachel.artikel)}
                             className={`relative flex flex-col justify-between border-2 p-3 sm:p-4 rounded-xl text-left transition touch-manipulation select-none min-h-[96px] sm:min-h-[112px] active:scale-[0.97] ${
                               menge > 0
                                 ? 'bg-red-100 border-fwv-red shadow-inner'
                                 : 'bg-red-50 hover:bg-red-100 active:bg-red-200 border-fwv-red'
                             }`}
                           >
-                            <div className={`font-bold text-lg sm:text-xl leading-tight line-clamp-2 ${menge > 0 ? 'pr-9' : ''}`}>{item.name}</div>
-                            <div className="text-fwv-red font-bold text-base sm:text-lg mt-2 tabular-nums">
-                              CHF {item.price.toFixed(2)}
+                            <div className={`font-bold text-lg sm:text-xl leading-tight line-clamp-2 ${menge > 0 ? 'pr-9' : ''}`}>
+                              {kachel.art === 'gruppe' ? kachel.gruppe : anzeigeName(kachel.artikel.name)}
+                            </div>
+                            <div className="flex items-end justify-between gap-1 mt-2">
+                              <span className="text-fwv-red font-bold text-base sm:text-lg tabular-nums">
+                                {kachel.art === 'gruppe' ? gruppenPreis(kachel.varianten) : `CHF ${kachel.artikel.price.toFixed(2)}`}
+                              </span>
+                              {kachel.art === 'gruppe' && (
+                                <span className="text-sm font-bold text-fwv-red bg-white border border-fwv-red rounded-full px-2 py-0.5 whitespace-nowrap">
+                                  {kachel.varianten.length} ▸
+                                </span>
+                              )}
                             </div>
                             {menge > 0 && (
                               <span
@@ -1526,6 +1556,73 @@ function App() {
                     </div>
                   </div>
                 ))}
+
+                {/* Untermenue: Varianten einer Gruppe. Ein Tipp = +1, das
+                    Fenster bleibt offen; "Fertig" oder Tipp daneben schliesst. */}
+                {offeneGruppe && (() => {
+                  const kachel = kachelnDerKategorie(offeneGruppe.category)
+                    .find(k => k.art === 'gruppe' && k.gruppe === offeneGruppe.gruppe);
+                  if (!kachel || kachel.art !== 'gruppe') return null;
+                  const summe = kachel.varianten.reduce((s, v) => s + mengeImKorb(v.id), 0);
+                  // Portal: sonst liegt die Kopfzeile darueber (eigene Ebene).
+                  return createPortal(
+                    <div
+                      className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-3 sm:p-6"
+                      onClick={() => setOffeneGruppe(null)}
+                    >
+                      <div
+                        role="dialog"
+                        aria-label={kachel.gruppe}
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 pt-4 pb-3 border-b">
+                          <h3 className="text-xl sm:text-2xl font-bold leading-tight">{kachel.gruppe}</h3>
+                          {summe > 0 && (
+                            <span className="text-sm sm:text-base font-semibold text-fwv-red whitespace-nowrap">{summe} im Warenkorb</span>
+                          )}
+                        </div>
+                        <div className="overflow-y-auto p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                          {kachel.varianten.map(v => {
+                            const menge = mengeImKorb(v.id);
+                            return (
+                              <button
+                                key={v.id}
+                                onClick={() => addToCart(v)}
+                                className={`relative flex flex-col justify-between border-2 p-3 sm:p-4 rounded-xl text-left transition touch-manipulation select-none min-h-[96px] sm:min-h-[112px] active:scale-[0.97] ${
+                                  menge > 0
+                                    ? 'bg-red-100 border-fwv-red shadow-inner'
+                                    : 'bg-red-50 hover:bg-red-100 active:bg-red-200 border-fwv-red'
+                                }`}
+                              >
+                                <div className={`font-bold text-lg sm:text-xl leading-tight line-clamp-2 ${menge > 0 ? 'pr-9' : ''}`}>{variantenName(v.name)}</div>
+                                <div className="text-fwv-red font-bold text-base sm:text-lg mt-2 tabular-nums">
+                                  CHF {v.price.toFixed(2)}
+                                </div>
+                                {menge > 0 && (
+                                  <span
+                                    className="absolute top-2 right-2 min-w-[32px] h-8 px-2 rounded-full bg-fwv-red text-white text-lg font-extrabold flex items-center justify-center tabular-nums shadow"
+                                    aria-label={`${menge} im Warenkorb`}
+                                  >
+                                    {menge}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <div className="p-3 sm:p-4 border-t">
+                          <button
+                            onClick={() => setOffeneGruppe(null)}
+                            className="w-full py-4 rounded-xl bg-fwv-red text-white text-xl font-bold active:bg-red-800 touch-manipulation"
+                          >
+                            Fertig
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  , document.body);
+                })()}
 
                 {items.length === 0 && (
                   <div className="text-center text-gray-500 py-8">
@@ -1626,7 +1723,7 @@ function App() {
                                 {order.items && order.items[0]?.item_name
                                   ? order.items.map(i => (
                                       <span key={i.id} className={i.paid ? 'line-through text-green-700' : ''}>
-                                        {i.quantity}x {i.item_name}
+                                        {i.quantity}x {anzeigeName(i.item_name)}
                                         {i.paid && ' ✓'}
                                       </span>
                                     )).reduce((prev, curr, idx) => idx === 0 ? [curr] : [...prev, ', ', curr], [] as any)
@@ -1662,7 +1759,7 @@ function App() {
                       <div className="flex justify-between items-center gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="font-semibold text-base truncate">
-                            {item.name}
+                            {anzeigeName(item.name)}
                             {item.customPrice && <span className="text-blue-600 ml-1">*</span>}
                           </div>
                           <div className="text-sm text-gray-600">
@@ -2216,7 +2313,7 @@ function App() {
                           >
                             <div className="flex justify-between items-center">
                               <span className="font-medium">
-                                {isSelected ? '✓ ' : ''}1x {item.item_name}
+                                {isSelected ? '✓ ' : ''}1x {anzeigeName(item.item_name)}
                               </span>
                               <span className="font-bold">
                                 CHF {parseFloat(item.price).toFixed(2)}
@@ -2591,7 +2688,7 @@ function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {stats.top_items.slice(0, 5).map((item: any, index: number) => (
                   <div key={index} className="bg-gray-50 p-2 rounded text-sm">
-                    <div className="font-semibold truncate">{item.name}</div>
+                    <div className="font-semibold truncate">{anzeigeName(item.name)}</div>
                     <div className="text-gray-600">{item.total_sold}x verkauft</div>
                   </div>
                 ))}
@@ -2647,7 +2744,7 @@ function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass
                   <td className="px-3 py-2 text-sm">
                     {order.items && order.items[0]?.id ? (
                       <span className="text-xs">
-                        {order.items.map((item: any) => `${item.quantity}x ${item.item_name}`).join(', ')}
+                        {order.items.map((item: any) => `${item.quantity}x ${anzeigeName(item.item_name)}`).join(', ')}
                       </span>
                     ) : '-'}
                   </td>
@@ -2705,7 +2802,7 @@ function datumKurz(wert: string): string {
   return `${m[3]}.${m[2]}.${m[1]}${m[4] ? ` ${m[4]}:${m[5]}` : ''}`;
 }
 
-function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (stand: AnlassStand | null) => void }) {
+function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null; onAnlass: (stand: AnlassStand | null) => void; onGespeichert?: () => void }) {
   const [settings, setSettings] = useState({
     printer_bar_ip: '',
     printer_bar_port: '9100',
@@ -2714,6 +2811,9 @@ function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (st
     printer_kitchen_port: '9100',
     printer_kitchen_protocol: 'raw',
     twint_qr_url: '',
+    // Kacheln der Kasse (src/kacheln.ts)
+    kategorien_reihenfolge: '',
+    meistverkauft_zuerst: 'false',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2802,6 +2902,7 @@ function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (st
       });
 
       if (res.ok) {
+        onGespeichert?.();
         alert('Einstellungen gespeichert!');
       } else {
         alert('Fehler beim Speichern');
@@ -3061,6 +3162,38 @@ function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (st
 
           <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
             <p><strong>Tipp:</strong> Einen eigenen TWINT-QR pro Anlass laden Vorstand oder Organisator beim Anlass hoch (Vorstand-Seite oder App: Anlass bearbeiten).</p>
+          </div>
+        </div>
+
+        {/* Kacheln der Kasse (Oktober 2026): Reihenfolge der Kategorien und
+            Sortierung innerhalb. Untermenues per Artikelname "Gruppe | Variante"
+            im Inventar (src/kacheln.ts). */}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4">🧾 Kacheln der Kasse</h3>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reihenfolge der Kategorien (eine pro Zeile oder mit Komma getrennt)
+          </label>
+          <textarea
+            value={settings.kategorien_reihenfolge}
+            onChange={(e) => setSettings({ ...settings, kategorien_reihenfolge: e.target.value })}
+            rows={7}
+            placeholder={STANDARD_KATEGORIEN.join('\n')}
+            className="w-full px-3 py-2 border rounded-lg font-mono text-sm"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Leer = Standard ({STANDARD_KATEGORIEN.join(', ')}). Nicht genannte Kategorien folgen alphabetisch.
+          </p>
+          <label className="flex items-center gap-3 mt-4 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              className="w-5 h-5"
+              checked={settings.meistverkauft_zuerst === 'true'}
+              onChange={(e) => setSettings({ ...settings, meistverkauft_zuerst: e.target.checked ? 'true' : 'false' })}
+            />
+            Meistverkaufte zuerst (sonst nach Name: 01, 02, 03A, 04 ...)
+          </label>
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <p><strong>Untermenue:</strong> Artikel im Inventar «Gruppe | Variante» nennen (z.B. «Kaffee Lutz | Zwetschge», «Kaffee Lutz | Kirsch»). Die Kasse zeigt dann eine Kachel «Kaffee Lutz», die die Sorten oeffnet. Auf Bon und Kuechenanzeige steht «Kaffee Lutz Zwetschge».</p>
           </div>
         </div>
 
