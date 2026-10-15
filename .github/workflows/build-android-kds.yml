@@ -51,8 +51,9 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # Android-SDK ist auf ubuntu-latest vorinstalliert (wie bei
+      # build-android-vorstand.yml). android-actions/setup-android@v3 wollte
+      # das abgeschaffte Paket 'tools' installieren und brach ab (kds-v3.0).
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
