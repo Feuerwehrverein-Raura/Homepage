@@ -128,6 +128,9 @@ interface KassenAnlass {
   ende: string | null;
   ort: string | null;
   twint_qr_url: string | null;
+  // Schicht mit Bereich/Name "Service" (api-events) - aeltere Backends
+  // liefern das Feld nicht.
+  hat_service?: boolean;
 }
 
 interface AnlassStand {
@@ -135,6 +138,40 @@ interface AnlassStand {
   modus: 'automatisch' | 'manuell';
   auswahl: string | null;
   erreichbar: boolean;
+  hat_service?: boolean;
+}
+
+// Tische nur bei Anlaessen mit Service. Der zuletzt bekannte Wert wird pro
+// Geraet gemerkt, damit beim Neuladen nichts flackert. Noch nie bekannt:
+// wie bisher (mit Tischen).
+const SERVICE_SPEICHER = 'kasse_hat_service';
+function serviceGemerkt(): boolean {
+  try {
+    const wert = localStorage.getItem(SERVICE_SPEICHER);
+    return wert === null ? true : wert === '1';
+  } catch {
+    return true;
+  }
+}
+function serviceMerken(wert: boolean) {
+  try { localStorage.setItem(SERVICE_SPEICHER, wert ? '1' : '0'); } catch { /* egal */ }
+}
+
+// Aus der Antwort von /api/anlass: Service ja/nein - oder null, wenn die
+// Antwort nichts taugt (Backend ohne das Feld, api-events weg und kein
+// Anlass gemerkt). Dann bleibt der zuletzt bekannte Wert.
+function serviceAusStand(stand: AnlassStand | null): boolean | null {
+  if (!stand) return null;
+  if (typeof stand.hat_service !== 'boolean') return null;
+  if (stand.erreichbar === false && !stand.anlass) return null;
+  return stand.hat_service;
+}
+
+// Bargeld: Schnellknoepfe fuer den erhaltenen Betrag - nur Noten, die den
+// Betrag decken; ueber 100 auch 200.
+function bargeldKnoepfe(total: number): number[] {
+  const noten = total > 100 ? [10, 20, 50, 100, 200] : [10, 20, 50, 100];
+  return noten.filter(n => n >= total - 0.001);
 }
 
 // Vereins-Standard (frontend/public/twint-qr.png): gilt, wenn der Anlass
@@ -164,7 +201,8 @@ function App() {
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [statsData, setStatsData] = useState<any>(null);
   const [pendingOrder, setPendingOrder] = useState<{ id: number; total: number; tableNumber?: number } | null>(null);
-  const [cashPayment, setCashPayment] = useState<{ orderId: number; total: number; received: string } | null>(null);
+  // neu: der Betrag kam von einem Schnellknopf - die naechste Ziffer beginnt neu.
+  const [cashPayment, setCashPayment] = useState<{ orderId: number; total: number; received: string; neu?: boolean } | null>(null);
   const [cardPayment, setCardPayment] = useState<{ orderId: number; total: number } | null>(null);
   const [orderConfirmation, setOrderConfirmation] = useState<{
     orderId: number;
@@ -187,6 +225,13 @@ function App() {
   const [twintQrAnlass, setTwintQrAnlass] = useState<string | null>(null);
   // Aktueller Anlass fuer die Kopfzeile
   const [anlassStand, setAnlassStand] = useState<AnlassStand | null>(null);
+  // Hat der Anlass Service? (zuletzt bekannter Wert, siehe serviceAusStand)
+  const [hatService, setHatService] = useState<boolean>(serviceGemerkt);
+  // Meistverkaufte Artikel: item_id -> Rang (0 = am meisten verkauft)
+  const [beliebtRang, setBeliebtRang] = useState<Record<string, number>>({});
+  // Doppeltipp-Schutz fuers Anlegen: state allein reicht nicht, zwei Tipps
+  // im selben Augenblick saehen beide noch loading=false.
+  const sendetRef = useRef(false);
   // History: Filter nach Anlass ('' = alle, 'ohne' = ohne Anlass, sonst event_id)
   const [historyAnlass, setHistoryAnlass] = useState<string>('');
   const [historyAnlaesse, setHistoryAnlaesse] = useState<{ event_id: string; event_titel: string | null; bestellungen: number; umsatz: string }[]>([]);
@@ -250,10 +295,18 @@ function App() {
       fetchItems();
       fetchTwintQr();
       fetchAnlass();
-      const t = setInterval(() => { fetchTwintQr(); fetchAnlass(); }, 60 * 1000);
+      // Offene Tisch-Bestellungen auch ausserhalb der Tische-Ansicht kennen:
+      // Solange es welche gibt, bleibt der Reiter sichtbar.
+      fetchAllOpenOrders();
+      const t = setInterval(() => { fetchTwintQr(); fetchAnlass(); fetchAllOpenOrders(); }, 60 * 1000);
       return () => clearInterval(t);
     }
   }, [token]);
+
+  const anlassId = anlassStand?.anlass?.id || null;
+  useEffect(() => {
+    if (token) fetchBeliebt();
+  }, [token, anlassId]);
 
   const authHeaders = (): HeadersInit => token ? { 'Authorization': `Bearer ${token}` } : {};
 
@@ -280,9 +333,36 @@ function App() {
   const fetchAnlass = async () => {
     try {
       const res = await fetch(`${API_URL}/anlass`, { headers: authHeaders() });
-      if (res.ok) setAnlassStand(await res.json());
+      if (res.ok) anlassUebernehmen(await res.json());
     } catch {
       // Ohne Anlass-Anzeige weiter - die Kasse haengt nicht daran.
+    }
+  };
+
+  const anlassUebernehmen = (stand: AnlassStand | null) => {
+    setAnlassStand(stand);
+    const service = serviceAusStand(stand);
+    if (service !== null) {
+      setHatService(service);
+      serviceMerken(service);
+    }
+  };
+
+  // Reihenfolge der meistverkauften Artikel. Nur beim Start und bei einem
+  // Wechsel des Anlasses - nie nach jeder Bestellung, sonst springen die
+  // Knoepfe weg. Fehler: alte Reihenfolge (nach Namen) bleibt.
+  const fetchBeliebt = async () => {
+    try {
+      const res = await fetch(`${API_URL}/items/beliebt`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const rang: Record<string, number> = {};
+      (Array.isArray(data?.items) ? data.items : []).forEach((e: any, i: number) => {
+        if (e && e.item_id !== undefined && e.item_id !== null) rang[String(e.item_id)] = i;
+      });
+      setBeliebtRang(rang);
+    } catch {
+      // ohne Sortierung weiter
     }
   };
 
@@ -592,6 +672,13 @@ function App() {
     setTableNumber('');
   };
 
+  // Ziffer im Bargeld-Fenster: anhaengen, nach einem Schnellknopf neu beginnen.
+  const ziffer = (key: string) => {
+    if (!cashPayment) return;
+    const basis = cashPayment.neu || cashPayment.received === '0' ? '' : cashPayment.received;
+    setCashPayment({ ...cashPayment, received: basis + key, neu: false });
+  };
+
   const confirmCashPayment = async () => {
     if (!cashPayment) return;
 
@@ -782,7 +869,100 @@ function App() {
     }
   };
 
+  // Neue Bestellung anlegen. Liefert { id, total } oder null; bei null ist
+  // die Meldung schon gezeigt und der Warenkorb unveraendert.
+  const bestellungAnlegen = async (tableNum: number): Promise<{ id: number; total: number } | null> => {
+    const orderRes = await fetch(`${API_URL}/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        table_number: tableNum,
+        items: cart.map(c => ({
+          id: c.customPrice ? null : c.id,
+          quantity: c.quantity,
+          price: c.customPrice || c.price,
+          notes: c.notes,
+          item_name: c.name,
+          printer_station: c.printer_station,
+          is_custom: !!c.customPrice,
+        })),
+      }),
+    });
+
+    let order: any = null;
+    try { order = await orderRes.json(); } catch { order = null; }
+    if (!orderRes.ok || !order || !order.id) {
+      const grund = order?.error || `Server antwortete ${orderRes.status}`;
+      alert(`Bestellung nicht angelegt: ${grund}\n\nDer Warenkorb bleibt erhalten - bitte nochmals versuchen.`);
+      return null;
+    }
+
+    if (order.druckfehler?.length) {
+      setDruckWarnung({ orderId: order.id, fehler: order.druckfehler });
+    }
+    return { id: order.id, total };
+  };
+
+  // Bar-Bestellung mit Zahlart direkt aus dem Warenkorb: anlegen und gleich
+  // das passende Zahlfenster oeffnen (ohne Zwischenfenster).
+  const bezahlenDirekt = async (art: 'bar' | 'twint' | 'karte') => {
+    if (sendetRef.current || loading) return;
+    if (cart.length === 0) {
+      alert('Bitte Artikel auswählen!');
+      return;
+    }
+    sendetRef.current = true;
+    setLoading(true);
+    try {
+      const order = await bestellungAnlegen(0);
+      if (!order) return;
+      setCart([]);
+      zahlfensterOeffnen(order.id, order.total, art);
+    } catch (error) {
+      alert('Fehler beim Senden der Bestellung - der Warenkorb bleibt erhalten.');
+    } finally {
+      sendetRef.current = false;
+      setLoading(false);
+    }
+  };
+
+  // Zahlfenster fuer eine angelegte Bestellung oeffnen (auch zum Wechseln
+  // der Zahlart aus einem offenen Zahlfenster heraus).
+  const zahlfensterOeffnen = (orderId: number, betrag: number, art: 'bar' | 'twint' | 'karte') => {
+    setCashPayment(art === 'bar' ? { orderId, total: betrag, received: '' } : null);
+    setTwintPayment(art === 'twint' ? { orderId, total: betrag } : null);
+    setCardPayment(art === 'karte' ? { orderId, total: betrag } : null);
+  };
+
+  // Falsche Zahlart getippt? Im Zahlfenster auf eine andere wechseln - die
+  // Bestellung bleibt dieselbe.
+  const zahlartWechsel = (orderId: number, betrag: number, aktuell: 'bar' | 'twint' | 'karte') => {
+    const arten: { art: 'bar' | 'twint' | 'karte'; text: string }[] = [
+      { art: 'bar', text: '💵 Bar' },
+      ...(twintQrUrl ? [{ art: 'twint' as const, text: 'TWINT' }] : []),
+      { art: 'karte', text: '💳 Karte' },
+    ];
+    return (
+      <div className="flex items-center justify-center gap-2 mt-3 text-sm text-gray-500">
+        <span>Andere Zahlart:</span>
+        {arten.filter(a => a.art !== aktuell).map(a => (
+          <button
+            key={a.art}
+            onClick={() => zahlfensterOeffnen(orderId, betrag, a.art)}
+            className="px-3 py-2 min-h-[40px] rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium touch-manipulation"
+          >
+            {a.text}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   const submitOrder = async () => {
+    if (sendetRef.current) return;
     if (cart.length === 0) {
       alert('Bitte Artikel auswählen!');
       return;
@@ -795,6 +975,7 @@ function App() {
 
     const tableNum = getTableNumber();
 
+    sendetRef.current = true;
     setLoading(true);
     try {
       // If adding to existing order
@@ -840,32 +1021,9 @@ function App() {
         setSelectedOrder(null);
         fetchOpenOrders(tableNumber);
       } else {
-        // Create new order
-        const orderRes = await fetch(`${API_URL}/orders`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            table_number: tableNum,
-            items: cart.map(c => ({
-              id: c.customPrice ? null : c.id,
-              quantity: c.quantity,
-              price: c.customPrice || c.price,
-              notes: c.notes,
-              item_name: c.name,
-              printer_station: c.printer_station,
-              is_custom: !!c.customPrice,
-            })),
-          }),
-        });
-
-        const order = await orderRes.json();
-
-        if (order.druckfehler?.length) {
-          setDruckWarnung({ orderId: order.id, fehler: order.druckfehler });
-        }
+        // Create new order (Fehler: Meldung, Warenkorb bleibt)
+        const order = await bestellungAnlegen(tableNum);
+        if (!order) return;
 
         // Show payment modal (include table number for "pay later" option)
         const currentTableNum = orderType === 'tisch' ? parseInt(tableNumber) : undefined;
@@ -878,12 +1036,57 @@ function App() {
     } catch (error) {
       alert('Fehler beim Senden der Bestellung');
     } finally {
+      sendetRef.current = false;
       setLoading(false);
     }
   };
 
   const total = cart.reduce((sum, item) => sum + (item.customPrice || item.price) * item.quantity, 0);
   const categories = [...new Set(items.map(i => i.category))];
+
+  // Tische: bei Service - und immer, solange noch Tisch-Bestellungen offen
+  // sind (die duerfen nicht unsichtbar liegen bleiben).
+  // Offen = noch nicht (ganz) bezahlt; die Liste enthaelt auch fertige.
+  const unbezahlteTischBestellungen = allOpenOrders.filter(o =>
+    (parseFloat(o.total) || 0) - (parseFloat(o.paid_amount || '0') || 0) > 0.009);
+  const tischeSichtbar = hatService || unbezahlteTischBestellungen.length > 0;
+  // Bestellart "Tisch" nur bei Service; eine angefangene Tisch-Bestellung
+  // bleibt aber, bis sie gesendet oder geleert ist.
+  const tischWaehlbar = hatService || orderType === 'tisch';
+  // Zahlart direkt im Warenkorb: neue Bar-Bestellung (nicht beim Nachtragen)
+  const direktBezahlen = orderType === 'bar' && !selectedOrder;
+
+  // Menge eines Artikels im Warenkorb (Badge auf der Kachel)
+  const mengeImKorb = (id: number) => cart
+    .filter(c => c.id === id && !c.customPrice)
+    .reduce((summe, c) => summe + c.quantity, 0);
+
+  // Artikel einer Kategorie: meistverkaufte zuerst, sonst wie geliefert
+  // (nach Namen). Unbekannte hinten.
+  const artikelDerKategorie = (category: string) => items
+    .map((item, i) => ({ item, i }))
+    .filter(({ item }) => item.category === category)
+    .sort((a, b) => {
+      const ra = beliebtRang[String(a.item.id)];
+      const rb = beliebtRang[String(b.item.id)];
+      const wa = ra === undefined ? Number.MAX_SAFE_INTEGER : ra;
+      const wb = rb === undefined ? Number.MAX_SAFE_INTEGER : rb;
+      return (wa - wb) || (a.i - b.i);
+    })
+    .map(({ item }) => item);
+
+  // Ohne Tische nicht in der Tische-Ansicht stehen bleiben.
+  useEffect(() => {
+    if (!tischeSichtbar && view === 'tables') setView('order');
+  }, [tischeSichtbar, view]);
+
+  // Ohne Service nur Bar - eine angefangene Tisch-Bestellung (Tischnummer,
+  // Artikel oder gewaehlte Bestellung) wird aber nicht umgestellt.
+  useEffect(() => {
+    if (!hatService && orderType === 'tisch' && cart.length === 0 && !selectedOrder && !tableNumber) {
+      setOrderType('bar');
+    }
+  }, [hatService, orderType, cart.length, selectedOrder, tableNumber]);
 
   const showInventoryView = view === 'inventory';
   const showHistoryView = view === 'history';
@@ -1040,14 +1243,18 @@ function App() {
             >
               🛒 Kasse
             </button>
-            <button
-              onClick={() => setView('tables')}
-              className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
-                view === 'tables' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
-              }`}
-            >
-              🪑 Tische {allOpenOrders.length > 0 && `(${new Set(allOpenOrders.map(o => o.table_number)).size})`}
-            </button>
+            {/* Tische nur bei Anlaessen mit Service - oder solange noch
+                Tisch-Bestellungen offen sind. */}
+            {tischeSichtbar && (
+              <button
+                onClick={() => setView('tables')}
+                className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                  view === 'tables' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+                }`}
+              >
+                🪑 Tische {allOpenOrders.length > 0 && `(${new Set(allOpenOrders.map(o => o.table_number)).size})`}
+              </button>
+            )}
             <button
               onClick={() => setView('inventory')}
               className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
@@ -1077,7 +1284,7 @@ function App() {
       </div>
 
       {view === 'settings' ? (
-        <SettingsView token={token} onAnlass={(stand) => { setAnlassStand(stand); fetchTwintQr(); }} />
+        <SettingsView token={token} onAnlass={(stand) => { anlassUebernehmen(stand); fetchTwintQr(); }} />
       ) : showHistoryView ? (
         <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token}
           anlass={historyAnlass} anlaesse={historyAnlaesse} onAnlass={setHistoryAnlass} />
@@ -1099,6 +1306,14 @@ function App() {
                 🔄 Aktualisieren
               </button>
             </div>
+
+            {!hatService && (
+              <div className="mb-4 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg text-sm text-yellow-900">
+                Dieser Anlass hat keinen Service. Die Tische sind nur sichtbar,
+                weil noch Tisch-Bestellungen offen sind - bitte abrechnen.
+                Neue Bestellungen laufen über die Bar.
+              </div>
+            )}
 
             {allOpenOrders.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
@@ -1278,21 +1493,36 @@ function App() {
                     <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
                       {category}
                     </h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-                      {items
-                        .filter(i => i.category === category)
-                        .map(item => (
+                    {/* Grosse Kacheln: ein Tipp = +1, Menge im Warenkorb als
+                        Badge, meistverkaufte zuerst (GET /api/items/beliebt). */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
+                      {artikelDerKategorie(category).map(item => {
+                        const menge = mengeImKorb(item.id);
+                        return (
                           <button
                             key={item.id}
                             onClick={() => addToCart(item)}
-                            className="bg-red-50 hover:bg-red-100 active:bg-red-200 border-2 border-fwv-red p-3 sm:p-4 rounded-lg text-left transition touch-manipulation min-h-[70px] sm:min-h-[80px]"
+                            className={`relative flex flex-col justify-between border-2 p-3 sm:p-4 rounded-xl text-left transition touch-manipulation select-none min-h-[96px] sm:min-h-[112px] active:scale-[0.97] ${
+                              menge > 0
+                                ? 'bg-red-100 border-fwv-red shadow-inner'
+                                : 'bg-red-50 hover:bg-red-100 active:bg-red-200 border-fwv-red'
+                            }`}
                           >
-                            <div className="font-semibold text-sm sm:text-base line-clamp-2">{item.name}</div>
-                            <div className="text-fwv-red font-bold text-base sm:text-lg mt-1">
+                            <div className={`font-bold text-lg sm:text-xl leading-tight line-clamp-2 ${menge > 0 ? 'pr-9' : ''}`}>{item.name}</div>
+                            <div className="text-fwv-red font-bold text-base sm:text-lg mt-2 tabular-nums">
                               CHF {item.price.toFixed(2)}
                             </div>
+                            {menge > 0 && (
+                              <span
+                                className="absolute top-2 right-2 min-w-[32px] h-8 px-2 rounded-full bg-fwv-red text-white text-lg font-extrabold flex items-center justify-center tabular-nums shadow"
+                                aria-label={`${menge} im Warenkorb`}
+                              >
+                                {menge}
+                              </span>
+                            )}
                           </button>
-                        ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
@@ -1315,7 +1545,7 @@ function App() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Bestellart
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={`grid gap-2 ${tischWaehlbar ? 'grid-cols-2' : 'grid-cols-1'}`}>
                     <button
                       onClick={() => { setOrderType('bar'); setTableNumber(''); setSelectedOrder(null); }}
                       className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
@@ -1326,16 +1556,18 @@ function App() {
                     >
                       🍺 Bar
                     </button>
-                    <button
-                      onClick={() => { setOrderType('tisch'); setSelectedOrder(null); }}
-                      className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
-                        orderType === 'tisch'
-                          ? 'bg-fwv-red text-white'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      🪑 Tisch
-                    </button>
+                    {tischWaehlbar && (
+                      <button
+                        onClick={() => { setOrderType('tisch'); setSelectedOrder(null); }}
+                        className={`py-3 rounded-lg font-semibold text-sm sm:text-base transition touch-manipulation ${
+                          orderType === 'tisch'
+                            ? 'bg-fwv-red text-white'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        🪑 Tisch
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1478,6 +1710,43 @@ function App() {
                     <span className="text-green-600">CHF {total.toFixed(2)}</span>
                   </div>
 
+                  {direktBezahlen ? (
+                    /* Bar-Bestellung: Zahlart direkt waehlen - ein Tipp legt
+                       die Bestellung an und oeffnet das Zahlfenster. */
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 mb-2">
+                        {loading ? 'Bestellung wird angelegt...' : 'Bezahlen mit:'}
+                      </div>
+                      <div className={`grid gap-2 ${twintQrUrl ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                        <button
+                          onClick={() => bezahlenDirekt('bar')}
+                          disabled={loading || cart.length === 0}
+                          className="min-h-[72px] rounded-xl bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-bold text-lg sm:text-xl flex flex-col items-center justify-center touch-manipulation disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
+                          <span className="text-2xl leading-none">💵</span>
+                          <span>Bar</span>
+                        </button>
+                        {twintQrUrl && (
+                          <button
+                            onClick={() => bezahlenDirekt('twint')}
+                            disabled={loading || cart.length === 0}
+                            aria-label="TWINT"
+                            className="min-h-[72px] rounded-xl bg-black hover:bg-gray-800 active:bg-gray-900 text-white font-bold flex items-center justify-center touch-manipulation disabled:bg-gray-300 disabled:cursor-not-allowed"
+                          >
+                            <img src="/twint-logo.png" alt="TWINT" className={`h-8 max-w-[85%] object-contain ${loading || cart.length === 0 ? 'opacity-50' : ''}`} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => bezahlenDirekt('karte')}
+                          disabled={loading || cart.length === 0}
+                          className="min-h-[72px] rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-lg sm:text-xl flex flex-col items-center justify-center touch-manipulation disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
+                          <span className="text-2xl leading-none">💳</span>
+                          <span>Karte</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                   <button
                     onClick={submitOrder}
                     disabled={loading || cart.length === 0 || (orderType === 'tisch' && !tableNumber)}
@@ -1489,11 +1758,13 @@ function App() {
                   >
                     {loading ? 'Sende...' : selectedOrder ? `➕ Zu #${selectedOrder.id} hinzufügen` : '✅ Bestellung senden'}
                   </button>
+                  )}
 
                   {cart.length > 0 && (
                     <button
                       onClick={() => setCart([])}
-                      className="w-full mt-3 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-700 font-semibold py-3 rounded-lg transition touch-manipulation min-h-[48px]"
+                      disabled={loading}
+                      className="w-full mt-3 disabled:opacity-50 bg-red-100 hover:bg-red-200 active:bg-red-300 text-red-700 font-semibold py-3 rounded-lg transition touch-manipulation min-h-[48px]"
                     >
                       🗑️ Warenkorb leeren
                     </button>
@@ -1580,7 +1851,7 @@ function App() {
       {/* TWINT Payment Modal */}
       {twintPayment && twintQrUrl && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 max-h-[96vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-center mb-2">TWINT Zahlung</h2>
             <p className="text-sm text-gray-600 text-center mb-3">Bestellung #{twintPayment.orderId}</p>
 
@@ -1631,6 +1902,7 @@ function App() {
               >
                 ✓ Zahlung erhalten
               </button>
+              {zahlartWechsel(twintPayment.orderId, twintPayment.total, 'twint')}
               <button
                 onClick={() => setTwintPayment(null)}
                 className="w-full text-gray-500 hover:text-gray-700 py-2 text-sm"
@@ -1644,32 +1916,33 @@ function App() {
 
       {/* Cash Payment Modal */}
       {cashPayment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-center mb-2">Barzahlung</h2>
-            <p className="text-sm text-gray-600 text-center mb-4">Bestellung #{cashPayment.orderId}</p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 max-h-[96vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-center mb-3">
+              Barzahlung <span className="text-sm font-normal text-gray-500">· Bestellung #{cashPayment.orderId}</span>
+            </h2>
 
-            <div className="bg-gray-100 rounded-xl p-4 mb-3">
-              <div className="flex justify-between items-center text-lg">
-                <span>Betrag:</span>
-                <span className="font-bold text-green-600">CHF {cashPayment.total.toFixed(2)}</span>
+            {/* Betrag und Erhalten nebeneinander - so passt das Fenster
+                samt Ziffernblock auch quer aufs Tablet. */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-gray-100 rounded-xl p-3">
+                <div className="text-sm text-gray-600">Betrag</div>
+                <div className="text-2xl sm:text-3xl font-bold text-green-600 tabular-nums">{cashPayment.total.toFixed(2)}</div>
+              </div>
+              <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-3">
+                <div className="text-sm text-gray-600">Erhalten (CHF)</div>
+                <div className="text-2xl sm:text-3xl font-bold text-gray-800 tabular-nums">
+                  {cashPayment.received || '0.00'}
+                </div>
               </div>
             </div>
 
-            {/* Display for entered amount */}
-            <div className="bg-gray-50 border-2 border-gray-300 rounded-xl p-3 mb-3">
-              <div className="text-sm text-gray-600 mb-1">Erhalten (CHF)</div>
-              <div className="text-3xl font-bold text-center text-gray-800 min-h-[40px]">
-                {cashPayment.received || '0.00'}
-              </div>
-            </div>
-
-            {/* Change calculation - shown above keypad when applicable */}
+            {/* Rueckgeld gross, sobald genug erhalten ist */}
             {cashPayment.received && parseFloat(cashPayment.received) >= cashPayment.total && (
               <div className="bg-green-100 border-2 border-green-500 rounded-xl p-3 mb-3">
-                <div className="flex justify-between items-center text-lg">
-                  <span className="font-semibold">Wechselgeld:</span>
-                  <span className="font-bold text-green-700 text-2xl">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-lg">Rückgeld:</span>
+                  <span className="font-extrabold text-green-700 text-4xl tabular-nums">
                     CHF {(parseFloat(cashPayment.received) - cashPayment.total).toFixed(2)}
                   </span>
                 </div>
@@ -1687,104 +1960,67 @@ function App() {
               </div>
             )}
 
-            {/* Numeric Keypad */}
-            <div className="grid grid-cols-4 gap-2 mb-3">
-              {['7', '8', '9', '10'].map(key => (
+            {/* Schnellknoepfe: Passend und die Noten, die den Betrag decken.
+                Ein Tipp setzt "Erhalten"; die naechste Ziffer beginnt neu. */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              <button
+                onClick={() => setCashPayment({ ...cashPayment, received: cashPayment.total.toFixed(2), neu: true })}
+                className="flex-[2_1_0%] min-w-[96px] min-h-[64px] bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded-xl font-bold touch-manipulation leading-tight"
+              >
+                Passend<br /><span className="text-sm font-medium tabular-nums">{cashPayment.total.toFixed(2)}</span>
+              </button>
+              {bargeldKnoepfe(cashPayment.total).map(note => (
                 <button
-                  key={key}
-                  onClick={() => {
-                    if (key === '10') {
-                      setCashPayment({ ...cashPayment, received: '10' });
-                    } else {
-                      const current = cashPayment.received === '0' ? '' : cashPayment.received;
-                      setCashPayment({ ...cashPayment, received: current + key });
-                    }
-                  }}
-                  className={`py-4 rounded-xl font-bold text-xl touch-manipulation ${
-                    key === '10' ? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800' : 'bg-gray-100 hover:bg-gray-200 active:bg-gray-300'
+                  key={note}
+                  onClick={() => setCashPayment({ ...cashPayment, received: String(note), neu: true })}
+                  className={`flex-1 min-w-[56px] min-h-[64px] rounded-xl font-extrabold text-xl touch-manipulation tabular-nums ${
+                    cashPayment.received === String(note)
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800'
                   }`}
                 >
-                  {key}
+                  {note}
                 </button>
               ))}
-              {['4', '5', '6', '20'].map(key => (
+            </div>
+
+            {/* Ziffernblock */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {['7', '8', '9', '4', '5', '6', '1', '2', '3'].map(key => (
                 <button
                   key={key}
-                  onClick={() => {
-                    if (key === '20') {
-                      setCashPayment({ ...cashPayment, received: '20' });
-                    } else {
-                      const current = cashPayment.received === '0' ? '' : cashPayment.received;
-                      setCashPayment({ ...cashPayment, received: current + key });
-                    }
-                  }}
-                  className={`py-4 rounded-xl font-bold text-xl touch-manipulation ${
-                    key === '20' ? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800' : 'bg-gray-100 hover:bg-gray-200 active:bg-gray-300'
-                  }`}
-                >
-                  {key}
-                </button>
-              ))}
-              {['1', '2', '3', '50'].map(key => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    if (key === '50') {
-                      setCashPayment({ ...cashPayment, received: '50' });
-                    } else {
-                      const current = cashPayment.received === '0' ? '' : cashPayment.received;
-                      setCashPayment({ ...cashPayment, received: current + key });
-                    }
-                  }}
-                  className={`py-4 rounded-xl font-bold text-xl touch-manipulation ${
-                    key === '50' ? 'bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800' : 'bg-gray-100 hover:bg-gray-200 active:bg-gray-300'
-                  }`}
+                  onClick={() => ziffer(key)}
+                  className="py-3 rounded-xl font-bold text-xl touch-manipulation bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
                 >
                   {key}
                 </button>
               ))}
               <button
                 onClick={() => {
-                  const current = cashPayment.received === '0' ? '' : cashPayment.received;
-                  setCashPayment({ ...cashPayment, received: current + '0' });
+                  const basis = cashPayment.neu ? '' : cashPayment.received;
+                  if (!basis.includes('.')) {
+                    setCashPayment({ ...cashPayment, received: (basis || '0') + '.', neu: false });
+                  }
                 }}
-                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
+                className="py-3 rounded-xl font-bold text-xl touch-manipulation bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
+              >
+                .
+              </button>
+              <button
+                onClick={() => ziffer('0')}
+                className="py-3 rounded-xl font-bold text-xl touch-manipulation bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
               >
                 0
               </button>
               <button
                 onClick={() => {
-                  if (!cashPayment.received.includes('.')) {
-                    setCashPayment({ ...cashPayment, received: (cashPayment.received || '0') + '.' });
-                  }
+                  setCashPayment({ ...cashPayment, received: cashPayment.received.slice(0, -1) || '', neu: false });
                 }}
-                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
-              >
-                .
-              </button>
-              <button
-                onClick={() => {
-                  setCashPayment({ ...cashPayment, received: cashPayment.received.slice(0, -1) || '' });
-                }}
-                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-yellow-100 hover:bg-yellow-200 active:bg-yellow-300"
+                className="py-3 rounded-xl font-bold text-xl touch-manipulation bg-yellow-100 hover:bg-yellow-200 active:bg-yellow-300"
               >
                 ←
               </button>
-              <button
-                onClick={() => setCashPayment({ ...cashPayment, received: '100' })}
-                className="py-4 rounded-xl font-bold text-xl touch-manipulation bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-800"
-              >
-                100
-              </button>
             </div>
-
-            {/* Passend button */}
-            <button
-              onClick={() => setCashPayment({ ...cashPayment, received: cashPayment.total.toFixed(2) })}
-              className="w-full bg-gray-200 hover:bg-gray-300 active:bg-gray-400 py-3 rounded-xl font-medium mb-3 touch-manipulation"
-            >
-              Passend ({cashPayment.total.toFixed(2)})
-            </button>
 
             <button
               onClick={confirmCashPayment}
@@ -1794,9 +2030,10 @@ function App() {
               Bezahlung abschliessen
             </button>
 
+            {zahlartWechsel(cashPayment.orderId, cashPayment.total, 'bar')}
             <button
               onClick={() => setCashPayment(null)}
-              className="w-full mt-3 text-gray-500 hover:text-gray-700 py-2 text-sm"
+              className="w-full mt-1 text-gray-500 hover:text-gray-700 py-2 text-sm"
             >
               Abbrechen
             </button>
@@ -1807,7 +2044,7 @@ function App() {
       {/* Card Payment Modal (SumUp 3G+ Manual) */}
       {cardPayment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[96vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-center mb-2">💳 Kartenzahlung</h2>
             <p className="text-sm text-gray-600 text-center mb-4">Bestellung #{cardPayment.orderId}</p>
 
@@ -1843,9 +2080,10 @@ function App() {
               ✅ Zahlung erhalten
             </button>
 
+            {zahlartWechsel(cardPayment.orderId, cardPayment.total, 'karte')}
             <button
               onClick={() => setCardPayment(null)}
-              className="w-full mt-3 text-gray-500 hover:text-gray-700 py-2 text-sm"
+              className="w-full mt-1 text-gray-500 hover:text-gray-700 py-2 text-sm"
             >
               Abbrechen
             </button>

@@ -77,6 +77,27 @@ test('bildPruefen: Typ aus dem Inhalt, data:-Adresse, Grenzen', () => {
     assert.equal(k.bildPruefen({ data: gross.toString('base64') }).status, 413);
 });
 
+test('hatService: Bereich "Service" oder das Wort Service im Namen', () => {
+    assert.equal(k.hatService([{ bereich: 'Bar', name: 'Bar Abend' }, { bereich: ' service ', name: 'Schicht 1' }]), true);
+    assert.equal(k.hatService([{ bereich: 'SERVICE', name: null }]), true);
+    assert.equal(k.hatService([{ bereich: 'Allgemein', name: 'Service Abend' }]), true);
+    assert.equal(k.hatService([{ bereich: 'Allgemein', name: '  service  ' }]), true);
+    assert.equal(k.hatService([{ bereich: 'Allgemein', name: 'Service-Team 2' }]), true);
+    assert.equal(k.hatService([{ bereich: 'Bar', name: 'Bar' }, { bereich: 'Kueche', name: 'Kueche' },
+        { bereich: 'Aufbau', name: 'Aufbau' }, { bereich: 'Abbau', name: 'Abbau' }]), false);
+    assert.equal(k.hatService([{ bereich: 'Allgemein', name: 'Servicewagen putzen' }]), false, 'nur das ganze Wort');
+    assert.equal(k.hatService([]), false);
+    assert.equal(k.hatService(null), false);
+    assert.equal(k.hatService(undefined), false);
+});
+
+test('kassenAnsicht: hat_service aus den Schichten, ohne Schichten false', () => {
+    assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null, { schichten: [{ bereich: 'Service', name: 'S' }] })).hat_service, true);
+    assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null, { schichten: [{ bereich: 'Bar', name: 'B' }] })).hat_service, false);
+    assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null)).hat_service, false);
+    assert.ok(!('schichten' in k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null, { schichten: [] }))), 'Schichten selbst gehen nicht an die Kasse');
+});
+
 const DB = process.env.TEST_DATABASE_URL;
 const PORT = 55885;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -104,6 +125,13 @@ async function seed(pool) {
     await ev(5, 'offen', 'Datum offen', '2026-10-24 18:50', null, 'planned', 'offen');
     await ev(6, 'gv', 'GV 2026', '2026-11-20 19:00', null, 'planned');
     await ev(7, 'vorbei', 'Vorbei', '2026-10-20 18:00', null, 'planned');
+    // Chilbi mit Service (Bereich), GV mit Service nur im Namen, Aufbau ohne.
+    const schicht = (n, name, bereich) => pool.query(
+        `INSERT INTO shifts (event_id, name, date, bereich) VALUES ($1, $2, '2026-10-24', $3)`, [E(n), name, bereich]);
+    await schicht(1, 'Bar Abend', 'Bar');
+    await schicht(1, 'Tische bedienen', 'Service');
+    await schicht(2, 'Aufbau Zelt', 'Aufbau');
+    await schicht(6, 'Service GV', 'Allgemein');
 }
 
 test('Kasse und TWINT-QR gegen den echten Server', { skip: !DB && 'TEST_DATABASE_URL nicht gesetzt' }, async (t) => {
@@ -159,7 +187,7 @@ test('Kasse und TWINT-QR gegen den echten Server', { skip: !DB && 'TEST_DATABASE
         assert.equal(r.json.zeitpunkt, '2026-10-24 19:00:00');
         assert.deepEqual(r.json.anlass, {
             id: E(1), title: 'Chilbi 2026', start_date: '2026-10-24 18:00:00', end_date: '2026-10-25 02:00:00',
-            location: null, status: 'planned', twint_qr_url: null
+            location: null, status: 'planned', twint_qr_url: null, hat_service: true
         });
     });
 
@@ -167,8 +195,12 @@ test('Kasse und TWINT-QR gegen den echten Server', { skip: !DB && 'TEST_DATABASE
         const r = await kasse('/events/kasse/anlaesse');
         assert.equal(r.status, 200);
         assert.deepEqual(r.json.anlaesse.map(a => a.title), ['Aufbau Chilbi', 'Chilbi 2026', 'GV 2026']);
+        assert.deepEqual(r.json.anlaesse.map(a => a.hat_service), [false, true, true]);
         const einer = await kasse(`/events/kasse/anlaesse/${E(6)}`);
         assert.equal(einer.json.anlass.title, 'GV 2026');
+        assert.equal(einer.json.anlass.hat_service, true);
+        const ohne = await kasse(`/events/kasse/anlaesse/${E(7)}`);
+        assert.equal(ohne.json.anlass.hat_service, false, 'Anlass ohne Schichten');
         assert.equal((await kasse(`/events/kasse/anlaesse/${E(99)}`)).status, 404);
         assert.equal((await kasse('/events/kasse/anlaesse/kein-uuid')).status, 404);
     });

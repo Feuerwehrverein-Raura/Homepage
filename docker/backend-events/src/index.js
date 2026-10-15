@@ -896,8 +896,9 @@ function kasseSchluessel(req, res, next) {
 // hoechstens einen Tag vorbei), die genaue Regel steht in kasse-anlass.js.
 async function kassenKandidaten(zeitpunkt) {
     const r = await pool.query(`
-        SELECT id, title, start_date, end_date, location, status, datum_offen, twint_qr_url
-          FROM events
+        SELECT e.id, e.title, e.start_date, e.end_date, e.location, e.status, e.datum_offen, e.twint_qr_url,
+               ${kasseAnlass.SCHICHTEN_SQL}
+          FROM events e
          WHERE COALESCE(status, '') NOT IN ('cancelled', 'draft', 'proposed', 'rejected')
            AND datum_offen IS NOT TRUE
            AND COALESCE(end_date, start_date) >= $1::timestamp - INTERVAL '1 day'
@@ -931,8 +932,9 @@ app.get('/events/kasse/anlaesse/:id', kasseSchluessel, async (req, res) => {
     if (!UUID_MUSTER.test(req.params.id)) return res.status(404).json({ error: 'Anlass nicht gefunden' });
     try {
         const r = await pool.query(
-            `SELECT id, title, start_date, end_date, location, status, datum_offen, twint_qr_url
-               FROM events WHERE id = $1`, [req.params.id]);
+            `SELECT e.id, e.title, e.start_date, e.end_date, e.location, e.status, e.datum_offen, e.twint_qr_url,
+                    ${kasseAnlass.SCHICHTEN_SQL}
+               FROM events e WHERE e.id = $1`, [req.params.id]);
         if (!r.rows.length) return res.status(404).json({ error: 'Anlass nicht gefunden' });
         res.json({ anlass: kasseAnlass.kassenAnsicht(r.rows[0]) });
     } catch (error) {

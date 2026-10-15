@@ -3,15 +3,15 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VEREINS_QR_URL, AnlassErmittler, AnlassQuelle, KassenAnlass, eventsQuelle, twintAntwort, bildVersion } from '../src/anlass.js';
+import { VEREINS_QR_URL, AnlassErmittler, AnlassQuelle, KassenAnlass, eventsQuelle, twintAntwort, bildVersion, hatService, ausEvents } from '../src/anlass.js';
 
 const ID = '00000000-0000-0000-0000-e00000000001';
 const ID2 = '00000000-0000-0000-0000-e00000000002';
 const chilbi: KassenAnlass = {
   id: ID, titel: 'Chilbi 2026', beginn: '2026-10-24 18:00:00', ende: null, ort: 'Rheinufer',
-  twint_qr_url: `/events/${ID}/twint-qr?v=1729790000000`,
+  twint_qr_url: `/events/${ID}/twint-qr?v=1729790000000`, hat_service: true,
 };
-const gv: KassenAnlass = { id: ID2, titel: 'GV 2026', beginn: '2026-11-20 19:00:00', ende: null, ort: null, twint_qr_url: null };
+const gv: KassenAnlass = { id: ID2, titel: 'GV 2026', beginn: '2026-11-20 19:00:00', ende: null, ort: null, twint_qr_url: null, hat_service: false };
 
 function quelle(werte: { aktuell?: KassenAnlass | null; einer?: Record<string, KassenAnlass>; fehler?: boolean }) {
   const aufrufe = { aktuell: 0, einer: 0 };
@@ -109,7 +109,7 @@ test('eventsQuelle: Schluessel im Kopf, Felder uebersetzt, 404 -> null', async (
     return { ok: false, status: 404, json: async () => ({}) };
   };
   const q = eventsQuelle({ baseUrl: 'http://events:3000/', schluessel: 'k', fetchFn });
-  assert.deepEqual(await q.aktuell(), { id: ID, titel: 'Chilbi 2026', beginn: 's', ende: null, ort: 'Rheinufer', twint_qr_url: null });
+  assert.deepEqual(await q.aktuell(), { id: ID, titel: 'Chilbi 2026', beginn: 's', ende: null, ort: 'Rheinufer', twint_qr_url: null, hat_service: false });
   assert.equal(await q.einer(ID2), null);
   assert.equal(await q.einer('kein-uuid'), null);
   assert.deepEqual(gesehen, [
@@ -119,4 +119,31 @@ test('eventsQuelle: Schluessel im Kopf, Felder uebersetzt, 404 -> null', async (
   const kaputt = eventsQuelle({ baseUrl: 'http://x', schluessel: 'k',
     fetchFn: async () => ({ ok: false, status: 500, json: async () => ({}) }) });
   await assert.rejects(kaputt.aktuell(), /500/);
+});
+
+test('hat_service: von api-events uebernommen, nur true zaehlt', () => {
+  assert.equal(ausEvents({ id: ID, title: 'C', hat_service: true })?.hat_service, true);
+  assert.equal(ausEvents({ id: ID, title: 'C', hat_service: false })?.hat_service, false);
+  assert.equal(ausEvents({ id: ID, title: 'C' })?.hat_service, false, 'alte api-events ohne Feld');
+  assert.equal(ausEvents({ id: ID, title: 'C', hat_service: 'true' })?.hat_service, false);
+});
+
+test('hatService: kein Anlass oder Fehler ohne gemerkten Stand -> false', async () => {
+  assert.equal(hatService({ anlass: chilbi, modus: 'automatisch' }), true);
+  assert.equal(hatService({ anlass: gv, modus: 'manuell' }), false);
+  assert.equal(hatService({ anlass: null, modus: 'automatisch' }), false);
+  assert.equal(hatService(null), false);
+  assert.equal(hatService(undefined), false);
+  const leer = new AnlassErmittler(quelle({ fehler: true }).q, async () => null);
+  assert.equal(hatService(await leer.ermitteln()), false);
+});
+
+test('hatService: kurzer Ausfall von api-events -> Service des letzten Anlasses bleibt', async () => {
+  let jetzt = 0;
+  const werte: { aktuell: KassenAnlass; fehler?: boolean } = { aktuell: chilbi };
+  const e = new AnlassErmittler(quelle(werte).q, async () => null, 60_000, () => jetzt);
+  assert.equal(hatService(await e.ermitteln()), true);
+  werte.fehler = true;
+  jetzt += 61_000;
+  assert.equal(hatService(await e.ermitteln()), true);
 });

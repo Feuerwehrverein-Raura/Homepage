@@ -27,6 +27,10 @@ export interface KassenAnlass {
   ende: string | null;
   ort: string | null;
   twint_qr_url: string | null;
+  // Hat der Anlass Service (Schicht mit Bereich/Name "Service")? Dann zeigt
+  // die Kasse Tische und die Bestellart "Tisch". Regel in api-events
+  // (src/kasse-anlass.js hatService).
+  hat_service: boolean;
 }
 
 export type Modus = 'automatisch' | 'manuell';
@@ -59,7 +63,15 @@ export function ausEvents(e: any): KassenAnlass | null {
     ende: e.end_date || null,
     ort: e.location || null,
     twint_qr_url: e.twint_qr_url || null,
+    hat_service: e.hat_service === true,
   };
+}
+
+// Hat die Kasse gerade Service? Kein Anlass (oder nichts erreichbar und
+// nichts gemerkt) -> false. Faellt api-events nur kurz aus, gilt der letzte
+// bekannte Anlass weiter (AnlassErmittler) - und damit auch sein Service.
+export function hatService(stand: AnlassStand | null | undefined): boolean {
+  return stand?.anlass?.hat_service === true;
 }
 
 // Abfragen bei api-events mit dem geteilten Kassen-Schluessel.

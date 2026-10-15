@@ -103,6 +103,28 @@ function kommendeAnlaesse(anlaesse, zeitpunkt, limit = 30) {
         .slice(0, limit);
 }
 
+// Hat der Anlass Service (Bedienung an den Tischen)? Dann zeigt die Kasse
+// Tische und die Bestellart "Tisch", sonst nur Bar. Massgebend sind die
+// Schichten: mindestens eine mit Bereich "Service" - oder, weil der Bereich
+// oft auf "Allgemein" stehen bleibt, mit dem Wort "Service" im Namen
+// ("Service", "Service Abend", "Service 1"). Gross/klein egal.
+// schichten: [{ bereich, name }] (aus SCHICHTEN_SQL) oder null.
+const SERVICE_WORT = /(^|[^a-z0-9äöüß])service([^a-z0-9äöüß]|$)/i;
+function istServiceSchicht(schicht) {
+    if (!schicht) return false;
+    const bereich = String(schicht.bereich || '').trim().toLowerCase();
+    if (bereich === 'service') return true;
+    return SERVICE_WORT.test(String(schicht.name || '').trim());
+}
+
+function hatService(schichten) {
+    return Array.isArray(schichten) && schichten.some(istServiceSchicht);
+}
+
+// Spalte "schichten" fuer die Kassen-Abfragen (Tabellen-Alias e = events).
+const SCHICHTEN_SQL = `(SELECT COALESCE(json_agg(json_build_object('bereich', s.bereich, 'name', s.name)), '[]'::json)
+            FROM shifts s WHERE s.event_id = e.id) AS schichten`;
+
 // Was die Kasse von einem Anlass braucht - nicht mehr.
 function kassenAnsicht(anlass) {
     if (!anlass) return null;
@@ -113,7 +135,8 @@ function kassenAnsicht(anlass) {
         end_date: anlass.end_date || null,
         location: anlass.location || null,
         status: anlass.status || null,
-        twint_qr_url: anlass.twint_qr_url || null
+        twint_qr_url: anlass.twint_qr_url || null,
+        hat_service: hatService(anlass.schichten)
     };
 }
 
@@ -147,5 +170,6 @@ function qrPfad(eventId, zeit = Date.now()) {
 module.exports = {
     SCHEMA_SQL, MAX_BILD_BYTES, PUFFER_MS,
     ortszeitMs, endeMs, laeuft, aktuellerAnlass, kommendeAnlaesse, kassenAnsicht,
+    istServiceSchicht, hatService, SCHICHTEN_SQL,
     bildPruefen, qrPfad, zaehltFuerKasse
 };

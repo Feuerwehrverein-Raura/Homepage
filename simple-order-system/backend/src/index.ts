@@ -10,7 +10,8 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import crypto from 'crypto';
-import { AnlassErmittler, eventsQuelle, twintAntwort, UUID_MUSTER } from './anlass.js';
+import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } from './anlass.js';
+import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
@@ -846,9 +847,25 @@ app.get('/api/anlass', async (req, res) => {
       modus: stand.modus,
       auswahl: await getSetting('kasse_anlass_id'),
       erreichbar: !stand.fehler,
+      // Tische nur bei Anlaessen mit Service (src/anlass.ts hatService).
+      hat_service: hatService(stand),
     });
   } catch {
-    res.json({ anlass: null, modus: 'automatisch', auswahl: null, erreichbar: false });
+    res.json({ anlass: null, modus: 'automatisch', auswahl: null, erreichbar: false, hat_service: false });
+  }
+});
+
+// Meistverkaufte Artikel (src/beliebt.ts): { anlass_id, items: [{ item_id,
+// anlass, tage30 }] }, beliebteste zuerst. Bei einem Fehler eine leere Liste -
+// die Kasse sortiert dann wie bisher nach Namen.
+app.get('/api/items/beliebt', async (req, res) => {
+  const anlass = anlassErmittler.gemerkt()?.anlass || null;
+  try {
+    const r = await pool.query(BELIEBT_SQL, [anlass ? anlass.id : null]);
+    res.json({ anlass_id: anlass ? anlass.id : null, items: beliebtListe(r.rows) });
+  } catch (error: any) {
+    console.error('Meistverkaufte Artikel:', error?.message || error);
+    res.json({ anlass_id: anlass ? anlass.id : null, items: [] });
   }
 });
 
@@ -871,7 +888,8 @@ app.put('/api/anlass/auswahl', authenticateToken, async (req: AuthenticatedReque
     await setSetting('kasse_anlass_id', id);
     anlassErmittler.leeren();
     const stand = await anlassErmittler.ermitteln();
-    res.json({ anlass: stand.anlass, modus: stand.modus, auswahl: id || null, erreichbar: !stand.fehler });
+    res.json({ anlass: stand.anlass, modus: stand.modus, auswahl: id || null, erreichbar: !stand.fehler,
+      hat_service: hatService(stand) });
   } catch (error: any) {
     res.status(500).json({ error: `Auswahl nicht gespeichert: ${error?.message || error}` });
   }
