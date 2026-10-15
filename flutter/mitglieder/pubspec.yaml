@@ -74,6 +74,10 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   # Bildschirmfoto-Tour (test/tour): Bilder als JPEG speichern.
   image: ^4.12.0
+  # iPhone-Bilder fuer die Anleitung aus dem iOS-Simulator
+  # (integration_test/iphone_bilder_test.dart).
+  integration_test:
+    sdk: flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

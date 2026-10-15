@@ -25,20 +25,42 @@ neues Dokument bauen. Vorhanden: `anleitung-app.html`,
 ## Bildschirmfotos der App (Foto-Tour)
 
 Nie echte Mitgliederdaten fotografieren. Die Bilder der Mitglieder-App
-erzeugt eine Tour mit erfundenen Daten (Erika Muster), reproduzierbar:
+entstehen mit erfundenen Daten (Erika Muster, `test/tour/tour_daten.dart`)
+und denselben Schritten (`test/tour/tour_schritte.dart`), auf zwei Wegen:
+
+**Android und Browser** - Widget-Tour, reproduzierbar:
 ```sh
 cd flutter/mitglieder && TOUR=1 flutter test test/tour/bildschirmfotos_test.dart
 ```
-Schreibt nach `docker/frontend-website/images/anleitung/`: `android/` und
-`ios/` (01-anlaesse … 29-gruppen) und `web/mein-*` (Browser bzw.
-Computer-Programm, 1280x800) - auf allen drei Geraeten dieselben Namen
-(ausser `20-hilfe`, das es nur auf dem Handy gibt). Die Organisator-Bilder
-(11, 13, 24-26) entstehen mit einem Konto ohne Vorstand, weil der Vorstand
-statt "Organisator" den Reiter "Vorstand" sieht. `web/01–13` sind die
-oeffentlichen Seiten (von Hand). Nach jeder sichtbaren App-Aenderung Tour
-laufen lassen, geaenderte Bilder committen, betroffene PDFs neu erzeugen.
-Neue Bildschirme in `test/tour/bildschirmfotos_test.dart` ergaenzen (Daten
-in `tour_daten.dart`).
+Schreibt nach `docker/frontend-website/images/anleitung/`: `android/`
+(01-anlaesse … 29-gruppen) und `web/mein-*` (Browser bzw.
+Computer-Programm, 1280x800).
+
+**iPhone** - echter iOS-Simulator (Device Hub), echte iOS-Schrift und
+Statusleiste:
+```sh
+cd flutter/mitglieder && tool/iphone_bilder.sh            # alle
+cd flutter/mitglieder && tool/iphone_bilder.sh 05-profil  # nur einzelne
+```
+Das Skript legt den Simulator "FWV Tour iPhone 17" an (neuestes iOS,
+de-CH), startet ihn, stellt die Statusleiste fest (10:00, volle Balken,
+Akku voll; `simctl status_bar` nimmt die Zeit nur als volles ISO mit
+Millisekunden) und laesst `integration_test/iphone_bilder_test.dart`
+laufen. Der Test meldet jede Bildstelle per Datei, das Skript fotografiert
+mit `xcrun simctl io <udid> screenshot` und verkleinert auf 540 px
+(`ios/NN-*.jpg`). Die App bekommt nur die Nachbau-Dienste; `HttpOverrides`
+sperrt jede echte Verbindung. Erster Lauf ca. 6 Min. (Xcode-Build), danach
+ca. 4. Das Fenster heisst "Device Hub"
+(`Xcode.app/Contents/Applications/DeviceHub.app`), `open -a Simulator` gibt
+es nicht - zum Fotografieren ist es nicht noetig.
+
+Auf allen drei Geraeten dieselben Namen (ausser `20-hilfe`, das es nur auf
+dem Handy gibt). Die Organisator-Bilder (11, 13, 24-26) entstehen mit einem
+Konto ohne Vorstand, weil der Vorstand statt "Organisator" den Reiter
+"Vorstand" sieht. `web/01–13` sind die oeffentlichen Seiten (von Hand). Nach
+jeder sichtbaren App-Aenderung beide Wege laufen lassen, jedes Bild ansehen,
+geaenderte Bilder committen, betroffene PDFs neu erzeugen. Neue Bildschirme
+in `test/tour/tour_schritte.dart` ergaenzen (Daten in `tour_daten.dart`).
 
 Die iPhone-Bilder zeigen die native iPhone-App (in Entwicklung, noch nicht
 im App Store); iPhone-Nutzer verwenden bis dahin «Mein Bereich» in Safari.

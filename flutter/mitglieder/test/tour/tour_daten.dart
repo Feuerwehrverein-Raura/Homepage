@@ -1,4 +1,5 @@
-// Erfundene Testdaten fuer die Bildschirmfoto-Tour (bildschirmfotos_test.dart):
+// Erfundene Testdaten fuer die Bildschirmfoto-Tour (bildschirmfotos_test.dart
+// und integration_test/iphone_bilder_test.dart):
 // ein nachgebautes Backend (backend-members, backend-events, Inventar-API,
 // Roter Schopf, Musik) und die Dienste der App ohne Netz, Browser, Kamera
 // oder Firebase.
@@ -11,8 +12,10 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
@@ -23,8 +26,12 @@ import 'package:fwv_mitglieder/push/push_dienst.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-/// Wurzel des Repos (enthaelt docker/ und flutter/).
+/// Wurzel des Repos (enthaelt docker/ und flutter/). Im iOS-Simulator ist
+/// das Arbeitsverzeichnis nicht das Repo - dort kommt der Pfad ueber
+/// `--dart-define=REPO_WURZEL=...` (integration_test/iphone_bilder_test.dart).
 Directory repoWurzel() {
+  const vorgegeben = String.fromEnvironment('REPO_WURZEL');
+  if (vorgegeben.isNotEmpty) return Directory(vorgegeben);
   var dir = Directory.current.absolute;
   while (true) {
     if (Directory('${dir.path}/docker/frontend-website').existsSync() &&
@@ -123,6 +130,78 @@ class _TourPush implements PushDienst {
 
 const _chilbi = '00000000-0000-0000-0000-e00000000001';
 const _preisjassen = '00000000-0000-0000-0000-e00000000099';
+
+// ---------------------------------------------------------------------------
+// Bilder aus dem Netz (gibt es in der Tour nicht)
+
+/// Bilder, die sonst aus dem Netz kaemen: Adresse -> Bild.
+final _netzBilder = <String, ui.Image>{};
+
+Future<ui.Image> _png(String pfad) async {
+  final codec = await ui.instantiateImageCodec(await File(pfad).readAsBytes());
+  return (await codec.getNextFrame()).image;
+}
+
+/// Erfundenes Profilfoto: Initialen auf ruhigem Grund — sieht aus wie ein
+/// Bild, zeigt aber niemanden.
+ui.Image _profilfoto() {
+  const seite = 512.0;
+  final rec = ui.PictureRecorder();
+  final c = Canvas(rec);
+  c.drawRect(
+    const Rect.fromLTWH(0, 0, seite, seite),
+    Paint()
+      ..shader = ui.Gradient.linear(const Offset(0, 0), const Offset(seite, seite), const [
+        Color(0xFF94A3B8),
+        Color(0xFF475569),
+      ]),
+  );
+  final tp = TextPainter(
+    text: const TextSpan(
+      text: 'EM',
+      style: TextStyle(
+        // Im iOS-Simulator gibt es kein Roboto: dort die Systemschrift.
+        fontFamily: 'Roboto',
+        fontSize: 200,
+        fontWeight: FontWeight.w500,
+        color: Color(0xFFFFFFFF),
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  tp.paint(c, Offset((seite - tp.width) / 2, (seite - tp.height) / 2));
+  return rec.endRecording().toImageSync(seite.toInt(), seite.toInt());
+}
+
+/// Liest die Anlass-Logos und zeichnet das Profilfoto (einmal pro Lauf).
+Future<void> tourNetzBilderVorbereiten() async {
+  final w = repoWurzel().path;
+  for (final name in ['chilbi', 'preisjassen']) {
+    _netzBilder['https://www.fwv-raura.ch/images/anlaesse/$name.png'] = await _png(
+      '$w/docker/frontend-website/images/anlaesse/$name.png',
+    );
+  }
+  _netzBilder['https://api.fwv-raura.ch$profilFotoPfad'] = _profilfoto();
+}
+
+/// Legt die Bilder in den Bild-Speicher, unter denselben Schluesseln wie
+/// Image.network sie sucht (mit und ohne Token im Kopf).
+void tourNetzBilderEinlegen() {
+  for (final MapEntry(key: adresse, value: bild) in _netzBilder.entries) {
+    for (final kopf in [
+      null,
+      {'Authorization': 'Bearer $tourToken'},
+      {'Authorization': 'Bearer $tourTokenOrganisator'},
+    ]) {
+      imageCache.putIfAbsent(
+        NetworkImage(adresse, headers: kopf),
+        () => OneFrameImageStreamCompleter(SynchronousFuture(ImageInfo(image: bild.clone()))),
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 /// Das nachgebaute Backend aller Dienste.
 class TourBackend {
