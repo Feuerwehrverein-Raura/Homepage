@@ -36,7 +36,7 @@ Erneuert wird wie auf dem Handy mit dem Refresh-Token am selben Endpunkt.
 Wer den Browser-Tab schliesst, bricht im Login-Screen mit «Abbrechen» ab
 (sonst nach 10 Minuten von selbst).
 
-### In Authentik nötig (noch NICHT eingerichtet)
+### In Authentik (eingerichtet am 15.10.2026)
 
 Provider **fwv-members-app** → *Redirect URIs/Origins* → zusätzlich zum
 bestehenden `com.fwv.members:/oauth2redirect` (strict) einen Eintrag:
