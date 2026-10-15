@@ -370,6 +370,89 @@ final _png = Uint8List.fromList(
 const _chilbi = '00000000-0000-0000-0000-e00000000001';
 const _essen = '00000000-0000-0000-0000-e00000000004';
 const _altesFest = '00000000-0000-0000-0000-e00000000099';
+const _gastNeu = '00000000-0000-0000-0000-700000000004';
+const _paarGast = '00000000-0000-0000-0000-700000000006';
+
+/// Chilbi mit einem Mitglied, das sich fuer drei Schichten einzeln angemeldet
+/// hat (wie Adrian Gilgen), in verdrehter Reihenfolge, und einem Gast mit
+/// zwei Anmeldungen (E-Mail anders geschrieben). Dazu Schicht Abbau am Montag.
+Map<String, dynamic> _chilbiMitMehrfach() {
+  final json = _vertrag();
+  final chilbi = (json['anlaesse'] as List).first as Map<String, dynamic>;
+  final schichten = chilbi['shifts'] as List;
+  schichten.add({
+    ...(schichten.first as Map),
+    'id': _abbau,
+    'name': 'Abbau',
+    'date': '2026-10-19',
+    'start_time': '09:00:00',
+    'end_time': null,
+  });
+  Map<String, dynamic> anmeldung(
+    String id,
+    String schicht,
+    String beschriftung, {
+    String status = 'approved',
+    String? bemerkung,
+  }) => {
+    'id': id,
+    'status': status,
+    'status_text': status == 'pending' ? 'offen' : 'bestätigt',
+    'status_farbe': status == 'pending' ? 'gelb' : 'gruen',
+    'art': 'schicht',
+    'mitglied': true,
+    'member_id': 'm-adrian',
+    'name': 'Adrian Gilgen',
+    'email': 'adrian@example.ch',
+    'phone': '079 123 45 67',
+    'personen': 1,
+    'begleitpersonen': [],
+    'bemerkung': bemerkung,
+    'shift_ids': [schicht],
+    'schichten': [
+      {'id': schicht, 'beschriftung': beschriftung},
+    ],
+    'angemeldet_text': '01.10.2026',
+  };
+  final liste = chilbi['organisator']['anmeldungen'] as List;
+  liste.insertAll(0, [
+    anmeldung(_adrianAbbau, _abbau, 'Abbau · Mo 19.10. · 09:00'),
+    anmeldung(
+      _adrianKueche,
+      '00000000-0000-0000-0000-500000000003',
+      'Küche – Schicht 2 · Sa 17.10. · 17:00–20:00',
+      bemerkung: 'Erst ab 15 Uhr',
+    ),
+    anmeldung(
+      _adrianAufbau,
+      '00000000-0000-0000-0000-500000000001',
+      'Aufbau · Fr 16.10. · 08:00',
+      status: 'pending',
+    ),
+  ]);
+  // Gast Koch ein zweites Mal, E-Mail gross und mit Leerzeichen.
+  final koch = liste.firstWhere((r) => r['name'] == 'Gast Koch') as Map<String, dynamic>;
+  liste.add({
+    ...koch,
+    'id': _kochBar,
+    'email': ' Koch@Example.CH ',
+    'bemerkung': 'Nur Bar',
+    'shift_ids': ['00000000-0000-0000-0000-500000000002'],
+    'schichten': [
+      {
+        'id': '00000000-0000-0000-0000-500000000002',
+        'beschriftung': 'Bar – Schicht 1 · Sa 17.10. · 12:00–14:00',
+      },
+    ],
+  });
+  return json;
+}
+
+const _abbau = '00000000-0000-0000-0000-500000000009';
+const _adrianAbbau = '00000000-0000-0000-0000-7000000000a1';
+const _adrianKueche = '00000000-0000-0000-0000-7000000000a2';
+const _adrianAufbau = '00000000-0000-0000-0000-7000000000a3';
+const _kochBar = '00000000-0000-0000-0000-7000000000b1';
 
 void main() {
   late _FalscherZugang zugang;
@@ -443,6 +526,20 @@ void main() {
     await tester.tap(f);
     await tester.pumpAndSettle();
   }
+
+  /// Aktion einer Anmeldung ueber ihr Menue (drei Punkte); ohne [anmeldung]
+  /// das erste Menue der Liste.
+  Future<void> aktion(WidgetTester tester, String text, {String? anmeldung}) async {
+    await tippen(
+      tester,
+      anmeldung == null ? find.byTooltip('Aktionen').first : find.byKey(Key('aktionen-$anmeldung')),
+    );
+    await tester.tap(find.text(text).last);
+    await tester.pumpAndSettle();
+  }
+
+  /// Oberkante eines Textes - fuer die Reihenfolge in der Liste.
+  double oben(WidgetTester tester, Finder f) => tester.getTopLeft(f).dy;
 
   /// Im Reiter Material zu [f] scrollen (runter, sonst hoch) und antippen.
   /// Meldungen unten werden vorher weggeraeumt, damit sie nichts verdecken.
@@ -570,7 +667,7 @@ void main() {
     expect(find.text('Allergien: Nüsse'), findsOneWidget);
     expect(find.text('Menü: Vegi'), findsOneWidget);
 
-    await tippen(tester, find.text('Ändern').first);
+    await aktion(tester, 'Ändern', anmeldung: _paarGast);
     expect(find.text('Bleibt unverändert'), findsOneWidget);
     await tippen(tester, find.byTooltip('Mehr'));
     await tippen(tester, find.byKey(const Key('anmeldung-speichern')));
@@ -714,7 +811,7 @@ void main() {
   testWidgets('Anmeldung aendern: Schichten tauschen', (tester) async {
     await anlass(tester, _chilbi);
     // Erste Anmeldung: Gast Neu, Schicht 2
-    await tippen(tester, find.text('Ändern').first);
+    await aktion(tester, 'Ändern', anmeldung: _gastNeu);
     await tester.scrollUntilVisible(
       find.byKey(const Key('schicht-wahl-$schicht2')),
       200,
@@ -751,7 +848,7 @@ void main() {
       await tester.tap(find.byTooltip('Zurück'));
       await tester.pumpAndSettle();
       await tippen(tester, find.widgetWithText(Tab, 'Anmeldungen'));
-      await tippen(tester, find.text('Ändern').first);
+      await aktion(tester, 'Ändern');
       await tester.scrollUntilVisible(
         find.byKey(const Key('anmeldung-schichten')),
         200,
@@ -763,11 +860,177 @@ void main() {
 
   testWidgets('Andere Schicht vorschlagen', (tester) async {
     await anlass(tester, _chilbi);
-    await tippen(tester, find.text('Andere Schicht').first);
+    await aktion(tester, 'Andere Schicht', anmeldung: _gastNeu);
     await tippen(tester, find.byType(RadioListTile<String>).first);
     await tippen(tester, find.text('Vorschlag senden'));
     final args = zugang.letzter('alternative') as List;
     expect(args[4], 'neu@example.ch');
+  });
+
+  group('Eine Karte pro Person', () {
+    Finder karte(String schluessel) => find.byKey(Key('person-$schluessel'));
+    Finder zeile(String anmeldung) => find.byKey(Key('anmeldung-$anmeldung'));
+    Finder inKarte(Finder k, String text) => find.descendant(of: k, matching: find.text(text));
+
+    testWidgets('drei Anmeldungen derselben Person: eine Karte, Schichten nach Zeit', (
+      tester,
+    ) async {
+      zugang.json = _chilbiMitMehrfach();
+      await anlass(tester, _chilbi);
+      final adrian = karte('member:m-adrian');
+      expect(adrian, findsOneWidget);
+      expect(find.text('Adrian Gilgen'), findsOneWidget, reason: 'Name nur einmal');
+      expect(find.text('079 123 45 67'), findsOneWidget, reason: 'Telefon nur einmal');
+      expect(find.text('adrian@example.ch'), findsOneWidget, reason: 'E-Mail nur einmal');
+      expect(inKarte(adrian, 'angemeldet am 01.10.2026 · Mitglied'), findsOneWidget);
+
+      final aufbau = inKarte(adrian, 'Aufbau · Fr 16.10. · 08:00');
+      final kueche = inKarte(adrian, 'Küche – Schicht 2 · Sa 17.10. · 17:00–20:00');
+      final abbau = inKarte(adrian, 'Abbau · Mo 19.10. · 09:00');
+      for (final f in [aufbau, kueche, abbau]) {
+        expect(f, findsOneWidget);
+      }
+      expect(oben(tester, aufbau), lessThan(oben(tester, kueche)));
+      expect(oben(tester, kueche), lessThan(oben(tester, abbau)));
+
+      // Notiz an der richtigen Schicht, nicht an den anderen.
+      expect(
+        find.descendant(of: zeile(_adrianKueche), matching: find.text('Erst ab 15 Uhr')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: zeile(_adrianAbbau), matching: find.text('Erst ab 15 Uhr')),
+        findsNothing,
+      );
+
+      // Gemischter Status: Kennzeichen pro Schicht, offene mit Bestaetigen.
+      expect(
+        find.descendant(of: zeile(_adrianAufbau), matching: find.text('offen')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: zeile(_adrianKueche), matching: find.text('bestätigt')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: zeile(_adrianAufbau), matching: find.text('Bestätigen')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: zeile(_adrianKueche), matching: find.text('Bestätigen')),
+        findsNothing,
+      );
+      await tippen(
+        tester,
+        find.descendant(of: zeile(_adrianAufbau), matching: find.text('Bestätigen')),
+      );
+      expect(zugang.letzter('bestaetigen'), [_chilbi, _adrianAufbau]);
+    });
+
+    testWidgets('Gast per E-Mail gruppiert (Gross-/Kleinschreibung, Leerzeichen)', (tester) async {
+      zugang.json = _chilbiMitMehrfach();
+      await anlass(tester, _chilbi);
+      final koch = karte('gast:koch@example.ch|gast koch');
+      expect(koch, findsOneWidget);
+      expect(find.text('Gast Koch'), findsOneWidget);
+      expect(inKarte(koch, 'angemeldet am 15.09.2026 · Gast'), findsOneWidget);
+      final bar = inKarte(koch, 'Bar – Schicht 1 · Sa 17.10. · 12:00–14:00');
+      final kueche = inKarte(koch, 'Küche – Schicht 2 · Sa 17.10. · 17:00–20:00');
+      expect(oben(tester, bar), lessThan(oben(tester, kueche)));
+      expect(find.descendant(of: zeile(_kochBar), matching: find.text('Nur Bar')), findsOneWidget);
+      // Ein Status fuer beide: Kennzeichen nur im Kopf.
+      expect(inKarte(koch, 'bestätigt'), findsOneWidget);
+    });
+
+    testWidgets('«Ändern» an der zweiten Schicht oeffnet genau diese Anmeldung', (tester) async {
+      zugang.json = _chilbiMitMehrfach();
+      await anlass(tester, _chilbi);
+      await aktion(tester, 'Ändern', anmeldung: _adrianKueche);
+      expect(find.text('Anmeldung ändern'), findsOneWidget);
+      await tippen(tester, find.byKey(const Key('schicht-wahl-$_abbau')));
+      await tippen(tester, find.byKey(const Key('anmeldung-speichern')));
+      final args = zugang.letzter('anmeldungAendern') as List;
+      expect(args[1], _adrianKueche);
+      expect(args.last, {
+        'shift_ids': ['00000000-0000-0000-0000-500000000003', _abbau],
+      });
+    });
+
+    testWidgets('Personen nach fruehester Schicht, dann Name; Zaehler im Titel', (tester) async {
+      zugang.json = _chilbiMitMehrfach();
+      await anlass(tester, _chilbi);
+      expect(find.text('Anmeldungen (5 Personen · 9 Schichten)'), findsOneWidget);
+      final reihe = [
+        'Adrian Gilgen', // Fr 08:00
+        'Erika Muster', // Fr 08:00, Name nach Adrian
+        'Gast Koch', // Sa 12:00
+        'Hans Helfer', // Sa 12:00, Name nach Gast Koch
+        'Gast Neu', // Sa 17:00
+      ];
+      for (var i = 1; i < reihe.length; i++) {
+        expect(
+          oben(tester, find.text(reihe[i - 1])),
+          lessThan(oben(tester, find.text(reihe[i]))),
+          reason: '${reihe[i - 1]} vor ${reihe[i]}',
+        );
+      }
+    });
+
+    test('ohne Schicht ans Ende, ohne member_id und E-Mail je eine Karte', () {
+      const schicht = Schicht(id: 's1', datum: '2026-10-17', beginn: '10:00:00');
+      final personen = anmeldungenNachPerson(
+        const [
+          VerwalteteAnmeldung(id: 'a', name: 'Anna', memberId: 'm1'),
+          VerwalteteAnmeldung(id: 'b', name: 'Bea'),
+          VerwalteteAnmeldung(id: 'c', name: 'Bea'),
+          VerwalteteAnmeldung(
+            id: 'd',
+            name: 'Zora',
+            art: AnmeldeArt.schicht,
+            schichten: [(id: 's1', beschriftung: 'S1')],
+          ),
+          VerwalteteAnmeldung(id: 'e', name: 'Anna', memberId: 'm1'),
+          // Gleiche Adresse, anderer Name: Familie, nicht dieselbe Person.
+          VerwalteteAnmeldung(id: 'f', name: 'Max', email: 'fam@example.ch'),
+          VerwalteteAnmeldung(id: 'g', name: 'Mia', email: 'FAM@example.ch'),
+        ],
+        const [schicht],
+      );
+      expect(
+        [for (final p in personen) p.anmeldungen.map((r) => r.id).join()],
+        ['d', 'ae', 'b', 'c', 'f', 'g'],
+      );
+    });
+
+    for (final groesse in [const Size(360, 640), const Size(1400, 900)]) {
+      testWidgets('Personen-Karten bei ${groesse.width} dp: nichts laeuft ueber', (tester) async {
+        final json = _chilbiMitMehrfach();
+        // Lange Angaben, die umbrechen muessen.
+        final liste = (json['anlaesse'] as List).first['organisator']['anmeldungen'] as List;
+        liste.first['email'] = 'adrian.gilgen.mit.sehr.langer.adresse@beispiel-firma.example.ch';
+        liste.first['bemerkung'] = 'Kann erst nach der Arbeit, bringt aber den Anhaenger mit';
+        zugang.json = json;
+        await zeigen(
+          tester,
+          VerwaltungsAnlassScreen(verwaltung: verwaltung(), anlassId: _chilbi),
+          groesse: groesse,
+        );
+        expect(tester.takeException(), isNull);
+        final adrian = karte('member:m-adrian');
+        final erika = karte('member:00000000-0000-0000-0000-a00000000001');
+        if (groesse.width > 1000) {
+          expect(
+            tester.getTopLeft(erika).dx,
+            greaterThan(tester.getTopLeft(adrian).dx),
+            reason: 'nebeneinander in Spalten',
+          );
+        } else {
+          expect(tester.getTopLeft(erika).dy, greaterThan(tester.getTopLeft(adrian).dy));
+        }
+        await aktion(tester, 'Andere Schicht', anmeldung: _adrianKueche);
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 
   testWidgets('Informieren zeigt, wen es erreicht hat', (tester) async {
@@ -982,7 +1245,7 @@ void main() {
     expect(find.text('Chilbi 2026'), findsOneWidget, reason: 'ohne ID der erste Anlass');
     expect(find.byType(TabBar), findsNothing);
     expect(find.byTooltip('Anlass bearbeiten'), findsNothing);
-    expect(find.text('Ändern'), findsNothing);
+    expect(find.byTooltip('Aktionen'), findsNothing, reason: 'kein Aendern, keine andere Schicht');
     expect(find.text('Bestätigen'), findsOneWidget);
     await tippen(tester, find.text('Arbeitsplan senden'));
     await tippen(tester, find.widgetWithText(FilledButton, 'Senden'));
@@ -1025,7 +1288,7 @@ void main() {
     for (final r in ['Schichten', 'Notizen', 'Material', 'Anmeldungen']) {
       await tippen(tester, find.widgetWithText(Tab, r));
     }
-    await tippen(tester, find.text('Ändern').first);
+    await aktion(tester, 'Ändern');
     await tester.tap(find.byTooltip('Zurück'));
     await tester.pumpAndSettle();
     await tippen(tester, find.byTooltip('Anlass bearbeiten'));

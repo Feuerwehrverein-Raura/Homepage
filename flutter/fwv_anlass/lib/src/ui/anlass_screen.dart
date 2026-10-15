@@ -1,6 +1,7 @@
 // Ein Anlass in der Verwaltung, mit Reitern:
 //  - Anmeldungen: bestaetigen, ablehnen, aendern, Person eintragen, andere
-//    Schicht vorschlagen; oben Informieren, PDFs, Arbeitsplan senden.
+//    Schicht vorschlagen; oben Informieren, PDFs, Arbeitsplan senden. Eine
+//    Karte pro Person, darin ihre Schichten chronologisch ([PersonKarte]).
 //  - Schichten, Notizen, Rezepte & Material — nur wenn der Zugang sie
 //    erlaubt ([AnlassRechte]).
 // Oben rechts: Anlass bearbeiten; der Vorstand kann ihn auch loeschen.
@@ -207,8 +208,19 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
     ];
   }
 
+  /// "Anmeldungen (4)" - mit Schichten "Anmeldungen (3 Personen · 5 Schichten)",
+  /// weil eine Karte pro Person mehrere Anmeldungen zusammenfasst.
+  String _anmeldungenTitel(VerwalteterAnlass a, List<AnmeldePerson> personen) {
+    final schichten = personen.fold(0, (n, p) => n + p.schichten);
+    if (schichten == 0) return 'Anmeldungen (${a.anmeldungen.length})';
+    final n = personen.length;
+    return 'Anmeldungen ($n ${n == 1 ? 'Person' : 'Personen'} · '
+        '$schichten ${schichten == 1 ? 'Schicht' : 'Schichten'})';
+  }
+
   Widget _anmeldungen(VerwalteterAnlass a) {
     final r = _z.rechte(a);
+    final personen = anmeldungenNachPerson(a.anmeldungen, a.anlass.schichten);
     return Scaffold(
       resizeToAvoidBottomInset: false,
       floatingActionButton: r.hinzufuegen
@@ -224,7 +236,12 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           // Unten Platz fuer den "Person"-Knopf.
-          padding: mitSystemleiste(context, const EdgeInsets.fromLTRB(12, 8, 12, 96)),
+          // Breit genug fuer Personen-Karten in Spalten.
+          padding: mitSystemleiste(
+            context,
+            const EdgeInsets.fromLTRB(12, 8, 12, 96),
+            maxBreite: kartenBreite,
+          ),
           children: [
             _Kopf(anlass: a),
             const SizedBox(height: 8),
@@ -235,25 +252,32 @@ class _VerwaltungsAnlassScreenState extends State<VerwaltungsAnlassScreen> {
               arbeitsplanSenden: () => _arbeitsplanSenden(a),
               organisatoren: () => _oeffnen(OrganisatorenScreen(verwaltung: _v, anlass: a.anlass)),
             ),
-            Abschnitt('Anmeldungen (${a.zahlen.anmeldungen})'),
+            Abschnitt(_anmeldungenTitel(a, personen)),
             if (a.anmeldungen.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 child: Text('Noch keine Anmeldungen.'),
               ),
-            for (final reg in a.anmeldungen)
-              AnmeldungKarte(
-                anmeldung: reg,
-                rechte: r,
-                laeuft: _laeuft.contains(reg.id),
-                linkOeffnen: _v.umgebung.linkOeffnen,
-                bestaetigen: () => _bestaetigen(a, reg),
-                ablehnen: () => _ablehnen(a, reg),
-                bearbeiten: () =>
-                    _oeffnen(AnmeldungBearbeitenScreen(verwaltung: _v, anlass: a, anmeldung: reg)),
-                andereSchicht: () =>
-                    _oeffnen(AlternativeScreen(verwaltung: _v, anlass: a.anlass, anmeldung: reg)),
-              ),
+            KartenSpalten(
+              minBreite: 400,
+              children: [
+                for (final p in personen)
+                  PersonKarte(
+                    person: p,
+                    rechte: r,
+                    laeuft: _laeuft,
+                    linkOeffnen: _v.umgebung.linkOeffnen,
+                    bestaetigen: (reg) => _bestaetigen(a, reg),
+                    ablehnen: (reg) => _ablehnen(a, reg),
+                    bearbeiten: (reg) => _oeffnen(
+                      AnmeldungBearbeitenScreen(verwaltung: _v, anlass: a, anmeldung: reg),
+                    ),
+                    andereSchicht: (reg) => _oeffnen(
+                      AlternativeScreen(verwaltung: _v, anlass: a.anlass, anmeldung: reg),
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -409,42 +433,171 @@ class _Werkzeuge extends StatelessWidget {
   }
 }
 
-/// Eine Anmeldung mit allem, was der Organisator wissen muss, und den
-/// Knoepfen dazu (immer sichtbar, kein Wischen noetig).
-class AnmeldungKarte extends StatelessWidget {
-  const AnmeldungKarte({
+/// Eine Person mit all ihren Anmeldungen: Name, Mitglied/Gast, Telefon und
+/// E-Mail einmal, darunter die Schichten chronologisch - jede mit ihrer
+/// Notiz und den Aktionen ihrer Anmeldung (Bestaetigen/Ablehnen sichtbar,
+/// Aendern und Andere Schicht im Menue mit den drei Punkten).
+///
+/// Die Aktionen gehoeren immer zur jeweiligen Anmeldung, nicht zur Person.
+class PersonKarte extends StatelessWidget {
+  const PersonKarte({
     super.key,
-    required this.anmeldung,
+    required this.person,
     required this.rechte,
     required this.bestaetigen,
     required this.ablehnen,
     required this.bearbeiten,
     required this.andereSchicht,
     required this.linkOeffnen,
-    this.laeuft = false,
+    this.laeuft = const {},
   });
 
-  final VerwalteteAnmeldung anmeldung;
+  final AnmeldePerson person;
   final AnlassRechte rechte;
-  final bool laeuft;
-  final VoidCallback bestaetigen;
-  final VoidCallback ablehnen;
-  final VoidCallback bearbeiten;
-  final VoidCallback andereSchicht;
+
+  /// IDs der Anmeldungen, bei denen gerade etwas laeuft.
+  final Set<String> laeuft;
+  final void Function(VerwalteteAnmeldung r) bestaetigen;
+  final void Function(VerwalteteAnmeldung r) ablehnen;
+  final void Function(VerwalteteAnmeldung r) bearbeiten;
+  final void Function(VerwalteteAnmeldung r) andereSchicht;
   final Future<bool> Function(Uri adresse) linkOeffnen;
 
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final p = person;
+    final r0 = p.erste;
+    final einzeln = p.anmeldungen.length == 1;
+    // "angemeldet am" in den Kopf, wenn alle am selben Tag kamen.
+    final angemeldet = {for (final r in p.anmeldungen) r.angemeldetText};
+    final angemeldetKopf = angemeldet.length == 1 ? angemeldet.first : null;
+    final unterzeile = [
+      if (angemeldetKopf != null) 'angemeldet am $angemeldetKopf',
+      p.mitglied ? 'Mitglied' : 'Gast',
+    ].join(' · ');
+    final telefon = p.telefon;
+    final email = p.email;
+    return Card(
+      key: Key('person-${p.schluessel}'),
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 6, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      einzeln && r0.personen > 1 ? '${p.name} (${r0.personen} Personen)' : p.name,
+                      style: t.textTheme.titleSmall,
+                    ),
+                  ),
+                  if (p.einStatus) ...[
+                    const SizedBox(width: 8),
+                    StatusChip(text: r0.statusText ?? r0.status, farbe: r0.statusFarbe),
+                  ],
+                ],
+              ),
+            ),
+            Text(unterzeile, style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline)),
+            if (telefon != null || email != null)
+              Wrap(
+                children: [
+                  if (telefon != null)
+                    TextButton.icon(
+                      style: _knopfStil,
+                      onPressed: () =>
+                          linkOeffnen(Uri(scheme: 'tel', path: telefon.replaceAll(' ', ''))),
+                      icon: const Icon(Icons.phone_outlined, size: 18),
+                      label: Text(telefon),
+                    ),
+                  if (email != null)
+                    TextButton.icon(
+                      style: _knopfStil,
+                      onPressed: () => linkOeffnen(Uri(scheme: 'mailto', path: email)),
+                      icon: const Icon(Icons.mail_outline, size: 18),
+                      label: Text(email, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+              ),
+            for (final (i, r) in p.anmeldungen.indexed) ...[
+              if (i > 0) const Divider(height: 12, endIndent: 8),
+              _AnmeldungZeile(
+                anmeldung: r,
+                rechte: rechte,
+                mitStatus: !p.einStatus,
+                mitPersonen: !einzeln,
+                angemeldet: angemeldetKopf == null ? r.angemeldetText : null,
+                laeuft: laeuft.contains(r.id),
+                bestaetigen: () => bestaetigen(r),
+                ablehnen: () => ablehnen(r),
+                bearbeiten: () => bearbeiten(r),
+                andereSchicht: () => andereSchicht(r),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Kleine Knoepfe, damit die Karte kompakt bleibt.
+final _knopfStil = TextButton.styleFrom(
+  visualDensity: VisualDensity.compact,
+  padding: const EdgeInsets.symmetric(horizontal: 8),
+);
+
+/// Eine Anmeldung in der [PersonKarte]: ihre Schicht(en) bzw. "ohne
+/// Schicht", die Notizen und die Aktionen.
+class _AnmeldungZeile extends StatelessWidget {
+  const _AnmeldungZeile({
+    required this.anmeldung,
+    required this.rechte,
+    required this.mitStatus,
+    required this.mitPersonen,
+    required this.angemeldet,
+    required this.laeuft,
+    required this.bestaetigen,
+    required this.ablehnen,
+    required this.bearbeiten,
+    required this.andereSchicht,
+  });
+
+  final VerwalteteAnmeldung anmeldung;
+  final AnlassRechte rechte;
+
+  /// Status pro Anmeldung zeigen (die Person hat gemischte Status).
+  final bool mitStatus;
+
+  /// "N Personen" hier zeigen statt im Kopf (mehrere Anmeldungen).
+  final bool mitPersonen;
+
+  /// "angemeldet am", wenn es nicht im Kopf steht.
+  final String? angemeldet;
+  final bool laeuft;
+  final VoidCallback bestaetigen;
+  final VoidCallback ablehnen;
+  final VoidCallback bearbeiten;
+  final VoidCallback andereSchicht;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Theme.of(context);
     final r = anmeldung;
-    Widget zeile(IconData symbol, String text) => Padding(
+    Widget zeile(IconData symbol, String text, {TextStyle? stil}) => Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(symbol, size: 16, color: t.colorScheme.outline),
           const SizedBox(width: 6),
-          Expanded(child: Text(text, style: t.textTheme.bodyMedium)),
+          Expanded(child: Text(text, style: stil ?? t.textTheme.bodyMedium)),
         ],
       ),
     );
@@ -453,99 +606,124 @@ class AnmeldungKarte extends StatelessWidget {
         r.art == AnmeldeArt.schicht &&
         r.email != null &&
         r.status != 'rejected';
+    final mitMenue = rechte.bearbeiten || kannAndereSchicht;
     final alt = r.alternative;
-    return Card(
+    final klein = t.textTheme.bodySmall?.copyWith(color: t.colorScheme.onSurfaceVariant);
+    final personen = mitPersonen && r.personen > 1 ? ' · ${r.personen} Personen' : '';
+    final schichtStil = t.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500);
+    return Column(
       key: Key('anmeldung-${r.id}'),
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-        child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    r.personen > 1 ? '${r.name} (${r.personen} Personen)' : r.name,
-                    style: t.textTheme.titleSmall,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                StatusChip(text: r.statusText ?? r.status, farbe: r.statusFarbe),
-              ],
-            ),
-            if (r.angemeldetText != null)
-              Text(
-                'angemeldet am ${r.angemeldetText}${r.mitglied ? ' · Mitglied' : ' · Gast'}',
-                style: t.textTheme.bodySmall?.copyWith(color: t.colorScheme.outline),
-              ),
-            for (final s in r.schichten) zeile(Icons.schedule, s.beschriftung),
-            if (r.begleitpersonen.isNotEmpty)
-              zeile(
-                Icons.group_outlined,
-                'Mit: ${r.begleitpersonen.map((b) => b.name).join(', ')}',
-              ),
-            if (r.menue != null) zeile(Icons.restaurant, 'Menü: ${r.menue}'),
-            if (r.allergien != null)
-              zeile(Icons.warning_amber_outlined, 'Allergien: ${r.allergien}'),
-            if (r.bemerkung != null) zeile(Icons.notes, r.bemerkung!),
-            if (alt != null)
-              zeile(
-                Icons.swap_horiz,
-                'Vorgeschlagen: ${alt.schichtText}'
-                '${alt.vorgeschlagenText == null ? '' : ' (${alt.vorgeschlagenText})'}',
-              ),
-            if (r.telefon != null || r.email != null)
-              Wrap(
-                spacing: 4,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (r.telefon != null)
-                    TextButton.icon(
-                      onPressed: () =>
-                          linkOeffnen(Uri(scheme: 'tel', path: r.telefon!.replaceAll(' ', ''))),
-                      icon: const Icon(Icons.phone_outlined, size: 18),
-                      label: Text(r.telefon!),
+                  if (r.schichten.isEmpty)
+                    zeile(Icons.event_outlined, 'ohne Schicht$personen', stil: schichtStil),
+                  for (final (i, s) in r.schichten.indexed)
+                    zeile(
+                      Icons.schedule,
+                      i == 0 ? '${s.beschriftung}$personen' : s.beschriftung,
+                      stil: schichtStil,
                     ),
-                  if (r.email != null)
-                    TextButton.icon(
-                      onPressed: () => linkOeffnen(Uri(scheme: 'mailto', path: r.email)),
-                      icon: const Icon(Icons.mail_outline, size: 18),
-                      label: Text(r.email!, overflow: TextOverflow.ellipsis),
+                  if (mitStatus)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 22),
+                      child: StatusChip(text: r.statusText ?? r.status, farbe: r.statusFarbe),
                     ),
                 ],
               ),
-            if (laeuft)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: LinearProgressIndicator(),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  if (r.offen && rechte.bestaetigen) ...[
-                    FilledButton(onPressed: bestaetigen, child: const Text('Bestätigen')),
-                    OutlinedButton(onPressed: ablehnen, child: const Text('Ablehnen')),
-                  ],
+            ),
+            if (mitMenue && !laeuft)
+              PopupMenuButton<VoidCallback>(
+                key: Key('aktionen-${r.id}'),
+                tooltip: 'Aktionen',
+                icon: const Icon(Icons.more_vert),
+                style: IconButton.styleFrom(visualDensity: VisualDensity.compact),
+                padding: EdgeInsets.zero,
+                onSelected: (tun) => tun(),
+                itemBuilder: (context) => [
                   if (rechte.bearbeiten)
-                    TextButton.icon(
-                      onPressed: bearbeiten,
-                      icon: const Icon(Icons.edit_outlined, size: 18),
-                      label: const Text('Ändern'),
+                    PopupMenuItem(
+                      value: bearbeiten,
+                      child: const ListTile(
+                        leading: Icon(Icons.edit_outlined),
+                        title: Text('Ändern'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
                   if (kannAndereSchicht)
-                    TextButton.icon(
-                      onPressed: andereSchicht,
-                      icon: const Icon(Icons.swap_horiz, size: 18),
-                      label: const Text('Andere Schicht'),
+                    PopupMenuItem(
+                      value: andereSchicht,
+                      child: const ListTile(
+                        leading: Icon(Icons.swap_horiz),
+                        title: Text('Andere Schicht'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
                 ],
-              ),
+              )
+            else
+              const SizedBox(width: 8),
           ],
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.only(left: 22, right: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (r.begleitpersonen.isNotEmpty)
+                zeile(
+                  Icons.group_outlined,
+                  'Mit: ${r.begleitpersonen.map((b) => b.name).join(', ')}',
+                  stil: klein,
+                ),
+              if (r.menue != null) zeile(Icons.restaurant, 'Menü: ${r.menue}', stil: klein),
+              if (r.allergien != null)
+                zeile(Icons.warning_amber_outlined, 'Allergien: ${r.allergien}', stil: klein),
+              if (r.bemerkung != null) zeile(Icons.notes, r.bemerkung!, stil: klein),
+              if (alt != null)
+                zeile(
+                  Icons.swap_horiz,
+                  'Vorgeschlagen: ${alt.schichtText}'
+                  '${alt.vorgeschlagenText == null ? '' : ' (${alt.vorgeschlagenText})'}',
+                  stil: klein,
+                ),
+              if (angemeldet != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text('angemeldet am $angemeldet', style: klein),
+                ),
+            ],
+          ),
+        ),
+        if (laeuft)
+          const Padding(padding: EdgeInsets.fromLTRB(22, 8, 8, 8), child: LinearProgressIndicator())
+        else if (r.offen && rechte.bestaetigen)
+          Padding(
+            padding: const EdgeInsets.only(left: 18, top: 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                FilledButton(
+                  style: FilledButton.styleFrom(visualDensity: VisualDensity.compact),
+                  onPressed: bestaetigen,
+                  child: const Text('Bestätigen'),
+                ),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
+                  onPressed: ablehnen,
+                  child: const Text('Ablehnen'),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

@@ -5,7 +5,9 @@
 //
 // Die App rechnet nichts: Personen, Begleitpersonen, Allergien, Menue,
 // Status-Texte, Zahlen und welche Aktionen erlaubt sind — alles kommt fertig
-// vom Backend (Vertrag: fixtures/organisator-uebersicht.json).
+// vom Backend (Vertrag: fixtures/organisator-uebersicht.json). Einzig die
+// Anzeige fasst die Anmeldungen pro Person zusammen und sortiert nach Zeit
+// ([anmeldungenNachPerson]).
 //
 // Die Entwuerfe (AnlassEntwurf, SchichtEntwurf, AnmeldungEntwurf) schicken
 // beim Speichern nur, was sich geaendert hat. Das behebt drei Fehler der
@@ -329,6 +331,117 @@ class Begleitperson {
   final String name;
   final String? email;
   final String? telefon;
+}
+
+/// Alle Anmeldungen einer Person an einem Anlass - fuer eine Karte statt
+/// einer pro Schicht. Gebildet von [anmeldungenNachPerson].
+class AnmeldePerson {
+  const AnmeldePerson({required this.schluessel, required this.anmeldungen});
+
+  /// member:…, gast:… oder anmeldung:… (siehe [anmeldungenNachPerson]).
+  final String schluessel;
+
+  /// Chronologisch nach der fruehesten Schicht; ohne Schicht am Ende.
+  final List<VerwalteteAnmeldung> anmeldungen;
+
+  VerwalteteAnmeldung get erste => anmeldungen.first;
+  String get name => erste.name;
+  bool get mitglied => anmeldungen.any((r) => r.mitglied);
+  String? get email => _erster((r) => r.email);
+  String? get telefon => _erster((r) => r.telefon);
+
+  /// Alle Anmeldungen im selben Status: der Status gehoert in den Kopf.
+  bool get einStatus => anmeldungen.every((r) => r.status == erste.status);
+
+  /// Zahl der Schichten ueber alle Anmeldungen.
+  int get schichten => anmeldungen.fold(0, (n, r) => n + r.schichten.length);
+
+  String? _erster(String? Function(VerwalteteAnmeldung r) wert) {
+    for (final r in anmeldungen) {
+      final w = wert(r);
+      if (w != null && w.trim().isNotEmpty) return w;
+    }
+    return null;
+  }
+}
+
+/// Fasst die Anmeldungen pro Person zusammen und sortiert sie nach Zeit.
+///
+/// Person = gleiche `member_id`; bei Gaesten gleiche E-Mail (klein,
+/// getrimmt) UND gleicher Name - Familien teilen sich oft eine Adresse,
+/// zwei verschiedene Gaeste duerfen nicht in einer Karte landen. Ohne
+/// beides bleibt jede Anmeldung fuer sich.
+///
+/// Reihenfolge: Personen nach ihrer fruehesten Schicht (Datum, Beginn), dann
+/// Name; Personen ohne Schicht am Ende. In der Karte die Anmeldungen und
+/// ihre Schichten chronologisch. Die Zeiten kommen aus den Schichten des
+/// Anlasses ([schichtenDesAnlasses]); unbekannte Schichten zaehlen wie ohne
+/// Datum (hinter die datierten).
+List<AnmeldePerson> anmeldungenNachPerson(
+  List<VerwalteteAnmeldung> anmeldungen,
+  List<Schicht> schichtenDesAnlasses,
+) {
+  final zeit = {
+    for (final s in schichtenDesAnlasses) s.id: '${s.datum ?? '9999-99-99'} ${s.beginn ?? '99:99'}',
+  };
+  // Ohne Schicht ganz ans Ende (hinter alle Zeiten).
+  const ohne = '\u{10FFFF}';
+  String schichtZeit(String id) => zeit[id] ?? '9999-99-99 99:99';
+  String frueheste(VerwalteteAnmeldung r) {
+    final zeiten = [for (final s in r.schichten) schichtZeit(s.id)]..sort();
+    return zeiten.isEmpty ? ohne : zeiten.first;
+  }
+
+  String schluessel(VerwalteteAnmeldung r) {
+    final m = r.memberId?.trim() ?? '';
+    if (m.isNotEmpty) return 'member:$m';
+    final e = r.email?.trim().toLowerCase() ?? '';
+    if (e.isNotEmpty) return 'gast:$e|${r.name.trim().toLowerCase()}';
+    return 'anmeldung:${r.id}';
+  }
+
+  final gruppen = <String, List<VerwalteteAnmeldung>>{};
+  for (final r in anmeldungen) {
+    // Schichten der Anmeldung selbst auch in zeitlicher Reihenfolge.
+    final sortiert = [...r.schichten]
+      ..sort((a, b) => schichtZeit(a.id).compareTo(schichtZeit(b.id)));
+    final kopie = VerwalteteAnmeldung(
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      statusText: r.statusText,
+      statusFarbe: r.statusFarbe,
+      art: r.art,
+      mitglied: r.mitglied,
+      memberId: r.memberId,
+      email: r.email,
+      telefon: r.telefon,
+      personen: r.personen,
+      begleitpersonen: r.begleitpersonen,
+      allergien: r.allergien,
+      menue: r.menue,
+      bemerkung: r.bemerkung,
+      schichtIds: r.schichtIds,
+      schichten: sortiert,
+      alternative: r.alternative,
+      angemeldetText: r.angemeldetText,
+    );
+    gruppen.putIfAbsent(schluessel(r), () => []).add(kopie);
+  }
+  final personen = [
+    for (final e in gruppen.entries)
+      AnmeldePerson(
+        schluessel: e.key,
+        anmeldungen: [...e.value]..sort((a, b) => frueheste(a).compareTo(frueheste(b))),
+      ),
+  ];
+  personen.sort((a, b) {
+    final z = frueheste(a.erste).compareTo(frueheste(b.erste));
+    if (z != 0) return z;
+    final n = a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    return n != 0 ? n : a.erste.id.compareTo(b.erste.id);
+  });
+  return personen;
 }
 
 // ---------------------------------------------------------------------------
