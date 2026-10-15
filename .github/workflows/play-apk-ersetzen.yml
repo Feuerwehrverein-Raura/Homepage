@@ -1,0 +1,44 @@
+name: Play-APK ersetzen
+
+# Ersetzt die APK eines bestehenden Releases (members-vX.Y.Z) und den
+# rollenden Zeiger members-latest durch die von Google Play signierte APK.
+# Fuer Releases von vor dem 15.10.2026 (damals selbst signiert) oder wenn
+# der Schritt im Release-Lauf scheiterte. Siehe .github/scripts/play-apk.py.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, z.B. 1.0.22'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  ersetzen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Play-APK laden und hochladen
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version '$VERSION' ist nicht X.Y.Z"; exit 1; }
+          IFS='.' read -r A B C <<< "$VERSION"
+          VCODE=$(( A * 10000 + B * 100 + C ))
+          pip install --quiet google-auth requests
+          python3 .github/scripts/play-apk.py laden com.fwv.members "$VCODE" "members-${VERSION}-release.apk"
+          gh release upload "members-v${VERSION}" "members-${VERSION}-release.apk" --clobber
+          # Zeiger nur anfassen, wenn er auf genau diese Version zeigt.
+          gh release download members-latest -p members-latest.json -O aktuell.json
+          if grep -q "\"versionCode\":${VCODE}[,}]" aktuell.json; then
+            cp "members-${VERSION}-release.apk" members-latest.apk
+            gh release upload members-latest members-latest.apk --clobber
+            echo "members-latest.apk ersetzt (${VERSION})."
+          else
+            echo "members-latest zeigt auf eine andere Version - nicht angefasst."
+          fi

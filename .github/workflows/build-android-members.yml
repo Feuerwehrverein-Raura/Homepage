@@ -198,52 +198,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # DEUTSCH: Rollender Zeiger auf die jeweils neuste Fassung.
-      #
-      # Warum ueberhaupt: Die Release-Datei traegt die Versionsnummer im
-      # Namen, ein Link darauf veraltet also mit jedem Release. Gedruckte
-      # Anleitungen und QR-Codes brauchen aber eine Adresse, die bleibt.
-      # `releases/latest` scheidet aus — die gehoert dem Desktop-Updater
-      # (siehe make_latest oben). Also ein eigener Tag mit gleichbleibendem
-      # Dateinamen:
-      #
-      #   .../releases/download/members-latest/members-latest.apk
-      #
-      # Als Vorabversion markiert, damit GitHub sie nicht zur "Latest
-      # release" des Repos macht und dem Desktop-Updater dazwischenfunkt.
-      - name: Rollenden Zeiger "members-latest" aktualisieren
-        if: startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true
-        working-directory: ${{ github.workspace }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          cp "members-${VERSION}-release.apk" members-latest.apk
-          # Daran erkennt eine von GitHub installierte App, dass es eine
-          # neuere APK gibt (flutter/mitglieder/lib/einstellungen/app_update.dart).
-          APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
-          printf '{"version":"%s","versionCode":%s,"apk":"%s"}\n' "$VERSION" "$VCODE" "$APK_URL" > members-latest.json
-
-          NOTES="Dieser Eintrag zeigt immer auf die neuste Fassung der
-          Mitglieder-App. Der Dateiname bleibt gleich, damit Links und
-          QR-Codes in den Anleitungen nicht veralten.
-
-          Aktuell ausgeliefert: **${VERSION}**
-
-          Direktlink:
-          https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
-
-          if gh release view members-latest >/dev/null 2>&1; then
-            gh release upload members-latest members-latest.apk members-latest.json --clobber
-            gh release edit members-latest --notes "$NOTES"
-          else
-            gh release create members-latest members-latest.apk members-latest.json \
-              --title "Mitglieder-App — neuste Fassung" \
-              --notes "$NOTES" \
-              --prerelease \
-              --target "$GITHUB_SHA"
-          fi
-
       - name: Play-Zugang pruefen
         id: play
         if: startsWith(github.ref, 'refs/tags/members-v')
@@ -291,6 +245,74 @@ jobs:
           set -euo pipefail
           pip install --quiet google-auth requests
           python3 "$GITHUB_WORKSPACE/.github/scripts/play-hochstufen.py" com.fwv.members "$VCODE" internal alpha
+
+      # DEUTSCH: Die APK fuer Website und GitHub ist die, die Google Play selbst
+      # signiert hat (Play App Signing, Schluessel EF:99:A7:...), nicht unsere
+      # mit dem Upload-Schluessel (00:66:28:...). Nur so passen App-ID UND
+      # Signatur: die APK laesst sich ueber eine Play-Installation installieren
+      # und Play kann eine APK-Installation aktualisieren. Ohne Play-Zugang
+      # bleibt die selbst signierte APK (mit Warnung).
+      - name: Von Play signierte APK holen
+        if: (startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true) && steps.play.outputs.vorhanden == 'true'
+        working-directory: ${{ github.workspace }}
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          pip install --quiet google-auth requests
+          python3 .github/scripts/play-apk.py laden com.fwv.members "$VCODE" "members-${VERSION}-release.apk"
+          gh release upload "members-v${VERSION}" "members-${VERSION}-release.apk" --clobber
+
+      - name: Ohne Play-Zugang - selbst signierte APK
+        if: (startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true) && steps.play.outputs.vorhanden != 'true'
+        run: echo "::warning::Ohne Play-Zugang ist die APK mit dem Upload-Schluessel signiert und laesst sich nicht ueber eine Play-Installation installieren."
+
+      # DEUTSCH: Rollender Zeiger auf die jeweils neuste Fassung.
+      #
+      # Warum ueberhaupt: Die Release-Datei traegt die Versionsnummer im
+      # Namen, ein Link darauf veraltet also mit jedem Release. Gedruckte
+      # Anleitungen und QR-Codes brauchen aber eine Adresse, die bleibt.
+      # `releases/latest` scheidet aus — die gehoert dem Desktop-Updater
+      # (siehe make_latest oben). Also ein eigener Tag mit gleichbleibendem
+      # Dateinamen:
+      #
+      #   .../releases/download/members-latest/members-latest.apk
+      #
+      # Als Vorabversion markiert, damit GitHub sie nicht zur "Latest
+      # release" des Repos macht und dem Desktop-Updater dazwischenfunkt.
+      - name: Rollenden Zeiger "members-latest" aktualisieren
+        if: startsWith(github.ref, 'refs/tags/members-v') || inputs.create_release == true
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cp "members-${VERSION}-release.apk" members-latest.apk
+          # Daran erkennt eine von GitHub installierte App, dass es eine
+          # neuere APK gibt (flutter/mitglieder/lib/einstellungen/app_update.dart).
+          APK_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
+          printf '{"version":"%s","versionCode":%s,"apk":"%s"}\n' "$VERSION" "$VCODE" "$APK_URL" > members-latest.json
+
+          NOTES="Dieser Eintrag zeigt immer auf die neuste Fassung der
+          Mitglieder-App. Der Dateiname bleibt gleich, damit Links und
+          QR-Codes in den Anleitungen nicht veralten.
+
+          Aktuell ausgeliefert: **${VERSION}**
+
+          Direktlink:
+          https://github.com/${GITHUB_REPOSITORY}/releases/download/members-latest/members-latest.apk"
+
+          if gh release view members-latest >/dev/null 2>&1; then
+            gh release upload members-latest members-latest.apk members-latest.json --clobber
+            gh release edit members-latest --notes "$NOTES"
+          else
+            gh release create members-latest members-latest.apk members-latest.json \
+              --title "Mitglieder-App — neuste Fassung" \
+              --notes "$NOTES" \
+              --prerelease \
+              --target "$GITHUB_SHA"
+          fi
 
   # ---------------------------------------------------------------------
   # Desktop-Programm (ersetzt vorstand-desktop)
