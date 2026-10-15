@@ -11,7 +11,6 @@ import path from 'path';
 import https from 'https';
 import crypto from 'crypto';
 import { AnlassErmittler, eventsQuelle, twintAntwort, UUID_MUSTER } from './anlass.js';
-import { SCHLUESSEL_URL, TERMINAL_PROVIDER, TERMINAL_ZAHLUNG_STATUS, pruefeTerminalEinstellungen, pruefeZahlungsProvider, terminalStand } from './raisenow-terminal.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
@@ -410,21 +409,6 @@ async function getSetting(key: string): Promise<string | null> {
 }
 
 // Set setting in database
-// TWINT ueber das RaiseNow Digital Terminal: die Kasse bekommt keine
-// Rueckmeldung, die Kassierin bestaetigt. Vermerk in payments, damit spaeter
-// nachvollziehbar ist, welche Zahlungen ueber das Terminal liefen.
-async function vermerkeTerminalZahlung(
-  db: { query: (text: string, values?: any[]) => Promise<any> },
-  orderId: number,
-  amount: number | string
-): Promise<void> {
-  await db.query(
-    `INSERT INTO payments (order_id, provider, amount, currency, status)
-     VALUES ($1, $2, $3, 'CHF', $4)`,
-    [orderId, TERMINAL_PROVIDER, amount, TERMINAL_ZAHLUNG_STATUS]
-  );
-}
-
 async function setSetting(key: string, value: string): Promise<void> {
   await pool.query(`
     INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
@@ -1369,23 +1353,12 @@ app.patch('/api/orders/:orderId/items/complete', async (req, res) => {
 app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, payment_method, provider } = req.body;
+    const { status, payment_method } = req.body;
 
-    // provider 'raisenow_terminal': TWINT ueber das RaiseNow Digital Terminal,
-    // von der Kassierin bestaetigt (src/raisenow-terminal.ts).
-    const terminal = pruefeZahlungsProvider(provider, payment_method);
-    if ('fehler' in terminal) {
-      return res.status(400).json({ error: terminal.fehler });
-    }
-
-    const updated = await pool.query(
-      'UPDATE orders SET status = $1, payment_method = $2 WHERE id = $3 RETURNING total',
+    await pool.query(
+      'UPDATE orders SET status = $1, payment_method = $2 WHERE id = $3',
       [status || 'paid', payment_method || null, id]
     );
-
-    if (terminal.vermerken && updated.rows.length > 0) {
-      await vermerkeTerminalZahlung(pool, parseInt(id), updated.rows[0].total);
-    }
 
     broadcast({ type: 'order_updated', order_id: id, status, payment_method });
 
@@ -1662,17 +1635,10 @@ app.post('/api/orders/:id/split-payment', async (req, res) => {
     await client.query('BEGIN');
 
     const { id } = req.params;
-    const { amount, payment_method, description, provider } = req.body;
+    const { amount, payment_method, description } = req.body;
 
     if (!amount || amount <= 0) {
-      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Betrag muss grösser als 0 sein' });
-    }
-
-    const terminal = pruefeZahlungsProvider(provider, payment_method);
-    if ('fehler' in terminal) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ error: terminal.fehler });
     }
 
     // Get order and calculate remaining amount
@@ -1708,10 +1674,6 @@ app.post('/api/orders/:id/split-payment', async (req, res) => {
     `, [id, amount, payment_method || 'cash', description || null]);
 
     const payment = paymentResult.rows[0];
-
-    if (terminal.vermerken) {
-      await vermerkeTerminalZahlung(client, parseInt(id), amount);
-    }
 
     // Check if order is fully paid
     const newRemaining = remaining - amount;
@@ -1969,14 +1931,7 @@ app.get('/api/settings', authenticateToken, async (req: AuthenticatedRequest, re
 
 app.put('/api/settings', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
-    const settings = { ...(req.body || {}) };
-
-    // Terminal-Link pruefen: nur https://terminal.raisenow.io/<kennung>
-    const terminal = pruefeTerminalEinstellungen(settings);
-    if ('fehler' in terminal) {
-      return res.status(400).json({ error: terminal.fehler });
-    }
-    Object.assign(settings, terminal.werte);
+    const settings = req.body;
 
     for (const [key, value] of Object.entries(settings)) {
       // Die Anlass-Auswahl hat ihre eigene Route (PUT /api/anlass/auswahl).
@@ -1990,18 +1945,6 @@ app.put('/api/settings', authenticateToken, async (req: AuthenticatedRequest, re
   } catch (error) {
     console.error('Save settings error:', error);
     res.status(500).json({ error: 'Fehler beim Speichern der Einstellungen' });
-  }
-});
-
-// RaiseNow Digital Terminal fuer TWINT (src/raisenow-terminal.ts): Link fuer
-// alle Geraete. Ob ein Geraet das Terminal nutzt, entscheidet es selbst
-// (localStorage 'kasse.raisenow_terminal', Standard aus).
-app.get('/api/raisenow-terminal', async (req, res) => {
-  try {
-    res.json(terminalStand(await getSetting(SCHLUESSEL_URL)));
-  } catch (error) {
-    console.error('RaiseNow-Terminal error:', error);
-    res.json(terminalStand(null));
   }
 });
 
