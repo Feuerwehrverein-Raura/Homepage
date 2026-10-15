@@ -5,6 +5,10 @@ name: Play anzeigen
 
 on:
   workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'versionCode fuer die Play-Signatur (leer = nur Tracks)'
+        required: false
 
 jobs:
   zeigen:
@@ -18,3 +22,10 @@ jobs:
           set -euo pipefail
           pip install --quiet google-auth requests
           python3 .github/scripts/play-zeigen.py com.fwv.members
+      - name: Signatur der von Play erzeugten APK
+        if: inputs.version_code != ''
+        env:
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          pip install --quiet google-auth requests
+          python3 .github/scripts/play-apk.py zeigen com.fwv.members "${{ inputs.version_code }}"
