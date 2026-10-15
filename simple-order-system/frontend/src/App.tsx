@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { InstallPrompt } from './InstallPrompt';
+import { TERMINAL_STANDARD_URL, TERMINAL_PROVIDER, pruefeTerminalUrl, terminalAufGeraet, setzeTerminalAufGeraet, TwintModusWahl, TerminalBetrag, TerminalFenster } from './RaiseNowTerminal';
 
 // Offline Banner Component
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
@@ -191,6 +192,15 @@ function App() {
   const [historyAnlass, setHistoryAnlass] = useState<string>('');
   const [historyAnlaesse, setHistoryAnlaesse] = useState<{ event_id: string; event_titel: string | null; bestellungen: number; umsatz: string }[]>([]);
   const [twintPayment, setTwintPayment] = useState<{ orderId: number; total: number } | null>(null);
+  // RaiseNow Digital Terminal (RaiseNowTerminal.tsx): ein/aus PRO GERAET
+  // (localStorage, Standard aus), Link fuer alle Geraete vom Backend.
+  // Ist es aus, laeuft TWINT genau wie bisher mit dem festen QR-Code.
+  const [terminalAn, setTerminalAn] = useState<boolean>(() => terminalAufGeraet());
+  const [terminalUrl, setTerminalUrl] = useState<string>(TERMINAL_STANDARD_URL);
+  // Pro Zahlung: doch den festen QR-Code nehmen (Ausweichweg)
+  const [twintFesterQr, setTwintFesterQr] = useState(false);
+  const [terminalSendet, setTerminalSendet] = useState(false);
+  const mitTerminal = terminalAn && !twintFesterQr;
 
   // Nicht gedruckte Bons. Bewusst ein stehendes Banner und kein alert():
   // Ein Hinweisfenster ist im Betrieb weggeklickt, bevor es jemand gelesen
@@ -254,6 +264,65 @@ function App() {
       return () => clearInterval(t);
     }
   }, [token]);
+
+  // Terminal-Link nur holen, wenn das Geraet das Terminal nutzt.
+  useEffect(() => {
+    if (token && terminalAn) {
+      fetchTerminalUrl();
+      const t = setInterval(fetchTerminalUrl, 5 * 60 * 1000);
+      return () => clearInterval(t);
+    }
+  }, [token, terminalAn]);
+
+  const fetchTerminalUrl = async () => {
+    try {
+      const res = await fetch(`${API_URL}/raisenow-terminal`, { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setTerminalUrl(pruefeTerminalUrl(String(data.url || '')) || TERMINAL_STANDARD_URL);
+      }
+    } catch {
+      // Letzten Stand bzw. Standard-Link behalten.
+    }
+  };
+
+  // Einstellung "Auf diesem Geraet" (SettingsView)
+  const schalteTerminal = (an: boolean): boolean => {
+    const gespeichert = setzeTerminalAufGeraet(an);
+    setTerminalAn(an);
+    return gespeichert;
+  };
+
+  // TWINT ueber das Terminal: die Kassierin bestaetigt, sobald das Terminal
+  // "Zahlung erfolgreich" zeigt. Vermerk im Backend: payments.provider
+  // 'raisenow_terminal'.
+  const bestaetigeTerminalZahlung = async () => {
+    if (!twintPayment || terminalSendet) return;
+    setTerminalSendet(true);
+    try {
+      const res = await fetch(`${API_URL}/orders/${twintPayment.orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ status: 'paid', payment_method: 'twint', provider: TERMINAL_PROVIDER }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Zahlung nicht gespeichert: ${err.error || res.status}. Bitte nochmals bestätigen.`);
+        return;
+      }
+      setOrderConfirmation({
+        orderId: twintPayment.orderId,
+        orderType: 'bar',
+        total: twintPayment.total,
+        message: 'TWINT Zahlung erhalten (RaiseNow-Terminal)'
+      });
+      setTwintPayment(null);
+    } catch {
+      alert('Zahlung nicht gespeichert (keine Verbindung). Bitte nochmals bestätigen.');
+    } finally {
+      setTerminalSendet(false);
+    }
+  };
 
   const authHeaders = (): HeadersInit => token ? { 'Authorization': `Bearer ${token}` } : {};
 
@@ -634,6 +703,7 @@ function App() {
     setSplitAmount('');
     setSelectedItemIds([]);
     setSplitPaymentMethod('cash');
+    setTwintFesterQr(false);
   };
 
   // Close split payment modal
@@ -661,12 +731,21 @@ function App() {
     return total;
   };
 
+  // Betrag, der gerade bezahlt wird (fuer die Anzeige im Terminal-Ablauf)
+  const getSplitBetrag = (order: OpenOrder): number => {
+    if (splitPaymentMode === 'full') return getUnpaidTotal(order);
+    if (splitPaymentMode === 'split') return parseFloat(splitAmount) || 0;
+    return getSelectedItemsTotal(order);
+  };
+
   // Distribute a payment amount across multiple orders sequentially
   const distributePayment = async (
     allOrders: { id: number; total: string; paid_amount?: string }[],
     totalAmount: number,
     paymentMethod: string,
-    description: string
+    description: string,
+    // Nur beim RaiseNow-Terminal gesetzt (dann auch mit Token).
+    provider?: string
   ): Promise<{ ok: boolean; allPaid: boolean; error?: string }> => {
     let remaining = totalAmount;
     let allPaid = true;
@@ -680,8 +759,15 @@ function App() {
       const payAmount = Math.min(remaining, orderRemaining);
       const response = await fetch(`${API_URL}/orders/${order.id}/split-payment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        headers: provider
+          ? { 'Content-Type': 'application/json', ...authHeaders() }
+          : { 'Content-Type': 'application/json' },
+        body: JSON.stringify(provider ? {
+          amount: payAmount,
+          payment_method: paymentMethod,
+          description,
+          provider
+        } : {
           amount: payAmount,
           payment_method: paymentMethod,
           description
@@ -747,7 +833,16 @@ function App() {
         { id: splitPaymentOrder.id, total: splitPaymentOrder.total, paid_amount: splitPaymentOrder.paid_amount }
       ];
 
-      const result = await distributePayment(orders, amount, splitPaymentMethod, description);
+      const imTerminal = splitPaymentMethod === 'twint' && mitTerminal;
+      if (imTerminal) {
+        if (terminalSendet) return;
+        setTerminalSendet(true);
+      }
+      const result = await distributePayment(
+        orders, amount, splitPaymentMethod,
+        imTerminal ? `${description} (RaiseNow-Terminal)` : description,
+        imTerminal ? TERMINAL_PROVIDER : undefined
+      ).finally(() => { if (imTerminal) setTerminalSendet(false); });
 
       if (!result.ok) {
         alert(`Fehler: ${result.error}`);
@@ -1075,7 +1170,8 @@ function App() {
       </div>
 
       {view === 'settings' ? (
-        <SettingsView token={token} onAnlass={(stand) => { setAnlassStand(stand); fetchTwintQr(); }} />
+        <SettingsView token={token} onAnlass={(stand) => { setAnlassStand(stand); fetchTwintQr(); }}
+          terminalAn={terminalAn} onTerminalAn={schalteTerminal} onTerminalUrl={setTerminalUrl} />
       ) : showHistoryView ? (
         <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token}
           anlass={historyAnlass} anlaesse={historyAnlaesse} onAnlass={setHistoryAnlass} />
@@ -1551,9 +1647,10 @@ function App() {
               </button>
 
               {/* TWINT option - only show if QR code is configured */}
-              {twintQrUrl && (
+              {(twintQrUrl || terminalAn) && (
                 <button
                   onClick={() => {
+                    setTwintFesterQr(false);
                     setTwintPayment({ orderId: pendingOrder.id, total: pendingOrder.total });
                     setPendingOrder(null);
                   }}
@@ -1575,12 +1672,64 @@ function App() {
         </div>
       )}
 
-      {/* TWINT Payment Modal */}
-      {twintPayment && twintQrUrl && (
+      {/* TWINT ueber das RaiseNow Digital Terminal (nur wenn auf diesem
+          Geraet eingeschaltet). Breit: links Betrag und Knoepfe, rechts das
+          Terminal. Schmal: untereinander, Knoepfe unten angeheftet. */}
+      {twintPayment && mitTerminal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[96vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              <h2 className="text-2xl font-bold text-center mb-1">TWINT Zahlung</h2>
+              <p className="text-sm text-gray-600 text-center mb-3">Bestellung #{twintPayment.orderId}</p>
+              <TwintModusWahl festerQr={twintFesterQr} onFesterQr={setTwintFesterQr} />
+              <div className="md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:gap-6 space-y-3 md:space-y-0">
+                <div className="space-y-3">
+                  <TerminalBetrag betrag={twintPayment.total} url={terminalUrl} />
+                  <div className="hidden md:block space-y-2">
+                    <button
+                      onClick={bestaetigeTerminalZahlung}
+                      disabled={terminalSendet}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-lg touch-manipulation disabled:bg-gray-400"
+                    >
+                      ✓ Zahlung im Terminal bestätigt
+                    </button>
+                    <button
+                      onClick={() => setTwintPayment(null)}
+                      className="w-full text-gray-500 hover:text-gray-700 py-2 text-sm"
+                    >
+                      Abbrechen
+                    </button>
+                  </div>
+                </div>
+                <TerminalFenster url={terminalUrl} />
+              </div>
+            </div>
+            <div className="md:hidden sticky bottom-0 bg-white border-t p-3 space-y-1">
+              <button
+                onClick={bestaetigeTerminalZahlung}
+                disabled={terminalSendet}
+                className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-lg touch-manipulation disabled:bg-gray-400"
+              >
+                ✓ Zahlung im Terminal bestätigt
+              </button>
+              <button
+                onClick={() => setTwintPayment(null)}
+                className="w-full text-gray-500 hover:text-gray-700 py-2 text-sm"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TWINT Payment Modal (fester QR-Code) */}
+      {twintPayment && twintQrUrl && !mitTerminal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
             <h2 className="text-2xl font-bold text-center mb-2">TWINT Zahlung</h2>
             <p className="text-sm text-gray-600 text-center mb-2">Bestellung #{twintPayment.orderId}</p>
+            {terminalAn && <TwintModusWahl festerQr={twintFesterQr} onFesterQr={setTwintFesterQr} />}
             <p className="text-3xl font-bold text-center text-green-600 mb-4">
               CHF {twintPayment.total.toFixed(2)}
             </p>
@@ -1849,8 +1998,10 @@ function App() {
       {/* Split Payment Modal */}
       {splitPaymentOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
+          <div className={`bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-y-auto ${
+            splitPaymentMethod === 'twint' && mitTerminal ? 'max-w-2xl' : 'max-w-md'
+          }`}>
+            <div className={splitPaymentMethod === 'twint' && mitTerminal ? 'p-4 sm:p-6' : 'p-6'}>
               <h2 className="text-2xl font-bold text-center mb-2">💳 Bezahlen</h2>
               <p className="text-sm text-gray-600 text-center mb-1">
                 Tisch {splitPaymentOrder.table_number} - Bestellung #{splitPaymentOrder.id}
@@ -2007,7 +2158,7 @@ function App() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Zahlungsart
                 </label>
-                <div className={`grid gap-2 ${twintQrUrl ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <div className={`grid gap-2 ${(twintQrUrl || terminalAn) ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   <button
                     onClick={() => setSplitPaymentMethod('cash')}
                     className={`py-3 rounded-lg font-semibold transition ${
@@ -2028,7 +2179,7 @@ function App() {
                   >
                     💳 Karte
                   </button>
-                  {twintQrUrl && (
+                  {(twintQrUrl || terminalAn) && (
                     <button
                       onClick={() => setSplitPaymentMethod('twint')}
                       className={`py-3 rounded-lg font-semibold transition ${
@@ -2043,8 +2194,19 @@ function App() {
                 </div>
               </div>
 
+              {/* TWINT ueber das RaiseNow-Terminal: Teilbetrag anzeigen */}
+              {splitPaymentMethod === 'twint' && terminalAn && (
+                <TwintModusWahl festerQr={twintFesterQr} onFesterQr={setTwintFesterQr} />
+              )}
+              {splitPaymentMethod === 'twint' && mitTerminal && (
+                <div className="space-y-3 mb-4">
+                  <TerminalBetrag betrag={getSplitBetrag(splitPaymentOrder)} url={terminalUrl} />
+                  <TerminalFenster url={terminalUrl} />
+                </div>
+              )}
+
               {/* TWINT QR Code - shown when TWINT is selected */}
-              {splitPaymentMethod === 'twint' && twintQrUrl && (
+              {splitPaymentMethod === 'twint' && twintQrUrl && !mitTerminal && (
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
                   <p className="text-center text-sm text-gray-600 mb-3">
                     QR-Code mit TWINT App scannen:
@@ -2061,20 +2223,29 @@ function App() {
               )}
 
               {/* Confirm Button */}
+              <div className={splitPaymentMethod === 'twint' && mitTerminal ? 'sticky bottom-0 bg-white pt-2 pb-1' : ''}>
               <button
                 onClick={processSplitPayment}
                 disabled={
                   (splitPaymentMode === 'split' && (!splitAmount || parseFloat(splitAmount) <= 0)) ||
-                  (splitPaymentMode === 'items' && selectedItemIds.length === 0)
+                  (splitPaymentMode === 'items' && selectedItemIds.length === 0) ||
+                  (splitPaymentMethod === 'twint' && mitTerminal && terminalSendet)
                 }
                 className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold text-lg touch-manipulation"
               >
+                {splitPaymentMethod === 'twint' && mitTerminal ? (
+                  getSplitBetrag(splitPaymentOrder) > 0
+                    ? `✓ Zahlung im Terminal bestätigt (CHF ${getSplitBetrag(splitPaymentOrder).toFixed(2)})`
+                    : (splitPaymentMode === 'items' ? 'Artikel auswählen' : 'Betrag eingeben')
+                ) : (<>
                 {splitPaymentMode === 'full' && `CHF ${getUnpaidTotal(splitPaymentOrder).toFixed(2)} bezahlen`}
                 {splitPaymentMode === 'split' && splitAmount && `CHF ${parseFloat(splitAmount).toFixed(2)} bezahlen`}
                 {splitPaymentMode === 'split' && !splitAmount && 'Betrag eingeben'}
                 {splitPaymentMode === 'items' && selectedItemIds.length > 0 && `CHF ${getSelectedItemsTotal(splitPaymentOrder).toFixed(2)} bezahlen`}
                 {splitPaymentMode === 'items' && selectedItemIds.length === 0 && 'Artikel auswählen'}
+                </>)}
               </button>
+              </div>
 
               <button
                 onClick={closeSplitPayment}
@@ -2460,7 +2631,13 @@ function datumKurz(wert: string): string {
   return `${m[3]}.${m[2]}.${m[1]}${m[4] ? ` ${m[4]}:${m[5]}` : ''}`;
 }
 
-function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (stand: AnlassStand | null) => void }) {
+function SettingsView({ token, onAnlass, terminalAn, onTerminalAn, onTerminalUrl }: {
+  token: string | null;
+  onAnlass: (stand: AnlassStand | null) => void;
+  terminalAn: boolean;
+  onTerminalAn: (an: boolean) => boolean;
+  onTerminalUrl: (url: string) => void;
+}) {
   const [settings, setSettings] = useState({
     printer_bar_ip: '',
     printer_bar_port: '9100',
@@ -2469,8 +2646,11 @@ function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (st
     printer_kitchen_port: '9100',
     printer_kitchen_protocol: 'raw',
     twint_qr_url: '',
+    raisenow_terminal_url: TERMINAL_STANDARD_URL,
   });
   const [loading, setLoading] = useState(true);
+  const [geraetHinweis, setGeraetHinweis] = useState<string | null>(null);
+  const terminalUrlGueltig = pruefeTerminalUrl(settings.raisenow_terminal_url || '') !== null;
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
 
@@ -2545,6 +2725,10 @@ function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (st
   };
 
   const saveSettings = async () => {
+    if (!terminalUrlGueltig) {
+      alert('Terminal-Link ungültig: erlaubt ist nur https://terminal.raisenow.io/<kennung>');
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`${API_URL}/settings`, {
@@ -2557,9 +2741,12 @@ function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (st
       });
 
       if (res.ok) {
+        const url = pruefeTerminalUrl(settings.raisenow_terminal_url || '');
+        if (url) onTerminalUrl(url);
         alert('Einstellungen gespeichert!');
       } else {
-        alert('Fehler beim Speichern');
+        const err = await res.json().catch(() => ({}));
+        alert(err.error ? `Fehler beim Speichern: ${err.error}` : 'Fehler beim Speichern');
       }
     } catch (error) {
       alert('Fehler beim Speichern');
@@ -2816,6 +3003,58 @@ function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (st
 
           <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
             <p><strong>Tipp:</strong> Einen eigenen TWINT-QR pro Anlass laden Vorstand oder Organisator beim Anlass hoch (Vorstand-Seite oder App: Anlass bearbeiten).</p>
+          </div>
+        </div>
+
+        {/* RaiseNow Digital Terminal fuer TWINT (RaiseNowTerminal.tsx).
+            Ein/aus gilt nur auf diesem Geraet (localStorage), der Link fuer
+            alle Geraete (settings.raisenow_terminal_url). */}
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            📲 RaiseNow-Terminal für TWINT
+          </h3>
+
+          <div className="border rounded-lg p-4 space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-800 mb-2">Auf diesem Gerät</p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={terminalAn}
+                  onChange={(e) => {
+                    const ok = onTerminalAn(e.target.checked);
+                    setGeraetHinweis(ok ? null : 'Dieser Browser kann die Einstellung nicht speichern - sie gilt nur bis zum Neuladen.');
+                  }}
+                  className="mt-1 h-6 w-6 shrink-0"
+                />
+                <span>
+                  <span className="font-semibold">RaiseNow-Terminal für TWINT nutzen</span>
+                  <span className="block text-sm text-gray-600">
+                    Bei TWINT erscheint das Terminal mit dem Betrag zum Eintippen statt des festen QR-Codes.
+                    Gilt nur auf diesem Gerät; die anderen Kassen bleiben, wie sie sind.
+                  </span>
+                </span>
+              </label>
+              {geraetHinweis && <p className="text-xs text-orange-700 mt-2">{geraetHinweis}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Terminal-Link (für alle Geräte)</label>
+              <input
+                type="url"
+                inputMode="url"
+                value={settings.raisenow_terminal_url || ''}
+                onChange={(e) => setSettings({ ...settings, raisenow_terminal_url: e.target.value })}
+                placeholder={TERMINAL_STANDARD_URL}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none ${
+                  terminalUrlGueltig ? 'border-gray-300 focus:border-blue-500' : 'border-red-500'
+                }`}
+              />
+              <p className={`text-xs mt-1 ${terminalUrlGueltig ? 'text-gray-500' : 'text-red-600'}`}>
+                Nur https://terminal.raisenow.io/&lt;kennung&gt; (Standard: {TERMINAL_STANDARD_URL}).
+                Wird mit "Einstellungen speichern" gesichert.
+              </p>
+            </div>
           </div>
         </div>
 
