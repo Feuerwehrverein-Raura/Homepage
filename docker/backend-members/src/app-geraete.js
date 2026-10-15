@@ -118,7 +118,7 @@ function geraetAusEingabe(body) {
 
 /**
  * Felder aus POST /members/me/fcm-token als Geraete-Meldung, oder null,
- * wenn die App (vor 1.0.23) keine mitschickt. device_id ist die geraet_id,
+ * wenn die App (vor 1.0.24) keine mitschickt. device_id ist die geraet_id,
  * platform die plattform.
  */
 function geraetAusFcmEingabe(body) {
@@ -185,7 +185,7 @@ function appGeraete({ pool, neusteVersion = process.env.APP_NEUSTE_VERSION, log 
      *               os_version, geraet_modell, erstmals, zuletzt, veraltet }],
      *   ohne_meldung: [{ member_id, name, plattform, zuletzt }] }
      * ohne_meldung: Push-Tokens (fcm_tokens) ohne passende Geraete-Meldung -
-     * App aelter als 1.0.23, Version unbekannt.
+     * App aelter als 1.0.24, Version unbekannt.
      */
     async function liste() {
         await tabelleAnlegen();

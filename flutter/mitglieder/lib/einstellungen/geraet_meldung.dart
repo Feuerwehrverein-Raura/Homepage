@@ -11,7 +11,7 @@
 //    Methode "quelle"), web, desktop, sonst unbekannt
 //  - app_version, build_nummer (PackageInfo)
 //  - os_version und geraet_modell, soweit ohne weiteres Paket bekannt:
-//    Android ueber denselben Kanal (Methode "geraet", ab 1.0.23), sonst
+//    Android ueber denselben Kanal (Methode "geraet", ab 1.0.24), sonst
 //    Platform.operatingSystemVersion; im Browser nichts.
 //
 // Keine IP, kein Standort. Fehler werden still geschluckt - die Meldung ist

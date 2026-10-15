@@ -92,7 +92,7 @@ void main() {
     expect(oben('1.0.25'), lessThan(oben('1.0.23')));
     expect(oben('1.0.23'), lessThan(oben('1.0.0')));
     await tester.scrollUntilVisible(
-      find.byKey(const Key('gruppe-Version unbekannt (vor 1.0.23)')),
+      find.byKey(const Key('gruppe-Version unbekannt (vor 1.0.24)')),
       200,
       scrollable: find.byType(Scrollable).last,
     );
@@ -174,7 +174,7 @@ void main() {
     expect(s.herkunft, 'geraete');
     expect(s.alle, hasLength(5));
     expect(s.ohneMeldung.single.istVeraltet, isTrue);
-    expect(s.ohneMeldung.single.versionText, 'Version unbekannt (vor 1.0.23)');
+    expect(s.ohneMeldung.single.versionText, 'Version unbekannt (vor 1.0.24)');
     expect(s.geraete[3].herkunftText, 'Browser');
     expect(AppGeraeteStand.ausJson(null).alle, isEmpty);
   });

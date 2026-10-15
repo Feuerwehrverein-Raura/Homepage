@@ -1,7 +1,7 @@
 // Geraete und App-Versionen der Mitglieder ("Welcher Tester hat welche
 // Version?"): GET /vorstand/app-geraete bei api-members
 // (docker/backend-members/src/app-geraete.js). Die Mitglieder-App meldet sich
-// einmal pro Start; Push-Tokens ohne Meldung stammen von Apps vor 1.0.23.
+// einmal pro Start; Push-Tokens ohne Meldung stammen von Apps vor 1.0.24.
 //
 // Die neuste Version bestimmt das Backend (env APP_NEUSTE_VERSION, sonst die
 // hoechste Meldung eines Android-Geraets) und markiert veraltete Geraete
@@ -12,7 +12,7 @@ import 'package:fwv_core/fwv_core.dart';
 import '../zeit.dart';
 
 /// Ein Geraet eines Mitglieds. [ohneMeldung]: nur ein Push-Token bekannt,
-/// Version unbekannt (App vor 1.0.23).
+/// Version unbekannt (App vor 1.0.24).
 class AppGeraet {
   const AppGeraet({
     required this.mitgliedId,
@@ -64,7 +64,7 @@ class AppGeraet {
   final bool ohneMeldung;
 
   /// Gilt als veraltet: vom Backend markiert, oder gar keine Meldung (vor
-  /// 1.0.23 - sicher alt).
+  /// 1.0.24 - sicher alt).
   bool get istVeraltet => ohneMeldung || veraltet == true;
 
   /// "Android · Play", "Android · APK", "Browser", "Computer · Windows",
@@ -90,7 +90,7 @@ class AppGeraet {
 
   /// "1.0.23" bzw. "Version unbekannt".
   String get versionText => ohneMeldung
-      ? 'Version unbekannt (vor 1.0.23)'
+      ? 'Version unbekannt (vor 1.0.24)'
       : version ?? (build != null ? 'Build $build' : 'Version unbekannt');
 }
 

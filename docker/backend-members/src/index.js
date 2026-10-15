@@ -5687,7 +5687,7 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
                   updated_at = NOW()
         `, [memberId, token, device_id || null, platform || 'android']);
 
-        // Ab App 1.0.23 kommen Version, Quelle usw. mit (src/app-geraete.js).
+        // Ab App 1.0.24 kommen Version, Quelle usw. mit (src/app-geraete.js).
         // Nur Beiwerk: ein Fehler dort laesst die Token-Anmeldung gelingen.
         const geraet = geraetAusFcmEingabe(req.body);
         if (geraet) await appGeraeteDienst.leiseMelden(memberId, geraet);
