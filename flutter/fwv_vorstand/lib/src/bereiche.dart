@@ -10,6 +10,7 @@ import 'ui/antraege_ansicht.dart';
 import 'ui/audit_ansicht.dart';
 import 'ui/beitraege_ansicht.dart';
 import 'ui/email_ansicht.dart';
+import 'ui/geraete_ansicht.dart';
 import 'ui/mitglieder_ansicht.dart';
 import 'ui/nachricht_ansicht.dart';
 
@@ -71,6 +72,13 @@ final vorstandBereiche = <VorstandBereich>[
     titel: 'Audit',
     symbol: Icons.history_outlined,
     bauen: (d) => AuditAnsicht(dienste: d),
+  ),
+  // Welche App-Version auf welchem Geraet (Support, Update-Hinweise).
+  VorstandBereich(
+    schluessel: 'geraete',
+    titel: 'Geräte',
+    symbol: Icons.devices_outlined,
+    bauen: (d) => GeraeteAnsicht(dienste: d),
   ),
 ];
 

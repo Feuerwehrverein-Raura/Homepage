@@ -205,6 +205,7 @@ Quellen: Bestandsaufnahmen vom 14.10.2026 (Code gelesen, keine Annahmen).
 |---|---|---|---|---|---|---|---|
 | [ ] | Audit-Log mit Aktionsfilter | ✓ | ½ | ✓ | – | – | GET /audit (M); A ohne Filter |
 | [x] | Benachrichtigung bei neuen Audit-Ereignissen (Antrag, Austritt, Löschung, Anmeldung) | – | ✓ | – | – | ✓ | Push vom Backend (M src/vorstand-melder.js), Kanal "Vorstand", abschaltbar |
+| [x] | Geraete und App-Versionen der Mitglieder (wer hat welche Version, veraltete, ohne Meldung) | – | – | – | – | ✓ | **neu in F** (15.10.2026): Bereich «Geräte», GET /vorstand/app-geraete (M src/app-geraete.js); App meldet POST /members/me/geraet; neuste Version aus env APP_NEUSTE_VERSION oder hoechster Android-Meldung |
 
 ## 14. Export und Sonstiges
 

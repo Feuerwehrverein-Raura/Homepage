@@ -341,9 +341,38 @@ void main() {
         'device_id': 'g1',
         'platform': 'android',
       });
+      await dienst.pushTokenRegistrieren(
+        token: 'fcm-1',
+        geraeteId: 'g1',
+        plattform: 'android',
+        geraet: {'quelle': 'play', 'app_version': '1.0.23', 'build_nummer': 10023},
+      );
+      expect(jsonDecode(koerper.last), {
+        'quelle': 'play',
+        'app_version': '1.0.23',
+        'build_nummer': 10023,
+        'token': 'fcm-1',
+        'device_id': 'g1',
+        'platform': 'android',
+      });
       await dienst.pushTokenAbmelden('fcm-1');
       expect(anfragen.last.method, 'DELETE');
       expect(jsonDecode(koerper.last), {'token': 'fcm-1'});
+    });
+
+    test('Geraet melden', () async {
+      routen['POST /members/me/geraet'] = (_) => _antwort('{"success":true}', 200);
+      await dienst.geraetMelden(
+        geraeteId: 'g1',
+        angaben: {'plattform': 'web', 'quelle': 'web', 'app_version': '1.0.23'},
+      );
+      expect(anfragen.last.url.path, endsWith('/members/me/geraet'));
+      expect(jsonDecode(koerper.last), {
+        'plattform': 'web',
+        'quelle': 'web',
+        'app_version': '1.0.23',
+        'geraet_id': 'g1',
+      });
     });
 
     test('Newsletter an und ab', () async {

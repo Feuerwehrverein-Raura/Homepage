@@ -20,6 +20,9 @@ import io.flutter.plugin.common.MethodChannel
  *  - "pruefen"      -> {"verfuegbar": Boolean, "geladen": Boolean}
  *  - "laden"        -> Boolean: flexibles Update gestartet (Play-Dialog).
  *  - "abschliessen" -> null: installiert das geladene Update, App startet neu.
+ *  - "geraet"       -> {"modell": "samsung SM-A376B", "android": "16", "sdk": 36}
+ *                      fuer die Geraete-Meldung (lib/einstellungen/geraet_meldung.dart);
+ *                      nur Build-Konstanten, keine Hardware-Kennung.
  *
  * Sobald Play fertig heruntergeladen hat, ruft der Kanal "geladen" in Dart auf.
  */
@@ -45,6 +48,13 @@ class AppUpdateKanal(
                     )
                 }
                 .addOnFailureListener { result.success(mapOf("verfuegbar" to false, "geladen" to false)) }
+            "geraet" -> result.success(
+                mapOf(
+                    "modell" to "${Build.MANUFACTURER} ${Build.MODEL}".trim(),
+                    "android" to Build.VERSION.RELEASE,
+                    "sdk" to Build.VERSION.SDK_INT,
+                )
+            )
             "laden" -> laden(result)
             "abschliessen" -> {
                 manager.completeUpdate()

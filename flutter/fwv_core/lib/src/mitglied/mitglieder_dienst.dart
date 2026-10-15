@@ -84,15 +84,25 @@ class MitgliederDienst {
   );
 
   /// Meldet das FCM-Token dieses Geraets an (mehrfach aufrufen ist harmlos).
-  /// [plattform]: "android" oder "ios".
+  /// [plattform]: "android" oder "ios". [geraet]: dieselben Angaben wie bei
+  /// [geraetMelden] (app_version, quelle, ...) - das Backend aktualisiert
+  /// damit auch die Geraete-Zeile; aeltere Backends ignorieren sie.
   Future<void> pushTokenRegistrieren({
     required String token,
     String? geraeteId,
     required String plattform,
+    Map<String, Object?> geraet = const {},
   }) => api.post(
     'members/me/fcm-token',
-    daten: {'token': token, 'device_id': ?geraeteId, 'platform': plattform},
+    daten: {...geraet, 'token': token, 'device_id': ?geraeteId, 'platform': plattform},
   );
+
+  /// Meldet dieses Geraet (`POST members/me/geraet`): welche App-Version auf
+  /// welcher Plattform. [geraeteId] ist die Zufallskennung der App, keine
+  /// Hardware-ID; [angaben] z.B. plattform, quelle, app_version,
+  /// build_nummer, os_version, geraet_modell.
+  Future<void> geraetMelden({required String geraeteId, required Map<String, Object?> angaben}) =>
+      api.post('members/me/geraet', daten: {...angaben, 'geraet_id': geraeteId});
 
   /// Meldet das FCM-Token ab (beim Abmelden). Idempotent.
   Future<void> pushTokenAbmelden(String token) =>

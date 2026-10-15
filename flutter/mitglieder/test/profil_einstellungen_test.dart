@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_core/fwv_core.dart';
 import 'package:fwv_mitglieder/anmeldung/authentik_anmeldung.dart';
 import 'package:fwv_mitglieder/dienste.dart';
+import 'package:fwv_mitglieder/einstellungen/geraet_meldung.dart';
 import 'package:fwv_mitglieder/einstellungen/kontakte_abgleich.dart';
 import 'package:fwv_mitglieder/main.dart';
 import 'package:fwv_mitglieder/push/push_dienst.dart';
@@ -159,6 +160,7 @@ class _Backend {
         return json({'success': true, 'message': 'Passwort erfolgreich geändert'});
       case 'POST /members/me/fcm-token':
       case 'DELETE /members/me/fcm-token':
+      case 'POST /members/me/geraet':
         return json({'success': true});
       case 'POST /newsletter/subscribe':
       case 'POST /newsletter/unsubscribe':
@@ -211,6 +213,7 @@ void main() {
     Plattform plattform = Plattform.android,
     KontakteAbgleich kontakte = const KontakteAbgleich(),
     Size groesse = const Size(360, 800),
+    GeraeteAngabenLesen? geraeteAngaben,
   }) async {
     // Ohne nativen Kontakt-Abgleich (wie heute): der Kanal meldet
     // MissingPluginException — sofort, nicht erst ueber die echte Engine.
@@ -250,6 +253,7 @@ void main() {
       },
       dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, utf8.decode(bytes))),
       plattform: plattform,
+      geraeteAngaben: geraeteAngaben,
     );
     await tester.pumpWidget(FwvApp(dienste: d));
     await tester.pumpAndSettle();
@@ -419,6 +423,69 @@ void main() {
     });
   });
 
+  group('Geraete-Meldung', () {
+    const angaben = GeraeteAngaben(
+      plattform: 'android',
+      quelle: 'apk',
+      appVersion: '1.0.23',
+      buildNummer: 10023,
+      osVersion: 'Android 16 (SDK 36)',
+      modell: 'samsung SM-A376B',
+    );
+
+    testWidgets('Beim Start einmal melden, Angaben auch mit dem Push-Token', (tester) async {
+      var gelesen = 0;
+      await starten(
+        tester,
+        geraeteAngaben: () async {
+          gelesen++;
+          return angaben;
+        },
+      );
+      final meldungen = backend.anfragen.where((a) => a.$2 == '/members/me/geraet').toList();
+      expect(meldungen, hasLength(1));
+      expect(meldungen.single.$3, {
+        'plattform': 'android',
+        'quelle': 'apk',
+        'app_version': '1.0.23',
+        'build_nummer': 10023,
+        'os_version': 'Android 16 (SDK 36)',
+        'geraet_modell': 'samsung SM-A376B',
+        'geraet_id': roh.werte['geraete_id'],
+      });
+      final token = backend.letzter('POST', '/members/me/fcm-token') as Map;
+      expect(token['device_id'], roh.werte['geraete_id']);
+      expect(token['app_version'], '1.0.23');
+      expect(token['quelle'], 'apk');
+      expect(gelesen, 1, reason: 'Angaben nur einmal lesen');
+
+      // Reiter wechseln usw. meldet nicht nochmals.
+      await reiter(tester, 'Mehr');
+      expect(backend.anfragen.where((a) => a.$2 == '/members/me/geraet'), hasLength(1));
+    });
+
+    testWidgets('Fehler beim Lesen oder Senden stoeren nicht', (tester) async {
+      await starten(tester, geraeteAngaben: () async => throw StateError('kein Paket'));
+      expect(backend.gab('POST', '/members/me/geraet'), isFalse);
+      // Das Token geht trotzdem, nur ohne Angaben.
+      final token = backend.letzter('POST', '/members/me/fcm-token') as Map;
+      expect(token.containsKey('app_version'), isFalse);
+      expect(find.text('Mit Vereinskonto anmelden'), findsNothing);
+    });
+
+    test('Angaben als JSON: leere Felder fehlen, Freitext gekuerzt', () {
+      expect(const GeraeteAngaben(plattform: 'web', quelle: 'web').alsJson(), {
+        'plattform': 'web',
+        'quelle': 'web',
+      });
+      final lang = GeraeteAngaben(plattform: 'linux', osVersion: 'Linux  6.8\n${'x' * 200}');
+      final os = lang.alsJson()['os_version']! as String;
+      expect(os.length, 100);
+      expect(os, startsWith('Linux 6.8 x'));
+      expect(lang.alsJson()['quelle'], 'unbekannt');
+    });
+  });
+
   group('Einstellungen', () {
     testWidgets('VPN: Geraete sehen, Zugang anlegen und an WireGuard geben, entfernen', (
       tester,
@@ -585,7 +652,10 @@ void main() {
       await starten(tester);
       expect(find.byType(NavigationRail), findsNothing);
       expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.descendant(of: find.byType(NavigationBar), matching: find.text('Musik')), findsNothing);
+      expect(
+        find.descendant(of: find.byType(NavigationBar), matching: find.text('Musik')),
+        findsNothing,
+      );
     });
 
     testWidgets('Hilfe: die vier Anleitungen der Website', (tester) async {

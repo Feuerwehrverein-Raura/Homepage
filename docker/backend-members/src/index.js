@@ -28,6 +28,7 @@ const { gruppenVerwaltung, gruppenAnsicht, darfGruppenVerwalten } = require('./a
 const { logoNachtrag } = require('./sender-logo');
 const { vorstandMelder, fcmNachricht, ABSCHALT_ART: VORSTAND_ABSCHALT_ART, ARTEN: VORSTAND_ARTEN } = require('./vorstand-melder');
 const { fcmDaten, vorlageZiel } = require('./push-daten');
+const { appGeraete, geraetAusEingabe, geraetAusFcmEingabe } = require('./app-geraete');
 
 // DEUTSCH: Firebase Admin SDK initialisieren — fuer FCM-Push-Notifications.
 // Kein Crash bei fehlender Config; ohne Credentials werden Pushes uebersprungen.
@@ -5605,6 +5606,39 @@ app.get('/members/me/notifications', authenticateToken, async (req, res) => {
     }
 });
 
+// DEUTSCH: Geraete der Mitglieder-App (src/app-geraete.js, Tabelle
+// app_geraete): welche Version auf welchem Geraet? Die App meldet sich
+// einmal pro Start; der Vorstand sieht die Liste unter GET /vorstand/app-geraete.
+// Neuste Version: env APP_NEUSTE_VERSION, sonst hoechste Android-Meldung.
+const appGeraeteDienst = appGeraete({ pool });
+appGeraeteDienst.tabelleAnlegen().catch(e => console.error('app_geraete anlegen:', e.message));
+
+// Body: { geraet_id, plattform, quelle?, app_version?, build_nummer?,
+// os_version?, geraet_modell? }. Nur Mitglieder (externe Organisatoren
+// haben kein Mitgliederkonto -> 404).
+app.post('/members/me/geraet', authenticateToken, async (req, res) => {
+    try {
+        const { werte, fehler } = geraetAusEingabe(req.body);
+        if (fehler) return res.status(400).json({ error: fehler });
+        const m = await mitgliedZurAnmeldung(req);
+        if (!m) return res.status(404).json({ error: 'Member profile not found' });
+        await appGeraeteDienst.melden(m.id, werte);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('POST /members/me/geraet:', error.message);
+        res.status(500).json({ error: 'Geraet konnte nicht gespeichert werden' });
+    }
+});
+
+app.get('/vorstand/app-geraete', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        res.json(await appGeraeteDienst.liste());
+    } catch (error) {
+        console.error('GET /vorstand/app-geraete:', error.message);
+        res.status(500).json({ error: 'Geraete konnten nicht gelesen werden' });
+    }
+});
+
 // DEUTSCH: FCM-Token-Registrierung (api-members v0.23.0+) — Mitglieder-App
 // ruft das beim Login + bei Token-Refresh auf, damit der Server Push-
 // Notifications an dieses Geraet senden kann.
@@ -5652,6 +5686,11 @@ app.post('/members/me/fcm-token', authenticateToken, async (req, res) => {
                   platform = COALESCE($4, fcm_tokens.platform),
                   updated_at = NOW()
         `, [memberId, token, device_id || null, platform || 'android']);
+
+        // Ab App 1.0.23 kommen Version, Quelle usw. mit (src/app-geraete.js).
+        // Nur Beiwerk: ein Fehler dort laesst die Token-Anmeldung gelingen.
+        const geraet = geraetAusFcmEingabe(req.body);
+        if (geraet) await appGeraeteDienst.leiseMelden(memberId, geraet);
 
         res.json({ success: true });
     } catch (error) {

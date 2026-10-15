@@ -24,6 +24,7 @@ import 'anmeldung/authentik_anmeldung.dart';
 import 'anmeldung/loopback_anmeldung.dart';
 import 'desktop/desktop.dart';
 import 'einstellungen/app_update.dart';
+import 'einstellungen/geraet_meldung.dart';
 import 'einstellungen/kontakte_abgleich.dart';
 import 'organisator/organisator_pruefung.dart';
 import 'roterschopf/schopf_pruefung.dart';
@@ -69,6 +70,8 @@ class Dienste {
     this.roterSchopfTakt = const Duration(seconds: 20),
     // Nur die echte App fragt von selbst nach (Tests: kein Wecker).
     Duration? schopfPruefTakt,
+    // Geraete-Meldung (Version, Plattform); ohne Angabe (Tests) keine.
+    GeraeteAngabenLesen? geraeteAngaben,
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
        dokumentFotoWaehlen = dokumentFotoWaehlen ?? _dokumentFotoMitImagePicker,
        pdfWaehlen = pdfWaehlen ?? _pdfMitFilePicker,
@@ -81,7 +84,16 @@ class Dienste {
        dateiTeilen = dateiTeilen ?? _teilenMitSharePlus,
        jetzt = jetzt ?? DateTime.now,
        plattform = plattform ?? _aktuellePlattform() {
-    pushAnmeldung = PushAnmeldung(push: push, speicher: this.speicher);
+    final lesen = geraeteAngaben;
+    // Dieselbe Zufallskennung wie beim Push-Token (fcm_tokens.device_id).
+    geraetMeldung = lesen == null
+        ? null
+        : GeraetMeldung(lesen: lesen, geraeteId: () => pushAnmeldung.geraeteId());
+    pushAnmeldung = PushAnmeldung(
+      push: push,
+      speicher: this.speicher,
+      geraet: geraetMeldung?.felder,
+    );
     organisator = OrganisatorPruefung(sitzung);
     schopfPruefung = SchopfPruefung(
       sitzung,
@@ -130,6 +142,7 @@ class Dienste {
           : const KeinAppUpdate(),
       dateiTeilen: istDesktop ? dateiSpeichernUndOeffnen : null,
       schopfPruefTakt: const Duration(minutes: 10),
+      geraeteAngaben: geraeteAngabenAusSystem,
     );
     push.beiAntippen = dienste.pushAngetippt;
     return dienste;
@@ -148,6 +161,10 @@ class Dienste {
 
   final PushDienst push;
   late final PushAnmeldung pushAnmeldung;
+
+  /// Meldet einmal pro Start Version und Plattform dieses Geraets
+  /// (einstellungen/geraet_meldung.dart); null in Tests ohne Angaben.
+  late final GeraetMeldung? geraetMeldung;
 
   /// Wohin eine angetippte Push-Mitteilung fuehrt ([PushZiel]). Die
   /// Hauptseite fuehrt dorthin (Anlass, Profil, Dialog) und setzt es danach
@@ -313,6 +330,7 @@ class Dienste {
     await sitzung.laden();
     _warAngemeldet = sitzung.angemeldet;
     sitzung.addListener(_sitzungGeaendert);
+    if (_alsMitgliedAngemeldet) unawaited(geraetMeldung?.melden(mitglieder));
     unawaited(_pushVorbereiten());
   }
 
@@ -330,7 +348,9 @@ class Dienste {
 
   void _sitzungGeaendert() {
     final jetzt = sitzung.angemeldet;
+    if (!jetzt) geraetMeldung?.vergessen();
     if (jetzt && !_warAngemeldet && _alsMitgliedAngemeldet) {
+      unawaited(geraetMeldung?.melden(mitglieder));
       // Frisch angemeldet: Erlaubnis fragen (Android 13+), Token anmelden.
       unawaited(() async {
         await push.erlaubnisAnfragen();

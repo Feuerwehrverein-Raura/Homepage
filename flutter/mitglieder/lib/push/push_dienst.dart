@@ -460,10 +460,15 @@ class FirebasePush implements PushDienst {
 /// (eine Zufallszahl, die beim ersten Mal entsteht und auch das Abmelden
 /// ueberdauert).
 class PushAnmeldung {
-  PushAnmeldung({required this.push, required this.speicher});
+  PushAnmeldung({required this.push, required this.speicher, this.geraet});
 
   final PushDienst push;
   final GeheimSpeicher speicher;
+
+  /// Angaben zum Geraet (Version, Quelle, ...), die mit dem Token gehen -
+  /// so bleibt die Geraete-Zeile beim Backend auch nach einem neuen Token
+  /// aktuell ([GeraetMeldung.felder]). Ohne: nur das Token.
+  final Future<Map<String, Object?>> Function()? geraet;
 
   static const _schluesselGeraet = 'geraete_id';
 
@@ -493,6 +498,7 @@ class PushAnmeldung {
         token: t,
         geraeteId: await geraeteId(),
         plattform: push.plattform,
+        geraet: await geraet?.call() ?? const {},
       );
       _angemeldet = t;
     } on Object catch (e) {

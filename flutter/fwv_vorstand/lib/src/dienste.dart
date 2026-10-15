@@ -10,6 +10,7 @@ import 'package:fwv_core/fwv_core.dart';
 import 'antraege/antraege_dienst.dart';
 import 'audit/audit_dienst.dart';
 import 'email/mailcow_dienst.dart';
+import 'geraete/app_geraete.dart';
 import 'geplant/geplante_auftraege.dart';
 import 'mitglieder/mitglieder_verwaltung.dart';
 import 'mitglieder/zugangs_dokumente.dart';
@@ -79,6 +80,9 @@ class VorstandDienste {
 
   /// Login-Datenblatt, Anmeldebon und App-QR eines Mitglieds (api-members).
   ZugangsDokumenteDienst get zugangsDokumente => ZugangsDokumenteDienst(api);
+
+  /// Geraete und App-Versionen der Mitglieder (GET vorstand/app-geraete).
+  AppGeraeteDienst get appGeraete => AppGeraeteDienst(api);
 }
 
 /// Vorstand-Seite der Website - fuer alles, was die App noch nicht kann.
