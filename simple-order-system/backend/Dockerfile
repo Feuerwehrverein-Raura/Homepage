@@ -23,6 +23,8 @@ RUN npm install --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
+# Logo fuer den Bon (assets/logo-bon.json) - fehlte bisher im Image.
+COPY --from=builder /app/assets ./assets
 
 EXPOSE 3000
 

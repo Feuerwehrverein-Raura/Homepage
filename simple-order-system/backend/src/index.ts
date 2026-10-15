@@ -2119,6 +2119,25 @@ function escapeXml(str: string): string {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Vereinslogo als ePOS-Rasterbild (einmal geladen). null-sicher.
+let bonLogoCache: string | null = null;
+function bonLogoXml(): string {
+  if (bonLogoCache !== null) return bonLogoCache;
+  bonLogoCache = '';
+  try {
+    const datei = path.join(process.cwd(), 'assets', 'logo-bon.json');
+    if (fs.existsSync(datei)) {
+      const l = JSON.parse(fs.readFileSync(datei, 'utf8'));
+      if (Number.isInteger(l.width) && Number.isInteger(l.height) && typeof l.raster === 'string') {
+        bonLogoCache = `<text align="center"/><image width="${l.width}" height="${l.height}" color="color_1" mode="mono">${l.raster}</image><text>&#10;</text>`;
+      }
+    }
+  } catch (err) {
+    console.error('Bon-Logo nicht lesbar:', err);
+  }
+  return bonLogoCache;
+}
+
 // Print via Epson ePOS-Print (HTTPS/XML) - fuer TM-m30III und neuere Modelle
 async function printViaEpos(
   ip: string,
@@ -2139,29 +2158,27 @@ async function printViaEpos(
     }
   });
 
-  // Load kitchen logo for kitchen station
-  let logoXml = '';
-  if (station === 'kitchen') {
-    try {
-      const logoPath = path.join(process.cwd(), 'assets', 'logo-kitchen.png');
-      if (fs.existsSync(logoPath)) {
-        const logoBuffer = fs.readFileSync(logoPath);
-        const logoBase64 = logoBuffer.toString('base64');
-        logoXml = `<image align="center">${logoBase64}</image><text>&#10;</text>`;
-      }
-    } catch (err) {
-      console.error('Failed to load kitchen logo:', err);
-    }
-  }
+  // Vereinslogo oben auf jedem Bon (assets/logo-bon.json: fertiges
+  // 1-Bit-Rasterbild fuer ePOS, aus images/logo.png erzeugt). Fehlt die
+  // Datei, wird ohne Logo gedruckt.
+  const logoXml = bonLogoXml();
+
+  // Bar und Kueche drucken auf denselben Drucker: der Kuechen-Bon traegt
+  // gross "KUECHE". "BAR" (Tisch 0) wird nicht mehr gedruckt, nur "TISCH n".
+  const kopfZeilen: string[] = [];
+  if (station === 'kitchen') kopfZeilen.push('KÜCHE');
+  if (tableNumber !== 0) kopfZeilen.push(tableLabel(tableNumber));
+  const kopfXml = kopfZeilen.map((z) =>
+    `<text align="center" font="font_a" em="true" width="3" height="3"/><text>${escapeXml(z)}&#10;</text>`
+  ).join('');
 
   const eposXml = `<?xml version="1.0" encoding="utf-8"?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
   <s:Body>
     <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
       ${logoXml}
-      <text align="center" font="font_a" em="true" width="3" height="3"/>
-      <text>${escapeXml(tableLabel(tableNumber))}&#10;</text>
-      <text width="1" height="1" em="false"/>
+      ${kopfXml}
+      <text align="center" width="1" height="1" em="false"/>
       <text>&#10;</text>
       <text align="left" width="1" height="2"/>
       <text>Bestell-Nr: #${orderId}&#10;</text>
@@ -2171,10 +2188,7 @@ async function printViaEpos(
       ${itemsXml}
       <text em="false" width="1" height="1"/>
       <text>================================&#10;</text>
-      <text>&#10;</text>
-      <text align="center" em="true" width="3" height="3"/>
-      <text>${escapeXml(tableLabel(tableNumber))}&#10;</text>
-      <text width="1" height="1"/>
+      ${tableNumber !== 0 ? `<text>&#10;</text><text align="center" em="true" width="3" height="3"/><text>${escapeXml(tableLabel(tableNumber))}&#10;</text><text width="1" height="1"/>` : ''}
       <feed line="3"/>
       <cut type="feed"/>
     </epos-print>
