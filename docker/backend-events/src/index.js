@@ -880,7 +880,9 @@ function gleicherSchluessel(a, b) {
 }
 
 function kasseSchluessel(req, res, next) {
-    if (gleicherSchluessel(req.headers['x-order-api-key'], process.env.ORDER_API_KEY)
+    // Live heisst derselbe Wert in api-events INVENTORY_KEY (siehe unten).
+    const kassenKey = process.env.ORDER_API_KEY || process.env.INVENTORY_KEY;
+    if (gleicherSchluessel(req.headers['x-order-api-key'], kassenKey)
         || gleicherSchluessel(req.headers['x-api-key'], process.env.API_KEY)) {
         return next();
     }
