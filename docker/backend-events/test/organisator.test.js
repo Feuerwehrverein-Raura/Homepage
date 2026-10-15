@@ -114,7 +114,11 @@ test('Organisator-Login und oeffentliche Anmeldung', { skip: !DB && 'TEST_DATABA
         assert.ok(!JSON.stringify(mails).includes('Falscher Titel'));
 
         const nochmal = await senden('/registrations/public', { type: 'participant', eventId: E(1), name: 'x', email: 'anders@example.ch' }, erika);
-        assert.equal(nochmal.status, 409, 'Doppelte Anmeldung ueber das Token erkannt');
+        // Dieselbe Person ueber das Token erkannt: keine zweite Zeile, die
+        // bestehende Anmeldung kommt zurueck (src/doppelte-anmeldung.js).
+        assert.equal(nochmal.status, 200, 'Doppelte Anmeldung ueber das Token erkannt');
+        assert.equal(nochmal.json.bereits_angemeldet, true);
+        assert.equal(nochmal.json.registrationId, r.json.registrationId);
     });
 
     await t.test('organizer_email des Anlasses bekommt die Meldung', async () => {

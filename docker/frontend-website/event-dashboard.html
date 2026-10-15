@@ -732,6 +732,13 @@
             const shiftIds = Array.from(document.querySelectorAll('.add-p-shift:checked')).map(c => c.value);
             if (shiftIds.length > 0) body.shift_ids = shiftIds;
 
+            // Knopf sperren, solange gesendet wird (sonst ergibt ein
+            // Mehrfachklick mehrere Anmeldungen; das Backend lehnt dieselbe
+            // Person inzwischen mit 409 und Text ab).
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn?.disabled) return;
+            const submitText = submitBtn?.textContent;
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Wird gespeichert...'; }
             try {
                 const response = await fetch(`${API_BASE}/events/my-event/registrations`, {
                     method: 'POST',
@@ -754,6 +761,8 @@
                 await loadDashboard();
             } catch (error) {
                 alert('Fehler: ' + error.message);
+            } finally {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitText; }
             }
         });
     </script>

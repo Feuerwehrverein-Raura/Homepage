@@ -3,6 +3,7 @@
 // Vertragsdateien aus docker/backend-events/test/fixtures/ (aus dem Repo
 // gelesen, nie kopiert) — keine echten Konten, kein Netz.
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -63,6 +64,9 @@ class _Backend {
   };
   var kannBearbeiten = false;
   http.Response Function()? anmeldeAntwort;
+
+  /// Haelt die Antwort auf die Anmeldung zurueck, bis der Test sie freigibt.
+  Completer<void>? anmeldungHalten;
   final anfragen = <http.Request>[];
 
   Object? letzterBody(String methode, String pfad) {
@@ -97,6 +101,7 @@ class _Backend {
           'mobile': '+41 79 000 00 00',
         });
       case 'POST /registrations/public':
+        await anmeldungHalten?.future;
         return anmeldeAntwort?.call() ??
             json({
               'success': true,
@@ -447,9 +452,8 @@ void main() {
         utf8.encode(
           jsonEncode({
             'success': false,
-            'message':
-                'Mit dieser E-Mail-Adresse besteht bereits eine Anmeldung für diesen Anlass.',
-            'code': 'already_registered',
+            'message': 'Das Event ist bereits voll. Bitte wende dich an den Organisator.',
+            'code': 'event_full',
           }),
         ),
         409,
@@ -480,13 +484,56 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('anmelden-fehler')),
-          matching: find.text(
-            'Mit dieser E-Mail-Adresse besteht bereits eine Anmeldung für diesen Anlass.',
-          ),
+          matching: find.text('Das Event ist bereits voll. Bitte wende dich an den Organisator.'),
         ),
         findsOneWidget,
       );
       expect(find.text('Anmeldung senden'), findsOneWidget, reason: 'Formular bleibt offen');
+    });
+
+    testWidgets('Doppeltipp sendet einmal; schon angemeldet wird freundlich gezeigt', (
+      tester,
+    ) async {
+      backend.anmeldeAntwort = () => http.Response.bytes(
+        utf8.encode(
+          jsonEncode({
+            'success': true,
+            'bereits_angemeldet': true,
+            'registrationId': 'r1',
+            'isMember': true,
+            'message':
+                'Du bist schon angemeldet (1 Person). Eine zweite Anmeldung ist nicht nötig.',
+          }),
+        ),
+        200,
+      );
+      await detailOeffnen(tester, 'Herbstmarkt');
+      await tester.tap(find.byKey(const Key('anlass-anmelden')));
+      await tester.pumpAndSettle();
+      expect(find.text('Wie viele Personen kommen, dich eingeschlossen?'), findsOneWidget);
+
+      final senden = find.byKey(const Key('anmelden-senden'));
+      await tester.ensureVisible(senden);
+      backend.anmeldungHalten = Completer<void>();
+      await tester.tap(senden);
+      await tester.tap(senden, warnIfMissed: false);
+      await tester.pump();
+      // Waehrend des Sendens gesperrt, mit Ladeanzeige.
+      expect(tester.widget<FilledButton>(senden).onPressed, isNull);
+      expect(
+        find.descendant(of: senden, matching: find.byType(CircularProgressIndicator)),
+        findsOneWidget,
+      );
+      await tester.tap(senden, warnIfMissed: false);
+      backend.anmeldungHalten!.complete();
+      await tester.pumpAndSettle();
+
+      expect(backend.zaehle('POST', '/registrations/public'), 1);
+      expect(find.text('Schon angemeldet'), findsOneWidget);
+      expect(
+        find.text('Du bist schon angemeldet (1 Person). Eine zweite Anmeldung ist nicht nötig.'),
+        findsOneWidget,
+      );
     });
   });
 

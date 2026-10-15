@@ -275,6 +275,9 @@ class _PersonHinzufuegenScreenState extends State<PersonHinzufuegenScreen> {
   ];
 
   Future<void> _speichern() async {
+    // Doppeltipp im selben Frame: nur einmal eintragen (das Backend lehnt
+    // dieselbe Person sonst mit 409 ab).
+    if (_laeuft) return;
     if (!_alsGast && _mitglied == null) {
       meldung(context, 'Bitte ein Mitglied auswählen.');
       return;

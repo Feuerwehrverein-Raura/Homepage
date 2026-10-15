@@ -89,6 +89,23 @@ void main() {
     });
   });
 
+  test('Schon angemeldet (Doppelklick): Erfolg mit Kennzeichen und Text', () async {
+    final d = dienst(
+      (_) => json({
+        'success': true,
+        'bereits_angemeldet': true,
+        'registrationId': 'r1',
+        'message': 'Du bist schon angemeldet (2 Personen). Eine zweite Anmeldung ist nicht nötig.',
+      }),
+    );
+    final e = await d.anmelden(
+      const AnmeldeAnfrage(art: AnmeldeArt.teilnahme, anlassId: 'e2', name: 'Heinz Degen'),
+    );
+    expect(e.bereitsAngemeldet, isTrue);
+    expect(e.mussBestaetigen, isFalse);
+    expect(e.meldung, startsWith('Du bist schon angemeldet (2 Personen).'));
+  });
+
   test('Absage des Backends wird zum Fehler mit seiner Meldung', () async {
     final d = dienst(
       (_) => json({

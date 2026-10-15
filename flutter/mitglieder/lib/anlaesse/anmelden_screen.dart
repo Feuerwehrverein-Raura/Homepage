@@ -80,6 +80,9 @@ class _AnmeldenScreenState extends State<AnmeldenScreen> {
   }
 
   Future<void> _senden() async {
+    // Zwei Tipps im selben Frame: der Knopf ist erst nach dem naechsten
+    // Aufbau gesperrt - darum hier nochmals.
+    if (_sendet) return;
     setState(() {
       _geprueft = true;
       _fehler = null;
@@ -113,9 +116,19 @@ class _AnmeldenScreenState extends State<AnmeldenScreen> {
         context: context,
         builder: (context) => AlertDialog(
           icon: Icon(
-            ergebnis.mussBestaetigen ? Icons.mark_email_unread_outlined : Icons.check_circle,
+            ergebnis.mussBestaetigen
+                ? Icons.mark_email_unread_outlined
+                : ergebnis.bereitsAngemeldet
+                ? Icons.event_available
+                : Icons.check_circle,
           ),
-          title: Text(ergebnis.mussBestaetigen ? 'Bitte bestätigen' : 'Angemeldet'),
+          title: Text(
+            ergebnis.mussBestaetigen
+                ? 'Bitte bestätigen'
+                : ergebnis.bereitsAngemeldet
+                ? 'Schon angemeldet'
+                : 'Angemeldet',
+          ),
           content: Text(ergebnis.meldung),
           actions: [
             FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
@@ -219,7 +232,7 @@ class _AnmeldenScreenState extends State<AnmeldenScreen> {
                 const Abschnitt('Teilnahme'),
                 Row(
                   children: [
-                    const Expanded(child: Text('Personen')),
+                    const Expanded(child: Text('Wie viele Personen kommen, dich eingeschlossen?')),
                     IconButton(
                       onPressed: _sendet || _personen <= 1
                           ? null

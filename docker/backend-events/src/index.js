@@ -21,6 +21,7 @@ const { mitAnlassLogo, escapeHtml } = require('./anlass-mail');
 const { STANDARD_ORGANISATOR, ohneOrganisator, istStandardOrganisator } = require('./organisator-standard');
 const mitorganisatoren = require('./mitorganisatoren');
 const { schichtenPruefen } = require('./schicht-eintrag');
+const doppelteAnmeldung = require('./doppelte-anmeldung');
 const { pushZielDaten, mitZiel } = require('./push-ziel');
 const { listenLimit } = require('./liste-limit');
 
@@ -2051,20 +2052,40 @@ app.post('/events/my-event/registrations', authenticateEventOrganizer, async (re
         });
         if (schichten.fehler) return res.status(schichten.fehler.status).json(schichten.fehler.body);
 
-        const registration = await pool.query(`
-            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
-            VALUES ($1, $2, $3, $4, $5, $6, 'approved')
-            RETURNING *
-        `, [
-            eventId,
-            member_id || null,
-            name,
-            email,
-            schichten.shiftIds ?? null,
-            JSON.stringify({ phone: guest_phone, participants: participants || 1, notes })
-        ]);
+        // Teilnehmer ohne Schicht: dieselbe Person nicht zweimal
+        // (src/doppelte-anmeldung.js). Von Hand eingetragen ist ein Doppel
+        // eher ein Versehen - darum 409 mit Text statt still 200.
+        const teilnahme = doppelteAnmeldung.istTeilnahme(schichten.shiftIds);
+        const eintrag = await doppelteAnmeldung.mitAnmeldeSperre(pool, eventId, async (db) => {
+            if (teilnahme) {
+                const bestehend = await doppelteAnmeldung.bestehendeTeilnahme(db, {
+                    eventId, memberId: member_id || null, email, name
+                });
+                if (bestehend) return { bestehend };
+            }
+            const r = await db.query(`
+                INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
+                VALUES ($1, $2, $3, $4, $5, $6, 'approved')
+                RETURNING *
+            `, [
+                eventId,
+                member_id || null,
+                name,
+                email,
+                schichten.shiftIds ?? null,
+                JSON.stringify({ phone: guest_phone, participants: participants || 1, notes })
+            ]);
+            return { reg: r.rows[0] };
+        });
+        if (eintrag.bestehend) {
+            return res.status(409).json({
+                error: doppelteAnmeldung.hinweisVorstand(eintrag.bestehend),
+                code: 'bereits_angemeldet',
+                registration: eintrag.bestehend
+            });
+        }
 
-        const reg = registration.rows[0];
+        const reg = eintrag.reg;
         res.json({ success: true, registration: reg, warnung: schichten.warnung ?? null });
 
         // Wie beim Eintrag in der App: Person und Organisatoren informieren.
@@ -2340,13 +2361,42 @@ app.post('/registrations', authenticateAny, async (req, res) => {
             });
         }
 
-        const result = await pool.query(`
-            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING *
-        `, [event_id, member_id, guest_name, guest_email, shift_ids, notes, regStatus]);
+        // Teilnehmer ohne Schicht: dieselbe Person nicht zweimal
+        // (src/doppelte-anmeldung.js). So entstanden am Spaghetti-Plausch 2026
+        // vier Zeilen "Degen, Heinz" in 5 Sekunden: vorstand.html "Person
+        // hinzufuegen" schickte bei jedem Klick ein neues POST hierher.
+        // Vorstand/Admin bekommen 409 (Versehen), ein Mitglied, das sich
+        // selbst nochmals anmeldet, die bestehende Anmeldung (200).
+        const eintrag = await doppelteAnmeldung.mitAnmeldeSperre(pool, event_id, async (db) => {
+            if (doppelteAnmeldung.istTeilnahme(shift_ids)) {
+                const bestehend = await doppelteAnmeldung.bestehendeTeilnahme(db, {
+                    eventId: event_id, memberId: member_id || null, email: guest_email || '', name: guest_name || ''
+                });
+                if (bestehend) return { bestehend };
+            }
+            const r = await db.query(`
+                INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING *
+            `, [event_id, member_id, guest_name, guest_email, shift_ids, notes, regStatus]);
+            return { reg: r.rows[0] };
+        });
+        if (eintrag.bestehend) {
+            if (isPrivileged) {
+                return res.status(409).json({
+                    error: doppelteAnmeldung.hinweisVorstand(eintrag.bestehend),
+                    code: 'bereits_angemeldet',
+                    registration: eintrag.bestehend
+                });
+            }
+            return res.status(200).json({
+                ...eintrag.bestehend,
+                bereits_angemeldet: true,
+                message: doppelteAnmeldung.hinweisSelbst(eintrag.bestehend, null)
+            });
+        }
 
-        const reg = result.rows[0];
+        const reg = eintrag.reg;
 
         // Push an den Vorstand nur, wenn die Anmeldung noch bestaetigt werden
         // muss - traegt der Vorstand selbst ein, weiss er es schon.
@@ -2437,21 +2487,19 @@ async function ensureRegistrationConfirmationsSchema() {
 // DEUTSCH: Legt die eigentliche Anmeldung an (Insert + Audit-Push + Bestaetigungs-/
 // Organisator-Mails) und gibt die Registrierungs-Zeile zurueck. Wird direkt aufgerufen
 // (Mitglieder / Anmeldungen ohne E-Mail) ODER nach erfolgreicher Gast-Bestaetigung.
-async function finalizeRegistration(ctx) {
+// Nur die Zeile anlegen ([db]: Pool oder Transaktions-Client).
+async function anmeldungEinfuegen(db, ctx) {
     const {
-        ev, memberId, isMember, name, email, phone, type,
+        ev, memberId, name, email, phone, type,
         shiftIds, shifts, notes, meal_selection, allergies,
         requestedPersons, companions
     } = ctx;
-    const eventTitle = ev.title;
-    const eventId = ev.id;
-
-    const registration = await pool.query(`
+    const r = await db.query(`
         INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status)
         VALUES ($1, $2, $3, $4, $5, $6, 'pending')
         RETURNING *
     `, [
-        eventId, memberId || null, name, email,
+        ev.id, memberId || null, name, email,
         type === 'shift' ? eindeutig(shiftIds) : null,
         JSON.stringify({
             phone,
@@ -2462,6 +2510,39 @@ async function finalizeRegistration(ctx) {
             allergies: allergies || null
         })
     ]);
+    return r.rows[0];
+}
+
+// Teilnehmer-Anmeldung unter der Anmelde-Sperre des Anlasses: ist dieselbe
+// Person schon angemeldet (src/doppelte-anmeldung.js), kommt { bestehend }
+// zurueck, sonst { reg } (frisch eingefuegt). [pruefen](db) darf vorher
+// noch { fehler } liefern (z.B. Anlass voll) - auch unter der Sperre.
+async function teilnahmeAnlegen(ctx, pruefen = null) {
+    return doppelteAnmeldung.mitAnmeldeSperre(pool, ctx.ev.id, async (db) => {
+        const bestehend = await doppelteAnmeldung.bestehendeTeilnahme(db, {
+            eventId: ctx.ev.id, memberId: ctx.memberId || null, email: ctx.email || '', name: ctx.name || ''
+        });
+        if (bestehend) return { bestehend };
+        if (pruefen) {
+            const fehler = await pruefen(db);
+            if (fehler) return { fehler };
+        }
+        return { reg: await anmeldungEinfuegen(db, ctx) };
+    });
+}
+
+// [vorhanden]: schon eingefuegte Zeile (teilnahmeAnlegen) - dann nur noch
+// Audit, Push und Mails.
+async function finalizeRegistration(ctx, vorhanden = null) {
+    const {
+        ev, memberId, isMember, name, email, phone, type,
+        shiftIds, shifts, notes, meal_selection, allergies,
+        requestedPersons
+    } = ctx;
+    const eventTitle = ev.title;
+    const eventId = ev.id;
+
+    const registration = { rows: [vorhanden || await anmeldungEinfuegen(pool, ctx)] };
 
     // Push an den Vorstand: neue Anmeldung wartet auf Bestaetigung (pending).
     // Wer sich selbst anmeldet, bekommt keinen Push.
@@ -2641,9 +2722,13 @@ app.post('/registrations/public', async (req, res) => {
             );
 
             if (memberCheck.rows.length > 0) {
-                memberId = memberCheck.rows[0].id;
+                // Paare teilen sich oft eine Adresse: das Mitglied mit dem
+                // Namen aus dem Formular nehmen, nicht einfach das erste.
+                const treffer = memberCheck.rows.find(m => doppelteAnmeldung.gleicherName(
+                    [m.vorname, m.nachname].filter(Boolean).join(' '), name)) || memberCheck.rows[0];
+                memberId = treffer.id;
                 isMember = true;
-                console.log(`Registrierung automatisch verknüpft mit Mitglied: ${memberCheck.rows[0].vorname} ${memberCheck.rows[0].nachname}`);
+                console.log(`Registrierung automatisch verknüpft mit Mitglied: ${treffer.vorname} ${treffer.nachname}`);
             }
         }
 
@@ -2680,11 +2765,8 @@ app.post('/registrations/public', async (req, res) => {
                 code: 'deadline_passed'
             });
         }
-        // DEUTSCH: Duplikat-Schutz — dieselbe E-Mail (Gast ODER verknuepftes
-        // Mitglied) hat fuer diesen Anlass schon eine offene/bestaetigte
-        // Anmeldung. Nur fuer Teilnehmer-/GV-Anmeldungen: Helfer duerfen
-        // spaeter zusaetzliche Schichten nachbuchen.
-        // Helfer: weitere Schichten ja, dieselbe Schicht nein.
+        // Helfer: weitere Schichten ja, dieselbe Schicht nein
+        // (src/doppelte-schicht.js). Teilnehmer: siehe weiter unten.
         if (type === 'shift') {
             const doppelt = await schichtKonflikte(pool, {
                 eventId: ev.id, memberId, email, shiftIds: shiftIds
@@ -2705,47 +2787,51 @@ app.post('/registrations/public', async (req, res) => {
                 });
             }
         }
-        if (type !== 'shift' && (email || memberId)) {
-            const dupe = await pool.query(
-                `SELECT id FROM registrations
-                 WHERE event_id = $1 AND status IN ('pending', 'approved')
-                   AND (($2 <> '' AND LOWER(guest_email) = LOWER($2))
-                        OR ($3::uuid IS NOT NULL AND member_id = $3::uuid)
-                        OR member_id = (SELECT id FROM members WHERE $2 <> '' AND LOWER(email) = LOWER($2) LIMIT 1))
-                 LIMIT 1`,
-                [ev.id, email || '', memberId]
-            );
-            if (dupe.rows.length > 0) {
-                return res.status(409).json({
-                    success: false,
-                    message: 'Mit dieser E-Mail-Adresse besteht bereits eine Anmeldung für diesen Anlass. Falls du etwas ändern möchtest, melde dich beim Vorstand.',
-                    code: 'already_registered'
-                });
-            }
+        // Teilnehmer: dieselbe Person nicht zweimal (src/doppelte-anmeldung.js).
+        // Frueher sperrte hier schon dieselbe E-Mail - auch Paare mit
+        // gemeinsamer Adresse, die sich je selbst anmelden wollten. Jetzt
+        // zaehlt Mitglied/Adresse UND Name; ein zweiter Versuch derselben
+        // Person (Doppelklick) bekommt die bestehende Anmeldung zurueck.
+        const requestedPersons = Math.min(Math.max(parseInt(participants, 10) || 1, 1), 50);
+        const schonAngemeldet = (bestehend) => res.json({
+            success: true,
+            bereits_angemeldet: true,
+            registrationId: bestehend.id,
+            isMember,
+            message: doppelteAnmeldung.hinweisSelbst(bestehend, requestedPersons)
+        });
+        if (type !== 'shift') {
+            const bestehend = await doppelteAnmeldung.bestehendeTeilnahme(pool, {
+                eventId: ev.id, memberId, email, name
+            });
+            if (bestehend) return schonAngemeldet(bestehend);
         }
 
         // DEUTSCH: Kapazitaet in PERSONEN pruefen (eine Anmeldung kann mehrere
         // Personen umfassen) — inkl. der jetzt angefragten Personenzahl.
-        const requestedPersons = Math.min(Math.max(parseInt(participants, 10) || 1, 1), 50);
-        if (ev.max_participants) {
-            const cnt = await pool.query(
+        // Liefert die 409-Antwort oder null; laeuft beim Einfuegen nochmals
+        // unter der Anmelde-Sperre.
+        const kapazitaetPruefen = async (db) => {
+            if (!ev.max_participants) return null;
+            const cnt = await db.query(
                 `SELECT notes FROM registrations
                  WHERE event_id = $1 AND status IN ('approved', 'pending')`,
                 [ev.id]
             );
             const used = sumRegistrationPersons(cnt.rows);
             const free = ev.max_participants - used;
-            if (free < requestedPersons) {
-                return res.status(409).json({
-                    success: false,
-                    message: free <= 0
-                        ? 'Das Event ist bereits voll. Bitte wende dich an den Organisator.'
-                        : `Es sind nur noch ${free} freie ${free === 1 ? 'Platz' : 'Plätze'} verfügbar (angefragt: ${requestedPersons}). Bitte reduziere die Personenzahl oder wende dich an den Organisator.`,
-                    code: 'event_full',
-                    freeSpots: Math.max(0, free)
-                });
-            }
-        }
+            if (free >= requestedPersons) return null;
+            return {
+                success: false,
+                message: free <= 0
+                    ? 'Das Event ist bereits voll. Bitte wende dich an den Organisator.'
+                    : `Es sind nur noch ${free} freie ${free === 1 ? 'Platz' : 'Plätze'} verfügbar (angefragt: ${requestedPersons}). Bitte reduziere die Personenzahl oder wende dich an den Organisator.`,
+                code: 'event_full',
+                freeSpots: Math.max(0, free)
+            };
+        };
+        const voll = await kapazitaetPruefen(pool);
+        if (voll) return res.status(409).json(voll);
 
         // DEUTSCH: Begleitpersonen (Namen der weiteren Personen) — vom Formular
         // mitgeschickt, sanitisiert (max 49 Namen, je max 100 Zeichen).
@@ -2825,8 +2911,17 @@ Feuerwehrverein Raura
             });
         }
 
-        // Mitglied ODER keine E-Mail: sofort finalisieren.
-        const reg = await finalizeRegistration(ctx);
+        // Mitglied ODER keine E-Mail: sofort finalisieren. Teilnehmer unter
+        // der Anmelde-Sperre: vier Klicks in 5 Sekunden ergeben eine Zeile.
+        let reg;
+        if (type !== 'shift') {
+            const eintrag = await teilnahmeAnlegen(ctx, kapazitaetPruefen);
+            if (eintrag.bestehend) return schonAngemeldet(eintrag.bestehend);
+            if (eintrag.fehler) return res.status(409).json(eintrag.fehler);
+            reg = await finalizeRegistration(ctx, eintrag.reg);
+        } else {
+            reg = await finalizeRegistration(ctx);
+        }
         res.json({
             success: true,
             message: isMember ? 'Anmeldung erfolgreich (als Mitglied verknüpft)' : 'Anmeldung erfolgreich',
@@ -2879,8 +2974,19 @@ app.get('/registrations/confirm', async (req, res) => {
             return res.status(409).send(page('Anlass abgesagt', 'Dieser Anlass wurde inzwischen abgesagt – eine Anmeldung ist nicht mehr möglich.', false));
         }
         const payload = typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
-        await finalizeRegistration({ ...payload, ev });
-        await pool.query('DELETE FROM registration_confirmations WHERE token = $1', [token]);
+        if (payload.type !== 'shift') {
+            // Zweimal bestaetigt (zwei Mails, zweimal geklickt): eine Zeile.
+            const eintrag = await teilnahmeAnlegen({ ...payload, ev });
+            await pool.query('DELETE FROM registration_confirmations WHERE token = $1', [token]);
+            if (eintrag.bestehend) {
+                return res.send(page('Schon angemeldet',
+                    doppelteAnmeldung.hinweisSelbst(eintrag.bestehend, payload.requestedPersons), true));
+            }
+            await finalizeRegistration({ ...payload, ev }, eintrag.reg);
+        } else {
+            await finalizeRegistration({ ...payload, ev });
+            await pool.query('DELETE FROM registration_confirmations WHERE token = $1', [token]);
+        }
         return res.send(page('Anmeldung bestätigt',
             `Danke${payload.name ? ', ' + payload.name : ''}! Deine Anmeldung für „${ev.title}" ist bestätigt. Der Organisator wurde informiert und meldet sich bei dir.`, true));
     } catch (error) {
@@ -3592,23 +3698,42 @@ app.post('/events/:id/registrations-as-organizer', authenticateAny, async (req, 
         });
         if (schichten.fehler) return res.status(schichten.fehler.status).json(schichten.fehler.body);
 
-        const result = await pool.query(`
-            INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status, approved_by, approved_at)
-            VALUES ($1, $2, $3, $4, $5, $6, 'approved', $7, NOW())
-            RETURNING *
-        `, [
-            id,
-            member_id || null,
-            guest_name || '',
-            guest_email || '',
-            schichten.shiftIds ?? null,
-            JSON.stringify({ phone: guest_phone, participants: participants || 1, notes }),
-            req.user.email || req.user.name || 'organizer'
-        ]);
-        res.json({ success: true, registration: result.rows[0], warnung: schichten.warnung ?? null });
+        // Teilnehmer ohne Schicht: dieselbe Person nicht zweimal
+        // (src/doppelte-anmeldung.js) - 409, von Hand ist es ein Versehen.
+        const teilnahme = doppelteAnmeldung.istTeilnahme(schichten.shiftIds);
+        const eintrag = await doppelteAnmeldung.mitAnmeldeSperre(pool, id, async (db) => {
+            if (teilnahme) {
+                const bestehend = await doppelteAnmeldung.bestehendeTeilnahme(db, {
+                    eventId: id, memberId: member_id || null, email: guest_email || '', name: guest_name || ''
+                });
+                if (bestehend) return { bestehend };
+            }
+            const r = await db.query(`
+                INSERT INTO registrations (event_id, member_id, guest_name, guest_email, shift_ids, notes, status, approved_by, approved_at)
+                VALUES ($1, $2, $3, $4, $5, $6, 'approved', $7, NOW())
+                RETURNING *
+            `, [
+                id,
+                member_id || null,
+                guest_name || '',
+                guest_email || '',
+                schichten.shiftIds ?? null,
+                JSON.stringify({ phone: guest_phone, participants: participants || 1, notes }),
+                req.user.email || req.user.name || 'organizer'
+            ]);
+            return { reg: r.rows[0] };
+        });
+        if (eintrag.bestehend) {
+            return res.status(409).json({
+                error: doppelteAnmeldung.hinweisVorstand(eintrag.bestehend),
+                code: 'bereits_angemeldet',
+                registration: eintrag.bestehend
+            });
+        }
+        res.json({ success: true, registration: eintrag.reg, warnung: schichten.warnung ?? null });
 
         const ev = await pool.query('SELECT title FROM events WHERE id=$1', [id]);
-        const newReg = result.rows[0];
+        const newReg = eintrag.reg;
         notifyRegistrationChange({
             eventId: id, eventTitle: ev.rows[0]?.title || 'Event',
             memberId: newReg.member_id,

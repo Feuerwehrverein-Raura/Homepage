@@ -53,6 +53,7 @@ class AnlaesseDienst {
     return AnmeldeErgebnis(
       meldung: meldung ?? 'Anmeldung erfolgreich',
       mussBestaetigen: bestaetigen,
+      bereitsAngemeldet: jsonWahr(m['bereits_angemeldet']) ?? false,
     );
   }
 
@@ -117,13 +118,21 @@ class AnmeldeAnfrage {
 }
 
 class AnmeldeErgebnis {
-  const AnmeldeErgebnis({required this.meldung, this.mussBestaetigen = false});
+  const AnmeldeErgebnis({
+    required this.meldung,
+    this.mussBestaetigen = false,
+    this.bereitsAngemeldet = false,
+  });
 
   /// Text des Backends, z.B. "Anmeldung erfolgreich (als Mitglied verknüpft)".
   final String meldung;
 
   /// Gaeste muessen per E-Mail-Link bestaetigen (Double-Opt-in).
   final bool mussBestaetigen;
+
+  /// Dieselbe Person war schon angemeldet (z.B. Doppelklick): das Backend
+  /// legt keine zweite Anmeldung an und gibt die bestehende zurueck.
+  final bool bereitsAngemeldet;
 }
 
 /// `GET event-optionen`: die einzige Quelle fuer Kategorien usw.
