@@ -1,8 +1,10 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fwv_mitglieder/einstellungen/app_update.dart';
+import 'package:fwv_mitglieder/einstellungen/update_hinweis.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -48,8 +50,10 @@ void main() {
     const kanal = MethodChannel('test/update');
 
     void nativ(Object? Function(MethodCall) antwort) {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(kanal, (call) async => antwort(call));
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+        kanal,
+        (call) async => antwort(call),
+      );
     }
 
     AndroidAppUpdate dienst(http.Client client) =>
@@ -58,11 +62,13 @@ void main() {
     final keinNetz = MockClient((_) async => throw StateError('kein Netz erwartet'));
 
     test('aus Play: fragt Play, nicht GitHub', () async {
-      nativ((c) => switch (c.method) {
-        'quelle' => 'play',
-        'pruefen' => {'verfuegbar': true, 'geladen': false},
-        _ => null,
-      });
+      nativ(
+        (c) => switch (c.method) {
+          'quelle' => 'play',
+          'pruefen' => {'verfuegbar': true, 'geladen': false},
+          _ => null,
+        },
+      );
       final s = await dienst(keinNetz).pruefen();
       expect(s, isA<PlayUpdate>());
       expect((s as PlayUpdate).geladen, isFalse);
@@ -92,6 +98,43 @@ void main() {
       expect(s, isA<KeinUpdate>());
       nativ((c) => throw PlatformException(code: 'x'));
       expect(await dienst(keinNetz).pruefen(), isA<KeinUpdate>());
+    });
+  });
+
+  group('apkUpdateErklaeren', () {
+    final apk = Uri.parse('https://example.org/members-latest.apk');
+
+    Future<List<Uri>> oeffnen(WidgetTester tester, String knopf) async {
+      final geoeffnet = <Uri>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => apkUpdateErklaeren(context, '1.0.2', apk, (u) async {
+                geoeffnet.add(u);
+                return true;
+              }),
+              child: const Text('los'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('los'));
+      await tester.pumpAndSettle();
+      expect(find.text('Version 1.0.2 installieren'), findsOneWidget);
+      expect(find.textContaining('Trotzdem herunterladen'), findsOneWidget);
+      await tester.tap(find.text(knopf));
+      await tester.pumpAndSettle();
+      expect(find.text('Version 1.0.2 installieren'), findsNothing);
+      return geoeffnet;
+    }
+
+    testWidgets('erklaert die Chrome-Rueckfrage, dann Link im Browser', (tester) async {
+      expect(await oeffnen(tester, 'Herunterladen'), [apk]);
+    });
+
+    testWidgets('Später: kein Download', (tester) async {
+      expect(await oeffnen(tester, 'Später'), isEmpty);
     });
   });
 }

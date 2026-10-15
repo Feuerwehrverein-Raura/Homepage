@@ -191,7 +191,7 @@
                                     </span>
                                 </div>
                                 <h4 class="font-semibold text-gray-800 mb-2">Datei direkt laden</h4>
-                                <p class="text-sm text-gray-600 mb-4">Braucht keine Freischaltung. Android fragt beim Öffnen einmal, ob es Apps aus dieser Quelle installieren darf.</p>
+                                <p class="text-sm text-gray-600 mb-4">Braucht keine Freischaltung, hat aber ein paar Rückfragen mehr. Einfacher bleibt der Weg über den Play Store.</p>
                                 <a href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest.apk"
                                    class="block w-full text-center bg-fire-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-fire-700 transition-colors shadow-md">
                                     <svg class="inline-block w-5 h-5 mr-2 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -199,6 +199,18 @@
                                     </svg>
                                     APK herunterladen
                                 </a>
+                                <!-- DEUTSCH: Chrome fragt bei JEDER APK ausserhalb von Play nach
+                                     ("Die Datei könnte schädlich sein"); serverseitig nicht
+                                     abschaltbar. In eingebetteten Fenstern (Custom Tab, Link aus
+                                     WhatsApp/Mail) zeigt Chrome die Frage gar nicht, der Download
+                                     steht dann bei 100 %. Ein intent://-Link auf Chrome hilft dort
+                                     nicht: Chrome laedt Links auf sich selbst im selben Fenster
+                                     (ExternalNavigationHandler.isNavigationToSelf). -->
+                                <ol class="mt-4 space-y-2 text-sm text-gray-600 list-decimal pl-5">
+                                    <li>Chrome fragt «Die Datei könnte schädlich sein» — das kommt bei jeder App ausserhalb des Play Stores. Tippe auf <strong>Trotzdem herunterladen</strong>.</li>
+                                    <li>Dann auf <strong>Öffnen</strong> tippen und installieren. Beim ersten Mal will Android, dass du Chrome das Installieren erlaubst.</li>
+                                </ol>
+                                <p class="mt-3 text-xs text-gray-500">Steht der Download bei 100 % still? Dann ist der Link in einem eingebetteten Fenster offen (z.&nbsp;B. aus WhatsApp oder einer E-Mail). Oben rechts auf <strong>⋮</strong> → <strong>In Chrome öffnen</strong> tippen und nochmals laden. <a href="#apk-installation" class="text-fire-600 underline">Mit Bild</a></p>
                             </div>
                         </div>
 
@@ -625,7 +637,7 @@
 
     <!-- DEUTSCH: Installations-Anleitung Sektion - Schritt-fuer-Schritt-Anleitung zur APK-Installation -->
     <!-- DEUTSCH: Erklaert Nutzern, wie man Android-Apps ausserhalb des Play Stores installiert -->
-    <section class="bg-white py-16">
+    <section class="bg-white py-16" id="apk-installation">
         <div class="max-w-7xl mx-auto px-4">
             <div class="text-center mb-12">
                 <h2 class="text-3xl font-bold text-gray-800 mb-3">APK Installation</h2>
@@ -645,21 +657,23 @@
                         </div>
                     </div>
 
-                    <!-- DEUTSCH: Schritt 2: Sicherheitseinstellung fuer unbekannte Quellen aktivieren -->
+                    <!-- DEUTSCH: Schritt 2: Chrome-Warnung bestaetigen (kommt bei jeder APK) -->
                     <div class="flex items-start space-x-4">
                         <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">2</div>
                         <div>
-                            <h3 class="text-lg font-bold text-gray-800">Installation erlauben</h3>
-                            <p class="text-gray-600">Öffne Einstellungen → Sicherheit → «Unbekannte Quellen» aktivieren (oder erlaube es für deinen Browser).</p>
+                            <h3 class="text-lg font-bold text-gray-800">Chrome-Rückfrage bestätigen</h3>
+                            <p class="text-gray-600">Chrome fragt «Die Datei könnte schädlich sein» — das kommt bei jeder App ausserhalb des Play Stores. Tippe auf <strong>Trotzdem herunterladen</strong>.</p>
+                            <img src="images/anleitung/android/apk-warnung.jpg" alt="Chrome fragt: Die Datei könnte schädlich sein – mit den Knöpfen Abbrechen und Trotzdem herunterladen" class="mt-3 w-full max-w-xs rounded-lg border border-gray-200" loading="lazy">
+                            <p class="text-gray-500 text-sm mt-3">Keine Frage und der Download steht bei 100 %? Dann ist der Link in einem eingebetteten Fenster offen (z.&nbsp;B. aus WhatsApp, Telegram oder einer E-Mail). Oben rechts auf <strong>⋮</strong> → <strong>In Chrome öffnen</strong> tippen und nochmals laden.</p>
                         </div>
                     </div>
 
-                    <!-- DEUTSCH: Schritt 3: Heruntergeladene APK-Datei oeffnen -->
+                    <!-- DEUTSCH: Schritt 3: Heruntergeladene APK-Datei oeffnen, beim ersten Mal Installation fuer Chrome erlauben -->
                     <div class="flex items-start space-x-4">
                         <div class="w-10 h-10 rounded-full bg-fire-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">3</div>
                         <div>
                             <h3 class="text-lg font-bold text-gray-800">APK öffnen</h3>
-                            <p class="text-gray-600">Öffne die heruntergeladene Datei aus den Benachrichtigungen oder dem Downloads-Ordner.</p>
+                            <p class="text-gray-600">Unten erscheint «Datei heruntergeladen»: auf <strong>Öffnen</strong> tippen (oder die Datei im Downloads-Ordner öffnen). Beim ersten Mal fragt Android, ob Chrome Apps installieren darf: <strong>Einstellungen</strong> → Schalter einschalten → zurück.</p>
                         </div>
                     </div>
 

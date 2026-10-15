@@ -7,7 +7,11 @@
 //
 // Sonst (APK von GitHub, members-latest): die Datei members-latest.json am
 // GitHub-Release sagt, welche Version dort liegt; ist sie neuer, fuehrt der
-// Hinweis zum Herunterladen der APK. Installieren muss man sie von Hand.
+// Hinweis zum Herunterladen der APK in Chrome (update_hinweis.dart erklaert
+// vorher die Chrome-Rueckfrage). Installieren muss man sie von Hand: ein
+// eigener Download mit Paketinstaller braeuchte REQUEST_INSTALL_PACKAGES und
+// waere fuer die Play-Fassung (dieselbe Datei) ein Selbst-Update an Play
+// vorbei - verboten (Play-Richtlinie Device and Network Abuse).
 //
 // Der native Teil (Kanal "ch.fwvraura.members/update") steht in
 // android/app/src/main/kotlin/.../AppUpdateKanal.kt:
