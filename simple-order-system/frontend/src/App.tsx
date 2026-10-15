@@ -302,7 +302,7 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/orders/${twintPayment.orderId}/status`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({ status: 'paid', payment_method: 'twint', provider: TERMINAL_PROVIDER }),
       });
       if (!res.ok) {
@@ -898,6 +898,7 @@ function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             items: cart.map(c => ({
@@ -939,6 +940,7 @@ function App() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
             table_number: tableNum,
@@ -1755,7 +1757,7 @@ function App() {
                   try {
                     await fetch(`${API_URL}/orders/${twintPayment.orderId}/status`, {
                       method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
+                      headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
                       body: JSON.stringify({ status: 'paid', payment_method: 'twint' }),
                     });
                     setOrderConfirmation({
