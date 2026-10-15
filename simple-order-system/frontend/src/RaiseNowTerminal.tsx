@@ -3,13 +3,12 @@
 // Das Terminal (Touchpoint "TWINT Zahlungen") zeigt nach "Einkassieren"
 // einen TWINT-QR MIT Betrag und meldet die Zahlung sofort. Einen Betrag per
 // URL nimmt es nicht an - die Kassierin tippt ihn dort nochmals ein. Die
-// Kasse zeigt ihn dafuer gross an und kann ihn kopieren.
+// Kasse zeigt ihn dafuer gross an (ohne Kopieren-Knopf: Eintippen ist
+// schneller als Kopieren und Einfuegen, Entscheid 15.10.2026).
 //
 // Ein/aus gilt PRO GERAET (localStorage, Standard aus). Der Link kommt vom
 // Backend (GET /api/raisenow-terminal, Einstellung raisenow_terminal_url).
 // Backend: src/raisenow-terminal.ts.
-
-import { useState } from 'react';
 
 export const TERMINAL_STANDARD_URL = 'https://terminal.raisenow.io/swndq';
 export const TERMINAL_PROVIDER = 'raisenow_terminal';
@@ -67,38 +66,15 @@ export function TwintModusWahl({ festerQr, onFesterQr }: { festerQr: boolean; on
   );
 }
 
-// Betrag gross, "Betrag kopieren", Terminal in neuem Fenster, Hinweis.
+// Betrag gross, Terminal in neuem Fenster, Hinweis.
 export function TerminalBetrag({ betrag, url }: { betrag: number; url: string }) {
-  const [kopiert, setKopiert] = useState<'ok' | 'fehler' | null>(null);
   const text = betrag.toFixed(2);
-
-  const kopieren = async () => {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('keine Zwischenablage');
-      await navigator.clipboard.writeText(text);
-      setKopiert('ok');
-    } catch {
-      setKopiert('fehler');
-    }
-    window.setTimeout(() => setKopiert(null), 2500);
-  };
 
   return (
     <div className="space-y-3">
       <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 text-center">
         <div className="text-3xl sm:text-4xl font-bold text-purple-900 break-words">CHF {text}</div>
-        <div className="text-sm text-purple-800 mt-1">im Terminal eingeben</div>
-        <button
-          type="button"
-          onClick={kopieren}
-          disabled={betrag <= 0}
-          className="mt-3 w-full bg-purple-700 hover:bg-purple-800 active:bg-purple-900 text-white py-3 rounded-lg font-semibold touch-manipulation min-h-[48px] disabled:bg-gray-400"
-        >
-          {kopiert === 'ok' ? '✓ Betrag kopiert' : '📋 Betrag kopieren'}
-        </button>
-        {kopiert === 'fehler' && (
-          <p className="text-xs text-orange-700 mt-2">Kopieren geht hier nicht - bitte {text} von Hand eintippen.</p>
-        )}
+        <div className="text-sm text-purple-800 mt-1">im Terminal eintippen</div>
       </div>
 
       {/* Ausweichweg, falls die eingebettete Seite auf einem Geraet nicht
@@ -126,7 +102,7 @@ export function TerminalFenster({ url }: { url: string }) {
     <iframe
       src={url}
       title="RaiseNow Terminal (TWINT)"
-      allow="clipboard-read; clipboard-write; payment"
+      allow="payment"
       referrerPolicy="strict-origin"
       className="w-full h-[70vh] min-h-[460px] max-h-[820px] border-2 border-gray-200 rounded-xl bg-white"
     />

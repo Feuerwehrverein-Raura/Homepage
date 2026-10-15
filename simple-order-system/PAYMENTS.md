@@ -200,9 +200,9 @@ speichern». Erlaubt ist nur `https://terminal.raisenow.io/<kennung>`
 **Ablauf an der Kasse (Terminal an):**
 
 1. Bestellung senden → TWINT waehlen.
-2. Die Kasse zeigt gross «CHF 12.50 im Terminal eingeben» mit
-   «Betrag kopieren» und darunter bzw. daneben das eingebettete Terminal.
-3. Im Terminal den Betrag eintippen (oder einfuegen) → «Einkassieren».
+2. Die Kasse zeigt gross «CHF 12.50 im Terminal eintippen», darunter bzw.
+   daneben das eingebettete Terminal.
+3. Im Terminal den Betrag eintippen → «Einkassieren».
 4. Kunde scannt den QR mit TWINT und bestaetigt.
 5. Erst wenn das Terminal «Zahlung erfolgreich» zeigt: «Zahlung im
    Terminal bestätigt». Die Bestellung ist bezahlt (`payment_method`
