@@ -2119,6 +2119,34 @@ function escapeXml(str: string): string {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Bon-Zeile mit Wortumbruch: "1x " + Name auf Breite [breite]; Folgezeilen
+// werden auf die Laenge des Praefixes eingerueckt. Zu lange Woerter werden
+// notfalls doch geteilt.
+function bonUmbruch(praefix: string, name: string, breite: number): string[] {
+  const einzug = ' '.repeat(praefix.length);
+  const zeilen: string[] = [];
+  let zeile = praefix;
+  let leer = true;
+  for (let wort of String(name).split(/\s+/).filter(Boolean)) {
+    while (wort.length > breite - einzug.length) {
+      // Wort laenger als eine ganze Zeile: hart teilen.
+      if (!leer) { zeilen.push(zeile); zeile = einzug; }
+      zeilen.push(zeile + wort.slice(0, breite - zeile.length));
+      wort = wort.slice(breite - zeile.length);
+      zeile = einzug; leer = true;
+    }
+    if (!wort) continue;
+    if (!leer && zeile.length + 1 + wort.length > breite) {
+      zeilen.push(zeile); zeile = einzug + wort;
+    } else {
+      zeile += (leer ? '' : ' ') + wort;
+    }
+    leer = false;
+  }
+  zeilen.push(zeile);
+  return zeilen;
+}
+
 // Vereinslogo als ePOS-Rasterbild (einmal geladen). null-sicher.
 let bonLogoCache: string | null = null;
 function bonLogoXml(): string {
@@ -2152,7 +2180,10 @@ async function printViaEpos(
 
   let itemsXml = '';
   items.forEach((item: any) => {
-    itemsXml += `<text em="true" width="2" height="2"/><text>${escapeXml(item.quantity + 'x ' + anzeigeName(item.item_name))}&#10;</text>`;
+    // Doppelte Breite: 24 Zeichen pro Zeile (80-mm-Drucker). Umbruch zwischen
+    // Woertern statt mitten im Wort, Folgezeilen unter dem Namen eingerueckt.
+    const zeilen = bonUmbruch(item.quantity + 'x ', anzeigeName(item.item_name), 24);
+    itemsXml += `<text em="true" width="2" height="2"/><text>${zeilen.map(escapeXml).join('&#10;')}&#10;</text>`;
     if (item.notes) {
       itemsXml += `<text em="false" width="1" height="2"/><text>  -&gt; ${escapeXml(item.notes)}&#10;</text>`;
     }
