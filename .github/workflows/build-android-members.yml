@@ -229,7 +229,7 @@ jobs:
           packageName: com.fwv.members
           releaseFiles: members-${{ env.VERSION }}-release.aab
           releaseName: ${{ env.VERSION }}
-          track: internal
+          tracks: internal
           status: completed
           whatsNewDirectory: flutter/mitglieder/play/whatsnew
           mappingFile: flutter/mitglieder/build/app/outputs/mapping/release/mapping.txt
