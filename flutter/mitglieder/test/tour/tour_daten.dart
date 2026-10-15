@@ -36,8 +36,7 @@ Directory repoWurzel() {
   }
 }
 
-Object? _json(String pfad) =>
-    jsonDecode(File('${repoWurzel().path}/$pfad').readAsStringSync());
+Object? _json(String pfad) => jsonDecode(File('${repoWurzel().path}/$pfad').readAsStringSync());
 
 Map<String, dynamic> _karte(Object? o) => (o as Map).cast<String, dynamic>();
 
@@ -50,7 +49,7 @@ String _jwt(Map<String, Object?> angaben) {
   return '${teil({'alg': 'RS256', 'typ': 'JWT'})}.${teil(angaben)}.signatur';
 }
 
-/// Erika Muster ist im Vorstand: Damit erscheinen Organisator, Lager,
+/// Erika Muster ist im Vorstand: Damit erscheinen Vorstand, Lager,
 /// Schopf und (auf grossen Bildschirmen) Gruppen.
 final tourToken = _jwt({
   'iss': 'https://auth.fwv-raura.ch/application/o/fwv-members-app/',
@@ -60,8 +59,19 @@ final tourToken = _jwt({
   'groups': ['Mitglieder', 'Vorstand', 'Lager', 'Roter Schopf'],
 });
 
-Sitzung tourSitzung() => Sitzung(
-  accessToken: tourToken,
+/// Dieselbe Erika als gewoehnliches Mitglied, das die Chilbi organisiert:
+/// Der Vorstand sieht statt "Organisator" den Reiter "Vorstand" - fuer die
+/// Bilder der Organisatoren braucht es darum ein Konto ohne Vorstand.
+final tourTokenOrganisator = _jwt({
+  'iss': 'https://auth.fwv-raura.ch/application/o/fwv-members-app/',
+  'sub': 'tour-erika',
+  'name': 'Erika Muster',
+  'email': 'erika@example.ch',
+  'groups': ['Mitglieder'],
+});
+
+Sitzung tourSitzung({bool vorstand = true}) => Sitzung(
+  accessToken: vorstand ? tourToken : tourTokenOrganisator,
   refreshToken: 'tour-refresh',
   kontotyp: Kontotyp.mitglied,
   name: 'Erika Muster',
@@ -149,9 +159,8 @@ class TourBackend {
   );
   // Lampen-Kennungen sind Adressen im Netz des Schopfs - im Bild erfundene.
   final schopf = jsonDecode(
-    jsonEncode(
-      _json('docker/backend-members/test/fixtures/roter-schopf-app.json'),
-    ).replaceAll('192.168.33.', '10.0.0.'),
+    jsonEncode(_json('docker/backend-members/test/fixtures/roter-schopf-app.json'))
+        .replaceAll('192.168.33.', '10.0.0.'),
   );
   final schopfZugang = _karte(_json('docker/backend-members/test/fixtures/schopf-zugang-app.json'));
   final musik = _karte(_json('docker/backend-members/test/fixtures/kiosk-musik-app.json'));
@@ -304,6 +313,23 @@ class TourBackend {
         return json(gruppen['gruppen']);
       case 'GET /vorstand/gruppen/kandidaten':
         return json(gruppen['kandidaten']);
+      case 'GET /events/proposals':
+        return json(<Object>[]);
+      case 'GET /members':
+        return json(_mitglieder);
+      case 'GET /members/stats/overview':
+        return json({'total': 5, 'aktiv': 3, 'ehren': 1, 'pendent': 1});
+      // Zweite Anmeldung derselben Person (backend-events
+      // src/doppelte-anmeldung.js): kein Fehler, sondern ein Hinweis.
+      case 'POST /registrations/public':
+        return json({
+          'success': true,
+          'bereits_angemeldet': true,
+          'message':
+              'Du bist schon angemeldet (2 Personen). Eine zweite Anmeldung ist nicht nötig.',
+        });
+      case 'GET /events/$_chilbi/organizers':
+        return json(_organisatoren);
     }
     if (a.method == 'GET' && teile.length == 3 && teile[1] == 'events') {
       final e = anlaesse.where((e) => e['id'] == teile[2] || e['slug'] == teile[2]).firstOrNull;
@@ -368,6 +394,86 @@ class TourBackend {
     {'id': 'm4', 'vorname': 'Anna', 'nachname': 'Muster'},
   ];
 
+  /// Mitgliederliste im Reiter Vorstand - alles erfunden.
+  static const _mitglieder = [
+    {
+      'id': 'm2',
+      'anrede': 'Herr',
+      'vorname': 'Hans',
+      'nachname': 'Beispiel',
+      'email': 'hans@example.ch',
+      'ort': 'Kaiseraugst',
+      'status': 'Aktivmitglied',
+      'funktion': 'Präsident',
+    },
+    {
+      'id': 'm3',
+      'anrede': 'Herr',
+      'vorname': 'Max',
+      'nachname': 'Beispiel',
+      'email': 'max@example.ch',
+      'ort': 'Rheinfelden',
+      'status': 'Aktivmitglied',
+      'funktion': 'Kassier',
+    },
+    {
+      'id': 'm5',
+      'anrede': 'Frau',
+      'vorname': 'Petra',
+      'nachname': 'Exempel',
+      'email': 'petra@example.ch',
+      'ort': 'Augst',
+      'status': 'Ehrenmitglied',
+    },
+    {
+      'id': 'tour-a1',
+      'anrede': 'Frau',
+      'vorname': 'Erika',
+      'nachname': 'Muster',
+      'email': 'erika@example.ch',
+      'ort': 'Kaiseraugst',
+      'status': 'Aktivmitglied',
+      'funktion': 'Aktuarin',
+    },
+    {
+      'id': 'm4',
+      'anrede': 'Frau',
+      'vorname': 'Anna',
+      'nachname': 'Muster',
+      'email': 'anna@example.ch',
+      'ort': 'Kaiseraugst',
+      'status': 'Aktivmitglied',
+    },
+  ];
+
+  /// Organisatoren der Chilbi: Erika, dazu ein Mitglied und eine Externe.
+  static const _organisatoren = {
+    'hauptorganisator': {
+      'id': 'o0',
+      'name': 'Erika Muster',
+      'member_id': 'tour-a1',
+      'email': 'erika@example.ch',
+      'art': 'mitglied',
+    },
+    'mitorganisatoren': [
+      {
+        'id': 'o1',
+        'name': 'Hans Beispiel',
+        'member_id': 'm2',
+        'email': 'hans@example.ch',
+        'art': 'mitglied',
+      },
+      {
+        'id': 'o2',
+        'name': 'Petra Exempel',
+        'email': 'petra@example.ch',
+        'art': 'extern',
+        'zugang_bis': '2026-10-19',
+      },
+    ],
+    'darf_verwalten': true,
+  };
+
   static const _playlists = [
     {'id': 'p1', 'name': 'Chilbi Abend', 'anzahl': 42, 'erstellt_von_name': 'Hans Beispiel'},
     {'id': 'p2', 'name': 'Apéro', 'anzahl': 18, 'erstellt_von_name': 'Erika Muster'},
@@ -393,6 +499,7 @@ Future<Dienste> tourDienste(
   required Plattform plattform,
   bool angemeldet = true,
   bool kontakteAn = true,
+  bool vorstand = true,
 }) async {
   final backend = TourBackend();
   // Android-Kontaktabgleich: eingeschaltet, ohne echten nativen Teil.
@@ -408,7 +515,7 @@ Future<Dienste> tourDienste(
   // Keine Frage nach dem Adressbuch ueber dem ersten Bild.
   await roh.schreiben(SitzungsSchluessel.kontakteGefragt, 'true');
   final speicher = SitzungsSpeicher(roh);
-  if (angemeldet) await speicher.speichern(tourSitzung());
+  if (angemeldet) await speicher.speichern(tourSitzung(vorstand: vorstand));
   return Dienste(
     sitzung: SitzungsVerwaltung(speicher: speicher, http: backend.client),
     authentik: _KeinBrowser(),

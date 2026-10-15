@@ -4,7 +4,12 @@
 //
 //   docker/frontend-website/images/anleitung/android/NN-*.jpg  Handy, Android
 //   docker/frontend-website/images/anleitung/ios/NN-*.jpg      Handy, iOS
-//   docker/frontend-website/images/anleitung/web/mein-NN-*.jpg Browser (Mein Bereich)
+//   docker/frontend-website/images/anleitung/web/mein-NN-*.jpg Browser (Mein Bereich,
+//                                                             auch Desktop-Programm)
+//
+// Gleiche Namen auf allen drei Geraeten (die Anleitung schaltet nur den
+// Ordner um). Die Bilder der Organisatoren entstehen mit einem Konto ohne
+// Vorstand (_alsOrganisator).
 //
 // Ausfuehren (in flutter/mitglieder):
 //
@@ -132,8 +137,7 @@ Directory get _flutterWurzel {
   throw StateError('Flutter-SDK nicht gefunden (FLUTTER_ROOT setzen)');
 }
 
-Future<ByteData> _datei(String pfad) async =>
-    ByteData.sublistView(await File(pfad).readAsBytes());
+Future<ByteData> _datei(String pfad) async => ByteData.sublistView(await File(pfad).readAsBytes());
 
 /// Roboto unter allen Namen, die die Themes der Plattformen verlangen, dazu
 /// die Material-Symbole.
@@ -232,12 +236,11 @@ void _netzBilderEinlegen() {
     for (final kopf in [
       null,
       {'Authorization': 'Bearer $tourToken'},
+      {'Authorization': 'Bearer $tourTokenOrganisator'},
     ]) {
       imageCache.putIfAbsent(
         NetworkImage(adresse, headers: kopf),
-        () => OneFrameImageStreamCompleter(
-          SynchronousFuture(ImageInfo(image: bild.clone())),
-        ),
+        () => OneFrameImageStreamCompleter(SynchronousFuture(ImageInfo(image: bild.clone()))),
       );
     }
   }
@@ -337,7 +340,12 @@ class _Wischleiste extends StatelessWidget {
 // Ablauf
 
 /// Startet die App auf [g] (angemeldet als Erika Muster).
-Future<void> _starten(WidgetTester tester, _Geraet g, {bool angemeldet = true}) async {
+Future<void> _starten(
+  WidgetTester tester,
+  _Geraet g, {
+  bool angemeldet = true,
+  bool vorstand = true,
+}) async {
   tester.view.physicalSize = g.groesse * g.dichte;
   tester.view.devicePixelRatio = g.dichte;
   final rand = FakeViewPadding(top: g.oben * g.dichte, bottom: g.unten * g.dichte);
@@ -352,7 +360,12 @@ Future<void> _starten(WidgetTester tester, _Geraet g, {bool angemeldet = true}) 
     (_) async => null,
   );
   _netzBilderEinlegen();
-  final d = await tourDienste(tester, plattform: g.plattform, angemeldet: angemeldet);
+  final d = await tourDienste(
+    tester,
+    plattform: g.plattform,
+    angemeldet: angemeldet,
+    vorstand: vorstand,
+  );
   await tester.pumpWidget(
     RepaintBoundary(
       key: _wurzel,
@@ -489,9 +502,23 @@ Future<void> _tippen(WidgetTester tester, Finder f) async {
 /// Ein Bild der Tour: Name und Weg dorthin (die App ist schon gestartet).
 typedef _Schritte = Future<void> Function(WidgetTester tester, _Geraet g);
 
-/// Bilder fuer das Handy (Android und iOS). Die Nummern 01-11 gab es schon
-/// in den alten Apps — die Anleitung verweist darauf.
-final _handyBilder = <String, _Schritte>{
+/// Bilder, die als Organisator ohne Vorstand entstehen (der Vorstand sieht
+/// statt "Organisator" den Reiter "Vorstand").
+const _alsOrganisator = {
+  '11-organisator',
+  '13-organisator-anlass',
+  '24-organisator-schichten',
+  '25-anmeldung-aendern',
+  '26-organisatoren',
+};
+
+/// Nur auf dem Handy: Im Browser stehen die Anleitungen links in der Leiste.
+const _nurHandy = {'20-hilfe'};
+
+/// Die Bilder der Tour - auf dem Handy (Android, iOS) und im Browser
+/// ("mein-" davor) unter denselben Namen. Die Nummern 01-11 gab es schon in
+/// den alten Apps; die Anleitungen verweisen darauf.
+final _bilder = <String, _Schritte>{
   '01-anlaesse': (t, g) async {},
   '02-kalender': (t, g) async => _tippen(t, find.text('Kalender')),
   '03-anlass-detail': (t, g) async => _tippen(t, find.text('Chilbi 2026')),
@@ -512,10 +539,10 @@ final _handyBilder = <String, _Schritte>{
   },
   '10-adressbuch': (t, g) async {
     await _reiter(t, g, 'Einstellungen');
-    if (g.ios) {
-      await _tippen(t, find.text('Mitglieder-Adressbuch einrichten'));
-    } else {
+    if (g.plattform == Plattform.android) {
       await _sichtbar(t, find.text('Adressbuch'));
+    } else {
+      await _tippen(t, find.text('Mitglieder-Adressbuch einrichten'));
     }
   },
   '11-organisator': (t, g) async => _reiter(t, g, 'Organisator'),
@@ -529,6 +556,7 @@ final _handyBilder = <String, _Schritte>{
     await _tippen(t, find.text('Messwerte'));
   },
   '17-musik': (t, g) async {
+    if (!g.handy) return _reiter(t, g, 'Musik');
     await _reiter(t, g, 'Einstellungen');
     await _tippen(t, find.widgetWithText(ListTile, 'Musik'));
   },
@@ -542,28 +570,43 @@ final _handyBilder = <String, _Schritte>{
     await _sichtbar(t, find.text('Hilfe'));
   },
   '21-austritt': _austritt,
+  '22-anmelden-teilnahme': _teilnahme,
+  '23-schon-angemeldet': (t, g) async {
+    await _teilnahme(t, g);
+    await _tippen(t, find.byKey(const Key('anmelden-senden')));
+    expect(find.text('Schon angemeldet'), findsOneWidget);
+  },
+  '24-organisator-schichten': (t, g) async {
+    await _organisatorAnlass(t, g);
+    await _tippen(t, find.widgetWithText(Tab, 'Schichten'));
+  },
+  '25-anmeldung-aendern': (t, g) async {
+    await _organisatorAnlass(t, g);
+    await _tippen(t, find.byKey(const Key('aktionen-00000000-0000-0000-0000-700000000001')));
+    await _tippen(t, find.text('Ändern'));
+  },
+  '26-organisatoren': (t, g) async {
+    await _organisatorAnlass(t, g);
+    await _tippen(t, find.widgetWithText(ActionChip, 'Organisatoren'));
+  },
+  '27-vorstand': (t, g) async => _reiter(t, g, 'Vorstand'),
+  '28-vorstand-mitglieder': (t, g) async {
+    await _reiter(t, g, 'Vorstand');
+    await _tippen(t, find.widgetWithText(Tab, 'Mitglieder'));
+  },
+  '29-gruppen': (t, g) async {
+    if (!g.handy) return _reiter(t, g, 'Gruppen');
+    await _reiter(t, g, 'Einstellungen');
+    await _tippen(t, find.text('Gruppen verwalten'));
+  },
 };
 
-/// Bilder fuer den Browser (Mein Bereich, Seitenleiste links).
-final _webBilder = <String, _Schritte>{
-  '01-anlaesse': (t, g) async {},
-  '02-kalender': (t, g) async => _tippen(t, find.text('Kalender')),
-  '03-anlass-detail': (t, g) async => _tippen(t, find.text('Chilbi 2026')),
-  '04-anmeldung': _anmeldung,
-  '05-profil': (t, g) async => _reiter(t, g, 'Profil'),
-  '06-zugaenge': (t, g) async {
-    await _reiter(t, g, 'Profil');
-    await _tippen(t, find.text('Zugänge'));
-  },
-  '07-einstellungen': (t, g) async => _reiter(t, g, 'Einstellungen'),
-  '08-organisator': (t, g) async => _reiter(t, g, 'Organisator'),
-  '09-organisator-anlass': _organisatorAnlass,
-  '10-lager': (t, g) async => _reiter(t, g, 'Lager'),
-  '11-schopf': (t, g) async => _reiter(t, g, 'Schopf'),
-  '12-musik': (t, g) async => _reiter(t, g, 'Musik'),
-  '13-gruppen': (t, g) async => _reiter(t, g, 'Gruppen'),
-  '14-material-ausleihen': _ausleihen,
-};
+/// Teilnahme am Preisjassen: zwei Personen.
+Future<void> _teilnahme(WidgetTester t, _Geraet g) async {
+  await _tippen(t, find.text('Preisjassen 2026'));
+  await _tippen(t, find.byKey(const Key('anlass-anmelden')));
+  await _tippen(t, find.byTooltip('Mehr Personen'));
+}
 
 Future<void> _anmeldung(WidgetTester t, _Geraet g) async {
   await _tippen(t, find.text('Chilbi 2026'));
@@ -617,14 +660,19 @@ void main() {
   });
 
   for (final g in [_android, _ios, _web]) {
-    final bilder = g.handy ? _handyBilder : _webBilder;
     group(g.ordner, () {
-      for (final MapEntry(key: name, value: schritte) in bilder.entries) {
+      for (final MapEntry(key: name, value: schritte) in _bilder.entries) {
+        if (!g.handy && _nurHandy.contains(name)) continue;
         testWidgets(
           name,
           (tester) async {
             try {
-              await _starten(tester, g, angemeldet: name != '12-login');
+              await _starten(
+                tester,
+                g,
+                angemeldet: name != '12-login',
+                vorstand: !_alsOrganisator.contains(name),
+              );
               await schritte(tester, g);
               await _foto(tester, g, name);
             } finally {

@@ -144,12 +144,15 @@
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                     Android 8+
                                 </span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
+                                    iPhone &amp; Computer
+                                </span>
                                 <span id="members-version" class="text-gray-400 text-xs">Lade...</span>
                             </div>
                         </div>
                     </div>
                     <div class="p-6">
-                        <p class="text-gray-600 mb-4">Anlässe ansehen, sich für Schichten eintragen, das eigene Profil und die Zugänge verwalten — alles vom Telefon aus. Es gibt zwei Wege zur App.</p>
+                        <p class="text-gray-600 mb-4">Anlässe ansehen, sich für Schichten eintragen, das eigene Profil und die Zugänge verwalten — vom Telefon oder vom Computer aus. Für Android gibt es zwei Wege zur App.</p>
 
                         <div class="grid md:grid-cols-2 gap-6">
                             <!-- DEUTSCH: Weg 1 - Play Store, aber nur nach Freischaltung -->
@@ -196,6 +199,43 @@
                                     </svg>
                                     APK herunterladen
                                 </a>
+                            </div>
+                        </div>
+
+                        <!-- DEUTSCH: iPhone und Computer. Eine iPhone-App gibt es noch
+                             nicht im App Store - bis dahin dieselbe App im Browser
+                             (mein.html). Das Desktop-Programm haengt am rollenden Tag
+                             members-latest (feste Dateinamen, build-android-members.yml). -->
+                        <div class="grid md:grid-cols-2 gap-6 mt-6">
+                            <div class="border border-gray-200 rounded-xl p-5">
+                                <div class="flex items-center mb-3">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">
+                                        iPhone
+                                    </span>
+                                </div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Im Browser: «Mein Bereich»</h4>
+                                <p class="text-sm text-gray-600 mb-4">Die iPhone-App ist in Entwicklung und noch nicht im App Store. Bis dahin läuft dieselbe App in Safari. Über Teilen → «Zum Home-Bildschirm» liegt sie wie eine App auf dem Telefon.</p>
+                                <a href="mein.html"
+                                   class="block w-full text-center border-2 border-fire-600 text-fire-700 px-6 py-3 rounded-xl font-semibold hover:bg-fire-50 transition-colors">
+                                    «Mein Bereich» öffnen
+                                </a>
+                            </div>
+                            <div class="border border-gray-200 rounded-xl p-5">
+                                <div class="flex flex-wrap items-center gap-2 mb-3">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Windows</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-800">macOS</span>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Linux</span>
+                                </div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Programm für den Computer</h4>
+                                <!-- DEUTSCH: Hinweis entfernen, sobald die Anmeldung im
+                                     Desktop-Programm in Authentik freigeschaltet ist. -->
+                                <p class="text-sm text-amber-800 bg-amber-50 rounded-lg px-3 py-2 mb-3">Die Anmeldung im Programm wird in Kürze freigeschaltet. Bis dahin «Mein Bereich» im Browser verwenden.</p>
+                                <ul class="text-sm space-y-1 mb-1">
+                                    <li><a class="text-fire-600 hover:underline" href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest-windows-x64.zip">Windows 10/11 (.zip)</a></li>
+                                    <li><a class="text-fire-600 hover:underline" href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest-macos.dmg">macOS 12+ (.dmg)</a></li>
+                                    <li><a class="text-fire-600 hover:underline" href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest-linux-amd64.deb">Linux (.deb)</a> ·
+                                        <a class="text-fire-600 hover:underline" href="https://github.com/Feuerwehrverein-Raura/Homepage/releases/download/members-latest/members-latest-linux-x64.tar.gz">.tar.gz</a></li>
+                                </ul>
                             </div>
                         </div>
 
