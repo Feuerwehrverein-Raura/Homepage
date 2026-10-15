@@ -24,6 +24,7 @@ const { schichtenPruefen } = require('./schicht-eintrag');
 const doppelteAnmeldung = require('./doppelte-anmeldung');
 const { pushZielDaten, mitZiel } = require('./push-ziel');
 const { listenLimit } = require('./liste-limit');
+const kasseAnlass = require('./kasse-anlass');
 
 // Configure pg to return dates/timestamps as strings (not JS Date objects)
 // This prevents timezone conversion issues
@@ -848,6 +849,180 @@ function jsonbWert(feld, wert) {
     }
     return wert;
 }
+
+// ---------------------------------------------------------------------------
+// TWINT-QR pro Anlass und "aktueller Anlass" fuer die Kasse
+// (src/kasse-anlass.js; Tabelle event_twint_qr, Spalte events.twint_qr_url)
+//
+//  - GET    /events/:id/twint-qr          Bild (oeffentlich wie /events/:id/pdf -
+//                                         der QR haengt ohnehin am Stand)
+//  - PUT    /events/:id/twint-qr          { data, content_type } Vorstand/Organisator
+//  - DELETE /events/:id/twint-qr          Vorstand/Organisator
+//  - PUT/DELETE /events/my-event/twint-qr externer Organisator (Event-Login)
+//  - GET    /events/kasse/aktuell         Kasse (Service-Schluessel)
+//  - GET    /events/kasse/anlaesse        Kasse: laufende und kommende
+//  - GET    /events/kasse/anlaesse/:id    Kasse: ein bestimmter Anlass
+// Stehen vor GET /events/:id, damit "kasse" nie als Anlass-id gilt.
+// ---------------------------------------------------------------------------
+async function ensureKasseAnlassSchema() {
+    for (const sql of kasseAnlass.SCHEMA_SQL) await pool.query(sql);
+}
+
+// Service-Schluessel der Kasse: X-Order-API-Key (derselbe geteilte Schluessel,
+// mit dem die Kasse schon das Inventar aufruft und api-members die Kasse)
+// oder der allgemeine interne x-api-key. Kein Benutzer-Token: die Kasse
+// fragt ohne angemeldete Person nach.
+function gleicherSchluessel(a, b) {
+    if (!a || !b) return false;
+    const x = Buffer.from(String(a));
+    const y = Buffer.from(String(b));
+    return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+function kasseSchluessel(req, res, next) {
+    if (gleicherSchluessel(req.headers['x-order-api-key'], process.env.ORDER_API_KEY)
+        || gleicherSchluessel(req.headers['x-api-key'], process.env.API_KEY)) {
+        return next();
+    }
+    return res.status(401).json({ error: 'Kein gueltiger Kassen-Schluessel' });
+}
+
+// UUID_MUSTER steht weiter unten (bei den Anmeldungen); die Routen hier
+// laufen erst nach dem Laden der Datei.
+
+// Kandidaten fuer die Kasse. Grob in SQL eingegrenzt (Ende bzw. Beginn
+// hoechstens einen Tag vorbei), die genaue Regel steht in kasse-anlass.js.
+async function kassenKandidaten(zeitpunkt) {
+    const r = await pool.query(`
+        SELECT id, title, start_date, end_date, location, status, datum_offen, twint_qr_url
+          FROM events
+         WHERE COALESCE(status, '') NOT IN ('cancelled', 'draft', 'proposed', 'rejected')
+           AND datum_offen IS NOT TRUE
+           AND COALESCE(end_date, start_date) >= $1::timestamp - INTERVAL '1 day'
+         ORDER BY start_date, id`, [zeitpunkt]);
+    return r.rows;
+}
+
+app.get('/events/kasse/aktuell', kasseSchluessel, async (req, res) => {
+    try {
+        const zeitpunkt = appAnsicht.zuerich(appAnsicht.jetzt()).zeitpunkt;
+        const anlass = kasseAnlass.aktuellerAnlass(await kassenKandidaten(zeitpunkt), zeitpunkt);
+        res.json({ anlass: kasseAnlass.kassenAnsicht(anlass), zeitpunkt });
+    } catch (error) {
+        console.error('GET /events/kasse/aktuell:', error.message);
+        res.status(500).json({ error: 'Aktueller Anlass konnte nicht bestimmt werden' });
+    }
+});
+
+app.get('/events/kasse/anlaesse', kasseSchluessel, async (req, res) => {
+    try {
+        const zeitpunkt = appAnsicht.zuerich(appAnsicht.jetzt()).zeitpunkt;
+        const liste = kasseAnlass.kommendeAnlaesse(await kassenKandidaten(zeitpunkt), zeitpunkt);
+        res.json({ anlaesse: liste.map(kasseAnlass.kassenAnsicht) });
+    } catch (error) {
+        console.error('GET /events/kasse/anlaesse:', error.message);
+        res.status(500).json({ error: 'Anlaesse konnten nicht geladen werden' });
+    }
+});
+
+app.get('/events/kasse/anlaesse/:id', kasseSchluessel, async (req, res) => {
+    if (!UUID_MUSTER.test(req.params.id)) return res.status(404).json({ error: 'Anlass nicht gefunden' });
+    try {
+        const r = await pool.query(
+            `SELECT id, title, start_date, end_date, location, status, datum_offen, twint_qr_url
+               FROM events WHERE id = $1`, [req.params.id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Anlass nicht gefunden' });
+        res.json({ anlass: kasseAnlass.kassenAnsicht(r.rows[0]) });
+    } catch (error) {
+        console.error('GET /events/kasse/anlaesse/:id:', error.message);
+        res.status(500).json({ error: 'Anlass konnte nicht geladen werden' });
+    }
+});
+
+app.get('/events/:id/twint-qr', async (req, res) => {
+    if (!UUID_MUSTER.test(req.params.id)) return res.status(404).json({ error: 'Kein TWINT-QR vorhanden' });
+    try {
+        const r = await pool.query('SELECT content_type, data FROM event_twint_qr WHERE event_id = $1', [req.params.id]);
+        if (!r.rows.length) return res.status(404).json({ error: 'Kein TWINT-QR vorhanden' });
+        res.setHeader('Content-Type', r.rows[0].content_type);
+        // Die Adresse traegt ?v=<Zeit> - ein neues Bild hat eine neue Adresse.
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        // helmet setzt same-origin; vorstand.html (www) und die Apps binden
+        // das Bild aber von hier ein.
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.send(Buffer.from(r.rows[0].data, 'base64'));
+    } catch (error) {
+        console.error('GET /events/:id/twint-qr:', error.message);
+        res.status(500).json({ error: 'TWINT-QR konnte nicht geladen werden' });
+    }
+});
+
+// Speichern/Entfernen - gemeinsam fuer Vorstand/Organisator (Mitglieder-
+// bzw. Authentik-Token) und den externen Organisator-Login (my-event).
+async function twintQrSpeichern(eventId, req, res, von) {
+    try {
+        const bild = kasseAnlass.bildPruefen(req.body);
+        if (bild.fehler) return res.status(bild.status).json({ error: bild.fehler });
+        const url = kasseAnlass.qrPfad(eventId);
+        const wer = String(von || 'unbekannt').substring(0, 200);
+        await pool.query(`
+            INSERT INTO event_twint_qr (event_id, content_type, data, groesse, hochgeladen_von, hochgeladen_am)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (event_id) DO UPDATE SET content_type = EXCLUDED.content_type, data = EXCLUDED.data,
+                groesse = EXCLUDED.groesse, hochgeladen_von = EXCLUDED.hochgeladen_von, hochgeladen_am = NOW()`,
+        [eventId, bild.contentType, bild.buffer.toString('base64'), bild.buffer.length, wer]);
+        await pool.query('UPDATE events SET twint_qr_url = $1, updated_at = NOW() WHERE id = $2', [url, eventId]);
+        logInfo('TWINT_QR_HOCHGELADEN', { eventId, von: wer, bytes: bild.buffer.length });
+        res.json({ twint_qr_url: url, content_type: bild.contentType, groesse: bild.buffer.length });
+    } catch (error) {
+        console.error('TWINT-QR speichern:', error.message);
+        res.status(500).json({ error: 'TWINT-QR konnte nicht gespeichert werden' });
+    }
+}
+
+async function twintQrEntfernen(eventId, res, von) {
+    try {
+        await pool.query('DELETE FROM event_twint_qr WHERE event_id = $1', [eventId]);
+        await pool.query('UPDATE events SET twint_qr_url = NULL, updated_at = NOW() WHERE id = $1', [eventId]);
+        logInfo('TWINT_QR_ENTFERNT', { eventId, von });
+        res.json({ twint_qr_url: null });
+    } catch (error) {
+        console.error('TWINT-QR entfernen:', error.message);
+        res.status(500).json({ error: 'TWINT-QR konnte nicht entfernt werden' });
+    }
+}
+
+// Externer Organisator (Event-Login, Token type 'event-organizer'): sein
+// Anlass. Steht vor /events/:id/twint-qr, sonst gaelte "my-event" als id.
+app.put('/events/my-event/twint-qr', authenticateEventOrganizer, (req, res) =>
+    twintQrSpeichern(req.eventOrganizer.event_id, req, res, req.eventOrganizer.email));
+app.delete('/events/my-event/twint-qr', authenticateEventOrganizer, (req, res) =>
+    twintQrEntfernen(req.eventOrganizer.event_id, res, req.eventOrganizer.email));
+
+// Vorstand oder Organisator/Mitorganisator des Anlasses (ensureOrganizerAccess).
+app.put('/events/:id/twint-qr', authenticateAny, async (req, res) => {
+    if (!UUID_MUSTER.test(req.params.id)) return res.status(404).json({ error: 'Event nicht gefunden' });
+    try {
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return; // 403/404 bereits gesendet
+        await twintQrSpeichern(event.id, req, res, req.user?.email || req.user?.name);
+    } catch (error) {
+        console.error('PUT /events/:id/twint-qr:', error.message);
+        res.status(500).json({ error: 'TWINT-QR konnte nicht gespeichert werden' });
+    }
+});
+
+app.delete('/events/:id/twint-qr', authenticateAny, async (req, res) => {
+    if (!UUID_MUSTER.test(req.params.id)) return res.status(404).json({ error: 'Event nicht gefunden' });
+    try {
+        const event = await ensureOrganizerAccess(req, res, req.params.id);
+        if (!event) return;
+        await twintQrEntfernen(event.id, res, req.user?.email || req.user?.name);
+    } catch (error) {
+        console.error('DELETE /events/:id/twint-qr:', error.message);
+        res.status(500).json({ error: 'TWINT-QR konnte nicht entfernt werden' });
+    }
+});
 
 // DEUTSCH: Alle Events auflisten, optional gefiltert nach upcoming/category, inkl. Schichten und Registrierungen
 app.get('/events', async (req, res) => {
@@ -7285,6 +7460,9 @@ app.listen(PORT, () => {
     ensureRegistrationConfirmationsSchema()
         .then(() => console.log('Registrierungs-Bestätigungs-Schema bereit'))
         .catch(e => console.error('ensureRegistrationConfirmationsSchema failed:', e.message));
+    ensureKasseAnlassSchema()
+        .then(() => console.log('TWINT-QR-Schema (Kasse) bereit'))
+        .catch(e => console.error('ensureKasseAnlassSchema failed:', e.message));
 
     // Schicht-Erinnerung eine Stunde vorher (Push), alle 5 Minuten geprueft.
     // Nur Push: Die Mail kommt schon am Vortag (/reminders/send-daily).

@@ -29,6 +29,7 @@ class Anlass {
     this.anmeldungVerlangt = false,
     this.menueOptionen = const [],
     this.pdfDateiname,
+    this.twintQrUrl,
     this.app = const AnlassApp(),
     this.schichten = const [],
   });
@@ -56,6 +57,7 @@ class Anlass {
           for (final e in l) ?jsonText(e),
       ],
       pdfDateiname: jsonText(m['pdf_filename']),
+      twintQrUrl: jsonText(m['twint_qr_url']),
       app: AnlassApp.ausJson(m['app']),
       schichten: jsonListe(m['shifts'], Schicht.ausJson),
     );
@@ -88,6 +90,10 @@ class Anlass {
 
   /// Name des angehängten PDFs (Aushang, `GET events/:id/pdf`), sonst null.
   final String? pdfDateiname;
+
+  /// Eigener TWINT-QR fuer die Kasse (`GET events/:id/twint-qr?v=…`,
+  /// relativ zur API), sonst null - dann gilt an der Kasse der Vereins-QR.
+  final String? twintQrUrl;
   final AnlassApp app;
   final List<Schicht> schichten;
 

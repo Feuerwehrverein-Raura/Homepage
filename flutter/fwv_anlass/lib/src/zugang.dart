@@ -199,6 +199,22 @@ abstract class AnlassVerwaltungZugang {
   Future<void> pdfAushangEntfernen(String anlassId) async => throw const NichtErlaubt();
 
   // -------------------------------------------------------------------
+  // TWINT-QR fuer die Kasse (Vorstand und Organisatoren). Die Kasse zeigt
+  // bei TWINT den QR des laufenden Anlasses; ohne eigenen gilt der
+  // Vereins-QR. Wird sofort gespeichert, nicht erst mit dem Formular.
+
+  /// Bild hochladen (ersetzt ein bisheriges); gibt die neue Adresse
+  /// (`twint_qr_url`) zurueck.
+  Future<String?> twintQrSetzen(String anlassId, GewaehlteDatei bild) async =>
+      throw const NichtErlaubt();
+
+  /// Eigenen QR entfernen (danach gilt der Vereins-QR).
+  Future<void> twintQrEntfernen(String anlassId) async => throw const NichtErlaubt();
+
+  /// Das hochgeladene Bild (Vorschau).
+  Future<Uint8List> twintQrBild(String anlassId) async => throw const NichtErlaubt();
+
+  // -------------------------------------------------------------------
   // Mitorganisatoren (Vorstand und Haupt-Organisator verwalten, siehe
   // [AnlassRechte.organisatorenVerwalten]). Standard: [NichtErlaubt].
 
@@ -226,7 +242,13 @@ class VerwaltungsUmgebung {
     required this.linkOeffnen,
     this.anhangVerkleinern = anhangBildVerkleinern,
     this.pdfWaehlen,
+    this.bildWaehlen,
   });
+
+  /// Bild vom Geraet waehlen (TWINT-QR fuer die Kasse), unveraendert - ein
+  /// verkleinerter QR liesse sich schlechter scannen. null bei Abbruch;
+  /// ohne diese Funktion bietet das Formular nur das Entfernen an.
+  final Future<GewaehlteDatei?> Function()? bildWaehlen;
 
   /// PDF vom Geraet waehlen (PDF-Aushang); null bei Abbruch. Ohne diese
   /// Funktion (die App hat noch keinen Dateiwaehler) bietet das Formular
@@ -253,4 +275,27 @@ class AnlassVerwaltung {
 
   final AnlassVerwaltungZugang zugang;
   final VerwaltungsUmgebung umgebung;
+}
+
+/// Groesstes TWINT-QR-Bild (wie das Backend, src/kasse-anlass.js).
+const twintQrHoechstGroesse = 2 * 1024 * 1024;
+
+/// Bildtyp nach Inhalt (PNG, JPEG, WebP, GIF) - sonst null. Das Backend
+/// prueft dasselbe; hier nur, damit die Meldung gleich beim Waehlen kommt.
+String? bildTyp(Uint8List b) {
+  bool beginnt(List<int> z, [int ab = 0]) {
+    if (b.length < ab + z.length) return false;
+    for (var i = 0; i < z.length; i++) {
+      if (b[ab + i] != z[i]) return false;
+    }
+    return true;
+  }
+
+  if (beginnt(const [0x89, 0x50, 0x4e, 0x47])) return 'image/png';
+  if (beginnt(const [0xff, 0xd8, 0xff])) return 'image/jpeg';
+  if (beginnt(const [0x52, 0x49, 0x46, 0x46]) && beginnt(const [0x57, 0x45, 0x42, 0x50], 8)) {
+    return 'image/webp';
+  }
+  if (beginnt(const [0x47, 0x49, 0x46, 0x38])) return 'image/gif';
+  return null;
 }

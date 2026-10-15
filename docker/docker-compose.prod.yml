@@ -125,6 +125,10 @@ services:
       API_KEY: ${API_KEY}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}    # DEUTSCH: Fuer interne Calls an api-members (FCM-Push)
       KIOSK_KEY: ${KIOSK_KEY}                  # DEUTSCH: Laptop im Roten Schopf holt damit den Arbeitsplan
+      # DEUTSCH: Kasse (order-backend) fragt damit /events/kasse/* ab (aktueller
+      # Anlass, TWINT-QR). Gleicher geteilter Schluessel wie bei api-members und
+      # im simple-order-system (Header X-Order-API-Key).
+      ORDER_API_KEY: ${ORDER_API_KEY}
       AUTHENTIK_URL: https://auth.fwv-raura.ch
       MEMBERS_API_URL: http://api-members:3000
       DISPATCH_API_URL: http://api-dispatch:3000

@@ -64,6 +64,7 @@ class Dienste {
     Future<Uint8List> Function(Uint8List roh)? anhangVerkleinern,
     Future<Uint8List?> Function({required bool kamera})? dokumentFotoWaehlen,
     Future<GewaehlteDatei?> Function()? pdfWaehlen,
+    Future<GewaehlteDatei?> Function()? bildWaehlen,
     Future<String?> Function(BuildContext context)? barcodeScannen,
     Uri? inventarBasis,
     this.update = const KeinAppUpdate(),
@@ -75,6 +76,7 @@ class Dienste {
   }) : speicher = speicher ?? SpeicherImArbeitsspeicher(),
        dokumentFotoWaehlen = dokumentFotoWaehlen ?? _dokumentFotoMitImagePicker,
        pdfWaehlen = pdfWaehlen ?? _pdfMitFilePicker,
+       bildWaehlen = bildWaehlen ?? _bildMitFilePicker,
        barcodeScannen = barcodeScannen ?? _barcodeMitKamera,
        inventarBasis = inventarBasis ?? inventarApiBasis,
        anhangVerkleinern = anhangVerkleinern ?? anhangBildVerkleinern,
@@ -219,6 +221,10 @@ class Dienste {
   /// Abbruch. In Tests ersetzt.
   final Future<GewaehlteDatei?> Function() pdfWaehlen;
 
+  /// Bild vom Geraet waehlen, unveraendert (TWINT-QR fuer die Kasse beim
+  /// Anlass); null bei Abbruch. In Tests ersetzt.
+  final Future<GewaehlteDatei?> Function() bildWaehlen;
+
   /// Barcode lesen (Kamera-Screen aus fwv_lager; in Tests ersetzt).
   final Future<String?> Function(BuildContext context) barcodeScannen;
 
@@ -316,6 +322,7 @@ class Dienste {
     linkOeffnen: linkOeffnen,
     anhangVerkleinern: anhangVerkleinern,
     pdfWaehlen: pdfWaehlen,
+    bildWaehlen: bildWaehlen,
   );
 
   /// Externe Organisatoren (Event-Login) haben kein Mitgliederkonto.
@@ -469,6 +476,18 @@ Future<Uint8List?> _dokumentFotoMitImagePicker({required bool kamera}) async {
 /// PDF ueber den Dateiwaehler des Systems (file_picker: Android Dokumente,
 /// iOS Dateien, Web Datei-Dialog). Zu grosse Dateien werden gar nicht erst
 /// gelesen; ob es wirklich ein PDF ist, prueft das Formular ([istPdf]).
+/// TWINT-QR: Bild unveraendert (nicht verkleinert - der QR soll scharf
+/// bleiben); die Grenze wie im Backend (2 MB).
+Future<GewaehlteDatei?> _bildMitFilePicker() async {
+  final datei = await FilePicker.pickFile(dialogTitle: 'TWINT-QR wählen', type: FileType.image);
+  if (datei == null) return null;
+  final groesse = datei.lengthSync() ?? await datei.length();
+  if (groesse != null && groesse > twintQrHoechstGroesse) {
+    throw const ApiFehler('Das Bild darf höchstens 2 MB gross sein.');
+  }
+  return (bytes: await datei.readAsBytes(), dateiname: datei.name);
+}
+
 Future<GewaehlteDatei?> _pdfMitFilePicker() async {
   final datei = await FilePicker.pickFile(
     dialogTitle: 'PDF-Aushang wählen',

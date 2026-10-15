@@ -443,6 +443,34 @@ aufgerundet auf ganze Einheiten. Rezept-Zutaten und Material von Hand.
 `aktionen.einkauf` in der Organisator-Übersicht sagt, ob der Einkauf
 angeboten wird (nicht beim Organisator-Login).
 
+### TWINT-QR für die Kasse
+
+Jeder Anlass kann einen eigenen TWINT-QR haben; die Kasse
+(order.fwv-raura.ch) zeigt ihn, solange der Anlass läuft. Ohne eigenen QR
+gilt an der Kasse der Vereins-Standard (`twint-qr.png` im Kassen-Frontend).
+Das Bild liegt als Base64 in `event_twint_qr` (eigene Tabelle, damit
+`SELECT e.*` kein Bild mitschleppt); `events.twint_qr_url` zeigt auf den
+Abruf (`/events/<id>/twint-qr?v=<Zeit>`) oder ist `null`. Migration 030,
+beim Start auch idempotent (`src/kasse-anlass.js`).
+
+| Route | Wer | Zweck |
+|---|---|---|
+| `GET /events/:id/twint-qr` | öffentlich (wie das PDF) | das Bild |
+| `PUT /events/:id/twint-qr` | Vorstand, Organisator, Mitorganisator | `{ data (Base64 oder data:-URI), content_type? }` → `{ twint_qr_url }`; PNG/JPEG/WebP/GIF nach Inhalt, max. 2 MB, kein SVG |
+| `DELETE /events/:id/twint-qr` | dito | eigenen QR entfernen |
+| `PUT/DELETE /events/my-event/twint-qr` | externer Organisator-Login | dasselbe für den eigenen Anlass |
+| `GET /events/kasse/aktuell` | Kasse (`X-Order-API-Key` = `ORDER_API_KEY`, oder `x-api-key`) | `{ anlass: {id, title, start_date, end_date, location, status, twint_qr_url} \| null, zeitpunkt }` |
+| `GET /events/kasse/anlaesse` | Kasse | laufende und kommende Anlässe (Auswahl in den Kassen-Einstellungen) |
+| `GET /events/kasse/anlaesse/:id` | Kasse | ein bestimmter Anlass (manuelle Auswahl) |
+
+**Aktueller Anlass:** läuft gerade (Beginn − 2 h bis Ende + 2 h, Ortszeit
+Europe/Zurich; ohne Ende gilt der Starttag bis 23:59), nicht abgesagt,
+kein Entwurf/Vorschlag/abgelehnt, nicht "Datum noch offen"; bei mehreren
+der zuletzt begonnene. Bewusst anders als der Kiosk
+(`/arbeitsplan/kiosk`: laufend oder nächster, nur mit Schichten) - für
+eine Zahlung darf kein Anlass von nächster Woche gelten.
+Tests: `test/kasse-anlass.test.js`.
+
 ## Schichten
 
 ### Alle Schichten

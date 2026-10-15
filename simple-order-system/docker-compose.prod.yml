@@ -51,6 +51,13 @@ services:
       # Inventory Integration
       USE_INVENTORY_API: "true"
       INVENTORY_API_URL: http://inventory-backend:3000
+      # Geteilter Service-Schluessel (X-Order-API-Key) fuer Inventar, api-members
+      # und api-events - Pflicht, ohne bricht das Backend beim Start ab.
+      ORDER_API_KEY: ${ORDER_API_KEY}
+      # Anlaesse (api-events): aktueller Anlass + TWINT-QR pro Anlass, siehe
+      # backend/src/anlass.ts. Container fwv-api-events im Netz "proxy".
+      # Kasse vor Ort (LOCAL_MODE): https://api.fwv-raura.ch
+      EVENTS_API_URL: ${EVENTS_API_URL:-http://fwv-api-events:3000}
     volumes:
       - ./data/uploads:/app/uploads
     depends_on:

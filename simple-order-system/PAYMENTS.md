@@ -130,6 +130,49 @@ URL: https://your-domain.com/api/webhooks/raisenow
 Events: transaction.success, transaction.failed
 ```
 
+### 3. TWINT-QR an der Kasse: pro Anlass (seit Oktober 2026)
+
+Die Kasse zeigt bei TWINT ein QR-Bild. Welches, entscheidet der Anlass:
+
+1. **QR des Anlasses** - Vorstand oder Organisator laden ihn beim Anlass
+   hoch (vorstand.html "Anlass bearbeiten" → "TWINT-QR fuer die Kasse",
+   oder Mitglieder-App → Anlass bearbeiten). Gespeichert in api-events
+   (`PUT/DELETE /events/:id/twint-qr`, Tabelle `event_twint_qr`).
+2. Altbestand: ein in den Kassen-Einstellungen hochgeladenes Bild
+   (`settings.twint_qr_url`) - gilt nur, solange es gesetzt ist; die
+   Oberflaeche bietet den Upload nicht mehr an, nur noch "Entfernen".
+3. **Vereins-Standard** `frontend/public/twint-qr.png`.
+
+Welcher Anlass? In den Einstellungen "💳 TWINT und Anlass":
+*automatisch* (Standard) oder ein bestimmter Anlass. Automatisch fragt das
+Backend api-events (`GET /events/kasse/aktuell`, Header
+`X-Order-API-Key`): der Anlass, der gerade laeuft - Beginn - 2 h bis
+Ende + 2 h (ohne Ende: Ende des Starttages), Ortszeit Zuerich, nicht
+abgesagt/Entwurf/Vorschlag, nicht "Datum offen"; bei mehreren der zuletzt
+begonnene.
+
+Backend (`backend/src/anlass.ts`):
+
+| Route | Zweck |
+|---|---|
+| `GET /api/twint-qr` | `{ url, anlass: {id, titel} \| null, quelle: 'anlass'\|'einstellung'\|'standard', modus }` |
+| `GET /api/twint-qr/bild/:eventId` | reicht das Bild von api-events durch (offen wie `/api/uploads/`) |
+| `GET /api/anlass` | aktueller Anlass fuer Kopfzeile/Einstellungen |
+| `GET /api/anlass/liste` | laufende und kommende Anlaesse (Auswahl) |
+| `PUT /api/anlass/auswahl` | `{ event_id }` - `null` = automatisch (`settings.kasse_anlass_id`) |
+| `GET /api/orders/history?anlass=<id>\|ohne` | History nach Anlass |
+| `GET /api/orders/history/anlaesse` | Anlaesse mit Bestellungen und Umsatz |
+
+Jede neue Bestellung bekommt `event_id` und `event_titel` (Spalten in
+`orders`) - spaeter Umsatz pro Anlass. api-events darf die Kasse nie
+aufhalten: Ergebnis 60 s gemerkt, Zeitlimit 2,5 s, bei Fehlern der letzte
+bekannte Stand bzw. der Vereins-Standard; Bestellungen warten nie (sie
+nehmen den gemerkten Stand, aufgefrischt jede Minute im Hintergrund).
+
+Umgebung: `EVENTS_API_URL` (Standard `http://fwv-api-events:3000`, vor
+Ort `https://api.fwv-raura.ch`) und `ORDER_API_KEY` (derselbe geteilte
+Schluessel, den api-events als `ORDER_API_KEY` kennt).
+
 ## 📊 Zahlungsdatenbank
 
 ### Payments Tabelle

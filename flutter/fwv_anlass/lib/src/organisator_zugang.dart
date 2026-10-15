@@ -8,6 +8,7 @@
 //    `events/my-event/members`.
 // Welche Aktionen gehen, sagt das Backend ([AnlassRechte]).
 
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:fwv_core/fwv_core.dart';
@@ -295,6 +296,27 @@ class OrganisatorZugang extends AnlassVerwaltungZugang {
   @override
   Future<Uint8List> arbeitsplanPdf(String anlassId) =>
       api.datei('events/${_e(anlassId)}/pdf/arbeitsplan');
+
+  // -------------------------------------------------------------------
+  // TWINT-QR fuer die Kasse: `PUT/DELETE events/:id/twint-qr` (Vorstand und
+  // Organisatoren), der externe Login `events/my-event/twint-qr`. Das Bild
+  // selbst ist oeffentlich (`GET events/:id/twint-qr`).
+
+  @override
+  Future<String?> twintQrSetzen(String anlassId, GewaehlteDatei bild) async {
+    final antwort = await api.put(
+      externerLogin ? 'events/my-event/twint-qr' : 'events/${_e(anlassId)}/twint-qr',
+      daten: {'data': base64Encode(bild.bytes), 'content_type': bildTyp(bild.bytes)},
+    );
+    return antwort is Map ? jsonText(antwort['twint_qr_url']) : null;
+  }
+
+  @override
+  Future<void> twintQrEntfernen(String anlassId) =>
+      api.delete(externerLogin ? 'events/my-event/twint-qr' : 'events/${_e(anlassId)}/twint-qr');
+
+  @override
+  Future<Uint8List> twintQrBild(String anlassId) => api.datei('events/${_e(anlassId)}/twint-qr');
 
   // -------------------------------------------------------------------
   // Mitorganisatoren (`events/:id/organizers`). Lesen duerfen alle

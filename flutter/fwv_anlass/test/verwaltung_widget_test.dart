@@ -113,6 +113,14 @@ class _FalscherZugang extends AnlassVerwaltungZugang {
   }
 
   @override
+  Future<String?> twintQrSetzen(String a, GewaehlteDatei bild) =>
+      _merken('twintQrSetzen', [a, bild.bytes.length, bildTyp(bild.bytes)], '/events/$a/twint-qr?v=1');
+  @override
+  Future<void> twintQrEntfernen(String a) => _merken('twintQrEntfernen', [a], null);
+  @override
+  Future<Uint8List> twintQrBild(String a) => _merken('twintQrBild', [a], _png);
+
+  @override
   Future<void> schichtAnlegen(String a, SchichtEntwurf s) =>
       _merken('schichtAnlegen', [a, s.alsJson()], null);
   @override
@@ -360,7 +368,7 @@ class _FalscherVorstand extends _FalscherZugang {
   }
 }
 
-// Kleinstes gueltiges PNG (1x1), fuer die Beleg-Ansicht.
+// Kleinstes gueltiges PNG (1x1), fuer die Beleg-Ansicht und den TWINT-QR.
 final _png = Uint8List.fromList(
   base64Decode(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
@@ -468,6 +476,7 @@ void main() {
   AnlassVerwaltung verwaltung([
     AnlassVerwaltungZugang? anderer,
     Future<GewaehlteDatei?> Function()? pdfWaehlen,
+    Future<GewaehlteDatei?> Function()? bildWaehlen,
   ]) => AnlassVerwaltung(
     zugang: anderer ?? zugang,
     umgebung: VerwaltungsUmgebung(
@@ -475,6 +484,7 @@ void main() {
           pdfWaehlen ??
           () async =>
               (bytes: Uint8List.fromList(utf8.encode('%PDF-1.4 x')), dateiname: 'aushang.pdf'),
+      bildWaehlen: bildWaehlen ?? () async => (bytes: _png, dateiname: 'twint.png'),
       dateiTeilen: (bytes, name, typ, {ursprung}) async => geteilt.add((name, typ)),
       fotoWaehlen: ({required bool kamera}) async => Uint8List.fromList([1, 2, 3]),
       linkOeffnen: (u) async {
@@ -1574,6 +1584,51 @@ void main() {
       expect(find.text('Kein PDF angehängt'), findsOneWidget);
     }
     expect(i, 4);
+  });
+
+  testWidgets('TWINT-QR fuer die Kasse: Organisator laedt hoch und entfernt sofort', (
+    tester,
+  ) async {
+    await anlass(tester, _chilbi);
+    await tippen(tester, find.byTooltip('Anlass bearbeiten'));
+    await tippen(tester, find.byKey(const Key('twint-qr-waehlen')));
+    expect(zugang.letzter('twintQrSetzen'), [_chilbi, _png.length, 'image/png']);
+    expect(find.text('Eigener QR hinterlegt'), findsOneWidget);
+    expect(find.byType(Image), findsOneWidget, reason: 'Vorschau');
+    expect(find.text('TWINT-QR gespeichert'), findsOneWidget);
+    tester.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger)).clearSnackBars();
+    await tester.pumpAndSettle();
+    await tippen(tester, find.byKey(const Key('twint-qr-entfernen')));
+    expect(zugang.letzter('twintQrEntfernen'), [_chilbi]);
+    expect(find.text('Kein eigener QR'), findsOneWidget);
+    expect(find.text('Ohne eigenen QR gilt der Vereins-QR.'), findsOneWidget);
+    expect(zugang.gab('anlassAendern'), isFalse, reason: 'eigene Route, nicht das Formular');
+  });
+
+  testWidgets('TWINT-QR: kein Bild - Meldung, nichts hochgeladen', (tester) async {
+    await zeigen(
+      tester,
+      VerwaltungsAnlassScreen(
+        verwaltung: verwaltung(
+          null,
+          null,
+          () async => (bytes: Uint8List.fromList(utf8.encode('<svg/>')), dateiname: 'x.svg'),
+        ),
+        anlassId: _chilbi,
+      ),
+    );
+    await tippen(tester, find.byTooltip('Anlass bearbeiten'));
+    await tippen(tester, find.byKey(const Key('twint-qr-waehlen')));
+    expect(find.text('Bitte ein Bild wählen (PNG, JPEG, WebP oder GIF).'), findsOneWidget);
+    expect(zugang.gab('twintQrSetzen'), isFalse);
+  });
+
+  test('bildTyp nach Inhalt', () {
+    expect(bildTyp(_png), 'image/png');
+    expect(bildTyp(Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0])), 'image/jpeg');
+    expect(bildTyp(Uint8List.fromList(utf8.encode('GIF89a'))), 'image/gif');
+    expect(bildTyp(Uint8List.fromList(utf8.encode('RIFF0000WEBPVP8 '))), 'image/webp');
+    expect(bildTyp(Uint8List.fromList(utf8.encode('<svg/>'))), isNull);
   });
 
   test('dateiGroesseText', () {

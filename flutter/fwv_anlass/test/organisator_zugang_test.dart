@@ -71,6 +71,29 @@ void main() {
     expect(u.anlaesse.single.rechte.anlassBearbeiten, isFalse);
   });
 
+  test('TWINT-QR: Mitglied/Vorstand events/:id, externer Login my-event', () async {
+    final png = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+    );
+    antwort = (a) => a.method == 'GET' ? png : {'twint_qr_url': '/events/e1/twint-qr?v=7'};
+    final d = dienst();
+    expect(await d.twintQrSetzen('e1', (bytes: png, dateiname: 'qr.png')), '/events/e1/twint-qr?v=7');
+    await d.twintQrEntfernen('e1');
+    expect(await d.twintQrBild('e1'), png);
+    expect(anfragen.map(route), [
+      'PUT /events/e1/twint-qr',
+      'DELETE /events/e1/twint-qr',
+      'GET /events/e1/twint-qr',
+    ]);
+    expect(body(anfragen.first), {'data': base64Encode(png), 'content_type': 'image/png'});
+
+    anfragen.clear();
+    final x = dienst(extern: true);
+    await x.twintQrSetzen('e1', (bytes: png, dateiname: 'qr.png'));
+    await x.twintQrEntfernen('e1');
+    expect(anfragen.map(route), ['PUT /events/my-event/twint-qr', 'DELETE /events/my-event/twint-qr']);
+  });
+
   group('Routen je nach Zugang', () {
     test('Mitglied: …-as-organizer', () async {
       final d = dienst();

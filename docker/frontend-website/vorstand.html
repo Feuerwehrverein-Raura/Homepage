@@ -2330,6 +2330,22 @@
                             </div>
                         </div>
 
+                        <!-- TWINT-QR fuer die Kasse: die Kasse (order.fwv-raura.ch) zeigt bei
+                             TWINT den QR des laufenden Anlasses (api-events /events/kasse/aktuell).
+                             Wird sofort gespeichert (PUT/DELETE /events/:id/twint-qr). -->
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">TWINT-QR fuer die Kasse</label>
+                            <div id="event-twint-qr-neu" class="text-sm text-gray-500 hidden">Erst den Anlass speichern, dann den QR-Code hochladen.</div>
+                            <div id="event-twint-qr-bereich" class="flex flex-wrap items-center gap-3">
+                                <img id="event-twint-qr-vorschau" alt="TWINT-QR des Anlasses" class="hidden w-24 h-24 object-contain border rounded-lg bg-white">
+                                <input type="file" id="event-twint-qr-upload" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+                                <button type="button" onclick="document.getElementById('event-twint-qr-upload').click()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm">QR-Bild hochladen</button>
+                                <button type="button" id="event-twint-qr-remove" onclick="removeEventTwintQr()" class="hidden text-red-500 hover:text-red-700 text-sm">Entfernen</button>
+                                <span id="event-twint-qr-info" class="text-sm text-gray-500"></span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Ohne eigenen QR gilt der Vereins-QR. PNG, JPEG, WebP oder GIF, max. 2 MB.</p>
+                        </div>
+
                         <!-- Anmeldung (fuer Teilnehmer-Events wie Ausfluege) -->
                         <div id="registration-section" class="md:col-span-2 border-t pt-4 mt-2 contents">
                             <div class="md:col-span-2">
@@ -5253,6 +5269,7 @@
             await populateOrganizerMemberSelect('');
             switchOrganizerMode('member');
             document.getElementById('delete-event-btn').classList.add('hidden');
+            zeigeEventTwintQr(null);
             updateEventFormByCategory();
             document.getElementById('event-modal').classList.remove('hidden');
         }
@@ -5322,6 +5339,9 @@
                     pdfInfo.textContent = '';
                     pdfRemove.classList.add('hidden');
                 }
+
+                // TWINT-QR fuer die Kasse
+                zeigeEventTwintQr(event);
 
                 // Load shifts
                 loadEventShifts(event.shifts || []);
@@ -5992,6 +6012,75 @@
                 remove.classList.remove('hidden');
             }
         });
+
+        // TWINT-QR fuer die Kasse: Anzeige im Formular. event = null -> neuer
+        // Anlass (noch keine id, Hochladen erst nach dem Speichern).
+        function zeigeEventTwintQr(event) {
+            const neu = !event || !event.id;
+            document.getElementById('event-twint-qr-neu').classList.toggle('hidden', !neu);
+            document.getElementById('event-twint-qr-bereich').classList.toggle('hidden', neu);
+            document.getElementById('event-twint-qr-upload').value = '';
+            const vorschau = document.getElementById('event-twint-qr-vorschau');
+            const url = event && event.twint_qr_url;
+            if (url) {
+                vorschau.src = API_BASE + url;
+                vorschau.classList.remove('hidden');
+            } else {
+                vorschau.removeAttribute('src');
+                vorschau.classList.add('hidden');
+            }
+            document.getElementById('event-twint-qr-remove').classList.toggle('hidden', !url);
+            document.getElementById('event-twint-qr-info').textContent = url ? 'Eigener QR' : 'Kein eigener QR - es gilt der Vereins-QR';
+        }
+
+        document.getElementById('event-twint-qr-upload')?.addEventListener('change', async function() {
+            const file = this.files[0];
+            const id = document.getElementById('event-id').value;
+            if (!file || !id) return;
+            if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+                alert('Nur PNG, JPEG, WebP oder GIF erlaubt');
+                this.value = '';
+                return;
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Bild darf maximal 2 MB gross sein');
+                this.value = '';
+                return;
+            }
+            const info = document.getElementById('event-twint-qr-info');
+            info.textContent = 'Wird hochgeladen...';
+            try {
+                const response = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}/twint-qr`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ data: await fileToBase64(file), content_type: file.type })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+                zeigeEventTwintQr({ id, twint_qr_url: result.twint_qr_url });
+            } catch (error) {
+                alert('TWINT-QR konnte nicht gespeichert werden: ' + error.message);
+                info.textContent = '';
+            } finally {
+                this.value = '';
+            }
+        });
+
+        async function removeEventTwintQr() {
+            const id = document.getElementById('event-id').value;
+            if (!id || !confirm('Eigenen TWINT-QR entfernen? Danach gilt an der Kasse der Vereins-QR.')) return;
+            try {
+                const response = await fetch(`${API_BASE}/events/${encodeURIComponent(id)}/twint-qr`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+                zeigeEventTwintQr({ id, twint_qr_url: null });
+            } catch (error) {
+                alert('TWINT-QR konnte nicht entfernt werden: ' + error.message);
+            }
+        }
 
         function removeEventPdf() {
             document.getElementById('event-pdf-upload').value = '';

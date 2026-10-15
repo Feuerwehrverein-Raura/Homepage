@@ -120,6 +120,27 @@ interface OpenOrder {
 
 type OrderType = 'bar' | 'tisch';
 
+// Anlass der Kasse (Backend src/anlass.ts, Quelle api-events)
+interface KassenAnlass {
+  id: string;
+  titel: string;
+  beginn: string | null;
+  ende: string | null;
+  ort: string | null;
+  twint_qr_url: string | null;
+}
+
+interface AnlassStand {
+  anlass: KassenAnlass | null;
+  modus: 'automatisch' | 'manuell';
+  auswahl: string | null;
+  erreichbar: boolean;
+}
+
+// Vereins-Standard (frontend/public/twint-qr.png): gilt, wenn der Anlass
+// keinen eigenen TWINT-QR hat oder nichts erreichbar ist.
+const VEREINS_QR_URL = '/twint-qr.png';
+
 function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -162,6 +183,13 @@ function App() {
 
   // TWINT payment states
   const [twintQrUrl, setTwintQrUrl] = useState<string | null>(null);
+  // Woher der QR kommt (Anlass oder Vereins-Standard) - steht unter dem QR.
+  const [twintQrAnlass, setTwintQrAnlass] = useState<string | null>(null);
+  // Aktueller Anlass fuer die Kopfzeile
+  const [anlassStand, setAnlassStand] = useState<AnlassStand | null>(null);
+  // History: Filter nach Anlass ('' = alle, 'ohne' = ohne Anlass, sonst event_id)
+  const [historyAnlass, setHistoryAnlass] = useState<string>('');
+  const [historyAnlaesse, setHistoryAnlaesse] = useState<{ event_id: string; event_titel: string | null; bestellungen: number; umsatz: string }[]>([]);
   const [twintPayment, setTwintPayment] = useState<{ orderId: number; total: number } | null>(null);
 
   // Nicht gedruckte Bons. Bewusst ein stehendes Banner und kein alert():
@@ -215,11 +243,15 @@ function App() {
     setSessionChecked(true);
   }, []);
 
-  // Fetch items and TWINT QR after login
+  // Fetch items and TWINT QR after login. QR und Anlass jede Minute neu:
+  // Der laufende Anlass wechselt im Tagesverlauf (Backend merkt ihn 60 s).
   useEffect(() => {
     if (token) {
       fetchItems();
       fetchTwintQr();
+      fetchAnlass();
+      const t = setInterval(() => { fetchTwintQr(); fetchAnlass(); }, 60 * 1000);
+      return () => clearInterval(t);
     }
   }, [token]);
 
@@ -227,18 +259,30 @@ function App() {
 
   const fetchTwintQr = async () => {
     try {
+      // { url, anlass: {id, titel} | null, quelle: 'anlass'|'einstellung'|'standard' }
       const res = await fetch(`${API_URL}/twint-qr`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
-        setTwintQrUrl(data.url || '/twint-qr.png');
+        setTwintQrUrl(data.url || VEREINS_QR_URL);
+        setTwintQrAnlass(data.quelle === 'anlass' && data.anlass ? data.anlass.titel : null);
       } else {
-        // Fallback to local QR code in public folder
-        setTwintQrUrl('/twint-qr.png');
+        // Fallback: Vereins-Standard im public-Ordner
+        setTwintQrUrl(VEREINS_QR_URL);
+        setTwintQrAnlass(null);
       }
     } catch (error) {
       console.error('Failed to fetch TWINT QR:', error);
-      // Fallback to local QR code
-      setTwintQrUrl('/twint-qr.png');
+      setTwintQrUrl(VEREINS_QR_URL);
+      setTwintQrAnlass(null);
+    }
+  };
+
+  const fetchAnlass = async () => {
+    try {
+      const res = await fetch(`${API_URL}/anlass`, { headers: authHeaders() });
+      if (res.ok) setAnlassStand(await res.json());
+    } catch {
+      // Ohne Anlass-Anzeige weiter - die Kasse haengt nicht daran.
     }
   };
 
@@ -272,14 +316,17 @@ function App() {
 
   const fetchHistory = async () => {
     try {
-      const [historyRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/orders/history?limit=50`, { headers: authHeaders() }),
-        fetch(`${API_URL}/stats/daily`, { headers: authHeaders() })
+      const filter = historyAnlass ? `&anlass=${encodeURIComponent(historyAnlass)}` : '';
+      const [historyRes, statsRes, anlaesseRes] = await Promise.all([
+        fetch(`${API_URL}/orders/history?limit=50${filter}`, { headers: authHeaders() }),
+        fetch(`${API_URL}/stats/daily`, { headers: authHeaders() }),
+        fetch(`${API_URL}/orders/history/anlaesse`, { headers: authHeaders() })
       ]);
       const history = await historyRes.json();
       const stats = await statsRes.json();
       setHistoryData(history);
       setStatsData(stats);
+      if (anlaesseRes.ok) setHistoryAnlaesse(await anlaesseRes.json());
     } catch (error) {
       console.error('Failed to fetch history:', error);
     }
@@ -354,7 +401,7 @@ function App() {
     if (view === 'history' && user) {
       fetchHistory();
     }
-  }, [view, user]);
+  }, [view, user, historyAnlass]);
 
   // WebSocket connection for real-time order updates
   useEffect(() => {
@@ -953,6 +1000,16 @@ function App() {
                 className="h-8 w-8 sm:h-12 sm:w-12 rounded-full bg-white p-0.5 sm:p-1"
               />
               <h1 className="text-lg sm:text-2xl font-bold">Kasse</h1>
+              {/* Aktueller Anlass (api-events) - dezent, damit man sieht,
+                  welchem Anlass Bestellungen und TWINT-QR gelten. */}
+              {anlassStand?.anlass && (
+                <span
+                  className="text-xs sm:text-sm text-red-100 truncate max-w-[40vw]"
+                  title={anlassStand.modus === 'manuell' ? 'In den Einstellungen gewaehlt' : 'Automatisch (laufender Anlass)'}
+                >
+                  · {anlassStand.anlass.titel}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {user && <span className="text-xs sm:text-sm">Hallo, {user.name}</span>}
@@ -1018,9 +1075,10 @@ function App() {
       </div>
 
       {view === 'settings' ? (
-        <SettingsView token={token} />
+        <SettingsView token={token} onAnlass={(stand) => { setAnlassStand(stand); fetchTwintQr(); }} />
       ) : showHistoryView ? (
-        <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token} />
+        <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token}
+          anlass={historyAnlass} anlaesse={historyAnlaesse} onAnlass={setHistoryAnlass} />
       ) : showInventoryView ? (
         <InventoryView items={items} onUpdate={fetchItems} token={token} />
       ) : view === 'tables' ? (
@@ -1536,6 +1594,9 @@ function App() {
                 alt="TWINT QR Code"
                 className="w-48 mx-auto border-2 border-gray-200 rounded-lg"
               />
+              {twintQrAnlass && (
+                <p className="text-center text-xs text-gray-500 mt-2">QR-Code von: {twintQrAnlass}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -1993,6 +2054,9 @@ function App() {
                     alt="TWINT QR Code"
                     className="w-48 mx-auto border-2 border-gray-200 rounded-lg"
                   />
+                  {twintQrAnlass && (
+                    <p className="text-center text-xs text-gray-500 mt-2">QR-Code von: {twintQrAnlass}</p>
+                  )}
                 </div>
               )}
 
@@ -2185,7 +2249,12 @@ function InventoryView({ items, onUpdate, token }: { items: Item[]; onUpdate: ()
   );
 }
 
-function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: any; onRefresh: () => void; token: string | null }) {
+function HistoryView({ data, stats, onRefresh, token, anlass, anlaesse, onAnlass }: {
+  data: any[]; stats: any; onRefresh: () => void; token: string | null;
+  anlass: string;
+  anlaesse: { event_id: string; event_titel: string | null; bestellungen: number; umsatz: string }[];
+  onAnlass: (wert: string) => void;
+}) {
   const [sendingReport, setSendingReport] = useState(false);
 
   const sendReport = async () => {
@@ -2289,7 +2358,23 @@ function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: an
 
       {/* Order History */}
       <div className="bg-white rounded-lg shadow p-4 sm:p-6">
-        <h2 className="text-xl sm:text-2xl font-bold mb-4">Bestellhistorie</h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          <h2 className="text-xl sm:text-2xl font-bold">Bestellhistorie</h2>
+          {/* Filter nach Anlass (event_id an der Bestellung) - mit Umsatz */}
+          <select
+            value={anlass}
+            onChange={(e) => onAnlass(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            <option value="">Alle Anlaesse</option>
+            {anlaesse.map((a) => (
+              <option key={a.event_id} value={a.event_id}>
+                {a.event_titel || a.event_id} ({a.bestellungen} Best., CHF {parseFloat(a.umsatz || '0').toFixed(2)})
+              </option>
+            ))}
+            <option value="ohne">Ohne Anlass</option>
+          </select>
+        </div>
 
         <div className="overflow-x-auto -mx-4 sm:mx-0">
           <table className="w-full min-w-[700px]">
@@ -2298,6 +2383,7 @@ function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: an
                 <th className="px-3 py-2 text-left text-sm">#</th>
                 <th className="px-3 py-2 text-left text-sm">Tisch</th>
                 <th className="px-3 py-2 text-left text-sm">Zeit</th>
+                <th className="px-3 py-2 text-left text-sm">Anlass</th>
                 <th className="px-3 py-2 text-left text-sm">Artikel</th>
                 <th className="px-3 py-2 text-left text-sm">Total</th>
                 <th className="px-3 py-2 text-left text-sm">Zahlung</th>
@@ -2312,6 +2398,7 @@ function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: an
                   <td className="px-3 py-2 text-sm">
                     {new Date(order.created_at).toLocaleString('de-CH')}
                   </td>
+                  <td className="px-3 py-2 text-sm text-gray-600">{order.event_titel || '-'}</td>
                   <td className="px-3 py-2 text-sm">
                     {order.items && order.items[0]?.id ? (
                       <span className="text-xs">
@@ -2366,7 +2453,14 @@ function HistoryView({ data, stats, onRefresh, token }: { data: any[]; stats: an
   );
 }
 
-function SettingsView({ token }: { token: string | null }) {
+// '2026-10-24 18:00:00' -> '24.10.2026 18:00'
+function datumKurz(wert: string): string {
+  const m = wert.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (!m) return wert;
+  return `${m[3]}.${m[2]}.${m[1]}${m[4] ? ` ${m[4]}:${m[5]}` : ''}`;
+}
+
+function SettingsView({ token, onAnlass }: { token: string | null; onAnlass: (stand: AnlassStand | null) => void }) {
   const [settings, setSettings] = useState({
     printer_bar_ip: '',
     printer_bar_port: '9100',
@@ -2382,8 +2476,53 @@ function SettingsView({ token }: { token: string | null }) {
 
   const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+  // Anlass der Kasse (Backend /api/anlass, Liste aus api-events)
+  const [anlass, setAnlass] = useState<AnlassStand | null>(null);
+  const [anlaesse, setAnlaesse] = useState<KassenAnlass[]>([]);
+  const [anlaesseFehler, setAnlaesseFehler] = useState<string | null>(null);
+  const [anlassSpeichert, setAnlassSpeichert] = useState(false);
+  const kopf = (): Record<string, string> => (token ? { 'Authorization': `Bearer ${token}` } : {});
+
+  const fetchAnlass = async () => {
+    try {
+      const [standRes, listeRes] = await Promise.all([
+        fetch(`${API_URL}/anlass`, { headers: kopf() }),
+        fetch(`${API_URL}/anlass/liste`, { headers: kopf() }),
+      ]);
+      if (standRes.ok) setAnlass(await standRes.json());
+      const liste = await listeRes.json().catch(() => ({}));
+      setAnlaesse(Array.isArray(liste.anlaesse) ? liste.anlaesse : []);
+      setAnlaesseFehler(listeRes.ok ? null : (liste.error || 'Anlaesse nicht erreichbar'));
+    } catch {
+      setAnlaesseFehler('Anlaesse nicht erreichbar');
+    }
+  };
+
+  const anlassWaehlen = async (eventId: string | null) => {
+    setAnlassSpeichert(true);
+    try {
+      const res = await fetch(`${API_URL}/anlass/auswahl`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...kopf() },
+        body: JSON.stringify({ event_id: eventId }),
+      });
+      const stand = await res.json();
+      if (res.ok) {
+        setAnlass(stand);
+        onAnlass(stand);
+      } else {
+        alert(stand.error || 'Auswahl nicht gespeichert');
+      }
+    } catch {
+      alert('Auswahl nicht gespeichert');
+    } finally {
+      setAnlassSpeichert(false);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
+    fetchAnlass();
   }, []);
 
   const fetchSettings = async () => {
@@ -2581,89 +2720,102 @@ function SettingsView({ token }: { token: string | null }) {
           </div>
         </div>
 
-        {/* TWINT/RaiseNow QR Code Settings */}
+        {/* TWINT-QR und Anlass (Oktober 2026): Der QR kommt vom Anlass
+            (api-events, hochgeladen in vorstand.html bzw. der App beim
+            Anlass). Ohne eigenen QR gilt der Vereins-Standard /twint-qr.png.
+            Der fruehere Upload hier ist weg; ein noch gesetztes Bild
+            (settings.twint_qr_url) gilt nur, solange es gesetzt ist. */}
         <div className="mb-8">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            💳 TWINT Zahlung (RaiseNow)
+            💳 TWINT und Anlass
           </h3>
 
-          <div className="border rounded-lg p-4">
-            <div className="space-y-4">
-              {/* File Upload */}
-              <div>
-                <label className="block text-sm text-gray-600 mb-2">QR-Code Bild hochladen</label>
-                <div className="flex gap-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-
-                      const formData = new FormData();
-                      formData.append('qrcode', file);
-
-                      try {
-                        setSaving(true);
-                        const res = await fetch(`${API_URL}/settings/upload-twint-qr`, {
-                          method: 'POST',
-                          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-                          body: formData,
-                        });
-
-                        const result = await res.json();
-                        if (res.ok && result.url) {
-                          setSettings(prev => ({ ...prev, twint_qr_url: result.url }));
-                          alert('QR-Code erfolgreich hochgeladen!');
-                        } else {
-                          alert(result.error || 'Upload fehlgeschlagen');
-                        }
-                      } catch (error) {
-                        alert('Upload fehlgeschlagen');
-                      } finally {
-                        setSaving(false);
-                        e.target.value = ''; // Reset file input
-                      }
-                    }}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Bild wird automatisch zu Nextcloud hochgeladen und verlinkt.
+          <div className="border rounded-lg p-4 space-y-4">
+            <div>
+              <p className="text-sm text-gray-600">Aktueller Anlass:</p>
+              <p className="font-semibold">
+                {anlass?.anlass ? anlass.anlass.titel : 'Kein Anlass'}
+                <span className="font-normal text-gray-500">
+                  {' '}({anlass?.modus === 'manuell' ? 'gewaehlt' : 'automatisch'})
+                </span>
+              </p>
+              {anlass?.anlass && (
+                <p className="text-xs text-gray-500">
+                  {anlass.anlass.twint_qr_url ? 'Mit eigenem TWINT-QR' : 'Ohne eigenen TWINT-QR - es gilt der Vereins-Standard'}
                 </p>
-              </div>
-
-              {/* Or manual URL */}
-              <div className="border-t pt-4">
-                <label className="block text-sm text-gray-600 mb-1">Oder URL manuell eingeben:</label>
-                <input
-                  type="text"
-                  placeholder="https://example.com/twint-qr.png"
-                  value={settings.twint_qr_url || ''}
-                  onChange={(e) => setSettings({ ...settings, twint_qr_url: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Preview */}
-              {settings.twint_qr_url && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-2">Vorschau:</p>
-                  <img
-                    src={settings.twint_qr_url}
-                    alt="TWINT QR Code"
-                    className="max-w-[200px] mx-auto border rounded"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
+              )}
+              {anlass && !anlass.erreichbar && (
+                <p className="text-xs text-orange-600 mt-1">Anlaesse gerade nicht erreichbar - die Kasse nimmt den letzten Stand bzw. den Vereins-Standard.</p>
               )}
             </div>
+
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Anlass fuer Bestellungen und TWINT-QR</label>
+              <select
+                value={anlass?.auswahl || ''}
+                disabled={anlassSpeichert}
+                onChange={(e) => anlassWaehlen(e.target.value || null)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+              >
+                <option value="">Automatisch (laufender Anlass)</option>
+                {anlaesse.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.titel}{a.beginn ? ` - ${datumKurz(a.beginn)}` : ''}{a.twint_qr_url ? ' (eigener QR)' : ''}
+                  </option>
+                ))}
+                {anlass?.auswahl && !anlaesse.some((a) => a.id === anlass.auswahl) && (
+                  <option value={anlass.auswahl}>{anlass.anlass?.titel || 'Gewaehlter Anlass'}</option>
+                )}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Automatisch: der Anlass, der gerade laeuft (2 h vor Beginn bis 2 h nach Ende).
+                {anlaesseFehler && <span className="text-orange-600"> {anlaesseFehler}</span>}
+              </p>
+            </div>
+
+            <div className="border-t pt-4">
+              <p className="text-sm text-gray-600 mb-2">Ohne eigenen QR beim Anlass gilt der Vereins-Standard:</p>
+              <img
+                src={VEREINS_QR_URL}
+                alt="TWINT QR-Code Vereins-Standard"
+                className="max-w-[200px] mx-auto border rounded"
+              />
+            </div>
+
+            {settings.twint_qr_url && (
+              <div className="p-3 bg-orange-50 rounded-lg text-sm text-orange-800">
+                <p className="mb-2">
+                  In den Einstellungen ist noch ein frueheres QR-Bild hinterlegt. Es gilt anstelle des
+                  Vereins-Standards, wenn der Anlass keinen eigenen QR hat.
+                </p>
+                <button
+                  onClick={async () => {
+                    if (!confirm('Frueheres QR-Bild entfernen? Danach gilt der Vereins-Standard.')) return;
+                    const res = await fetch(`${API_URL}/settings`, {
+                      method: 'PUT',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                      },
+                      body: JSON.stringify({ twint_qr_url: '' }),
+                    });
+                    if (res.ok) {
+                      setSettings((prev) => ({ ...prev, twint_qr_url: '' }));
+                      onAnlass(anlass);
+                    } else {
+                      alert('Entfernen fehlgeschlagen');
+                    }
+                  }}
+                  className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded"
+                >
+                  Frueheres QR-Bild entfernen
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-            <p><strong>Tipp:</strong> Den QR-Code kannst du im RaiseNow Dashboard generieren und hier hochladen.</p>
+            <p><strong>Tipp:</strong> Einen eigenen TWINT-QR pro Anlass laden Vorstand oder Organisator beim Anlass hoch (Vorstand-Seite oder App: Anlass bearbeiten).</p>
           </div>
         </div>
 

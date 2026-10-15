@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 import crypto from 'crypto';
+import { AnlassErmittler, eventsQuelle, twintAntwort, UUID_MUSTER } from './anlass.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
@@ -116,6 +117,8 @@ const OPEN_API_PATHS = [
   /^\/sync\//,
   /^\/internal\//,
   /^\/uploads\//,
+  // TWINT-QR des Anlasses: <img> schickt kein Token mit (wie /uploads/).
+  /^\/twint-qr\/bild\//,
 ];
 app.use('/api', (req: AuthenticatedRequest, res, next) => {
   if (LOCAL_MODE) return next();
@@ -258,6 +261,13 @@ async function initDB() {
   await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS sync_source VARCHAR(100)`);
   await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS sync_source_id INTEGER`);
   await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS synced_at TIMESTAMP`);
+
+  // Anlass der Bestellung (aus api-events, siehe src/anlass.ts) - fuer den
+  // Umsatz pro Anlass. Der Titel steht mit drin, damit die Auswertung auch
+  // ohne api-events lesbar bleibt.
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS event_id VARCHAR(64)`);
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS event_titel VARCHAR(255)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_event_id ON orders(event_id)`);
 
   // Sync queue for offline sync
   await pool.query(`
@@ -516,9 +526,10 @@ async function syncFromCloud() {
         if (existing.rows.length > 0) continue;
 
         const orderResult = await client.query(`
-          INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id, synced_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id, table_number, status, total, payment_method, created_at
-        `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, order.sync_source || 'cloud', order.id]);
+          INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id, synced_at, event_id, event_titel)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9) RETURNING id, table_number, status, total, payment_method, created_at
+        `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, order.sync_source || 'cloud', order.id,
+            order.event_id || null, order.event_titel || null]);
 
         const insertedOrder = orderResult.rows[0];
         const insertedItems: any[] = [];
@@ -765,13 +776,104 @@ app.get('/api/items', async (req, res) => {
   }
 });
 
-// Public endpoint to get TWINT QR code URL (for payment modal)
+// ============================================
+// ANLASS (api-events) UND TWINT-QR - siehe src/anlass.ts
+// ============================================
+// Im Docker-Netz "proxy" heisst der Container fwv-api-events. Die Kasse vor
+// Ort (LOCAL_MODE) setzt EVENTS_API_URL=https://api.fwv-raura.ch.
+const EVENTS_API_URL = process.env.EVENTS_API_URL || 'http://fwv-api-events:3000';
+const anlassErmittler = new AnlassErmittler(
+  eventsQuelle({ baseUrl: EVENTS_API_URL, schluessel: ORDER_API_KEY }),
+  () => getSetting('kasse_anlass_id'),
+);
+
+// Im Hintergrund aktuell halten, damit Bestellungen nie auf api-events
+// warten (sie nehmen nur den gemerkten Stand).
+function anlassAuffrischen() {
+  anlassErmittler.ermitteln()
+    .then((stand) => { if (stand.fehler) console.warn('Anlass von api-events:', stand.fehler); })
+    .catch(() => {});
+}
+setTimeout(anlassAuffrischen, 5000);
+setInterval(anlassAuffrischen, 60 * 1000);
+
+// TWINT-QR fuer die Zahlung: { url, anlass: {id, titel} | null,
+// quelle: 'anlass'|'einstellung'|'standard', modus: 'automatisch'|'manuell' }.
+// Reihenfolge (src/anlass.ts twintAntwort): QR des gewaehlten bzw. laufenden
+// Anlasses -> settings.twint_qr_url nur falls noch gesetzt (Altbestand) ->
+// Vereins-Standard /twint-qr.png. Fehler -> Vereins-Standard.
 app.get('/api/twint-qr', async (req, res) => {
+  let einstellung: string | null = null;
   try {
-    const qrUrl = await getSetting('twint_qr_url');
-    res.json({ url: qrUrl || null });
-  } catch (error) {
-    res.json({ url: null });
+    einstellung = await getSetting('twint_qr_url');
+  } catch {
+    einstellung = null;
+  }
+  try {
+    const stand = await anlassErmittler.ermitteln();
+    res.json(twintAntwort(stand, einstellung));
+  } catch {
+    res.json(twintAntwort({ anlass: null, modus: 'automatisch' }, einstellung));
+  }
+});
+
+// Bild des Anlass-QR durchreichen. So braucht der Browser der Kasse keine
+// zweite Adresse, und api-events muss fuer die Kasse nicht erreichbar sein.
+app.get('/api/twint-qr/bild/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  if (!UUID_MUSTER.test(eventId)) return res.status(404).json({ error: 'Kein QR-Code' });
+  try {
+    const r = await fetch(`${EVENTS_API_URL.replace(/\/+$/, '')}/events/${encodeURIComponent(eventId)}/twint-qr`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    const typ = r.headers.get('content-type') || '';
+    if (!r.ok || !typ.startsWith('image/')) return res.status(404).json({ error: 'Kein QR-Code' });
+    res.setHeader('Content-Type', typ);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(Buffer.from(await r.arrayBuffer()));
+  } catch (error: any) {
+    console.error('TWINT-QR des Anlasses nicht geladen:', error?.message || error);
+    res.status(502).json({ error: 'QR-Code nicht erreichbar' });
+  }
+});
+
+// Aktueller Anlass fuer Kopfzeile und Einstellungen.
+app.get('/api/anlass', async (req, res) => {
+  try {
+    const stand = await anlassErmittler.ermitteln();
+    res.json({
+      anlass: stand.anlass,
+      modus: stand.modus,
+      auswahl: await getSetting('kasse_anlass_id'),
+      erreichbar: !stand.fehler,
+    });
+  } catch {
+    res.json({ anlass: null, modus: 'automatisch', auswahl: null, erreichbar: false });
+  }
+});
+
+// Laufende und kommende Anlaesse fuer die Auswahl in den Einstellungen.
+app.get('/api/anlass/liste', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  try {
+    const quelle = eventsQuelle({ baseUrl: EVENTS_API_URL, schluessel: ORDER_API_KEY });
+    res.json({ anlaesse: await quelle.liste() });
+  } catch (error: any) {
+    console.error('Anlass-Liste von api-events:', error?.message || error);
+    res.status(502).json({ error: 'Anlaesse nicht erreichbar (api-events)', anlaesse: [] });
+  }
+});
+
+// Auswahl setzen: { event_id: null } = automatisch, sonst ein bestimmter Anlass.
+app.put('/api/anlass/auswahl', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const id = req.body?.event_id ? String(req.body.event_id) : '';
+  if (id && !UUID_MUSTER.test(id)) return res.status(400).json({ error: 'Ungueltige Anlass-ID' });
+  try {
+    await setSetting('kasse_anlass_id', id);
+    anlassErmittler.leeren();
+    const stand = await anlassErmittler.ermitteln();
+    res.json({ anlass: stand.anlass, modus: stand.modus, auswahl: id || null, erreichbar: !stand.fehler });
+  } catch (error: any) {
+    res.status(500).json({ error: `Auswahl nicht gespeichert: ${error?.message || error}` });
   }
 });
 
@@ -918,10 +1020,14 @@ app.post('/api/orders', async (req, res) => {
       sum + (item.price * item.quantity), 0
     );
 
+    // Anlass der Bestellung: der gemerkte Stand (src/anlass.ts) - hier wird
+    // nie auf api-events gewartet.
+    const anlass = anlassErmittler.gemerkt()?.anlass || null;
+
     // Create order
     const orderResult = await client.query(
-      'INSERT INTO orders (table_number, total) VALUES ($1, $2) RETURNING *',
-      [table_number, total]
+      'INSERT INTO orders (table_number, total, event_id, event_titel) VALUES ($1, $2, $3, $4) RETURNING *',
+      [table_number, total, anlass ? anlass.id : null, anlass ? anlass.titel.substring(0, 255) : null]
     );
     const order = orderResult.rows[0];
 
@@ -1269,7 +1375,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
 // Order history (for admin view)
 app.get('/api/orders/history', async (req, res) => {
   try {
-    const { date, status, limit = 100 } = req.query;
+    const { date, status, anlass, limit = 100 } = req.query;
 
     let query = `
       SELECT o.*,
@@ -1299,6 +1405,14 @@ app.get('/api/orders/history', async (req, res) => {
       conditions.push(`o.status = $${params.length}`);
     }
 
+    // Nach Anlass filtern: ?anlass=<event_id>, ?anlass=ohne fuer Bestellungen ohne Anlass
+    if (anlass === 'ohne') {
+      conditions.push('o.event_id IS NULL');
+    } else if (anlass) {
+      params.push(String(anlass));
+      conditions.push(`o.event_id = $${params.length}`);
+    }
+
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
@@ -1310,6 +1424,23 @@ app.get('/api/orders/history', async (req, res) => {
 
     const result = await pool.query(query, params);
     res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Anlaesse, zu denen es Bestellungen gibt (Filter in der History), mit Umsatz.
+app.get('/api/orders/history/anlaesse', async (req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT event_id, MAX(event_titel) AS event_titel, COUNT(*)::int AS bestellungen,
+             COALESCE(SUM(total) FILTER (WHERE status IN ('paid', 'completed')), 0) AS umsatz,
+             MAX(created_at) AS zuletzt
+        FROM orders
+       WHERE event_id IS NOT NULL
+       GROUP BY event_id
+       ORDER BY MAX(created_at) DESC`);
+    res.json(r.rows);
   } catch (error) {
     res.status(500).json({ error: 'Database error' });
   }
@@ -1803,6 +1934,10 @@ app.put('/api/settings', authenticateToken, async (req: AuthenticatedRequest, re
     const settings = req.body;
 
     for (const [key, value] of Object.entries(settings)) {
+      // Die Anlass-Auswahl hat ihre eigene Route (PUT /api/anlass/auswahl).
+      // Das Formular schickt alle geladenen Einstellungen zurueck - sonst
+      // ueberschriebe ein alter Stand die gerade getroffene Auswahl.
+      if (key === 'kasse_anlass_id') continue;
       await setSetting(key, String(value));
     }
 
@@ -1836,7 +1971,10 @@ app.post('/api/settings/test-printer', authenticateToken, async (req: Authentica
   }
 });
 
-// Upload TWINT QR code - saves locally or to Nextcloud
+// Upload TWINT QR code - saves locally or to Nextcloud.
+// Altbestand (Oktober 2026): Die Oberflaeche bietet das nicht mehr an. Der
+// QR kommt vom Anlass (api-events), sonst gilt der Vereins-Standard
+// /twint-qr.png. Ein hier gesetztes Bild gilt nur, solange es gesetzt ist.
 app.post('/api/settings/upload-twint-qr', authenticateToken, upload.single('qrcode'), async (req: AuthenticatedRequest, res) => {
   try {
     if (!req.file) {
@@ -2528,10 +2666,11 @@ app.post('/api/sync/orders', verifySyncKey, async (req, res) => {
 
       // Insert order
       const orderResult = await client.query(`
-        INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id, event_id, event_titel)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
-      `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, source, order.id]);
+      `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, source, order.id,
+          order.event_id || null, order.event_titel || null]);
 
       const newOrderId = orderResult.rows[0].id;
 
@@ -2627,10 +2766,11 @@ app.post('/api/sync/full', verifySyncKey, async (req, res) => {
         if (existing.rows.length > 0) continue;
 
         const orderResult = await client.query(`
-          INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id, event_id, event_titel)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           RETURNING id
-        `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, source, order.id]);
+        `, [order.table_number, order.status, order.total, order.payment_method, order.created_at, source, order.id,
+            order.event_id || null, order.event_titel || null]);
 
         const newOrderId = orderResult.rows[0].id;
 

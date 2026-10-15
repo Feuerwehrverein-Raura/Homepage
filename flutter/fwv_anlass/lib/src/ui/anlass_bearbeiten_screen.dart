@@ -20,6 +20,8 @@
 //    bei bestehenden Anlaessen stehen sie im Reiter "Schichten".
 // Fuer den Organisator bleibt das Formular, wie es war.
 
+import 'dart:typed_data';
+
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -81,6 +83,12 @@ class _AnlassBearbeitenScreenState extends State<AnlassBearbeitenScreen> {
 
   /// Neue Schichten (nur beim Anlegen).
   final _schichten = <SchichtEntwurf>[];
+
+  // TWINT-QR fuer die Kasse: wird sofort gespeichert (eigene Route), nicht
+  // erst mit dem Formular.
+  late String? _twintQr = widget.anlass?.twintQrUrl;
+  late Future<Uint8List>? _twintVorschau = _twintQr == null ? null : _twintBildLaden();
+  bool _twintLaeuft = false;
 
   AnlassVerwaltungZugang get _z => widget.verwaltung.zugang;
   bool get _vorstand => _z.kannAnlegen;
@@ -220,6 +228,63 @@ class _AnlassBearbeitenScreenState extends State<AnlassBearbeitenScreen> {
       _e.pdfNeu = d;
       _e.pdfEntfernen = false;
     });
+  }
+
+  Future<Uint8List> _twintBildLaden() => _z.twintQrBild(widget.anlass!.id);
+
+  Future<void> _twintQrWaehlen() async {
+    final waehlen = widget.verwaltung.umgebung.bildWaehlen;
+    final a = widget.anlass;
+    if (waehlen == null || a == null) return;
+    final GewaehlteDatei? d;
+    try {
+      d = await waehlen();
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+      return;
+    }
+    if (d == null || !mounted) return;
+    if (bildTyp(d.bytes) == null) {
+      meldung(context, 'Bitte ein Bild wählen (PNG, JPEG, WebP oder GIF).');
+      return;
+    }
+    if (d.bytes.length > twintQrHoechstGroesse) {
+      meldung(context, 'Das Bild darf höchstens 2 MB gross sein.');
+      return;
+    }
+    setState(() => _twintLaeuft = true);
+    try {
+      final url = await _z.twintQrSetzen(a.id, d);
+      if (!mounted) return;
+      setState(() {
+        _twintQr = url ?? 'neu';
+        _twintVorschau = Future.value(d!.bytes);
+      });
+      meldung(context, 'TWINT-QR gespeichert');
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _twintLaeuft = false);
+    }
+  }
+
+  Future<void> _twintQrEntfernen() async {
+    final a = widget.anlass;
+    if (a == null) return;
+    setState(() => _twintLaeuft = true);
+    try {
+      await _z.twintQrEntfernen(a.id);
+      if (!mounted) return;
+      setState(() {
+        _twintQr = null;
+        _twintVorschau = null;
+      });
+      meldung(context, 'TWINT-QR entfernt - es gilt der Vereins-QR');
+    } on Object catch (e) {
+      if (mounted) meldung(context, fehlerText(e));
+    } finally {
+      if (mounted) setState(() => _twintLaeuft = false);
+    }
   }
 
   void _pdfEntfernen() => setState(() {
@@ -398,6 +463,56 @@ class _AnlassBearbeitenScreenState extends State<AnlassBearbeitenScreen> {
       ),
       if (waehlen == null)
         Text('Ein PDF hochladen geht vorerst nur auf der Website.', style: t.textTheme.bodySmall),
+    ];
+  }
+
+  List<Widget> _twintFelder() {
+    final t = Theme.of(context);
+    final waehlen = widget.verwaltung.umgebung.bildWaehlen;
+    final vorschau = _twintVorschau;
+    return [
+      _ueberschrift('TWINT-QR für die Kasse'),
+      Card(
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          key: const Key('anlass-twint-qr'),
+          leading: vorschau == null
+              ? const Icon(Icons.qr_code_2)
+              : SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: FutureBuilder<Uint8List>(
+                    future: vorschau,
+                    builder: (context, s) => s.hasData
+                        ? Image.memory(s.data!, fit: BoxFit.contain)
+                        : const Icon(Icons.qr_code_2),
+                  ),
+                ),
+          title: Text(_twintQr == null ? 'Kein eigener QR' : 'Eigener QR hinterlegt'),
+          subtitle: const Text('Ohne eigenen QR gilt der Vereins-QR.'),
+        ),
+      ),
+      Wrap(
+        spacing: 8,
+        children: [
+          if (waehlen != null)
+            TextButton.icon(
+              key: const Key('twint-qr-waehlen'),
+              onPressed: _twintLaeuft ? null : _twintQrWaehlen,
+              icon: const Icon(Icons.image_outlined),
+              label: Text(_twintQr == null ? 'Bild wählen' : 'Anderes Bild'),
+            ),
+          if (_twintQr != null)
+            TextButton.icon(
+              key: const Key('twint-qr-entfernen'),
+              onPressed: _twintLaeuft ? null : _twintQrEntfernen,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Entfernen'),
+            ),
+        ],
+      ),
+      if (waehlen == null)
+        Text('Ein Bild hochladen geht vorerst nur auf der Website.', style: t.textTheme.bodySmall),
     ];
   }
 
@@ -613,6 +728,7 @@ class _AnlassBearbeitenScreenState extends State<AnlassBearbeitenScreen> {
                   onChanged: (v) => _e.beschreibung = v,
                 ),
                 if (_vorstand) ..._pdfFelder(),
+                if (!_neu) ..._twintFelder(),
                 if (_vorstand && _neu && felder.schichten) ..._schichtFelder(optionen),
               ],
             ),
