@@ -12,7 +12,7 @@ import https from 'https';
 import crypto from 'crypto';
 import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } from './anlass.js';
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
-import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
+import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
 // ist LOCAL_MODE aus -> dann wird Authentifizierung erzwungen.
@@ -134,6 +134,9 @@ app.get('/api/auth/mode', (req, res) => {
 });
 
 app.post('/api/auth/login', localLogin);
+// Kuechendisplay/Kiosk: gueltiges POS-Token gegen ein frisches tauschen (kein
+// OPEN_API_PATH — die Auth-Schranke oben prueft das Token bereits).
+app.post('/api/auth/refresh', refreshLogin);
 
 // Blocked IPs management (admin only)
 app.get('/api/auth/blocked-ips', authenticateToken, (req: AuthenticatedRequest, res) => {

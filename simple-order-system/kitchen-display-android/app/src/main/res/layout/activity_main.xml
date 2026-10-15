@@ -22,7 +22,9 @@
             app:layout_constraintTop_toTopOf="parent">
 
             <!-- Logo -->
+            <!-- Logo 3 s gedrueckt halten: Code-Abfrage -> Einstellungen (Kiosk-Ausgang) -->
             <ImageView
+                android:id="@+id/headerLogo"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:src="@mipmap/ic_launcher"
@@ -32,6 +34,7 @@
 
             <!-- Title -->
             <TextView
+                android:id="@+id/headerTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
@@ -96,18 +99,22 @@
                 android:textColor="@color/warning"
                 android:textSize="14sp" />
 
-            <!-- Settings Button -->
-            <ImageButton
-                android:id="@+id/btnSettings"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginStart="16dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_settings"
-                android:contentDescription="@string/settings"
-                app:tint="@color/text_primary" />
 
         </LinearLayout>
+
+        <!-- Verbindungsproblem: gross und rot, damit es in der Kueche auffaellt -->
+        <TextView
+            android:id="@+id/statusBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/urgent"
+            android:gravity="center"
+            android:padding="12dp"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/header" />
 
         <!-- Orders Grid -->
         <androidx.recyclerview.widget.RecyclerView
@@ -116,7 +123,23 @@
             android:layout_height="0dp"
             android:padding="8dp"
             android:clipToPadding="false"
-            app:layout_constraintTop_toBottomOf="@id/header"
+            app:layout_constraintTop_toBottomOf="@id/statusBanner"
+            app:layout_constraintBottom_toTopOf="@id/updateBar" />
+
+        <!-- Neue App-Version: ein Tipp laedt und oeffnet die Installation -->
+        <TextView
+            android:id="@+id/updateBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/cleaning_blue"
+            android:gravity="center"
+            android:padding="12dp"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent" />
 
         <!-- Empty State -->

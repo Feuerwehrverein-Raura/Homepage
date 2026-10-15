@@ -3,6 +3,21 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory
+        android:title="@string/station"
+        app:iconSpaceReserved="false">
+
+        <ListPreference
+            android:key="station"
+            android:title="@string/station"
+            android:entries="@array/station_labels"
+            android:entryValues="@array/station_values"
+            android:defaultValue="kitchen"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:title="@string/connection_category"
         app:iconSpaceReserved="false">
 
@@ -11,6 +26,12 @@
             android:title="@string/server_url"
             android:summary="@string/server_url_summary"
             android:defaultValue="@string/default_server_url"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="logout"
+            android:title="@string/logout"
+            android:summary="@string/logout_summary"
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>
@@ -24,6 +45,36 @@
             android:title="@string/sound_enabled"
             android:summary="@string/sound_enabled_summary"
             android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/kiosk_category"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="as_home"
+            android:title="@string/as_home"
+            android:summary="@string/as_home_summary"
+            android:defaultValue="false"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="check_update"
+            android:title="@string/check_update"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="exit_code"
+            android:title="@string/exit_code_pref"
+            android:summary="@string/exit_code_pref_summary"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="exit_app"
+            android:title="@string/exit_app"
+            android:summary="@string/exit_app_summary"
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>

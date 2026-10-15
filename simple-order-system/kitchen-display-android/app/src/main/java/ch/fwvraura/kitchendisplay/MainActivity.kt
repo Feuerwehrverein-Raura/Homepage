@@ -1,21 +1,21 @@
 package ch.fwvraura.kitchendisplay
 
+import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.util.Log
-import android.media.SoundPool
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import android.view.View
-import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageButton
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import ch.fwvraura.kitchendisplay.models.Order
@@ -24,144 +24,170 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import kotlinx.coroutines.*
 
+/**
+ * Die eigentliche Anzeige.
+ *
+ * Damit niemand mehr von Hand neu laden muss:
+ * - WebSocket mit Ping (siehe WebSocketManager) + Abruf aller Bestellungen
+ *   alle 30 s als Rueckfallebene.
+ * - Waechter alle 15 s: Kein Netz -> rote Leiste «Keine Verbindung – versuche
+ *   erneut». Seit 60 s nichts vom Server -> Server neu suchen, neu verbinden.
+ *   Seit 10 min nichts -> Anzeige komplett neu aufbauen (wie «Neu laden»).
+ * - Netz kommt zurueck -> sofort neu verbinden und abrufen.
+ * - Token taeglich erneuern; lehnt der Server es ab, erst erneuern, und nur
+ *   wenn das scheitert zur Anmeldung.
+ */
 class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
+
+    companion object {
+        private const val TAG = "MainActivity"
+        private const val POLL_MS = 30_000L
+        private const val WATCHDOG_MS = 15_000L
+        private const val STALE_MS = 60_000L
+        private const val RELOAD_MS = 10 * 60_000L
+        private const val TOKEN_CHECK_MS = 60 * 60_000L
+        private const val UPDATE_CHECK_MS = 2 * 60 * 60_000L
+    }
 
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyState: TextView
     private lateinit var connectionStatus: TextView
+    private lateinit var headerTitle: TextView
+    private lateinit var statusBanner: TextView
+    private lateinit var updateBar: TextView
     private lateinit var stationToggle: MaterialButtonToggleGroup
-    private lateinit var btnAll: MaterialButton
-    private lateinit var btnBar: MaterialButton
-    private lateinit var btnKitchen: MaterialButton
-    private lateinit var btnSettings: ImageButton
     private lateinit var btnClean: MaterialButton
     private lateinit var cleaningOverlay: FrameLayout
     private lateinit var cleaningTimer: TextView
 
     private lateinit var adapter: OrderAdapter
+    private lateinit var tokenManager: TokenManager
+    private lateinit var updateChecker: UpdateChecker
+
     private var webSocketManager: WebSocketManager? = null
     private var apiService: ApiService? = null
+    private var serverUrl: String = ""
 
     private val orders = mutableListOf<Order>()
-    private var currentStation = "all"
-
-    private val mainScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private val timerHandler = Handler(Looper.getMainLooper())
-
-    private var soundPool: SoundPool? = null
-    private var notificationSoundId: Int = 0
+    private var currentStation = Kiosk.STATION_KITCHEN
     private var soundEnabled = true
 
-    private lateinit var updateChecker: UpdateChecker
-    private val updateHandler = Handler(Looper.getMainLooper())
-    private val updateCheckInterval = 2 * 60 * 60 * 1000L // Check every 2 hours
+    private val mainScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var running = false
+    private var lastSuccessAt = 0L
+    private var lastReconnectAt = 0L
+    private var startedAt = 0L
+    private var networkAvailable = true
+    private var handlingAuthFailure = false
+    private var pendingUpdate: UpdateChecker.UpdateResult.UpdateAvailable? = null
+    private var downloading = false
 
     private var cleaningCountDown: CountDownTimer? = null
-    private lateinit var tokenManager: TokenManager
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
+    // --- Lebenszyklus -------------------------------------------------------
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         tokenManager = TokenManager(this)
+        updateChecker = UpdateChecker(this)
+
+        val station = Kiosk.station(this)
+        if (station == null || !tokenManager.isLoggedIn()) {
+            LoginActivity.open(this, if (station == null) null else getString(R.string.notice_login_expired))
+            finish()
+            return
+        }
+        currentStation = station
 
         setContentView(R.layout.activity_main)
-
-        // Keep screen on
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        Kiosk.applyFullscreen(this)
 
         initViews()
-        initSound()
-        loadSettings()
         setupRecyclerView()
         setupStationToggle()
         setupCleaningMode()
-        startTimerUpdates()
-
-        updateChecker = UpdateChecker(this)
-        startPeriodicUpdateCheck()
+        registerNetworkCallback()
     }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) Kiosk.applyFullscreen(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!::adapter.isInitialized) return
+
+        if (!tokenManager.isLoggedIn()) {
+            goToLogin(getString(R.string.notice_login_expired))
+            return
+        }
+
+        // Einstellungen koennen sich geaendert haben
+        soundEnabled = Kiosk.soundEnabled(this)
+        Kiosk.station(this)?.let { if (it != currentStation) selectStation(it) }
+
+        running = true
+        startedAt = SystemClock.elapsedRealtime()
+        lastSuccessAt = startedAt
+        serverUrl = "" // Server-Adresse kann in den Einstellungen geaendert worden sein
+        startConnection(detect = true)
+
+        handler.post(pollRunnable)
+        handler.postDelayed(watchdogRunnable, WATCHDOG_MS)
+        handler.postDelayed(tokenRunnable, 5_000)
+        handler.postDelayed(updateRunnable, 15_000)
+        handler.postDelayed(minuteTicker, 60_000)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        running = false
+        handler.removeCallbacksAndMessages(null)
+        webSocketManager?.disconnect()
+        webSocketManager = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mainScope.cancel()
+        handler.removeCallbacksAndMessages(null)
+        cleaningCountDown?.cancel()
+        networkCallback?.let {
+            try {
+                (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(it)
+            } catch (e: Exception) { /* schon abgemeldet */ }
+        }
+    }
+
+    // --- Oberflaeche --------------------------------------------------------
 
     private fun initViews() {
         recyclerView = findViewById(R.id.ordersRecyclerView)
         emptyState = findViewById(R.id.emptyState)
         connectionStatus = findViewById(R.id.connectionStatus)
+        headerTitle = findViewById(R.id.headerTitle)
+        statusBanner = findViewById(R.id.statusBanner)
+        updateBar = findViewById(R.id.updateBar)
         stationToggle = findViewById(R.id.stationToggle)
-        btnAll = findViewById(R.id.btnAll)
-        btnBar = findViewById(R.id.btnBar)
-        btnKitchen = findViewById(R.id.btnKitchen)
-        btnSettings = findViewById(R.id.btnSettings)
         btnClean = findViewById(R.id.btnClean)
         cleaningOverlay = findViewById(R.id.cleaningOverlay)
         cleaningTimer = findViewById(R.id.cleaningTimer)
 
-        btnSettings.setOnClickListener {
+        // Kein sichtbarer Einstellungs-Knopf mehr: Logo 3 s halten + Ausgangs-Code
+        Kiosk.attachSecretHold(this, findViewById(R.id.headerLogo)) {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-    }
-
-    private fun initSound() {
-        val audioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .build()
-
-        soundPool = SoundPool.Builder()
-            .setMaxStreams(1)
-            .setAudioAttributes(audioAttributes)
-            .build()
-
-        // Generate a simple beep tone programmatically
-        notificationSoundId = 0 // We'll use ToneGenerator instead
-    }
-
-    private fun playNotificationSound() {
-        if (!soundEnabled) return
-
-        try {
-            val toneGenerator = android.media.ToneGenerator(
-                android.media.AudioManager.STREAM_NOTIFICATION,
-                100
-            )
-            // Play three ascending tones
-            toneGenerator.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150)
-            Handler(Looper.getMainLooper()).postDelayed({
-                toneGenerator.startTone(android.media.ToneGenerator.TONE_PROP_BEEP2, 150)
-            }, 200)
-            Handler(Looper.getMainLooper()).postDelayed({
-                toneGenerator.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 200)
-                Handler(Looper.getMainLooper()).postDelayed({
-                    toneGenerator.release()
-                }, 300)
-            }, 400)
-        } catch (e: Exception) {
-            // Ignore sound errors
-        }
-    }
-
-    private fun loadSettings() {
-        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        val configuredUrl = prefs.getString("server_url", getString(R.string.default_server_url))
-            ?: getString(R.string.default_server_url)
-        soundEnabled = prefs.getBoolean("sound_enabled", true)
-
-        val token = tokenManager.getToken()
-
-        // Start with configured URL, then auto-detect in background
-        apiService = ApiService(configuredUrl, token)
-        webSocketManager = WebSocketManager(configuredUrl, this, token)
-
-        // Auto-detect: try local (kasse.local) first, fallback to configured/cloud
-        mainScope.launch {
-            val detectedUrl = ServerDetector.detectServer(configuredUrl)
-            if (detectedUrl != configuredUrl) {
-                Log.d("MainActivity", "Switching to detected server: $detectedUrl")
-                apiService = ApiService(detectedUrl, token)
-                webSocketManager?.disconnect()
-                webSocketManager = WebSocketManager(detectedUrl, this@MainActivity, token)
-                webSocketManager?.connect()
-                fetchOrders()
-            }
-        }
+        // «Zurueck» beendet die Anzeige nicht (Kiosk)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { /* bewusst ignoriert */ }
+        })
+        updateBar.setOnClickListener { pendingUpdate?.let { startUpdate(it) } }
+        headerTitle.text = Kiosk.stationLabel(this, currentStation)
     }
 
     private fun setupRecyclerView() {
@@ -171,49 +197,56 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
             onItemClick = { order, item -> completeItem(order, item) }
         )
 
-        // Calculate span count based on screen width
         val displayMetrics = resources.displayMetrics
         val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
-        val spanCount = when {
-            screenWidthDp >= 1200 -> 2
-            screenWidthDp >= 600 -> 1
-            else -> 1
-        }
+        val spanCount = if (screenWidthDp >= 1200) 2 else 1
 
         recyclerView.layoutManager = GridLayoutManager(this, spanCount)
         recyclerView.adapter = adapter
     }
 
-    private fun setupStationToggle() {
-        stationToggle.check(R.id.btnAll)
+    private fun stationButton(station: String) = when (station) {
+        Kiosk.STATION_BAR -> R.id.btnBar
+        Kiosk.STATION_KITCHEN -> R.id.btnKitchen
+        else -> R.id.btnAll
+    }
 
+    private fun setupStationToggle() {
+        stationToggle.check(stationButton(currentStation))
         stationToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isChecked) {
-                currentStation = when (checkedId) {
-                    R.id.btnBar -> "bar"
-                    R.id.btnKitchen -> "kitchen"
-                    else -> "all"
-                }
+            if (!isChecked) return@addOnButtonCheckedListener
+            val station = when (checkedId) {
+                R.id.btnBar -> Kiosk.STATION_BAR
+                R.id.btnKitchen -> Kiosk.STATION_KITCHEN
+                else -> Kiosk.STATION_ALL
+            }
+            if (station != currentStation) {
+                currentStation = station
+                Kiosk.setStation(this, station) // bleibt nach Neustart erhalten
+                headerTitle.text = Kiosk.stationLabel(this, station)
                 updateOrdersList()
             }
         }
     }
 
+    private fun selectStation(station: String) {
+        currentStation = station
+        headerTitle.text = Kiosk.stationLabel(this, station)
+        stationToggle.check(stationButton(station))
+        updateOrdersList()
+    }
+
     private fun setupCleaningMode() {
-        btnClean.setOnClickListener {
-            startCleaningMode()
-        }
+        btnClean.setOnClickListener { startCleaningMode() }
     }
 
     private fun startCleaningMode() {
         cleaningOverlay.visibility = View.VISIBLE
         cleaningTimer.text = "30"
-
         cleaningCountDown?.cancel()
         cleaningCountDown = object : CountDownTimer(30000, 1000) {
             override fun onTick(millisUntilFinished: Long) {
-                val seconds = (millisUntilFinished / 1000).toInt()
-                cleaningTimer.text = seconds.toString()
+                cleaningTimer.text = (millisUntilFinished / 1000).toInt().toString()
             }
 
             override fun onFinish() {
@@ -222,96 +255,260 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         }.start()
     }
 
-    private fun startTimerUpdates() {
-        timerHandler.post(object : Runnable {
-            override fun run() {
-                adapter.notifyDataSetChanged()
-                timerHandler.postDelayed(this, 60000) // Update every minute
-            }
-        })
-    }
-
-    override fun onResume() {
-        super.onResume()
-
-        // Check if still logged in
-        if (!tokenManager.isLoggedIn()) {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
-            return
+    private fun playNotificationSound() {
+        if (!soundEnabled) return
+        try {
+            val toneGenerator = android.media.ToneGenerator(android.media.AudioManager.STREAM_NOTIFICATION, 100)
+            toneGenerator.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 150)
+            handler.postDelayed({ toneGenerator.startTone(android.media.ToneGenerator.TONE_PROP_BEEP2, 150) }, 200)
+            handler.postDelayed({
+                toneGenerator.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 200)
+                handler.postDelayed({ toneGenerator.release() }, 300)
+            }, 400)
+        } catch (e: Exception) {
+            // Ton ist nett, aber nicht kritisch
         }
-
-        loadSettings()
-        webSocketManager?.connect()
-        fetchOrders()
     }
 
-    private fun checkForUpdates() {
-        mainScope.launch {
-            when (val result = updateChecker.checkForUpdate()) {
-                is UpdateChecker.UpdateResult.UpdateAvailable -> {
-                    updateChecker.showUpdateDialog(result)
+    private fun updateOrdersList() {
+        val filteredOrders = orders.filter { it.hasItemsForStation(currentStation) }.sortedBy { it.id }
+        adapter.submitList(filteredOrders)
+        // In-place-Aenderungen (item.completed) erkennt DiffUtil nicht
+        adapter.notifyDataSetChanged()
+        emptyState.visibility = if (filteredOrders.isEmpty()) View.VISIBLE else View.GONE
+        recyclerView.visibility = if (filteredOrders.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    private fun showConnectionState() {
+        val connected = webSocketManager?.isConnected == true
+        connectionStatus.text = getString(if (connected) R.string.connected else R.string.connecting)
+        connectionStatus.setTextColor(
+            ContextCompat.getColor(this, if (connected) R.color.accent else R.color.warning)
+        )
+
+        val silentFor = SystemClock.elapsedRealtime() - lastSuccessAt
+        val text = when {
+            !networkAvailable -> getString(R.string.banner_no_network)
+            silentFor > STALE_MS -> getString(R.string.banner_server_unreachable, silentFor / 60_000)
+            else -> null
+        }
+        if (text == null) {
+            statusBanner.visibility = View.GONE
+        } else {
+            statusBanner.text = text
+            statusBanner.visibility = View.VISIBLE
+        }
+    }
+
+    // --- Verbindung ---------------------------------------------------------
+
+    private fun startConnection(detect: Boolean) {
+        val token = tokenManager.getToken()
+        val configured = Kiosk.serverUrl(this)
+        if (serverUrl.isEmpty()) serverUrl = configured
+        connectTo(serverUrl, token)
+        if (detect) {
+            // Vor-Ort-Server (kasse.local) bevorzugen, sonst Cloud
+            mainScope.launch {
+                val detected = ServerDetector.detectServer(configured)
+                if (running && detected != serverUrl) {
+                    Log.d(TAG, "Server gewechselt: $serverUrl -> $detected")
+                    serverUrl = detected
+                    connectTo(detected, tokenManager.getToken())
                 }
-                else -> { /* No update or error - ignore */ }
             }
         }
     }
 
-    private fun startPeriodicUpdateCheck() {
-        updateHandler.post(object : Runnable {
-            override fun run() {
-                checkForUpdates()
-                updateHandler.postDelayed(this, updateCheckInterval)
-            }
-        })
-    }
-
-    override fun onPause() {
-        super.onPause()
+    private fun connectTo(url: String, token: String?) {
         webSocketManager?.disconnect()
+        apiService = ApiService(url, token)
+        webSocketManager = WebSocketManager(url, this, token).also { it.connect() }
+        fetchOrders()
+        showConnectionState()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        mainScope.cancel()
-        timerHandler.removeCallbacksAndMessages(null)
-        updateHandler.removeCallbacksAndMessages(null)
-        cleaningCountDown?.cancel()
-        soundPool?.release()
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            fetchOrders()
+            handler.postDelayed(this, POLL_MS)
+        }
+    }
+
+    private val minuteTicker = object : Runnable {
+        override fun run() {
+            if (!running) return
+            adapter.notifyDataSetChanged() // Minutenanzeige auffrischen
+            handler.postDelayed(this, 60_000)
+        }
+    }
+
+    private val watchdogRunnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            val now = SystemClock.elapsedRealtime()
+            val silentFor = now - lastSuccessAt
+            showConnectionState()
+            if (networkAvailable && silentFor > RELOAD_MS && now - startedAt > RELOAD_MS) {
+                Log.w(TAG, "Seit ${silentFor / 1000}s nichts vom Server — Anzeige wird neu aufgebaut")
+                mainScope.launch(Dispatchers.IO) { ApiService.resetConnections() }
+                recreate()
+                return
+            }
+            if (silentFor > STALE_MS && now - lastReconnectAt > STALE_MS) {
+                Log.w(TAG, "Seit ${silentFor / 1000}s nichts vom Server — neu verbinden")
+                lastReconnectAt = now
+                mainScope.launch(Dispatchers.IO) { ApiService.resetConnections() }
+                serverUrl = "" // neu suchen (Vor-Ort-Server koennte weg/da sein)
+                webSocketManager?.disconnect()
+                startConnection(detect = true)
+            }
+            handler.postDelayed(this, WATCHDOG_MS)
+        }
+    }
+
+    private fun registerNetworkCallback() {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        @Suppress("DEPRECATION")
+        networkAvailable = cm.activeNetworkInfo?.isConnected == true
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                handler.post {
+                    val wasOffline = !networkAvailable
+                    networkAvailable = true
+                    if (running && wasOffline) {
+                        Log.i(TAG, "Netz wieder da — neu verbinden")
+                        mainScope.launch(Dispatchers.IO) { ApiService.resetConnections() }
+                        webSocketManager?.reconnectNow()
+                        fetchOrders()
+                    }
+                    showConnectionState()
+                }
+            }
+
+            override fun onLost(network: Network) {
+                handler.post {
+                    @Suppress("DEPRECATION")
+                    networkAvailable = cm.activeNetworkInfo?.isConnected == true
+                    showConnectionState()
+                }
+            }
+        }
+        try {
+            cm.registerDefaultNetworkCallback(callback)
+            networkCallback = callback
+        } catch (e: Exception) {
+            Log.w(TAG, "Netz-Rueckruf nicht moeglich: ${e.message}")
+        }
+    }
+
+    private fun markSuccess() {
+        lastSuccessAt = SystemClock.elapsedRealtime()
+        if (statusBanner.visibility == View.VISIBLE) showConnectionState()
     }
 
     private fun fetchOrders() {
+        val api = apiService ?: return
         mainScope.launch {
-            apiService?.fetchOrders()?.onSuccess { fetchedOrders ->
-                orders.clear()
-                // Include pending, paid, and null status (server returns pending + paid)
-                orders.addAll(fetchedOrders.filter {
-                    it.status == "pending" || it.status == "paid" || it.status == null
-                })
-                updateOrdersList()
+            api.fetchOrders()
+                .onSuccess { fetchedOrders ->
+                    if (api !== apiService) return@onSuccess
+                    markSuccess()
+                    orders.clear()
+                    orders.addAll(fetchedOrders.filter {
+                        it.status == "pending" || it.status == "paid" || it.status == null
+                    })
+                    updateOrdersList()
+                }
+                .onFailure { e ->
+                    if (e is AuthException) handleAuthFailure()
+                    showConnectionState()
+                }
+        }
+    }
+
+    // --- Anmeldung ----------------------------------------------------------
+
+    /** Taeglich: Token gegen ein frisches tauschen (POST /api/auth/refresh). */
+    private val tokenRunnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            if (!tokenManager.isLoggedIn()) {
+                goToLogin(getString(R.string.notice_login_expired))
+                return
+            }
+            if (tokenManager.needsRefresh()) {
+                val token = tokenManager.getToken()
+                if (token != null) mainScope.launch {
+                    // Immer gegen den konfigurierten (Cloud-)Server: der Vor-Ort-Server
+                    // hat ein anderes Geheimnis und kennt unser Token nicht.
+                    when (val r = AuthService.refresh(Kiosk.serverUrl(this@MainActivity), token)) {
+                        is AuthService.Result.Ok -> {
+                            Log.i(TAG, "Token erneuert")
+                            tokenManager.saveToken(r.token)
+                            if (running) connectTo(serverUrl, r.token)
+                        }
+                        // Ablehnung hier ist kein Grund zur Abmeldung (z.B. Server noch
+                        // ohne /refresh, oder Vor-Ort-Betrieb). Das alte Token gilt weiter.
+                        else -> Log.w(TAG, "Token-Erneuerung nicht moeglich: $r")
+                    }
+                }
+            }
+            handler.postDelayed(this, TOKEN_CHECK_MS)
+        }
+    }
+
+    private fun handleAuthFailure() {
+        if (handlingAuthFailure) return
+        handlingAuthFailure = true
+        val token = tokenManager.getToken()
+        if (token == null) {
+            goToLogin(getString(R.string.notice_login_expired))
+            return
+        }
+        mainScope.launch {
+            when (val r = AuthService.refresh(serverUrl, token)) {
+                is AuthService.Result.Ok -> {
+                    tokenManager.saveToken(r.token)
+                    handlingAuthFailure = false
+                    if (running) connectTo(serverUrl, r.token)
+                }
+                is AuthService.Result.Unreachable -> {
+                    handlingAuthFailure = false // spaeter erneut
+                }
+                is AuthService.Result.Rejected -> {
+                    tokenManager.logout()
+                    goToLogin(getString(R.string.notice_login_rejected))
+                }
             }
         }
     }
 
+    private fun goToLogin(notice: String) {
+        running = false
+        handler.removeCallbacksAndMessages(null)
+        webSocketManager?.disconnect()
+        LoginActivity.open(this, notice)
+        finish()
+    }
+
+    // --- Erledigen ----------------------------------------------------------
+
     private fun completeOrder(order: Order) {
         mainScope.launch {
-            if (currentStation == "all") {
-                // Complete entire order when viewing all stations
+            if (currentStation == Kiosk.STATION_ALL) {
                 apiService?.completeOrder(order.id)?.onSuccess {
                     orders.removeAll { it.id == order.id }
                     updateOrdersList()
-                }
+                }?.onFailure { if (it is AuthException) handleAuthFailure() }
             } else {
-                // Only complete items for current station
-                val stationItems = order.getItemsForStation(currentStation)
-                    .filter { !it.completed }
+                val stationItems = order.getItemsForStation(currentStation).filter { !it.completed }
                 if (stationItems.isNotEmpty()) {
-                    val itemIds = stationItems.map { it.id }
-                    apiService?.completeItems(order.id, itemIds)?.onSuccess {
-                        // Update local state
+                    apiService?.completeItems(order.id, stationItems.map { it.id })?.onSuccess {
                         stationItems.forEach { it.completed = true }
                         updateOrdersList()
-                    }
+                    }?.onFailure { if (it is AuthException) handleAuthFailure() }
                 }
             }
         }
@@ -320,54 +517,102 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     private fun completeItem(order: Order, item: OrderItem) {
         mainScope.launch {
             apiService?.completeItems(order.id, listOf(item.id))?.onSuccess {
-                // Update local state
                 item.completed = true
                 updateOrdersList()
+            }?.onFailure { if (it is AuthException) handleAuthFailure() }
+        }
+    }
+
+    // --- Selbst-Update ------------------------------------------------------
+
+    private val updateRunnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            checkForUpdates()
+            handler.postDelayed(this, UPDATE_CHECK_MS)
+        }
+    }
+
+    private fun checkForUpdates() {
+        mainScope.launch {
+            val result = updateChecker.checkForUpdate()
+            if (result is UpdateChecker.UpdateResult.UpdateAvailable && !downloading) {
+                pendingUpdate = result
+                updateBar.text = getString(R.string.update_available, result.newVersion)
+                updateBar.visibility = View.VISIBLE
             }
         }
     }
 
-    private fun updateOrdersList() {
-        val filteredOrders = orders.filter { it.hasItemsForStation(currentStation) }
-            .sortedBy { it.id }
-
-        adapter.submitList(filteredOrders)
-        // Force rebind because DiffUtil may not detect in-place item.completed changes
-        adapter.notifyDataSetChanged()
-
-        emptyState.visibility = if (filteredOrders.isEmpty()) View.VISIBLE else View.GONE
-        recyclerView.visibility = if (filteredOrders.isEmpty()) View.GONE else View.VISIBLE
+    private fun startUpdate(update: UpdateChecker.UpdateResult.UpdateAvailable) {
+        if (downloading) return
+        if (!updateChecker.canInstall()) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.update_permission_title)
+                .setMessage(R.string.update_permission_message)
+                .setPositiveButton(R.string.open_settings) { _, _ ->
+                    try {
+                        startActivity(updateChecker.installPermissionIntent())
+                    } catch (e: Exception) {
+                        startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
+                    }
+                }
+                .setNegativeButton(R.string.later, null)
+                .show()
+            return
+        }
+        downloading = true
+        updateBar.text = getString(R.string.update_downloading, 0)
+        mainScope.launch {
+            val apk = updateChecker.download(update) { pct ->
+                updateBar.text = getString(R.string.update_downloading, pct)
+            }
+            downloading = false
+            if (apk == null) {
+                updateBar.text = getString(R.string.update_failed)
+            } else {
+                updateBar.text = getString(R.string.update_available, update.newVersion)
+                try {
+                    updateChecker.install(apk)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Installer nicht startbar", e)
+                    updateBar.text = getString(R.string.update_failed)
+                }
+            }
+        }
     }
 
-    // WebSocket Listener Implementation
+    // --- WebSocket-Rueckrufe ------------------------------------------------
 
     override fun onConnected() {
-        connectionStatus.text = getString(R.string.connected)
-        connectionStatus.setTextColor(ContextCompat.getColor(this, R.color.accent))
+        markSuccess()
+        showConnectionState()
         fetchOrders()
     }
 
     override fun onDisconnected() {
-        connectionStatus.text = getString(R.string.disconnected)
-        connectionStatus.setTextColor(ContextCompat.getColor(this, R.color.urgent))
+        showConnectionState()
+    }
+
+    override fun onAuthFailed() {
+        handleAuthFailure()
+    }
+
+    override fun onMessageReceived() {
+        markSuccess()
     }
 
     override fun onNewOrder(order: Order) {
         if (orders.none { it.id == order.id }) {
             orders.add(order)
             updateOrdersList()
-            playNotificationSound()
-
-            // Flash effect
-            val originalColor = window.decorView.background
-            window.decorView.setBackgroundColor(
-                ContextCompat.getColor(this, R.color.warning)
-            )
-            Handler(Looper.getMainLooper()).postDelayed({
-                window.decorView.setBackgroundColor(
-                    ContextCompat.getColor(this, R.color.background_dark)
-                )
-            }, 200)
+            if (order.hasItemsForStation(currentStation)) {
+                playNotificationSound()
+                window.decorView.setBackgroundColor(ContextCompat.getColor(this, R.color.warning))
+                handler.postDelayed({
+                    window.decorView.setBackgroundColor(ContextCompat.getColor(this, R.color.background_dark))
+                }, 200)
+            }
         }
     }
 
@@ -377,10 +622,18 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     }
 
     override fun onOrderUpdated(orderId: Int, status: String?, paymentMethod: String?) {
-        val orderIndex = orders.indexOfFirst { it.id == orderId }
-        if (orderIndex >= 0 && status == "completed") {
-            orders.removeAt(orderIndex)
+        // Wie die Web-Anzeige: im Zweifel frisch abrufen (Positionen koennen sich geaendert haben)
+        if (status == "completed" || status == "cancelled") {
+            orders.removeAll { it.id == orderId }
             updateOrdersList()
         }
+        fetchOrders()
+    }
+
+    override fun onItemsCompleted(orderId: Int, itemIds: List<Int>) {
+        // Eine andere Anzeige (z.B. die Bar) hat Positionen erledigt
+        val order = orders.firstOrNull { it.id == orderId } ?: return
+        order.items.forEach { if (it.id in itemIds) it.completed = true }
+        updateOrdersList()
     }
 }

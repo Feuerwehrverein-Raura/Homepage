@@ -24,9 +24,46 @@
     <string name="login_button">Anmelden</string>
     <string name="error_empty_password">Bitte Passwort eingeben</string>
     <string name="error_wrong_password">Falsches Passwort</string>
-    <string name="error_connection">Verbindungsfehler</string>
+    <string name="error_connection">Keine Verbindung zum Bestellsystem – bitte Netzwerk prüfen und erneut versuchen.</string>
     <string name="clean">Putzen</string>
     <string name="cleaning_title">Bildschirm putzen</string>
     <string name="cleaning_subtitle">Touch-Eingaben deaktiviert</string>
     <string name="seconds_remaining">Sekunden verbleibend</string>
+
+    <!-- Version 3.0: Kiosk-Betrieb -->
+    <string name="choose_station">Welche Bestellungen zeigt dieses Display?</string>
+    <string name="password_help">Passwort «Kasse &amp; Küche» – steht im Mitgliederbereich unter «Zugänge». Nur einmal nötig, danach meldet sich die App selbst wieder an.</string>
+    <string name="start_button">Anzeige starten</string>
+    <string name="version_label">Version %1$s</string>
+    <string name="notice_login_expired">Die Anmeldung ist abgelaufen (Display war länger als 30 Tage offline). Bitte einmal das aktuelle Passwort eingeben.</string>
+    <string name="notice_login_rejected">Der Server hat die Anmeldung nicht mehr akzeptiert. Bitte einmal das aktuelle Passwort eingeben.</string>
+    <string name="banner_no_network">Keine Verbindung – versuche erneut …</string>
+    <string name="banner_server_unreachable">Keine Verbindung zum Bestellsystem (seit %1$d min) – versuche erneut …</string>
+    <string name="update_available">Neue Version %1$s verfügbar – hier tippen zum Installieren</string>
+    <string name="update_downloading">Update wird geladen … %1$d %%</string>
+    <string name="update_failed">Update konnte nicht geladen werden – hier tippen für neuen Versuch</string>
+    <string name="update_permission_title">Installation erlauben</string>
+    <string name="update_permission_message">Damit sich die App selbst aktualisieren kann, muss die Installation aus «Unbekannten Quellen» erlaubt sein.\n\nAndroid 7: Einstellungen › Sicherheit › Unbekannte Herkunft einschalten.\nAndroid 8+: Einstellungen › Apps › Kitchen Display › Unbekannte Apps installieren.</string>
+    <string name="open_settings">Einstellungen öffnen</string>
+    <string name="later">Später</string>
+    <string name="station">Station</string>
+    <string name="kiosk_category">Kiosk</string>
+    <string name="as_home">Als Startbildschirm verwenden</string>
+    <string name="as_home_summary">Home-Taste führt zur Anzeige. Android fragt beim nächsten Druck auf «Home» einmal nach – «Immer» wählen.</string>
+    <string name="check_update">Nach Update suchen</string>
+    <string name="logout">Abmelden</string>
+    <string name="logout_summary">Token löschen und Anmeldemaske zeigen</string>
+    <string name="no_update">Die App ist aktuell.</string>
+    <string name="update_check_failed">Prüfung nicht möglich: %1$s</string>
+    <string name="attempts_warning_title">Achtung: IP-Sperre</string>
+    <string name="attempts_warning">Noch %1$d Versuch(e), danach ist der Schopf 24 h gesperrt – auch die Kasse kommt dann nicht mehr ins Bestellsystem.\n\nPasswort bitte genau prüfen (Mitgliederbereich › Zugänge › «Kasse &amp; Küche»).</string>
+    <string name="attempts_hint">Noch %1$d Versuch(e), danach ist der Schopf 24 h gesperrt (auch die Kasse).</string>
+    <string name="attempts_send">Trotzdem senden</string>
+    <string name="attempts_cancel">Abbrechen</string>
+    <string name="exit_code_title">Code eingeben</string>
+    <string name="exit_code_hint">Code</string>
+    <string name="exit_code_pref">Ausgangs-Code für den Kioskmodus</string>
+    <string name="exit_code_pref_summary">Code zum Öffnen der Einstellungen (Logo 3 s gedrückt halten)</string>
+    <string name="exit_app">App beenden</string>
+    <string name="exit_app_summary">Kioskmodus verlassen (startet beim nächsten Geräte-Neustart wieder)</string>
 </resources>

@@ -6,14 +6,18 @@ plugins {
 
 android {
     namespace = "ch.fwvraura.kitchendisplay"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "ch.fwvraura.kitchendisplay"
+        // Android 7.0 (Kuechendisplay laeuft mit 7.1.2)
         minSdk = 24
-        targetSdk = 34
-        versionCode = 22
-        versionName = "2.6"
+        targetSdk = 35
+        // versionCode folgt dem Schema des Release-Workflows
+        // (major*1000 + minor*100 + patch): kds-v2.6.1 war 2601, 3.0 ist 3000.
+        // Ein kleinerer Code (z.B. 30) liesse sich ueber 2.6.1 nicht installieren.
+        versionCode = 3000
+        versionName = "3.0"
     }
 
     buildTypes {
@@ -38,6 +42,12 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    lint {
+        // Kiosk-App: feste Queransicht ist gewollt.
+        disable += setOf("LockedOrientationActivity", "DiscouragedApi")
+        abortOnError = false
+    }
 }
 
 dependencies {
@@ -61,4 +71,6 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    testImplementation("junit:junit:4.13.2")
 }

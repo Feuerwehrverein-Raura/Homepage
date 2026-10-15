@@ -238,7 +238,11 @@ export function localLogin(req: Request, res: Response) {
   // Successful login - clear failed attempts
   clearFailedAttempts(ip);
 
-  const token = jwt.sign(
+  res.json({ token: signPosToken(), mode: LOCAL_MODE ? 'local' : 'shared' });
+}
+
+function signPosToken(): string {
+  return jwt.sign(
     {
       id: 'pos-shared',
       email: 'kasse@fwv-raura.ch',
@@ -248,8 +252,40 @@ export function localLogin(req: Request, res: Response) {
     JWT_SECRET,
     { expiresIn: POS_TOKEN_TTL }
   );
+}
 
-  res.json({ token, mode: LOCAL_MODE ? 'local' : 'shared' });
+/**
+ * Tauscht ein noch gueltiges Kassen-/Kuechen-Token gegen ein frisches.
+ *
+ * Wozu: Das Kuechendisplay (Android-App, Kiosk) soll nach der einmaligen
+ * Anmeldung durchlaufen. Das Passwort rotiert woechentlich, das Token lebt
+ * POS_TOKEN_TTL (30 Tage). Ohne Erneuerung muesste jemand jeden Monat das
+ * aktuelle Passwort eintippen. Die App erneuert taeglich.
+ *
+ * Nur fuer eigene, signierte POS-Tokens (id 'pos-shared') — Authentik-Tokens
+ * werden hier nicht verlaengert. Abgelaufene Tokens werden abgelehnt; dann
+ * hilft nur die Anmeldung mit dem aktuellen Passwort. Alle Tokens auf einmal
+ * ungueltig machen: JWT_SECRET wechseln.
+ */
+export function renewPosToken(token: string | undefined): string | null {
+  if (!token) return null;
+  try {
+    const d = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as any;
+    if (!d || d.id !== 'pos-shared') return null;
+    return signPosToken();
+  } catch {
+    return null;
+  }
+}
+
+export function refreshLogin(req: Request, res: Response) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  const renewed = renewPosToken(token);
+  if (!renewed) {
+    return res.status(401).json({ error: 'Token ungueltig oder abgelaufen — bitte neu anmelden.' });
+  }
+  res.json({ token: renewed });
 }
 
 /**

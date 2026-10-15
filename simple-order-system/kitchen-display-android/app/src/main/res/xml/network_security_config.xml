@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Cloud (order.fwv-raura.ch) nur ueber HTTPS. Der Vor-Ort-Server im Festzelt
+    (Raspberry Pi, kasse.local) spricht nur HTTP — ohne diese Ausnahme blockt
+    Android ab targetSdk 28 jede Anfrage dorthin, und die automatische
+    Erkennung des Vor-Ort-Servers schlug immer fehl.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">kasse.local</domain>
+    </domain-config>
+</network-security-config>

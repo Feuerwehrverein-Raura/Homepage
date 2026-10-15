@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="station_labels">
+        <item>@string/station_kitchen</item>
+        <item>@string/station_bar</item>
+        <item>@string/station_all</item>
+    </string-array>
+    <string-array name="station_values" translatable="false">
+        <item>kitchen</item>
+        <item>bar</item>
+        <item>all</item>
+    </string-array>
+</resources>

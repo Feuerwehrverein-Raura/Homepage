@@ -8,9 +8,6 @@
 -keepattributes *Annotation*
 -keep class ch.fwvraura.kitchendisplay.models.** { *; }
 
-# Keep UpdateChecker data classes for Gson
--keep class ch.fwvraura.kitchendisplay.UpdateChecker$GitHubRelease { *; }
--keep class ch.fwvraura.kitchendisplay.UpdateChecker$Asset { *; }
 
 # Keep Gson TypeToken and related
 -keep class com.google.gson.reflect.TypeToken { *; }

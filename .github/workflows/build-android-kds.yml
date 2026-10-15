@@ -1,16 +1,27 @@
 name: Build Android Kitchen Display
 
+# Release: Tag kds-vX.Y[.Z] pushen -> signiertes APK haengt am GitHub-Release.
+# Die App (UpdateChecker) sucht die Tags kds-v* und laedt das «-release.apk».
+#
+# Wichtig: Das Release-APK MUSS mit dem Schluessel aus KEYSTORE_BASE64 signiert
+# sein (gleicher Schluessel wie alle bisherigen Releases bis 2.6.1), sonst laesst
+# Android das Update nicht ueber die installierte App installieren. Fehlt das
+# Secret, bricht der Release-Build ab, statt ein unsigniertes APK zu verteilen.
+# (Im April 2026 war die Signatur versehentlich aus dem Workflow gefallen.)
+
 on:
   push:
     paths:
       - 'simple-order-system/kitchen-display-android/**'
+      - '.github/workflows/build-android-kds.yml'
     branches:
       - main
     tags:
-      - 'kds-v*'  # Release bei Tag wie kds-v1.0.0
+      - 'kds-v*'
   pull_request:
     paths:
       - 'simple-order-system/kitchen-display-android/**'
+      - '.github/workflows/build-android-kds.yml'
   workflow_dispatch:
     inputs:
       create_release:
@@ -19,14 +30,16 @@ on:
         default: false
         type: boolean
       version:
-        description: 'Version number (e.g. 1.0.0)'
+        description: 'Version number (e.g. 3.0)'
         required: false
-        default: '1.0.0'
+        default: ''
         type: string
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -38,71 +51,120 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.12'
+
+      - name: Version bestimmen
+        shell: bash
+        run: |
+          GRADLE_FILE="simple-order-system/kitchen-display-android/app/build.gradle.kts"
+          if [[ "${{ github.ref }}" == refs/tags/kds-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#kds-v}"
+          elif [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=$(grep -oP 'versionName = "\K[^"]+' "$GRADLE_FILE")
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # versionCode = major*1000 + minor*100 + patch (2.6.1 -> 2601, 3.0 -> 3000)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          VCODE=$(( ${MAJOR:-0} * 1000 + ${MINOR:-0} * 100 + ${PATCH:-0} ))
+          [ "$VCODE" -lt 1 ] && VCODE=1
+          sed -i "s/versionName = \".*\"/versionName = \"$VERSION\"/" "$GRADLE_FILE"
+          sed -i "s/versionCode = [0-9]*/versionCode = $VCODE/" "$GRADLE_FILE"
+          echo "Version: $VERSION (code: $VCODE)"
+          grep -E "version(Code|Name)" "$GRADLE_FILE"
+
+      - name: Unit-Tests
+        working-directory: simple-order-system/kitchen-display-android
+        run: gradle testDebugUnitTest --stacktrace
+
       - name: Build Debug APK
         working-directory: simple-order-system/kitchen-display-android
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace
 
       - name: Build Release APK
         working-directory: simple-order-system/kitchen-display-android
-        run: gradle assembleRelease
+        run: gradle assembleRelease --stacktrace
 
-      - name: Rename APKs
+      - name: Release-APK signieren
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/kds-v') || inputs.create_release == true }}
+        shell: bash
         run: |
-          VERSION="${{ inputs.version || '1.0.0' }}"
-          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/app-debug.apk \
-             simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/kitchen-display-${VERSION}-debug.apk
-          mv simple-order-system/kitchen-display-android/app/build/outputs/apk/release/app-release-unsigned.apk \
-             simple-order-system/kitchen-display-android/app/build/outputs/apk/release/kitchen-display-${VERSION}-release.apk
+          UNSIGNED_APK=simple-order-system/kitchen-display-android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            if [ "$IS_RELEASE" = "true" ]; then
+              echo "::error::KEYSTORE_BASE64/KEYSTORE_PASSWORD fehlen — kein unsigniertes Release."
+              exit 1
+            fi
+            echo "Keine Signatur-Secrets (z.B. PR aus Fork) — Release-APK bleibt unsigniert."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/kds.jks"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -f -p 4 "$UNSIGNED_APK" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/kds.jks" \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --ks-key-alias kds \
+            --key-pass "pass:$KEYSTORE_PASSWORD" \
+            --out "$RUNNER_TEMP/signed.apk" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify --print-certs "$RUNNER_TEMP/signed.apk" | head -3
+          rm -f "$RUNNER_TEMP/kds.jks"
+          echo "SIGNED_APK=$RUNNER_TEMP/signed.apk" >> $GITHUB_ENV
 
-      - name: Upload Debug APK
+      - name: APKs benennen
+        shell: bash
+        run: |
+          mkdir -p out
+          cp simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/app-debug.apk \
+             "out/kitchen-display-${VERSION}-debug.apk"
+          if [ -n "$SIGNED_APK" ]; then
+            cp "$SIGNED_APK" "out/kitchen-display-${VERSION}-release.apk"
+          else
+            cp simple-order-system/kitchen-display-android/app/build/outputs/apk/release/app-release-unsigned.apk \
+               "out/kitchen-display-${VERSION}-release-unsigned.apk"
+          fi
+          ls -la out
+
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: kitchen-display-debug
-          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
-          retention-days: 30
-
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: kitchen-display-release
-          path: simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+          name: kitchen-display-${{ env.VERSION }}
+          path: out/*.apk
           retention-days: 30
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/kds-v') || inputs.create_release == true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name || format('kds-v{0}', inputs.version) }}
-          name: Kitchen Display Android ${{ inputs.version || github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('kds-v{0}', env.VERSION) }}
+          name: Kitchen Display Android ${{ env.VERSION }}
           # NIE als "Latest" markieren: releases/latest gehoert dem Desktop-Auto-
           # Updater (latest.json) — Android-Releases wuerden ihn sonst kapern.
           make_latest: false
           body: |
-            ## Kitchen Display Android App
+            ## Kitchen Display Android App ${{ env.VERSION }}
 
-            Native Android App für das Kitchen Display System.
+            Native Küchen-/Bar-Anzeige für das Bestellsystem (order.fwv-raura.ch).
 
             **Kompatibilität:** Android 7.0+ (API 24)
 
             ### Installation
-            1. APK auf das Android-Gerät übertragen
-            2. "Unbekannte Quellen" in den Einstellungen erlauben
-            3. APK installieren
-            4. App starten und Server-URL in den Einstellungen konfigurieren
+            1. `kitchen-display-${{ env.VERSION }}-release.apk` auf dem Gerät öffnen
+            2. Android 7: Einstellungen › Sicherheit › «Unbekannte Herkunft» erlauben
+            3. Station wählen, einmal das Passwort «Kasse & Küche» eingeben
 
-            ### Features
-            - Echtzeit-Bestellungen via WebSocket
-            - Station-Filter (Alle/Bar/Küche)
-            - Audio-Benachrichtigungen
-            - Automatischer Reconnect
-          files: |
-            simple-order-system/kitchen-display-android/app/build/outputs/apk/debug/*.apk
-            simple-order-system/kitchen-display-android/app/build/outputs/apk/release/*.apk
+            Installierte Geräte (ab 3.0) zeigen neue Versionen selbst an –
+            ein Tipp auf die blaue Leiste installiert sie.
+          files: out/kitchen-display-*-release.apk
           draft: false
           prerelease: false
