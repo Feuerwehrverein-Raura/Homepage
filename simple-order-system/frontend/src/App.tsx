@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { InstallPrompt } from './InstallPrompt';
+import { QrScanner } from './QrScanner';
 import { anzeigeName, kategorienSortieren, kachelnBilden, gruppenPreis, variantenName, STANDARD_KATEGORIEN } from './kacheln';
 
 // Offline Banner Component
@@ -310,6 +311,9 @@ function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
   const [user, setUser] = useState<User | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [qrOffen, setQrOffen] = useState(false);
+  const [qrLaeuft, setQrLaeuft] = useState(false);
+  const [qrFehler, setQrFehler] = useState<string | null>(null);
   // In einem Rahmen (Kiosk im Roten Schopf) laeuft die Anmeldung anders:
   // Authentik erlaubt sich nicht einbetten (X-Frame-Options: DENY), eine
   // Weiterleitung landete auf einer leeren Flaeche. Der Kiosk reicht
@@ -512,6 +516,30 @@ function App() {
     } catch {
       // Standard
     }
+  };
+
+  // QR-Login: Code an /api/auth/qr-login, das ein Kassen-Token auf den Namen
+  // des Mitglieds ausstellt (Datenblatt oder Anmeldebon).
+  const qrAnmelden = async (code: string) => {
+    setQrOffen(false);
+    setQrLaeuft(true);
+    setQrFehler(null);
+    try {
+      const res = await fetch(`${API_URL}/auth/qr-login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.token) {
+        setQrFehler(d.error || `Anmeldung fehlgeschlagen (${res.status})`);
+      } else {
+        localStorage.setItem('order_token', d.token);
+        setUser({ name: d.name || 'Mitglied', email: '', groups: ['pos'] });
+        setToken(d.token);
+      }
+    } catch {
+      setQrFehler('Keine Verbindung - bitte nochmals versuchen.');
+    }
+    setQrLaeuft(false);
   };
 
   const redirectToLogin = () => {
@@ -1420,10 +1448,23 @@ function App() {
         </div>
       );
     }
-    redirectToLogin();
+    // Anmelden: Vereinskonto (Authentik) oder QR-Code (Datenblatt/Anmeldebon).
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-gray-500 text-lg">Weiterleitung zur Anmeldung...</div>
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl shadow p-6 w-full max-w-sm text-center">
+          <div className="text-2xl font-bold text-fwv-red mb-6">Kasse</div>
+          <button onClick={redirectToLogin}
+            className="w-full py-4 rounded-xl bg-fwv-red text-white font-bold text-lg mb-3 touch-manipulation">
+            Mit Vereinskonto anmelden
+          </button>
+          <button onClick={() => { setQrFehler(null); setQrOffen(true); }} disabled={qrLaeuft}
+            className="w-full py-4 rounded-xl bg-gray-800 text-white font-bold text-lg touch-manipulation disabled:opacity-50">
+            {qrLaeuft ? 'Anmeldung läuft…' : '📷 Mit QR-Code anmelden'}
+          </button>
+          <div className="text-xs text-gray-500 mt-2">Datenblatt oder Anmeldebon vom Bondrucker</div>
+          {qrFehler && <div className="mt-4 p-3 rounded-lg bg-red-100 text-red-800 text-sm">{qrFehler}</div>}
+        </div>
+        {qrOffen && <QrScanner onCode={qrAnmelden} onClose={() => setQrOffen(false)} />}
       </div>
     );
   }

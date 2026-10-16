@@ -14,8 +14,9 @@ import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } 
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
+import { qrCodeLesen } from './qrcode.js';
 import { bestellNr, escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
-import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, vorOrtToken, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
+import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, vorOrtToken, signMitgliedPosToken, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
 // ist LOCAL_MODE aus -> dann wird Authentifizierung erzwungen.
@@ -125,7 +126,7 @@ app.use('/api', (req: AuthenticatedRequest, res, next) => {
 // bleibt alles offen wie bisher, damit der Festbetrieb offline weiterlaeuft.
 const OPEN_API_PATHS = [
   /^\/health/,
-  /^\/auth\/(mode|login)/,
+  /^\/auth\/(mode|login|qr-login)/,
   /^\/webhooks\//,
   /^\/sync\//,
   /^\/internal\//,
@@ -151,6 +152,41 @@ app.post('/api/auth/login', localLogin);
 app.post('/api/auth/refresh', refreshLogin);
 // Kassen-Token fuer den T400 (siehe vorOrtToken in auth.ts); hinter der Auth-Schranke.
 app.post('/api/auth/vor-ort-token', vorOrtToken);
+
+// QR-Login mit dem Datenblatt eines Mitglieds oder dem Anmeldebon vom
+// Bondrucker (Kasse, Kueche, Kuechen-App). Erkannt werden:
+//  - Datenblatt: JSON {"type":"fwv-member-login","token":"fwv-member-..."}
+//    oder das nackte Token -> api-members /auth/member/qr-login
+//  - Anmeldebon: https://www.fwv-raura.ch/anmelden.html?code=... (einmalig,
+//    1 h einloesbar) -> api-members /auth/member/code-login
+// Gueltig = aktives Mitglied (Entscheid Stefan, 16.10.2026). Braucht
+// Internet - auch der T400 fragt bei api-members nach.
+const MEMBERS_API_URL = (process.env.MEMBERS_API_URL || 'https://api.fwv-raura.ch').replace(/\/$/, '');
+app.post('/api/auth/qr-login', async (req, res) => {
+  const gelesen = qrCodeLesen(req.body?.code);
+  if (!gelesen) return res.status(400).json({ error: 'Das ist kein Login-Code des Vereins.' });
+  try {
+    const r = await fetch(`${MEMBERS_API_URL}/auth/member/${gelesen.art === 'bon' ? 'code-login' : 'qr-login'}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(gelesen.art === 'bon' ? { code: gelesen.code } : { token: gelesen.token }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (r.status === 401) {
+      return res.status(401).json({ error: gelesen.art === 'bon'
+        ? 'Dieser Bon ist schon benutzt oder abgelaufen - bitte einen neuen drucken.'
+        : 'Dieser Code ist ungültig oder gesperrt.' });
+    }
+    if (!r.ok) return res.status(502).json({ error: `Mitgliederverwaltung antwortete ${r.status}` });
+    const d: any = await r.json();
+    const name = String(d?.user?.name || d?.name || '').slice(0, 100);
+    console.log(`QR-Login Kasse/Kueche (${gelesen.art}): ${name || 'Mitglied'}`);
+    res.json({ token: signMitgliedPosToken(name, d?.user?.email || null), name, mode: 'qr' });
+  } catch (e: any) {
+    console.error('QR-Login:', e?.message || e);
+    res.status(502).json({ error: 'Anmeldung per QR braucht Internet - bitte später nochmals oder mit Passwort.' });
+  }
+});
 
 // Blocked IPs management (admin only)
 app.get('/api/auth/blocked-ips', authenticateToken, (req: AuthenticatedRequest, res) => {

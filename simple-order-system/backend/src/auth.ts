@@ -241,6 +241,17 @@ export function localLogin(req: Request, res: Response) {
   res.json({ token: signPosToken(), mode: LOCAL_MODE ? 'local' : 'shared' });
 }
 
+// QR-Login (Datenblatt eines Mitglieds): Kassen-Token wie beim Passwort,
+// aber auf den Namen des Mitglieds - so steht in Protokollen, wer es war.
+// id bleibt 'pos-shared', damit die Kuechen-App es taeglich erneuern kann.
+export function signMitgliedPosToken(name: string, email: string | null): string {
+  return jwt.sign(
+    { id: 'pos-shared', email: email || 'kasse@fwv-raura.ch', name: name || 'Mitglied', groups: ['pos'], via: 'qr' },
+    JWT_SECRET,
+    { expiresIn: POS_TOKEN_TTL }
+  );
+}
+
 function signPosToken(): string {
   return jwt.sign(
     {
