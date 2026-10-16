@@ -282,6 +282,14 @@ const fetchMitLimit = (url: string, init: RequestInit, ms: number): Promise<Resp
   return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
 };
 // Anzeige der Bestellnummer: lokale (gepufferte) Bestellungen haben noch keine.
+// Was an einer Bestellung noch offen ist. Direkt (Bar/TWINT/Karte) bezahlte
+// Bestellungen haben payment_method, aber keine Teilzahlungen - die zaehlen
+// als bezahlt, auch wenn die Kueche sie danach abschliesst.
+const offenerBetrag = (o: { status?: string; payment_method?: string | null; total: string; paid_amount?: string }): number => {
+  if (o.status === 'cancelled' || o.payment_method) return 0;
+  return (parseFloat(o.total) || 0) - (parseFloat(o.paid_amount || '0') || 0);
+};
+
 // Lokal (T400, ab 500000) "L-12", Server "S-7"; gepufferte noch ohne Nummer.
 const bestellNr = (id: number | string) => {
   const n = Number(id);
@@ -582,8 +590,9 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/orders`, { headers: authHeaders() });
       const data = await res.json();
-      // Filter only table orders (table_number > 0) that are not fully paid
-      const tableOrders = data.filter((o: any) => o.table_number > 0 && o.status !== 'paid');
+      // Nur Tische mit offenem Betrag (vorher blieben direkt bezahlte und von
+      // der Kueche abgeschlossene Bestellungen als "offen" stehen).
+      const tableOrders = data.filter((o: any) => o.table_number > 0 && offenerBetrag(o) > 0.009);
       setAllOpenOrders(tableOrders);
     } catch (error) {
       console.error('Failed to fetch all orders:', error);
@@ -591,10 +600,30 @@ function App() {
     }
   };
 
+  // Tisch aufloesen: alle offenen Bestellungen des Tisches stornieren.
+  const tischAufloesen = async (tableNum: number, bestellungen: OpenOrder[]) => {
+    const bezahlt = bestellungen.reduce((s, o) => s + (parseFloat(o.paid_amount || '0') || 0), 0);
+    const offen = bestellungen.reduce((s, o) => s + offenerBetrag(o), 0);
+    const text = `Tisch ${tableNum} auflösen?\n\nOffen: CHF ${offen.toFixed(2)} wird storniert.` +
+      (bezahlt > 0 ? `\nBereits bezahlt: CHF ${bezahlt.toFixed(2)} bleibt in der Abrechnung.` : '');
+    if (!confirm(text)) return;
+    const fehler: string[] = [];
+    for (const o of bestellungen) {
+      try {
+        const res = await fetch(`${API_URL}/orders/${o.id}/cancel`, { method: 'POST', headers: authHeaders() });
+        if (!res.ok) fehler.push(`${bestellNr(o.id)}: ${(await res.json().catch(() => ({}))).error || res.status}`);
+      } catch {
+        fehler.push(`${bestellNr(o.id)}: keine Verbindung`);
+      }
+    }
+    if (fehler.length) alert(`Nicht alles storniert:\n${fehler.join('\n')}`);
+    fetchAllOpenOrders();
+  };
+
   // Cancel/Stornieren individual order item
-  const cancelOrderItem = async (orderId: number, itemId: number) => {
+  const cancelOrderItem = async (orderId: number, itemId: number, trotzKueche = false) => {
     try {
-      const res = await fetch(`${API_URL}/orders/${orderId}/items/${itemId}`, {
+      const res = await fetch(`${API_URL}/orders/${orderId}/items/${itemId}${trotzKueche ? '?trotz_kueche=1' : ''}`, {
         method: 'DELETE',
         headers: authHeaders(),
       });
@@ -1341,8 +1370,7 @@ function App() {
   // Tische: bei Service - und immer, solange noch Tisch-Bestellungen offen
   // sind (die duerfen nicht unsichtbar liegen bleiben).
   // Offen = noch nicht (ganz) bezahlt; die Liste enthaelt auch fertige.
-  const unbezahlteTischBestellungen = allOpenOrders.filter(o =>
-    (parseFloat(o.total) || 0) - (parseFloat(o.paid_amount || '0') || 0) > 0.009);
+  const unbezahlteTischBestellungen = allOpenOrders.filter(o => offenerBetrag(o) > 0.009);
   const tischeSichtbar = hatService || unbezahlteTischBestellungen.length > 0;
   // Bestellart "Tisch" nur bei Service; eine angefangene Tisch-Bestellung
   // bleibt aber, bis sie gesendet oder geleert ist.
@@ -1685,12 +1713,15 @@ function App() {
                                   {item.quantity}x {anzeigeName(item.item_name)}
                                 </span>
                                 <span className="mr-2">CHF {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
-                                {!item.paid && !item.completed && (
+                                {!item.paid && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (confirm(`"${item.quantity}x ${anzeigeName(item.item_name)}" wirklich stornieren?`)) {
-                                        cancelOrderItem(order.id, item.id);
+                                      const text = item.completed
+                                        ? `"${item.quantity}x ${anzeigeName(item.item_name)}" hat die Küche schon bestätigt.\n\nTrotzdem entfernen (z.B. falsch getippt, nie serviert)?`
+                                        : `"${item.quantity}x ${anzeigeName(item.item_name)}" wirklich stornieren?`;
+                                      if (confirm(text)) {
+                                        cancelOrderItem(order.id, item.id, !!item.completed);
                                       }
                                     }}
                                     className="text-red-600 hover:text-red-800 hover:bg-red-200 rounded p-1 text-xs font-bold"
@@ -1725,6 +1756,14 @@ function App() {
                           </button>
                         </div>
                       )}
+                      <div className="px-3 pb-3">
+                        <button
+                          onClick={() => tischAufloesen(tableNum, tableOrders)}
+                          className="w-full text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 py-2 rounded-lg text-sm font-medium touch-manipulation"
+                        >
+                          🗑️ Tisch auflösen
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

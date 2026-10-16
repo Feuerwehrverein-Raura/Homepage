@@ -1352,8 +1352,9 @@ app.delete('/api/orders/:orderId/items/:itemId', async (req, res) => {
 
     const item = itemResult.rows[0];
 
-    // Check if item is completed by kitchen - cannot cancel
-    if (item.completed) {
+    // Von der Kueche bestaetigt: nur mit ausdruecklicher Rueckfrage in der
+    // Kasse (?trotz_kueche=1) - z.B. falsch getippt oder nie serviert.
+    if (item.completed && req.query.trotz_kueche !== '1') {
       return res.status(400).json({
         error: 'Küche hat diesen Artikel bereits bestätigt - kann nicht mehr storniert werden.'
       });
@@ -1438,6 +1439,24 @@ app.patch('/api/orders/:orderId/items/complete', async (req, res) => {
 });
 
 // Update order status with payment method
+// Bestellung stornieren (Tisch aufloesen). Bereits erfasste Teilzahlungen
+// bleiben in order_payments und damit in der Abrechnung.
+app.post('/api/orders/:id/cancel', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: 'Ungueltige Bestellung' });
+    const r = await pool.query(
+      `UPDATE orders SET status = 'cancelled' WHERE id = $1 AND status <> 'cancelled' RETURNING id`, [id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'Bestellung nicht gefunden oder schon storniert' });
+    broadcast({ type: 'order_completed', order_id: id });
+    broadcast({ type: 'order_updated', order_id: id, status: 'cancelled' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Cancel order error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
