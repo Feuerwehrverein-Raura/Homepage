@@ -599,17 +599,6 @@ Authorization: Bearer <token>
 
 ## PDFs & Dokumente
 
-### Arbeitsplan-PDF generieren
-```http
-POST /arbeitsplan/pdf
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "event_id": 1
-}
-```
-
 ### Event-Arbeitsplan PDF
 ```http
 GET /events/:id/pdf/arbeitsplan
@@ -714,10 +703,3 @@ DELETE /event-groups/:id
 Authorization: Bearer <token>
 ```
 
-### Gruppen-Arbeitsplan PDF
-```http
-POST /event-groups/:id/arbeitsplan-pdf
-Authorization: Bearer <token>
-```
-
-Generiert einen kombinierten Arbeitsplan über alle Events der Gruppe.

@@ -241,7 +241,6 @@ Event-Management mit Schichten, Anmeldungen, Arbeitsplänen und Event-Gruppen.
 | `/registrations/:id` | PUT/DELETE | Anmeldung bearbeiten/löschen |
 | **PDFs & Dokumente** | | |
 | `/calendar/ics` | GET | iCalendar-Export |
-| `/arbeitsplan/pdf` | POST | Arbeitsplan-PDF generieren |
 | `/events/:id/pdf/arbeitsplan` | GET | Event-Arbeitsplan PDF |
 | `/events/:id/pdf/teilnehmerliste` | GET | Teilnehmerliste PDF |
 | `/teilnehmerliste/pdf` | POST | Teilnehmerliste generieren |
@@ -256,7 +255,6 @@ Event-Management mit Schichten, Anmeldungen, Arbeitsplänen und Event-Gruppen.
 | `/event-groups/:id` | GET | Event-Gruppen-Details |
 | `/event-groups` | POST | Gruppe erstellen (Vorstand) |
 | `/event-groups/:id` | PUT/DELETE | Gruppe bearbeiten/löschen |
-| `/event-groups/:id/arbeitsplan-pdf` | POST | Gruppen-Arbeitsplan PDF |
 
 ### 3. Dispatch API (`backend-dispatch`)
 
@@ -755,7 +753,7 @@ VITE_AUTHENTIK_CLIENT_ID=inventory-system
 
 ## Bekannte Gotchas
 
-1. **Traefik Routing:** Höhere Priority-Zahl = wird zuerst gematcht. Bei neuen Routes prüfen ob es Konflikte gibt. Dispatch hat Priority 200 für `/invoices/generate` und `/arbeitsplan/pdf`.
+1. **Traefik Routing:** Höhere Priority-Zahl = wird zuerst gematcht. Bei neuen Routes prüfen ob es Konflikte gibt. Dispatch hat Priority 200 für `/invoices/generate`.
 
 2. **Git Push:** Bei CI-Commits (Semantic Release) oft `git pull --rebase` nötig vor dem Push.
 

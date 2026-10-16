@@ -176,13 +176,6 @@ services:
       - traefik.http.routers.api-dispatch-invoices.tls.certresolver=letsencrypt
       - traefik.http.routers.api-dispatch-invoices.service=api-dispatch
       - traefik.http.routers.api-dispatch-invoices.priority=200       # DEUTSCH: Priorität 200 > Standard, fängt /invoices/generate VOR Accounting ab
-      # DEUTSCH: Höhere Priorität für /arbeitsplan/pdf — Dispatch generiert Arbeitsplan-PDFs
-      - traefik.http.routers.api-dispatch-arbeitsplan.rule=Host(`api.fwv-raura.ch`) && PathPrefix(`/arbeitsplan/pdf`)
-      - traefik.http.routers.api-dispatch-arbeitsplan.entrypoints=https
-      - traefik.http.routers.api-dispatch-arbeitsplan.tls=true
-      - traefik.http.routers.api-dispatch-arbeitsplan.tls.certresolver=letsencrypt
-      - traefik.http.routers.api-dispatch-arbeitsplan.service=api-dispatch
-      - traefik.http.routers.api-dispatch-arbeitsplan.priority=200
 
   # ============================================
   # DEUTSCH: FRONTENDS — Statische Webseiten in Nginx-Containern

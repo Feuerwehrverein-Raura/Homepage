@@ -101,5 +101,4 @@ Bei überlappenden Pfaden wird die Priorität über Traefik-Labels gesteuert. H�
 | Pfad | Priorität | Service |
 |------|-----------|---------|
 | `/invoices/generate*` | 200 | Dispatch |
-| `/arbeitsplan/pdf` | 200 | Dispatch |
 | Alle anderen | Standard | Je nach Pfad-Prefix |
