@@ -189,7 +189,7 @@ test('Kasse und TWINT-QR gegen den echten Server', { skip: !DB && 'TEST_DATABASE
         assert.equal(r.json.zeitpunkt, '2026-10-24 19:00:00');
         assert.deepEqual(r.json.anlass, {
             id: E(1), title: 'Chilbi 2026', start_date: '2026-10-24 18:00:00', end_date: '2026-10-25 02:00:00',
-            location: null, status: 'planned', twint_qr_url: null, hat_service: true
+            location: null, status: 'planned', twint_qr_url: null, hat_service: true, slug: 'chilbi'
         });
     });
 
