@@ -40,6 +40,26 @@
         // DEUTSCH: Basis-URL des Members-Backends (Express API auf Hetzner VPS)
         const API_BASE = 'https://api.fwv-raura.ch';
 
+        // DEUTSCH: Weiterleitungsziel pruefen: absolute URL nur https auf fwv-raura.ch
+        // DEUTSCH: oder einer Subdomain, sonst eigener Pfad; alles andere -> Startseite.
+        function sicheresZiel(ziel) {
+            if (/^https?:/i.test(ziel)) {
+                try {
+                    const url = new URL(ziel);
+                    const host = url.hostname.toLowerCase();
+                    if (url.protocol === 'https:' && !url.username && !url.password &&
+                        (host === 'fwv-raura.ch' || host.endsWith('.fwv-raura.ch'))) {
+                        return { absolut: true, url };
+                    }
+                } catch (e) { /* ungueltig -> Startseite */ }
+                return { absolut: false, pfad: '/' };
+            }
+            if (ziel.startsWith('/') && !ziel.startsWith('//') && !ziel.startsWith('/\\')) {
+                return { absolut: false, pfad: ziel };
+            }
+            return { absolut: false, pfad: '/' };
+        }
+
         // DEUTSCH: Hauptfunktion, die den OIDC Callback-Ablauf abwickelt.
         // DEUTSCH: Ablauf: URL-Parameter lesen -> Client-Typ bestimmen -> Code gegen Token tauschen -> Weiterleiten
         async function handleCallback() {
@@ -73,7 +93,7 @@
                 let clientType = 'members';
                 if (state && state.includes('/vorstand')) {
                     clientType = 'vorstand';
-                } else if (state && (state.includes('order.fwv-raura.ch') || state.includes('kitchen.fwv-raura.ch'))) {
+                } else if (state && (() => { try { const z = sicheresZiel(decodeURIComponent(state)); return z.absolut && ['order.fwv-raura.ch', 'kitchen.fwv-raura.ch'].includes(z.url.hostname); } catch (e) { return false; } })()) {
                     clientType = 'order';
                 }
 
@@ -130,12 +150,16 @@
                 // DEUTSCH: (z.B. https://order.fwv-raura.ch), wird das Token als URL-Parameter angehaengt,
                 // DEUTSCH: da localStorage nicht subdomain-uebergreifend geteilt werden kann.
                 // DEUTSCH: Bei Same-Domain-Weiterleitungen (relativer Pfad) reicht der localStorage.
-                if (redirectTo.startsWith('http')) {
-                    const url = new URL(redirectTo);
-                    url.searchParams.set('token', accessToken);
-                    window.location.href = url.toString();
+                // DEUTSCH: Sicherheit: state kommt aus der URL und ist damit von aussen
+                // DEUTSCH: steuerbar. Das Token geht nur an https-Seiten unter fwv-raura.ch,
+                // DEUTSCH: sonst koennte ein praeparierter Login-Link es an fremde Seiten leiten.
+                // DEUTSCH: Relative Ziele nur als eigener Pfad ("/…", nicht "//…").
+                const ziel = sicheresZiel(redirectTo);
+                if (ziel.absolut) {
+                    ziel.url.searchParams.set('token', accessToken);
+                    window.location.href = ziel.url.toString();
                 } else {
-                    window.location.href = redirectTo;
+                    window.location.href = ziel.pfad;
                 }
 
             } catch (error) {
