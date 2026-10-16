@@ -278,6 +278,16 @@ export function renewPosToken(token: string | undefined): string | null {
   }
 }
 
+/**
+ * Kasse vor Ort (T400): Die Oberflaeche meldet sich ueber Authentik an; der
+ * T400 kann diese Tokens ohne Internet nicht pruefen. Wer angemeldet ist
+ * (Auth-Schranke davor), bekommt hier ein eigenes Kassen-Token (HS256,
+ * JWT_SECRET, 30 Tage), das der T400 mit demselben JWT_SECRET offline prueft.
+ */
+export function vorOrtToken(_req: Request, res: Response) {
+  res.json({ token: signPosToken() });
+}
+
 export function refreshLogin(req: Request, res: Response) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];

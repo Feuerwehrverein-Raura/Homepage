@@ -13,8 +13,9 @@ import crypto from 'crypto';
 import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } from './anlass.js';
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
+import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
-import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
+import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, vorOrtToken, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
 // ist LOCAL_MODE aus -> dann wird Authentifizierung erzwungen.
@@ -68,8 +69,17 @@ const wss = new WebSocketServer({
 // Trust reverse proxy (Traefik) for X-Forwarded-* headers
 app.set('trust proxy', true);
 
+// Kasse vor Ort: Die Oberflaeche kommt von order.fwv-raura.ch (oeffentlich)
+// und spricht den T400 im Schopf-Netz an. Chrome verlangt dafuer bei der
+// Vorabfrage die Freigabe fuer das private Netz (Private Network Access).
+app.use((req, res, next) => {
+  if (req.headers['access-control-request-private-network']) {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  }
+  next();
+});
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Serve uploaded files (TWINT QR codes etc.)
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
@@ -139,6 +149,8 @@ app.post('/api/auth/login', localLogin);
 // Kuechendisplay/Kiosk: gueltiges POS-Token gegen ein frisches tauschen (kein
 // OPEN_API_PATH — die Auth-Schranke oben prueft das Token bereits).
 app.post('/api/auth/refresh', refreshLogin);
+// Kassen-Token fuer den T400 (siehe vorOrtToken in auth.ts); hinter der Auth-Schranke.
+app.post('/api/auth/vor-ort-token', vorOrtToken);
 
 // Blocked IPs management (admin only)
 app.get('/api/auth/blocked-ips', authenticateToken, (req: AuthenticatedRequest, res) => {
@@ -220,7 +232,7 @@ app.get('/api/audit-log', authenticateToken, async (req: AuthenticatedRequest, r
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', mode: getAuthMode().local ? 'local' : 'online' });
+  res.json({ status: 'ok', mode: getAuthMode().local ? 'local' : 'online', vor_ort: VOR_ORT });
 });
 
 // Database setup
@@ -410,6 +422,8 @@ async function initDB() {
       CONSTRAINT pos_credentials_single_row CHECK (id = 1)
     )
   `);
+
+  await vorOrtSchema(pool);
 
   console.log('Database initialized');
 }
@@ -690,6 +704,9 @@ if (!ORDER_API_KEY) {
   process.exit(1);
 }
 
+// Kasse vor Ort (T400) und Annahme ihrer Bestellungen in der Cloud - src/vorort.ts
+vorOrtEinrichten({ app, pool, orderApiKey: ORDER_API_KEY, inventoryApiUrl: INVENTORY_API_URL, broadcast, setSetting, getSetting });
+
 // ============================================
 // GEMEINSAMES KASSEN-/KUECHEN-PASSWORT (woechentliche Rotation)
 // ============================================
@@ -709,6 +726,12 @@ function generatePosPassword(): string {
 // ADMIN_PASSWORD, damit Cloud und Offline nicht auseinanderlaufen.
 async function loadOrRotatePosPassword(): Promise<void> {
   if (LOCAL_MODE) return;
+  // T400: Passwort der Cloud uebernehmen, keine eigene Rotation.
+  if (VOR_ORT) {
+    const pw = await cloudPasswortHolen(ORDER_API_KEY!);
+    if (pw) setSharedPassword(pw);
+    return;
+  }
   try {
     const r = await pool.query('SELECT password, rotated_at FROM pos_credentials WHERE id = 1');
     if (r.rows.length === 0) {
@@ -755,10 +778,11 @@ app.get('/api/internal/pos-credential', async (req, res) => {
 app.get('/api/items', async (req, res) => {
   try {
     // Fetch all items from inventory system
-    const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`);
+    const response = await fetch(`${INVENTORY_API_URL}/api/items/sellable`, { signal: AbortSignal.timeout(8000) });
     if (!response.ok) {
       console.error('Inventory API returned:', response.status);
-      return res.json([]); // Return empty array if inventory unavailable
+      // T400 ohne Internet: letzte gute Liste
+      return res.json((await artikelAusSpeicher(getSetting)) || []);
     }
 
     const inventoryItems = await response.json() as any[];
@@ -781,10 +805,11 @@ app.get('/api/items', async (req, res) => {
       return a.name.localeCompare(b.name);
     });
 
+    await artikelMerken(setSetting, items);
     res.json(items);
   } catch (error) {
     console.error('Inventory API error:', error);
-    res.json([]); // Return empty array on error
+    res.json((await artikelAusSpeicher(getSetting)) || []); // T400: letzte gute Liste
   }
 });
 
@@ -1092,7 +1117,8 @@ app.post('/api/orders', async (req, res) => {
     try {
       const inventoryItems = items.map((item: any) => ({ id: item.id, quantity: item.quantity }));
 
-      if (inventoryItems.length > 0) {
+      // T400: Das Lager bucht die Cloud, wenn die Bestellung dort ankommt.
+      if (inventoryItems.length > 0 && !VOR_ORT) {
         await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
           method: 'POST',
           headers: {
@@ -1228,7 +1254,8 @@ app.post('/api/orders/:id/items', async (req, res) => {
     try {
       const inventoryItems = items.map((item: any) => ({ id: item.id, quantity: item.quantity }));
 
-      if (inventoryItems.length > 0) {
+      // T400: Das Lager bucht die Cloud, wenn die Bestellung dort ankommt.
+      if (inventoryItems.length > 0 && !VOR_ORT) {
         await fetch(`${INVENTORY_API_URL}/api/items/sell`, {
           method: 'POST',
           headers: {

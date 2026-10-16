@@ -71,8 +71,74 @@ async function detectBackend() {
   console.log('Local backend not reachable, falling back to cloud');
   API_URL = CLOUD_API_URL;
   WS_URL = CLOUD_WS_URL;
+  CLOUD_API = API_URL;
+  CLOUD_WS = WS_URL;
 }
 detectBackend();
+
+// ---------------------------------------------------------------------------
+// Kasse vor Ort (T400 im Roten Schopf), Oktober 2026
+//
+// Im Schopf-Netz zeigt kasse-lokal.fwv-raura.ch auf den T400 (oeffentlicher
+// DNS-Eintrag auf die private Adresse, echtes Zertifikat). Antwortet er, laeuft
+// die Kasse dort: Bons direkt an den Drucker, auch ohne Internet. Sonst Cloud.
+// Der T400 schickt alles in die Cloud nach (backend/src/vorort.ts).
+//
+// Anmeldung: Der T400 kann Authentik-Tokens ohne Internet nicht pruefen. Die
+// Kasse holt sich deshalb in der Cloud ein Kassen-Token (30 Tage) und setzt
+// es fuer Anfragen an den T400 ein (fetch-Huelle unten), ohne die 26
+// Aufrufstellen einzeln anzufassen.
+// ---------------------------------------------------------------------------
+let CLOUD_API = API_URL;
+let CLOUD_WS = WS_URL;
+const VOR_ORT_BASIS = 'https://kasse-lokal.fwv-raura.ch';
+const VOR_ORT_TOKEN_KEY = 'kasse_vor_ort_token';
+const vorOrtTokenLesen = (): string | null => {
+  try {
+    const t = localStorage.getItem(VOR_ORT_TOKEN_KEY);
+    if (!t) return null;
+    const exp = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp;
+    return exp && exp * 1000 > Date.now() ? t : null;
+  } catch { return null; }
+};
+const vorOrtTokenRestTage = (): number => {
+  try {
+    const t = vorOrtTokenLesen();
+    if (!t) return 0;
+    const exp = JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp;
+    return (exp * 1000 - Date.now()) / 86400000;
+  } catch { return 0; }
+};
+// Anfragen an den T400 tragen das Kassen-Token statt des Authentik-Tokens.
+const echtesFetch = window.fetch.bind(window);
+window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (url.startsWith(VOR_ORT_BASIS)) {
+    const t = vorOrtTokenLesen();
+    const h = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+    if (t && h.has('Authorization')) {
+      h.set('Authorization', `Bearer ${t}`);
+      return echtesFetch(input, { ...init, headers: h });
+    }
+  }
+  return echtesFetch(input, init);
+};
+type KasseOrt = 'cloud' | 'lokal';
+let kasseOrt: KasseOrt = 'cloud';
+function ortSetzen(o: KasseOrt) {
+  kasseOrt = o;
+  API_URL = o === 'lokal' ? `${VOR_ORT_BASIS}/api` : CLOUD_API;
+  WS_URL = o === 'lokal' ? `${VOR_ORT_BASIS.replace('https:', 'wss:')}/ws` : CLOUD_WS;
+}
+// Antwortet der T400? (ohne Anmeldung, kurzes Zeitlimit)
+async function vorOrtErreichbar(): Promise<boolean> {
+  try {
+    const r = await echtesFetch(`${VOR_ORT_BASIS}/api/health`, { signal: AbortSignal.timeout(2500), cache: 'no-store' });
+    if (!r.ok) return false;
+    const d = await r.json();
+    return d?.vor_ort === true;
+  } catch { return false; }
+}
 const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
 const AUTH_CLIENT_ID = 'order-system';
 const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
@@ -278,6 +344,9 @@ function App() {
   // Doppeltipp-Schutz fuers Anlegen: state allein reicht nicht, zwei Tipps
   // im selben Augenblick saehen beide noch loading=false.
   const sendetRef = useRef(false);
+  // Wo die Kasse gerade arbeitet (T400 im Schopf oder Cloud), siehe ortSetzen.
+  const [ort, setOrt] = useState<KasseOrt>(kasseOrt);
+  const ortFehlerRef = useRef(0);
   // Gepufferte Bestellungen/Zahlungen (siehe PufferEintrag)
   const [pufferAnzahl, setPufferAnzahl] = useState(() => pufferOffen(pufferLesen()));
   const pufferLaeuftRef = useRef(false);
@@ -556,7 +625,8 @@ function App() {
     const connectWebSocket = () => {
       // Token als Query-Param anhaengen — Browser koennen bei WebSockets keinen
       // Authorization-Header setzen; der Server prueft es in verifyClient.
-      const ws = new WebSocket(token ? `${WS_URL}?token=${encodeURIComponent(token)}` : WS_URL);
+      const wsToken = kasseOrt === 'lokal' ? (vorOrtTokenLesen() || token) : token;
+      const ws = new WebSocket(wsToken ? `${WS_URL}?token=${encodeURIComponent(wsToken)}` : WS_URL);
 
       ws.onopen = () => {
         console.log('WebSocket connected');
@@ -628,7 +698,7 @@ function App() {
         wsRef.current = null;
       }
     };
-  }, [token]);
+  }, [token, ort]);
 
   // Auto-refresh Tische view every 15 seconds as fallback
   useEffect(() => {
@@ -784,6 +854,49 @@ function App() {
     window.addEventListener('online', online);
     return () => { clearInterval(t); window.removeEventListener('online', online); };
   }, [token]);
+
+  // T400 suchen: beim Start und alle 20 s. Wechsel zum T400 sofort, zurueck
+  // in die Cloud erst nach zwei Fehlschlaegen (ein verlorenes Paket im WLAN
+  // soll nicht hin- und herschalten).
+  useEffect(() => {
+    if (!token || import.meta.env.VITE_API_URL) return;
+    let aus = false;
+    const pruefen = async () => {
+      // Kassen-Token fuer den T400 holen/erneuern - nur ueber die Cloud.
+      if (vorOrtTokenRestTage() < 7) {
+        try {
+          const r = await echtesFetch(`${CLOUD_API}/auth/vor-ort-token`, {
+            method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, signal: AbortSignal.timeout(8000),
+          });
+          if (r.ok) {
+            const d = await r.json();
+            if (d?.token) localStorage.setItem(VOR_ORT_TOKEN_KEY, d.token);
+          }
+        } catch { /* spaeter nochmals */ }
+      }
+      const da = !!vorOrtTokenLesen() && await vorOrtErreichbar();
+      if (aus) return;
+      if (da) {
+        ortFehlerRef.current = 0;
+        if (kasseOrt !== 'lokal') { ortSetzen('lokal'); setOrt('lokal'); }
+      } else {
+        ortFehlerRef.current += 1;
+        if (kasseOrt === 'lokal' && ortFehlerRef.current >= 2) { ortSetzen('cloud'); setOrt('cloud'); }
+      }
+    };
+    pruefen();
+    const t = setInterval(pruefen, 20000);
+    return () => { aus = true; clearInterval(t); };
+  }, [token]);
+
+  // Nach einem Wechsel: Artikel und Tische vom neuen Ort, Puffer dorthin.
+  useEffect(() => {
+    if (!token) return;
+    fetchItems();
+    fetchAllOpenOrders();
+    pufferSenden();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ort]);
 
   const handlePayment = async (method: 'bar' | 'sumup') => {
     if (!pendingOrder) return;
@@ -1391,6 +1504,12 @@ function App() {
               )}
             </div>
             <div className="flex items-center gap-2">
+              <span
+                className={`text-xs px-2 py-1 rounded-full font-semibold ${ort === 'lokal' ? 'bg-green-600' : 'bg-red-800'}`}
+                title={ort === 'lokal' ? 'Kasse läuft auf dem Rechner im Schopf - Bons direkt, auch ohne Internet' : 'Kasse läuft über die Cloud'}
+              >
+                {ort === 'lokal' ? '📍 Schopf' : '☁️ Cloud'}
+              </span>
               {user && <span className="text-xs sm:text-sm">Hallo, {user.name}</span>}
               {/* Kein Logout im Rahmen: Der Kiosk meldet sich nicht
                   persoenlich an, und die Abmeldung fuehrt zu Authentik, das
