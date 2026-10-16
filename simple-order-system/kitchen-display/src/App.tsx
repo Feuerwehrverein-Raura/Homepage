@@ -640,21 +640,28 @@ function App() {
         </div>
       );
     }
-    // Anmelden: Vereinskonto (Authentik) oder QR-Code (Datenblatt/Anmeldebon).
+    // Anmelden: Vereinskonto (Authentik) oder QR-Code (Datenblatt, Anmeldebon,
+    // Kassen-QR aus den Zugaengen).
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
-        <div className="bg-gray-800 rounded-2xl p-6 w-full max-w-sm text-center">
-          <div className="text-2xl font-bold text-white mb-6">Küche</div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center p-4">
+        <div className="bg-gray-800 border border-gray-700 rounded-3xl shadow-2xl px-6 pt-5 pb-6 w-full max-w-sm text-center">
+          <img src="/logo-512.png" alt="Küche" className="h-56 mx-auto -mt-2 -mb-10 object-contain" />
+          <div className="text-sm text-gray-400 mb-6">Feuerwehrverein Raura</div>
+          <button onClick={() => { setQrFehler(null); setQrOffen(true); }} disabled={qrLaeuft}
+            className="w-full py-4 rounded-xl bg-red-700 hover:bg-red-600 text-white font-bold text-lg shadow touch-manipulation disabled:opacity-50 flex items-center justify-center gap-2">
+            <span className="text-2xl">📷</span> {qrLaeuft ? 'Anmeldung läuft…' : 'Mit QR-Code anmelden'}
+          </button>
+          <div className="text-xs text-gray-400 mt-2 mb-5">
+            Kassen-QR aus «Zugänge», Datenblatt oder Anmeldebon
+          </div>
+          <div className="flex items-center gap-3 mb-5 text-xs text-gray-500">
+            <div className="flex-1 h-px bg-gray-700" /> oder <div className="flex-1 h-px bg-gray-700" />
+          </div>
           <button onClick={redirectToLogin}
-            className="w-full py-4 rounded-xl bg-red-700 text-white font-bold text-lg mb-3 touch-manipulation">
+            className="w-full py-3 rounded-xl border-2 border-gray-600 hover:bg-gray-700 text-gray-100 font-semibold touch-manipulation">
             Mit Vereinskonto anmelden
           </button>
-          <button onClick={() => { setQrFehler(null); setQrOffen(true); }} disabled={qrLaeuft}
-            className="w-full py-4 rounded-xl bg-gray-600 text-white font-bold text-lg touch-manipulation disabled:opacity-50">
-            {qrLaeuft ? 'Anmeldung läuft…' : '📷 Mit QR-Code anmelden'}
-          </button>
-          <div className="text-xs text-gray-400 mt-2">Datenblatt oder Anmeldebon vom Bondrucker</div>
-          {qrFehler && <div className="mt-4 p-3 rounded-lg bg-red-900 text-red-100 text-sm">{qrFehler}</div>}
+          {qrFehler && <div className="mt-5 p-3 rounded-lg bg-red-900 text-red-100 text-sm">{qrFehler}</div>}
         </div>
         {qrOffen && <QrScanner onCode={qrAnmelden} onClose={() => setQrOffen(false)} />}
       </div>
