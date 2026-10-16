@@ -121,3 +121,10 @@ test('rezeptListe: aus der Event-Rezeptliste des Inventars', () => {
   ]);
   assert.deepEqual(rezeptListe({ error: 'x' }), []);
 });
+
+test('bestellNr: L- fuer den T400, S- fuer den Server', async () => {
+  const { bestellNr } = await import('../src/bon.js');
+  assert.equal(bestellNr(7), 'S-7');
+  assert.equal(bestellNr(500012), 'L-12');
+  assert.equal(bestellNr('500000'), 'L-0');
+});

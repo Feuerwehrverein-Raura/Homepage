@@ -9,6 +9,15 @@
 // 48 Zeichen normal, 24 Zeichen bei doppelter Breite.
 // ---------------------------------------------------------------------------
 
+// Bestellnummer fuer Menschen: Der T400 zaehlt ab 500000 (src/vorort.ts),
+// angezeigt wird "L-12" (lokal, T400) bzw. "S-7" (Server/Cloud).
+export const LOKAL_AB = 500000;
+export function bestellNr(id: number | string): string {
+  const n = Number(id);
+  if (!Number.isFinite(n)) return String(id);
+  return n >= LOKAL_AB ? `L-${n - LOKAL_AB}` : `S-${n}`;
+}
+
 export const BREITE_NORMAL = 48;
 export const BREITE_DOPPELT = 24;
 // Obergrenze fuer Beschreibung und Anleitung (je), damit ein versehentlich

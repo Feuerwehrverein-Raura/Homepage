@@ -521,7 +521,7 @@ function App() {
     if (notificationsEnabled && 'Notification' in window) {
       const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
       const title = order.table_number === 0
-        ? `Neue Bestellung #${order.id}`
+        ? `Neue Bestellung ${order.id >= 500000 ? `L-${order.id - 500000}` : `S-${order.id}`}`
         : `Neue Bestellung - Tisch ${order.table_number}`;
       new Notification(title, {
         body: `${itemCount} Artikel`,

@@ -14,7 +14,7 @@ import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } 
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
-import { escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
+import { bestellNr, escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, vorOrtToken, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
@@ -2297,7 +2297,7 @@ async function printViaEpos(
       <text align="center" width="1" height="1" em="false"/>
       <text>&#10;</text>
       <text align="left" width="1" height="2"/>
-      <text>Bestell-Nr: #${orderId}&#10;</text>
+      <text>Bestell-Nr: ${bestellNr(orderId)}&#10;</text>
       <text>${escapeXml(dateStr)} ${escapeXml(timeStr)}&#10;</text>
       <text width="1" height="1"/>
       <text>================================&#10;</text>
@@ -2348,7 +2348,7 @@ async function printViaRawTcp(
           .text('')
           .align('lt')
           .style('normal')
-          .text(`Bestellung: #${orderId}`)
+          .text(`Bestellung: ${bestellNr(orderId)}`)
           .text(`Zeit: ${dateStr} ${timeStr}`)
           .text(`Station: ${station.toUpperCase()}`)
           .text('--------------------------------')
@@ -2633,7 +2633,7 @@ app.post('/api/payments/create', async (req, res) => {
       currency: 'CHF',
       orderId: orderId.toString(),
       tableNumber: order.table_number,
-      description: `Tisch ${order.table_number} - Bestellung #${orderId}`,
+      description: `Tisch ${order.table_number} - Bestellung ${bestellNr(orderId)}`,
     };
     
     let paymentResult;

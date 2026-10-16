@@ -282,7 +282,12 @@ const fetchMitLimit = (url: string, init: RequestInit, ms: number): Promise<Resp
   return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
 };
 // Anzeige der Bestellnummer: lokale (gepufferte) Bestellungen haben noch keine.
-const bestellNr = (id: number) => (id > 0 ? `#${id}` : '(wartet auf Verbindung)');
+// Lokal (T400, ab 500000) "L-12", Server "S-7"; gepufferte noch ohne Nummer.
+const bestellNr = (id: number | string) => {
+  const n = Number(id);
+  if (!(n > 0)) return '(wartet auf Verbindung)';
+  return n >= 500000 ? `L-${n - 500000}` : `S-${n}`;
+};
 
 function App() {
   const [items, setItems] = useState<Item[]>([]);
@@ -1426,7 +1431,7 @@ function App() {
             <div className="text-2xl leading-none">🖨️</div>
             <div className="flex-1">
               <div className="font-bold">
-                Bon nicht gedruckt — Bestellung #{druckWarnung.orderId}
+                Bon nicht gedruckt — Bestellung {bestellNr(druckWarnung.orderId)}
               </div>
               <ul className="mt-1 text-sm space-y-0.5">
                 {druckWarnung.fehler.map((f, i) => (
@@ -1657,7 +1662,7 @@ function App() {
                           return (
                           <div key={order.id} className="mb-2 pb-2 border-b last:border-0">
                             <div className="text-xs text-gray-500 mb-1 flex items-center gap-2">
-                              <span>#{order.id} - {new Date(order.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span>{bestellNr(order.id)} - {new Date(order.created_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}</span>
                               {completedItems.length > 0 && (
                                 <span className="bg-green-600 text-white px-1.5 py-0.5 rounded text-xs">
                                   ✓ {completedItems.length}/{totalItems}
@@ -1984,7 +1989,7 @@ function App() {
                               }`}
                             >
                               <div className="flex justify-between items-center">
-                                <span className="font-semibold">#{order.id}</span>
+                                <span className="font-semibold">{bestellNr(order.id)}</span>
                                 <div className="text-right">
                                   {hasPaidItems && (
                                     <div className="text-xs text-green-700 line-through">
@@ -2024,7 +2029,7 @@ function App() {
                     </div>
                     {selectedOrder && (
                       <p className="text-xs text-yellow-700 mt-2">
-                        Artikel werden zu Bestellung #{selectedOrder.id} hinzugefügt
+                        Artikel werden zu Bestellung {bestellNr(selectedOrder.id)} hinzugefügt
                       </p>
                     )}
                   </div>
@@ -2467,7 +2472,7 @@ function App() {
             <div className="p-6">
               <h2 className="text-2xl font-bold text-center mb-2">💳 Bezahlen</h2>
               <p className="text-sm text-gray-600 text-center mb-1">
-                Tisch {splitPaymentOrder.table_number} - Bestellung #{splitPaymentOrder.id}
+                Tisch {splitPaymentOrder.table_number} - Bestellung {bestellNr(splitPaymentOrder.id)}
               </p>
               <p className="text-lg font-bold text-center text-fwv-red mb-4">
                 Offen: CHF {getUnpaidTotal(splitPaymentOrder).toFixed(2)}
