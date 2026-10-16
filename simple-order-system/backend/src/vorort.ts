@@ -12,8 +12,8 @@
 // Zahlungsnummern ab T400_AB (die Cloud bleibt darunter). Eine Bestellung hat
 // deshalb ueberall dieselbe Nummer - auf dem Bon, in der Kasse, in der Kueche
 // - und der Abgleich kann in beide Richtungen laufen, ohne zu verwechseln:
-//  - T400 -> Cloud: Bestellungen mit geaendert > gesendet (alle 15 s)
-//  - Cloud -> T400: alles mit geaendert > Merker (alle 10 s, 30 s Ueberlappung)
+//  - T400 -> Cloud: Bestellungen mit geaendert > gesendet (alle 3 s)
+//  - Cloud -> T400: alles mit geaendert > Merker (alle 5 s, 30 s Ueberlappung)
 // Zusammengefuehrt wird ueberall gleich (mischen): fehlende Bestellungen,
 // Positionen und Zahlungen werden mit ihrer Nummer angelegt, Status nie
 // zurueckgestuft, "bezahlt"/"fertig" einer Position bleibt, Total = Summe.
@@ -25,6 +25,11 @@
 // die Cloud einen Bon nicht drucken (z.B. WireGuard weg), druckt der T400 ihn
 // nach - aber nur bei ausdruecklichem Fehler, nie bei "unbekannt", sonst
 // kaeme er doppelt. Gedruckt gilt, sobald eine Seite '' meldet.
+//
+// Stornos: Die Kasse loescht stornierte Positionen. Damit die andere Seite
+// sie nicht wieder einspielt, merkt sich ein Trigger jede geloeschte
+// Position (storno_positionen); die Liste reist mit und wird beim Mischen
+// zuerst angewendet.
 //
 // "geaendert" setzen Trigger, aber nur bei echten Aenderungen - sonst wuerde
 // jede Uebernahme eine Gegen-Uebernahme ausloesen (Ping-Pong).
@@ -113,6 +118,20 @@ export async function vorOrtSchema(pool: pg.Pool): Promise<void> {
       FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION abgleich_kind_geaendert()`);
   }
 
+  // Stornierte (geloeschte) Positionen merken
+  await pool.query(`CREATE TABLE IF NOT EXISTS storno_positionen (
+      id INTEGER PRIMARY KEY, order_id INTEGER NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_storno_order ON storno_positionen(order_id)`);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION abgleich_storno_merken() RETURNS trigger AS $$
+    BEGIN
+      INSERT INTO storno_positionen (id, order_id) VALUES (OLD.id, OLD.order_id) ON CONFLICT (id) DO NOTHING;
+      RETURN NULL;
+    END $$ LANGUAGE plpgsql`);
+  await pool.query(`DROP TRIGGER IF EXISTS abgleich_storno ON order_items`);
+  await pool.query(`CREATE TRIGGER abgleich_storno AFTER DELETE ON order_items
+    FOR EACH ROW EXECUTE FUNCTION abgleich_storno_merken()`);
+
   // T400: eigene Nummernkreise
   if (VOR_ORT) {
     for (const [t, ab] of Object.entries(T400_AB)) {
@@ -139,10 +158,13 @@ async function bestellungenLesen(db: pg.Pool | pg.PoolClient, where: string, par
   const zahlungen = (await db.query(
     `SELECT id, order_id, amount, payment_method, description, ${ZEIT('created_at')} AS created_at
      FROM order_payments WHERE order_id = ANY($1::int[]) ORDER BY id`, [ids])).rows;
+  const stornos = (await db.query(
+    'SELECT id, order_id FROM storno_positionen WHERE order_id = ANY($1::int[])', [ids])).rows;
   return orders.map((o: any) => ({
     ...o,
     items: items.filter((i: any) => i.order_id === o.id),
     payments: zahlungen.filter((z: any) => z.order_id === o.id),
+    storniert: stornos.filter((x: any) => x.order_id === o.id).map((x: any) => x.id),
   }));
 }
 
@@ -204,9 +226,17 @@ export async function mischen(client: pg.PoolClient, b: any, quelle: string | nu
        bonMischen(da.bon_fehler, b.bon_fehler)]);
   }
 
+  // Stornos zuerst: geloeschte Positionen nie wieder anlegen.
+  for (const sid of (Array.isArray(b.storniert) ? b.storniert : [])) {
+    const n = Number(sid);
+    if (!Number.isInteger(n)) continue;
+    await client.query('INSERT INTO storno_positionen (id, order_id) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING', [n, id]);
+    await client.query('DELETE FROM order_items WHERE id = $1 AND order_id = $2', [n, id]);
+  }
   for (const p of (Array.isArray(b.items) ? b.items : [])) {
     const pid = Number(p.id);
     if (!Number.isInteger(pid)) continue;
+    if ((await client.query('SELECT 1 FROM storno_positionen WHERE id = $1', [pid])).rows.length) continue;
     const alt = (await client.query('SELECT id, order_id, completed FROM order_items WHERE id = $1', [pid])).rows[0];
     if (alt && alt.order_id !== id) continue; // gehoert zu einer anderen Bestellung - nie anfassen
     if (alt) {
@@ -389,8 +419,10 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
       sendet = false;
     }
   }
-  setInterval(senden, 15000);
-  setTimeout(senden, 5000);
+  // Alle 3 s: Faellt der T400 aus, fehlt der Cloud hoechstens das (z.B. eine
+  // Teilzahlung) - je kuerzer, desto kleiner das Risiko doppelt zu kassieren.
+  setInterval(senden, 3000);
+  setTimeout(senden, 3000);
 
   // ---- T400: Aenderungen aus der Cloud holen ------------------------------
   let holt = false;
@@ -421,7 +453,7 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
       holt = false;
     }
   }
-  setInterval(holen, 10000);
+  setInterval(holen, 5000);
   setTimeout(holen, 4000);
 
   // Stand fuer Anzeige/Ampel
