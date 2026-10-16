@@ -37,4 +37,16 @@ void main() {
       QrCodeFehler.ohneToken,
     );
   });
+
+  test('Anmeldebon vom Bondrucker', () {
+    final c = qrLoginCodeLesen('https://www.fwv-raura.ch/anmelden.html?code=AbC-123_x');
+    expect(c.istGueltig, isTrue);
+    expect(c.bonCode, 'AbC-123_x');
+    expect(c.token, isNull);
+  });
+
+  test('Bon-Adresse einer fremden Seite', () {
+    expect(qrLoginCodeLesen('https://evil.ch/anmelden.html?code=abc').fehler, QrCodeFehler.fremderCode);
+    expect(qrLoginCodeLesen('https://fwv-raura.ch.evil.ch/anmelden.html?code=abc').fehler, QrCodeFehler.fremderCode);
+  });
 }

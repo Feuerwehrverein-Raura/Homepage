@@ -116,6 +116,22 @@ class SitzungsVerwaltung extends ChangeNotifier implements TokenQuelle {
     );
   }
 
+  /// Anmeldebon vom Bondrucker (einmaliger Code, `auth/member/code-login`).
+  /// Das Token gilt sieben Tage; ein stilles Neu-Anmelden gibt es nicht,
+  /// der Code ist danach verbraucht. Antwort: `{token, name}`.
+  Future<void> mitAnmeldebonAnmelden(String code) async {
+    final antwort = await _offen.post('auth/member/code-login', daten: {'code': code});
+    final token = antwort is Map ? _text(antwort['token']) : null;
+    if (token == null) throw const ApiFehler('Die Anmeldung wurde nicht angenommen.');
+    await _beginnen(
+      Sitzung(
+        accessToken: token,
+        kontotyp: Kontotyp.mitglied,
+        name: _text((antwort as Map)['name']),
+      ),
+    );
+  }
+
   /// Externer Organisator: E-Mail und Passwort des Anlasses (`events/login`).
   /// Das Backend liefert `{success, token, event: {id, title, slug,
   /// organizer_name}}`; das Token gilt 24 Stunden und laesst sich nicht

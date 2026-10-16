@@ -103,10 +103,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     }
     await _ausfuehren(() async {
       try {
-        await _sitzung.mitQrCodeAnmelden(code.token!);
+        if (code.bonCode != null) {
+          await _sitzung.mitAnmeldebonAnmelden(code.bonCode!);
+        } else {
+          await _sitzung.mitQrCodeAnmelden(code.token!);
+        }
       } on ApiFehler catch (e) {
         if (e.status == 401 || e.status == 400) {
-          throw const ApiFehler('Der Code wurde nicht angenommen (ungültig oder widerrufen).');
+          throw ApiFehler(code.bonCode != null
+              ? 'Dieser Bon ist schon benutzt oder abgelaufen - bitte einen neuen drucken.'
+              : 'Der Code wurde nicht angenommen (ungültig oder widerrufen).');
         }
         rethrow;
       }

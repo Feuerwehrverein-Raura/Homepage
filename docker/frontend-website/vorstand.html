@@ -22,6 +22,8 @@
     <!-- SheetJS fuer XLSX-Export mit mehreren Tabellenblaettern -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="scripts/sicher.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="scripts/qr-anmeldung.js?v=1"></script>
     <script src="scripts/arbeitsplan.js?v=2"></script>
     <script src="scripts/anlass-logo.js"></script>
     <script src="scripts/mailcow-groesse.js"></script>
@@ -151,6 +153,11 @@
                     class="w-full bg-fire-600 text-white py-3 rounded-lg font-semibold hover:bg-fire-700 transition-colors">
                     Anmelden
                 </button>
+                <button type="button" id="login-qr-btn"
+                    class="w-full bg-gray-800 text-white py-3 rounded-lg font-semibold hover:bg-gray-900 transition-colors">
+                    📷 Mit QR-Code anmelden
+                </button>
+                <p class="text-center text-gray-500 text-xs">Datenblatt oder Anmeldebon vom Bondrucker</p>
             </form>
 
             <p class="text-center text-gray-500 text-xs mt-6">
@@ -3920,6 +3927,44 @@
         }
 
         document.getElementById('login-form').addEventListener('submit', handleLogin);
+
+        // QR-Anmeldung (scripts/qr-anmeldung.js): Datenblatt oder Anmeldebon
+        // eines Mitglieds. Das Mitglieder-Token gilt hier nur, wenn das Mitglied
+        // in der Gruppe Vorstand ist - /auth/vorstand/me prueft das.
+        async function handleQrLogin() {
+            const btn = document.getElementById('login-qr-btn');
+            const errorEl = document.getElementById('login-error');
+            errorEl.classList.add('hidden');
+            btn.disabled = true;
+            try {
+                const token = await window.qrAnmeldung(API_BASE);
+                if (!token) return;
+                btn.textContent = 'Anmelden...';
+                const me = await fetch(`${API_BASE}/auth/vorstand/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (me.status === 401 || me.status === 403) throw new Error('Dieses Mitglied hat keinen Zugang zum Vorstandsbereich.');
+                if (!me.ok) throw new Error('Anmeldung konnte nicht geprüft werden.');
+                const info = await me.json();
+
+                localStorage.setItem('vorstand_token', token);
+                const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString();
+                document.cookie = `vorstand_token=${token}; domain=.fwv-raura.ch; path=/; expires=${expires}; secure; samesite=lax`;
+                authToken = token;
+                currentUser = { email: info.email, role: info.role, name: info.person || info.name || 'Vorstand' };
+                document.getElementById('user-info').textContent = currentUser.name;
+                const userInfoMobile = document.getElementById('user-info-mobile');
+                if (userInfoMobile) userInfoMobile.textContent = currentUser.name;
+                hideLoginModal();
+                await loadStats();
+                await loadMembers();
+            } catch (error) {
+                errorEl.textContent = error.message;
+                errorEl.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📷 Mit QR-Code anmelden';
+            }
+        }
+        document.getElementById('login-qr-btn').addEventListener('click', handleQrLogin);
 
         // ============================================
         // MEMBERS
