@@ -44,6 +44,11 @@ object AuthService {
     suspend fun login(serverUrl: String, password: String): Result =
         post("${serverUrl.trimEnd('/')}/api/auth/login", gson.toJson(mapOf("password" to password)), null)
 
+    // QR-Login: Datenblatt oder Anmeldebon; der Server loest den Code bei der
+    // Mitgliederverwaltung ein und gibt ein Kassen-Token zurueck.
+    suspend fun qrLogin(serverUrl: String, code: String): Result =
+        post("${serverUrl.trimEnd('/')}/api/auth/qr-login", gson.toJson(mapOf("code" to code)), null)
+
     suspend fun refresh(serverUrl: String, token: String): Result =
         post("${serverUrl.trimEnd('/')}/api/auth/refresh", "{}", token)
 

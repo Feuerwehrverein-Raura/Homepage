@@ -144,6 +144,15 @@
                 android:textSize="16sp"
                 app:backgroundTint="@color/primary" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/qrButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/qr_login_button"
+                android:textSize="16sp" />
+
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:id="@+id/loadingIndicator"
                 android:layout_width="wrap_content"

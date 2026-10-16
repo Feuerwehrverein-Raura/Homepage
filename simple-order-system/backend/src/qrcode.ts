@@ -1,7 +1,10 @@
 // Login-QR-Codes des Vereins erkennen (Kasse, Kueche) - siehe /api/auth/qr-login.
 //  - Datenblatt: JSON {"type":"fwv-member-login","token":"fwv-member-..."} oder nacktes Token
 //  - Anmeldebon (Bondrucker): https://www.fwv-raura.ch/anmelden.html?code=...
-export function qrCodeLesen(roh: unknown): { art: 'datenblatt'; token: string } | { art: 'bon'; code: string } | null {
+//  - Kassen-QR (Zugaenge in der App): {"type":"fwv-kasse-login","passwort":"..."}
+//    = das woechentlich rotierende Kassen-Passwort, kein persoenliches Konto
+export type QrCode = { art: 'datenblatt'; token: string } | { art: 'bon'; code: string } | { art: 'kasse'; passwort: string };
+export function qrCodeLesen(roh: unknown): QrCode | null {
   if (typeof roh !== 'string') return null;
   const text = roh.trim();
   if (text.length > 500) return null;
@@ -17,6 +20,9 @@ export function qrCodeLesen(roh: unknown): { art: 'datenblatt'; token: string } 
     const j = JSON.parse(text);
     if (j && j.type === 'fwv-member-login' && typeof j.token === 'string' && j.token.startsWith('fwv-member-')) {
       return { art: 'datenblatt', token: j.token };
+    }
+    if (j && j.type === 'fwv-kasse-login' && typeof j.passwort === 'string' && j.passwort.length <= 100) {
+      return { art: 'kasse', passwort: j.passwort };
     }
   } catch { /* kein JSON */ }
   return null;

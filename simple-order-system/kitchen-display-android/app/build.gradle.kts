@@ -66,6 +66,9 @@ dependencies {
     // OkHttp for WebSocket and HTTP
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
+    // QR-Login (Datenblatt/Anmeldebon) - laeuft ohne Google-Dienste, auch auf Android 7
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
     // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.10.1")
 

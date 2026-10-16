@@ -4,10 +4,13 @@
 // Passwort einer Funktions-Mail aendern: `PUT members/me/function-email-
 // password` (mindestens 12 Zeichen).
 
+import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:fwv_anlass/fwv_anlass.dart' show mitSystemleiste;
 import 'package:fwv_core/fwv_core.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../dienste.dart';
 import '../gemeinsam.dart';
@@ -160,6 +163,8 @@ class _ZugaengeScreenState extends State<ZugaengeScreen> {
                           if (k.passwort != null) GeheimZeile(titel: 'Passwort', wert: k.passwort!),
                           if (k.naechsterWechsel != null)
                             _Zeile('Nächster Wechsel', schweizerDatum(k.naechsterWechsel!)),
+                          if (k.kontoName == 'order-system' && k.passwort != null)
+                            _KassenQr(passwort: k.passwort!),
                         ],
                       ),
                   ],
@@ -423,6 +428,39 @@ class _FunktionsMailPasswortScreenState extends State<FunktionsMailPasswortScree
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Kassen-QR: Kasse oder Kueche scannen ihn ("Mit QR-Code anmelden") und
+/// sind als Kasse angemeldet - ohne persoenliches Konto. Enthaelt das
+/// woechentlich rotierende Kassen-Passwort; das order-backend prueft es wie
+/// eine Passwort-Eingabe (auch am T400 ohne Internet).
+class _KassenQr extends StatelessWidget {
+  const _KassenQr({required this.passwort});
+
+  final String passwort;
+
+  @override
+  Widget build(BuildContext context) {
+    final inhalt = jsonEncode({'v': 1, 'type': 'fwv-kasse-login', 'passwort': passwort});
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, right: 8, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Kasse oder Küche anmelden', style: Theme.of(context).textTheme.titleSmall),
+          const Text('Am Gerät «Mit QR-Code anmelden» tippen und diesen Code zeigen.'),
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(8),
+              child: QrImageView(data: inhalt, size: 200, backgroundColor: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }

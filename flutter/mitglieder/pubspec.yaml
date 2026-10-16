@@ -50,6 +50,7 @@ dependencies:
   http: ^1.6.0
   flutter_appauth: ^12.1.0
   mobile_scanner: ^7.4.2
+  qr_flutter: ^4.1.0
   image_picker: ^1.2.4
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0

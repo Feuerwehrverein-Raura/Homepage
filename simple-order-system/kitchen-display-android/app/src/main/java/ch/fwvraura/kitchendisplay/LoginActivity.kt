@@ -11,6 +11,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.*
 
 /**
@@ -89,6 +91,15 @@ class LoginActivity : AppCompatActivity() {
         }
 
         loginButton.setOnClickListener { doLogin() }
+        findViewById<MaterialButton>(R.id.qrButton).setOnClickListener {
+            qrScanner.launch(
+                ScanOptions()
+                    .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                    .setPrompt(getString(R.string.qr_prompt))
+                    .setBeepEnabled(false)
+                    .setOrientationLocked(false)
+            )
+        }
 
         // Kiosk: «Zurueck» ignorieren; Einstellungen/Beenden nur ueber Logo 3 s + Code
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
@@ -187,6 +198,33 @@ class LoginActivity : AppCompatActivity() {
                     is AuthService.Result.Unreachable -> showError(
                         result.serverText ?: getString(R.string.error_connection)
                     )
+                }
+            } finally {
+                loginButton.isEnabled = true
+                loadingIndicator.visibility = View.GONE
+            }
+        }
+    }
+
+    // QR-Code gescannt (Datenblatt/Anmeldebon) -> beim Server einloesen
+    private val qrScanner = registerForActivityResult(ScanContract()) { ergebnis ->
+        val code = ergebnis.contents ?: return@registerForActivityResult
+        Kiosk.setStation(this, selectedStation())
+        errorText.visibility = View.GONE
+        loginButton.isEnabled = false
+        loadingIndicator.visibility = View.VISIBLE
+        scope.launch {
+            try {
+                val serverUrl = ServerDetector.detectServer(Kiosk.serverUrl(this@LoginActivity))
+                when (val result = AuthService.qrLogin(serverUrl, code)) {
+                    is AuthService.Result.Ok -> {
+                        tokenManager.saveToken(result.token)
+                        startMainActivity()
+                    }
+                    is AuthService.Result.Rejected ->
+                        showError(result.message ?: "Anmeldung abgelehnt (HTTP ${result.code})")
+                    is AuthService.Result.Unreachable ->
+                        showError(result.serverText ?: getString(R.string.error_connection))
                 }
             } finally {
                 loginButton.isEnabled = true

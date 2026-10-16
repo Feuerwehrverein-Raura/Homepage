@@ -159,12 +159,19 @@ app.post('/api/auth/vor-ort-token', vorOrtToken);
 //    oder das nackte Token -> api-members /auth/member/qr-login
 //  - Anmeldebon: https://www.fwv-raura.ch/anmelden.html?code=... (einmalig,
 //    1 h einloesbar) -> api-members /auth/member/code-login
-// Gueltig = aktives Mitglied (Entscheid Stefan, 16.10.2026). Braucht
+// Gueltig = aktives Mitglied (Entscheid Stefan, 16.10.2026); Kassen-QR siehe
+// src/qrcode.ts. Datenblatt und Bon brauchen
 // Internet - auch der T400 fragt bei api-members nach.
 const MEMBERS_API_URL = (process.env.MEMBERS_API_URL || 'https://api.fwv-raura.ch').replace(/\/$/, '');
 app.post('/api/auth/qr-login', async (req, res) => {
   const gelesen = qrCodeLesen(req.body?.code);
   if (!gelesen) return res.status(400).json({ error: 'Das ist kein Login-Code des Vereins.' });
+  // Kassen-QR: wie die Passwort-Anmeldung (gleiche Pruefung und Sperre nach
+  // Fehlversuchen), geht auch auf dem T400 ohne Internet.
+  if (gelesen.art === 'kasse') {
+    req.body = { password: gelesen.passwort };
+    return localLogin(req, res);
+  }
   try {
     const r = await fetch(`${MEMBERS_API_URL}/auth/member/${gelesen.art === 'bon' ? 'code-login' : 'qr-login'}`, {
       method: 'POST',
