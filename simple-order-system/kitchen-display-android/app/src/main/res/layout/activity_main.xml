@@ -99,6 +99,20 @@
                 android:textColor="@color/warning"
                 android:textSize="14sp" />
 
+            <!-- Laufende Uhr mit Sekunden: bleibt sie stehen, haengt die App.
+                 TextClock laeuft im UI-Thread mit und friert mit der App ein. -->
+            <TextClock
+                android:id="@+id/headerUhr"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:format12Hour="HH:mm:ss"
+                android:format24Hour="HH:mm:ss"
+                android:fontFeatureSettings="tnum"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
 
         </LinearLayout>
 

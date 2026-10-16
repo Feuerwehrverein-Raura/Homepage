@@ -759,6 +759,8 @@ function App() {
                 <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-red-400 animate-pulse'}`}></span>
                 {wsConnected ? 'Live' : 'Verbinde...'}{ort === 'lokal' ? ' · 📍 Schopf' : ' · ☁️ Cloud'}
               </span>
+              {/* Laufende Uhr: bleibt sie stehen, haengt die Anzeige */}
+              <Uhr />
               <span className="text-xl font-bold">
                 {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}
               </span>
@@ -923,3 +925,17 @@ function OrderCard({
 }
 
 export default App;
+
+// Laufende Uhr mit Sekunden im Kopf - steht sie, haengt die Anzeige.
+function Uhr() {
+  const [jetzt, setJetzt] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setJetzt(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <span className="text-xl font-bold tabular-nums">
+      {jetzt.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+    </span>
+  );
+}
