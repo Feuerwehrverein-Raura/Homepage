@@ -396,6 +396,19 @@
                     <button id="app-qr-close" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                 </div>
 
+                <!-- Kassen-Anmeldebon: meldet ein Kassen-/Kuechengeraet einmal (1 h) an,
+                     ohne persoenliches Konto. POST /vorstand/kassenbon -> order-backend druckt. -->
+                <div class="mb-4 p-3 rounded-lg border-2 border-red-100 bg-red-50 print:hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-800">🎫 Kasse/Küche-Gerät anmelden</div>
+                            <div class="text-sm text-gray-600">Druckt am Bondrucker einen QR-Bon. Das Gerät scannt ihn bei «QR-Code» und ist als Kasse angemeldet. Gilt einmal, eine Stunde.</div>
+                            <div id="kassenbon-meldung" class="text-sm mt-1 hidden"></div>
+                        </div>
+                        <button type="button" id="kassenbon-btn" class="px-4 py-2 bg-fire-600 text-white rounded-lg hover:bg-fire-700 text-sm whitespace-nowrap">🖨️ Anmeldebon drucken</button>
+                    </div>
+                </div>
+
                 <!-- Tab-Auswahl: Vorstand vs Mitglied -->
                 <div id="app-qr-tabs" class="flex border-b border-gray-200 mb-3 print:hidden">
                     <button data-tab="vorstand" class="app-qr-tab px-4 py-2 text-sm font-medium border-b-2 border-fire-500 text-fire-600">Vorstand-App</button>
@@ -10457,6 +10470,31 @@ body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-si
         document.getElementById('reset-password-btn').addEventListener('click', resetMemberPassword);
         document.getElementById('datenblatt-btn').addEventListener('click', generateDatenblatt);
         document.getElementById('anmeldebon-btn').addEventListener('click', anmeldebonDrucken);
+
+        // Kassen-Anmeldebon (siehe App-QR-Fenster)
+        document.getElementById('kassenbon-btn').addEventListener('click', async () => {
+            const knopf = document.getElementById('kassenbon-btn');
+            const meldung = document.getElementById('kassenbon-meldung');
+            knopf.disabled = true;
+            knopf.textContent = 'Druckt…';
+            meldung.classList.add('hidden');
+            try {
+                const response = await fetch(`${API_BASE}/vorstand/kassenbon`, {
+                    method: 'POST', headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const d = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(d.error || `Fehler (${response.status})`);
+                const bis = new Date(d.gilt_bis).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+                meldung.textContent = `Bon gedruckt – gilt einmal bis ${bis} Uhr.`;
+                meldung.className = 'text-sm mt-1 text-green-700';
+            } catch (e) {
+                meldung.textContent = e.message;
+                meldung.className = 'text-sm mt-1 text-red-700';
+            } finally {
+                knopf.disabled = false;
+                knopf.textContent = '🖨️ Anmeldebon drucken';
+            }
+        });
         document.getElementById('set-password-btn').addEventListener('click', () => {
             const form = document.getElementById('set-password-form');
             form.classList.toggle('hidden');

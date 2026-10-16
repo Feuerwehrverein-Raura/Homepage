@@ -15,6 +15,7 @@ import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
 import { VOR_ORT, vorOrtSchema, vorOrtEinrichten, cloudPasswortHolen, artikelMerken, artikelAusSpeicher } from './vorort.js';
 import { qrCodeLesen } from './qrcode.js';
+import { kassenbonSchema, kassenbonAnlegen, kassenbonEinloesen, kassenbonXml } from './kassenbon.js';
 import { bestellNr, escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, vorOrtToken, signMitgliedPosToken, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
@@ -150,6 +151,58 @@ app.post('/api/auth/login', localLogin);
 // Kuechendisplay/Kiosk: gueltiges POS-Token gegen ein frisches tauschen (kein
 // OPEN_API_PATH — die Auth-Schranke oben prueft das Token bereits).
 app.post('/api/auth/refresh', refreshLogin);
+// Kassen-Anmeldebon drucken (src/kassenbon.ts). Gedruckt wird auf dem
+// Bar-Drucker (sonst Kueche); nur ePOS kann QR-Codes.
+const CLOUD_ORDER_URL = (process.env.CLOUD_ORDER_URL || 'https://order.fwv-raura.ch').replace(/\/$/, '');
+async function kassenbonDrucken(code: string, giltBis: Date, von: string): Promise<void> {
+  const cfgs = await getPrinterConfig();
+  const cfg = cfgs.bar || cfgs.kitchen;
+  if (!cfg) throw new Error('Kein Bondrucker eingerichtet');
+  if (cfg.protocol !== 'epos') throw new Error('Der Bondrucker kann keine QR-Codes (kein ePOS)');
+  await eposSenden(cfg.ip, 'bar', eposHuelle(kassenbonXml(code, giltBis, von, bonLogoXml())));
+}
+// Cloud: Bon anlegen fuer api-members (Vorstand, mit Druck) und den T400
+// (ohne Druck - er druckt selbst). Nur mit X-Order-API-Key.
+app.post('/api/internal/kassenbon', async (req, res) => {
+  if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
+  const von = String(req.body?.erstellt_von || 'Vorstand').slice(0, 100);
+  try {
+    const bon = await kassenbonAnlegen(pool, von);
+    if (req.body?.drucken) {
+      await kassenbonDrucken(bon.code, bon.giltBis, von);
+      return res.json({ gilt_bis: bon.giltBis.toISOString() });
+    }
+    res.json({ code: bon.code, gilt_bis: bon.giltBis.toISOString() });
+  } catch (e: any) {
+    console.error('Kassen-Anmeldebon (intern):', e?.message || e);
+    res.status(502).json({ error: `Bon nicht gedruckt: ${e?.message || e}` });
+  }
+});
+// Kasse: Bon drucken (angemeldet). Am T400 liegt der Bon in der Cloud, damit
+// er auch an einer Kasse gilt, die gerade ueber die Cloud laeuft.
+app.post('/api/auth/kassenbon', async (req: AuthenticatedRequest, res) => {
+  const von = String(req.user?.name || 'Kasse').slice(0, 100);
+  try {
+    let bon: { code: string; giltBis: Date } | null = null;
+    if (VOR_ORT) {
+      try {
+        const r = await fetch(`${CLOUD_ORDER_URL}/api/internal/kassenbon`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': ORDER_API_KEY! },
+          body: JSON.stringify({ erstellt_von: von, drucken: false }), signal: AbortSignal.timeout(8000),
+        });
+        const d: any = await r.json();
+        if (r.ok && d.code) bon = { code: d.code, giltBis: new Date(d.gilt_bis) };
+      } catch { /* ohne Internet: lokal */ }
+    }
+    if (!bon) bon = await kassenbonAnlegen(pool, von);
+    await kassenbonDrucken(bon.code, bon.giltBis, von);
+    res.json({ gilt_bis: bon.giltBis.toISOString() });
+  } catch (e: any) {
+    console.error('Kassen-Anmeldebon:', e?.message || e);
+    res.status(502).json({ error: `Bon nicht gedruckt: ${e?.message || e}` });
+  }
+});
+
 // Kassen-Token fuer den T400 (siehe vorOrtToken in auth.ts); hinter der Auth-Schranke.
 app.post('/api/auth/vor-ort-token', vorOrtToken);
 
@@ -171,6 +224,27 @@ app.post('/api/auth/qr-login', async (req, res) => {
   if (gelesen.art === 'kasse') {
     req.body = { password: gelesen.passwort };
     return localLogin(req, res);
+  }
+  // Kassen-Anmeldebon (src/kassenbon.ts): einmalig, 1 h. Am T400 zuerst
+  // lokal, sonst in der Cloud einloesen (dort liegen die meisten Bons).
+  if (gelesen.art === 'kassenbon') {
+    const stand = await kassenbonEinloesen(pool, gelesen.code);
+    if (stand === 'ok') {
+      console.log('Kassen-Anmeldebon eingeloest');
+      return res.json({ token: signMitgliedPosToken('Kasse (Anmeldebon)', null), name: 'Kasse', mode: 'kassenbon' });
+    }
+    if (stand === 'unbekannt' && VOR_ORT) {
+      try {
+        const r = await fetch(`${CLOUD_ORDER_URL}/api/auth/qr-login`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: req.body.code }), signal: AbortSignal.timeout(10000),
+        });
+        return res.status(r.status).json(await r.json().catch(() => ({})));
+      } catch {
+        return res.status(502).json({ error: 'Dieser Bon kommt vom Vereinsserver - dafür braucht es Internet.' });
+      }
+    }
+    return res.status(401).json({ error: 'Dieser Bon ist schon benutzt oder abgelaufen - bitte einen neuen drucken.' });
   }
   try {
     const r = await fetch(`${MEMBERS_API_URL}/auth/member/${gelesen.art === 'bon' ? 'code-login' : 'qr-login'}`, {
@@ -467,6 +541,7 @@ async function initDB() {
   `);
 
   await vorOrtSchema(pool);
+  await kassenbonSchema(pool);
 
   console.log('Database initialized');
 }

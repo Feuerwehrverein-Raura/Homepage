@@ -4031,6 +4031,23 @@ async function authentikAnmeldelink(authentikUserId) {
     }
 }
 
+// Kassen-Anmeldebon (Oktober 2026): Bon, der ein Geraet einmal (1 h) als
+// Kasse anmeldet - ohne persoenliches Konto. Anlegen und Drucken macht das
+// order-backend (src/kassenbon.ts); hier nur fuer den Vorstand ausloesen.
+app.post('/vorstand/kassenbon', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
+    try {
+        const ORDER_INTERNAL_URL = process.env.ORDER_INTERNAL_URL || 'http://order-backend:3000';
+        const r = await axios.post(`${ORDER_INTERNAL_URL}/api/internal/kassenbon`,
+            { erstellt_von: req.user.name || req.user.email || 'Vorstand', drucken: true },
+            { headers: { 'X-Order-API-Key': process.env.ORDER_API_KEY }, timeout: 40000, validateStatus: () => true });
+        await logAudit(pool, 'KASSENBON_GEDRUCKT', null, req.user.email, getClientIp(req), { status: r.status });
+        res.status(r.status).json(r.data);
+    } catch (error) {
+        console.error('POST /vorstand/kassenbon:', error.message);
+        res.status(502).json({ error: 'Kasse nicht erreichbar - Bon nicht gedruckt.' });
+    }
+});
+
 // Anmeldebon fuer ein Mitglied drucken.
 app.post('/members/:id/anmeldebon', authenticateAny, requireRole('vorstand', 'admin'), async (req, res) => {
     try {

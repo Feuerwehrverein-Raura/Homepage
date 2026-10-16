@@ -3150,6 +3150,27 @@ function datumKurz(wert: string): string {
 }
 
 function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null; onAnlass: (stand: AnlassStand | null) => void; onGespeichert?: () => void }) {
+  const [bonLaeuft, setBonLaeuft] = useState(false);
+  const [bonMeldung, setBonMeldung] = useState<{ ok: boolean; text: string } | null>(null);
+  const anmeldebonDrucken = async () => {
+    setBonLaeuft(true);
+    setBonMeldung(null);
+    try {
+      const res = await fetch(`${API_URL}/auth/kassenbon`, {
+        method: 'POST', headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const bis = new Date(d.gilt_bis).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+        setBonMeldung({ ok: true, text: `Bon gedruckt – gilt einmal bis ${bis} Uhr.` });
+      } else {
+        setBonMeldung({ ok: false, text: d.error || `Fehler (${res.status})` });
+      }
+    } catch {
+      setBonMeldung({ ok: false, text: 'Keine Verbindung.' });
+    }
+    setBonLaeuft(false);
+  };
   const [settings, setSettings] = useState({
     printer_bar_ip: '',
     printer_bar_port: '9100',
@@ -3309,6 +3330,22 @@ function SettingsView({ token, onAnlass, onGespeichert }: { token: string | null
     <div className="max-w-7xl mx-auto p-2 sm:p-4">
       <div className="bg-white rounded-lg shadow p-4 sm:p-6">
         <h2 className="text-xl sm:text-2xl font-bold mb-6">Einstellungen</h2>
+
+        {/* Kassen-Anmeldebon: QR-Bon, der ein Geraet einmal (1 h) als Kasse anmeldet */}
+        <div className="mb-8 border-2 border-red-100 bg-red-50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold">🎫 Anmeldebon für ein Gerät</h3>
+            <p className="text-sm text-gray-600">
+              Druckt einen Bon mit QR-Code. Ein weiteres Handy oder die Küche scannt ihn bei
+              «QR-Code» und ist als Kasse angemeldet – ohne eigenes Konto. Gilt einmal, eine Stunde.
+            </p>
+            {bonMeldung && <p className={`text-sm mt-2 ${bonMeldung.ok ? 'text-green-700' : 'text-red-700'}`}>{bonMeldung.text}</p>}
+          </div>
+          <button onClick={anmeldebonDrucken} disabled={bonLaeuft}
+            className="px-5 py-3 rounded-lg bg-red-700 text-white font-semibold disabled:opacity-50 whitespace-nowrap">
+            {bonLaeuft ? 'Druckt…' : '🖨️ Anmeldebon drucken'}
+          </button>
+        </div>
 
         {/* Printer Settings */}
         <div className="mb-8">

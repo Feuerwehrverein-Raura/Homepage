@@ -3,7 +3,8 @@
 //  - Anmeldebon (Bondrucker): https://www.fwv-raura.ch/anmelden.html?code=...
 //  - Kassen-QR (Zugaenge in der App): {"type":"fwv-kasse-login","passwort":"..."}
 //    = das woechentlich rotierende Kassen-Passwort, kein persoenliches Konto
-export type QrCode = { art: 'datenblatt'; token: string } | { art: 'bon'; code: string } | { art: 'kasse'; passwort: string };
+//  - Kassen-Anmeldebon: {"type":"fwv-kasse-bon","code":"..."} (src/kassenbon.ts)
+export type QrCode = { art: 'datenblatt'; token: string } | { art: 'bon'; code: string } | { art: 'kasse'; passwort: string } | { art: 'kassenbon'; code: string };
 export function qrCodeLesen(roh: unknown): QrCode | null {
   if (typeof roh !== 'string') return null;
   const text = roh.trim();
@@ -23,6 +24,9 @@ export function qrCodeLesen(roh: unknown): QrCode | null {
     }
     if (j && j.type === 'fwv-kasse-login' && typeof j.passwort === 'string' && j.passwort.length <= 100) {
       return { art: 'kasse', passwort: j.passwort };
+    }
+    if (j && j.type === 'fwv-kasse-bon' && typeof j.code === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(j.code)) {
+      return { art: 'kassenbon', code: j.code };
     }
   } catch { /* kein JSON */ }
   return null;

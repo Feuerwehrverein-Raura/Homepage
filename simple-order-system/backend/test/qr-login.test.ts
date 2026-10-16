@@ -10,6 +10,8 @@ test('qrCodeLesen: Datenblatt, Bon-Adresse, fremde Codes', () => {
   assert.equal(lesen('https://evil.ch/anmelden.html?code=AbCdEfGhIjKlMnOpQrStUvWx'), null);
   assert.equal(lesen('https://www.fwv-raura.ch.evil.ch/anmelden.html?code=AbCdEfGhIjKlMnOpQrStUvWx'), null);
   assert.deepEqual(lesen('{"v":1,"type":"fwv-kasse-login","passwort":"abcd-efgh"}'), { art: 'kasse', passwort: 'abcd-efgh' });
+  assert.deepEqual(lesen('{"v":1,"type":"fwv-kasse-bon","code":"AbCdEfGhIjKlMnOpQrStUvWx"}'), { art: 'kassenbon', code: 'AbCdEfGhIjKlMnOpQrStUvWx' });
+  assert.equal(lesen('{"type":"fwv-kasse-bon","code":"kurz"}'), null);
   assert.equal(lesen('hallo'), null);
   assert.equal(lesen(42), null);
 });
