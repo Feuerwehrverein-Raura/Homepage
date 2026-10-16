@@ -13,6 +13,7 @@ import crypto from 'crypto';
 import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } from './anlass.js';
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
+import { escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, rezeptListe, faktorPruefen } from './bon.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
@@ -2114,38 +2115,7 @@ function tableLabel(tableNumber: number): string {
   return tableNumber === 0 ? 'BAR' : `TISCH ${tableNumber}`;
 }
 
-// XML-Sonderzeichen escapen fuer ePOS-Print
-function escapeXml(str: string): string {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// Bon-Zeile mit Wortumbruch: "1x " + Name auf Breite [breite]; Folgezeilen
-// werden auf die Laenge des Praefixes eingerueckt. Zu lange Woerter werden
-// notfalls doch geteilt.
-function bonUmbruch(praefix: string, name: string, breite: number): string[] {
-  const einzug = ' '.repeat(praefix.length);
-  const zeilen: string[] = [];
-  let zeile = praefix;
-  let leer = true;
-  for (let wort of String(name).split(/\s+/).filter(Boolean)) {
-    while (wort.length > breite - einzug.length) {
-      // Wort laenger als eine ganze Zeile: hart teilen.
-      if (!leer) { zeilen.push(zeile); zeile = einzug; }
-      zeilen.push(zeile + wort.slice(0, breite - zeile.length));
-      wort = wort.slice(breite - zeile.length);
-      zeile = einzug; leer = true;
-    }
-    if (!wort) continue;
-    if (!leer && zeile.length + 1 + wort.length > breite) {
-      zeilen.push(zeile); zeile = einzug + wort;
-    } else {
-      zeile += (leer ? '' : ' ') + wort;
-    }
-    leer = false;
-  }
-  zeilen.push(zeile);
-  return zeilen;
-}
+// escapeXml und bonUmbruch stehen in src/bon.ts (getestet).
 
 // Vereinslogo als ePOS-Rasterbild (einmal geladen). null-sicher.
 let bonLogoCache: string | null = null;
@@ -2165,6 +2135,56 @@ function bonLogoXml(): string {
   }
   return bonLogoCache;
 }
+
+// ePOS-Print-Inhalt (<text/>, <image/>, <cut/> ...) in die SOAP-Huelle packen
+// und per HTTPS an den Drucker schicken.
+function eposHuelle(inhalt: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+  <s:Body>
+    <epos-print xmlns="http://www.epson-pos.com/schemas/2011/03/epos-print">
+${inhalt}
+    </epos-print>
+  </s:Body>
+</s:Envelope>`;
+}
+
+function eposSenden(ip: string, station: string, eposXml: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: ip,
+      port: 443,
+      path: '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000',
+      method: 'POST',
+      rejectUnauthorized: false,
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'Content-Length': Buffer.byteLength(eposXml),
+        'SOAPAction': '""'
+      }
+    };
+
+    const req = https.request(options, (res: any) => {
+      let data = '';
+      res.on('data', (chunk: any) => data += chunk);
+      res.on('end', () => {
+        if (data.includes('success="true"')) {
+          console.log(`Printed to ${station} printer via ePOS (${ip})`);
+          resolve();
+        } else {
+          const codeMatch = data.match(/code="([^"]+)"/);
+          reject(new Error(`ePOS print failed: ${codeMatch ? codeMatch[1] : 'unknown error'}`));
+        }
+      });
+    });
+
+    req.on('error', (e: any) => reject(e));
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('ePOS print timeout')); });
+    req.write(eposXml);
+    req.end();
+  });
+}
+
 
 // Print via Epson ePOS-Print (HTTPS/XML) - fuer TM-m30III und neuere Modelle
 async function printViaEpos(
@@ -2226,39 +2246,7 @@ async function printViaEpos(
   </s:Body>
 </s:Envelope>`;
 
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: ip,
-      port: 443,
-      path: '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000',
-      method: 'POST',
-      rejectUnauthorized: false,
-      headers: {
-        'Content-Type': 'text/xml; charset=utf-8',
-        'Content-Length': Buffer.byteLength(eposXml),
-        'SOAPAction': '""'
-      }
-    };
-
-    const req = https.request(options, (res: any) => {
-      let data = '';
-      res.on('data', (chunk: any) => data += chunk);
-      res.on('end', () => {
-        if (data.includes('success="true"')) {
-          console.log(`Printed to ${station} printer via ePOS (${ip})`);
-          resolve();
-        } else {
-          const codeMatch = data.match(/code="([^"]+)"/);
-          reject(new Error(`ePOS print failed: ${codeMatch ? codeMatch[1] : 'unknown error'}`));
-        }
-      });
-    });
-
-    req.on('error', (e: any) => reject(e));
-    req.setTimeout(15000, () => { req.destroy(); reject(new Error('ePOS print timeout')); });
-    req.write(eposXml);
-    req.end();
-  });
+  return eposSenden(ip, station, eposXml);
 }
 
 // Print via Raw TCP (ESC/POS) - fuer TM-T20III und aeltere Modelle
@@ -2441,6 +2429,100 @@ function meldeDruckfehler(druckfehler: Druckfehler[], orderId: number) {
 const paymentService = new PaymentService();
 
 // Routes: Terminal Status & Pairing
+// ---------------------------------------------------------------------------
+// Rezepte auf den Bondrucker (Oktober 2026)
+//
+// Rezepte, die an einem Anlass dazukommen, liegen im Inventar
+// (recipes/recipe_ingredients) und sind dort per event_recipes.event_slug an
+// den Anlass geknuepft. Die Kasse kennt den Slug ihres aktuellen Anlasses
+// von api-events (/events/kasse/aktuell -> slug).
+//   GET  /api/rezepte                 Rezepte des aktuellen Anlasses
+//   POST /api/rezepte/:id/drucken     { station?: 'kitchen'|'bar', anzahl? }
+// Bon-Aufbau: src/bon.ts (rezeptBonXml / rezeptBonText).
+// ---------------------------------------------------------------------------
+
+function inventarHolen(pfad: string): Promise<any> {
+  return fetch(`${INVENTORY_API_URL}${pfad}`, {
+    headers: { 'X-Order-API-Key': ORDER_API_KEY!, Accept: 'application/json' },
+    signal: AbortSignal.timeout(6000),
+  }) as any;
+}
+
+app.get('/api/rezepte', async (req, res) => {
+  try {
+    const stand = await anlassErmittler.ermitteln();
+    const a = stand.anlass;
+    const anlass = a ? { id: a.id, titel: a.titel } : null;
+    if (!a || !a.slug) return res.json({ anlass, rezepte: [] });
+    const r = await inventarHolen(`/api/events/${encodeURIComponent(a.slug)}/recipes`);
+    if (!r.ok) throw new Error(`Inventar antwortete ${r.status}`);
+    res.json({ anlass, rezepte: rezeptListe(await r.json()) });
+  } catch (err: any) {
+    console.error('GET /api/rezepte:', err?.message || err);
+    res.status(502).json({ error: 'Rezepte konnten nicht geladen werden (Inventar nicht erreichbar)' });
+  }
+});
+
+// Textfassung auf einen raw/ESC-POS-Drucker.
+function rezeptViaRawTcp(printerConfig: { ip: string; port: number }, zeilen: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const device = new Network(printerConfig.ip, printerConfig.port);
+    const printer = new escpos.Printer(device);
+    device.open((err: any) => {
+      if (err) { reject(err); return; }
+      try {
+        printer.font('a').align('ct').style('b').size(2, 2).text(zeilen[0]).size(1, 1).align('lt').style('normal');
+        for (const z of zeilen.slice(1)) printer.text(z);
+        printer.text('').cut().close(() => resolve());
+      } catch (e) {
+        device.close(() => {});
+        reject(e);
+      }
+    });
+  });
+}
+
+app.post('/api/rezepte/:rezeptId/drucken', async (req, res) => {
+  const id = Number(req.params.rezeptId);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Ungueltige Rezept-Nummer' });
+  const station = req.body?.station === undefined || req.body?.station === null || req.body?.station === ''
+    ? 'kitchen' : req.body.station;
+  if (station !== 'kitchen' && station !== 'bar') return res.status(400).json({ error: 'Station muss kitchen oder bar sein' });
+  const faktor = faktorPruefen(req.body?.anzahl);
+  if (faktor === null) return res.status(400).json({ error: 'Anzahl muss eine Zahl zwischen 0 und 100 sein' });
+
+  let rezept;
+  try {
+    const r = await inventarHolen(`/api/recipes/${id}`);
+    if (r.status === 404) return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    if (!r.ok) throw new Error(`Inventar antwortete ${r.status}`);
+    const roh: any = await r.json();
+    if (roh && roh.active === false) return res.status(404).json({ error: 'Rezept nicht gefunden' });
+    rezept = rezeptAusInventar(roh);
+    if (!rezept) return res.status(404).json({ error: 'Rezept nicht gefunden' });
+  } catch (err: any) {
+    console.error('Rezept holen:', err?.message || err);
+    return res.status(502).json({ error: 'Rezept konnte nicht geladen werden (Inventar nicht erreichbar)' });
+  }
+
+  const cfg = (await getPrinterConfig())[station];
+  const stationName = station === 'kitchen' ? 'Küche' : 'Bar';
+  if (!cfg) return res.status(409).json({ error: `Kein Drucker für ${stationName} eingerichtet` });
+
+  const anlass = anlassErmittler.gemerkt()?.anlass?.titel || null;
+  try {
+    if (cfg.protocol === 'epos') {
+      await eposSenden(cfg.ip, station, eposHuelle(rezeptBonXml(rezept, faktor, { anlass, logoXml: bonLogoXml() })));
+    } else {
+      await rezeptViaRawTcp(cfg, rezeptBonText(rezept, faktor, { anlass }));
+    }
+    res.json({ ok: true, station, rezept: { id: rezept.id, name: rezept.name }, anzahl: faktor });
+  } catch (err: any) {
+    console.error(`Rezept-Bon (${station}, ${cfg.ip}):`, err?.message || err);
+    res.status(502).json({ error: `Drucker ${stationName} nicht erreichbar: ${err?.message || err}` });
+  }
+});
+
 app.get('/api/terminal/status', async (req, res) => {
   try {
     const status = await paymentService.sumup.getTerminalStatus();

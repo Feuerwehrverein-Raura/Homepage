@@ -109,7 +109,7 @@ test('eventsQuelle: Schluessel im Kopf, Felder uebersetzt, 404 -> null', async (
     return { ok: false, status: 404, json: async () => ({}) };
   };
   const q = eventsQuelle({ baseUrl: 'http://events:3000/', schluessel: 'k', fetchFn });
-  assert.deepEqual(await q.aktuell(), { id: ID, titel: 'Chilbi 2026', beginn: 's', ende: null, ort: 'Rheinufer', twint_qr_url: null, hat_service: false });
+  assert.deepEqual(await q.aktuell(), { id: ID, titel: 'Chilbi 2026', beginn: 's', ende: null, ort: 'Rheinufer', twint_qr_url: null, hat_service: false, slug: null });
   assert.equal(await q.einer(ID2), null);
   assert.equal(await q.einer('kein-uuid'), null);
   assert.deepEqual(gesehen, [
@@ -119,6 +119,11 @@ test('eventsQuelle: Schluessel im Kopf, Felder uebersetzt, 404 -> null', async (
   const kaputt = eventsQuelle({ baseUrl: 'http://x', schluessel: 'k',
     fetchFn: async () => ({ ok: false, status: 500, json: async () => ({}) }) });
   await assert.rejects(kaputt.aktuell(), /500/);
+});
+
+test('slug: von api-events uebernommen (Rezepte im Inventar), sonst null', () => {
+  assert.equal(ausEvents({ id: ID, title: 'C', slug: 'chilbi-2026' })?.slug, 'chilbi-2026');
+  assert.equal(ausEvents({ id: ID, title: 'C' })?.slug, null);
 });
 
 test('hat_service: von api-events uebernommen, nur true zaehlt', () => {

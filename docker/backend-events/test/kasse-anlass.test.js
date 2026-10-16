@@ -95,6 +95,8 @@ test('kassenAnsicht: hat_service aus den Schichten, ohne Schichten false', () =>
     assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null, { schichten: [{ bereich: 'Service', name: 'S' }] })).hat_service, true);
     assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null, { schichten: [{ bereich: 'Bar', name: 'B' }] })).hat_service, false);
     assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null)).hat_service, false);
+    assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null, { slug: 'chilbi-2026' })).slug, 'chilbi-2026');
+    assert.equal(k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null)).slug, null);
     assert.ok(!('schichten' in k.kassenAnsicht(anlass('c', '2026-10-24 18:00', null, { schichten: [] }))), 'Schichten selbst gehen nicht an die Kasse');
 });
 

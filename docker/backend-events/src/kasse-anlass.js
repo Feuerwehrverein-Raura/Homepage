@@ -131,6 +131,8 @@ function kassenAnsicht(anlass) {
     return {
         id: anlass.id,
         title: anlass.title,
+        // slug: Schluessel der Rezepte im Inventar (event_recipes.event_slug)
+        slug: anlass.slug || null,
         start_date: anlass.start_date,
         end_date: anlass.end_date || null,
         location: anlass.location || null,

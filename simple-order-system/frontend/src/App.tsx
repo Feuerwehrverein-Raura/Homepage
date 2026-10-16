@@ -187,7 +187,9 @@ function App() {
   const [tableNumber, setTableNumber] = useState<string>('');
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<OpenOrder | null>(null);
-  const [view, setView] = useState<'order' | 'tables' | 'inventory' | 'history' | 'settings'>('order');
+  const [view, setView] = useState<'order' | 'tables' | 'inventory' | 'history' | 'rezepte' | 'settings'>('order');
+  // Rezepte des aktuellen Anlasses (Inventar) - zum Drucken auf den Bondrucker.
+  const [rezepte, setRezepte] = useState<RezeptEintrag[]>([]);
   const [allOpenOrders, setAllOpenOrders] = useState<OpenOrder[]>([]);
   const [loading, setLoading] = useState(false);
   const [token, setToken] = useState<string | null>(localStorage.getItem('order_token'));
@@ -306,7 +308,8 @@ function App() {
       // Offene Tisch-Bestellungen auch ausserhalb der Tische-Ansicht kennen:
       // Solange es welche gibt, bleibt der Reiter sichtbar.
       fetchAllOpenOrders();
-      const t = setInterval(() => { fetchTwintQr(); fetchAnlass(); fetchAllOpenOrders(); }, 60 * 1000);
+      fetchRezepte();
+      const t = setInterval(() => { fetchTwintQr(); fetchAnlass(); fetchAllOpenOrders(); fetchRezepte(); }, 60 * 1000);
       return () => clearInterval(t);
     }
   }, [token]);
@@ -314,6 +317,10 @@ function App() {
   const anlassId = anlassStand?.anlass?.id || null;
   useEffect(() => {
     if (token) fetchBeliebt();
+  }, [token, anlassId]);
+
+  useEffect(() => {
+    if (token) fetchRezepte();
   }, [token, anlassId]);
 
   useEffect(() => {
@@ -339,6 +346,20 @@ function App() {
       console.error('Failed to fetch TWINT QR:', error);
       setTwintQrUrl(VEREINS_QR_URL);
       setTwintQrAnlass(null);
+    }
+  };
+
+  // Fehler: alte Liste bleibt (Inventar kurz weg soll den Reiter nicht
+  // verschwinden lassen).
+  const fetchRezepte = async () => {
+    try {
+      const res = await fetch(`${API_URL}/rezepte`, { headers: authHeaders() });
+      if (res.ok) {
+        const d = await res.json();
+        if (Array.isArray(d?.rezepte)) setRezepte(d.rezepte);
+      }
+    } catch {
+      // Kasse laeuft ohne Rezepte weiter.
     }
   };
 
@@ -1287,6 +1308,17 @@ function App() {
             >
               📊 History
             </button>
+            {/* Rezepte nur, wenn der aktuelle Anlass welche hat. */}
+            {(rezepte.length > 0 || view === 'rezepte') && (
+              <button
+                onClick={() => { setView('rezepte'); fetchRezepte(); }}
+                className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
+                  view === 'rezepte' ? 'bg-white text-fwv-red font-bold' : 'bg-red-700 active:bg-red-800'
+                }`}
+              >
+                📖 Rezepte
+              </button>
+            )}
             <button
               onClick={() => setView('settings')}
               className={`px-4 py-3 sm:px-6 sm:py-3 rounded-lg text-sm sm:text-base whitespace-nowrap min-h-[48px] sm:min-h-[52px] touch-manipulation flex-shrink-0 font-medium ${
@@ -1301,6 +1333,8 @@ function App() {
 
       {view === 'settings' ? (
         <SettingsView token={token} onAnlass={(stand) => { anlassUebernehmen(stand); fetchTwintQr(); }} onGespeichert={fetchKachelEinstellungen} />
+      ) : view === 'rezepte' ? (
+        <RezepteView rezepte={rezepte} token={token} anlassTitel={anlassStand?.anlass?.titel || null} onRefresh={fetchRezepte} />
       ) : showHistoryView ? (
         <HistoryView data={historyData} stats={statsData} onRefresh={fetchHistory} token={token}
           anlass={historyAnlass} anlaesse={historyAnlaesse} onAnlass={setHistoryAnlass} />
@@ -2427,6 +2461,154 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+interface RezeptEintrag {
+  id: number;
+  name: string;
+  kategorie: string | null;
+  anzahl_zutaten: number | null;
+}
+
+type Station = 'kitchen' | 'bar';
+
+function stationGemerkt(): Station {
+  try { return localStorage.getItem('rezept_station') === 'bar' ? 'bar' : 'kitchen'; } catch { return 'kitchen'; }
+}
+
+// Faktor -/+: unter 1 nur ein halbes Rezept, sonst ganze.
+function faktorSchritt(f: number, richtung: 1 | -1): number {
+  if (richtung === -1) return f <= 1 ? 0.5 : Math.max(1, Math.ceil(f) - 1);
+  return f < 1 ? 1 : Math.min(100, Math.floor(f) + 1);
+}
+
+// Rezepte des aktuellen Anlasses auf den Bondrucker (POST /api/rezepte/:id/drucken).
+function RezepteView({ rezepte, token, anlassTitel, onRefresh }: {
+  rezepte: RezeptEintrag[]; token: string | null; anlassTitel: string | null; onRefresh: () => void;
+}) {
+  const [offen, setOffen] = useState<RezeptEintrag | null>(null);
+  const [station, setStation] = useState<Station>(stationGemerkt);
+  const [faktor, setFaktor] = useState(1);
+  const [druckt, setDruckt] = useState(false);
+  const laeuft = useRef(false);
+  const [meldung, setMeldung] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const oeffnen = (r: RezeptEintrag) => { setOffen(r); setFaktor(1); setMeldung(null); };
+
+  const drucken = async () => {
+    if (!offen || laeuft.current) return; // Doppeltipp-Schutz
+    laeuft.current = true;
+    setDruckt(true);
+    setMeldung(null);
+    try { localStorage.setItem('rezept_station', station); } catch { /* egal */ }
+    try {
+      const res = await fetch(`${API_URL}/rezepte/${offen.id}/drucken`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ station, anzahl: faktor }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMeldung({ ok: true, text: `Gedruckt: ${offen.name} (${station === 'kitchen' ? 'Küche' : 'Bar'})` });
+        setOffen(null);
+      } else {
+        setMeldung({ ok: false, text: d.error || `Druck fehlgeschlagen (${res.status})` });
+      }
+    } catch {
+      setMeldung({ ok: false, text: 'Keine Verbindung zum Kassen-Server' });
+    } finally {
+      // Kurz gesperrt lassen, damit ein zweiter Tipp nicht gleich nochmals druckt.
+      setTimeout(() => { laeuft.current = false; setDruckt(false); }, 1500);
+    }
+  };
+
+  return (
+    <div className="max-w-3xl mx-auto p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow p-3 sm:p-4">
+        <div className="flex justify-between items-center gap-2 mb-3">
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold">Rezepte</h2>
+            {anlassTitel && <div className="text-sm text-gray-500 truncate">{anlassTitel}</div>}
+          </div>
+          <button onClick={onRefresh} className="bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded text-sm min-h-[40px] touch-manipulation">
+            Aktualisieren
+          </button>
+        </div>
+
+        {meldung && !offen && (
+          <div className={`mb-3 p-3 rounded text-sm ${meldung.ok ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+            {meldung.ok ? '✓ ' : '⚠ '}{meldung.text}
+          </div>
+        )}
+
+        {rezepte.length === 0 ? (
+          <div className="text-gray-500 py-8 text-center">Für den aktuellen Anlass sind keine Rezepte hinterlegt.</div>
+        ) : (
+          <ul className="divide-y">
+            {rezepte.map(r => (
+              <li key={r.id} className="flex items-center gap-3 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold break-words">{r.name}</div>
+                  <div className="text-xs sm:text-sm text-gray-500">
+                    {[r.kategorie, r.anzahl_zutaten !== null ? `${r.anzahl_zutaten} Zutaten` : null].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
+                <button
+                  onClick={() => oeffnen(r)}
+                  className="bg-fwv-red text-white px-4 py-2 rounded-lg font-medium min-h-[44px] touch-manipulation flex-shrink-0 active:opacity-80"
+                >
+                  🖨️ Drucken
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {offen && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[10000] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => !druckt && setOffen(null)}>
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 sm:p-6 shadow-xl" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }} onClick={e => e.stopPropagation()}>
+            <div className="text-sm text-gray-500">Rezept drucken</div>
+            <div className="text-lg font-bold mb-4 break-words">{offen.name}</div>
+
+            <div className="text-sm font-medium mb-1">Drucker</div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {(['kitchen', 'bar'] as Station[]).map(s => (
+                <button key={s} onClick={() => setStation(s)}
+                  className={`py-3 rounded-lg border-2 font-medium min-h-[48px] touch-manipulation ${station === s ? 'border-fwv-red bg-red-50 text-fwv-red' : 'border-gray-200 text-gray-700'}`}>
+                  {s === 'kitchen' ? '🍳 Küche' : '🍺 Bar'}
+                </button>
+              ))}
+            </div>
+
+            <div className="text-sm font-medium mb-1">Menge (× Rezept)</div>
+            <div className="flex items-center gap-3 mb-1">
+              <button onClick={() => setFaktor(f => faktorSchritt(f, -1))} disabled={faktor <= 0.5} aria-label="weniger"
+                className="w-14 h-12 rounded-lg bg-gray-100 text-2xl font-bold touch-manipulation disabled:opacity-40">−</button>
+              <div className="flex-1 text-center text-2xl font-bold tabular-nums">{faktor === 0.5 ? '½' : faktor}×</div>
+              <button onClick={() => setFaktor(f => faktorSchritt(f, 1))} disabled={faktor >= 100} aria-label="mehr"
+                className="w-14 h-12 rounded-lg bg-gray-100 text-2xl font-bold touch-manipulation disabled:opacity-40">+</button>
+            </div>
+            <div className="text-xs text-gray-500 mb-4">Die Zutatenmengen werden damit multipliziert.</div>
+
+            {meldung && !meldung.ok && (
+              <div className="mb-3 p-3 rounded text-sm bg-red-50 text-red-800 border border-red-200">⚠ {meldung.text}</div>
+            )}
+
+            <div className="flex gap-2">
+              <button onClick={() => setOffen(null)} disabled={druckt}
+                className="flex-1 py-3 rounded-lg bg-gray-100 font-medium min-h-[48px] touch-manipulation disabled:opacity-50">Abbrechen</button>
+              <button onClick={drucken} disabled={druckt}
+                className="flex-[2] py-3 rounded-lg bg-fwv-red text-white font-bold min-h-[48px] touch-manipulation disabled:opacity-60">
+                {druckt ? 'Druckt …' : '🖨️ Drucken'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -31,6 +31,9 @@ export interface KassenAnlass {
   // die Kasse Tische und die Bestellart "Tisch". Regel in api-events
   // (src/kasse-anlass.js hatService).
   hat_service: boolean;
+  // Schluessel des Anlasses bei den Rezepten im Inventar
+  // (event_recipes.event_slug). Fehlt bei aelterem api-events.
+  slug?: string | null;
 }
 
 export type Modus = 'automatisch' | 'manuell';
@@ -64,6 +67,7 @@ export function ausEvents(e: any): KassenAnlass | null {
     ort: e.location || null,
     twint_qr_url: e.twint_qr_url || null,
     hat_service: e.hat_service === true,
+    slug: e.slug ? String(e.slug) : null,
   };
 }
 

@@ -1035,6 +1035,7 @@ app.get('/api/events/:slug/recipes', authenticateEventAccess, async (req: Authen
       -- Rezept-Basisportionen.
       SELECT er.id AS link_id, er.notes AS link_notes,
              r.*, rc.name AS category_name,
+             (SELECT COUNT(*)::int FROM recipe_ingredients ri WHERE ri.recipe_id = r.id) AS ingredient_count,
              er.servings
       FROM event_recipes er
       JOIN recipes r ON r.id = er.recipe_id
