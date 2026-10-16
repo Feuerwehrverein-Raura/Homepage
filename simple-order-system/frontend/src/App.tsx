@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { InstallPrompt } from './InstallPrompt';
 import { QrScanner } from './QrScanner';
+import { Anmeldeseite } from './Anmeldeseite';
 import { anzeigeName, kategorienSortieren, kachelnBilden, gruppenPreis, variantenName, STANDARD_KATEGORIEN } from './kacheln';
 
 // Offline Banner Component
@@ -1448,31 +1449,13 @@ function App() {
         </div>
       );
     }
-    // Anmelden: Vereinskonto (Authentik) oder QR-Code (Datenblatt, Anmeldebon,
-    // Kassen-QR aus den Zugaengen).
+    // Anmelden wie in der Mitglieder-App (Anmeldeseite.tsx)
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl px-6 pt-4 pb-6 w-full max-w-sm text-center">
-          <img src="/logo-512.png" alt="Kasse" className="w-56 h-56 mx-auto -mb-2 object-contain" />
-          <div className="text-sm text-gray-500 mb-6">Feuerwehrverein Raura</div>
-          <button onClick={() => { setQrFehler(null); setQrOffen(true); }} disabled={qrLaeuft}
-            className="w-full py-4 rounded-xl bg-fwv-red hover:bg-red-700 text-white font-bold text-lg shadow touch-manipulation disabled:opacity-50 flex items-center justify-center gap-2">
-            <span className="text-2xl">📷</span> {qrLaeuft ? 'Anmeldung läuft…' : 'Mit QR-Code anmelden'}
-          </button>
-          <div className="text-xs text-gray-500 mt-2 mb-5">
-            Kassen-QR aus «Zugänge», Datenblatt oder Anmeldebon
-          </div>
-          <div className="flex items-center gap-3 mb-5 text-xs text-gray-400">
-            <div className="flex-1 h-px bg-gray-200" /> oder <div className="flex-1 h-px bg-gray-200" />
-          </div>
-          <button onClick={redirectToLogin}
-            className="w-full py-3 rounded-xl border-2 border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold touch-manipulation">
-            Mit Vereinskonto anmelden
-          </button>
-          {qrFehler && <div className="mt-5 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">{qrFehler}</div>}
-        </div>
+      <>
+        <Anmeldeseite logo="/logo-512.png" logoAlt="Kasse" laeuft={qrLaeuft} fehler={qrFehler}
+          onKonto={redirectToLogin} onQr={() => { setQrFehler(null); setQrOffen(true); }} />
         {qrOffen && <QrScanner onCode={qrAnmelden} onClose={() => setQrOffen(false)} />}
-      </div>
+      </>
     );
   }
 
