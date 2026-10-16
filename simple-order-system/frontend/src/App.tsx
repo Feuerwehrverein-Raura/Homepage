@@ -922,7 +922,7 @@ function App() {
   // in die Cloud erst nach zwei Fehlschlaegen (ein verlorenes Paket im WLAN
   // soll nicht hin- und herschalten).
   useEffect(() => {
-    if (!token || import.meta.env.VITE_API_URL) return;
+    if (!token || location.hostname === 'localhost') return; // Suche nicht am Entwicklungsrechner (VITE_API_URL ist im Build immer gesetzt)
     let aus = false;
     const pruefen = async () => {
       // Kassen-Token fuer den T400 holen/erneuern - nur ueber die Cloud.

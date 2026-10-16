@@ -426,7 +426,7 @@ function App() {
 
   // T400 suchen (beim Start, alle 20 s). Hin sofort, zurueck nach zwei Fehlschlaegen.
   useEffect(() => {
-    if (!sessionToken || import.meta.env.VITE_API_URL) return;
+    if (!sessionToken || location.hostname === 'localhost') return; // Suche nicht am Entwicklungsrechner (VITE_API_URL ist im Build immer gesetzt)
     let aus = false;
     const pruefen = async () => {
       if ((jwtExp(vorOrtTokenLesen()) * 1000 - Date.now()) / 86400000 < 7) {
