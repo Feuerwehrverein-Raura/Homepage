@@ -69,8 +69,54 @@ async function detectBackend() {
   console.log('Local backend not reachable, falling back to cloud');
   API_URL = CLOUD_API_URL;
   WS_URL = CLOUD_WS_URL;
+  CLOUD_API = API_URL;
+  CLOUD_WS = WS_URL;
 }
 detectBackend();
+
+// ---------------------------------------------------------------------------
+// Kueche vor Ort (T400 im Roten Schopf), Oktober 2026 - wie in der Kasse:
+// Antwortet kasse-lokal.fwv-raura.ch (nur im Schopf-Netz), arbeitet die
+// Kueche dort und sieht alle Bestellungen auch ohne Internet (der T400 holt
+// die Cloud-Bestellungen dazu). Sonst Cloud. Fuer den T400 ein Kassen-Token
+// aus der Cloud, das er ohne Internet pruefen kann.
+// ---------------------------------------------------------------------------
+let CLOUD_API = API_URL;
+let CLOUD_WS = WS_URL;
+const VOR_ORT_BASIS = 'https://kasse-lokal.fwv-raura.ch';
+const VOR_ORT_TOKEN_KEY = 'kitchen_vor_ort_token';
+const jwtExp = (t: string | null): number => {
+  try { return t ? JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp || 0 : 0; } catch { return 0; }
+};
+const vorOrtTokenLesen = (): string | null => {
+  const t = localStorage.getItem(VOR_ORT_TOKEN_KEY);
+  return t && jwtExp(t) * 1000 > Date.now() ? t : null;
+};
+const echtesFetch = window.fetch.bind(window);
+window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (url.startsWith(VOR_ORT_BASIS)) {
+    const t = vorOrtTokenLesen();
+    const h = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+    if (t && h.has('Authorization')) {
+      h.set('Authorization', `Bearer ${t}`);
+      return echtesFetch(input, { ...init, headers: h });
+    }
+  }
+  return echtesFetch(input, init);
+};
+let kuecheOrt: 'cloud' | 'lokal' = 'cloud';
+function ortSetzen(o: 'cloud' | 'lokal') {
+  kuecheOrt = o;
+  API_URL = o === 'lokal' ? `${VOR_ORT_BASIS}/api` : CLOUD_API;
+  WS_URL = o === 'lokal' ? `${VOR_ORT_BASIS.replace('https:', 'wss:')}/ws` : CLOUD_WS;
+}
+async function vorOrtErreichbar(): Promise<boolean> {
+  try {
+    const r = await echtesFetch(`${VOR_ORT_BASIS}/api/health`, { signal: AbortSignal.timeout(2500), cache: 'no-store' });
+    return r.ok && (await r.json())?.vor_ort === true;
+  } catch { return false; }
+}
 const AUTHENTIK_URL = 'https://auth.fwv-raura.ch';
 const AUTH_CLIENT_ID = 'order-system';
 const AUTH_CALLBACK_URI = 'https://fwv-raura.ch/auth-callback.html';
@@ -212,6 +258,8 @@ function App() {
   // Session auth state (Authentik OIDC)
   const [sessionToken, setSessionToken] = useState<string | null>(localStorage.getItem('kitchen_token'));
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [ort, setOrt] = useState<'cloud' | 'lokal'>(kuecheOrt);
+  const ortFehlerRef = useRef(0);
 
   // Check session token on mount + handle cross-domain callback
   useEffect(() => {
@@ -349,6 +397,36 @@ function App() {
     };
   }, [sessionToken]);
 
+  // T400 suchen (beim Start, alle 20 s). Hin sofort, zurueck nach zwei Fehlschlaegen.
+  useEffect(() => {
+    if (!sessionToken || import.meta.env.VITE_API_URL) return;
+    let aus = false;
+    const pruefen = async () => {
+      if ((jwtExp(vorOrtTokenLesen()) * 1000 - Date.now()) / 86400000 < 7) {
+        try {
+          const r = await echtesFetch(`${CLOUD_API}/auth/vor-ort-token`, {
+            method: 'POST', headers: { 'Authorization': `Bearer ${sessionToken}` }, signal: AbortSignal.timeout(8000),
+          });
+          if (r.ok) { const d = await r.json(); if (d?.token) localStorage.setItem(VOR_ORT_TOKEN_KEY, d.token); }
+        } catch { /* spaeter */ }
+      }
+      const da = !!vorOrtTokenLesen() && await vorOrtErreichbar();
+      if (aus) return;
+      const vorher = kuecheOrt;
+      if (da) { ortFehlerRef.current = 0; if (kuecheOrt !== 'lokal') ortSetzen('lokal'); }
+      else { ortFehlerRef.current += 1; if (kuecheOrt === 'lokal' && ortFehlerRef.current >= 2) ortSetzen('cloud'); }
+      if (kuecheOrt !== vorher) {
+        setOrt(kuecheOrt);
+        fetchOrders();
+        // Schliessen -> onclose verbindet neu, dann zur neuen Adresse.
+        wsRef.current?.close();
+      }
+    };
+    pruefen();
+    const t = setInterval(pruefen, 20000);
+    return () => { aus = true; clearInterval(t); };
+  }, [sessionToken]);
+
   const fetchOrders = async () => {
     try {
       const headers: HeadersInit = {};
@@ -367,7 +445,8 @@ function App() {
 
   const connectWebSocket = () => {
     // Token als Query-Param anhaengen (Browser koennen keinen WS-Header setzen).
-    const ws = new WebSocket(sessionToken ? `${WS_URL}?token=${encodeURIComponent(sessionToken)}` : WS_URL);
+    const wsToken = kuecheOrt === 'lokal' ? (vorOrtTokenLesen() || sessionToken) : sessionToken;
+    const ws = new WebSocket(wsToken ? `${WS_URL}?token=${encodeURIComponent(wsToken)}` : WS_URL);
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -649,7 +728,7 @@ function App() {
             <div className="flex items-center gap-4">
               <span className={`text-sm flex items-center gap-1 ${wsConnected ? 'text-green-400' : 'text-red-400'}`}>
                 <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-red-400 animate-pulse'}`}></span>
-                {wsConnected ? 'Live' : 'Verbinde...'}
+                {wsConnected ? 'Live' : 'Verbinde...'}{ort === 'lokal' ? ' · 📍 Schopf' : ' · ☁️ Cloud'}
               </span>
               <span className="text-xl font-bold">
                 {filteredOrders.length} offene Bestellung{filteredOrders.length !== 1 ? 'en' : ''}

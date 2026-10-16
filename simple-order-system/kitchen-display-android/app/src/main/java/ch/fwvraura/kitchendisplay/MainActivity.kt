@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
     companion object {
         private const val TAG = "MainActivity"
         private const val POLL_MS = 30_000L
+        private const val ORT_MS = 20_000L
         private const val WATCHDOG_MS = 15_000L
         private const val STALE_MS = 60_000L
         private const val RELOAD_MS = 10 * 60_000L
@@ -142,6 +143,7 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         handler.postDelayed(tokenRunnable, 5_000)
         handler.postDelayed(updateRunnable, 15_000)
         handler.postDelayed(minuteTicker, 60_000)
+        handler.postDelayed(ortRunnable, ORT_MS)
     }
 
     override fun onPause() {
@@ -281,7 +283,8 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
 
     private fun showConnectionState() {
         val connected = webSocketManager?.isConnected == true
-        connectionStatus.text = getString(if (connected) R.string.connected else R.string.connecting)
+        connectionStatus.text = getString(if (connected) R.string.connected else R.string.connecting) +
+            getString(if (serverUrl == ServerDetector.LOCAL_URL) R.string.ort_schopf else R.string.ort_cloud)
         connectionStatus.setTextColor(
             ContextCompat.getColor(this, if (connected) R.color.accent else R.color.warning)
         )
@@ -326,6 +329,33 @@ class MainActivity : AppCompatActivity(), WebSocketManager.WebSocketListener {
         webSocketManager = WebSocketManager(url, this, token).also { it.connect() }
         fetchOrders()
         showConnectionState()
+    }
+
+    // T400 im Schopf laufend suchen: hin sofort, zurueck in die Cloud erst
+    // nach zwei Fehlschlaegen (ein verlorenes Paket soll nicht umschalten).
+    private var ortFehler = 0
+    private val ortRunnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            mainScope.launch {
+                val configured = Kiosk.serverUrl(this@MainActivity)
+                val detected = ServerDetector.detectServer(configured)
+                if (!running) return@launch
+                val lokal = detected == ServerDetector.LOCAL_URL
+                if (lokal) ortFehler = 0 else ortFehler++
+                val ziel = when {
+                    lokal && serverUrl != detected -> detected
+                    !lokal && serverUrl == ServerDetector.LOCAL_URL && ortFehler >= 2 -> configured
+                    else -> null
+                }
+                if (ziel != null) {
+                    Log.d(TAG, "Ort gewechselt: $serverUrl -> $ziel")
+                    serverUrl = ziel
+                    connectTo(ziel, tokenManager.getToken())
+                }
+            }
+            handler.postDelayed(this, ORT_MS)
+        }
     }
 
     private val pollRunnable = object : Runnable {
