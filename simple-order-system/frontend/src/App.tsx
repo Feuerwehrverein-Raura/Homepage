@@ -47,8 +47,8 @@ function OfflineBanner({ apiUrl }: { apiUrl: string }) {
   return (
     <div className="bg-red-600 text-white px-4 py-2 text-center text-sm font-medium">
       {!isOnline
-        ? '⚠️ Keine Internetverbindung'
-        : '⚠️ Server nicht erreichbar - Bestellungen werden nicht verarbeitet'}
+        ? '⚠️ Keine Internetverbindung - Bar-Bestellungen werden zwischengespeichert und nachgesendet'
+        : '⚠️ Server nicht erreichbar - Bar-Bestellungen werden zwischengespeichert und nachgesendet, Tische gehen erst wieder mit Verbindung'}
     </div>
   );
 }
@@ -180,6 +180,44 @@ function bargeldKnoepfe(total: number): number[] {
 // keinen eigenen TWINT-QR hat oder nichts erreichbar ist.
 const VEREINS_QR_URL = '/twint-qr.png';
 
+// ---------------------------------------------------------------------------
+// Puffer fuer schlechte Verbindung (Oktober 2026)
+//
+// Bar-Bestellungen (ohne Tisch) gehen nicht verloren, wenn das Netz im Schopf
+// hustet: Kommt keine Antwort (Zeitlimit, kein Netz, Server 5xx), landet die
+// Bestellung im localStorage und die Kasse arbeitet weiter (Zahlfenster mit
+// lokaler Nummer < 0). Ein Takt sendet nach; die Bestellreferenz (client_ref)
+// sorgt dafuer, dass eine doch angekommene Bestellung nicht doppelt gebucht
+// wird. Zahlungen, die nicht ankamen, werden ebenso nachgereicht.
+// Bons fuer Kueche/Bar kommen erst beim Nachsenden aus dem Drucker.
+// ---------------------------------------------------------------------------
+type PufferEintrag =
+  | { art: 'bestellung'; ref: string; lokaleId: number; body: any; total: number; erstellt: number; serverId?: number; zahlung?: string }
+  | { art: 'zahlung'; ref: string; orderId: number; zahlung: string; erstellt: number };
+
+const PUFFER_KEY = 'kasse_puffer';
+const pufferLesen = (): PufferEintrag[] => {
+  try { const d = JSON.parse(localStorage.getItem(PUFFER_KEY) || '[]'); return Array.isArray(d) ? d : []; } catch { return []; }
+};
+const pufferSchreiben = (l: PufferEintrag[]) => {
+  try { localStorage.setItem(PUFFER_KEY, JSON.stringify(l)); } catch { /* voll/gesperrt */ }
+};
+const neueRef = (): string => {
+  try { if (crypto?.randomUUID) return crypto.randomUUID(); } catch { /* alt */ }
+  return 'k' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+};
+// Noch offen = nicht ganz beim Server (Bestellung ohne serverId oder Zahlung offen).
+const pufferOffen = (l: PufferEintrag[]) =>
+  l.filter(e => e.art === 'zahlung' || !e.serverId || !!e.zahlung).length;
+// fetch mit Zeitlimit (AbortSignal.timeout fehlt in aelteren WebViews).
+const fetchMitLimit = (url: string, init: RequestInit, ms: number): Promise<Response> => {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+};
+// Anzeige der Bestellnummer: lokale (gepufferte) Bestellungen haben noch keine.
+const bestellNr = (id: number) => (id > 0 ? `#${id}` : '(wartet auf Verbindung)');
+
 function App() {
   const [items, setItems] = useState<Item[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -240,6 +278,9 @@ function App() {
   // Doppeltipp-Schutz fuers Anlegen: state allein reicht nicht, zwei Tipps
   // im selben Augenblick saehen beide noch loading=false.
   const sendetRef = useRef(false);
+  // Gepufferte Bestellungen/Zahlungen (siehe PufferEintrag)
+  const [pufferAnzahl, setPufferAnzahl] = useState(() => pufferOffen(pufferLesen()));
+  const pufferLaeuftRef = useRef(false);
   // History: Filter nach Anlass ('' = alle, 'ohne' = ohne Anlass, sonst event_id)
   const [historyAnlass, setHistoryAnlass] = useState<string>('');
   const [historyAnlaesse, setHistoryAnlaesse] = useState<{ event_id: string; event_titel: string | null; bestellungen: number; umsatz: string }[]>([]);
@@ -647,6 +688,103 @@ function App() {
     ));
   };
 
+  // Zahlung an den Server; ohne Verbindung in den Puffer. Lokale Bestellung
+  // (id < 0): Zahlung am Puffer-Eintrag merken, der Takt reicht sie nach.
+  // Liefert false nur bei klarer Ablehnung durch den Server.
+  const bezahltMelden = async (orderId: number, zahlung: string): Promise<boolean> => {
+    if (orderId < 0) {
+      const l = pufferLesen();
+      const e = l.find(x => x.art === 'bestellung' && x.lokaleId === orderId);
+      if (e && e.art === 'bestellung') e.zahlung = zahlung;
+      pufferSchreiben(l);
+      setPufferAnzahl(pufferOffen(l));
+      pufferSenden();
+      return true;
+    }
+    try {
+      const res = await fetchMitLimit(`${API_URL}/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ status: 'paid', payment_method: zahlung }),
+      }, 10000);
+      if (res.ok) return true;
+      if (res.status < 500) return false;
+    } catch { /* kein Netz -> Puffer */ }
+    const l = pufferLesen();
+    l.push({ art: 'zahlung', ref: neueRef(), orderId, zahlung, erstellt: Date.now() });
+    pufferSchreiben(l);
+    setPufferAnzahl(pufferOffen(l));
+    return true;
+  };
+
+  // Puffer nachsenden (Takt, 'online'-Ereignis, nach jeder Zahlung).
+  const pufferSenden = async () => {
+    if (pufferLaeuftRef.current || !token) return;
+    pufferLaeuftRef.current = true;
+    const kopf = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+    try {
+      for (const e of pufferLesen()) {
+        let fertig = false;
+        let neu: Partial<PufferEintrag> = {};
+        if (e.art === 'bestellung') {
+          let serverId = e.serverId;
+          if (!serverId) {
+            const r = await fetchMitLimit(`${API_URL}/orders`, { method: 'POST', headers: kopf, body: JSON.stringify(e.body) }, 20000);
+            if (!r.ok) {
+              // 4xx ausser Anmeldung: Server will die Bestellung nicht -> sichtbar machen, nicht ewig wiederholen.
+              if (r.status >= 400 && r.status < 500 && r.status !== 401 && r.status !== 403) {
+                console.error('Gepufferte Bestellung abgelehnt', r.status, e);
+                alert(`Eine gepufferte Bestellung (CHF ${e.total.toFixed(2)}) wurde vom Server abgelehnt (${r.status}). Bitte von Hand nachbuchen.`);
+                fertig = true;
+              } else break;
+            } else {
+              const d = await r.json().catch(() => null);
+              serverId = d?.id;
+              if (d?.druckfehler?.length) setDruckWarnung({ orderId: d.id, fehler: d.druckfehler });
+              neu = { serverId };
+            }
+          }
+          if (serverId && e.zahlung) {
+            const r = await fetchMitLimit(`${API_URL}/orders/${serverId}/status`, {
+              method: 'PUT', headers: kopf, body: JSON.stringify({ status: 'paid', payment_method: e.zahlung }),
+            }, 10000);
+            if (r.ok || (r.status >= 400 && r.status < 500 && r.status !== 401 && r.status !== 403)) fertig = true;
+            else break;
+          } else if (serverId && Date.now() - e.erstellt > 12 * 3600000) {
+            fertig = true; // nie bezahlt gemeldet, Zuordnung nicht mehr gebraucht
+          }
+        } else {
+          const r = await fetchMitLimit(`${API_URL}/orders/${e.orderId}/status`, {
+            method: 'PUT', headers: kopf, body: JSON.stringify({ status: 'paid', payment_method: e.zahlung }),
+          }, 10000);
+          if (r.ok || (r.status >= 400 && r.status < 500 && r.status !== 401 && r.status !== 403)) fertig = true;
+          else break;
+        }
+        // Frisch lesen: waehrenddessen kann die Kasse neue Eintraege angelegt haben.
+        const l = pufferLesen();
+        const i = l.findIndex(x => x.ref === e.ref);
+        if (i >= 0) {
+          if (fertig) l.splice(i, 1); else l[i] = { ...l[i], ...neu } as PufferEintrag;
+          pufferSchreiben(l);
+        }
+        setPufferAnzahl(pufferOffen(l));
+      }
+    } catch {
+      // weiter kein Netz - naechster Takt
+    } finally {
+      pufferLaeuftRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+    pufferSenden();
+    const t = setInterval(pufferSenden, 15000);
+    const online = () => pufferSenden();
+    window.addEventListener('online', online);
+    return () => { clearInterval(t); window.removeEventListener('online', online); };
+  }, [token]);
+
   const handlePayment = async (method: 'bar' | 'sumup') => {
     if (!pendingOrder) return;
 
@@ -666,15 +804,10 @@ function App() {
     if (!cardPayment) return;
 
     try {
-      // Mark order as paid via API
-      await fetch(`${API_URL}/orders/${cardPayment.orderId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ status: 'paid', payment_method: 'card' }),
-      });
+      if (!(await bezahltMelden(cardPayment.orderId, 'card'))) {
+        alert('Zahlung vom Server abgelehnt. Bitte nochmals versuchen.');
+        return;
+      }
 
       setOrderConfirmation({
         orderId: cardPayment.orderId,
@@ -708,15 +841,10 @@ function App() {
     if (!cashPayment) return;
 
     try {
-      // Mark order as paid via API
-      await fetch(`${API_URL}/orders/${cashPayment.orderId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ status: 'paid', payment_method: 'cash' }),
-      });
+      if (!(await bezahltMelden(cashPayment.orderId, 'cash'))) {
+        alert('Zahlung vom Server abgelehnt. Bitte nochmals versuchen.');
+        return;
+      }
 
       const received = parseFloat(cashPayment.received) || cashPayment.total;
       const change = received - cashPayment.total;
@@ -897,25 +1025,48 @@ function App() {
   // Neue Bestellung anlegen. Liefert { id, total } oder null; bei null ist
   // die Meldung schon gezeigt und der Warenkorb unveraendert.
   const bestellungAnlegen = async (tableNum: number): Promise<{ id: number; total: number } | null> => {
-    const orderRes = await fetch(`${API_URL}/orders`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        table_number: tableNum,
-        items: cart.map(c => ({
-          id: c.customPrice ? null : c.id,
-          quantity: c.quantity,
-          price: c.customPrice || c.price,
-          notes: c.notes,
-          item_name: anzeigeName(c.name),
-          printer_station: c.printer_station,
-          is_custom: !!c.customPrice,
-        })),
-      }),
-    });
+    const body = {
+      table_number: tableNum,
+      client_ref: neueRef(),
+      erfasst_um: new Date().toISOString(),
+      items: cart.map(c => ({
+        id: c.customPrice ? null : c.id,
+        quantity: c.quantity,
+        price: c.customPrice || c.price,
+        notes: c.notes,
+        item_name: anzeigeName(c.name),
+        printer_station: c.printer_station,
+        is_custom: !!c.customPrice,
+      })),
+    };
+    // Keine (brauchbare) Antwort: Bar-Bestellung puffern, Tisch-Bestellung
+    // nicht (die braucht die offene Bestellung vom Server).
+    const puffern = (): { id: number; total: number } | null => {
+      if (tableNum !== 0) {
+        alert('Keine Verbindung zum Server - Tisch-Bestellung nicht angelegt.\n\nDer Warenkorb bleibt erhalten - bitte nochmals versuchen.');
+        return null;
+      }
+      const lokaleId = -Date.now();
+      const l = pufferLesen();
+      l.push({ art: 'bestellung', ref: body.client_ref, lokaleId, body, total, erstellt: Date.now() });
+      pufferSchreiben(l);
+      setPufferAnzahl(pufferOffen(l));
+      return { id: lokaleId, total };
+    };
+    let orderRes: Response;
+    try {
+      orderRes = await fetchMitLimit(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(body),
+      }, 15000);
+    } catch {
+      return puffern();
+    }
+    if (orderRes.status >= 500) return puffern();
 
     let order: any = null;
     try { order = await orderRes.json(); } catch { order = null; }
@@ -1146,6 +1297,13 @@ function App() {
       {/* Offline Warning Banner */}
       <OfflineBanner apiUrl={API_URL} />
 
+      {pufferAnzahl > 0 && (
+        <div className="sticky top-0 z-40 bg-amber-500 text-white px-4 py-2 shadow flex items-center justify-center gap-3 text-sm sm:text-base">
+          <span>⏳ {pufferAnzahl} {pufferAnzahl === 1 ? 'Buchung wartet' : 'Buchungen warten'} auf Verbindung – Kasse weiter bedienen, wird automatisch nachgesendet.</span>
+          <button onClick={() => pufferSenden()} className="px-3 py-1 rounded bg-white/20 font-semibold">Jetzt senden</button>
+        </div>
+      )}
+
       {/* Nicht gedruckte Bons. Steht oben und bleibt stehen, bis jemand
           bestaetigt — ein Bon, der nie gedruckt wurde, faellt sonst erst auf,
           wenn der Gast nachfragt. */}
@@ -1190,7 +1348,7 @@ function App() {
             <div className="text-6xl mb-4">✅</div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
               {orderConfirmation.orderType === 'bar'
-                ? `Bestellung #${orderConfirmation.orderId}`
+                ? `Bestellung ${bestellNr(orderConfirmation.orderId)}`
                 : `Tisch ${orderConfirmation.tableNumber}`}
             </h2>
             <p className="text-3xl font-bold text-fwv-red mb-2">
@@ -1878,7 +2036,7 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
             <h2 className="text-2xl font-bold text-center mb-2">
-              {pendingOrder.tableNumber ? `Tisch ${pendingOrder.tableNumber}` : `Bestellung #${pendingOrder.id}`}
+              {pendingOrder.tableNumber ? `Tisch ${pendingOrder.tableNumber}` : `Bestellung ${bestellNr(pendingOrder.id)}`}
             </h2>
             <p className="text-3xl font-bold text-center text-green-600 mb-6">
               CHF {pendingOrder.total.toFixed(2)}
@@ -1950,7 +2108,7 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 max-h-[96vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-center mb-2">TWINT Zahlung</h2>
-            <p className="text-sm text-gray-600 text-center mb-3">Bestellung #{twintPayment.orderId}</p>
+            <p className="text-sm text-gray-600 text-center mb-3">Bestellung {bestellNr(twintPayment.orderId)}</p>
 
             {/* Fester Vereins-/Anlass-Code ohne Betrag: der Betrag steht gross
                 darueber, damit die zahlende Person ihn in TWINT eintippt und
@@ -1975,12 +2133,7 @@ function App() {
                 onClick={async () => {
                   // Mark as paid with TWINT
                   try {
-                    const res = await fetch(`${API_URL}/orders/${twintPayment.orderId}/status`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
-                      body: JSON.stringify({ status: 'paid', payment_method: 'twint' }),
-                    });
-                    if (!res.ok) {
+                    if (!(await bezahltMelden(twintPayment.orderId, 'twint'))) {
                       alert('Zahlung nicht gespeichert. Bitte nochmals «Zahlung erhalten» tippen.');
                       return;
                     }
@@ -2016,7 +2169,7 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 max-h-[96vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-center mb-3">
-              Barzahlung <span className="text-sm font-normal text-gray-500">· Bestellung #{cashPayment.orderId}</span>
+              Barzahlung <span className="text-sm font-normal text-gray-500">· Bestellung {bestellNr(cashPayment.orderId)}</span>
             </h2>
 
             {/* Betrag und Erhalten nebeneinander - so passt das Fenster
@@ -2143,7 +2296,7 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[96vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-center mb-2">💳 Kartenzahlung</h2>
-            <p className="text-sm text-gray-600 text-center mb-4">Bestellung #{cardPayment.orderId}</p>
+            <p className="text-sm text-gray-600 text-center mb-4">Bestellung {bestellNr(cardPayment.orderId)}</p>
 
             <div className="bg-blue-50 border-4 border-blue-500 rounded-2xl p-6 mb-6">
               <div className="text-center">

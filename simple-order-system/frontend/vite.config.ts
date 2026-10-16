@@ -42,9 +42,12 @@ export default defineConfig({
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
+              // Schwaches Netz im Schopf: nach 8 s den letzten Stand nehmen,
+              // und der bleibt 12 h (Artikel auch nach Neuladen ohne Netz).
+              networkTimeoutSeconds: 8,
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 5 // 5 minutes
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 12
               }
             }
           }

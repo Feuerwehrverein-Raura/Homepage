@@ -275,6 +275,12 @@ async function initDB() {
   await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS event_titel VARCHAR(255)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_event_id ON orders(event_id)`);
 
+  // Bestellreferenz der Kasse (Oktober 2026): Die Kasse puffert Bestellungen
+  // bei schlechter Verbindung und sendet sie nach. Kommt dieselbe Referenz
+  // zweimal (Antwort ging verloren), wird nicht doppelt gebucht.
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_ref VARCHAR(64)`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_client_ref ON orders(client_ref) WHERE client_ref IS NOT NULL`);
+
   // Sync queue for offline sync
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sync_queue (
@@ -1038,6 +1044,23 @@ app.post('/api/orders', async (req, res) => {
 
     const { table_number, items } = req.body;
 
+    // Nachgesendete Bestellung (Puffer der Kasse): schon gebucht -> dieselbe
+    // Bestellung zurueck, ohne neuen Bon und ohne zweite Lagerbuchung.
+    const clientRef = typeof req.body.client_ref === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(req.body.client_ref)
+      ? req.body.client_ref : null;
+    if (clientRef) {
+      const vorhanden = await client.query('SELECT * FROM orders WHERE client_ref = $1', [clientRef]);
+      if (vorhanden.rows.length) {
+        await client.query('ROLLBACK');
+        return res.json({ ...vorhanden.rows[0], druckfehler: [], wiederholt: true });
+      }
+    }
+    // Zeitpunkt der Erfassung auf dem Tablet (nur bei nachgesendeten, hoechstens 24 h alt).
+    const erfasst = clientRef && typeof req.body.erfasst_um === 'string' ? new Date(req.body.erfasst_um) : null;
+    // ISO in UTC; die DB rechnet in ihre Zeitzone um (wie CURRENT_TIMESTAMP).
+    const erfasstUm = erfasst && !isNaN(erfasst.getTime()) && Date.now() - erfasst.getTime() < 86400000 && erfasst.getTime() <= Date.now() + 60000
+      ? erfasst.toISOString() : null;
+
     // Calculate total
     const total = items.reduce((sum: number, item: any) =>
       sum + (item.price * item.quantity), 0
@@ -1049,8 +1072,8 @@ app.post('/api/orders', async (req, res) => {
 
     // Create order
     const orderResult = await client.query(
-      'INSERT INTO orders (table_number, total, event_id, event_titel) VALUES ($1, $2, $3, $4) RETURNING *',
-      [table_number, total, anlass ? anlass.id : null, anlass ? anlass.titel.substring(0, 255) : null]
+      'INSERT INTO orders (table_number, total, event_id, event_titel, client_ref, created_at) VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, CURRENT_TIMESTAMP)) RETURNING *',
+      [table_number, total, anlass ? anlass.id : null, anlass ? anlass.titel.substring(0, 255) : null, clientRef, erfasstUm]
     );
     const order = orderResult.rows[0];
 
@@ -1112,8 +1135,13 @@ app.post('/api/orders', async (req, res) => {
     queueOrderSync(order.id, 'create');
 
     res.json({ ...order, druckfehler });
-  } catch (error) {
+  } catch (error: any) {
     await client.query('ROLLBACK');
+    // Gleiche Referenz gleichzeitig zweimal: die andere Anfrage hat gebucht.
+    if (error?.code === '23505' && typeof req.body?.client_ref === 'string') {
+      const vorhanden = await pool.query('SELECT * FROM orders WHERE client_ref = $1', [req.body.client_ref]);
+      if (vorhanden.rows.length) return res.json({ ...vorhanden.rows[0], druckfehler: [], wiederholt: true });
+    }
     res.status(500).json({ error: 'Database error' });
   } finally {
     client.release();
