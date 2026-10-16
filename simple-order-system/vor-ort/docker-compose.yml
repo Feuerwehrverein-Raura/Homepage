@@ -46,8 +46,6 @@ services:
       USE_INVENTORY_API: "true"
       INVENTORY_API_URL: https://inventar.fwv-raura.ch
       EVENTS_API_URL: https://api.fwv-raura.ch
-      # Offene Bestellungen nicht nach 2 h stornieren, wenn die Cloud weg ist
-      ORDER_AUTO_CANCEL_HOURS: "12"
     depends_on:
       postgres:
         condition: service_healthy
