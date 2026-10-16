@@ -1,0 +1,77 @@
+# Kasse vor Ort auf dem T400 im Roten Schopf (Oktober 2026)
+#
+# Liegt auf dem T400 unter /opt/kasse. Erreichbar im Schopf-Netz unter
+# https://kasse-lokal.fwv-raura.ch (oeffentlicher DNS-Eintrag auf
+# 192.168.88.10). Die Kasse aus der Cloud findet den T400 selbst und arbeitet
+# dann hier; alles geht in die Cloud nach (backend/src/vorort.ts).
+#
+# .env (0600, nicht im Repo): DB_PASSWORD, JWT_SECRET, ORDER_API_KEY - die
+# beiden letzten MUESSEN gleich wie beim order-backend der Cloud sein.
+# Zertifikat: certs/fullchain.pem + certs/key.pem, kommen vom Vereinsserver
+# (acme.sh, DNS-Pruefung bei Hetzner), siehe README.md.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kasse
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD fehlt}
+      POSTGRES_DB: kasse
+    volumes:
+      - ./daten/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kasse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-backend:
+    image: ghcr.io/feuerwehrverein-raura/order-backend:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      KASSE_VOR_ORT: "true"
+      SYNC_SOURCE: t400
+      CLOUD_ORDER_URL: https://order.fwv-raura.ch
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: kasse
+      DB_USER: kasse
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET fehlt}
+      ORDER_API_KEY: ${ORDER_API_KEY:?ORDER_API_KEY fehlt}
+      AUTHENTIK_URL: https://auth.fwv-raura.ch
+      USE_INVENTORY_API: "true"
+      INVENTORY_API_URL: https://inventar.fwv-raura.ch
+      EVENTS_API_URL: https://api.fwv-raura.ch
+      # Offene Bestellungen nicht nach 2 h stornieren, wenn die Cloud weg ist
+      ORDER_AUTO_CANCEL_HOURS: "12"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./certs:/certs:ro
+    depends_on:
+      - order-backend
+
+  # Neue Fassungen des order-backend stuendlich (um :30, die Cloud um :00).
+  watchtower:
+    image: nickfedor/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_SCHEDULE: "0 30 * * * *"

@@ -1,0 +1,20 @@
+#!/bin/sh
+# T400: /usr/local/sbin/kasse-zertifikat-annehmen (root, 755)
+# Nimmt fullchain.pem + key.pem als tar von stdin an (vom Vereinsserver, per
+# SSH-Schluessel mit erzwungenem Befehl), prueft sie und startet Caddy neu.
+# Mehr kann dieser Schluessel nicht.
+set -eu
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+tar -xf - -C "$tmp" fullchain.pem key.pem
+# Gueltig fuer kasse-lokal und mindestens noch einen Tag
+openssl x509 -in "$tmp/fullchain.pem" -noout -checkend 86400 >/dev/null
+openssl x509 -in "$tmp/fullchain.pem" -noout -ext subjectAltName | grep -q 'DNS:kasse-lokal.fwv-raura.ch'
+# Schluessel passt zum Zertifikat
+[ "$(openssl x509 -in "$tmp/fullchain.pem" -noout -pubkey | openssl sha256)" = \
+  "$(openssl pkey -in "$tmp/key.pem" -pubout | openssl sha256)" ]
+install -m 644 -o root -g root "$tmp/fullchain.pem" /opt/kasse/certs/fullchain.pem
+install -m 600 -o root -g root "$tmp/key.pem" /opt/kasse/certs/key.pem
+cd /opt/kasse && docker compose restart caddy >/dev/null 2>&1
+logger -t heinzel "Zertifikat kasse-lokal erneuert ($(openssl x509 -in /opt/kasse/certs/fullchain.pem -noout -enddate))"
+echo ok

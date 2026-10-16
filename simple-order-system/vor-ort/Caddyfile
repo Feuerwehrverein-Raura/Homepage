@@ -1,0 +1,10 @@
+# Nur die API der Kasse; die Oberflaeche kommt aus der Cloud.
+{
+	auto_https disable_redirects
+	admin off
+}
+
+kasse-lokal.fwv-raura.ch {
+	tls /certs/fullchain.pem /certs/key.pem
+	reverse_proxy order-backend:3000
+}
