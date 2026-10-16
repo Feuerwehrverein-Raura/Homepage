@@ -13,7 +13,7 @@ import crypto from 'crypto';
 import { AnlassErmittler, eventsQuelle, twintAntwort, hatService, UUID_MUSTER } from './anlass.js';
 import { BELIEBT_SQL, beliebtListe } from './beliebt.js';
 import { anzeigeName, anzeigeNameSql } from './anzeigename.js';
-import { escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, rezeptListe, faktorPruefen } from './bon.js';
+import { escapeXml, bonUmbruch, rezeptAusInventar, rezeptBonXml, rezeptBonText, faktorPruefen } from './bon.js';
 import { authenticateToken, optionalAuth, requireRole, AuthenticatedRequest, localLogin, refreshLogin, getAuthMode, getBlockedIps, unblockIp, setSharedPassword, verifyAnyToken } from './auth.js';
 
 // Offline-/Vor-Ort-Modus (Raspberry Pi im LAN). Im Cloud-Betrieb (order.fwv-raura.ch)
@@ -2432,12 +2432,11 @@ const paymentService = new PaymentService();
 // ---------------------------------------------------------------------------
 // Rezepte auf den Bondrucker (Oktober 2026)
 //
-// Rezepte, die an einem Anlass dazukommen, liegen im Inventar
-// (recipes/recipe_ingredients) und sind dort per event_recipes.event_slug an
-// den Anlass geknuepft. Die Kasse kennt den Slug ihres aktuellen Anlasses
-// von api-events (/events/kasse/aktuell -> slug).
-//   GET  /api/rezepte                 Rezepte des aktuellen Anlasses
-//   POST /api/rezepte/:id/drucken     { station?: 'kitchen'|'bar', anzahl? }
+// Rezepte liegen im Inventar. Gedruckt wird aus dem Inventar heraus (Rezept
+// bzw. Rezepte eines Anlasses); das Inventar-Backend ruft dazu diesen
+// internen Endpoint auf, weil nur die Kasse den Bondrucker (WireGuard) kennt.
+//   POST /api/internal/rezepte/:id/drucken  { station?: 'kitchen'|'bar', anzahl?, anlass? }
+//   nur mit X-Order-API-Key (Container-zu-Container)
 // Bon-Aufbau: src/bon.ts (rezeptBonXml / rezeptBonText).
 // ---------------------------------------------------------------------------
 
@@ -2447,21 +2446,6 @@ function inventarHolen(pfad: string): Promise<any> {
     signal: AbortSignal.timeout(6000),
   }) as any;
 }
-
-app.get('/api/rezepte', async (req, res) => {
-  try {
-    const stand = await anlassErmittler.ermitteln();
-    const a = stand.anlass;
-    const anlass = a ? { id: a.id, titel: a.titel } : null;
-    if (!a || !a.slug) return res.json({ anlass, rezepte: [] });
-    const r = await inventarHolen(`/api/events/${encodeURIComponent(a.slug)}/recipes`);
-    if (!r.ok) throw new Error(`Inventar antwortete ${r.status}`);
-    res.json({ anlass, rezepte: rezeptListe(await r.json()) });
-  } catch (err: any) {
-    console.error('GET /api/rezepte:', err?.message || err);
-    res.status(502).json({ error: 'Rezepte konnten nicht geladen werden (Inventar nicht erreichbar)' });
-  }
-});
 
 // Textfassung auf einen raw/ESC-POS-Drucker.
 function rezeptViaRawTcp(printerConfig: { ip: string; port: number }, zeilen: string[]): Promise<void> {
@@ -2482,7 +2466,8 @@ function rezeptViaRawTcp(printerConfig: { ip: string; port: number }, zeilen: st
   });
 }
 
-app.post('/api/rezepte/:rezeptId/drucken', async (req, res) => {
+app.post('/api/internal/rezepte/:rezeptId/drucken', async (req, res) => {
+  if (req.headers['x-order-api-key'] !== ORDER_API_KEY) return res.status(401).json({ error: 'Invalid API key' });
   const id = Number(req.params.rezeptId);
   if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Ungueltige Rezept-Nummer' });
   const station = req.body?.station === undefined || req.body?.station === null || req.body?.station === ''
@@ -2509,7 +2494,9 @@ app.post('/api/rezepte/:rezeptId/drucken', async (req, res) => {
   const stationName = station === 'kitchen' ? 'Küche' : 'Bar';
   if (!cfg) return res.status(409).json({ error: `Kein Drucker für ${stationName} eingerichtet` });
 
-  const anlass = anlassErmittler.gemerkt()?.anlass?.titel || null;
+  // Anlass-Titel vom Inventar (Event-Ansicht), sonst der laufende Anlass.
+  const anlassBody = typeof req.body?.anlass === 'string' ? req.body.anlass.trim().slice(0, 80) : '';
+  const anlass = anlassBody || anlassErmittler.gemerkt()?.anlass?.titel || null;
   try {
     if (cfg.protocol === 'epos') {
       await eposSenden(cfg.ip, station, eposHuelle(rezeptBonXml(rezept, faktor, { anlass, logoXml: bonLogoXml() })));

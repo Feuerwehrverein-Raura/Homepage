@@ -2156,6 +2156,96 @@ function ReportsView({ items, locations, onRefresh }: { items: Item[]; locations
   );
 }
 
+// Rezept auf den Bondrucker der Kasse (Kueche/Bar). Das Inventar-Backend
+// reicht den Auftrag an die Kasse weiter, die den Drucker erreicht.
+const rundeHalb = (n: number) => Math.max(0.5, Math.round(n * 2) / 2);
+function BondruckDialog({ rezeptId, name, portionen, startFaktor = 1, anlass, token, onClose }: {
+  rezeptId: number;
+  name: string;
+  portionen?: number;
+  startFaktor?: number;
+  anlass?: string;
+  token: string;
+  onClose: () => void;
+}) {
+  const [station, setStation] = useState<'kitchen' | 'bar'>(() => {
+    try { return localStorage.getItem('rezept_station') === 'bar' ? 'bar' : 'kitchen'; } catch { return 'kitchen'; }
+  });
+  const [faktor, setFaktor] = useState(rundeHalb(startFaktor));
+  const [laeuft, setLaeuft] = useState(false);
+  const [meldung, setMeldung] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Unter 1 in halben Schritten, darueber ganze.
+  const schritt = (r: 1 | -1) => setFaktor((f) => {
+    const n = f < 1 || (f === 1 && r < 0) ? f + r * 0.5 : Math.floor(f) === f ? f + r : (r > 0 ? Math.ceil(f) : Math.floor(f));
+    return Math.min(100, Math.max(0.5, n));
+  });
+
+  const drucken = async () => {
+    if (laeuft) return;
+    setLaeuft(true);
+    setMeldung(null);
+    try { localStorage.setItem('rezept_station', station); } catch { /* egal */ }
+    try {
+      const res = await fetch(`${API_URL}/recipes/${rezeptId}/drucken`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ station, anzahl: faktor, anlass }),
+      });
+      const d = await res.json().catch(() => ({}));
+      setMeldung(res.ok
+        ? { ok: true, text: `Gedruckt (${station === 'kitchen' ? 'Küche' : 'Bar'})` }
+        : { ok: false, text: d.error || 'Drucken fehlgeschlagen' });
+    } catch {
+      setMeldung({ ok: false, text: 'Keine Verbindung' });
+    }
+    setLaeuft(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="text-sm text-gray-500">Auf Bondrucker drucken</div>
+        <h3 className="text-xl font-bold mb-4">{name}</h3>
+
+        <div className="text-sm font-medium mb-1">Drucker</div>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          {(['kitchen', 'bar'] as const).map((st) => (
+            <button key={st} onClick={() => setStation(st)}
+              className={`py-3 rounded-lg font-semibold border-2 ${station === st ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200'}`}>
+              {st === 'kitchen' ? '🍳 Küche' : '🍺 Bar'}
+            </button>
+          ))}
+        </div>
+
+        <div className="text-sm font-medium mb-1">Menge (× Rezept)</div>
+        <div className="flex items-center gap-3 mb-1">
+          <button onClick={() => schritt(-1)} className="w-12 h-12 rounded-lg bg-gray-100 text-2xl font-bold">−</button>
+          <div className="flex-1 text-center text-2xl font-bold">{faktor}×</div>
+          <button onClick={() => schritt(1)} className="w-12 h-12 rounded-lg bg-gray-100 text-2xl font-bold">+</button>
+        </div>
+        {portionen && portionen > 0 && (
+          <div className="text-center text-sm text-gray-500 mb-4">= {Math.round(portionen * faktor * 10) / 10} Portionen</div>
+        )}
+
+        {meldung && (
+          <div className={`p-3 rounded-lg mb-3 text-sm ${meldung.ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {meldung.text}
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-3 rounded-lg bg-gray-100 font-semibold">Schliessen</button>
+          <button onClick={drucken} disabled={laeuft}
+            className="flex-1 py-3 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-50">
+            {laeuft ? 'Druckt…' : '🖨️ Drucken'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Recipe View Component
 function RecipeView({ items, token, user, onLogin }: {
   items: Item[];
@@ -2171,6 +2261,7 @@ function RecipeView({ items, token, user, onLogin }: {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [druckRezept, setDruckRezept] = useState<Recipe | null>(null);
 
   const fetchCategories = async () => {
     try {
@@ -2518,6 +2609,13 @@ function RecipeView({ items, token, user, onLogin }: {
                       🍳 Zubereiten
                     </button>
                     <button
+                      onClick={() => setDruckRezept(selectedRecipe)}
+                      className="px-4 py-3 bg-gray-700 text-white rounded-lg font-semibold"
+                      title="Auf Bondrucker drucken"
+                    >
+                      🖨️
+                    </button>
+                    <button
                       onClick={() => { setEditingRecipe(selectedRecipe); setShowForm(true); setSelectedRecipe(null); }}
                       className="px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold"
                     >
@@ -2535,6 +2633,16 @@ function RecipeView({ items, token, user, onLogin }: {
             </div>
           </div>
         </div>
+      )}
+
+      {druckRezept && token && (
+        <BondruckDialog
+          rezeptId={druckRezept.id}
+          name={druckRezept.name}
+          portionen={druckRezept.servings}
+          token={token}
+          onClose={() => setDruckRezept(null)}
+        />
       )}
 
       {/* Recipe Form Modal */}
@@ -3620,6 +3728,7 @@ function EventsView({ token, user, onLogin }: { token: string | null; user: User
   const [addRecipeId, setAddRecipeId] = useState('');
   const [addServings, setAddServings] = useState('30');
   const [loading, setLoading] = useState(false);
+  const [druck, setDruck] = useState<EventRecipe | null>(null);
 
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -3763,6 +3872,11 @@ function EventsView({ token, user, onLogin }: { token: string | null; user: User
                     }}
                     className="w-20 px-2 py-1 border rounded-lg"
                   />
+                  {token && (
+                    <button onClick={() => setDruck(er)} className="text-gray-600 hover:text-gray-900 text-lg" title="Auf Bondrucker drucken">
+                      🖨️
+                    </button>
+                  )}
                   <button onClick={() => removeRecipe(er.recipe_id)} className="text-red-500 hover:text-red-700 text-sm">
                     Entfernen
                   </button>
@@ -3860,6 +3974,20 @@ function EventsView({ token, user, onLogin }: { token: string | null; user: User
           )}
         </>
       )}
+      {druck && token && (() => {
+        // Menge so, dass die am Event geplanten Portionen herauskommen.
+        const basis = allRecipes.find((r) => r.id === druck.recipe_id)?.servings || 0;
+        return (
+          <BondruckDialog
+            rezeptId={druck.recipe_id}
+            name={druck.name}
+            portionen={basis || undefined}
+            startFaktor={basis > 0 ? druck.servings / basis : 1}
+            token={token}
+            onClose={() => setDruck(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

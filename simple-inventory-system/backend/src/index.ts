@@ -910,6 +910,29 @@ app.get('/api/recipes/:id/availability', async (req, res) => {
   }
 });
 
+// Rezept auf den Bondrucker (Oktober 2026). Der Drucker haengt per WireGuard
+// an der Kasse; deshalb reicht das Inventar den Auftrag an den internen
+// Endpoint des order-backend weiter (X-Order-API-Key). Body:
+// { station?: 'kitchen'|'bar', anzahl?: Faktor des Rezepts, anlass?: Titel }
+const ORDER_INTERNAL_URL = process.env.ORDER_INTERNAL_URL || 'http://order-backend:3000';
+app.post('/api/recipes/:id/drucken', authenticateToken, async (req: AuthenticatedRequest, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Ungueltige Rezept-Nummer' });
+  try {
+    const r = await fetch(`${ORDER_INTERNAL_URL}/api/internal/rezepte/${id}/drucken`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': ORDER_API_KEY! },
+      body: JSON.stringify({ station: req.body?.station, anzahl: req.body?.anzahl, anlass: req.body?.anlass }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const daten = await r.json().catch(() => ({}));
+    res.status(r.status).json(daten);
+  } catch (err: any) {
+    console.error('Rezept drucken:', err?.message || err);
+    res.status(502).json({ error: 'Kasse nicht erreichbar - Bondrucker kann nicht angesprochen werden' });
+  }
+});
+
 // Prepare recipe (manually deduct ingredients)
 app.post('/api/recipes/:id/prepare', authenticateToken, async (req: AuthenticatedRequest, res) => {
   const client = await pool.connect();
