@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { InstallPrompt } from './InstallPrompt';
+import { QrScanner } from './QrScanner';
 
 // Offline Banner Component
 function OfflineBanner({ apiUrl }: { apiUrl: string }) {
@@ -74,6 +75,25 @@ async function generateCodeChallenge(verifier: string): Promise<string> {
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const AUTHENTIK_URL = import.meta.env.VITE_AUTHENTIK_URL || 'https://auth.fwv-raura.ch';
+// QR-Login: Datenblatt oder Anmeldebon direkt bei api-members einloesen; das
+// Mitglieder-Token akzeptiert das Inventar-Backend schon (Lager-Recht wie App).
+const MEMBERS_API_URL = 'https://api.fwv-raura.ch';
+function qrCodeLesen(roh: string): { pfad: string; body: Record<string, string> } | null {
+  const text = roh.trim();
+  if (text.startsWith('fwv-member-')) return { pfad: 'qr-login', body: { token: text } };
+  try {
+    const u = new URL(text);
+    const code = u.searchParams.get('code');
+    if (/(^|\.)fwv-raura\.ch$/.test(u.hostname) && u.pathname.endsWith('/anmelden.html') && code) {
+      return { pfad: 'code-login', body: { code } };
+    }
+  } catch { /* keine Adresse */ }
+  try {
+    const j = JSON.parse(text);
+    if (j?.type === 'fwv-member-login' && typeof j.token === 'string') return { pfad: 'qr-login', body: { token: j.token } };
+  } catch { /* kein JSON */ }
+  return null;
+}
 const CLIENT_ID = import.meta.env.VITE_AUTHENTIK_CLIENT_ID || 'inventory-system';
 const REDIRECT_URI = window.location.origin + '/auth/callback';
 
@@ -208,6 +228,7 @@ function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [token, setToken] = useState<string | null>(localStorage.getItem('inventory_token'));
+  const [qrOffen, setQrOffen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -343,6 +364,28 @@ function App() {
       setToken(null);
     }
   }, [token]);
+
+  const qrAnmelden = async (roh: string) => {
+    setQrOffen(false);
+    const c = qrCodeLesen(roh);
+    if (!c) { alert('Das ist kein Login-Code des Vereins.'); return; }
+    setAuthLoading(true);
+    try {
+      const res = await fetch(`${MEMBERS_API_URL}/auth/member/${c.pfad}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(c.body),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.token) {
+        alert(d.error || (c.pfad === 'code-login' ? 'Bon schon benutzt oder abgelaufen.' : 'Code ungültig oder gesperrt.'));
+      } else {
+        localStorage.setItem('inventory_token', d.token);
+        setToken(d.token);
+      }
+    } catch {
+      alert('Keine Verbindung - bitte nochmals versuchen.');
+    }
+    setAuthLoading(false);
+  };
 
   const login = async () => {
     const verifier = generateCodeVerifier();
@@ -554,6 +597,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {qrOffen && <QrScanner onCode={qrAnmelden} onClose={() => setQrOffen(false)} />}
       <InstallPrompt appName="Inventar" />
       {/* Offline Warning Banner */}
       <OfflineBanner apiUrl={API_URL} />
@@ -579,13 +623,23 @@ function App() {
                 Abmelden
               </button>
             ) : (
-              <button
-                onClick={login}
-                disabled={authLoading}
-                className="text-sm bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded"
-              >
-                {authLoading ? '...' : 'Anmelden'}
-              </button>
+              <span className="flex gap-1">
+                <button
+                  onClick={login}
+                  disabled={authLoading}
+                  className="text-sm bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded"
+                >
+                  {authLoading ? '...' : 'Anmelden'}
+                </button>
+                <button
+                  onClick={() => setQrOffen(true)}
+                  disabled={authLoading}
+                  className="text-sm bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded"
+                  title="Mit QR-Code anmelden (Datenblatt oder Anmeldebon)"
+                >
+                  📷 QR
+                </button>
+              </span>
             )}
           </div>
         </div>
