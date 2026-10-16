@@ -3,22 +3,31 @@
 //
 // Dasselbe Backend laeuft zweimal:
 //  - in der Cloud (order.fwv-raura.ch) wie bisher
-//  - auf dem T400 mit KASSE_VOR_ORT=true, erreichbar im Schopf-Netz unter
-//    https://kasse-lokal.fwv-raura.ch. Die Kassen-Oberflaeche (aus der Cloud
-//    geladen) prueft, ob dieser Name antwortet, und arbeitet dann lokal:
-//    Bons gehen direkt an den Drucker, auch ohne Internet.
+//  - auf dem T400 mit KASSE_VOR_ORT=true, im Schopf-Netz erreichbar unter
+//    https://kasse-lokal.fwv-raura.ch. Kasse und Kuechendisplay pruefen, ob
+//    dieser Name antwortet, und arbeiten dann dort: Bons direkt an den
+//    Drucker, Kueche sieht alles, auch ohne Internet.
 //
-// Abgleich nur in eine Richtung: Der T400 schickt jede Bestellung mit ihrem
-// ganzen Stand (Positionen, Zahlungen, Status) in die Cloud, auch spaetere
-// Aenderungen. Erkannt werden Aenderungen ueber Trigger (lokal_geaendert >
-// cloud_gesendet). Die Cloud nimmt per Upsert an (sync_source/sync_source_id),
-// druckt nichts, bucht das Lager ab und meldet neue Bestellungen dem
-// Kuechendisplay. Der alte Zwei-Wege-Sync (sync_queue) bleibt aus: Er schickte
-// nur das Anlegen (Zahlungen gingen verloren) und druckte Cloud-Bestellungen
-// vor Ort ein zweites Mal.
+// Eindeutige Nummern: Der T400 vergibt Bestell-, Positions- und
+// Zahlungsnummern ab T400_AB (die Cloud bleibt darunter). Eine Bestellung hat
+// deshalb ueberall dieselbe Nummer - auf dem Bon, in der Kasse, in der Kueche
+// - und der Abgleich kann in beide Richtungen laufen, ohne zu verwechseln:
+//  - T400 -> Cloud: Bestellungen mit geaendert > gesendet (alle 15 s)
+//  - Cloud -> T400: alles mit geaendert > Merker (alle 10 s, 30 s Ueberlappung)
+// Zusammengefuehrt wird ueberall gleich (mischen): fehlende Bestellungen,
+// Positionen und Zahlungen werden mit ihrer Nummer angelegt, Status nie
+// zurueckgestuft, "bezahlt"/"fertig" einer Position bleibt, Total = Summe.
+// Gedruckt wird nur, wo eine Bestellung entsteht - nie beim Uebernehmen.
+// Das Lager bucht nur die Cloud (beim ersten Eintreffen einer T400-Position).
 //
-// Vom T400 aus geholt (die Cloud ist fuehrend): Artikel (zwischengespeichert,
-// falls das Internet weg ist), Einstellungen, Kassen-Passwort.
+// Druckvermerk (orders.bon_fehler): NULL = noch unbekannt, '' = alle Bons
+// gedruckt, sonst die Stationen mit Fehler ("kitchen", "bar,kitchen"). Konnte
+// die Cloud einen Bon nicht drucken (z.B. WireGuard weg), druckt der T400 ihn
+// nach - aber nur bei ausdruecklichem Fehler, nie bei "unbekannt", sonst
+// kaeme er doppelt. Gedruckt gilt, sobald eine Seite '' meldet.
+//
+// "geaendert" setzen Trigger, aber nur bei echten Aenderungen - sonst wuerde
+// jede Uebernahme eine Gegen-Uebernahme ausloesen (Ping-Pong).
 // ---------------------------------------------------------------------------
 import type express from 'express';
 import type pg from 'pg';
@@ -26,16 +35,18 @@ import type pg from 'pg';
 export const VOR_ORT = process.env.KASSE_VOR_ORT === 'true';
 const CLOUD = (process.env.CLOUD_ORDER_URL || 'https://order.fwv-raura.ch').replace(/\/$/, '');
 const QUELLE = process.env.SYNC_SOURCE || 't400';
+// Nummernkreise des T400 (Cloud bleibt darunter).
+export const T400_AB = { orders: 500000, order_items: 50000000, order_payments: 50000000 };
 // Einstellungen, die nur vor Ort gelten und nie aus der Cloud kommen.
-const NUR_LOKAL = new Set(['last_cloud_sync', 'artikel_cache']);
+const NUR_LOKAL = new Set(['last_cloud_sync', 'artikel_cache', 'cloud_merker']);
 
-// Status nie zurueckstufen: Die Kueche schliesst in der Cloud ab, der T400
-// kennt das nicht und schickt weiter "paid".
+// Status nie zurueckstufen (die Kueche schliesst ab, die andere Seite kennt
+// das noch nicht und schickt weiter "paid").
 const RANG: Record<string, number> = { pending: 0, paid: 1, completed: 2, cancelled: 3 };
-export function statusMischen(cloud: string | null | undefined, lokal: string | null | undefined): string {
-  const a = cloud || 'pending';
-  const b = lokal || 'pending';
-  return (RANG[b] ?? 0) > (RANG[a] ?? 0) ? b : a;
+export function statusMischen(a: string | null | undefined, b: string | null | undefined): string {
+  const x = a || 'pending';
+  const y = b || 'pending';
+  return (RANG[y] ?? 0) > (RANG[x] ?? 0) ? y : x;
 }
 
 interface Abhaengigkeiten {
@@ -44,56 +55,274 @@ interface Abhaengigkeiten {
   orderApiKey: string;
   inventoryApiUrl: string;
   broadcast: (d: any) => void;
+  // Bon fuer die genannten Positionen drucken; liefert die Stationen mit Fehler.
+  bonDrucken: (orderId: number, tableNumber: number, items: any[]) => Promise<string[]>;
   setSetting: (k: string, v: string) => Promise<void>;
   getSetting: (k: string) => Promise<string | null>;
 }
 
 const mitLimit = (ms: number) => AbortSignal.timeout(ms);
-
-export async function vorOrtSchema(pool: pg.Pool): Promise<void> {
-  // Beide Seiten: Zuordnung der Positionen/Zahlungen beim Upsert.
-  await pool.query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS sync_source_id INTEGER`);
-  await pool.query(`ALTER TABLE order_payments ADD COLUMN IF NOT EXISTS sync_source_id INTEGER`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_sync ON orders(sync_source, sync_source_id)`);
-  if (!VOR_ORT) return;
-  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS lokal_geaendert TIMESTAMPTZ DEFAULT clock_timestamp()`);
-  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cloud_gesendet TIMESTAMPTZ`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_lokal_geaendert ON orders(lokal_geaendert)`);
-  await pool.query(`
-    CREATE OR REPLACE FUNCTION vor_ort_order_geaendert() RETURNS trigger AS $$
-    BEGIN
-      IF TG_OP = 'UPDATE' AND NEW.cloud_gesendet IS DISTINCT FROM OLD.cloud_gesendet THEN
-        NEW.lokal_geaendert := OLD.lokal_geaendert;
-      ELSE
-        NEW.lokal_geaendert := clock_timestamp();
-      END IF;
-      RETURN NEW;
-    END $$ LANGUAGE plpgsql`);
-  await pool.query(`
-    CREATE OR REPLACE FUNCTION vor_ort_kind_geaendert() RETURNS trigger AS $$
-    BEGIN
-      IF TG_OP = 'DELETE' THEN
-        UPDATE orders SET lokal_geaendert = clock_timestamp() WHERE id = OLD.order_id;
-      ELSE
-        UPDATE orders SET lokal_geaendert = clock_timestamp() WHERE id = NEW.order_id;
-      END IF;
-      RETURN NULL;
-    END $$ LANGUAGE plpgsql`);
-  await pool.query(`DROP TRIGGER IF EXISTS vor_ort_orders ON orders`);
-  await pool.query(`CREATE TRIGGER vor_ort_orders BEFORE INSERT OR UPDATE ON orders
-    FOR EACH ROW EXECUTE FUNCTION vor_ort_order_geaendert()`);
-  for (const t of ['order_items', 'order_payments']) {
-    await pool.query(`DROP TRIGGER IF EXISTS vor_ort_${t} ON ${t}`);
-    await pool.query(`CREATE TRIGGER vor_ort_${t} AFTER INSERT OR UPDATE OR DELETE ON ${t}
-      FOR EACH ROW EXECUTE FUNCTION vor_ort_kind_geaendert()`);
-  }
-}
-
 // Zeitstempel ohne Zeitzone 1:1 weitergeben (beide DBs rechnen gleich).
 const ZEIT = (s: string) => `to_char(${s}, 'YYYY-MM-DD"T"HH24:MI:SS.US')`;
 
+export async function vorOrtSchema(pool: pg.Pool): Promise<void> {
+  // Erste Fassung (16.10. vormittags) aufraeumen
+  await pool.query(`DROP TRIGGER IF EXISTS vor_ort_orders ON orders`);
+  await pool.query(`DROP TRIGGER IF EXISTS vor_ort_order_items ON order_items`);
+  await pool.query(`DROP TRIGGER IF EXISTS vor_ort_order_payments ON order_payments`);
+  await pool.query(`ALTER TABLE orders DROP COLUMN IF EXISTS lokal_geaendert`);
+  await pool.query(`ALTER TABLE orders DROP COLUMN IF EXISTS cloud_gesendet`);
+
+  // Beide Seiten: "geaendert" fuer den Abgleich
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS geaendert TIMESTAMPTZ DEFAULT clock_timestamp()`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_orders_geaendert ON orders(geaendert)`);
+  if (VOR_ORT) await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS gesendet TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS bon_fehler TEXT`);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION abgleich_order_geaendert() RETURNS trigger AS $$
+    BEGIN
+      IF TG_OP = 'UPDATE' THEN
+        -- ausdruecklich gesetzt (Position/Zahlung geaendert): uebernehmen
+        IF NEW.geaendert IS DISTINCT FROM OLD.geaendert THEN RETURN NEW; END IF;
+        -- nichts Echtes geaendert (nur gesendet/synced_at): Zeit bleibt
+        IF (to_jsonb(NEW) - ARRAY['geaendert','gesendet','synced_at']) =
+           (to_jsonb(OLD) - ARRAY['geaendert','gesendet','synced_at']) THEN RETURN NEW; END IF;
+      END IF;
+      NEW.geaendert := clock_timestamp();
+      RETURN NEW;
+    END $$ LANGUAGE plpgsql`);
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION abgleich_kind_geaendert() RETURNS trigger AS $$
+    BEGIN
+      IF TG_OP = 'DELETE' THEN
+        UPDATE orders SET geaendert = clock_timestamp() WHERE id = OLD.order_id;
+      ELSE
+        UPDATE orders SET geaendert = clock_timestamp() WHERE id = NEW.order_id;
+      END IF;
+      RETURN NULL;
+    END $$ LANGUAGE plpgsql`);
+  await pool.query(`DROP TRIGGER IF EXISTS abgleich_orders ON orders`);
+  await pool.query(`CREATE TRIGGER abgleich_orders BEFORE INSERT OR UPDATE ON orders
+    FOR EACH ROW EXECUTE FUNCTION abgleich_order_geaendert()`);
+  for (const t of ['order_items', 'order_payments']) {
+    await pool.query(`DROP TRIGGER IF EXISTS abgleich_${t} ON ${t}`);
+    await pool.query(`DROP TRIGGER IF EXISTS abgleich_${t}_upd ON ${t}`);
+    await pool.query(`CREATE TRIGGER abgleich_${t} AFTER INSERT OR DELETE ON ${t}
+      FOR EACH ROW EXECUTE FUNCTION abgleich_kind_geaendert()`);
+    await pool.query(`CREATE TRIGGER abgleich_${t}_upd AFTER UPDATE ON ${t}
+      FOR EACH ROW WHEN (OLD.* IS DISTINCT FROM NEW.*) EXECUTE FUNCTION abgleich_kind_geaendert()`);
+  }
+
+  // T400: eigene Nummernkreise
+  if (VOR_ORT) {
+    for (const [t, ab] of Object.entries(T400_AB)) {
+      await pool.query(
+        `SELECT setval(pg_get_serial_sequence($1, 'id'), GREATEST($2::bigint, (SELECT COALESCE(MAX(id), 0) FROM ${t})))`,
+        [t, ab]);
+    }
+  }
+}
+
+// Bestellung samt Positionen und Zahlungen fuer den Abgleich lesen.
+async function bestellungenLesen(db: pg.Pool | pg.PoolClient, where: string, params: any[], limit: number) {
+  const orders = (await db.query(
+    `SELECT o.id, o.client_ref, o.table_number, o.status, o.total, o.payment_method, o.event_id, o.event_titel, o.bon_fehler,
+            ${ZEIT('o.created_at')} AS created_at, o.geaendert::text AS stand
+     FROM orders o WHERE ${where} ORDER BY o.geaendert LIMIT ${limit}`, params)).rows;
+  if (!orders.length) return [];
+  const ids = orders.map((o: any) => o.id);
+  const items = (await db.query(
+    `SELECT id, order_id, item_id, item_name, quantity, price, notes, printer_station,
+            COALESCE(paid, false) AS paid, ${ZEIT('paid_at')} AS paid_at,
+            COALESCE(completed, false) AS completed, ${ZEIT('completed_at')} AS completed_at
+     FROM order_items WHERE order_id = ANY($1::int[]) ORDER BY id`, [ids])).rows;
+  const zahlungen = (await db.query(
+    `SELECT id, order_id, amount, payment_method, description, ${ZEIT('created_at')} AS created_at
+     FROM order_payments WHERE order_id = ANY($1::int[]) ORDER BY id`, [ids])).rows;
+  return orders.map((o: any) => ({
+    ...o,
+    items: items.filter((i: any) => i.order_id === o.id),
+    payments: zahlungen.filter((z: any) => z.order_id === o.id),
+  }));
+}
+
+interface MischErgebnis {
+  id: number;
+  neu: boolean;
+  neueArtikel: { id: any; quantity: number }[];
+  statusVorher: string | null;
+  statusNachher: string;
+  fertigeArtikel: number[];
+  geaendert: boolean;
+}
+
+// Druckvermerke zusammenfuehren (siehe oben).
+export function bonMischen(a: string | null | undefined, b: string | null | undefined): string | null {
+  const x = a ?? null;
+  const y = b ?? null;
+  if (x === '' || y === '') return '';
+  if (x === null) return y;
+  if (y === null) return x;
+  const yy = new Set(y.split(',').filter(Boolean));
+  return x.split(',').filter((st) => yy.has(st)).join(',');
+}
+
+// Eine Bestellung der anderen Seite einarbeiten. In einer Transaktion.
+export async function mischen(client: pg.PoolClient, b: any, quelle: string | null): Promise<MischErgebnis> {
+  const id = Number(b?.id);
+  if (!Number.isInteger(id) || id <= 0) throw new Error('ungueltige id');
+  const erg: MischErgebnis = { id, neu: false, neueArtikel: [], statusVorher: null, statusNachher: b.status || 'pending', fertigeArtikel: [], geaendert: false };
+
+  const da = (await client.query('SELECT id, status, bon_fehler, geaendert::text AS stand FROM orders WHERE id = $1 FOR UPDATE', [id])).rows[0];
+  if (!da && typeof b.client_ref === 'string' && b.client_ref) {
+    // Gepufferte Bestellung, die auf beiden Seiten angelegt wurde (Antwort
+    // ging verloren, Kasse wechselte den Ort): nur den Status abgleichen.
+    const andere = (await client.query('SELECT id, status FROM orders WHERE client_ref = $1 FOR UPDATE', [b.client_ref])).rows[0];
+    if (andere) {
+      const s = statusMischen(andere.status, b.status);
+      await client.query('UPDATE orders SET status = $1, payment_method = COALESCE(payment_method, $2) WHERE id = $3',
+        [s, b.payment_method || null, andere.id]);
+      return { ...erg, id: andere.id, statusVorher: andere.status, statusNachher: s, geaendert: s !== andere.status };
+    }
+  }
+
+  if (!da) {
+    erg.neu = true;
+    await client.query(
+      `INSERT INTO orders (id, table_number, status, total, payment_method, created_at, sync_source, sync_source_id, synced_at, event_id, event_titel, client_ref, bon_fehler)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamp, CURRENT_TIMESTAMP), $7, $1, NOW(), $8, $9, $10, $11)`,
+      [id, b.table_number ?? 0, b.status || 'pending', b.total ?? 0, b.payment_method || null, b.created_at || null,
+       quelle, b.event_id || null, b.event_titel || null, b.client_ref || null, b.bon_fehler ?? null]);
+  } else {
+    erg.statusVorher = da.status;
+    erg.statusNachher = statusMischen(da.status, b.status);
+    await client.query(
+      `UPDATE orders SET status = $1, payment_method = COALESCE($2, payment_method),
+         event_id = COALESCE(event_id, $3), event_titel = COALESCE(event_titel, $4), table_number = $5, bon_fehler = $7
+       WHERE id = $6`,
+      [erg.statusNachher, b.payment_method || null, b.event_id || null, b.event_titel || null, b.table_number ?? 0, id,
+       bonMischen(da.bon_fehler, b.bon_fehler)]);
+  }
+
+  for (const p of (Array.isArray(b.items) ? b.items : [])) {
+    const pid = Number(p.id);
+    if (!Number.isInteger(pid)) continue;
+    const alt = (await client.query('SELECT id, order_id, completed FROM order_items WHERE id = $1', [pid])).rows[0];
+    if (alt && alt.order_id !== id) continue; // gehoert zu einer anderen Bestellung - nie anfassen
+    if (alt) {
+      await client.query(
+        `UPDATE order_items SET quantity = $1, price = $2, notes = $3,
+           paid = (COALESCE(paid, false) OR $4), paid_at = COALESCE(paid_at, $5::timestamp),
+           completed = (COALESCE(completed, false) OR $6), completed_at = COALESCE(completed_at, $7::timestamp)
+         WHERE id = $8`,
+        [p.quantity, p.price, p.notes || null, !!p.paid, p.paid_at || null, !!p.completed, p.completed_at || null, pid]);
+      if (p.completed && !alt.completed) erg.fertigeArtikel.push(pid);
+    } else {
+      await client.query(
+        `INSERT INTO order_items (id, order_id, item_id, item_name, quantity, price, notes, printer_station, paid, paid_at, completed, completed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamp, $11, $12::timestamp)`,
+        [pid, id, p.item_id ?? null, p.item_name || null, p.quantity, p.price, p.notes || null, p.printer_station || 'bar',
+         !!p.paid, p.paid_at || null, !!p.completed, p.completed_at || null]);
+      if (p.item_id) erg.neueArtikel.push({ id: Number(p.item_id) || p.item_id, quantity: p.quantity });
+    }
+  }
+  for (const z of (Array.isArray(b.payments) ? b.payments : [])) {
+    const zid = Number(z.id);
+    if (!Number.isInteger(zid)) continue;
+    await client.query(
+      `INSERT INTO order_payments (id, order_id, amount, payment_method, description, created_at)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamp, CURRENT_TIMESTAMP)) ON CONFLICT (id) DO NOTHING`,
+      [zid, id, z.amount, z.payment_method || 'cash', z.description || null, z.created_at || null]);
+  }
+  // Total = Summe der Positionen (beide Seiten rechnen gleich).
+  await client.query(
+    `UPDATE orders SET total = COALESCE((SELECT SUM(price * quantity) FROM order_items WHERE order_id = $1), 0) WHERE id = $1`, [id]);
+  const nach = (await client.query('SELECT geaendert::text AS stand FROM orders WHERE id = $1', [id])).rows[0];
+  erg.geaendert = erg.neu || !da || nach.stand !== da.stand;
+  return erg;
+}
+
 export function vorOrtEinrichten(d: Abhaengigkeiten): void {
   const { app, pool, orderApiKey, broadcast } = d;
+
+  // Kueche und Kassen dieser Seite ueber Uebernommenes informieren.
+  async function melden(e: MischErgebnis): Promise<void> {
+    if (!e.geaendert) return;
+    if (e.neu) {
+      const order = (await pool.query('SELECT * FROM orders WHERE id = $1', [e.id])).rows[0];
+      const items = (await pool.query('SELECT * FROM order_items WHERE order_id = $1 ORDER BY id', [e.id])).rows;
+      if (order && order.status !== 'completed' && order.status !== 'cancelled') {
+        broadcast({ type: 'new_order', order: { ...order, items } });
+      }
+      return;
+    }
+    if (e.statusNachher === 'completed' && e.statusVorher !== 'completed') {
+      broadcast({ type: 'order_completed', order_id: e.id });
+    } else if (e.fertigeArtikel.length) {
+      broadcast({ type: 'items_completed', order_id: e.id, item_ids: e.fertigeArtikel });
+    }
+    broadcast({ type: 'order_updated', order_id: e.id, status: e.statusNachher });
+  }
+
+  // T400: Bons nachdrucken, die die Cloud ausdruecklich nicht drucken konnte.
+  async function bonNachdrucken(id: number): Promise<void> {
+    const o = (await pool.query('SELECT id, table_number, status, bon_fehler FROM orders WHERE id = $1', [id])).rows[0];
+    if (!o || !o.bon_fehler || o.status === 'cancelled') return;
+    const stationen = o.bon_fehler.split(',').filter(Boolean);
+    const items = (await pool.query(
+      'SELECT * FROM order_items WHERE order_id = $1 AND printer_station = ANY($2::text[]) ORDER BY id', [id, stationen])).rows;
+    if (!items.length) return;
+    const rest = await d.bonDrucken(id, o.table_number, items);
+    await pool.query('UPDATE orders SET bon_fehler = $1 WHERE id = $2', [rest.join(','), id]);
+    console.log(`Bon #${id} nachgedruckt (${stationen.join(',')})${rest.length ? ', weiterhin Fehler: ' + rest.join(',') : ''}`);
+  }
+
+  async function einarbeiten(liste: any[], quelle: string | null, lagerBuchen: boolean, alsGesendet: boolean) {
+    const ok: number[] = [];
+    const fehler: { id: number; meldung: string }[] = [];
+    for (const b of liste) {
+      const client = await pool.connect();
+      let e: MischErgebnis | null = null;
+      try {
+        await client.query('BEGIN');
+        // T400: offene eigene Aenderungen vor dem Mischen merken
+        let offenVorher = false;
+        if (alsGesendet) {
+          const r = (await client.query('SELECT geaendert > COALESCE(gesendet, \'epoch\') AS offen FROM orders WHERE id = $1', [b.id])).rows[0];
+          offenVorher = !!r?.offen;
+        }
+        e = await mischen(client, b, quelle);
+        // Was von der Cloud kam, nicht wieder zurueckschicken - ausser es gab
+        // vorher schon eigene, noch nicht gesendete Aenderungen.
+        if (alsGesendet && !offenVorher) {
+          await client.query('UPDATE orders SET gesendet = geaendert WHERE id = $1', [e.id]);
+        }
+        await client.query('COMMIT');
+        ok.push(b.id);
+      } catch (err: any) {
+        await client.query('ROLLBACK').catch(() => {});
+        fehler.push({ id: b?.id, meldung: String(err?.message || err) });
+        e = null;
+      } finally {
+        client.release();
+      }
+      if (!e) continue;
+      melden(e).catch(() => {});
+      if (alsGesendet && e.id < T400_AB.orders) {
+        await bonNachdrucken(e.id).catch((err) => console.error(`Nachdruck #${e?.id}:`, err?.message || err));
+      }
+      if (lagerBuchen && e.neueArtikel.length) {
+        fetch(`${d.inventoryApiUrl}/api/items/sell`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': orderApiKey },
+          body: JSON.stringify({ items: e.neueArtikel, order_id: e.id, order_source: 'kasse' }),
+          signal: mitLimit(10000),
+        }).catch((err) => console.error('Lager (Vor-Ort-Bestellung):', err?.message || err));
+      }
+    }
+    if (fehler.length) console.error('Abgleich: nicht uebernommen:', JSON.stringify(fehler));
+    return { ok, fehler };
+  }
 
   // ---- Cloud: Bestellungen vom T400 annehmen ------------------------------
   app.post('/api/internal/vor-ort/bestellungen', async (req, res) => {
@@ -101,132 +330,22 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
     const quelle = typeof req.body?.quelle === 'string' && /^[a-z0-9-]{1,40}$/.test(req.body.quelle) ? req.body.quelle : null;
     const liste = Array.isArray(req.body?.bestellungen) ? req.body.bestellungen.slice(0, 100) : null;
     if (!quelle || !liste) return res.status(400).json({ error: 'quelle und bestellungen noetig' });
-
-    const ok: number[] = [];
-    const fehler: { id: number; meldung: string }[] = [];
-    for (const b of liste) {
-      try {
-        await bestellungAnnehmen(quelle, b);
-        ok.push(b.id);
-      } catch (e: any) {
-        console.error(`Vor-Ort-Bestellung ${quelle}#${b?.id}:`, e?.message || e);
-        fehler.push({ id: b?.id, meldung: String(e?.message || e) });
-      }
-    }
-    res.json({ ok, fehler });
+    res.json(await einarbeiten(liste, quelle, true, false));
   });
 
-  async function bestellungAnnehmen(quelle: string, b: any): Promise<void> {
-    const lokaleId = Number(b?.id);
-    if (!Number.isInteger(lokaleId) || lokaleId <= 0) throw new Error('ungueltige id');
-    const client = await pool.connect();
-    let neu = false;
-    let cloudId = 0;
-    const neueArtikel: { id: number; quantity: number }[] = [];
+  // ---- Cloud: Aenderungen fuer den T400 -----------------------------------
+  app.get('/api/internal/vor-ort/aenderungen', async (req, res) => {
+    if (req.headers['x-order-api-key'] !== orderApiKey) return res.status(401).json({ error: 'Invalid API key' });
+    const seit = typeof req.query.seit === 'string' && !isNaN(Date.parse(req.query.seit)) ? req.query.seit : null;
+    if (!seit) return res.status(400).json({ error: 'seit noetig' });
     try {
-      await client.query('BEGIN');
-      let vorhanden = (await client.query(
-        'SELECT id, status FROM orders WHERE sync_source = $1 AND sync_source_id = $2 FOR UPDATE', [quelle, lokaleId])).rows[0];
-      let ueberRef = false;
-      if (!vorhanden && typeof b.client_ref === 'string' && b.client_ref) {
-        // Gepufferte Bestellung, die (auch) direkt in der Cloud gelandet ist.
-        vorhanden = (await client.query('SELECT id, status FROM orders WHERE client_ref = $1 FOR UPDATE', [b.client_ref])).rows[0];
-        if (vorhanden) {
-          ueberRef = true;
-          await client.query('UPDATE orders SET sync_source = $1, sync_source_id = $2 WHERE id = $3', [quelle, lokaleId, vorhanden.id]);
-        }
-      }
-      if (!vorhanden) {
-        neu = true;
-        const r = await client.query(
-          `INSERT INTO orders (table_number, status, total, payment_method, created_at, sync_source, sync_source_id, synced_at, event_id, event_titel, client_ref)
-           VALUES ($1, $2, $3, $4, COALESCE($5::timestamp, CURRENT_TIMESTAMP), $6, $7, NOW(), $8, $9, $10) RETURNING id`,
-          [b.table_number ?? 0, b.status || 'pending', b.total ?? 0, b.payment_method || null, b.created_at || null,
-           quelle, lokaleId, b.event_id || null, b.event_titel || null, b.client_ref || null]);
-        cloudId = r.rows[0].id;
-      } else {
-        cloudId = vorhanden.id;
-        await client.query(
-          `UPDATE orders SET status = $1, total = $2, payment_method = COALESCE($3, payment_method), synced_at = NOW(),
-             event_id = COALESCE(event_id, $4), event_titel = COALESCE(event_titel, $5), table_number = $6
-           WHERE id = $7`,
-          [statusMischen(vorhanden.status, b.status), b.total ?? 0, b.payment_method || null,
-           b.event_id || null, b.event_titel || null, b.table_number ?? 0, cloudId]);
-      }
-
-      const positionen: any[] = Array.isArray(b.items) ? b.items : [];
-      if (ueberRef) {
-        // Positionen der Cloud-Kopie in Reihenfolge den lokalen zuordnen.
-        const alt = (await client.query(
-          'SELECT id FROM order_items WHERE order_id = $1 AND sync_source_id IS NULL ORDER BY id', [cloudId])).rows;
-        const lokal = [...positionen].sort((x, y) => x.id - y.id);
-        for (let i = 0; i < Math.min(alt.length, lokal.length); i++) {
-          await client.query('UPDATE order_items SET sync_source_id = $1 WHERE id = $2', [lokal[i].id, alt[i].id]);
-        }
-      }
-      for (const p of positionen) {
-        const pid = Number(p.id);
-        if (!Number.isInteger(pid)) continue;
-        const da = (await client.query(
-          'SELECT id FROM order_items WHERE order_id = $1 AND sync_source_id = $2', [cloudId, pid])).rows[0];
-        if (da) {
-          await client.query(
-            `UPDATE order_items SET quantity = $1, price = $2, notes = $3, paid = $4, paid_at = $5,
-               completed = (COALESCE(completed, false) OR $6), completed_at = COALESCE(completed_at, $7)
-             WHERE id = $8`,
-            [p.quantity, p.price, p.notes || null, !!p.paid, p.paid_at || null, !!p.completed, p.completed_at || null, da.id]);
-        } else {
-          await client.query(
-            `INSERT INTO order_items (order_id, item_id, item_name, quantity, price, notes, printer_station, paid, paid_at, completed, completed_at, sync_source_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-            [cloudId, p.item_id ?? null, p.item_name || null, p.quantity, p.price, p.notes || null, p.printer_station || 'bar',
-             !!p.paid, p.paid_at || null, !!p.completed, p.completed_at || null, pid]);
-          if (p.item_id) neueArtikel.push({ id: Number(p.item_id) || p.item_id, quantity: p.quantity });
-        }
-      }
-      // Lokal geloeschte Positionen (Stornos) auch in der Cloud entfernen.
-      const ids = positionen.map((p) => Number(p.id)).filter(Number.isInteger);
-      await client.query(
-        'DELETE FROM order_items WHERE order_id = $1 AND sync_source_id IS NOT NULL AND NOT (sync_source_id = ANY($2::int[]))',
-        [cloudId, ids]);
-
-      for (const z of (Array.isArray(b.payments) ? b.payments : [])) {
-        const zid = Number(z.id);
-        if (!Number.isInteger(zid)) continue;
-        const da = (await client.query(
-          'SELECT id FROM order_payments WHERE order_id = $1 AND sync_source_id = $2', [cloudId, zid])).rows[0];
-        if (!da) {
-          await client.query(
-            `INSERT INTO order_payments (order_id, amount, payment_method, description, created_at, sync_source_id)
-             VALUES ($1, $2, $3, $4, COALESCE($5::timestamp, CURRENT_TIMESTAMP), $6)`,
-            [cloudId, z.amount, z.payment_method || 'cash', z.description || null, z.created_at || null, zid]);
-        }
-      }
-      await client.query('COMMIT');
-    } catch (e) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw e;
-    } finally {
-      client.release();
+      // 30 s Ueberlappung: spaet bestaetigte Transaktionen nicht verpassen.
+      const liste = await bestellungenLesen(pool, `o.geaendert > ($1::timestamptz - interval '30 seconds')`, [seit], 200);
+      res.json({ bestellungen: liste.map(({ stand, ...b }: any) => b), bis: liste.length ? liste[liste.length - 1].stand : seit, mehr: liste.length === 200 });
+    } catch (e: any) {
+      res.status(500).json({ error: String(e?.message || e) });
     }
-
-    // Nach dem Commit: Kuechendisplay und Lager (nur fuer Neues).
-    if (neu) {
-      const items = (await pool.query('SELECT * FROM order_items WHERE order_id = $1 ORDER BY id', [cloudId])).rows;
-      const order = (await pool.query('SELECT * FROM orders WHERE id = $1', [cloudId])).rows[0];
-      broadcast({ type: 'new_order', order: { ...order, items } });
-    } else {
-      broadcast({ type: 'order_updated', orderId: cloudId });
-    }
-    if (neueArtikel.length) {
-      fetch(`${d.inventoryApiUrl}/api/items/sell`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': orderApiKey },
-        body: JSON.stringify({ items: neueArtikel, order_id: cloudId, order_source: 'kasse' }),
-        signal: mitLimit(10000),
-      }).catch((e) => console.error('Lager (Vor-Ort-Bestellung):', e?.message || e));
-    }
-  }
+  });
 
   // ---- Cloud: Einstellungen fuer den T400 ---------------------------------
   app.get('/api/internal/vor-ort/einstellungen', async (req, res) => {
@@ -239,37 +358,17 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
 
   // ---- T400: Bestellungen in die Cloud schicken ---------------------------
   let sendet = false;
-  let letzterFehler = '';
+  let sendeFehler = '';
   async function senden(): Promise<void> {
     if (sendet) return;
     sendet = true;
     try {
-      const offen = (await pool.query(
-        `SELECT o.id, o.client_ref, o.table_number, o.status, o.total, o.payment_method, o.event_id, o.event_titel,
-                ${ZEIT('o.created_at')} AS created_at, o.lokal_geaendert::text AS stand
-         FROM orders o
-         WHERE o.lokal_geaendert > COALESCE(o.cloud_gesendet, 'epoch')
-         ORDER BY o.lokal_geaendert LIMIT 50`)).rows;
+      const offen = await bestellungenLesen(pool, `o.geaendert > COALESCE(o.gesendet, 'epoch')`, [], 50);
       if (!offen.length) return;
-      const ids = offen.map((o) => o.id);
-      const items = (await pool.query(
-        `SELECT id, order_id, item_id, item_name, quantity, price, notes, printer_station,
-                COALESCE(paid, false) AS paid, ${ZEIT('paid_at')} AS paid_at,
-                COALESCE(completed, false) AS completed, ${ZEIT('completed_at')} AS completed_at
-         FROM order_items WHERE order_id = ANY($1::int[]) ORDER BY id`, [ids])).rows;
-      const zahlungen = (await pool.query(
-        `SELECT id, order_id, amount, payment_method, description, ${ZEIT('created_at')} AS created_at
-         FROM order_payments WHERE order_id = ANY($1::int[]) ORDER BY id`, [ids])).rows;
-      const bestellungen = offen.map((o) => ({
-        ...o,
-        stand: undefined,
-        items: items.filter((i) => i.order_id === o.id),
-        payments: zahlungen.filter((z) => z.order_id === o.id),
-      }));
       const r = await fetch(`${CLOUD}/api/internal/vor-ort/bestellungen`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Order-API-Key': orderApiKey },
-        body: JSON.stringify({ quelle: QUELLE, bestellungen }),
+        body: JSON.stringify({ quelle: QUELLE, bestellungen: offen.map(({ stand, ...b }: any) => b) }),
         signal: mitLimit(20000),
       });
       if (!r.ok) throw new Error(`Cloud antwortete ${r.status}`);
@@ -278,16 +377,14 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
       for (const o of offen) {
         if (!gut.has(o.id)) continue;
         // Nur als gesendet markieren, wenn sich seither nichts geaendert hat.
-        await pool.query(
-          'UPDATE orders SET cloud_gesendet = $2::timestamptz WHERE id = $1 AND lokal_geaendert = $2::timestamptz',
-          [o.id, o.stand]);
+        await pool.query('UPDATE orders SET gesendet = $2::timestamptz WHERE id = $1 AND geaendert = $2::timestamptz', [o.id, o.stand]);
       }
       if (antwort.fehler?.length) console.error('Cloud lehnte Bestellungen ab:', JSON.stringify(antwort.fehler));
-      if (letzterFehler) { console.log('Cloud-Abgleich wieder in Ordnung'); letzterFehler = ''; }
+      if (sendeFehler) { console.log('Senden an die Cloud wieder in Ordnung'); sendeFehler = ''; }
     } catch (e: any) {
       const m = String(e?.message || e);
-      if (m !== letzterFehler) console.error('Cloud-Abgleich:', m);
-      letzterFehler = m;
+      if (m !== sendeFehler) console.error('Senden an die Cloud:', m);
+      sendeFehler = m;
     } finally {
       sendet = false;
     }
@@ -295,11 +392,42 @@ export function vorOrtEinrichten(d: Abhaengigkeiten): void {
   setInterval(senden, 15000);
   setTimeout(senden, 5000);
 
-  // Stand fuer Anzeige/Ampel: wie viele Bestellungen noch nicht in der Cloud sind.
+  // ---- T400: Aenderungen aus der Cloud holen ------------------------------
+  let holt = false;
+  let holFehler = '';
+  async function holen(): Promise<void> {
+    if (holt) return;
+    holt = true;
+    try {
+      for (let runde = 0; runde < 10; runde++) {
+        // Beim ersten Mal: die letzten 12 h (offene Bestellungen fuer die Kueche)
+        const seit = (await d.getSetting('cloud_merker')) || new Date(Date.now() - 12 * 3600000).toISOString();
+        const r = await fetch(`${CLOUD}/api/internal/vor-ort/aenderungen?seit=${encodeURIComponent(seit)}`, {
+          headers: { 'X-Order-API-Key': orderApiKey }, signal: mitLimit(20000),
+        });
+        if (!r.ok) throw new Error(`Cloud antwortete ${r.status}`);
+        const a: any = await r.json();
+        const liste = Array.isArray(a.bestellungen) ? a.bestellungen : [];
+        if (liste.length) await einarbeiten(liste, 'cloud', false, true);
+        if (a.bis && a.bis !== seit) await d.setSetting('cloud_merker', a.bis);
+        if (!a.mehr) break;
+      }
+      if (holFehler) { console.log('Holen aus der Cloud wieder in Ordnung'); holFehler = ''; }
+    } catch (e: any) {
+      const m = String(e?.message || e);
+      if (m !== holFehler) console.error('Holen aus der Cloud:', m);
+      holFehler = m;
+    } finally {
+      holt = false;
+    }
+  }
+  setInterval(holen, 10000);
+  setTimeout(holen, 4000);
+
+  // Stand fuer Anzeige/Ampel
   app.get('/api/vor-ort/stand', async (_req, res) => {
-    const r = await pool.query(
-      `SELECT count(*)::int AS offen FROM orders WHERE lokal_geaendert > COALESCE(cloud_gesendet, 'epoch')`);
-    res.json({ vor_ort: true, offen: r.rows[0].offen, fehler: letzterFehler || null });
+    const r = await pool.query(`SELECT count(*)::int AS offen FROM orders WHERE geaendert > COALESCE(gesendet, 'epoch')`);
+    res.json({ vor_ort: true, offen: r.rows[0].offen, senden: sendeFehler || null, holen: holFehler || null });
   });
 
   // ---- T400: Einstellungen aus der Cloud holen -----------------------------

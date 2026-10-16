@@ -705,7 +705,14 @@ if (!ORDER_API_KEY) {
 }
 
 // Kasse vor Ort (T400) und Annahme ihrer Bestellungen in der Cloud - src/vorort.ts
-vorOrtEinrichten({ app, pool, orderApiKey: ORDER_API_KEY, inventoryApiUrl: INVENTORY_API_URL, broadcast, setSetting, getSetting });
+vorOrtEinrichten({
+  app, pool, orderApiKey: ORDER_API_KEY, inventoryApiUrl: INVENTORY_API_URL, broadcast, setSetting, getSetting,
+  bonDrucken: async (orderId, tableNumber, items) => {
+    const f = await printReceipt(orderId, tableNumber, items);
+    meldeDruckfehler(f, orderId);
+    return f.filter((x) => x.art === 'fehler').map((x) => x.station);
+  },
+});
 
 // ============================================
 // GEMEINSAMES KASSEN-/KUECHEN-PASSWORT (woechentliche Rotation)
@@ -1153,6 +1160,9 @@ app.post('/api/orders', async (req, res) => {
     }
 
     meldeDruckfehler(druckfehler, order.id);
+    // Druckvermerk fuer den Abgleich (src/vorort.ts): '' = gedruckt, sonst Stationen mit Fehler
+    await pool.query('UPDATE orders SET bon_fehler = $1 WHERE id = $2',
+      [druckfehler.filter((f) => f.art === 'fehler').map((f) => f.station).join(','), order.id]).catch(() => {});
 
     // Broadcast to kitchen display
     broadcast({ type: 'new_order', order: { ...order, items } });
