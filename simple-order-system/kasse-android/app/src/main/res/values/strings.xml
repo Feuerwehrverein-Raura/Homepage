@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Kasse</string>
+    <!-- Verknuepfung App <-> order.fwv-raura.ch (Digital Asset Links) -->
+    <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://order.fwv-raura.ch\"}}]</string>
+</resources>

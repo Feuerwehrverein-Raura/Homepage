@@ -1,0 +1,8 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "ch.fwvraura.kasse",
+    "sha256_cert_fingerprints": ["D8:28:38:AC:6A:F2:7F:EE:19:97:3D:7E:70:89:E0:4D:A0:B3:5C:59:63:1D:52:C3:5A:A4:99:FC:F8:19:4B:96"]
+  }
+}]

@@ -10,6 +10,7 @@
 #
 #   mitglieder.apk  <- Release members-latest (Play-signiert, Universal-APK)
 #   kueche.apk      <- neuestes Release kds-v*  (kitchen-display-*-release.apk)
+#   kasse.apk       <- neuestes Release kasse-v* (kasse-*-release.apk)
 #   versionen.json  <- Version, SHA-256 und Stand je App (auch fuer Apps selbst)
 set -euo pipefail
 ZIEL=/opt/app-downloads/dateien
@@ -47,9 +48,11 @@ hol() {
 
 m=$(neueste members-v)
 k=$(neueste kds-v)
+ka=$(neueste kasse-v)
 eintraege=()
 eintraege+=("$(hol mitglieder members-latest '^members-latest\.apk$' "${m#members-v}")") || true
 eintraege+=("$(hol kueche "$k" '-release\.apk$' "${k#kds-v}")") || true
+if [ -n "$ka" ]; then eintraege+=("$(hol kasse "$ka" '-release\.apk$' "${ka#kasse-v}")") || true; fi
 json="{$(IFS=,; echo "${eintraege[*]}" | sed 's/^,//;s/,,*/,/g;s/,$//')}"
 echo "$json" | jq . > "$ZIEL/.versionen.neu"   # jq prueft das JSON
 chmod 644 "$ZIEL/.versionen.neu"

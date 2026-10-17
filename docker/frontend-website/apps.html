@@ -523,6 +523,10 @@
                             </svg>
                             Öffnen
                         </a>
+                        <!-- Kassen-App (Android) - Link und Version aus /download/versionen.json -->
+                        <a id="kasse-download" href="/download/kasse.apk" class="hidden mt-2 block w-full text-center border-2 border-fire-600 text-fire-700 px-6 py-3 rounded-xl font-semibold hover:bg-fire-50 transition-colors">
+                            Android-App herunterladen <span id="kasse-version" class="text-xs text-gray-500"></span>
+                        </a>
                     </div>
                 </div>
 
@@ -835,6 +839,10 @@
                 };
                 setzen('kds', v.kueche);
                 setzen('members', v.mitglieder);
+                if (v.kasse) {
+                    setzen('kasse', v.kasse);
+                    document.getElementById('kasse-download')?.classList.remove('hidden');
+                }
             } catch {
                 // Fallback: GitHub wie bisher
                 loadLatestRelease('kds');
