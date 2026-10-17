@@ -34,6 +34,11 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Kein R8: es entfernte Methoden von shared_preferences_android, die
+            // Release-App 2.0/2.1 stuerzte beim Start ab (NoSuchMethodError
+            // SharedPreferencesApiRegistrar.getAll). Die App ist klein genug.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
