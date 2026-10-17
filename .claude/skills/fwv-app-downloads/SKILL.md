@@ -1,0 +1,74 @@
+---
+name: fwv-app-downloads
+description: Android-Apps des Vereins (Mitglieder, Kueche, Kasse) zum Download auf www.fwv-raura.ch/download/ bringen und auf der Apps-Seite zeigen - neue Version releasen (Tags kds-v*, kasse-v*, members-v*), Abholung pruefen, neue App aufnehmen. Verwenden bei "APK auf die Website", "App herunterladen", "neue Kassen-/Kuechen-App", "Download geht nicht", "auf der App-Seite einbauen".
+---
+
+# App-Downloads auf www.fwv-raura.ch
+
+Die APKs liegen auf der **eigenen Website**, nicht mehr als GitHub-Link
+(die Weiterleitung auf GitHubs Dateiserver blieb auf manchen Handys bei
+100 % haengen; Android 7 kennt GitHubs neue Zertifikatskette nicht).
+
+| App | Adresse | Quelle (GitHub-Release) | Projekt |
+|---|---|---|---|
+| Mitglieder | `/download/mitglieder.apk` | `members-latest` (Play-signiert) | `flutter/mitglieder` |
+| Kueche | `/download/kueche.apk` | neuestes `kds-v*` (`*-release.apk`) | `simple-order-system/kitchen-display-android` |
+| Kasse | `/download/kasse.apk` | neuestes `kasse-v*` (`*-release.apk`) | `simple-order-system/kasse-android` |
+
+`/download/versionen.json` nennt je App Version, SHA-256 und Stand -
+`apps.html` liest daraus Link und Versionsnummer (GitHub nur als Fallback).
+
+## So kommt eine Datei dorthin
+
+Vereinsserver `docker.fwv-raura.ch`:
+- `/opt/app-downloads/holen.sh` (Quelle im Repo: `docker/app-downloads/holen.sh`),
+  systemd-Timer `app-downloads` alle 15 min. Laedt nur bei Aenderung
+  (Asset-ID + Stand in `/opt/app-downloads/stand/`).
+- Ablage `/opt/app-downloads/dateien`, im Container `fwv-frontend-website`
+  schreibgeschuetzt als `/usr/share/nginx/html/download` eingehaengt
+  (`docker-compose.prod.yml`, Server-Datei `/opt/docker/fwv-website/`).
+- nginx (`docker/frontend-website/nginx.conf`, `location ^~ /download/`):
+  Typ `application/vnd.android.package-archive` - ohne ihn erkennt Android
+  die Datei nicht als App.
+
+Sofort holen statt 15 min warten:
+```sh
+ssh stefan@docker.fwv-raura.ch 'sudo systemctl start app-downloads.service; jq -c . /opt/app-downloads/dateien/versionen.json'
+```
+
+## Neue Version einer App
+
+- **Kueche:** `git tag kds-vX.Y && git push origin kds-vX.Y`
+  (Workflow `build-android-kds.yml`, versionCode = X*1000+Y*100+Z).
+- **Kasse:** `git tag kasse-vX.Y && git push origin kasse-vX.Y`
+  (Workflow `build-android-kasse.yml`, gleiche Signatur wie die Kueche).
+- **Mitglieder:** Skill `fwv-members-release` (Tag `members-vX.Y.Z`; der
+  Workflow verschiebt `members-latest`).
+
+Danach: Build beobachten (`gh run watch`), dann Abholung starten (oben) und
+pruefen:
+```sh
+curl -sI https://www.fwv-raura.ch/download/kasse.apk | grep -i content-type
+```
+
+## Kassen-App (Trusted Web Activity)
+
+Huelle um `https://order.fwv-raura.ch/` (androidbrowserhelper **2.5.0** -
+ab 2.7 braucht es AGP 8.9/compileSdk 36, die Vereins-Apps laufen mit
+AGP 8.7.3). Damit Chrome **keine Adressleiste** zeigt, muss
+`simple-order-system/frontend/public/.well-known/assetlinks.json` den
+Fingerabdruck des Signierschluessels enthalten (Kuechen-Schluessel,
+`D8:28:38:AC:...:4B:96`, Secrets `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`,
+Alias `kds`). Pruefen: `curl https://order.fwv-raura.ch/.well-known/assetlinks.json`.
+Ein Debug-APK hat einen anderen Schluessel - dort ist die Adressleiste normal.
+
+## Neue App aufnehmen
+
+1. Release-Workflow mit eigenem Tag-Praefix (`<app>-v*`), Asset `*-release.apk`,
+   `make_latest: false` (sonst kapert es den Desktop-Updater).
+2. In `docker/app-downloads/holen.sh` eine Zeile `hol <name> "$tag" ...`
+   ergaenzen, auf den Server kopieren (`sudo install -m 755 ... /opt/app-downloads/holen.sh`).
+3. Karte in `docker/frontend-website/apps.html` (Abschnitt Android Apps,
+   Vorlage: Karte "Kasse"), Ids `<name>-download` / `<name>-version`, und in
+   `eigeneDownloads()` `setzen('<name>', v.<name>)`.
+4. Website ausliefern (Skill `fwv-website-deploy`) und Download pruefen.
